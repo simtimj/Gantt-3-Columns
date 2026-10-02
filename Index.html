@@ -1,0 +1,2719 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{
+      --border:#d9d9d9;
+      --muted:#777;
+      --bg:#f6f7f8;
+      --panel:#fff;
+      --accent:#1a73e8;
+      --done:#666;
+      --paragraph-size:10px;
+      --subtitle-size:14px;
+      --title-size:20px;
+      --paragraph-font:Arial,Helvetica,sans-serif;
+      --subtitle-font:Arial,Helvetica,sans-serif;
+      --title-font:Arial,Helvetica,sans-serif;
+      --col-today:420px;
+      --col-journal:420px;
+      --col-reference:399px;
+    }
+    *{
+      box-sizing:border-box;
+    }
+    html,
+    body{
+      margin:0;
+      height:100%;
+      overflow:hidden;
+      font-family:Arial,Helvetica,sans-serif;
+      color:#222;
+      background:var(--bg);
+    }
+    button,
+    input,
+    select{
+      font:inherit;
+    }
+    #app{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+    }
+    #toolbar{
+      min-height:36px;
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      gap:5px;
+      padding:2px 6px;
+      background:#fff;
+      border-bottom:1px solid var(--border);
+    }
+    #title{
+      font-weight:700;
+      margin-right:8px;
+      white-space:nowrap;
+    }
+    .btn{
+      border:1px solid #c9c9c9;
+      background:#fff;
+      border-radius:6px;
+      padding:4px 8px;
+      cursor:pointer;
+    }
+    .btn:hover{
+      background:#f0f0f0;
+    }
+    #dateLabel{
+      color:#666;
+      font-size:12px;
+    }
+    .status{
+      margin-left:auto;
+      color:var(--muted);
+      font-size:12px;
+    }
+    #workspace{
+      flex:1;
+      min-height:0;
+      display:grid;
+      /* Keep all three columns at usable widths. On narrow screens,
+         the whole workspace pans horizontally instead of compressing
+         or stacking the columns. */
+      grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--col-reference);
+      overflow-x:auto;
+      overflow-y:hidden;
+      scrollbar-width:none;
+    }
+    /* Single-pane focus views. Hidden panes are removed from the grid and
+       the selected pane fills the visible workspace width. */
+    #workspace.view-single{
+      grid-template-columns:minmax(0,1fr);
+      overflow-x:hidden;
+    }
+    #workspace .pane.view-hidden{
+      display:none!important;
+    }
+    #workspace.view-single .pane:not(.view-hidden){
+      width:100%;
+      min-width:0;
+      border-right:0;
+    }
+    #workspace.scrollbar-hover{
+      scrollbar-width:thin;
+      scrollbar-color:rgba(0,0,0,.38) transparent;
+    }
+    #workspace::-webkit-scrollbar{
+      width:0;
+      height:0;
+      background:transparent;
+    }
+    #workspace.scrollbar-hover::-webkit-scrollbar{
+      height:10px;
+    }
+    #workspace.scrollbar-hover::-webkit-scrollbar-thumb{
+      background:rgba(0,0,0,.38);
+      border-radius:8px;
+      border:2px solid transparent;
+      background-clip:padding-box;
+    }
+
+    .column-resizer{
+      width:1px;
+      min-width:1px;
+      position:relative;
+      cursor:col-resize;
+      background:var(--border);
+      touch-action:none;
+      z-index:20;
+    }
+    /* Keep a comfortable invisible grab target without creating a visible gap. */
+    .column-resizer::before{
+      content:"";
+      position:absolute;
+      top:0;
+      bottom:0;
+      left:-4px;
+      right:-4px;
+      cursor:col-resize;
+    }
+    .column-resizer:hover,.column-resizer.dragging{background:#9dbcf0;}
+    #workspace.view-single .column-resizer{display:none;}
+    #focusControls{
+      display:none;position:fixed;top:3px;right:8px;z-index:2000;
+      align-items:center;gap:5px;
+    }
+    #focusControls .btn,#focusControls .top-select{
+      padding:4px 7px;font-size:11px;font-weight:700;box-shadow:0 1px 5px rgba(0,0,0,.10);
+    }
+    #focusStatus{
+      color:var(--muted);font-size:11px;white-space:nowrap;
+    }
+    body.focus-mode #toolbar{display:none;}
+    body.focus-mode #focusControls{display:flex;}
+    #todayScroll{scrollbar-width:none!important;}
+    #todayScroll::-webkit-scrollbar{width:0!important;height:0!important;}
+    .pane{
+      min-width:0;
+      min-height:0;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      background:var(--panel);
+      border-right:1px solid var(--border);
+    }
+    .pane:last-child{
+      border-right:0;
+    }
+    .pane-header{
+      flex:0 0 34px;
+      display:flex;
+      align-items:center;
+      padding:0 12px;
+      font-size:14px;
+      font-weight:700;
+      background:#fafafa;
+      border-bottom:1px solid var(--border);
+    }
+    .scroll{
+      flex:1 1 0;
+      height:0;
+      min-height:0;
+      overflow-y:auto;
+      overflow-x:hidden;
+      scrollbar-width:none;
+    }
+    .scroll.scrollbar-hover{
+      scrollbar-width:thin;
+      scrollbar-color:rgba(0,0,0,.38) transparent;
+    }
+    .scroll::-webkit-scrollbar{
+      width:0;
+      height:0;
+      background:transparent;
+    }
+    .scroll::-webkit-scrollbar-track{background:transparent;}
+    .scroll::-webkit-scrollbar-thumb{background:transparent;border-radius:8px;}
+    .scroll.scrollbar-hover::-webkit-scrollbar{width:10px;height:10px;}
+    .scroll.scrollbar-hover::-webkit-scrollbar-thumb{
+      background:rgba(0,0,0,.38);
+      border:2px solid transparent;
+      background-clip:padding-box;
+      border-radius:8px;
+    }
+    .scroll.scrollbar-hover::-webkit-scrollbar-thumb:hover{
+      background:rgba(0,0,0,.58);
+      background-clip:padding-box;
+    }
+    /* =========================================================
+       DAY ROWS
+       \========================================================= */
+    .day-row{
+      border-bottom:1px solid var(--border);
+      padding:5px 8px 6px;
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      overflow:visible;
+      min-height:0;
+    }
+    .day-row.dow-1{
+      background:#eeeeee;
+    }
+    .day-row.dow-2{
+      background:#fff0df;
+    }
+    .day-row.dow-3{
+      background:#e6f1fb;
+    }
+    .day-row.dow-4{
+      background:#ead8c2;
+    }
+    .day-row.dow-5{
+      background:#fff0bd;
+    }
+    .day-row.dow-6{
+      background:#d9b98c;
+    }
+    .day-row.dow-0{
+      background:#fff4a8;
+    }
+    /*
+     * Current-day border.
+     *
+     * Both Today and Journal keep their visible outer borders.
+     * The shared middle edge is drawn ONLY by the Today cell,
+     * so the divider between the two cells is one line instead
+     * of two overlapping borders.
+     */
+    .day-row.today{
+      z-index:2;
+    }
+    .day-row.today.day-pane-row{
+      box-shadow:
+        inset 0 2px 0 var(--today-border),
+        inset 0 -2px 0 var(--today-border),
+        inset 2px 0 0 var(--today-border),
+        inset -1px 0 0 var(--today-border);
+    }
+    .day-row.today.journal-pane-row{
+      box-shadow:
+        inset 0 2px 0 var(--today-border),
+        inset 0 -2px 0 var(--today-border),
+        inset -2px 0 0 var(--today-border),
+        inset 1px 0 0 var(--today-border);
+    }
+    .day-row.today.dow-1{
+      --today-border:#8a8a8a;
+    }
+    .day-row.today.dow-2{
+      --today-border:#c98545;
+    }
+    .day-row.today.dow-3{
+      --today-border:#5f8fb9;
+    }
+    .day-row.today.dow-4{
+      --today-border:#9a6f42;
+    }
+    .day-row.today.dow-5{
+      --today-border:#b9962e;
+    }
+    .day-row.today.dow-6{
+      --today-border:#8b6237;
+    }
+    .day-row.today.dow-0{
+      --today-border:#c3a51f;
+    }
+    .day-label{
+      font-size:14px;
+      font-weight:700;
+      color:#555;
+      margin-bottom:3px;
+      user-select:none;
+    }
+    .today-pill{
+      color:var(--accent);
+      margin-left:6px;
+    }
+    .top-select{
+      border:1px solid #c9c9c9;
+      background:#fff;
+      border-radius:6px;
+      padding:4px 6px;
+      cursor:pointer;
+    }
+    /*
+     * Today and Journal always start at Paragraph size.
+     */
+    .day-editor,
+    .journal-editor{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+      line-height:1.18;
+      /* Keep an empty day cell about three text lines tall, then size to content. */
+      min-height:3.54em;
+    }
+    .editor,
+    .ref-cell{
+      width:100%;
+      min-height:16px;
+      outline:0;
+      border:0;
+      padding:0;
+      line-height:1.18;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      min-width:0;
+      background:transparent;
+    }
+    .editor:empty:before,
+    .ref-cell:empty:before{
+      content:attr(data-placeholder);
+      color:#999;
+      pointer-events:none;
+    }
+    .editor p,
+    .ref-cell p{
+      margin:0 0 1px;
+    }
+    .editor p:last-child,
+    .ref-cell p:last-child{
+      margin-bottom:0;
+    }
+    .editor h1,
+    .editor h2,
+    .editor h3,
+    .ref-cell h1,
+    .ref-cell h2,
+    .ref-cell h3{
+      margin:2px 0 1px;
+    }
+    .editor h1,
+    .ref-cell h1{
+      font-family:var(--title-font);
+      font-size:var(--title-size);
+      line-height:1.12;
+    }
+    .editor h2,
+    .ref-cell h2{
+      font-family:var(--subtitle-font);
+      font-size:var(--subtitle-size);
+      line-height:1.14;
+    }
+    .editor h3,
+    .ref-cell h3{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+      line-height:1.18;
+    }
+    .editor ul,
+    .editor ol,
+    .ref-cell ul,
+    .ref-cell ol{
+      margin:1px 0 1px 20px;
+      padding:0;
+    }
+    .editor blockquote,
+    .ref-cell blockquote{
+      margin:1px 0;
+      padding-left:10px;
+      border-left:3px solid #bbb;
+      color:#222;
+    }
+    .editor code,
+    .ref-cell code{
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+      background:#eee;
+      padding:1px 4px;
+      border-radius:3px;
+    }
+    .check-line{
+      display:flex;
+      align-items:flex-start;
+      gap:5px;
+      min-height:16px;
+    }
+    .check-line input{
+      margin-top:1px;
+      flex:0 0 auto;
+    }
+    .check-text{
+      flex:1;
+      min-width:0;
+      min-height:1.18em;
+      line-height:1.18;
+      display:block;
+    }
+    .check-line.done .check-text,
+    .check-line input[type="checkbox"]:checked + .check-text{
+      text-decoration:none;
+      color:var(--done);
+      opacity:.82;
+    }
+    /*
+     * Indentation only changes horizontal position.
+     * It NEVER changes text color.
+     */
+    .indent-1{margin-left:24px}
+    .indent-2{margin-left:48px}
+    .indent-3{margin-left:72px}
+    .indent-4{margin-left:96px}
+    .indent-5{margin-left:120px}
+    .indent-6{margin-left:144px}
+    /* =========================================================
+       REFERENCE
+       \========================================================= */
+    #referenceScroll{
+      padding:8px 12px 40px;
+    }
+    .ref-toolbar{
+      display:flex;
+      gap:6px;
+      margin-bottom:5px;
+      position:sticky;
+      top:0;
+      background:#fff;
+      padding-bottom:8px;
+      z-index:10;
+    }
+    .ref-search{
+      flex:1;
+      min-width:0;
+      border:1px solid #ccc;
+      border-radius:6px;
+      padding:7px 8px;
+    }
+    #referenceTree{
+      display:flex;
+      flex-direction:column;
+    }
+    .ref-cell-wrapper{
+      position:relative;
+      border-bottom:1px solid #eee;
+      padding:8px 4px 10px;
+      min-height:38px;
+    }
+    .ref-cell-wrapper:hover{
+      background:#fafafa;
+    }
+    .ref-cell-wrapper:focus-within{
+      box-shadow:inset 2px 0 0 var(--accent);
+    }
+    .ref-disclosure{
+      position:absolute;
+      left:2px;
+      top:9px;
+      width:20px;
+      height:24px;
+      padding:0;
+      border:0;
+      background:transparent;
+      cursor:pointer;
+      font-size:14px;
+      line-height:24px;
+      color:#666;
+      z-index:2;
+    }
+    .ref-cell-wrapper{
+      padding-left:24px;
+    }
+    .ref-actions{
+      display:none;
+      position:absolute;
+      right:4px;
+      top:4px;
+      gap:3px;
+    }
+    .ref-cell-wrapper:hover .ref-actions,
+    .ref-cell-wrapper:focus-within .ref-actions{
+      display:flex;
+    }
+    .tiny{
+      font-size:11px;
+      padding:3px 6px;
+    }
+    .format-hint{
+      color:#888;
+      font-size:11px;
+      padding:3px 2px 10px;
+    }
+    /* Collapsed Reference cells: show exactly one top-level line. */
+    .ref-collapsed{
+      padding-top:8px;
+      padding-bottom:0;
+      height:42px;
+      min-height:42px;
+      max-height:42px;
+      overflow:hidden;
+    }
+    .ref-collapsed .ref-cell{
+      display:block;
+      height:26px;
+      min-height:26px;
+      max-height:26px;
+      line-height:26px;
+      overflow:hidden;
+      white-space:nowrap;
+      padding:0;
+      margin:0;
+    }
+    .ref-collapsed .ref-cell > *{margin:0!important;}
+    .ref-collapsed .ref-cell p,
+    .ref-collapsed .ref-cell div,
+    .ref-collapsed .ref-cell h1,
+    .ref-collapsed .ref-cell h2,
+    .ref-collapsed .ref-cell h3,
+    .ref-collapsed .ref-cell blockquote,
+    .ref-collapsed .ref-cell li{
+      height:26px;
+      max-height:26px;
+      line-height:26px;
+      margin:0!important;
+      padding-top:0;
+      padding-bottom:0;
+      white-space:nowrap;
+      overflow:hidden;
+    }
+    .ref-collapsed .ref-cell > *:not(:first-child){display:none!important;}
+    .hidden{
+      display:none!important;
+    }
+    .empty{
+      padding:14px;
+      color:#777;
+      font-size:13px;
+    }
+    .type-settings{
+      position:absolute;
+      top:36px;
+      left:150px;
+      z-index:1000;
+      width:330px;
+      padding:8px;
+      background:#fff;
+      border:1px solid #cfcfcf;
+      border-radius:7px;
+      box-shadow:0 4px 18px rgba(0,0,0,.16);
+      font-size:11px;
+    }
+    .type-settings label{
+      display:grid;
+      grid-template-columns:62px 1fr 48px 18px;
+      align-items:center;
+      gap:5px;
+      margin:4px 0;
+    }
+    .font-size-input{
+      width:48px;
+      padding:4px;
+      border:1px solid #c9c9c9;
+      border-radius:5px;
+    }
+    /* =========================================================
+       MOBILE
+       \========================================================= */
+    @media(max-width:900px){
+      /* Keep the desktop three-column geometry on small screens.
+         #workspace itself becomes the horizontal viewport. */
+      #workspace{
+        grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--col-reference);
+      }
+      #workspace.view-single{
+        grid-template-columns:minmax(0,1fr);
+      }
+      .scroll{
+        overflow-y:auto;
+        overflow-x:hidden;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="focusControls">
+    <span id="focusStatus" class="focus-status">Loading…</span>
+    <button class="btn" onclick="jumpToday()" title="Jump to today">Today</button>
+    <select id="focusViewMode" class="top-select" title="Workspace view">
+      <option value="all">All</option>
+      <option value="today">Today</option>
+      <option value="journal">Journal</option>
+      <option value="reference">Reference</option>
+    </select>
+    <button class="btn" onclick="setFocusMode(false)" title="Show toolbar">Show toolbar</button>
+  </div>
+  <div id="toolbar">
+    <div id="title">
+      Focus Workspace
+    </div>
+    <button
+      class="btn"
+      onclick="jumpToday()">
+      Today
+    </button>
+    <select
+      id="globalSize"
+      class="top-select"
+      title="Format selected text">
+      <option value="14" selected>
+        Paragraph
+      </option>
+      <option value="18">
+        Subtitle
+      </option>
+      <option value="28">
+        Title
+      </option>
+    </select>
+    <button class="btn" onclick="toggleTypeSettings()" title="Typography settings">
+      Fonts
+    </button>
+    <div id="typeSettings" class="type-settings hidden">
+      <label>Paragraph
+        <select id="paragraphFont" class="top-select font-family-select"></select>
+        <input id="paragraphSize" class="font-size-input" type="number" min="8" max="48" step="1" value="10"> px
+      </label>
+      <label>Subtitle
+        <select id="subtitleFont" class="top-select font-family-select"></select>
+        <input id="subtitleSize" class="font-size-input" type="number" min="8" max="64" step="1" value="14"> px
+      </label>
+      <label>Title
+        <select id="titleFont" class="top-select font-family-select"></select>
+        <input id="titleSize" class="font-size-input" type="number" min="8" max="80" step="1" value="20"> px
+      </label>
+      <button class="btn tiny" onclick="resetTypographySettings()">Reset</button>
+    </div>
+    <button class="btn" id="refCollapseBtn" onclick="toggleReferenceCollapse()">
+      Collapse Ref
+    </button>
+    <select id="viewMode" class="top-select" title="Workspace view">
+      <option value="all">All</option>
+      <option value="today">Today</option>
+      <option value="journal">Journal</option>
+      <option value="reference">Reference</option>
+    </select>
+    <button class="btn" onclick="setFocusMode(true)" title="Hide the top toolbar">Focus</button>
+    <span id="dateLabel"></span>
+    <span
+      id="status"
+      class="status">
+      Loading…
+    </span>
+  </div>
+  <div id="workspace">
+    <section class="pane" id="todayPane">
+      <div class="pane-header">
+        TODAY / TASKS
+      </div>
+      <div
+        class="scroll"
+        id="todayScroll">
+      </div>
+    </section>
+    <div class="column-resizer" data-left="today" data-right="journal" title="Drag to resize columns"></div>
+    <section class="pane" id="journalPane">
+      <div class="pane-header">
+        JOURNAL / NOTES
+      </div>
+      <div
+        class="scroll"
+        id="journalScroll">
+      </div>
+    </section>
+    <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
+    <section
+      class="pane"
+      id="referencePane">
+      <div class="pane-header">
+        REFERENCE
+      </div>
+      <div
+        class="scroll"
+        id="referenceScroll">
+        <div class="ref-toolbar">
+          <input
+            id="refSearch"
+            class="ref-search"
+            placeholder="Search reference…">
+          <button
+            class="btn"
+            onclick="addReferenceCell()">
+            \+ Cell
+          </button>
+        </div>
+        <div class="format-hint">
+          Enter = new line · ⌘/Ctrl+Enter = new cell ·
+          type [] + Space = checkbox · Tab = indent ·
+          Shift+Tab = outdent · ⌘/Ctrl+B/U = bold/underline ·
+          use the top Size menu for paragraph/subtitle/title
+        </div>
+        <div id="referenceTree"></div>
+      </div>
+    </section>
+  </div>
+</div>
+<script>
+  /* =========================================================
+     STATE
+     \========================================================= */
+  let state = {
+    days: [],
+    reference: [],
+    today: ''
+  };
+  let syncing = false;
+  let loadingPrev = false;
+  let loadingNext = false;
+  let saveTimers = {};
+  const daySaveState = new Map();
+  let activeRefId = null;
+  /*
+   * The editor that the global font menu currently controls.
+   */
+  let activeEditor = null;
+  /*
+   * The last known text selection inside activeEditor.
+   * This lets the font dropdown retain the correct selection
+   * even after the dropdown itself receives focus.
+   */
+  let savedRange = null;
+  const DAY_COLORS = {
+    0:'#fff4a8',
+    1:'#eeeeee',
+    2:'#fff0df',
+    3:'#e6f1fb',
+    4:'#ead8c2',
+    5:'#fff0bd',
+    6:'#d9b98c'
+  };
+  const TYPOGRAPHY_STORAGE_KEY = 'focusWorkspaceTypographyV1';
+  const VIEW_STORAGE_KEY = 'focusWorkspaceViewV1';
+  const COLUMN_STORAGE_KEY = 'focusWorkspaceColumnsV1';
+  const FOCUS_STORAGE_KEY = 'focusWorkspaceFocusV1';
+  const REF_COLLAPSE_STORAGE_KEY = 'focusWorkspaceRefCollapsedV1';
+  let referenceCollapsed = localStorage.getItem(REF_COLLAPSE_STORAGE_KEY) === '1';
+  const FONT_OPTIONS = [
+    ['Arial','Arial,Helvetica,sans-serif'],
+    ['Roboto','Roboto,Arial,sans-serif'],
+    ['Verdana','Verdana,Geneva,sans-serif'],
+    ['Tahoma','Tahoma,Geneva,sans-serif'],
+    ['Trebuchet','"Trebuchet MS",Arial,sans-serif'],
+    ['Georgia','Georgia,"Times New Roman",serif'],
+    ['Times New Roman','"Times New Roman",Times,serif'],
+    ['Monospace','ui-monospace,SFMono-Regular,Menlo,monospace']
+  ];
+  const DEFAULT_TYPOGRAPHY = {
+    paragraphFont:'Arial,Helvetica,sans-serif', paragraphSize:10,
+    subtitleFont:'Arial,Helvetica,sans-serif', subtitleSize:14,
+    titleFont:'Arial,Helvetica,sans-serif', titleSize:20
+  };
+  function loadTypographySettings(){
+    let saved = {};
+    try{ saved = JSON.parse(localStorage.getItem(TYPOGRAPHY_STORAGE_KEY) || '{}'); }catch(e){}
+    return {...DEFAULT_TYPOGRAPHY,...saved};
+  }
+  let typographySettings = loadTypographySettings();
+  function applyTypographySettings(){
+    const root = document.documentElement;
+    root.style.setProperty('--paragraph-font', typographySettings.paragraphFont);
+    root.style.setProperty('--paragraph-size', typographySettings.paragraphSize + 'px');
+    root.style.setProperty('--subtitle-font', typographySettings.subtitleFont);
+    root.style.setProperty('--subtitle-size', typographySettings.subtitleSize + 'px');
+    root.style.setProperty('--title-font', typographySettings.titleFont);
+    root.style.setProperty('--title-size', typographySettings.titleSize + 'px');
+    document.querySelectorAll('.day-editor,.journal-editor,.ref-cell').forEach(el => {
+      if(!el.style.fontFamily || el.style.fontFamily.includes('var(')) el.style.fontFamily = 'var(--paragraph-font)';
+      if(!el.style.fontSize || el.style.fontSize.includes('var(')) el.style.fontSize = 'var(--paragraph-size)';
+      el.style.lineHeight = '1.18';
+    });
+    requestAnimationFrame(syncDayHeights);
+  }
+  function populateFontSelect(select, value){
+    select.innerHTML = '';
+    FONT_OPTIONS.forEach(([label,css]) => {
+      const o=document.createElement('option'); o.textContent=label; o.value=css; o.selected=css===value; select.appendChild(o);
+    });
+  }
+  function initTypographyControls(){
+    ['paragraph','subtitle','title'].forEach(kind => {
+      const cap=kind[0].toUpperCase()+kind.slice(1);
+      const font=document.getElementById(kind+'Font');
+      const size=document.getElementById(kind+'Size');
+      populateFontSelect(font, typographySettings[kind+'Font']);
+      size.value=typographySettings[kind+'Size'];
+      font.addEventListener('change',()=>{ typographySettings[kind+'Font']=font.value; saveTypographySettings(); });
+      size.addEventListener('change',()=>{ typographySettings[kind+'Size']=Math.max(8,Number(size.value)||DEFAULT_TYPOGRAPHY[kind+'Size']); saveTypographySettings(); });
+    });
+    applyTypographySettings();
+  }
+  function saveTypographySettings(){
+    localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographySettings));
+    applyTypographySettings();
+  }
+  function resetTypographySettings(){
+    typographySettings={...DEFAULT_TYPOGRAPHY};
+    localStorage.removeItem(TYPOGRAPHY_STORAGE_KEY);
+    initTypographyControls();
+  }
+  function toggleTypeSettings(){
+    document.getElementById('typeSettings').classList.toggle('hidden');
+  }
+  /* =========================================================
+     BASIC HELPERS
+     \========================================================= */
+  const esc = s =>
+    String(s ?? '').replace(
+      /[&<>"']/g,
+      c => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+      }[c])
+    );
+  function formatDate(s){
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString(
+      undefined,
+      {
+        weekday:'long',
+        month:'long',
+        day:'numeric',
+        year:'numeric'
+      }
+    );
+  }
+  function setStatus(s){
+    const status=document.getElementById('status');
+    const focusStatus=document.getElementById('focusStatus');
+    if(status) status.textContent=s;
+    if(focusStatus) focusStatus.textContent=s;
+  }
+  function storedToHtml(v){
+    if(!v){
+      return '';
+    }
+    if(/<([a-z][\s\S]*?)>/i.test(v)){
+      return v;
+    }
+    return esc(v).replace(/\n/g,'<br>');
+  }
+  function dateObj(s){
+    return new Date(s + 'T00:00:00');
+  }
+  function addDays(s,n){
+    const d = dateObj(s);
+    d.setDate(
+      d.getDate() + n
+    );
+    return d.toISOString().slice(0,10);
+  }
+  function weekStart(s){
+    const d = dateObj(s);
+    d.setDate(
+      d.getDate() - d.getDay()
+    );
+    return d.toISOString().slice(0,10);
+  }
+  function mergeDays(newDays){
+    const map = new Map(
+      state.days.map(d => [d.date,d])
+    );
+    newDays.forEach(
+      d => map.set(d.date,d)
+    );
+    state.days = [
+      ...map.values()
+    ].sort(
+      (a,b) => a.date.localeCompare(b.date)
+    );
+  }
+  /* =========================================================
+     LOAD
+     \========================================================= */
+  function loadWorkspace(){
+    google.script.run
+      .withSuccessHandler(data => {
+        state = data;
+        renderDays();
+        renderReference();
+        setStatus('Ready');
+      })
+      .withFailureHandler(e => {
+        setStatus(
+          'Load error: ' +
+          e.message
+        );
+      })
+      .getWorkspaceData();
+  }
+  /* =========================================================
+     DAYS
+     \========================================================= */
+  function renderDays(){
+    const left =
+      document.getElementById('todayScroll');
+    const right =
+      document.getElementById('journalScroll');
+    left.innerHTML = '';
+    right.innerHTML = '';
+    if(!state.days.length){
+      left.innerHTML =
+        '<div class="empty">No days available.</div>';
+      right.innerHTML =
+        left.innerHTML;
+      return;
+    }
+    state.days.sort(
+      (a,b) =>
+        a.date.localeCompare(b.date)
+    );
+    state.days.forEach(day => {
+      appendDayRow(
+        day,
+        left,
+        'day'
+      );
+      appendDayRow(
+        day,
+        right,
+        'journal'
+      );
+    });
+    requestAnimationFrame(() => {
+      syncDayHeights();
+      syncDailyScroll();
+      jumpToday(false);
+    });
+  }
+  function appendDayRow(
+    day,
+    container,
+    type
+  ){
+    const today =
+      day.date === state.today;
+    const dow =
+      dateObj(day.date).getDay();
+    const row =
+      document.createElement('div');
+    row.className =
+      'day-row dow-' +
+      dow +
+      (today ? ' today' : '') +
+      (
+        type === 'day'
+          ? ' day-pane-row'
+          : ' journal-pane-row'
+      );
+    row.dataset.date =
+      day.date;
+    const label =
+      `<div class="day-label">
+        ${esc(formatDate(day.date))}
+        ${
+          today
+            ? '<span class="today-pill">• TODAY</span>'
+            : ''
+        }
+      </div>`;
+    const content =
+      type === 'day'
+        ? day.tasks
+        : day.journal;
+    row.innerHTML =
+      label +
+      `<div
+        class="editor ${
+          type === 'day'
+            ? 'day-editor'
+            : 'journal-editor'
+        }"
+        contenteditable="true"
+        data-date="${day.date}"
+        data-placeholder="${
+          type === 'day'
+            ? 'Tasks for this day…'
+            : 'Write whatever you want…'
+        }">${storedToHtml(content)}</div>`;
+    container.appendChild(row);
+    const ed =
+      row.querySelector('.editor');
+    /*
+     * Explicitly establish Paragraph as the default
+     * font for new/normal day editors.
+     */
+    ed.style.fontSize = 'var(--paragraph-size)';
+    ed.style.fontFamily = 'var(--paragraph-font)';
+    ed.style.lineHeight = '1.18';
+    wireEditor(
+      ed,
+      type
+    );
+  }
+  /* =========================================================
+     SELECTION / GLOBAL FONT
+     \========================================================= */
+  function rememberSelection(ed){
+    if(!ed){
+      return;
+    }
+    const sel =
+      window.getSelection();
+    if(
+      sel &&
+      sel.rangeCount &&
+      ed.contains(sel.anchorNode)
+    ){
+      activeEditor = ed;
+      savedRange =
+        sel
+          .getRangeAt(0)
+          .cloneRange();
+    }
+  }
+  function restoreSelection(){
+    if(!savedRange){
+      return false;
+    }
+    const sel =
+      window.getSelection();
+    try{
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      return true;
+    }catch(err){
+      return false;
+    }
+  }
+  function currentBlock(ed){
+    const sel =
+      window.getSelection();
+    let n =
+      sel?.anchorNode;
+    if(
+      !n ||
+      !ed.contains(n)
+    ){
+      return ed.lastElementChild || ed;
+    }
+    if(n.nodeType === 3){
+      n = n.parentElement;
+    }
+    const b =
+      n.closest(
+        'p,h1,h2,h3,div,blockquote,li,.check-line'
+      );
+    return b && ed.contains(b)
+      ? b
+      : ed;
+  }
+  function applyGlobalSize(size){
+    if(!activeEditor){
+      return;
+    }
+    const ed =
+      activeEditor;
+    /*
+     * Restore the selection that existed before the user
+     * clicked the top font menu.
+     */
+    ed.focus();
+    restoreSelection();
+    const block =
+      currentBlock(ed);
+    if(block === ed){
+      ed.style.fontSize =
+        size + 'px';
+      ed.style.lineHeight =
+        size === 28
+          ? '1.2'
+          : size === 18
+            ? '1.35'
+            : '1.48';
+    }else{
+      block.style.fontSize =
+        size + 'px';
+      block.style.lineHeight =
+        size === 28
+          ? '1.2'
+          : size === 18
+            ? '1.35'
+            : '1.48';
+    }
+    /*
+     * IMPORTANT:
+     * Save the actual editor we were editing.
+     * This is what prevents Reference formatting from
+     * accidentally saving to Journal.
+     */
+    saveEditorOwner(ed);
+  }
+  const globalSize =
+    document.getElementById('globalSize');
+  /*
+   * When the user opens the font menu, save the selection
+   * from whichever editor was actually active.
+   */
+  globalSize.addEventListener(
+    'mousedown',
+    () => {
+      if(activeEditor){
+        rememberSelection(activeEditor);
+      }
+    }
+  );
+  globalSize.addEventListener(
+    'change',
+    e => {
+      applyGlobalSize(
+        Number(e.target.value)
+      );
+    }
+  );
+  /* =========================================================
+     EDITORS
+     \========================================================= */
+  const editorHistories = new WeakMap();
+  /* Runtime-only checkbox listener tracking. Never serialize this state into saved HTML. */
+  const wiredCheckboxes = new WeakSet();
+  function ensureEditorHistory(el){
+    if(!editorHistories.has(el)){
+      editorHistories.set(el,{undo:[],redo:[],last:el.innerHTML,restoring:false});
+    }
+    return editorHistories.get(el);
+  }
+  function captureBeforeEdit(el){
+    const h=ensureEditorHistory(el);
+    if(h.restoring) return;
+    const current=el.innerHTML;
+    if(!h.undo.length || h.undo[h.undo.length-1]!==current){
+      h.undo.push(current);
+      if(h.undo.length>100) h.undo.shift();
+    }
+    h.redo.length=0;
+  }
+  function finishEditorEdit(el){
+    const h=ensureEditorHistory(el);
+    h.last=el.innerHTML;
+  }
+  function restoreEditorSnapshot(el,html){
+    const h=ensureEditorHistory(el);
+    h.restoring=true;
+    el.innerHTML=html;
+    el.querySelectorAll('input[type=checkbox]').forEach(wireCheckbox);
+    h.last=html;
+    h.restoring=false;
+    el.focus({preventScroll:true});
+    placeEnd(el);
+    saveEditorOwner(el);
+    if(el.dataset.date) syncDayHeight(el.dataset.date);
+  }
+  function undoEditor(el){
+    const h=ensureEditorHistory(el);
+    if(!h.undo.length) return;
+    h.redo.push(el.innerHTML);
+    restoreEditorSnapshot(el,h.undo.pop());
+  }
+  function redoEditor(el){
+    const h=ensureEditorHistory(el);
+    if(!h.redo.length) return;
+    h.undo.push(el.innerHTML);
+    restoreEditorSnapshot(el,h.redo.pop());
+  }
+  function wireEditorHistory(el){
+    ensureEditorHistory(el);
+    el.addEventListener('beforeinput',()=>captureBeforeEdit(el));
+    el.addEventListener('input',()=>finishEditorEdit(el));
+  }
+  function wireEditor(
+    el,
+    type
+  ){
+    wireEditorHistory(el);
+    el.addEventListener(
+      'input',
+      () => {
+        autoFormat(el);
+        syncDayHeight(
+          el.dataset.date
+        );
+        scheduleDaySave(
+          el.dataset.date
+        );
+      }
+    );
+    el.addEventListener(
+      'keydown',
+      e => {
+        handleEditorKey(
+          e,
+          el,
+          type
+        );
+      }
+    );
+    /*
+     * Focus MUST establish this editor as the global
+     * formatting target.
+     */
+    el.addEventListener(
+      'focus',
+      () => {
+        activeRefId = null;
+        activeEditor = el;
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'keyup',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'mouseup',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'input',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'paste',
+      e => {
+        e.preventDefault();
+        const text =
+          (
+            e.clipboardData ||
+            window.clipboardData
+          ).getData('text/plain');
+        pasteStructuredText(el, text);
+      }
+    );
+    el.querySelectorAll(
+      'input[type=checkbox]'
+    ).forEach(
+      wireCheckbox
+    );
+  }
+  function escapeHtml(text){
+    return String(text)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+  function pasteStructuredText(el, text){
+    /*
+     * Pasted task lists understand:
+     *   [] task
+     *   [ ] task
+     *   [x] completed task
+     *   [X] completed task
+     *
+     * Four leading spaces or one tab = one checkbox level.
+     * Ordinary pasted lines remain ordinary text.
+     */
+    const normalized =
+      String(text || '')
+        .replace(/\r\n?/g, '\n');
+    const lines =
+      normalized.split('\n');
+    const hasStructuredCheckbox =
+      lines.some(line =>
+        /^[ \t]*(?:\[\]|\[ \]|\[[xX]\])(?:\s|$)/.test(line)
+      );
+    /* Preserve the old plain-text paste behavior when no task syntax exists. */
+    if(!hasStructuredCheckbox){
+      document.execCommand(
+        'insertText',
+        false,
+        normalized
+      );
+      return;
+    }
+    captureBeforeEdit(el);
+    const html = lines.map(line => {
+      const match = line.match(
+        /^([ \t]*)(\[\]|\[ \]|\[[xX]\])(?:[ \t]+)?(.*)$/
+      );
+      if(match){
+        const indent = match[1] || '';
+        let columns = 0;
+        for(const ch of indent){
+          columns += ch === '\t' ? 4 : 1;
+        }
+        const level =
+          Math.max(0, Math.min(6, Math.floor(columns / 4)));
+        const checked =
+          /^\[[xX]\]$/.test(match[2]);
+        const taskText =
+          escapeHtml(match[3] || '');
+        const doneClass =
+          checked ? ' done' : '';
+        const checkedAttr =
+          checked ? ' checked' : '';
+        const margin =
+          level ? ` style="margin-left:${level * 24}px"` : '';
+        return `<div class="check-line${doneClass}" data-level="${level}"${margin}><input type="checkbox"${checkedAttr}><span class="check-text">${taskText}</span></div>`;
+      }
+      if(line === ''){
+        return '<div><br></div>';
+      }
+      return `<div>${escapeHtml(line)}</div>`;
+    }).join('');
+    document.execCommand(
+      'insertHTML',
+      false,
+      html
+    );
+    el.querySelectorAll(
+      'input[type=checkbox]'
+    ).forEach(wireCheckbox);
+    finishEditorEdit(el);
+    rememberSelection(el);
+    saveEditorOwner(el);
+    if(el.dataset.date){
+      syncDayHeight(el.dataset.date);
+    }
+  }
+  function handleEditorKey(
+    e,
+    el,
+    type
+  ){
+    const key=e.key.toLowerCase();
+    if((e.metaKey || e.ctrlKey) && key === 'z'){
+      e.preventDefault();
+      if(e.shiftKey) redoEditor(el); else undoEditor(el);
+      return;
+    }
+    if(e.ctrlKey && !e.metaKey && key === 'y'){
+      e.preventDefault();
+      redoEditor(el);
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      e.key.toLowerCase() === 'b'
+    ){
+      e.preventDefault();
+      document.execCommand(
+        'bold'
+      );
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      e.key.toLowerCase() === 'u'
+    ){
+      e.preventDefault();
+      document.execCommand(
+        'underline'
+      );
+      return;
+    }
+    if(e.key === 'Tab'){
+      e.preventDefault();
+      rememberSelection(el);
+      const line =
+        getCurrentLine(el);
+      if(line){
+        changeIndent(
+          line,
+          e.shiftKey ? -1 : 1
+        );
+        return;
+      }
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      e.key === 'Enter' &&
+      type === 'reference'
+    ){
+      e.preventDefault();
+      addReferenceCell(
+        activeRefId
+      );
+      return;
+    }
+    /*
+     * Enter on a checkbox creates another checkbox.
+     *
+     * Normal Enter:
+     *   same indentation level.
+     *
+     * Shift+Enter:
+     *   one level deeper, acting like a subtask.
+     */
+    if(e.key === 'Enter'){
+      const currentLine = getCurrentLine(el);
+      if(type === 'reference' && !e.shiftKey && currentLine && currentLine.tagName === 'H2'){
+        e.preventDefault();
+        captureBeforeEdit(el);
+        const paragraph = document.createElement('p');
+        paragraph.innerHTML = '<br>';
+        currentLine.insertAdjacentElement('afterend', paragraph);
+        placeEnd(paragraph);
+        finishEditorEdit(el);
+        saveEditorOwner(el);
+        return;
+      }
+      const line =
+        getCurrentLine(el);
+      if(
+        line &&
+        line.classList.contains('check-line')
+      ){
+        e.preventDefault();
+        const checkText =
+          line.querySelector(
+            '.check-text'
+          );
+        /*
+         * Google-Docs-style list exit:
+         * pressing Enter on an EMPTY checkbox removes
+         * the checkbox and leaves a normal blank line.
+         *
+         * Shift+Enter still creates an indented checkbox,
+         * even if the current checkbox is empty.
+         */
+        if(
+          !e.shiftKey &&
+          !(checkText?.textContent || '').trim()
+        ){
+          exitEmptyCheckbox(
+            line
+          );
+          return;
+        }
+        const currentLevel =
+          Number(
+            line.dataset.level || 0
+          );
+        const nextLevel =
+          e.shiftKey
+            ? Math.min(
+                6,
+                currentLevel + 1
+              )
+            : currentLevel;
+        insertCheckboxAfter(
+          line,
+          nextLevel
+        );
+        return;
+      }
+      /*
+       * Normal Enter in other content
+       * keeps the existing auto-format behavior.
+       */
+      setTimeout(
+        () => autoFormat(el),
+        0
+      );
+    }
+  }
+  function getCurrentLine(root){
+    const sel =
+      window.getSelection();
+    let n =
+      sel?.anchorNode;
+    if(
+      !n ||
+      !root.contains(n)
+    ){
+      return null;
+    }
+    if(n.nodeType === 3){
+      n = n.parentElement;
+    }
+    return n.closest(
+      'p,h1,h2,h3,div,blockquote,li,.check-line'
+    ) || null;
+  }
+  function changeIndent(
+    line,
+    delta
+  ){
+    let level =
+      Math.max(
+        0,
+        Math.min(
+          6,
+          Number(line.dataset.level || 0) +
+          delta
+        )
+      );
+    line.dataset.level =
+      String(level);
+    line.style.marginLeft =
+      level
+        ? `${level * 24}px`
+        : '';
+    /*
+     * No color manipulation happens here.
+     */
+    saveEditorOwner(
+      line.closest(
+        '.editor,.ref-cell'
+      )
+    );
+  }
+  function saveEditorOwner(el){
+    if(!el){
+      return;
+    }
+    if(
+      el.closest('.day-row')
+    ){
+      scheduleDaySave(
+        el.dataset.date
+      );
+    }else{
+      const id =
+        el.closest(
+          '.ref-cell-wrapper'
+        )?.dataset.id;
+      if(id){
+        saveRefFromDom(
+          id
+        );
+      }
+    }
+  }
+  function scheduleOwnerSave(el){
+    saveEditorOwner(el);
+  }
+  /* =========================================================
+     AUTO FORMATTING
+     \========================================================= */
+  function autoFormat(el){
+    const sel =
+      window.getSelection();
+    if(
+      !sel ||
+      !sel.rangeCount ||
+      !el.contains(sel.anchorNode)
+    ){
+      return;
+    }
+    let node =
+      sel.anchorNode;
+    let line =
+      node.nodeType === 3
+        ? node.parentElement
+        : node;
+    line =
+      line?.closest(
+        'p,div,li,h1,h2,h3,blockquote'
+      );
+    if(
+      !line ||
+      !el.contains(line) ||
+      line.classList.contains('check-line')
+    ){
+      return;
+    }
+    const text =
+      line.textContent || '';
+    /*
+     * Checkbox
+     */
+    if(/^\[\]\s/.test(text)){
+      const rest =
+        text.replace(
+          /^\[\]\s/,
+          ''
+        );
+      const c =
+        document.createElement('div');
+      c.className =
+        'check-line';
+      c.dataset.level =
+        '0';
+      c.innerHTML =
+        '<input type="checkbox">' +
+        '<span class="check-text"></span>';
+      c.querySelector(
+        '.check-text'
+      ).textContent =
+        rest;
+      line.replaceWith(c);
+      wireCheckbox(
+        c.querySelector('input')
+      );
+      placeEnd(
+        c.querySelector('.check-text')
+      );
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Headings
+     */
+    if(
+      /^#{1,3}\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      const n =
+        (
+          text.match(/^#+/)[0]
+        ).length;
+      const h =
+        document.createElement(
+          'h' + n
+        );
+      h.textContent =
+        text.replace(
+          /^#{1,3}\s/,
+          ''
+        );
+      line.replaceWith(h);
+      placeEnd(h);
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Bullet
+     */
+    if(
+      /^(?:[-*])\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      const ul =
+        document.createElement('ul');
+      const li =
+        document.createElement('li');
+      li.textContent =
+        text.replace(
+          /^[-*]\s/,
+          ''
+        );
+      ul.appendChild(li);
+      line.replaceWith(ul);
+      placeEnd(li);
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Blockquote
+     */
+    if(
+      /^>\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      const q =
+        document.createElement(
+          'blockquote'
+        );
+      q.textContent =
+        text.replace(
+          /^>\s/,
+          ''
+        );
+      line.replaceWith(q);
+      placeEnd(q);
+      saveEditorOwner(el);
+    }
+  }
+  function createCheckboxLine(level = 0){
+    const c =
+      document.createElement('div');
+    c.className =
+      'check-line';
+    c.dataset.level =
+      String(
+        Math.max(
+          0,
+          Math.min(
+            6,
+            Number(level) || 0
+          )
+        )
+      );
+    c.style.marginLeft =
+      c.dataset.level !== '0'
+        ? `${Number(c.dataset.level) * 24}px`
+        : '';
+    c.innerHTML =
+      '<input type="checkbox">' +
+      '<span class="check-text"></span>';
+    wireCheckbox(
+      c.querySelector('input')
+    );
+    return c;
+  }
+  function exitEmptyCheckbox(line){
+    const editor =
+      line.closest(
+        '.editor,.ref-cell'
+      );
+    if(!editor){
+      return;
+    }
+    captureBeforeEdit(editor);
+    /*
+     * Replace the empty checkbox row with an ordinary
+     * blank paragraph. A <br> gives contenteditable a
+     * stable caret target without displaying any text.
+     */
+    const paragraph =
+      document.createElement('p');
+    paragraph.appendChild(
+      document.createElement('br')
+    );
+    line.replaceWith(
+      paragraph
+    );
+    editor.focus({
+      preventScroll:true
+    });
+    const range =
+      document.createRange();
+    range.setStart(
+      paragraph,
+      0
+    );
+    range.collapse(true);
+    const sel =
+      window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    activeEditor =
+      editor;
+    savedRange =
+      range.cloneRange();
+    finishEditorEdit(editor);
+    saveEditorOwner(editor);
+  }
+  function insertCheckboxAfter(
+    line,
+    level
+  ){
+    const editor =
+      line.closest(
+        '.editor,.ref-cell'
+      );
+    if(!editor){
+      return;
+    }
+    captureBeforeEdit(editor);
+    const next =
+      createCheckboxLine(level);
+    line.insertAdjacentElement(
+      'afterend',
+      next
+    );
+    const text =
+      next.querySelector(
+        '.check-text'
+      );
+    /*
+     * Focus the editor first, then explicitly put
+     * the caret inside the text span.
+     */
+    editor.focus({preventScroll:true});
+    placeCaretInsideCheckbox(text);
+    finishEditorEdit(editor);
+    saveEditorOwner(editor);
+  }
+  function placeCaretInsideCheckbox(text){
+    const editor=text.closest('.editor,.ref-cell');
+    if(!editor) return;
+    const setCaret=()=>{
+      editor.focus({preventScroll:true});
+      const range=document.createRange();
+      range.setStart(text,0);
+      range.collapse(true);
+      const sel=window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      activeEditor=editor;
+      savedRange=range.cloneRange();
+    };
+    setCaret();
+    requestAnimationFrame(setCaret);
+  }
+  function placeEnd(el){
+    const editor =
+      el.closest(
+        '.editor,.ref-cell'
+      );
+    /*
+     * Make sure the contenteditable editor owns
+     * the selection before positioning the caret.
+     */
+    if(editor){
+      editor.focus({
+        preventScroll:true
+      });
+    }
+    const r =
+      document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    const s =
+      window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+    /*
+     * Keep the global formatting target synchronized.
+     */
+    if(editor){
+      activeEditor =
+        editor;
+      savedRange =
+        r.cloneRange();
+    }
+  }
+  function wireCheckbox(cb){
+    if(!cb || wiredCheckboxes.has(cb)){
+      return;
+    }
+    wiredCheckboxes.add(cb);
+    /* Remove the old persisted listener marker from previously saved content. */
+    cb.removeAttribute('data-wired');
+    /* Keep restored/saved checkbox markup and its visual state aligned. */
+    const initialLine =
+      cb.closest('.check-line');
+    if(initialLine){
+      initialLine.classList.toggle('done', cb.checked);
+    }
+    cb.addEventListener(
+      'change',
+      () => {
+        const line =
+          cb.closest(
+            '.check-line'
+          );
+        if(!line){
+          return;
+        }
+        line.classList.toggle(
+          'done',
+          cb.checked
+        );
+        /*
+         * checked is normally a live DOM property. Mirror it to the
+         * HTML attribute so innerHTML saves/undo snapshots retain it.
+         */
+        if(cb.checked){
+          cb.setAttribute('checked', '');
+        }else{
+          cb.removeAttribute('checked');
+        }
+        const root =
+          cb.closest(
+            '.editor,.ref-cell'
+          );
+        saveEditorOwner(root);
+      }
+    );
+  }
+  /* =========================================================
+     DAY HEIGHT / SCROLL
+     \========================================================= */
+  function syncDayHeights(){
+    /*
+     * Every pass measures the real content height. Rows do not keep
+     * a previously larger height after text or trailing lines are removed.
+     */
+    state.days.forEach(
+      d => syncDayHeight(d.date)
+    );
+  }
+  function syncDayHeight(date){
+    const a =
+      document.querySelector(
+        `#todayScroll .day-row[data-date="${CSS.escape(date)}"]`
+      );
+    const b =
+      document.querySelector(
+        `#journalScroll .day-row[data-date="${CSS.escape(date)}"]`
+      );
+    if(!a || !b){
+      return;
+    }
+    /* Clear the paired fixed height first so scrollHeight reflects only
+       the date label and the content that actually remains. */
+    a.style.height = 'auto';
+    b.style.height = 'auto';
+    const naturalHeight = Math.max(
+      a.scrollHeight,
+      b.scrollHeight
+    );
+    const h = Math.ceil(naturalHeight);
+    a.style.height = h + 'px';
+    b.style.height = h + 'px';
+  }
+  function syncDailyScroll(){
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    a.onscroll = () => {
+      if(!syncing){
+        syncing = true;
+        b.scrollTop =
+          a.scrollTop;
+        syncing = false;
+      }
+      updateVisibleDate();
+      maybeLoadMore(a);
+    };
+    /* Today intentionally has no visible scrollbar. Wheel/trackpad input over
+       Today is forwarded to Journal, which owns the shared scrollbar. */
+    a.onwheel = e => {
+      if(Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const before = b.scrollTop;
+      b.scrollTop += e.deltaY;
+      /* Even at an edge (or before there is enough overflow to move),
+         let wheel/trackpad input participate in lazy week loading. */
+      maybeLoadMore(b);
+      if(b.scrollTop !== before) e.preventDefault();
+    };
+    b.onscroll = () => {
+      if(!syncing){
+        syncing = true;
+        a.scrollTop =
+          b.scrollTop;
+        syncing = false;
+      }
+      updateVisibleDate();
+      maybeLoadMore(b);
+    };
+  }
+  function updateVisibleDate(){
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const rows =
+      [
+        ...a.querySelectorAll(
+          '.day-row'
+        )
+      ];
+    let best = null;
+    let bestDist = Infinity;
+    for(const r of rows){
+      const d =
+        Math.abs(
+          r.offsetTop -
+          a.scrollTop
+        );
+      if(d < bestDist){
+        bestDist = d;
+        best = r;
+      }
+    }
+    if(best){
+      document.getElementById(
+        'dateLabel'
+      ).textContent =
+        formatDate(
+          best.dataset.date
+        );
+    }
+  }
+  /* =========================================================
+     LAZY WEEK LOADING
+     \========================================================= */
+  function maybeLoadMore(scroll){
+    if(!state.days.length){
+      return;
+    }
+    const threshold = 80;
+    const nearTop =
+      scroll.scrollTop <= threshold;
+    const nearBottom =
+      scroll.scrollHeight -
+      scroll.scrollTop -
+      scroll.clientHeight <=
+      threshold;
+    if(
+      nearTop &&
+      !loadingPrev
+    ){
+      loadPreviousWeek();
+    }
+    if(
+      nearBottom &&
+      !loadingNext
+    ){
+      loadNextWeek();
+    }
+  }
+  function loadPreviousWeek(){
+    loadingPrev = true;
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    const oldH =
+      a.scrollHeight;
+    const oldTop =
+      a.scrollTop;
+    const first =
+      state.days[0].date;
+    const start =
+      addDays(first,-7);
+    const end =
+      addDays(first,-1);
+    setStatus(
+      'Loading earlier week…'
+    );
+    google.script.run
+      .withSuccessHandler(days => {
+        if(!days?.length){
+          loadingPrev = false;
+          setStatus('Ready');
+          return;
+        }
+        mergeDays(days);
+        prependDays(days);
+        requestAnimationFrame(() => {
+          const delta =
+            a.scrollHeight -
+            oldH;
+          a.scrollTop =
+            oldTop + delta;
+          b.scrollTop =
+            a.scrollTop;
+          syncDayHeights();
+          loadingPrev = false;
+          setStatus('Ready');
+        });
+      })
+      .withFailureHandler(e => {
+        loadingPrev = false;
+        setStatus(
+          'Load error: ' +
+          e.message
+        );
+      })
+      .getDaysRange(
+        start,
+        end
+      );
+  }
+  function loadNextWeek(){
+    loadingNext = true;
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const first =
+      state.days[
+        state.days.length - 1
+      ].date;
+    const start =
+      addDays(first,1);
+    const end =
+      addDays(first,7);
+    setStatus(
+      'Loading later week…'
+    );
+    google.script.run
+      .withSuccessHandler(days => {
+        if(!days?.length){
+          loadingNext = false;
+          setStatus('Ready');
+          return;
+        }
+        mergeDays(days);
+        appendDays(days);
+        requestAnimationFrame(() => {
+          syncDayHeights();
+          loadingNext = false;
+          setStatus('Ready');
+        });
+      })
+      .withFailureHandler(e => {
+        loadingNext = false;
+        setStatus(
+          'Load error: ' +
+          e.message
+        );
+      })
+      .getDaysRange(
+        start,
+        end
+      );
+  }
+  function prependDays(days){
+    const sorted =
+      [...days].sort(
+        (a,b) =>
+          a.date.localeCompare(b.date)
+      );
+    const left =
+      document.getElementById(
+        'todayScroll'
+      );
+    const right =
+      document.getElementById(
+        'journalScroll'
+      );
+    const fragL =
+      document.createDocumentFragment();
+    const fragR =
+      document.createDocumentFragment();
+    sorted.forEach(d => {
+      appendDayRow(
+        d,
+        fragL,
+        'day'
+      );
+      appendDayRow(
+        d,
+        fragR,
+        'journal'
+      );
+    });
+    left.prepend(fragL);
+    right.prepend(fragR);
+  }
+  function appendDays(days){
+    const sorted =
+      [...days].sort(
+        (a,b) =>
+          a.date.localeCompare(b.date)
+      );
+    const left =
+      document.getElementById(
+        'todayScroll'
+      );
+    const right =
+      document.getElementById(
+        'journalScroll'
+      );
+    sorted.forEach(d => {
+      if(
+        !left.querySelector(
+          `.day-row[data-date="${CSS.escape(d.date)}"]`
+        )
+      ){
+        appendDayRow(
+          d,
+          left,
+          'day'
+        );
+        appendDayRow(
+          d,
+          right,
+          'journal'
+        );
+      }
+    });
+  }
+  function jumpToday(
+    announce = true
+  ){
+    const row =
+      document.querySelector(
+        `#todayScroll .day-row[data-date="${CSS.escape(state.today)}"]`
+      );
+    if(!row){
+      return;
+    }
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    /* Align the top border of today's row directly beneath the pane header.
+       offsetTop can include layout offsets from ancestors, so calculate the
+       row position in each scroll container explicitly. */
+    const todayRowTop = row.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop;
+    const journalRow = b.querySelector(`.day-row[data-date="${CSS.escape(state.today)}"]`);
+    const journalRowTop = journalRow
+      ? journalRow.getBoundingClientRect().top - b.getBoundingClientRect().top + b.scrollTop
+      : todayRowTop;
+    a.scrollTop = Math.max(0,todayRowTop);
+    b.scrollTop = Math.max(0,journalRowTop);
+    updateVisibleDate();
+    if(announce){
+      setStatus('Today');
+    }
+  }
+  /* =========================================================
+     DAY SAVING
+     \========================================================= */
+  function scheduleDaySave(date){
+    clearTimeout(saveTimers[date]);
+    const info=daySaveState.get(date)||{inFlight:false,pending:false};
+    info.pending=true;
+    daySaveState.set(date,info);
+    setStatus('Unsaved…');
+    saveTimers[date]=setTimeout(()=>saveDay(date),700);
+  }
+  function saveDay(date){
+    clearTimeout(saveTimers[date]);
+    const info=daySaveState.get(date)||{inFlight:false,pending:true};
+    if(info.inFlight){
+      info.pending=true;
+      daySaveState.set(date,info);
+      return;
+    }
+    const t=document.querySelector(`.day-editor[data-date="${CSS.escape(date)}"]`);
+    const j=document.querySelector(`.journal-editor[data-date="${CSS.escape(date)}"]`);
+    /* Runtime wiring markers must never be persisted. */
+    t?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    j?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    const tasks=t?.innerHTML||'';
+    const journal=j?.innerHTML||'';
+    const d=state.days.find(x=>x.date===date);
+    if(d){d.tasks=tasks;d.journal=journal;}
+    info.inFlight=true;
+    info.pending=false;
+    daySaveState.set(date,info);
+    setStatus('Saving…');
+    google.script.run
+      .withSuccessHandler(()=>{
+        info.inFlight=false;
+        if(info.pending){
+          saveDay(date);
+        }else{
+          setStatus('Saved');
+        }
+      })
+      .withFailureHandler(e=>{
+        info.inFlight=false;
+        setStatus('Save error: '+e.message);
+        if(info.pending) saveDay(date);
+      })
+      .saveDay(date,tasks,journal);
+  }
+  /* =========================================================
+     REFERENCE
+     \========================================================= */
+  function renderReference(){
+    const tree =
+      document.getElementById(
+        'referenceTree'
+      );
+    tree.innerHTML = '';
+    const items =
+      [...state.reference].sort(
+        (a,b) =>
+          a.sort - b.sort
+      );
+    if(!items.length){
+      tree.innerHTML =
+        '<div class="empty">' +
+        'No reference cells yet. ' +
+        'Click + Cell or press ⌘/Ctrl+Enter.' +
+        '</div>';
+      return;
+    }
+    items.forEach(
+      item =>
+        createReferenceCell(item)
+    );
+    filterReference();
+  }
+  function createReferenceCell(item){
+    const wrap =
+      document.createElement(
+        'div'
+      );
+    wrap.className =
+      'ref-cell-wrapper' + (item.expanded === false ? ' ref-collapsed' : '');
+    wrap.dataset.id =
+      item.id;
+    wrap.innerHTML =
+      `<button class="ref-disclosure" type="button" data-toggle title="Expand/collapse reference cell">${item.expanded === false ? '▸' : '▾'}</button>
+      <div
+        class="ref-cell"
+        contenteditable="true"
+        data-placeholder="Type reference material…"
+      >${storedToHtml(
+        item.content || item.title || ''
+      )}</div>
+      <div class="ref-actions">
+        <button
+          class="btn tiny"
+          data-del>
+          Delete
+        </button>
+      </div>`;
+    document
+      .getElementById(
+        'referenceTree'
+      )
+      .appendChild(wrap);
+    const ed =
+      wrap.querySelector(
+        '.ref-cell'
+      );
+    wireEditorHistory(ed);
+    /*
+     * IMPORTANT:
+     * Reference now explicitly establishes itself as
+     * the active editor whenever focused.
+     */
+    ed.addEventListener(
+      'focus',
+      () => {
+        activeRefId =
+          item.id;
+        activeEditor =
+          ed;
+        rememberSelection(ed);
+      }
+    );
+    ed.addEventListener(
+      'keyup',
+      () => {
+        rememberSelection(ed);
+      }
+    );
+    ed.addEventListener(
+      'mouseup',
+      () => {
+        rememberSelection(ed);
+      }
+    );
+    ed.addEventListener(
+      'input',
+      () => {
+        activeEditor =
+          ed;
+        rememberSelection(ed);
+        autoFormat(ed);
+        saveRefFromDom(
+          item.id
+        );
+      }
+    );
+    ed.addEventListener(
+      'keydown',
+      e => {
+        handleEditorKey(
+          e,
+          ed,
+          'reference'
+        );
+      }
+    );
+    ed.addEventListener(
+      'paste',
+      e => {
+        e.preventDefault();
+        activeEditor =
+          ed;
+        const text =
+          (
+            e.clipboardData ||
+            window.clipboardData
+          ).getData(
+            'text/plain'
+          );
+        pasteStructuredText(ed, text);
+      }
+    );
+    ed.querySelectorAll(
+      'input[type=checkbox]'
+    ).forEach(
+      wireCheckbox
+    );
+    wrap.querySelector(
+      '[data-toggle]'
+    ).onclick = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.expanded = item.expanded === false;
+      wrap.classList.toggle('ref-collapsed', !item.expanded);
+      e.currentTarget.textContent = item.expanded ? '▾' : '▸';
+      google.script.run.saveReferenceItem(item);
+    };
+    wrap.querySelector(
+      '[data-del]'
+    ).onclick =
+      () =>
+        deleteReference(
+          item.id
+        );
+    return wrap;
+  }
+  function saveRefFromDom(id){
+    const wrap =
+      document.querySelector(
+        `.ref-cell-wrapper[data-id="${CSS.escape(id)}"]`
+      );
+    const item =
+      state.reference.find(
+        x => x.id === id
+      );
+    if(!wrap || !item){
+      return;
+    }
+    const refCell = wrap.querySelector('.ref-cell');
+    refCell?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    item.content = refCell?.innerHTML || '';
+    clearTimeout(
+      item._timer
+    );
+    setStatus(
+      'Unsaved reference…'
+    );
+    item._timer =
+      setTimeout(
+        () => {
+          google.script.run
+            .withSuccessHandler(
+              () =>
+                setStatus('Saved')
+            )
+            .saveReferenceItem(
+              item
+            );
+        },
+        700
+      );
+  }
+  function addReferenceCell(afterId){
+    google.script.run
+      .withSuccessHandler(id => {
+        const item = {
+          id:id,
+          parentId:'',
+          type:'item',
+          title:'',
+          content:'',
+          expanded:true,
+          sort:Date.now()
+        };
+        state.reference.push(
+          item
+        );
+        createReferenceCell(
+          item
+        );
+        const ed =
+          document.querySelector(
+            `.ref-cell-wrapper[data-id="${CSS.escape(id)}"] .ref-cell`
+          );
+        ed.focus();
+        activeRefId =
+          id;
+        activeEditor =
+          ed;
+        placeEnd(ed);
+      })
+      .addReferenceItem(
+        '',
+        '',
+        '<h2><br></h2><p><br></p>'
+      );
+  }
+  function deleteReference(id){
+    google.script.run
+      .withSuccessHandler(() => {
+        state.reference =
+          state.reference.filter(
+            x => x.id !== id
+          );
+        renderReference();
+      })
+      .deleteReferenceItem(id);
+  }
+  /* =========================================================
+     REFERENCE COLLAPSE / EXPAND
+     ========================================================= */
+  function applyReferenceCollapseState(){
+    const items = state.reference || [];
+    document.querySelectorAll('.ref-cell-wrapper').forEach(w => {
+      const item = items.find(x => x.id === w.dataset.id);
+      const collapsed = item ? item.expanded === false : referenceCollapsed;
+      w.classList.toggle('ref-collapsed', collapsed);
+      const arrow = w.querySelector('[data-toggle]');
+      if(arrow) arrow.textContent = collapsed ? '▸' : '▾';
+    });
+    const btn = document.getElementById('refCollapseBtn');
+    if(btn) btn.textContent = referenceCollapsed ? 'Expand Ref' : 'Collapse Ref';
+  }
+  function toggleReferenceCollapse(){
+    referenceCollapsed = !referenceCollapsed;
+    localStorage.setItem(REF_COLLAPSE_STORAGE_KEY, referenceCollapsed ? '1' : '0');
+    (state.reference || []).forEach(item => {
+      item.expanded = !referenceCollapsed;
+      google.script.run.saveReferenceItem(item);
+    });
+    applyReferenceCollapseState();
+    setStatus(referenceCollapsed ? 'Reference collapsed' : 'Reference expanded');
+  }
+  /* =========================================================
+     WORKSPACE VIEW
+     ========================================================= */
+  function applyWorkspaceView(mode){
+    const allowed=['all','today','journal','reference'];
+    if(!allowed.includes(mode)) mode='all';
+    const workspace=document.getElementById('workspace');
+    const panes={today:document.getElementById('todayPane'),journal:document.getElementById('journalPane'),reference:document.getElementById('referencePane')};
+    workspace.classList.toggle('view-single',mode!=='all');
+    Object.entries(panes).forEach(([name,pane])=>pane.classList.toggle('view-hidden',mode!=='all'&&mode!==name));
+    const select=document.getElementById('viewMode');
+    const focusSelect=document.getElementById('focusViewMode');
+    if(select) select.value=mode;
+    if(focusSelect) focusSelect.value=mode;
+    localStorage.setItem(VIEW_STORAGE_KEY,mode);
+    requestAnimationFrame(()=>{ if(mode==='all'||mode==='today'||mode==='journal') syncDayHeights(); });
+  }
+  function initWorkspaceView(){
+    const select=document.getElementById('viewMode');
+    const saved=localStorage.getItem(VIEW_STORAGE_KEY)||'all';
+    select.addEventListener('change',()=>applyWorkspaceView(select.value));
+    const focusSelect=document.getElementById('focusViewMode');
+    if(focusSelect) focusSelect.addEventListener('change',()=>applyWorkspaceView(focusSelect.value));
+    applyWorkspaceView(saved);
+  }
+  /* =========================================================
+     COLUMN RESIZING / FOCUS MODE
+     ========================================================= */
+  function loadColumnWidths(){
+    let v={today:420,journal:420,reference:399};
+    try{v={...v,...JSON.parse(localStorage.getItem(COLUMN_STORAGE_KEY)||'{}')};}catch(e){}
+    return v;
+  }
+  let columnWidths=loadColumnWidths();
+  function applyColumnWidths(){
+    const root=document.documentElement;
+    root.style.setProperty('--col-today',columnWidths.today+'px');
+    root.style.setProperty('--col-journal',columnWidths.journal+'px');
+    root.style.setProperty('--col-reference',columnWidths.reference+'px');
+  }
+  function initColumnResizers(){
+    applyColumnWidths();
+    document.querySelectorAll('.column-resizer').forEach(handle=>{
+      handle.addEventListener('pointerdown',e=>{
+        e.preventDefault();
+        handle.setPointerCapture(e.pointerId);
+        handle.classList.add('dragging');
+        const left=handle.dataset.left,right=handle.dataset.right,startX=e.clientX;
+        const startLeft=columnWidths[left],startRight=columnWidths[right];
+        const move=ev=>{
+          const dx=ev.clientX-startX;
+          const min=220;
+          let newLeft=Math.max(min,startLeft+dx);
+          let actualDx=newLeft-startLeft;
+          let newRight=Math.max(min,startRight-actualDx);
+          if(newRight===min){newLeft=startLeft+(startRight-min);}
+          columnWidths[left]=Math.round(newLeft);columnWidths[right]=Math.round(newRight);
+          applyColumnWidths();requestAnimationFrame(syncDayHeights);
+        };
+        const up=()=>{
+          handle.classList.remove('dragging');
+          handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);
+          localStorage.setItem(COLUMN_STORAGE_KEY,JSON.stringify(columnWidths));
+        };
+        handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
+      });
+    });
+  }
+  function setFocusMode(on){
+    document.body.classList.toggle('focus-mode',!!on);
+    localStorage.setItem(FOCUS_STORAGE_KEY,on?'1':'0');
+    requestAnimationFrame(syncDayHeights);
+  }
+  function initFocusMode(){setFocusMode(localStorage.getItem(FOCUS_STORAGE_KEY)==='1');}
+  /* =========================================================
+     REFERENCE SEARCH
+     \========================================================= */
+  function filterReference(){
+    const q =
+      document
+        .getElementById(
+          'refSearch'
+        )
+        .value
+        .trim()
+        .toLowerCase();
+    document
+      .querySelectorAll(
+        '.ref-cell-wrapper'
+      )
+      .forEach(w => {
+        const matches =
+          !q ||
+          w.innerText
+            .toLowerCase()
+            .includes(q);
+        w.classList.toggle(
+          'hidden',
+          !matches
+        );
+        const disclosure =
+          w.querySelector('[data-toggle]');
+        if(q && matches){
+          /* Search expansion is temporary: reveal deep matches without
+             changing the item's saved expanded/collapsed preference. */
+          w.classList.remove('ref-collapsed');
+          if(disclosure){
+            disclosure.textContent = '▾';
+          }
+        }else if(!q){
+          const item = state.reference.find(
+            ref => String(ref.id) === String(w.dataset.id)
+          );
+          const expanded = !item || item.expanded !== false;
+          w.classList.toggle(
+            'ref-collapsed',
+            !expanded
+          );
+          if(disclosure){
+            disclosure.textContent = expanded ? '▾' : '▸';
+          }
+        }
+      });
+  }
+  document
+    .getElementById(
+      'refSearch'
+    )
+    .addEventListener(
+      'input',
+      filterReference
+    );
+  /* =========================================================
+     SCROLLBARS
+     \========================================================= */
+  /*
+   * Scrollbars remain functional but invisible until the pointer
+   * is within 24px of the right edge of the scrollable pane.
+   */
+  function wireScrollbarHover(scroll){
+    if(!scroll){
+      return;
+    }
+    scroll.addEventListener(
+      'mousemove',
+      e => {
+        const r =
+          scroll.getBoundingClientRect();
+        const nearRight =
+          e.clientX >= r.right - 24 &&
+          e.clientX <= r.right;
+        const nearBottom =
+          e.clientY >= r.bottom - 24 &&
+          e.clientY <= r.bottom;
+        const inScrollbarZone =
+          nearRight || nearBottom;
+        scroll.classList.toggle(
+          'scrollbar-hover',
+          inScrollbarZone
+        );
+      }
+    );
+    scroll.addEventListener(
+      'mouseleave',
+      () => {
+        scroll.classList.remove(
+          'scrollbar-hover'
+        );
+      }
+    );
+  }
+  /*
+   * Apply the behavior to Today, Journal, and Reference.
+   */
+  ['journalScroll','referenceScroll'].forEach(id => wireScrollbarHover(document.getElementById(id)));
+  /* The whole workspace owns horizontal scrolling on narrow screens. */
+  wireScrollbarHover(
+    document.getElementById('workspace')
+  );
+  /* =========================================================
+     START
+     \========================================================= */
+  initTypographyControls();
+  initWorkspaceView();
+  initColumnResizers();
+  initFocusMode();
+  loadWorkspace();
+</script>
+</body>
+</html>

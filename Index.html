@@ -1,0 +1,4221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="theme-color" content="#f6f7f8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Focus Workspace">
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+  <style>
+    :root{
+      --border:#d9d9d9;
+      --muted:#777;
+      --bg:#f6f7f8;
+      --panel:#fff;
+      --accent:#1a73e8;
+      --done:#666;
+      --paragraph-size:14px;
+      --subtitle-size:18px;
+      --title-size:28px;
+      --paragraph-font:Arial,Helvetica,sans-serif;
+      --subtitle-font:Arial,Helvetica,sans-serif;
+      --title-font:Arial,Helvetica,sans-serif;
+      --col-today:420px;
+      --col-journal:420px;
+      --col-reference:399px;
+      --pad-x:1;
+      --pad-y:1;
+    }
+    *{
+      box-sizing:border-box;
+    }
+    html,
+    body{
+      margin:0;
+      height:100%;
+      overflow:hidden;
+      font-family:Arial,Helvetica,sans-serif;
+      color:#222;
+      background:var(--bg);
+    }
+    button,
+    input,
+    select{
+      font:inherit;
+    }
+    #app{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+    }
+    #toolbar{
+      min-height:36px;
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      gap:5px;
+      padding:2px 6px;
+      background:#fff;
+      border-bottom:1px solid var(--border);
+    }
+    #title{
+      font-weight:700;
+      margin-right:8px;
+      white-space:nowrap;
+    }
+    .btn{
+      border:1px solid #c9c9c9;
+      background:#fff;
+      border-radius:6px;
+      padding:4px 8px;
+      cursor:pointer;
+    }
+    .btn:hover{
+      background:#f0f0f0;
+    }
+    .btn:disabled{
+      opacity:.45;
+      cursor:default;
+    }
+    #dateLabel{
+      color:#666;
+      font-size:12px;
+    }
+    .status{
+      margin-left:auto;
+      color:var(--muted);
+      font-size:12px;
+    }
+    #workspace{
+      flex:1;
+      min-height:0;
+      display:grid;
+      /* Keep all three columns at usable widths. On narrow screens,
+         the whole workspace pans horizontally instead of compressing
+         or stacking the columns. */
+      grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--col-reference);
+      overflow-x:auto;
+      overflow-y:hidden;
+      width:100%;
+      min-width:0;
+      overscroll-behavior-x:contain;
+      scrollbar-width:none;
+      overflow-anchor:none;
+      touch-action:pan-x pan-y;
+      -webkit-overflow-scrolling:touch;
+    }
+    /* Single-pane focus views. Hidden panes are removed from the grid and
+       the selected pane fills the visible workspace width. */
+    #workspace.view-single{
+      grid-template-columns:minmax(0,1fr);
+      overflow-x:hidden;
+    }
+    #workspace .pane.view-hidden{
+      display:none!important;
+    }
+    #workspace.view-single .pane:not(.view-hidden){
+      width:100%;
+      min-width:0;
+      border-right:0;
+    }
+
+    .column-resizer{
+      width:1px;
+      min-width:1px;
+      position:relative;
+      cursor:col-resize;
+      background:var(--border);
+      touch-action:none;
+      z-index:20;
+    }
+    /* Keep a comfortable invisible grab target without creating a visible gap. */
+    .column-resizer::before{
+      content:"";
+      position:absolute;
+      top:0;
+      bottom:0;
+      left:-4px;
+      right:-4px;
+      cursor:col-resize;
+    }
+    .column-resizer:hover,.column-resizer.dragging{background:#9dbcf0;}
+    #workspace.view-single .column-resizer{display:none;}
+    #focusControls{
+      display:none;position:fixed;top:3px;right:8px;z-index:2000;
+      align-items:center;gap:5px;
+    }
+    #focusControls .btn,#focusControls .top-select{
+      padding:4px 7px;font-size:11px;font-weight:700;box-shadow:0 1px 5px rgba(0,0,0,.10);
+    }
+    #focusStatus{
+      display:none;
+      margin-left:auto;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:400;
+      white-space:nowrap;
+    }
+    body.focus-mode #focusStatus{display:inline-flex;}
+    .view-menu{position:relative;}
+    .view-menu-popup{
+      position:absolute;
+      top:calc(100% + 4px);
+      left:0;
+      z-index:2100;
+      min-width:220px;
+      padding:5px;
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:6px;
+      box-shadow:0 4px 14px rgba(0,0,0,.16);
+    }
+    #focusControls .view-menu-popup{left:auto;right:0;}
+    .view-menu-row{display:flex;align-items:center;gap:8px;padding:4px 5px;}
+    .view-menu-row label{display:flex;align-items:center;gap:7px;flex:1;cursor:pointer;}
+    .view-menu-row input{margin:0;}
+    .view-menu-row .btn{padding:3px 7px;font-size:11px;}
+    .view-menu-popup[hidden]{display:none;}
+    body.focus-mode #toolbar{display:none;}
+    body.focus-mode #focusControls{display:flex;}
+    #todayScroll{scrollbar-width:none!important;}
+    #todayScroll::-webkit-scrollbar{width:0!important;height:0!important;}
+    .pane{
+      min-width:0;
+      min-height:0;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      background:var(--panel);
+      border-right:1px solid var(--border);
+    }
+    .pane:last-child{
+      border-right:0;
+    }
+    .pane-header{
+      flex:0 0 34px;
+      display:flex;
+      align-items:center;
+      padding:0 12px;
+      font-size:14px;
+      font-weight:700;
+      background:#fafafa;
+      border-bottom:1px solid var(--border);
+    }
+    #todayPane .pane-header{gap:8px;}
+    .scroll{
+      flex:1 1 0;
+      height:0;
+      min-height:0;
+      overflow-y:auto;
+      overflow-x:hidden;
+      overflow-anchor:none;
+      scrollbar-width:none;
+    }
+    /* =========================================================
+       DAY ROWS
+       ========================================================= */
+    .day-row{
+      border-bottom:1px solid var(--border);
+      padding:calc(5px * var(--pad-y,1)) calc(8px * var(--pad-x,1)) calc(6px * var(--pad-y,1));
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      overflow:visible;
+      min-height:0;
+    }
+    .day-row.dow-1{
+      background:#eeeeee;
+    }
+    .day-row.dow-2{
+      background:#fff0df;
+    }
+    .day-row.dow-3{
+      background:#e6f1fb;
+    }
+    .day-row.dow-4{
+      background:#ead8c2;
+    }
+    .day-row.dow-5{
+      background:#fff0bd;
+    }
+    .day-row.dow-6{
+      background:#d9b98c;
+    }
+    .day-row.dow-0{
+      background:#fff4a8;
+    }
+    /*
+     * Current-day border.
+     *
+     * Both Today and Journal keep their visible outer borders.
+     * The shared middle edge is drawn ONLY by the Today cell,
+     * so the divider between the two cells is one line instead
+     * of two overlapping borders.
+     */
+    .day-row.today{
+      z-index:2;
+    }
+    .day-row.today.day-pane-row{
+      box-shadow:
+        inset 0 2px 0 var(--today-border),
+        inset 0 -2px 0 var(--today-border),
+        inset 2px 0 0 var(--today-border),
+        inset -1px 0 0 var(--today-border);
+    }
+    .day-row.today.journal-pane-row{
+      box-shadow:
+        inset 0 2px 0 var(--today-border),
+        inset 0 -2px 0 var(--today-border),
+        inset -2px 0 0 var(--today-border),
+        inset 1px 0 0 var(--today-border);
+    }
+    .day-row.today.dow-1{
+      --today-border:#8a8a8a;
+    }
+    .day-row.today.dow-2{
+      --today-border:#c98545;
+    }
+    .day-row.today.dow-3{
+      --today-border:#5f8fb9;
+    }
+    .day-row.today.dow-4{
+      --today-border:#9a6f42;
+    }
+    .day-row.today.dow-5{
+      --today-border:#b9962e;
+    }
+    .day-row.today.dow-6{
+      --today-border:#8b6237;
+    }
+    .day-row.today.dow-0{
+      --today-border:#c3a51f;
+    }
+    .day-label{
+      font-size:14px;
+      font-weight:700;
+      color:#555;
+      margin-bottom:3px;
+      user-select:none;
+    }
+    .today-pill{
+      color:var(--accent);
+      margin-left:6px;
+    }
+    .top-select{
+      border:1px solid #c9c9c9;
+      background:#fff;
+      border-radius:6px;
+      padding:4px 6px;
+      cursor:pointer;
+    }
+    /*
+     * Today and Journal always start at Paragraph size.
+     */
+    .day-editor,
+    .journal-editor{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+      line-height:1.18;
+    }
+    .editor,
+    .ref-cell{
+      width:100%;
+      min-height:16px;
+      outline:0;
+      border:0;
+      padding:0;
+      line-height:1.18;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      min-width:0;
+      background:transparent;
+    }
+    .ref-cell{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+    }
+    .editor.day-editor,
+    .editor.journal-editor{
+      min-height:5.9em;
+    }
+    .editor:empty:before,
+    .ref-cell:empty:before{
+      content:attr(data-placeholder);
+      color:#999;
+      pointer-events:none;
+    }
+    .editor p,
+    .ref-cell p{
+      margin:0 0 1px;
+    }
+    .editor p:last-child,
+    .ref-cell p:last-child{
+      margin-bottom:0;
+    }
+    .editor h1,
+    .editor h2,
+    .editor h3,
+    .ref-cell h1,
+    .ref-cell h2,
+    .ref-cell h3{
+      margin:2px 0 1px;
+    }
+    .editor h1,
+    .ref-cell h1{
+      font-family:var(--title-font);
+      font-size:var(--title-size);
+      line-height:1.12;
+    }
+    .editor h2,
+    .ref-cell h2{
+      font-family:var(--subtitle-font);
+      font-size:var(--subtitle-size);
+      line-height:1.14;
+    }
+    .editor h3,
+    .ref-cell h3{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+      line-height:1.18;
+    }
+    .editor ul,
+    .editor ol,
+    .ref-cell ul,
+    .ref-cell ol{
+      margin:1px 0 1px 20px;
+      padding:0;
+    }
+    .editor blockquote,
+    .ref-cell blockquote{
+      margin:1px 0;
+      padding-left:10px;
+      border-left:3px solid #bbb;
+      color:#222;
+    }
+    .editor code,
+    .ref-cell code{
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+      background:#eee;
+      padding:1px 4px;
+      border-radius:3px;
+    }
+    .check-line{
+      display:flex;
+      align-items:flex-start;
+      gap:5px;
+      min-height:16px;
+    }
+    .check-line input{
+      margin-top:1px;
+      flex:0 0 auto;
+    }
+    .check-text{
+      flex:1;
+      min-width:0;
+      min-height:1.18em;
+      line-height:1.18;
+      display:block;
+    }
+    .check-line.done > .check-text,
+    .check-line > input[type="checkbox"]:checked + .check-text{
+      color:var(--done);
+      opacity:.82;
+    }
+    .check-line.task-struck > .check-text{text-decoration:line-through;}
+    .check-line > .check-text{align-self:flex-start;}
+    .editor pre.code-block,.ref-cell pre.code-block{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;
+      font-size:.95em!important;line-height:1.4!important;
+      white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2;
+      background:#f1f3f5;border:1px solid #d9dde2;border-radius:6px;
+      padding:8px 10px;margin:5px 0;color:#20252b;min-height:1.4em;
+    }
+    .ref-cell pre.code-block *,.editor pre.code-block *{font-family:inherit!important;font-size:inherit!important;line-height:inherit!important;}
+    .editor pre.code-block code,.ref-cell pre.code-block code{background:none;padding:0;}
+    /*
+     * Indentation only changes horizontal position.
+     * It NEVER changes text color.
+     */
+    .indent-1{margin-left:24px}
+    .indent-2{margin-left:48px}
+    .indent-3{margin-left:72px}
+    .indent-4{margin-left:96px}
+    .indent-5{margin-left:120px}
+    .indent-6{margin-left:144px}
+    /* =========================================================
+       REFERENCE
+       ========================================================= */
+    #referenceScroll{
+      padding:6px 5px 40px;
+    }
+    .ref-toolbar{
+      display:flex;
+      gap:6px;
+      margin-bottom:5px;
+      position:sticky;
+      top:0;
+      background:#fff;
+      padding-bottom:8px;
+      z-index:10;
+    }
+    .ref-search{
+      flex:1;
+      min-width:0;
+      border:1px solid #ccc;
+      border-radius:6px;
+      padding:7px 8px;
+    }
+    #referenceTree{
+      display:flex;
+      flex-direction:column;
+    }
+    .ref-cell-wrapper{
+      position:relative;
+      border-bottom:1px solid #eee;
+      padding:calc(8px * var(--pad-y,1)) 4px calc(10px * var(--pad-y,1));
+      min-height:38px;
+    }
+    .ref-cell-wrapper:hover{
+      background:#fafafa;
+    }
+    .ref-cell-wrapper:focus-within{
+      box-shadow:inset 2px 0 0 var(--accent);
+    }
+    .ref-drag{position:absolute;left:18px;top:8px;width:18px;height:27px;border:0;background:transparent;color:#777;cursor:grab;touch-action:none;z-index:4;font-size:18px;}
+    .ref-drag:active{cursor:grabbing;}
+    .ref-drop-before{box-shadow:inset 0 3px #1a73e8!important;}
+    .ref-drop-after{box-shadow:inset 0 -3px #1a73e8!important;}
+    .ref-dragging{opacity:.5;}
+    #referenceEdgeResize{width:9px;position:absolute;right:0;top:0;bottom:0;cursor:col-resize;touch-action:none;z-index:35;background:transparent;}
+    #referenceEdgeResize:hover,#referenceEdgeResize.dragging{background:#1a73e833;}
+    body.mobile-mode #referenceEdgeResize,body.mobile-split #referenceEdgeResize{display:none;}
+    #workspace{position:relative;}
+    .editor hr,.ref-cell hr{border:0;border-top:1px solid #aaa;margin:7px 0;}
+    .ref-disclosure{
+      position:absolute;
+      left:2px;
+      top:9px;
+      width:20px;
+      height:24px;
+      padding:0;
+      border:0;
+      background:transparent;
+      cursor:pointer;
+      font-size:14px;
+      line-height:24px;
+      color:#666;
+      z-index:2;
+    }
+    .ref-actions{
+      display:none;
+      position:absolute;
+      right:4px;
+      top:4px;
+      gap:3px;
+    }
+    .ref-cell-wrapper:hover .ref-actions,
+    .ref-cell-wrapper:focus-within .ref-actions{
+      display:flex;
+    }
+    .tiny{
+      font-size:11px;
+      padding:3px 6px;
+    }
+    .format-hint{
+      color:#888;
+      font-size:11px;
+      padding:3px 2px 10px;
+    }
+    .hidden{
+      display:none!important;
+    }
+    .empty{
+      padding:14px;
+      color:#777;
+      font-size:13px;
+    }
+    .type-settings{
+      position:fixed;
+      top:48px;
+      left:8px;
+      z-index:1000;
+      width:330px;
+      max-width:calc(100vw - 16px);
+      max-height:calc(100vh - 64px);
+      max-height:calc(100dvh - 64px);
+      overflow:auto;
+      padding:8px;
+      background:#fff;
+      border:1px solid #cfcfcf;
+      border-radius:7px;
+      box-shadow:0 4px 18px rgba(0,0,0,.16);
+      font-size:11px;
+    }
+    .type-settings label{
+      display:grid;
+      grid-template-columns:62px 1fr 48px 18px;
+      align-items:center;
+      gap:5px;
+      margin:4px 0;
+    }
+    .font-size-input{
+      width:48px;
+      padding:4px;
+      border:1px solid #c9c9c9;
+      border-radius:5px;
+    }
+    /* =========================================================
+       MOBILE / NARROW SCREENS
+       ========================================================= */
+    @media(max-width:900px){
+      /* Keep the desktop three-column geometry on small screens.
+         #workspace itself becomes the horizontal viewport. */
+      #workspace{
+        grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--col-reference);
+      }
+      #workspace.view-single{
+        grid-template-columns:minmax(0,1fr);
+      }
+      .scroll{
+        overflow-y:auto;
+        overflow-x:hidden;
+      }
+    }
+    .day-row.today.day-pane-row{box-shadow:inset 0 1px 0 var(--today-border),inset 0 -1px 0 var(--today-border),inset 1px 0 0 var(--today-border),inset -1px 0 0 var(--today-border);}
+    .day-row.today.journal-pane-row{box-shadow:inset 0 1px 0 var(--today-border),inset 0 -1px 0 var(--today-border),inset -1px 0 0 var(--today-border);}
+    #todayPane,#journalPane{border-right:0;}
+    .day-row.today .day-label{color:#444;}
+    .day-row.today .today-pill{color:var(--today-border);font-weight:700;}
+    .editor.day-editor,.editor.journal-editor{min-height:5.9em;flex-shrink:0;}
+    .pane,.scroll{overscroll-behavior:contain;}
+    @media(max-width:900px){
+      html,body{height:100%;height:100dvh;}
+      #app{height:100%;}
+      #toolbar{flex-wrap:wrap;gap:calc(6px * var(--mobile-scale,1));padding:calc(6px * var(--mobile-scale,1)) calc(8px * var(--mobile-scale,1));font-size:calc(14px * var(--mobile-scale,1));}
+      #title{font-size:calc(14px * var(--mobile-scale,1));}
+      #toolbar .btn,#toolbar .top-select{min-height:calc(40px * var(--mobile-scale,1));}
+      #dateLabel{display:none;}
+      .status{font-size:calc(12px * var(--mobile-scale,1));}
+      .pane-header{flex:0 0 calc(42px * var(--mobile-scale,1));padding:0 calc(12px * var(--mobile-scale,1));font-size:calc(15px * var(--mobile-scale,1));}
+      .day-row{padding:calc(8px * var(--mobile-scale,1) * var(--pad-y,1)) calc(12px * var(--mobile-scale,1) * var(--pad-x,1)) calc(10px * var(--mobile-scale,1) * var(--pad-y,1));}
+      .day-label{font-size:calc(15px * var(--mobile-scale,1));line-height:1.35;margin-bottom:calc(6px * var(--mobile-scale,1));}
+      .editor.day-editor,.editor.journal-editor{min-height:6.75em;}
+      .check-line{gap:calc(8px * var(--mobile-scale,1));min-height:calc(28px * var(--mobile-scale,1));}
+      .check-line input[type=checkbox]{width:calc(22px * var(--mobile-scale,1));height:calc(22px * var(--mobile-scale,1));margin-top:calc(1px * var(--mobile-scale,1));}
+      .check-text{line-height:1.35;}
+      #workspace{scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
+      #workspace .pane{scroll-snap-align:start;}
+      .column-resizer{display:none!important;}
+      #focusControls{position:static;flex:0 0 auto;padding:calc(6px * var(--mobile-scale,1)) calc(8px * var(--mobile-scale,1));flex-wrap:wrap;background:#fff;}
+      #focusControls .btn{min-height:calc(40px * var(--mobile-scale,1));font-size:calc(13px * var(--mobile-scale,1));}
+      #focusStatus{margin-right:auto;}
+      .view-menu-popup{position:fixed;top:calc(54px * var(--mobile-scale,1));left:calc(8px * var(--mobile-scale,1))!important;right:calc(8px * var(--mobile-scale,1))!important;width:auto;z-index:2500;}
+      .view-menu-row .btn{min-height:calc(40px * var(--mobile-scale,1));font-size:calc(14px * var(--mobile-scale,1));}
+      .type-settings{position:fixed;top:calc(54px * var(--mobile-scale,1));left:calc(8px * var(--mobile-scale,1));right:calc(8px * var(--mobile-scale,1));width:auto;z-index:2600;}
+      .type-settings label{grid-template-columns:calc(70px * var(--mobile-scale,1)) 1fr calc(54px * var(--mobile-scale,1)) calc(18px * var(--mobile-scale,1));font-size:calc(13px * var(--mobile-scale,1));}
+      .type-settings input,.type-settings select{min-height:calc(40px * var(--mobile-scale,1));font-size:calc(16px * var(--mobile-scale,1));}
+      .ref-search{font-size:calc(16px * var(--mobile-scale,1));min-height:calc(44px * var(--mobile-scale,1));}
+      .ref-toolbar .btn{min-height:calc(44px * var(--mobile-scale,1));}
+      .ref-actions{position:static;justify-content:flex-end;margin-top:calc(5px * var(--mobile-scale,1));}
+      .ref-actions .btn{min-height:calc(36px * var(--mobile-scale,1));}
+      .format-hint{font-size:calc(12px * var(--mobile-scale,1));line-height:1.4;}
+    }
+    .reference-sort-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;}
+    .reference-sort-bar select{min-width:0;flex:1;}
+    #mobileScale{width:100%;min-width:0;}
+    @media(max-width:900px){
+      .reference-sort-bar{font-size:calc(14px * var(--mobile-scale,1));}
+      .reference-sort-bar select{font-size:calc(14px * var(--mobile-scale,1));min-height:44px;}
+      #mobileScaleValue{font-size:13px;}
+    }
+
+    /* Mobile layout is an app state, not browser fullscreen. */
+    body.mobile-mode #workspace{scroll-snap-type:none!important;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;}
+    body.mobile-mode #workspace .pane{scroll-snap-align:start;}
+    body.mobile-mode .column-resizer{display:none!important;}
+    /* Split works in regular and Mobile mode (body class name kept from before). */
+    body:not(.mobile-split) #mobileSplitResizer{display:none!important;}
+    #mobileSplitResizer{display:none;background:var(--border);height:7px;cursor:row-resize;touch-action:none;position:relative;z-index:40;}
+    #mobileSplitResizer::before{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px;}
+    body.mobile-split #mobileSplitResizer{display:block;}
+    body.mobile-split #workspace{overflow:hidden;scroll-snap-type:none;}
+    /* Non-split mode must always permit horizontal overflow on both desktop and mobile. */
+    body:not(.mobile-split) #workspace:not(.view-single){overflow-x:auto!important;overflow-y:hidden;}
+    body:not(.mobile-split) #workspace .pane{min-width:0;}
+    body.mobile-split #workspace .pane{min-height:0;}
+    body.mobile-split #workspace .pane.view-hidden{display:none!important;}
+    body.mobile-split #mobileSplitResizer{touch-action:none;}
+    body.mobile-mode #toolbar{font-size:calc(14px * var(--mobile-scale,1));}
+    body.mobile-mode .pane-header{font-size:calc(15px * var(--mobile-scale,1));flex-basis:calc(42px * var(--mobile-scale,1));}
+    body.mobile-mode .day-label{font-size:calc(15px * var(--mobile-scale,1));}
+    body.mobile-mode .check-line input[type=checkbox]{width:calc(22px * var(--mobile-scale,1));height:calc(22px * var(--mobile-scale,1));}
+    body.mobile-mode .day-row{padding:calc(8px * var(--mobile-scale,1) * var(--pad-y,1)) calc(12px * var(--mobile-scale,1) * var(--pad-x,1));}
+    body.mobile-mode .btn{font-size:inherit;}
+
+    /* Unified editor sizes. Reference's first line (the title) differs by weight only. */
+    .editor h1,.editor h2,.editor h3,.ref-cell h1,.ref-cell h2,.ref-cell h3{font-size:var(--paragraph-size)!important;line-height:1.25!important;}
+    .ref-cell > :first-child{font-weight:700;}
+    body.mobile-mode .day-label{font-size:calc(14px * var(--mobile-scale,1))!important;line-height:1.25!important;}
+    body.mobile-mode .check-line{min-height:calc(18px * var(--mobile-scale,1));gap:calc(6px * var(--mobile-scale,1));}
+    body.mobile-mode .check-text{line-height:1.3!important;}
+    body.mobile-mode .ref-cell > :first-child{font-weight:700;}
+
+    body.mobile-split #workspace{display:grid!important;min-width:0!important;max-width:100%;overflow:hidden!important;scroll-snap-type:none!important;}
+    body.mobile-split #workspace .pane{box-sizing:border-box;min-width:0!important;width:100%!important;max-width:100%;height:100%;min-height:0;}
+    body.mobile-split #mobileSplitResizer{min-width:7px;min-height:7px;align-self:stretch;justify-self:stretch;}
+    /* Desktop horizontal scroll is available when fixed-size panes exceed viewport. */
+    body:not(.mobile-split) #workspace:not(.view-single){overflow-x:auto!important;min-width:0;}
+    body:not(.mobile-split) #workspace:not(.view-single) .pane{min-width:0;}
+
+    body.mobile-mode #workspace{scroll-snap-type:none!important;}
+    body.mobile-mode #workspace .pane{scroll-snap-align:none!important;}
+    [data-split-mirror] .scroll{overflow-y:auto;}
+    /* No scrollbar chrome in narrow or wide windows. Keep actual overflow
+       scrollable, so horizontal trackpad swipes and touch gestures still work. */
+    *,*::before,*::after{
+      scrollbar-width:none!important;
+      -ms-overflow-style:none!important;
+    }
+    #workspace,.scroll,html,body{
+      scrollbar-width:none!important;
+      scrollbar-gutter:auto!important;
+    }
+    *::-webkit-scrollbar,
+    *::-webkit-scrollbar-track,
+    *::-webkit-scrollbar-thumb,
+    *::-webkit-scrollbar-corner{
+      width:0!important;
+      height:0!important;
+      display:none!important;
+      background:transparent!important;
+      border:0!important;
+    }
+    /* Final viewport isolation: prevent the PAGE from becoming the horizontal
+       scroller when the desktop browser window is narrowed. Only #workspace
+       is allowed to retain horizontal overflow and accept trackpad gestures. */
+    html, body {
+      width:100%!important;
+      max-width:100%!important;
+      overflow-x:clip!important;
+      overflow-y:hidden!important;
+      overscroll-behavior-x:none;
+    }
+    #app {
+      position:fixed;
+      inset:0;
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      height:100%;
+      height:100dvh;
+      overflow:clip;
+    }
+    #workspace {
+      max-width:100%;
+      scrollbar-width:none!important;
+      -ms-overflow-style:none!important;
+    }
+    #workspace::-webkit-scrollbar,
+    #workspace::-webkit-scrollbar:horizontal,
+    #workspace::-webkit-scrollbar:vertical {
+      display:none!important;
+      width:0!important;
+      height:0!important;
+      background:transparent!important;
+    }
+
+    /* 2026-10-14: shared scale and typography, regardless of editing device. */
+    :root{--workspace-scale:1;}
+    #toolbar{min-height:calc(42px * var(--workspace-scale));gap:calc(7px * var(--workspace-scale));padding:calc(4px * var(--workspace-scale)) calc(8px * var(--workspace-scale));}
+    .btn,.top-select{min-height:calc(34px * var(--workspace-scale));padding:calc(6px * var(--workspace-scale)) calc(10px * var(--workspace-scale));font-size:calc(13px * var(--workspace-scale));}
+    #focusControls .btn{min-height:calc(34px * var(--workspace-scale));font-size:calc(13px * var(--workspace-scale));}
+    .pane-header{font-size:calc(14px * var(--workspace-scale));}
+    .day-label,body.mobile-mode .day-label{font-size:calc(17px * var(--workspace-scale))!important;line-height:1.3!important;}
+    .today-pill{font-size:inherit;}
+    .editor,.ref-cell,
+    .editor :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
+    .ref-cell :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
+    .check-text,.check-text *,
+    body.mobile-mode .editor,body.mobile-mode .ref-cell,
+    body.mobile-mode .editor :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
+    body.mobile-mode .ref-cell :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
+    body.mobile-mode .check-text,body.mobile-mode .check-text *{
+      font-family:var(--paragraph-font)!important;
+      font-size:calc(var(--paragraph-size) * var(--workspace-scale))!important;
+      line-height:1.3!important;
+    }
+    .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale));height:calc(17px * var(--workspace-scale));}
+    body.mobile-mode .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale))!important;height:calc(17px * var(--workspace-scale))!important;min-width:calc(17px * var(--workspace-scale))!important;}
+    #referenceScroll{padding-left:4px;padding-right:4px;}
+    .type-settings{z-index:3100;}
+
+    /* 2026-10-15 */
+    /* Notes header: Template button sits at the far right of the header. */
+    #journalTemplateButton{margin-left:auto;min-height:calc(26px * var(--workspace-scale));padding:2px calc(9px * var(--workspace-scale));font-size:calc(12px * var(--workspace-scale));}
+    /* The save-status text must never change the toolbar's height (that shifted the
+       whole workspace, and its scroll position, every time "Saving…" changed). */
+    #status.status{flex:1 1 64px;min-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+
+    /* Scale / Fonts panel: fixed-size controls that do not scale with the Scale
+       slider itself, always fits on screen and scrolls if it must. */
+    #typeSettings{left:8px;right:auto;width:min(360px,calc(100vw - 16px));max-width:calc(100vw - 16px);overflow-x:hidden;overflow-y:auto;padding:10px 12px;font-size:13px;z-index:3100;}
+    #typeSettings .ts-head{display:flex;align-items:center;justify-content:space-between;font-size:14px;}
+    #typeSettings .ts-row{display:grid;grid-template-columns:minmax(0,1fr) 46px auto;gap:4px 8px;align-items:center;margin:10px 0;}
+    #typeSettings .ts-row.ts-font{grid-template-columns:minmax(0,1fr) 64px auto;}
+    #typeSettings .ts-label{grid-column:1 / -1;font-weight:700;font-size:13px;}
+    #typeSettings input[type=range]{width:100%;min-width:0;min-height:28px;margin:0;}
+    #typeSettings output{text-align:right;font-variant-numeric:tabular-nums;font-size:13px;}
+    #typeSettings .btn,#typeSettings .top-select,#typeSettings .font-size-input{min-height:34px;padding:4px 10px;font-size:13px;}
+    #typeSettings .top-select{min-width:0;width:100%;}
+    #typeSettings .font-size-input{width:100%;}
+
+    /* =========================================================
+       2026-10-20
+       ========================================================= */
+    /* No double-tap zoom on buttons, menus or the toolbar. */
+    #app,button,select,input,label,.ctx-menu{touch-action:manipulation;}
+    #workspace{touch-action:pan-x pan-y;}
+
+    /* Columns menu: bigger checkboxes, taller rows, Split section. */
+    .view-menu-popup{min-width:270px;max-height:calc(100dvh - 70px);overflow-y:auto;padding:8px;}
+    .view-menu-row{min-height:40px;padding:5px 6px;font-size:14px;}
+    .view-menu-row label{gap:10px;}
+    .view-menu-row input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;margin:0;}
+    .view-menu-section{border-top:1px solid var(--border);margin-top:6px;padding:8px 6px 4px;display:grid;gap:7px;}
+    .view-menu-heading{font-weight:700;font-size:13px;}
+    .split-state{font-weight:400;color:var(--accent);}
+    .split-field{display:grid;grid-template-columns:62px minmax(0,1fr);align-items:center;gap:8px;font-size:13px;}
+    .split-field select{min-width:0;width:100%;}
+    .view-menu-actions{display:flex;gap:6px;}
+    .view-menu-actions .btn{flex:1;}
+    @media(max-width:900px){
+      .view-menu-row{min-height:48px;font-size:16px;}
+      .view-menu-row input[type=checkbox]{width:24px;height:24px;flex-basis:24px;}
+      .split-field{font-size:15px;grid-template-columns:70px minmax(0,1fr);}
+      .split-field select{min-height:42px;font-size:15px;}
+      .view-menu-actions .btn{min-height:42px;font-size:15px;}
+    }
+
+    /* Right-click / long-press formatting menu. */
+    .ctx-menu{position:fixed;z-index:3200;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.2);min-width:220px;}
+    .ctx-menu[hidden]{display:none!important;}
+    .ctx-menu .btn{text-align:left;white-space:nowrap;min-height:34px;padding:5px 10px;font-size:13px;}
+    .ctx-menu .ctx-wide{grid-column:1 / -1;}
+    .ctx-menu.ctx-touch .btn{min-height:44px;font-size:15px;}
+
+    /* Reference follows Scale: title line height, collapsed rows, arrow and drag handle. */
+    :root{--ref-line:calc(var(--paragraph-size) * var(--workspace-scale,1) * 1.3);}
+    #referenceTree .ref-cell-wrapper{
+      min-height:0;
+      padding-top:calc(8px * var(--pad-y,1));
+      padding-bottom:calc(10px * var(--pad-y,1));
+      padding-right:max(0px,calc(1px + 10px * (var(--pad-x,1) - 1)));
+      padding-left:max(calc(var(--ref-line) * 1.9 + 6px),calc(var(--ref-line) * 2 + 6px + 8px * (var(--pad-x,1) - 1)))!important;
+    }
+    #referenceTree .ref-disclosure{
+      left:0;
+      top:calc(8px * var(--pad-y,1));
+      width:calc(var(--ref-line) * 1.1);
+      height:var(--ref-line);
+      line-height:var(--ref-line);
+      font-size:calc(var(--paragraph-size) * var(--workspace-scale,1) * 1.25);
+      text-align:center;
+    }
+    #referenceTree .ref-drag{
+      left:calc(var(--ref-line) * 1.1 + 2px);
+      top:calc(8px * var(--pad-y,1));
+      width:calc(var(--ref-line) * .8);
+      height:var(--ref-line);
+      line-height:var(--ref-line);
+      padding:0;
+      font-size:calc(var(--paragraph-size) * var(--workspace-scale,1) * 1.1);
+    }
+    #referenceTree .ref-collapsed{
+      height:auto!important;
+      min-height:0!important;
+      max-height:none!important;
+      padding-bottom:calc(8px * var(--pad-y,1));
+      overflow:hidden;
+    }
+    #referenceTree .ref-collapsed .ref-cell{
+      display:block;
+      height:var(--ref-line)!important;
+      min-height:var(--ref-line)!important;
+      max-height:var(--ref-line)!important;
+      line-height:var(--ref-line)!important;
+      overflow:hidden;
+      white-space:nowrap;
+      padding:0;
+      margin:0;
+    }
+    #referenceTree .ref-collapsed .ref-cell > *{margin:0!important;}
+    #referenceTree .ref-collapsed .ref-cell > :first-child{
+      height:var(--ref-line);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    #referenceTree .ref-collapsed .ref-cell > *:not(:first-child){display:none!important;}
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="focusControls">
+    <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
+    <div class="view-menu" data-view-menu>
+      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Columns</button>
+      <div class="view-menu-popup" hidden></div>
+    </div>
+    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale / Fonts</button>
+    <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
+    <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
+    <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref ▾</button>
+    <button class="btn" type="button" data-mobile-mode title="Toggle mobile layout">Mobile</button>
+    <button class="btn" type="button" data-layout="show-toolbar" title="Show toolbar">Show toolbar</button>
+  </div>
+  <div id="typeSettings" class="type-settings hidden" role="dialog" aria-label="Scale, padding and fonts">
+    <div class="ts-head"><strong>Scale / Fonts</strong><button class="btn tiny" id="closeTypeSettings" type="button">Close</button></div>
+    <div class="ts-row">
+      <span class="ts-label">Scale</span>
+      <input id="mobileScale" type="range" min="50" max="200" step="10" value="100" aria-label="Workspace scale">
+      <output id="mobileScaleValue">100%</output>
+      <button class="btn tiny" id="resetMobileScale" type="button">Reset</button>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label">Padding · left / right</span>
+      <input id="padX" type="range" min="0" max="300" step="10" value="100" aria-label="Left and right cell padding">
+      <output id="padXValue">100%</output>
+      <button class="btn tiny" id="resetPadX" type="button">Reset</button>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label">Padding · top / bottom</span>
+      <input id="padY" type="range" min="0" max="300" step="10" value="100" aria-label="Top and bottom cell padding">
+      <output id="padYValue">100%</output>
+      <button class="btn tiny" id="resetPadY" type="button">Reset</button>
+    </div>
+    <div class="ts-row ts-font">
+      <span class="ts-label">Text font · size</span>
+      <select id="paragraphFont" class="top-select font-family-select"></select>
+      <input id="paragraphSize" class="font-size-input" type="number" min="8" max="48" step="1" value="14" aria-label="Text size in pixels">
+      <button class="btn tiny" type="button" onclick="resetTypographySettings()">Reset</button>
+    </div>
+  </div>
+  <div id="toolbar">
+    <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
+    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale / Fonts</button>
+    <div class="view-menu" data-view-menu>
+      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Columns</button>
+      <div class="view-menu-popup" hidden></div>
+    </div>
+    <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
+    <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
+    <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref ▾</button>
+    <button class="btn" type="button" data-layout="focus" title="Hide the top toolbar">Focus</button>
+    <button class="btn" type="button" data-mobile-mode title="Toggle mobile layout">Mobile</button>
+    <span id="dateLabel"></span>
+    <span
+      id="status"
+      class="status">
+      Loading…
+    </span>
+  </div>
+  <div id="workspace">
+    <section class="pane" id="todayPane">
+      <div class="pane-header">
+        TODAY / TASKS
+        <span id="focusStatus" class="focus-status">Loading…</span>
+      </div>
+      <div
+        class="scroll"
+        id="todayScroll">
+      </div>
+    </section>
+    <div id="mobileSplitResizer" title="Drag to resize split"></div>
+    <div class="column-resizer" data-left="today" data-right="journal" title="Drag to resize columns"></div>
+    <section class="pane" id="journalPane">
+      <div class="pane-header">
+        NOTES
+        <button class="btn tiny" id="journalTemplateButton" type="button" title="Insert the Reference cell titled Journal Template into the selected Notes day">+ Template</button>
+      </div>
+      <div
+        class="scroll"
+        id="journalScroll">
+      </div>
+    </section>
+    <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
+    <section
+      class="pane"
+      id="referencePane">
+      <div class="pane-header">
+        REFERENCE
+      </div>
+      <div
+        class="scroll"
+        id="referenceScroll">
+        <div class="reference-sort-bar">
+          <label for="referenceSort">Sort</label>
+          <select id="referenceSort" class="top-select">
+            <option value="original">Original order</option>
+            <option value="title">Title A–Z</option>
+            <option value="modified">Last modified · newest first</option>
+          </select>
+        </div>
+        <div class="ref-toolbar">
+          <input
+            id="refSearch"
+            class="ref-search"
+            placeholder="Search reference…">
+          <button
+            class="btn"
+            onclick="addReferenceCell()">
+            + Cell
+          </button>
+        </div>
+        <div class="format-hint">
+          Right-click or long-press = formatting menu (Shift+right-click = browser menu) ·
+          Enter = new line · ⌘/Ctrl+Enter = new cell ·
+          type [] + Space = checkbox · Tab / Shift+Tab = indent / outdent ·
+          ⌘/Ctrl+B/U = bold/underline · ⌘/Ctrl+Shift+X = strike task ·
+          ``` + Enter = code block; ``` + Enter on its last line = exit
+        </div>
+        <div id="referenceTree"></div>
+      </div>
+    </section>
+    <div id="referenceEdgeResize" title="Drag to resize Reference column"></div>
+  </div>
+</div>
+<div id="contextMenu" class="ctx-menu" role="menu" hidden>
+  <button class="btn" type="button" tabindex="-1" data-ctx="bold"><b>Bold</b></button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="underline"><u>Underline</u></button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="strike"><s>Strike</s></button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="rule">Line</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="indent">Indent →</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="outdent">← Outdent</button>
+  <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="subtask">+ Subtask</button>
+</div>
+<script>
+  /* Filled in by Apps Script (Code.gs doGet), so the first screen needs no
+     extra server request. If it is missing, the page loads the data itself. */
+  window.__FW_INITIAL__ = <?!= initialData ?>;
+</script>
+<script>
+  /* =========================================================
+     STATE
+     ========================================================= */
+  let state = {
+    days: [],
+    reference: [],
+    today: ''
+  };
+  let syncing = false;
+  let loadingPrev = false;
+  let loadingNext = false;
+  let saveTimers = {};
+  const daySaveState = new Map();
+  let activeRefId = null;
+  /*
+   * Scroll bookkeeping. Lazy week-loading only reacts to scrolling the person
+   * actually did (wheel / touch / page keys). Scroll events caused by typing,
+   * layout changes or code never load more days, so typing can no longer
+   * trigger a prepend that shifts the view.
+   */
+  let lastUserScrollAt = 0;
+  let lastDayTop = 0;
+  let prevBlockedUntil = 0;
+  let nextBlockedUntil = 0;
+  /*
+   * The editor that formatting actions currently control.
+   */
+  let activeEditor = null;
+  /*
+   * The last known text selection inside activeEditor, so a menu or button
+   * can restore it after it receives the press.
+   */
+  let savedRange = null;
+  const TYPOGRAPHY_STORAGE_KEY = 'focusWorkspaceTypographyV1';
+  const VIEW_STORAGE_KEY = 'focusWorkspaceViewV1';
+  const VIEW_PANES = ['today','journal','reference'];
+  const PANE_LABELS = {today:'Today / Tasks',journal:'Notes',reference:'Reference'};
+  let visiblePanes = [...VIEW_PANES];
+  const COLUMN_STORAGE_KEY = 'focusWorkspaceColumnsV1';
+  const FOCUS_STORAGE_KEY = 'focusWorkspaceFocusV1';
+  const REF_COLLAPSE_STORAGE_KEY = 'focusWorkspaceRefCollapsedV1';
+  let columnWidths = loadColumnWidths();
+  let referenceCollapsed = localStorage.getItem(REF_COLLAPSE_STORAGE_KEY) === '1';
+  const FONT_OPTIONS = [
+    ['Arial','Arial,Helvetica,sans-serif'],
+    ['Roboto','Roboto,Arial,sans-serif'],
+    ['Verdana','Verdana,Geneva,sans-serif'],
+    ['Tahoma','Tahoma,Geneva,sans-serif'],
+    ['Trebuchet','"Trebuchet MS",Arial,sans-serif'],
+    ['Georgia','Georgia,"Times New Roman",serif'],
+    ['Times New Roman','"Times New Roman",Times,serif'],
+    ['Monospace','ui-monospace,SFMono-Regular,Menlo,monospace']
+  ];
+  const DEFAULT_TYPOGRAPHY = {
+    paragraphFont:'Arial,Helvetica,sans-serif', paragraphSize:14,
+    subtitleFont:'Arial,Helvetica,sans-serif', subtitleSize:18,
+    titleFont:'Arial,Helvetica,sans-serif', titleSize:28
+  };
+  function loadTypographySettings(){
+    let saved = {};
+    try{ saved = JSON.parse(localStorage.getItem(TYPOGRAPHY_STORAGE_KEY) || '{}'); }catch(e){}
+    if(saved.paragraphSize === 10) saved.paragraphSize = 14;
+    if(saved.subtitleSize === 14) saved.subtitleSize = 18;
+    if(saved.titleSize === 20) saved.titleSize = 28;
+    return {...DEFAULT_TYPOGRAPHY,...saved};
+  }
+  let typographySettings = loadTypographySettings();
+  function applyTypographySettings(){
+    const root = document.documentElement;
+    root.style.setProperty('--paragraph-font', typographySettings.paragraphFont);
+    root.style.setProperty('--paragraph-size', typographySettings.paragraphSize + 'px');
+    root.style.setProperty('--subtitle-font', typographySettings.subtitleFont);
+    root.style.setProperty('--subtitle-size', typographySettings.paragraphSize + 'px');
+    root.style.setProperty('--title-font', typographySettings.titleFont);
+    root.style.setProperty('--title-size', typographySettings.paragraphSize + 'px');
+    document.querySelectorAll('.day-editor,.journal-editor,.ref-cell').forEach(el => {
+      if(!el.style.fontFamily || el.style.fontFamily.includes('var(')) el.style.fontFamily = 'var(--paragraph-font)';
+      if(!el.style.fontSize || el.style.fontSize.includes('var(')) el.style.fontSize = 'var(--paragraph-size)';
+      el.style.lineHeight = '1.18';
+    });
+    requestAnimationFrame(syncDayHeights);
+  }
+  function populateFontSelect(select, value){
+    select.innerHTML = '';
+    FONT_OPTIONS.forEach(([label,css]) => {
+      const o=document.createElement('option'); o.textContent=label; o.value=css; o.selected=css===value; select.appendChild(o);
+    });
+  }
+  function initTypographyControls(){
+    ['paragraph'].forEach(kind => {
+      const font=document.getElementById(kind+'Font');
+      const size=document.getElementById(kind+'Size');
+      populateFontSelect(font, typographySettings[kind+'Font']);
+      size.value=typographySettings[kind+'Size'];
+      font.onchange=()=>{ typographySettings[kind+'Font']=font.value; saveTypographySettings(); };
+      size.onchange=()=>{ typographySettings[kind+'Size']=Math.max(8,Number(size.value)||DEFAULT_TYPOGRAPHY[kind+'Size']); saveTypographySettings(); };
+    });
+    applyTypographySettings();
+  }
+  function saveTypographySettings(){
+    localStorage.setItem(TYPOGRAPHY_STORAGE_KEY, JSON.stringify(typographySettings));
+    applyTypographySettings();
+  }
+  function resetTypographySettings(){
+    typographySettings={...DEFAULT_TYPOGRAPHY};
+    localStorage.removeItem(TYPOGRAPHY_STORAGE_KEY);
+    initTypographyControls();
+  }
+  function toggleTypeSettings(){
+    document.getElementById('typeSettings').classList.toggle('hidden');
+    positionTypeSettings();
+  }
+  /* Place the panel just under whichever top bar is showing and cap its height to
+     the visible app, so nothing is cut off at any scale or on a small screen. */
+  function positionTypeSettings(){
+    const panel = document.getElementById('typeSettings');
+    if(!panel || panel.classList.contains('hidden')) return;
+    const bar = document.body.classList.contains('focus-mode')
+      ? document.getElementById('focusControls') : document.getElementById('toolbar');
+    const barBottom = bar && bar.getClientRects().length ? bar.getBoundingClientRect().bottom : 0;
+    const top = Math.max(8, Math.round(barBottom + 6));
+    const appBox = document.getElementById('app').getBoundingClientRect();
+    const bottom = (appBox.height ? appBox.bottom : window.innerHeight) - 8;
+    panel.style.top = top + 'px';
+    panel.style.maxHeight = Math.max(160, Math.round(bottom - top)) + 'px';
+  }
+  /* =========================================================
+     BASIC HELPERS
+     ========================================================= */
+  const esc = s =>
+    String(s ?? '').replace(
+      /[&<>"']/g,
+      c => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+      }[c])
+    );
+  function formatDate(s){
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString(
+      undefined,
+      {
+        weekday:'long',
+        month:'long',
+        day:'numeric',
+        year:'numeric'
+      }
+    );
+  }
+  function setStatus(s){
+    const status=document.getElementById('status');
+    const focusStatus=document.getElementById('focusStatus');
+    if(status) status.textContent=s;
+    if(focusStatus) focusStatus.textContent=s;
+  }
+  function storedToHtml(v){
+    if(!v){
+      return '';
+    }
+    if(/<([a-z][\s\S]*?)>/i.test(v)){
+      return v;
+    }
+    return esc(v).replace(/\n/g,'<br>');
+  }
+  function dateObj(s){
+    return new Date(s + 'T00:00:00');
+  }
+  function addDays(s,n){
+    const d = dateObj(s);
+    d.setDate(
+      d.getDate() + n
+    );
+    return d.toISOString().slice(0,10);
+  }
+  function mergeDays(newDays){
+    const map = new Map(
+      state.days.map(d => [d.date,d])
+    );
+    newDays.forEach(
+      d => map.set(d.date,d)
+    );
+    state.days = [
+      ...map.values()
+    ].sort(
+      (a,b) => a.date.localeCompare(b.date)
+    );
+  }
+  function editableFocused(){
+    const el = document.activeElement;
+    return !!(el && el.isContentEditable);
+  }
+  /* Take focus off the cell being edited, so a button that does not need
+     typing never keeps (or brings back) the on-screen keyboard. */
+  function releaseEditor(){
+    const el = document.activeElement;
+    if(el && el.isContentEditable){
+      rememberSelection(el);
+      el.blur();
+    }
+  }
+  /* =========================================================
+     LOAD
+     ========================================================= */
+  function applyWorkspaceData(data){
+    state = data;
+    if(state.today && Array.isArray(state.days)){
+      const from=addDays(state.today,-7),to=addDays(state.today,3);
+      state.days=state.days.filter(d=>d.date>=from && d.date<=to);
+    }
+    renderDays();
+    renderReference();
+    applyReferenceCollapseState();
+    setStatus('Ready');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
+  }
+  function loadWorkspace(){
+    const initial = window.__FW_INITIAL__;
+    window.__FW_INITIAL__ = null;
+    if(initial && Array.isArray(initial.days) && initial.today){
+      applyWorkspaceData(initial);
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(applyWorkspaceData)
+      .withFailureHandler(e => {
+        setStatus(
+          'Load error: ' +
+          e.message
+        );
+      })
+      .getWorkspaceData();
+  }
+  /* =========================================================
+     DAYS
+     ========================================================= */
+  function renderDays(){
+    const left =
+      document.getElementById('todayScroll');
+    const right =
+      document.getElementById('journalScroll');
+    left.innerHTML = '';
+    right.innerHTML = '';
+    if(!state.days.length){
+      left.innerHTML =
+        '<div class="empty">No days available.</div>';
+      right.innerHTML =
+        left.innerHTML;
+      return;
+    }
+    state.days.sort(
+      (a,b) =>
+        a.date.localeCompare(b.date)
+    );
+    state.days.forEach(day => {
+      appendDayRow(
+        day,
+        left,
+        'day'
+      );
+      appendDayRow(
+        day,
+        right,
+        'journal'
+      );
+    });
+    requestAnimationFrame(() => {
+      syncDayHeights();
+      syncDailyScroll();
+      updateVisibleDate();
+    });
+  }
+  function appendDayRow(
+    day,
+    container,
+    type
+  ){
+    const today =
+      day.date === state.today;
+    const dow =
+      dateObj(day.date).getDay();
+    const row =
+      document.createElement('div');
+    row.className =
+      'day-row dow-' +
+      dow +
+      (today ? ' today' : '') +
+      (
+        type === 'day'
+          ? ' day-pane-row'
+          : ' journal-pane-row'
+      );
+    row.dataset.date =
+      day.date;
+    const label =
+      `<div class="day-label">
+        ${esc(formatDate(day.date))}
+        ${
+          today
+            ? '<span class="today-pill">• TODAY</span>'
+            : ''
+        }
+      </div>`;
+    const content =
+      type === 'day'
+        ? day.tasks
+        : day.journal;
+    row.innerHTML =
+      label +
+      `<div
+        class="editor ${
+          type === 'day'
+            ? 'day-editor'
+            : 'journal-editor'
+        }"
+        contenteditable="true"
+        data-date="${day.date}"
+        data-placeholder="${
+          type === 'day'
+            ? 'Tasks for this day…'
+            : 'Write whatever you want…'
+        }">${storedToHtml(content)}</div>`;
+    container.appendChild(row);
+    const ed =
+      row.querySelector('.editor');
+    ed.style.fontSize = 'var(--paragraph-size)';
+    ed.style.fontFamily = 'var(--paragraph-font)';
+    ed.style.lineHeight = '1.18';
+    wireEditor(
+      ed,
+      type
+    );
+  }
+  /* =========================================================
+     SELECTION
+     ========================================================= */
+  function rememberSelection(ed){
+    if(!ed){
+      return;
+    }
+    const sel =
+      window.getSelection();
+    if(
+      sel &&
+      sel.rangeCount &&
+      ed.contains(sel.anchorNode)
+    ){
+      activeEditor = ed;
+      savedRange =
+        sel
+          .getRangeAt(0)
+          .cloneRange();
+    }
+  }
+  function restoreSelection(){
+    if(!savedRange){
+      return false;
+    }
+    const sel =
+      window.getSelection();
+    try{
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+      return true;
+    }catch(err){
+      return false;
+    }
+  }
+  /* =========================================================
+     EDITORS
+     ========================================================= */
+  const editorHistories = new WeakMap();
+  /* Runtime-only checkbox listener tracking. Never serialize this state into saved HTML. */
+  const wiredCheckboxes = new WeakSet();
+  function ensureEditorHistory(el){
+    if(!editorHistories.has(el)){
+      editorHistories.set(el,{undo:[],redo:[],last:el.innerHTML,restoring:false});
+    }
+    return editorHistories.get(el);
+  }
+  function captureBeforeEdit(el){
+    const h=ensureEditorHistory(el);
+    if(h.restoring) return;
+    const current=el.innerHTML;
+    if(!h.undo.length || h.undo[h.undo.length-1]!==current){
+      h.undo.push(current);
+      if(h.undo.length>100) h.undo.shift();
+    }
+    h.redo.length=0;
+  }
+  function finishEditorEdit(el){
+    const h=ensureEditorHistory(el);
+    h.last=el.innerHTML;
+  }
+  function restoreEditorSnapshot(el,html){
+    const h=ensureEditorHistory(el);
+    h.restoring=true;
+    el.innerHTML=html;
+    normalizeEditorTasks(el);
+    h.last=el.innerHTML;
+    h.restoring=false;
+    el.focus({preventScroll:true});
+    placeEnd(el);
+    saveEditorOwner(el);
+  }
+  function undoEditor(el){
+    const h=ensureEditorHistory(el);
+    if(!h.undo.length) return;
+    h.redo.push(el.innerHTML);
+    restoreEditorSnapshot(el,h.undo.pop());
+  }
+  function redoEditor(el){
+    const h=ensureEditorHistory(el);
+    if(!h.redo.length) return;
+    h.undo.push(el.innerHTML);
+    restoreEditorSnapshot(el,h.redo.pop());
+  }
+  function wireEditorHistory(el){
+    ensureEditorHistory(el);
+    el.addEventListener('beforeinput',()=>captureBeforeEdit(el));
+    el.addEventListener('input',()=>finishEditorEdit(el));
+  }
+  function wireEditor(
+    el,
+    type
+  ){
+    normalizeEditorTasks(el);
+    wireCodeBlocks(el);
+    wireEditorHistory(el);
+    el.addEventListener(
+      'input',
+      () => {
+        autoFormat(el);
+        if(el.dataset.date){
+          requestAnimationFrame(() => syncDayHeightStable(el.dataset.date));
+        }
+        scheduleDaySave(
+          el.dataset.date
+        );
+      }
+    );
+    el.addEventListener('blur', () => {
+      if(el.dataset.date) requestAnimationFrame(() => syncDayHeight(el.dataset.date));
+    });
+    el.addEventListener(
+      'keydown',
+      e => {
+        handleEditorKey(
+          e,
+          el,
+          type
+        );
+      }
+    );
+    el.addEventListener(
+      'focus',
+      () => {
+        activeRefId = null;
+        activeEditor = el;
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'keyup',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'mouseup',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'input',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener('touchend',() => setTimeout(() => rememberSelection(el),0),{passive:true});
+    el.addEventListener('paste', e => pasteRichClipboard(e, el));
+    el.addEventListener('cut', e => copyStructuredText(e, el, true));
+    el.addEventListener(
+      'copy',
+      e => copyStructuredText(e, el)
+    );
+    el.querySelectorAll(
+      'input[type=checkbox]'
+    ).forEach(
+      wireCheckbox
+    );
+  }
+  // Canonical task markup is shared by loaded content, copy/cut and paste.
+  // Browser clipboards can omit a row wrapper or introduce nested block tags.
+  function normalizeEditorTasks(root, wire = true){
+    root.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      if(cb.closest('pre')) return;
+      if(cb.closest('.check-line')) return;
+      let container = cb.parentElement;
+      if(container === root || container.tagName === 'SPAN' && !container.classList.contains('check-text')){
+        const row = root.ownerDocument.createElement('div');
+        cb.before(row); row.appendChild(cb);
+        const sibling = row.nextSibling;
+        if(sibling?.nodeType === 1 && sibling.classList.contains('check-text')) row.appendChild(sibling);
+        else while(row.nextSibling && (row.nextSibling.nodeType === 3 || row.nextSibling.nodeType === 1 && /^(SPAN|B|STRONG|I|EM|U|S|DEL|CODE)$/.test(row.nextSibling.tagName))) row.appendChild(row.nextSibling);
+        container = row;
+      }
+      if(container.tagName !== 'DIV'){
+        const row = root.ownerDocument.createElement('div');
+        while(container.firstChild) row.appendChild(container.firstChild);
+        container.replaceWith(row); container = row;
+      }
+      container.classList.remove('check-text');
+      container.classList.add('check-line');
+    });
+    // Undo old pastes that nested a task inside another task's text.
+    [...root.querySelectorAll('.check-text .check-line')].reverse().forEach(line => {
+      const parent = line.parentElement.closest('.check-line');
+      if(parent) parent.after(line);
+    });
+    root.querySelectorAll('.check-line').forEach(line => {
+      line.classList.remove('check-text');
+      const cb = line.querySelector('input[type=checkbox]');
+      if(!cb){ line.classList.remove('check-line','done','task-struck'); return; }
+      let text = [...line.children].find(n => n.classList.contains('check-text'));
+      if(!text){ text = root.ownerDocument.createElement('span'); text.className = 'check-text'; }
+      // Keep all selected text and inline formatting in a single flex item.
+      const nodes = [...line.childNodes];
+      for(const node of nodes){
+        if(node === cb || node === text) continue;
+        if(node.nodeType === 1 && node.classList.contains('check-text')){
+          while(node.firstChild) text.appendChild(node.firstChild); node.remove();
+        }else text.appendChild(node);
+      }
+      line.prepend(cb); line.appendChild(text);
+      const level = Math.min(6,Math.max(0,Math.floor(Number(line.dataset.level) || 0)));
+      line.dataset.level = String(level);
+      // Clipboard presentation must not override the editor's task geometry.
+      for(const node of [line,text,cb]){
+        for(const name of ['display','width','height','max-width','padding','padding-left','text-indent','white-space','vertical-align','margin-left']) node.style.removeProperty(name);
+      }
+      line.style.marginLeft = level ? `${level * 24}px` : '';
+      cb.toggleAttribute('checked',cb.checked);
+      line.classList.toggle('done',cb.checked);
+      if(!text.firstChild) text.appendChild(root.ownerDocument.createElement('br'));
+      if(wire) wireCheckbox(cb);
+    });
+    syncCompletionAppearance(root);
+  }
+
+  function syncCompletionAppearance(root){
+    root.querySelectorAll('.done').forEach(node => {
+      const cb = node.classList.contains('check-line') ? node.querySelector('input[type=checkbox]') : null;
+      node.classList.toggle('done',!!cb?.checked);
+    });
+    root.querySelectorAll('[style],.check-text').forEach(node => {
+      // Strip only the app's generated completion paint; bold, underline,
+      // highlights and independent strike formatting remain intact.
+      const color = node.style.color.replace(/\s/g,'').toLowerCase();
+      if(['#666','#666666','rgb(102,102,102)','var(--done)'].includes(color)) node.style.removeProperty('color');
+      if(node.style.opacity === '0.82' || node.style.opacity === '.82') node.style.removeProperty('opacity');
+      if(node.classList.contains('check-text') && !node.closest('.check-line')) node.classList.remove('check-text');
+    });
+  }
+
+  function toggleTaskStrike(el){
+    const sel = window.getSelection();
+    if(!sel?.rangeCount || !el.contains(sel.anchorNode) || !el.contains(sel.focusNode)) return;
+    const range = sel.getRangeAt(0);
+    const tasks = [...el.querySelectorAll('.check-line')].filter(line => {
+      if(sel.isCollapsed) return line.contains(sel.anchorNode);
+      return range.intersectsNode(line);
+    });
+    captureBeforeEdit(el);
+    if(tasks.length){
+      const strike = !tasks.every(line => line.classList.contains('task-struck'));
+      tasks.forEach(line => line.classList.toggle('task-struck',strike));
+    }else{
+      document.execCommand('strikeThrough');
+    }
+    finishEditorEdit(el); rememberSelection(el); saveEditorOwner(el);
+  }
+
+  function currentCodeBlock(el){
+    const node = window.getSelection()?.anchorNode;
+    const element = node?.nodeType === 3 ? node.parentElement : node;
+    const pre = element?.closest?.('pre');
+    return pre && el.contains(pre) ? pre : null;
+  }
+
+  function insertCodeText(el,text){
+    const selection = window.getSelection();
+    if(!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if(!el.contains(range.startContainer) || !el.contains(range.endContainer)) return;
+    captureBeforeEdit(el);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    const pre = node.parentElement?.closest('pre');
+    if(pre && (pre.textContent.endsWith('\n') || !pre.textContent) && pre.lastChild?.nodeName !== 'BR') pre.appendChild(document.createElement('br'));
+    range.setStart(node,node.length); range.collapse(true);
+    selection.removeAllRanges(); selection.addRange(range);
+    finishEditorEdit(el); rememberSelection(el); saveEditorOwner(el);
+  }
+
+  function handleCodeEnter(el){
+    const pre = currentCodeBlock(el);
+    const sel = window.getSelection();
+    if(!sel?.rangeCount || !sel.isCollapsed) return false;
+    const range = sel.getRangeAt(0);
+    if(pre){
+      const prefix = document.createRange(); prefix.selectNodeContents(pre);
+      prefix.setEnd(range.startContainer,range.startOffset);
+      const before = prefix.toString();
+      const after = pre.textContent.slice(before.length);
+      const last = before.split('\n').pop();
+      if(/^\s*```\s*$/.test(last) && !after.trim()){
+        captureBeforeEdit(el);
+        pre.textContent = before.slice(0,before.length-last.length).replace(/\n$/,'');
+        const paragraph = document.createElement('p'); paragraph.innerHTML = '<br>';
+        pre.after(paragraph); placeEnd(paragraph);
+        finishEditorEdit(el); saveEditorOwner(el);
+        return true;
+      }
+      insertCodeText(el,'\n'); return true;
+    }
+    let line = getCurrentLine(el);
+    if(!line || line.closest('.check-line')) return false;
+    // A fresh editor may contain only a text node, with no paragraph yet.
+    const text = line.textContent || '';
+    const fence = text.match(/^\s*```([\w+-]*)\s*$/);
+    if(!fence) return false;
+    captureBeforeEdit(el);
+    const block = document.createElement('pre'); block.className = 'code-block';
+    if(fence[1]) block.dataset.language = fence[1];
+    block.appendChild(document.createElement('br'));
+    if(line === el) el.replaceChildren(block); else line.replaceWith(block);
+    const caret = document.createRange(); caret.setStart(block,0); caret.collapse(true);
+    sel.removeAllRanges(); sel.addRange(caret);
+    el.focus({preventScroll:true}); rememberSelection(el);
+    finishEditorEdit(el); saveEditorOwner(el);
+    return true;
+  }
+
+  function handleCodeKey(e,el){
+    if(e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return false;
+    const pre=currentCodeBlock(el);
+    if((e.key === 'Backspace' || e.key === 'Delete') && pre && !pre.textContent.trim()){
+      e.preventDefault(); captureBeforeEdit(el);
+      const paragraph=document.createElement('p'); paragraph.innerHTML='<br>';
+      pre.replaceWith(paragraph); placeEnd(paragraph);
+      finishEditorEdit(el); saveEditorOwner(el);
+      return true;
+    }
+    if(e.key === 'Enter' && handleCodeEnter(el)){e.preventDefault();return true;}
+    if(e.key === 'Tab' && currentCodeBlock(el)){
+      e.preventDefault();
+      if(!e.shiftKey) insertCodeText(el,'  ');
+      return true;
+    }
+    return false;
+  }
+
+  function wireCodeBlocks(el){
+    el.querySelectorAll('pre').forEach(pre => pre.classList.add('code-block'));
+    // Android keyboards often emit beforeinput rather than an Enter keydown.
+    el.addEventListener('beforeinput',event => {
+      if(!event.isComposing && (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') && handleCodeEnter(el)) event.preventDefault();
+    });
+    el.addEventListener('input',() => syncCompletionAppearance(el));
+  }
+
+  function escapeHtml(text){
+    return String(text)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+  function structuredClipboardTextFromRange(range){
+    const fragment = range.cloneContents();
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(fragment);
+    const codeTokens = new Map();
+    wrapper.querySelectorAll('pre').forEach((pre,index) => {
+      const token = '\uE000FWCODE' + index + '\uE001';
+      codeTokens.set(token,'```' + (pre.dataset.language || '') + '\n' + pre.textContent + '\n```');
+      const row = document.createElement('div'); row.textContent = token; pre.replaceWith(row);
+    });
+
+    /* Convert visual checkbox rows into portable text before reading textContent.
+       Native <input type=checkbox> elements contribute no [ ]/[x] text by themselves. */
+    wrapper.querySelectorAll('.check-line').forEach(line => {
+      const level = Math.max(0, Math.min(6, Number(line.dataset.level || 0)));
+      const checkbox = line.querySelector('input[type=checkbox]');
+      const text = line.querySelector('.check-text');
+      const prefix = '    '.repeat(level) + (checkbox?.checked ? '[x] ' : '[ ] ');
+      /* Keep the replacement as a block-level row so copied tasks keep their own lines. */
+      const replacement = document.createElement('div');
+      replacement.textContent = prefix + (text?.textContent || '');
+      line.replaceWith(replacement);
+    });
+
+    /* Preserve line boundaries for the block-level elements used by the editor. */
+    wrapper.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+    wrapper.querySelectorAll('p,h1,h2,h3,blockquote,li,div').forEach(node => {
+      if(node !== wrapper && node.parentNode){
+        node.appendChild(document.createTextNode('\n'));
+      }
+    });
+
+    let result = (wrapper.textContent || '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{2,}/g, '\n')
+      .replace(/^\n+|\n+$/g, '');
+    for(const [token,code] of codeTokens) result = result.replace(token,() => code);
+    return result;
+  }
+
+  function copyStructuredText(e, el, cutting = false){
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount || !el.contains(sel.anchorNode) || !el.contains(sel.focusNode) || sel.isCollapsed){
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    let text = structuredClipboardTextFromRange(range);
+    if(!text){
+      return;
+    }
+
+    if(!e.clipboardData) return;
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(range.cloneContents());
+    const ancestor = range.commonAncestorContainer.nodeType === 3
+      ? range.commonAncestorContainer.parentElement : range.commonAncestorContainer;
+    const task = ancestor.closest?.('.check-line');
+    // A Range inside a task omits its outer row. Restore that row if the
+    // checkbox was selected, so it cannot become a separate pasted line.
+    if(task && wrapper.querySelector('input[type=checkbox]') && !wrapper.querySelector('.check-line')){
+      const row = task.cloneNode(false);
+      while(wrapper.firstChild) row.appendChild(wrapper.firstChild);
+      wrapper.appendChild(row);
+    }
+    normalizeEditorTasks(wrapper, false);
+    const textRange = document.createRange();
+    textRange.selectNodeContents(wrapper);
+    text = structuredClipboardTextFromRange(textRange);
+    // A partial selection can omit its surrounding <b>, <u>, or styled span.
+    // Carry those inherited text styles in a wrapper as well as the selected HTML.
+    const source = range.commonAncestorContainer.nodeType === 3
+      ? range.commonAncestorContainer.parentElement : range.commonAncestorContainer;
+    if(source && el.contains(source)){
+      const styles = getComputedStyle(source);
+      ['font-family','font-size','font-weight','font-style','color',
+       'text-decoration-line','text-decoration-color','text-decoration-style',
+       'letter-spacing','white-space'].forEach(name => {
+        if(name === 'color' && source.closest('.check-line.done,.check-text')) return;
+        wrapper.style.setProperty(name, styles.getPropertyValue(name));
+      });
+      // Underline and strike-through propagate from ancestors without inheritance.
+      const decorations = new Set();
+      for(let node=source; node && el.contains(node); node=node.parentElement){
+        getComputedStyle(node).textDecorationLine.split(/\s+/).forEach(value => {
+          if(value === 'underline' || value === 'line-through') decorations.add(value);
+        });
+      }
+      if(decorations.size) wrapper.style.textDecorationLine = [...decorations].join(' ');
+    }
+    wrapper.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.toggleAttribute('checked', cb.checked);
+      cb.removeAttribute('data-wired');
+    });
+    // Use an inline wrapper so copying part of a sentence does not create a row.
+    const span = document.createElement('span');
+    span.style.cssText = wrapper.style.cssText;
+    while(wrapper.firstChild) span.appendChild(wrapper.firstChild);
+    removeClipboardCellBackgrounds(span);
+    const html = sanitizeClipboardHtml(span.outerHTML);
+    e.clipboardData.setData('text/plain', text);
+    e.clipboardData.setData('text/html', html);
+    e.preventDefault();
+    if(cutting){
+      captureBeforeEdit(el);
+      range.deleteContents();
+      range.collapse(true);
+      sel.removeAllRanges(); sel.addRange(range);
+      normalizeEditorTasks(el);
+      finishEditorEdit(el);
+      rememberSelection(el);
+      saveEditorOwner(el);
+    }
+  }
+
+  function removeClipboardCellBackgrounds(wrapper){
+    [wrapper,...wrapper.querySelectorAll('*')].forEach(node => {
+      const color = node.style.backgroundColor.replace(/\s/g,'').toLowerCase();
+      const block = /^(DIV|P|H[1-6]|BLOCKQUOTE|UL|OL|LI|TABLE|TR|TD|TH)$/.test(node.tagName);
+      if(block || color === 'white' || color === '#fff' || color === '#ffffff' || color === 'rgb(255,255,255)' || color === 'rgba(255,255,255,1)'){
+        node.style.removeProperty('background');
+        node.style.removeProperty('background-color');
+      }
+      if(block || (node.getAttribute('bgcolor') || '').toLowerCase() === 'white' || /^#?fff(?:fff)?$/i.test(node.getAttribute('bgcolor') || '')) node.removeAttribute('bgcolor');
+    });
+  }
+  function sanitizeClipboardHtml(html){
+    // Parse in an inert document; retain text formatting, never scripts or handlers.
+    const doc = new DOMParser().parseFromString(String(html), 'text/html');
+    doc.querySelectorAll('script,style,iframe,object,embed,link,meta,base,svg,math,template').forEach(n => n.remove());
+    const tags = new Set('span div p br b strong i em u s strike del sub sup mark small big font h1 h2 h3 h4 h5 h6 ul ol li blockquote pre code a hr table thead tbody tfoot tr th td caption colgroup col img input'.split(' '));
+    const styles = new Set('font-family font-size font-weight font-style font-variant color background-color text-decoration text-decoration-line text-decoration-color text-decoration-style text-align text-indent line-height letter-spacing word-spacing white-space vertical-align margin-left padding-left list-style-type border-collapse border border-color border-style border-width padding width height max-width'.split(' '));
+    const safeUrl = (value, image=false) => {
+      try{
+        const url = new URL(value); // Do not resolve relative URLs against the app.
+        return image ? ['https:','http:'].includes(url.protocol) || /^data:image\/(png|jpeg|gif|webp);base64,/i.test(value)
+          : ['https:','http:','mailto:','tel:'].includes(url.protocol);
+      }catch(_){ return false; }
+    };
+    Array.from(doc.body.querySelectorAll('*')).forEach(node => {
+      const tag = node.localName;
+      if(!tags.has(tag)){
+        node.replaceWith(...node.childNodes);
+        return;
+      }
+      if(tag === 'input' && node.getAttribute('type')?.toLowerCase() !== 'checkbox'){
+        node.remove(); return;
+      }
+      const keep = {};
+      const cleanStyle = document.createElement('span').style;
+      for(const name of Array.from(node.style)){
+        const value = node.style.getPropertyValue(name);
+        if(styles.has(name) && !/url\s*\(|expression\s*\(|@import|[<>]/i.test(value)) cleanStyle.setProperty(name, value);
+      }
+      if(cleanStyle.cssText) keep.style = cleanStyle.cssText;
+      const classes = ['check-line','check-text','done','task-struck','code-block'].filter(c => node.classList.contains(c));
+      if(classes.length) keep.class = classes.join(' ');
+      if(node.classList.contains('check-line')){
+        const level = Math.max(0, Math.min(6, Math.floor(Number(node.dataset.level) || 0)));
+        keep['data-level'] = String(level);
+        cleanStyle.marginLeft = level ? `${level * 24}px` : '';
+        keep.style = cleanStyle.cssText;
+      }
+      if(tag === 'pre'){
+        keep.class = 'code-block';
+        if(/^[\w+-]{1,30}$/.test(node.dataset.language || '')) keep['data-language'] = node.dataset.language;
+      }
+      if(tag === 'input'){
+        keep.type = 'checkbox';
+        if(node.hasAttribute('checked')) keep.checked = '';
+      }
+      if(tag === 'a' && safeUrl(node.getAttribute('href') || '')){
+        keep.href = node.getAttribute('href'); keep.target = '_blank'; keep.rel = 'noopener noreferrer';
+      }
+      if(tag === 'img'){
+        const src = node.getAttribute('src') || '';
+        if(!safeUrl(src,true)){ node.replaceWith(doc.createTextNode(node.getAttribute('alt') || '')); return; }
+        keep.src = src; keep.alt = node.getAttribute('alt') || '';
+        cleanStyle.maxWidth = '100%'; keep.style = cleanStyle.cssText;
+      }
+      if(tag === 'font') for(const attr of ['color','face','size']){
+        if(node.hasAttribute(attr)) keep[attr] = node.getAttribute(attr);
+      }
+      for(const attr of ['colspan','rowspan','start','value']){
+        if(/^-?\d{1,4}$/.test(node.getAttribute(attr) || '')) keep[attr] = node.getAttribute(attr);
+      }
+      if(node.getAttribute('dir') === 'rtl' || node.getAttribute('dir') === 'ltr') keep.dir = node.getAttribute('dir');
+      for(const attr of Array.from(node.attributes)) node.removeAttribute(attr.name);
+      for(const [name,value] of Object.entries(keep)) node.setAttribute(name,value);
+    });
+    removeClipboardCellBackgrounds(doc.body);
+    normalizeEditorTasks(doc.body, false);
+    return doc.body.innerHTML;
+  }
+
+  function pasteRichClipboard(e, el){
+    const clipboard = e.clipboardData || window.clipboardData;
+    if(!clipboard) return; // Allow native paste if clipboard access is unavailable.
+    let html = '', text = '';
+    try{ html = clipboard.getData('text/html'); }catch(_){}
+    try{ text = clipboard.getData('text/plain'); }catch(_){}
+    if(!text) try{ text = clipboard.getData('Text'); }catch(_){}
+    if(!html && !text) return;
+    activeEditor = el;
+    if(currentCodeBlock(el)){
+      e.preventDefault();
+      insertCodeText(el,text || new DOMParser().parseFromString(html,'text/html').body.textContent || '');
+      return;
+    }
+    if(!html && /(?:^|\n)\s*```/.test(text)){
+      e.preventDefault(); pasteStructuredText(el,text); return;
+    }
+    if(html){
+      const clean = sanitizeClipboardHtml(html);
+      if(clean && insertClipboardHtml(el, clean)){
+        e.preventDefault();
+        return;
+      }
+    }
+    if(text){
+      e.preventDefault();
+      pasteStructuredText(el, text);
+    }
+  }
+
+  function insertClipboardHtml(el, html){
+    const selection = window.getSelection();
+    let range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const inside = r => r && el.contains(r.startContainer) && el.contains(r.endContainer);
+    if(!inside(range)) range = inside(savedRange) ? savedRange.cloneRange() : null;
+    if(!range) return false;
+    captureBeforeEdit(el);
+    el.focus({preventScroll:true});
+    const fragment = range.createContextualFragment(html);
+    const hasBlocks = !!fragment.querySelector('div,p,h1,h2,h3,ul,ol,pre,blockquote,.check-line');
+    range.deleteContents();
+    const anchor = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+    // Block tasks must be siblings of the destination task, never children of
+    // its flex text span. Split the surrounding line and preserve both halves.
+    let block = anchor.closest?.('.check-line,p,h1,h2,h3,blockquote,li');
+    if(!block){
+      let candidate = anchor;
+      while(candidate && candidate.parentElement !== el) candidate = candidate.parentElement;
+      if(candidate && candidate !== el && candidate.tagName === 'DIV') block = candidate;
+    }
+    if(hasBlocks && block && block !== el && el.contains(block)){
+      const tailRange = document.createRange();
+      tailRange.selectNodeContents(block);
+      tailRange.setStart(range.startContainer,range.startOffset);
+      const tail = block.cloneNode(false);
+      tail.appendChild(tailRange.extractContents());
+      const task = block.classList.contains('check-line');
+      const originalCheckbox = block.querySelector('input[type=checkbox]') || tail.querySelector('input[type=checkbox]');
+      if(task && originalCheckbox){
+        const text = tail.querySelector('.check-text') || document.createElement('span');
+        text.className = 'check-text';
+        if(!tail.contains(text)) tail.appendChild(text);
+        if(!tail.querySelector('input[type=checkbox]')) tail.prepend(originalCheckbox.cloneNode(true));
+      }
+      const meaningful = node => !!node.textContent.trim() || !!node.querySelector('img,pre');
+      let insertion = block;
+      const keepHead = meaningful(block);
+      const keepTail = meaningful(tail);
+      if(keepTail) block.after(tail);
+      const lastNode = fragment.lastChild;
+      insertion.after(fragment);
+      if(!keepHead) block.remove();
+      if(lastNode){ range.setStartAfter(lastNode); range.collapse(true); }
+    }else{
+      const lastNode = fragment.lastChild;
+      if(!lastNode) return false;
+      range.insertNode(fragment);
+      range.setStartAfter(lastNode); range.collapse(true);
+    }
+    selection.removeAllRanges(); selection.addRange(range);
+    normalizeEditorTasks(el);
+    finishEditorEdit(el);
+    rememberSelection(el);
+    saveEditorOwner(el);
+    return true;
+  }
+
+  function pasteStructuredText(el, text){
+    const normalized = String(text || '').replace(/\r\n?/g,'\n');
+    if(!/^[ \t]*(?:\[\]|\[ \]|\[[xX]\]|```)(?:\s|$|[\w+-])/m.test(normalized)){
+      document.execCommand('insertText',false,normalized);
+      return;
+    }
+    const lines = normalized.split('\n');
+    let html = '', code = null, language = '';
+    const flushCode = () => {
+      html += '<pre class="code-block"' + (language ? ' data-language="' + escapeHtml(language) + '"' : '') + '>' + escapeHtml(code.join('\n')) + '</pre>';
+      code = null;
+    };
+    for(const line of lines){
+      if(code !== null){
+        if(/^\s*```\s*$/.test(line)) flushCode(); else code.push(line);
+        continue;
+      }
+      const fence = line.match(/^\s*```([\w+-]*)\s*$/);
+      if(fence){ code = []; language = fence[1]; continue; }
+      const match = line.match(/^([ \t]*)(\[\]|\[ \]|\[[xX]\])(?:[ \t]+)?(.*)$/);
+      if(match){
+        const columns = [...match[1]].reduce((n,ch) => n + (ch === '\t' ? 4 : 1),0);
+        const level = Math.min(6,Math.floor(columns / 4));
+        const checked = /^\[[xX]\]$/.test(match[2]);
+        html += `<div class="check-line${checked ? ' done' : ''}" data-level="${level}" style="margin-left:${level * 24}px"><input type="checkbox"${checked ? ' checked' : ''}><span class="check-text">${escapeHtml(match[3])}</span></div>`;
+      }else html += '<div>' + (line ? escapeHtml(line) : '<br>') + '</div>';
+    }
+    if(code !== null) flushCode();
+    insertClipboardHtml(el,html);
+  }
+  function handleEditorKey(
+    e,
+    el,
+    type
+  ){
+    const key=e.key.toLowerCase();
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && key === 'x'){
+      e.preventDefault(); toggleTaskStrike(el); return;
+    }
+    if(handleCodeKey(e,el)) return;
+    if((e.metaKey || e.ctrlKey) && key === 'z'){
+      e.preventDefault();
+      if(e.shiftKey) redoEditor(el); else undoEditor(el);
+      return;
+    }
+    if(e.ctrlKey && !e.metaKey && key === 'y'){
+      e.preventDefault();
+      redoEditor(el);
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      key === 'b'
+    ){
+      e.preventDefault();
+      document.execCommand(
+        'bold'
+      );
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      key === 'u'
+    ){
+      e.preventDefault();
+      document.execCommand(
+        'underline'
+      );
+      return;
+    }
+    if(e.key === 'Tab'){
+      e.preventDefault();
+      rememberSelection(el);
+      const line =
+        getCurrentLine(el);
+      if(line){
+        changeIndent(
+          line,
+          e.shiftKey ? -1 : 1
+        );
+      }
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      e.key === 'Enter' &&
+      type === 'reference'
+    ){
+      e.preventDefault();
+      addReferenceCell(
+        activeRefId
+      );
+      return;
+    }
+    /*
+     * Enter on a checkbox creates another checkbox.
+     *
+     * Normal Enter:
+     *   same indentation level.
+     *
+     * Shift+Enter:
+     *   one level deeper, acting like a subtask.
+     */
+    if(e.key === 'Enter'){
+      const currentLine = getCurrentLine(el);
+      if(type === 'reference' && !e.shiftKey && currentLine && currentLine.tagName === 'H2'){
+        e.preventDefault();
+        captureBeforeEdit(el);
+        const paragraph = document.createElement('p');
+        paragraph.innerHTML = '<br>';
+        currentLine.insertAdjacentElement('afterend', paragraph);
+        placeEnd(paragraph);
+        finishEditorEdit(el);
+        saveEditorOwner(el);
+        return;
+      }
+      const line =
+        getCurrentLine(el);
+      if(
+        line &&
+        line.classList.contains('check-line')
+      ){
+        e.preventDefault();
+        const checkText =
+          line.querySelector(
+            '.check-text'
+          );
+        /*
+         * Google-Docs-style list exit:
+         * pressing Enter on an EMPTY checkbox removes
+         * the checkbox and leaves a normal blank line.
+         *
+         * Shift+Enter still creates an indented checkbox,
+         * even if the current checkbox is empty.
+         */
+        if(
+          !e.shiftKey &&
+          !(checkText?.textContent || '').trim()
+        ){
+          exitEmptyCheckbox(
+            line
+          );
+          return;
+        }
+        captureBeforeEdit(el);
+        const currentLevel =
+          Number(
+            line.dataset.level || 0
+          );
+        if(!e.shiftKey && selectionAtStartOfCheckboxText(line)){
+          const previous = createCheckboxLine(currentLevel);
+          line.insertAdjacentElement('beforebegin',previous);
+          placeCaretInsideCheckbox(previous.querySelector('.check-text'));
+          finishEditorEdit(el);
+          saveEditorOwner(el);
+          return;
+        }
+        const nextLevel =
+          e.shiftKey
+            ? Math.min(
+                6,
+                currentLevel + 1
+              )
+            : currentLevel;
+        insertCheckboxAfter(
+          line,
+          nextLevel
+        );
+        return;
+      }
+      /*
+       * Normal Enter in other content
+       * keeps the existing auto-format behavior.
+       */
+      setTimeout(
+        () => autoFormat(el),
+        0
+      );
+    }
+  }
+  function getCurrentLine(root){
+    const sel =
+      window.getSelection();
+    let n =
+      sel?.anchorNode;
+    if(
+      !n ||
+      !root.contains(n)
+    ){
+      return null;
+    }
+    if(n.nodeType === 3){
+      n = n.parentElement;
+    }
+    const task = n.closest('.check-line');
+    return task && root.contains(task) ? task : n.closest('pre,p,h1,h2,h3,div,blockquote,li') || null;
+  }
+  function selectionAtStartOfCheckboxText(line){
+    const text = line.querySelector('.check-text');
+    const selection = window.getSelection();
+    if(!text || !selection?.isCollapsed || !text.contains(selection.anchorNode)){
+      return false;
+    }
+    const prefix = document.createRange();
+    prefix.selectNodeContents(text);
+    prefix.setEnd(selection.anchorNode,selection.anchorOffset);
+    return prefix.toString().length === 0;
+  }
+  function changeIndent(
+    line,
+    delta
+  ){
+    let level =
+      Math.max(
+        0,
+        Math.min(
+          6,
+          Number(line.dataset.level || 0) +
+          delta
+        )
+      );
+    line.dataset.level =
+      String(level);
+    line.style.marginLeft =
+      level
+        ? `${level * 24}px`
+        : '';
+    /*
+     * No color manipulation happens here.
+     */
+    saveEditorOwner(
+      line.closest(
+        '.editor,.ref-cell'
+      )
+    );
+  }
+  /* Save whichever cell an edit happened in, and (for day cells) grow or shrink
+     the row to fit, so programmatic inserts never spill into the next day. */
+  function saveEditorOwner(el){
+    if(!el){
+      return;
+    }
+    if(
+      el.closest('.day-row')
+    ){
+      const date = el.dataset.date;
+      scheduleDaySave(date);
+      requestAnimationFrame(() => syncDayHeightStable(date));
+    }else{
+      const id =
+        el.closest(
+          '.ref-cell-wrapper'
+        )?.dataset.id;
+      if(id){
+        saveRefFromDom(
+          id
+        );
+      }
+    }
+  }
+  /* =========================================================
+     AUTO FORMATTING
+     ========================================================= */
+  function autoFormat(el){
+    if(currentCodeBlock(el)) return;
+    const sel =
+      window.getSelection();
+    if(
+      !sel ||
+      !sel.rangeCount ||
+      !el.contains(sel.anchorNode)
+    ){
+      return;
+    }
+    let node =
+      sel.anchorNode;
+    let line =
+      node.nodeType === 3
+        ? node.parentElement
+        : node;
+    line =
+      line?.closest(
+        'p,div,li,h1,h2,h3,blockquote'
+      );
+    if(
+      !line ||
+      !el.contains(line) ||
+      line.closest('.check-line,pre')
+    ){
+      return;
+    }
+    const text =
+      line.textContent || '';
+    /*
+     * Checkbox. Accept both the compact form `[] task` and the
+     * spaced clipboard form `[ ] task`, plus completed `[x] task`.
+     */
+    const checkboxMatch = text.match(/^([ \t]*)(\[\]|\[ \]|\[[xX]\])(?:[ \t]+)?(.*)$/);
+    if(checkboxMatch){
+      const indent = checkboxMatch[1] || '';
+      let columns = 0;
+      for(const ch of indent){
+        columns += ch === '\t' ? 4 : 1;
+      }
+      const level = Math.max(0, Math.min(6, Math.floor(columns / 4)));
+      const checked = /^\[[xX]\]$/.test(checkboxMatch[2]);
+      const c = document.createElement('div');
+      c.className = 'check-line' + (checked ? ' done' : '');
+      c.dataset.level = String(level);
+      c.style.marginLeft = level ? `${level * 24}px` : '';
+      c.innerHTML =
+        `<input type="checkbox"${checked ? ' checked' : ''}>` +
+        '<span class="check-text"></span>';
+      c.querySelector('.check-text').textContent = checkboxMatch[3] || '';
+      if(line === el) el.replaceChildren(c); else line.replaceWith(c);
+      wireCheckbox(c.querySelector('input'));
+      placeEnd(c.querySelector('.check-text'));
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Headings
+     */
+    if(
+      /^#{1,3}\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      if(el.classList.contains('ref-cell')){
+        const paragraph = document.createElement('p');
+        paragraph.textContent = text.replace(/^#{1,3}\s/,'');
+        line.replaceWith(paragraph);
+        placeEnd(paragraph);
+        saveEditorOwner(el);
+        return;
+      }
+      const n =
+        (
+          text.match(/^#+/)[0]
+        ).length;
+      const h =
+        document.createElement(
+          'h' + n
+        );
+      h.textContent =
+        text.replace(
+          /^#{1,3}\s/,
+          ''
+        );
+      line.replaceWith(h);
+      placeEnd(h);
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Bullet
+     */
+    if(
+      /^(?:[-*])\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      const ul =
+        document.createElement('ul');
+      const li =
+        document.createElement('li');
+      li.textContent =
+        text.replace(
+          /^[-*]\s/,
+          ''
+        );
+      ul.appendChild(li);
+      line.replaceWith(ul);
+      placeEnd(li);
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Blockquote
+     */
+    if(
+      /^>\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      const q =
+        document.createElement(
+          'blockquote'
+        );
+      q.textContent =
+        text.replace(
+          /^>\s/,
+          ''
+        );
+      line.replaceWith(q);
+      placeEnd(q);
+      saveEditorOwner(el);
+    }
+  }
+  function createCheckboxLine(level = 0){
+    const c =
+      document.createElement('div');
+    c.className =
+      'check-line';
+    c.dataset.level =
+      String(
+        Math.max(
+          0,
+          Math.min(
+            6,
+            Number(level) || 0
+          )
+        )
+      );
+    c.style.marginLeft =
+      c.dataset.level !== '0'
+        ? `${Number(c.dataset.level) * 24}px`
+        : '';
+    c.innerHTML =
+      '<input type="checkbox">' +
+      '<span class="check-text"></span>';
+    wireCheckbox(
+      c.querySelector('input')
+    );
+    return c;
+  }
+  function exitEmptyCheckbox(line){
+    const editor =
+      line.closest(
+        '.editor,.ref-cell'
+      );
+    if(!editor){
+      return;
+    }
+    captureBeforeEdit(editor);
+    /*
+     * Replace the empty checkbox row with an ordinary
+     * blank paragraph. A <br> gives contenteditable a
+     * stable caret target without displaying any text.
+     */
+    const paragraph =
+      document.createElement('p');
+    paragraph.appendChild(
+      document.createElement('br')
+    );
+    line.replaceWith(
+      paragraph
+    );
+    editor.focus({
+      preventScroll:true
+    });
+    const range =
+      document.createRange();
+    range.setStart(
+      paragraph,
+      0
+    );
+    range.collapse(true);
+    const sel =
+      window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    activeEditor =
+      editor;
+    savedRange =
+      range.cloneRange();
+    finishEditorEdit(editor);
+    saveEditorOwner(editor);
+  }
+  function insertCheckboxAfter(
+    line,
+    level
+  ){
+    const editor =
+      line.closest(
+        '.editor,.ref-cell'
+      );
+    if(!editor){
+      return;
+    }
+    captureBeforeEdit(editor);
+    const next =
+      createCheckboxLine(level);
+    /* Split at the caret rather than dropping the rest of the sentence.
+       Moving DOM nodes (instead of plain text) retains inline formatting. */
+    const oldText=line.querySelector('.check-text');
+    const selection=window.getSelection();
+    if(oldText && selection?.rangeCount){
+      const selected=selection.getRangeAt(0);
+      if((selected.startContainer===oldText || oldText.contains(selected.startContainer)) &&
+         (selected.endContainer===oldText || oldText.contains(selected.endContainer))){
+        const caret=selected.cloneRange();
+        if(!caret.collapsed) caret.deleteContents();
+        caret.collapse(true);
+        const tail=document.createRange();
+        tail.selectNodeContents(oldText);
+        tail.setStart(caret.startContainer,caret.startOffset);
+        next.querySelector('.check-text').appendChild(tail.extractContents());
+      }
+    }
+    line.insertAdjacentElement(
+      'afterend',
+      next
+    );
+    const text =
+      next.querySelector(
+        '.check-text'
+      );
+    editor.focus({preventScroll:true});
+    placeCaretInsideCheckbox(text);
+    finishEditorEdit(editor);
+    saveEditorOwner(editor);
+  }
+  function placeCaretInsideCheckbox(text){
+    const editor=text.closest('.editor,.ref-cell');
+    if(!editor) return;
+    const setCaret=()=>{
+      editor.focus({preventScroll:true});
+      const range=document.createRange();
+      range.setStart(text,0);
+      range.collapse(true);
+      const sel=window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      activeEditor=editor;
+      savedRange=range.cloneRange();
+    };
+    setCaret();
+    requestAnimationFrame(setCaret);
+  }
+  function placeEnd(el){
+    const editor =
+      el.closest(
+        '.editor,.ref-cell'
+      );
+    if(editor){
+      editor.focus({
+        preventScroll:true
+      });
+    }
+    const r =
+      document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    const s =
+      window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+    if(editor){
+      activeEditor =
+        editor;
+      savedRange =
+        r.cloneRange();
+    }
+  }
+  function wireCheckbox(cb){
+    if(!cb || wiredCheckboxes.has(cb)){
+      return;
+    }
+    wiredCheckboxes.add(cb);
+    /* Remove the old persisted listener marker from previously saved content. */
+    cb.removeAttribute('data-wired');
+    /* Keep restored/saved checkbox markup and its visual state aligned. */
+    const initialLine =
+      cb.closest('.check-line');
+    if(initialLine){
+      initialLine.classList.toggle('done', cb.checked);
+    }
+    cb.addEventListener(
+      'change',
+      () => {
+        const line =
+          cb.closest(
+            '.check-line'
+          );
+        if(!line){
+          return;
+        }
+        line.classList.toggle(
+          'done',
+          cb.checked
+        );
+        /*
+         * checked is normally a live DOM property. Mirror it to the
+         * HTML attribute so innerHTML saves/undo snapshots retain it.
+         */
+        if(cb.checked){
+          cb.setAttribute('checked', '');
+        }else{
+          cb.removeAttribute('checked');
+        }
+        const root =
+          cb.closest(
+            '.editor,.ref-cell'
+          );
+        saveEditorOwner(root);
+      }
+    );
+  }
+  /* =========================================================
+     FORMATTING ACTIONS (used by the right-click / long-press menu)
+     ========================================================= */
+  function runEditAction(action, ed){
+    if(!ed || !ed.isConnected){
+      setStatus('Select text or a task first');
+      return;
+    }
+    activeEditor = ed;
+    ed.focus({preventScroll:true});
+    if(!savedRange || !ed.contains(savedRange.startContainer) || !ed.contains(savedRange.endContainer)){
+      setStatus('Tap where you want to edit first');
+      return;
+    }
+    restoreSelection();
+    if(action === 'strike'){
+      toggleTaskStrike(ed);
+      return;
+    }
+    if(action === 'bold' || action === 'underline'){
+      captureBeforeEdit(ed);
+      document.execCommand(action,false,null);
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
+      return;
+    }
+    if(action === 'rule'){
+      captureBeforeEdit(ed);
+      document.execCommand('insertHTML',false,'<hr><p><br></p>');
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
+      return;
+    }
+    const line = getCurrentLine(ed);
+    if(action === 'indent' || action === 'outdent'){
+      if(!line || line === ed){
+        setStatus('Place the cursor on a text or task line');
+        return;
+      }
+      captureBeforeEdit(ed);
+      changeIndent(line,action === 'indent' ? 1 : -1);
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      return;
+    }
+    if(action === 'subtask'){
+      if(line && line.classList.contains('check-line')){
+        insertCheckboxAfter(line,Math.min(6,Number(line.dataset.level || 0) + 1));
+        return;
+      }
+      const task = createCheckboxLine(1);
+      captureBeforeEdit(ed);
+      if(line && line !== ed) line.insertAdjacentElement('afterend',task);
+      else ed.appendChild(task);
+      placeCaretInsideCheckbox(task.querySelector('.check-text'));
+      finishEditorEdit(ed);
+      saveEditorOwner(ed);
+    }
+  }
+  /* =========================================================
+     RIGHT-CLICK / LONG-PRESS MENU
+     ========================================================= */
+  const ctxMenu = document.getElementById('contextMenu');
+  let ctxEditor = null;
+  let ctxAnchor = null;
+  let lastPointerType = 'mouse';
+  let longPress = null;
+  function editorFromTarget(target){
+    const el = target instanceof Element ? target : target?.parentElement;
+    const ed = el?.closest?.('.editor,.ref-cell');
+    // Read-only split copies are not editable and get the normal browser menu.
+    return ed && ed.isContentEditable ? ed : null;
+  }
+  function visibleBox(){
+    const vv = window.visualViewport;
+    return {
+      width:Math.min(window.innerWidth, vv ? vv.width : Infinity),
+      height:Math.min(window.innerHeight, vv ? vv.height : Infinity)
+    };
+  }
+  function positionContextMenu(){
+    if(ctxMenu.hidden || !ctxAnchor) return;
+    const {x,y,touch} = ctxAnchor;
+    const box = visibleBox();
+    const r = ctxMenu.getBoundingClientRect();
+    // On touch, sit below the finger so Chrome's own Copy / Paste bar
+    // (which appears above the selection) stays visible.
+    let left = touch ? x - r.width / 2 : x;
+    let top = touch ? y + 36 : y;
+    if(top + r.height > box.height - 8) top = touch ? y - r.height - 72 : y - r.height;
+    left = Math.max(8, Math.min(left, box.width - r.width - 8));
+    top = Math.max(8, Math.min(top, box.height - r.height - 8));
+    ctxMenu.style.left = Math.round(left) + 'px';
+    ctxMenu.style.top = Math.round(top) + 'px';
+  }
+  function showContextMenu(ed,x,y,touch){
+    ctxEditor = ed;
+    ctxAnchor = {x,y,touch:!!touch};
+    rememberSelection(ed);
+    activeEditor = ed;
+    ctxMenu.classList.toggle('ctx-touch',!!touch);
+    ctxMenu.hidden = false;
+    positionContextMenu();
+  }
+  function hideContextMenu(){
+    if(ctxMenu.hidden) return;
+    ctxMenu.hidden = true;
+    ctxEditor = null;
+    ctxAnchor = null;
+  }
+  function cancelLongPress(){
+    if(longPress){
+      clearTimeout(longPress.timer);
+      longPress = null;
+    }
+  }
+  function initContextMenu(){
+    document.addEventListener('pointerdown',e => { lastPointerType = e.pointerType || 'mouse'; },true);
+    document.addEventListener('contextmenu',e => {
+      const ed = editorFromTarget(e.target);
+      if(!ed) return;
+      const type = e.pointerType || lastPointerType;
+      const touch = type === 'touch' || type === 'pen';
+      if(!touch){
+        if(e.shiftKey) return;      // Shift+right-click keeps the browser's menu.
+        e.preventDefault();
+      }
+      // Touch: leave Chrome's own selection bar alone, and show ours as well.
+      cancelLongPress();
+      const x = e.clientX, y = e.clientY;
+      // The browser may move the selection to the pressed word after this event.
+      requestAnimationFrame(() => showContextMenu(ed,x,y,touch));
+    });
+    // Fallback for touch browsers that never send a contextmenu event.
+    document.addEventListener('touchstart',e => {
+      cancelLongPress();
+      if(e.touches.length !== 1) return;
+      const ed = editorFromTarget(e.target);
+      if(!ed) return;
+      const t = e.touches[0];
+      const press = {x:t.clientX,y:t.clientY,ed};
+      press.timer = setTimeout(() => {
+        if(longPress !== press) return;
+        longPress = null;
+        if(ctxMenu.hidden) showContextMenu(press.ed,press.x,press.y,true);
+      },650);
+      longPress = press;
+    },{capture:true,passive:true});
+    document.addEventListener('touchmove',e => {
+      if(!longPress) return;
+      const t = e.touches[0];
+      if(!t || Math.abs(t.clientX - longPress.x) > 10 || Math.abs(t.clientY - longPress.y) > 10) cancelLongPress();
+    },{capture:true,passive:true});
+    document.addEventListener('touchend',cancelLongPress,{capture:true,passive:true});
+    document.addEventListener('wheel',hideContextMenu,{capture:true,passive:true});
+    ctxMenu.addEventListener('contextmenu',e => e.preventDefault());
+    ctxMenu.querySelectorAll('[data-ctx]').forEach(btn => {
+      // Keep the text selection while the button is pressed.
+      btn.addEventListener('pointerdown',e => e.preventDefault());
+      btn.addEventListener('mousedown',e => e.preventDefault());
+      btn.addEventListener('click',() => {
+        const ed = ctxEditor;
+        hideContextMenu();
+        runEditAction(btn.dataset.ctx, ed);
+      });
+    });
+  }
+  /* =========================================================
+     DAY HEIGHT / SCROLL
+     ========================================================= */
+  function syncDayHeightsRaw(){
+    /*
+     * Every pass measures the real content height. Rows do not keep
+     * a previously larger height after text or trailing lines are removed.
+     */
+    state.days.forEach(
+      d => syncDayHeight(d.date)
+    );
+  }
+  function syncDayHeights(){
+    // Row heights can change above the visible area; keep the same day under the
+    // top edge of the pane instead of letting the view slide.
+    withScrollAnchor(syncDayHeightsRaw);
+  }
+  function visibleDayScroller(){
+    const a = document.getElementById('todayScroll');
+    const b = document.getElementById('journalScroll');
+    if(a && a.clientHeight > 0) return a;
+    if(b && b.clientHeight > 0) return b;
+    return null;
+  }
+  function withScrollAnchor(fn){
+    const a = document.getElementById('todayScroll');
+    const b = document.getElementById('journalScroll');
+    const ref = visibleDayScroller();
+    if(!ref){ fn(); return; }
+    const refTop = ref.getBoundingClientRect().top;
+    let anchor = null;
+    for(const row of ref.querySelectorAll('.day-row')){
+      if(row.getBoundingClientRect().bottom > refTop + 1){ anchor = row; break; }
+    }
+    if(!anchor){ fn(); return; }
+    const date = anchor.dataset.date;
+    const before = anchor.getBoundingClientRect().top - refTop;
+    fn();
+    const again = ref.querySelector(`.day-row[data-date="${CSS.escape(date)}"]`);
+    if(!again) return;
+    const after = again.getBoundingClientRect().top - ref.getBoundingClientRect().top;
+    const delta = after - before;
+    if(Math.abs(delta) > 0.5){
+      ref.scrollTop += delta;
+      [a,b].forEach(el => { if(el && el !== ref && el.clientHeight > 0) el.scrollTop = ref.scrollTop; });
+    }
+  }
+  function syncDayHeightStable(date){
+    if(!date) return;
+    const a = document.getElementById('todayScroll');
+    const b = document.getElementById('journalScroll');
+    const aTop = a ? a.scrollTop : 0;
+    const bTop = b ? b.scrollTop : 0;
+    syncDayHeight(date);
+    // Height changes are allowed, but editing must never navigate/recenter the view.
+    if(a && a.scrollTop !== aTop) a.scrollTop = aTop;
+    if(b && b.scrollTop !== bTop) b.scrollTop = bTop;
+  }
+  function syncDayHeight(date){
+    if(!date) return;
+    const rows = ['todayScroll','journalScroll'].map(id =>
+      document.querySelector(`#${id} .day-row[data-date="${CSS.escape(date)}"]`)
+    ).filter(Boolean);
+    rows.forEach(row => {
+      row.style.height = 'auto';
+      const ed = row.querySelector('.editor');
+      if(!ed) return;
+      const style = getComputedStyle(ed);
+      const lineHeight = parseFloat(style.lineHeight) || (parseFloat(style.fontSize) || 16) * 1.35;
+      ed.style.minHeight = Math.ceil(lineHeight * 5) + 'px';
+    });
+    const visible = rows.filter(row => row.getClientRects().length);
+    if(!visible.length) return;
+    const h = Math.ceil(Math.max(...visible.map(row => row.getBoundingClientRect().height)));
+    visible.forEach(row => row.style.height = h + 'px');
+  }
+  /* Remember where the day lists were, so hiding/showing a pane (which resets a
+     hidden scroller to 0 = the oldest loaded day) can put the view back. */
+  function noteDayScroll(el){
+    if(el.clientHeight > 0 && (el.scrollTop > 0 || recentUserScroll())) lastDayTop = el.scrollTop;
+  }
+  function restoreDayScroll(){
+    const els = ['todayScroll','journalScroll']
+      .map(id => document.getElementById(id))
+      .filter(el => el && el.clientHeight > 0);
+    if(!els.length) return;
+    let target = Math.max(...els.map(el => el.scrollTop));
+    if(!target && lastDayTop) target = lastDayTop;
+    els.forEach(el => { if(Math.abs(el.scrollTop - target) > 0.5) el.scrollTop = target; });
+  }
+  function syncDailyScroll(){
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    a.onscroll = () => {
+      if(!syncing){
+        syncing = true;
+        if(Math.abs(b.scrollTop - a.scrollTop) > 0.5) b.scrollTop = a.scrollTop;
+        syncing = false;
+      }
+      noteDayScroll(a);
+      updateVisibleDate();
+      maybeLoadMore(a);
+    };
+    /* Today intentionally has no visible scrollbar. Wheel/trackpad input over
+       Today is forwarded to Journal, which owns the shared scrollbar. */
+    a.onwheel = e => {
+      if(Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const before = b.scrollTop;
+      b.scrollTop += e.deltaY;
+      maybeLoadMore(b);
+      if(b.scrollTop !== before) e.preventDefault();
+    };
+    b.onscroll = () => {
+      if(!syncing){
+        syncing = true;
+        if(Math.abs(a.scrollTop - b.scrollTop) > 0.5) a.scrollTop = b.scrollTop;
+        syncing = false;
+      }
+      noteDayScroll(b);
+      updateVisibleDate();
+      maybeLoadMore(b);
+    };
+  }
+  function updateVisibleDate(){
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const rows =
+      [
+        ...a.querySelectorAll(
+          '.day-row'
+        )
+      ];
+    let best = null;
+    let bestDist = Infinity;
+    for(const r of rows){
+      const d =
+        Math.abs(
+          r.offsetTop -
+          a.scrollTop
+        );
+      if(d < bestDist){
+        bestDist = d;
+        best = r;
+      }
+    }
+    if(best){
+      document.getElementById(
+        'dateLabel'
+      ).textContent =
+        formatDate(
+          best.dataset.date
+        );
+    }
+  }
+  /* =========================================================
+     LAZY WEEK LOADING
+     ========================================================= */
+  function recentUserScroll(){
+    return Date.now() - lastUserScrollAt < 1500;
+  }
+  function maybeLoadMore(scroll){
+    if(!state.days.length){
+      return;
+    }
+    // Only a person scrolling may load more days. Typing, caret-into-view,
+    // layout changes and code-driven scrolling never do.
+    if(!recentUserScroll()){
+      return;
+    }
+    const now = Date.now();
+    const threshold = 80;
+    const nearTop =
+      scroll.scrollTop <= threshold;
+    const nearBottom =
+      scroll.scrollHeight -
+      scroll.scrollTop -
+      scroll.clientHeight <=
+      threshold;
+    if(
+      nearTop &&
+      !loadingPrev &&
+      now >= prevBlockedUntil
+    ){
+      loadPreviousWeek();
+    }
+    if(
+      nearBottom &&
+      !loadingNext &&
+      now >= nextBlockedUntil
+    ){
+      loadNextWeek();
+    }
+  }
+  function loadPreviousWeek(){
+    loadingPrev = true;
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    const first =
+      state.days[0].date;
+    const start =
+      addDays(first,-7);
+    const end =
+      addDays(first,-1);
+    setStatus(
+      'Loading earlier week…'
+    );
+    google.script.run
+      .withSuccessHandler(days => {
+        if(!days?.length){
+          loadingPrev = false;
+          prevBlockedUntil = Date.now() + 5000;
+          setStatus('Ready');
+          return;
+        }
+        // Measure at the moment of insertion (the person may have scrolled
+        // while the request was in flight), and size the new rows BEFORE
+        // computing how far the content moved.
+        const ref = (a.clientHeight > 0) ? a : b;
+        const oldH = ref.scrollHeight;
+        const oldTop = ref.scrollTop;
+        mergeDays(days);
+        prependDays(days);
+        syncDayHeightsRaw();
+        const delta = ref.scrollHeight - oldH;
+        [a,b].forEach(el => { if(el.clientHeight > 0) el.scrollTop = oldTop + delta; });
+        lastDayTop = oldTop + delta;
+        loadingPrev = false;
+        setStatus('Ready');
+      })
+      .withFailureHandler(e => {
+        loadingPrev = false;
+        prevBlockedUntil = Date.now() + 5000;
+        setStatus(
+          'Load error: ' +
+          e.message
+        );
+      })
+      .getDaysRange(
+        start,
+        end
+      );
+  }
+  function loadNextWeek(){
+    loadingNext = true;
+    const first =
+      state.days[
+        state.days.length - 1
+      ].date;
+    const start =
+      addDays(first,1);
+    const end =
+      addDays(first,7);
+    setStatus(
+      'Loading later week…'
+    );
+    google.script.run
+      .withSuccessHandler(days => {
+        if(!days?.length){
+          loadingNext = false;
+          nextBlockedUntil = Date.now() + 5000;
+          setStatus('Ready');
+          return;
+        }
+        mergeDays(days);
+        appendDays(days);
+        requestAnimationFrame(() => {
+          syncDayHeights();
+          loadingNext = false;
+          setStatus('Ready');
+        });
+      })
+      .withFailureHandler(e => {
+        loadingNext = false;
+        nextBlockedUntil = Date.now() + 5000;
+        setStatus(
+          'Load error: ' +
+          e.message
+        );
+      })
+      .getDaysRange(
+        start,
+        end
+      );
+  }
+  function prependDays(days){
+    const sorted =
+      [...days].sort(
+        (a,b) =>
+          a.date.localeCompare(b.date)
+      );
+    const left =
+      document.getElementById(
+        'todayScroll'
+      );
+    const right =
+      document.getElementById(
+        'journalScroll'
+      );
+    const fragL =
+      document.createDocumentFragment();
+    const fragR =
+      document.createDocumentFragment();
+    sorted.forEach(d => {
+      appendDayRow(
+        d,
+        fragL,
+        'day'
+      );
+      appendDayRow(
+        d,
+        fragR,
+        'journal'
+      );
+    });
+    left.prepend(fragL);
+    right.prepend(fragR);
+  }
+  function appendDays(days){
+    const sorted =
+      [...days].sort(
+        (a,b) =>
+          a.date.localeCompare(b.date)
+      );
+    const left =
+      document.getElementById(
+        'todayScroll'
+      );
+    const right =
+      document.getElementById(
+        'journalScroll'
+      );
+    sorted.forEach(d => {
+      if(
+        !left.querySelector(
+          `.day-row[data-date="${CSS.escape(d.date)}"]`
+        )
+      ){
+        appendDayRow(
+          d,
+          left,
+          'day'
+        );
+        appendDayRow(
+          d,
+          right,
+          'journal'
+        );
+      }
+    });
+  }
+  function jumpToday(
+    announce = true
+  ){
+    const row =
+      document.querySelector(
+        `#todayScroll .day-row[data-date="${CSS.escape(state.today)}"]`
+      );
+    if(!row){
+      return;
+    }
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    /* Align the top border of today's row directly beneath the pane header. */
+    const todayRowTop = row.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop;
+    const journalRow = b.querySelector(`.day-row[data-date="${CSS.escape(state.today)}"]`);
+    const journalRowTop = journalRow
+      ? journalRow.getBoundingClientRect().top - b.getBoundingClientRect().top + b.scrollTop
+      : todayRowTop;
+    a.scrollTop = Math.max(0,todayRowTop);
+    b.scrollTop = Math.max(0,journalRowTop);
+    lastDayTop = a.scrollTop || b.scrollTop || lastDayTop;
+    updateVisibleDate();
+    if(announce){
+      setStatus('Today');
+    }
+  }
+  /* =========================================================
+     DAY SAVING
+     ========================================================= */
+  function scheduleDaySave(date){
+    if(!date) return;
+    clearTimeout(saveTimers[date]);
+    const info=daySaveState.get(date)||{inFlight:false,pending:false};
+    info.pending=true;
+    daySaveState.set(date,info);
+    setStatus('Unsaved…');
+    saveTimers[date]=setTimeout(()=>saveDay(date),700);
+  }
+  function saveDay(date){
+    clearTimeout(saveTimers[date]);
+    const info=daySaveState.get(date)||{inFlight:false,pending:true};
+    if(info.inFlight){
+      info.pending=true;
+      daySaveState.set(date,info);
+      return;
+    }
+    const t=document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+    const j=document.querySelector(`#journalScroll .journal-editor[data-date="${CSS.escape(date)}"]`);
+    /* Runtime wiring markers must never be persisted. */
+    t?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    j?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    const tasks=t?.innerHTML||'';
+    const journal=j?.innerHTML||'';
+    const d=state.days.find(x=>x.date===date);
+    if(d){d.tasks=tasks;d.journal=journal;}
+    info.inFlight=true;
+    info.pending=false;
+    daySaveState.set(date,info);
+    setStatus('Saving…');
+    google.script.run
+      .withSuccessHandler(()=>{
+        info.inFlight=false;
+        if(info.pending){
+          saveDay(date);
+        }else{
+          setStatus('Saved');
+        }
+      })
+      .withFailureHandler(e=>{
+        info.inFlight=false;
+        setStatus('Save error: '+e.message);
+        if(info.pending) saveDay(date);
+      })
+      .saveDay(date,tasks,journal);
+  }
+  /* =========================================================
+     REFERENCE
+     ========================================================= */
+  const REF_SORT_KEY = 'focusWorkspaceReferenceSortV1';
+  let referenceSortMode = localStorage.getItem(REF_SORT_KEY) || 'original';
+  const referenceCollator = new Intl.Collator(undefined,{numeric:true,sensitivity:'base'});
+  function stripReferenceMetadata(html){
+    return String(html || '').replace(/<!--fw-modified:\d+-->/g,'');
+  }
+  function referenceModified(item){
+    const match = String(item.content || '').match(/<!--fw-modified:(\d+)-->/);
+    return match ? Number(match[1]) : 0;
+  }
+  function writeReferenceMetadata(html,time){
+    return `<!--fw-modified:${time}-->` + stripReferenceMetadata(html);
+  }
+  function referenceTitle(item){
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = storedToHtml(stripReferenceMetadata(item.content || item.title || ''));
+    const title = wrapper.querySelector('h2,h1,h3,p,div') || wrapper;
+    return (title.textContent || item.title || '').trim();
+  }
+  function sortedReferenceItems(){
+    return [...state.reference].sort((a,b) => {
+      if(referenceSortMode === 'title'){
+        const order = referenceCollator.compare(referenceTitle(a),referenceTitle(b));
+        if(order) return order;
+      }else if(referenceSortMode === 'modified'){
+        const order = referenceModified(b) - referenceModified(a);
+        if(order) return order;
+      }
+      return (Number(a.sort) || 0) - (Number(b.sort) || 0) || String(a.id).localeCompare(String(b.id));
+    });
+  }
+  function applyReferenceSort(){
+    if(document.activeElement?.closest?.('.ref-cell')) return;
+    const tree = document.getElementById('referenceTree');
+    sortedReferenceItems().forEach(item => {
+      const node = tree.querySelector(`.ref-cell-wrapper[data-id="${CSS.escape(String(item.id))}"]`);
+      if(node) tree.appendChild(node);
+    });
+  }
+  function initReferenceSort(){
+    const select = document.getElementById('referenceSort');
+    if(!['original','title','modified'].includes(referenceSortMode)) referenceSortMode = 'original';
+    select.value = referenceSortMode;
+    select.addEventListener('change',() => {
+      referenceSortMode = select.value;
+      localStorage.setItem(REF_SORT_KEY,referenceSortMode);
+      applyReferenceSort();
+    });
+  }
+  const MOBILE_SCALE_KEY = 'focusWorkspaceMobileScaleV1';
+  function normalizeMobileScale(value){
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? Math.max(50,Math.min(200,Math.round(number/10)*10)) : 100;
+  }
+  function setMobileScale(value){
+    const percent = normalizeMobileScale(value);
+    document.documentElement.style.setProperty('--mobile-scale',String(percent / 100));
+    document.documentElement.style.setProperty('--workspace-scale',String(percent / 100));
+    document.getElementById('mobileScale').value = String(percent);
+    document.getElementById('mobileScaleValue').textContent = percent + '%';
+    localStorage.setItem(MOBILE_SCALE_KEY,String(percent));
+    requestAnimationFrame(() => { updateWorkspaceLayout(); syncDayHeights(); positionTypeSettings(); });
+  }
+  function initMobileScale(){
+    document.getElementById('mobileScale').addEventListener('input',event => setMobileScale(event.target.value));
+    document.getElementById('resetMobileScale').addEventListener('click',() => setMobileScale(100));
+    setMobileScale(localStorage.getItem(MOBILE_SCALE_KEY) || 100);
+  }
+  /* Padding: the extra space around the content of each day cell and Reference
+     cell. Left/right and top/bottom are separate. 100% is the original spacing,
+     0% removes it, 300% triples it. */
+  const PAD_X_KEY = 'focusWorkspacePadXV1';
+  const PAD_Y_KEY = 'focusWorkspacePadYV1';
+  const PAD_SCALE_KEY = 'focusWorkspacePadScaleV1'; // older single slider, used only to migrate
+  function normalizePadScale(value){
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(0,Math.min(300,Math.round(number/10)*10)) : 100;
+  }
+  function setPad(axis,value,save = true){
+    const percent = normalizePadScale(value);
+    const upper = axis.toUpperCase();
+    document.documentElement.style.setProperty('--pad-' + axis,String(percent / 100));
+    const input = document.getElementById('pad' + upper);
+    const output = document.getElementById('pad' + upper + 'Value');
+    if(input) input.value = String(percent);
+    if(output) output.textContent = percent + '%';
+    if(save){ try{ localStorage.setItem(axis === 'x' ? PAD_X_KEY : PAD_Y_KEY,String(percent)); }catch(e){} }
+    requestAnimationFrame(() => syncDayHeights());
+  }
+  function initPadScale(){
+    ['x','y'].forEach(axis => {
+      const upper = axis.toUpperCase();
+      document.getElementById('pad' + upper).addEventListener('input',event => setPad(axis,event.target.value));
+      document.getElementById('resetPad' + upper).addEventListener('click',() => setPad(axis,100));
+      let saved = null;
+      try{
+        saved = localStorage.getItem(axis === 'x' ? PAD_X_KEY : PAD_Y_KEY);
+        if(saved === null) saved = localStorage.getItem(PAD_SCALE_KEY);
+      }catch(e){}
+      setPad(axis,saved === null ? 100 : saved,false);
+    });
+    document.getElementById('closeTypeSettings').addEventListener('click',() => {
+      document.getElementById('typeSettings').classList.add('hidden');
+    });
+  }
+  /* =========================================================
+     MOBILE MODE / SPLIT
+     ========================================================= */
+  const MOBILE_SPLIT_KEY = 'focusWorkspaceMobileSplitV1';
+  const MOBILE_SPLIT_SIZE_KEY = 'focusWorkspaceMobileSplitSizeV1';
+  const MOBILE_SPLIT_OPTIONS_KEY = 'focusWorkspaceMobileSplitOptionsV1';
+  let splitOptions = {first:'today',second:'reference',third:'none',orientation:'vertical'};
+  try{splitOptions={...splitOptions,...JSON.parse(localStorage.getItem(MOBILE_SPLIT_OPTIONS_KEY)||'{}')};}catch(e){}
+  function normalizeSplitOptions(){
+    if(!VIEW_PANES.includes(splitOptions.first)) splitOptions.first='today';
+    if(!VIEW_PANES.includes(splitOptions.second)) splitOptions.second='reference';
+    if(splitOptions.third!=='none' && !VIEW_PANES.includes(splitOptions.third)) splitOptions.third='none';
+    if(!['vertical','horizontal'].includes(splitOptions.orientation)) splitOptions.orientation='vertical';
+  }
+  let mobileSplitRatio = Math.max(.2,Math.min(.8,Number(localStorage.getItem(MOBILE_SPLIT_SIZE_KEY)) || .5));
+  function isActualMobileDevice(){
+    // Prefer the browser's explicit mobile hint. Fall back to mobile OS signals.
+    if(navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') return navigator.userAgentData.mobile;
+    const ua = navigator.userAgent || '';
+    if(/Android|iPhone|iPod|Mobile/i.test(ua)) return true;
+    // iPadOS can identify itself as Macintosh, but exposes multiple touch points.
+    if(/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true;
+    return /iPad/i.test(ua);
+  }
+  function isMobileLayout(){
+    return document.body.classList.contains('mobile-mode');
+  }
+  function isSplitActive(){
+    return document.body.classList.contains('mobile-split');
+  }
+  function setMobileMode(on){
+    on=!!on;
+    document.body.classList.toggle('mobile-mode',on);
+    document.querySelectorAll('[data-mobile-mode]').forEach(button => button.textContent = on ? 'Exit Mobile' : 'Mobile');
+    updateWorkspaceLayout();
+  }
+  /* Split works in regular desktop mode and in Mobile mode. */
+  function setSplit(on){
+    on = !!on;
+    document.body.classList.toggle('mobile-split',on);
+    try{ localStorage.setItem(MOBILE_SPLIT_KEY,on?'1':'0'); }catch(e){}
+    document.querySelectorAll('[data-split-state]').forEach(el => el.textContent = on ? '· on' : '');
+    document.querySelectorAll('[data-split-exit]').forEach(btn => btn.disabled = !on);
+    updateColumnsLabel();
+    updateWorkspaceLayout();
+  }
+  function initAppDisplay(){
+    document.querySelectorAll('[data-mobile-mode]').forEach(button => button.addEventListener('click',()=>{
+      releaseEditor();
+      setMobileMode(!isMobileLayout());
+    }));
+    // Always start in regular mode. Mobile mode turns on only from the button.
+    setMobileMode(false);
+    normalizeSplitOptions();
+    const handle=document.getElementById('mobileSplitResizer');
+    handle?.addEventListener('pointerdown',event=>{
+      event.preventDefault(); handle.setPointerCapture(event.pointerId);
+      const workspace=document.getElementById('workspace');
+      const rect=workspace.getBoundingClientRect();
+      const move=e=>{ const horizontal=splitOptions.orientation==='horizontal'; mobileSplitRatio=Math.max(.2,Math.min(.8,(horizontal?e.clientX-rect.left:e.clientY-rect.top)/Math.max(1,horizontal?rect.width:rect.height))); updateWorkspaceLayout(); };
+      const up=()=>{ localStorage.setItem(MOBILE_SPLIT_SIZE_KEY,String(mobileSplitRatio)); handle.removeEventListener('pointermove',move); handle.removeEventListener('pointerup',up); handle.removeEventListener('pointercancel',up); };
+      handle.addEventListener('pointermove',move); handle.addEventListener('pointerup',up); handle.addEventListener('pointercancel',up);
+    });
+  }
+  function renderReference(){
+    const tree =
+      document.getElementById(
+        'referenceTree'
+      );
+    tree.innerHTML = '';
+    const items =
+      sortedReferenceItems();
+    if(!items.length){
+      tree.innerHTML =
+        '<div class="empty">' +
+        'No reference cells yet. ' +
+        'Click + Cell or press ⌘/Ctrl+Enter.' +
+        '</div>';
+      return;
+    }
+    items.forEach(
+      item =>
+        createReferenceCell(item)
+    );
+    filterReference();
+  }
+  function createReferenceCell(item){
+    const wrap =
+      document.createElement(
+        'div'
+      );
+    wrap.className =
+      'ref-cell-wrapper' + (item.expanded === false ? ' ref-collapsed' : '');
+    wrap.dataset.id =
+      item.id;
+    wrap.innerHTML =
+      `<button class="ref-disclosure" type="button" data-toggle title="Expand/collapse reference cell">${item.expanded === false ? '▸' : '▾'}</button>
+      <button class="ref-drag" type="button" aria-label="Drag to reorder reference cell" title="Drag to reorder">⠿</button>
+      <div
+        class="ref-cell"
+        contenteditable="true"
+        data-placeholder="Type reference material…"
+      >${storedToHtml(
+        stripReferenceMetadata(item.content || item.title || '')
+      )}</div>
+      <div class="ref-actions">
+        <button
+          class="btn tiny"
+          data-del>
+          Delete
+        </button>
+      </div>`;
+    document
+      .getElementById(
+        'referenceTree'
+      )
+      .appendChild(wrap);
+    const ed =
+      wrap.querySelector(
+        '.ref-cell'
+      );
+    normalizeEditorTasks(ed);
+    ensureReferenceTitle(ed);
+    wireCodeBlocks(ed);
+    wireEditorHistory(ed);
+    ed.addEventListener('blur',() => setTimeout(applyReferenceSort,0));
+    ed.addEventListener(
+      'focus',
+      () => {
+        activeRefId =
+          item.id;
+        activeEditor =
+          ed;
+        rememberSelection(ed);
+      }
+    );
+    ed.addEventListener(
+      'keyup',
+      () => {
+        rememberSelection(ed);
+      }
+    );
+    ed.addEventListener(
+      'mouseup',
+      () => {
+        rememberSelection(ed);
+      }
+    );
+    ed.addEventListener(
+      'input',
+      () => {
+        activeEditor =
+          ed;
+        rememberSelection(ed);
+        autoFormat(ed);
+        saveRefFromDom(
+          item.id
+        );
+      }
+    );
+    ed.addEventListener(
+      'keydown',
+      e => {
+        handleEditorKey(
+          e,
+          ed,
+          'reference'
+        );
+      }
+    );
+    ed.addEventListener('paste', e => pasteRichClipboard(e, ed));
+    ed.addEventListener('cut', e => copyStructuredText(e, ed, true));
+    ed.addEventListener(
+      'copy',
+      e => copyStructuredText(e, ed)
+    );
+    ed.querySelectorAll(
+      'input[type=checkbox]'
+    ).forEach(
+      wireCheckbox
+    );
+    wrap.querySelector(
+      '[data-toggle]'
+    ).onclick = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.expanded = item.expanded === false;
+      wrap.classList.toggle('ref-collapsed', !item.expanded);
+      e.currentTarget.textContent = item.expanded ? '▾' : '▸';
+      google.script.run.saveReferenceItem(item);
+    };
+    wrap.querySelector(
+      '[data-del]'
+    ).onclick =
+      () =>
+        deleteReference(
+          item.id
+        );
+    initReferenceDragHandle(wrap);
+    return wrap;
+  }
+  function saveRefFromDom(id){
+    const wrap =
+      document.querySelector(
+        `#referenceTree .ref-cell-wrapper[data-id="${CSS.escape(id)}"]`
+      );
+    const item =
+      state.reference.find(
+        x => x.id === id
+      );
+    if(!wrap || !item){
+      return;
+    }
+    const refCell = wrap.querySelector('.ref-cell');
+    refCell?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    item.content = writeReferenceMetadata(refCell?.innerHTML || '',Date.now());
+    clearTimeout(
+      item._timer
+    );
+    setStatus(
+      'Unsaved reference…'
+    );
+    item._timer =
+      setTimeout(
+        () => {
+          google.script.run
+            .withSuccessHandler(
+              () =>
+                setStatus('Saved')
+            )
+            .withFailureHandler(
+              err =>
+                setStatus('Save error: ' + err.message)
+            )
+            .saveReferenceItem(
+              item
+            );
+        },
+        700
+      );
+  }
+  function ensureReferenceTitle(editor){
+    if(editor.firstElementChild?.tagName === 'H2') return;
+    // Tasks and code blocks are content, never title wrappers.
+    if(editor.firstElementChild?.matches('.check-line,pre') || editor.firstElementChild?.querySelector('input[type=checkbox]')){
+      const title = document.createElement('h2'); title.innerHTML = '<br>';
+      editor.prepend(title); return;
+    }
+    const heading = document.createElement('h2');
+    const first = editor.firstChild;
+    if(first?.nodeType === Node.ELEMENT_NODE){
+      while(first.firstChild) heading.appendChild(first.firstChild);
+      first.replaceWith(heading);
+    }else if(first?.nodeType === Node.TEXT_NODE){
+      heading.textContent = first.textContent;
+      first.remove();
+      if(editor.firstChild?.nodeName === 'BR') editor.firstChild.remove();
+      editor.prepend(heading);
+    }else{
+      heading.appendChild(document.createElement('br'));
+      editor.prepend(heading);
+    }
+  }
+  function addReferenceCell(afterId){
+    google.script.run
+      .withSuccessHandler(id => {
+        const item = {
+          id:id,
+          parentId:'',
+          type:'item',
+          title:'',
+          content:'<h2><br></h2>',
+          expanded:true,
+          sort:Date.now()
+        };
+        state.reference.push(
+          item
+        );
+        document.querySelector('#referenceTree > .empty')?.remove();
+        createReferenceCell(
+          item
+        );
+        const ed =
+          document.querySelector(
+            `#referenceTree .ref-cell-wrapper[data-id="${CSS.escape(id)}"] .ref-cell`
+          );
+        ed.focus();
+        activeRefId =
+          id;
+        activeEditor =
+          ed;
+        placeEnd(ed);
+      })
+      .addReferenceItem(
+        '',
+        '',
+        '<h2><br></h2>'
+      );
+  }
+  function deleteReference(id){
+    google.script.run
+      .withSuccessHandler(() => {
+        state.reference =
+          state.reference.filter(
+            x => x.id !== id
+          );
+        renderReference();
+      })
+      .deleteReferenceItem(id);
+  }
+  /* =========================================================
+     REFERENCE COLLAPSE / EXPAND
+     ========================================================= */
+  function applyReferenceCollapseState(){
+    const items = state.reference || [];
+    document.querySelectorAll('#referenceTree .ref-cell-wrapper').forEach(w => {
+      const item = items.find(x => x.id === w.dataset.id);
+      const collapsed = item ? item.expanded === false : referenceCollapsed;
+      w.classList.toggle('ref-collapsed', collapsed);
+      const arrow = w.querySelector('[data-toggle]');
+      if(arrow) arrow.textContent = collapsed ? '▸' : '▾';
+    });
+    document.querySelectorAll('[data-layout="reference"]').forEach(btn => {
+      btn.textContent = referenceCollapsed ? 'Ref ▸' : 'Ref ▾';
+    });
+  }
+  function toggleReferenceCollapse(){
+    referenceCollapsed = !referenceCollapsed;
+    localStorage.setItem(REF_COLLAPSE_STORAGE_KEY, referenceCollapsed ? '1' : '0');
+    (state.reference || []).forEach(item => {
+      item.expanded = !referenceCollapsed;
+    });
+    google.script.run
+      .withFailureHandler(err => setStatus('Save error: ' + err.message))
+      .saveReferenceExpanded(!referenceCollapsed);
+    applyReferenceCollapseState();
+    setStatus(referenceCollapsed ? 'Reference collapsed' : 'Reference expanded');
+  }
+  /* =========================================================
+     WORKSPACE VIEW
+     ========================================================= */
+  // Split slots may repeat a source. Mirrors are read-only and never save data.
+  let splitMirrorObservers=[];
+  function clearSplitMirror(){
+    splitMirrorObservers.forEach(observer=>observer.disconnect());
+    splitMirrorObservers=[];
+    document.querySelectorAll('[data-split-mirror]').forEach(el=>el.remove());
+  }
+  function buildSplitMirror(source,slot){
+    const mirror=source.cloneNode(true);
+    mirror.id='splitMirrorPane'+slot;
+    mirror.dataset.splitMirror=String(slot);
+    const sanitize=element=>{
+      element.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
+      element.querySelectorAll('[contenteditable]').forEach(el=>el.setAttribute('contenteditable','false'));
+      element.querySelectorAll('input,button,select,textarea').forEach(el=>{el.disabled=true;el.removeAttribute('onclick');});
+    };
+    sanitize(mirror);
+    mirror.setAttribute('aria-label','Read-only duplicate of '+source.id);
+    document.getElementById('workspace').appendChild(mirror);
+    // Start the duplicate at the same scroll position as the original.
+    requestAnimationFrame(()=>{
+      const from=[...source.querySelectorAll('.scroll')];
+      [...mirror.querySelectorAll('.scroll')].forEach((el,i)=>{ if(from[i]) el.scrollTop=from[i].scrollTop; });
+    });
+    let queued=false;
+    const observer=new MutationObserver(()=>{
+      if(queued || !mirror.isConnected)return;
+      queued=true;
+      requestAnimationFrame(()=>{
+        queued=false;
+        if(!mirror.isConnected)return;
+        // Rebuilding the copy would otherwise reset its scroll to the first
+        // (oldest) day on every keystroke made in the original.
+        const keep=[...mirror.querySelectorAll('.scroll')].map(el=>el.scrollTop);
+        const replacement=source.cloneNode(true);
+        sanitize(replacement);
+        mirror.replaceChildren(...Array.from(replacement.childNodes));
+        [...mirror.querySelectorAll('.scroll')].forEach((el,i)=>{ el.scrollTop=keep[i]||0; });
+      });
+    });
+    observer.observe(source,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','checked','style']});
+    splitMirrorObservers.push(observer);
+    return mirror;
+  }
+  function updateWorkspaceLayout(){
+    const workspace=document.getElementById('workspace');
+    const phone=isMobileLayout();
+    const splitActive=isSplitActive();
+    const handles=[...workspace.querySelectorAll('.column-resizer')];
+    handles.forEach(h=>{h.style.display='none';h.style.gridColumn='';h.style.gridRow='';});
+    clearSplitMirror();
+    const split=document.getElementById('mobileSplitResizer');
+    if(splitActive){
+      normalizeSplitOptions();
+      const slots=[splitOptions.first,splitOptions.second];
+      if(splitOptions.third!=='none')slots.push(splitOptions.third);
+      const horizontal=splitOptions.orientation==='horizontal';
+      const used=new Set();
+      const panes=slots.map((name,i)=>{
+        const source=document.getElementById(name+'Pane');
+        if(used.has(name))return buildSplitMirror(source,i);
+        used.add(name);return source;
+      });
+      VIEW_PANES.forEach(name=>{
+        const pane=document.getElementById(name+'Pane');
+        pane.classList.toggle('view-hidden',!used.has(name));
+        pane.style.gridColumn='';pane.style.gridRow='';
+      });
+      const ratio=slots.length===2 ? mobileSplitRatio : 1/3;
+      const tracks=slots.length===2
+        ? [`minmax(0,${ratio}fr)`,'7px',`minmax(0,${1-ratio}fr)`]
+        : ['minmax(0,1fr)','7px','minmax(0,1fr)','7px','minmax(0,1fr)'];
+      workspace.style.gridTemplateColumns=horizontal?tracks.join(' '):'minmax(0,1fr)';
+      workspace.style.gridTemplateRows=horizontal?'minmax(0,1fr)':tracks.join(' ');
+      panes.forEach((pane,i)=>{
+        pane.style.gridColumn=horizontal?String(i*2+1):'1';
+        pane.style.gridRow=horizontal?'1':String(i*2+1);
+        pane.style.width='100%';pane.style.minWidth='0';
+      });
+      split.style.display='block';
+      split.style.gridColumn=horizontal?'2':'1';
+      split.style.gridRow=horizontal?'1':'2';
+      split.style.width=horizontal?'7px':'auto';
+      split.style.height=horizontal?'auto':'7px';
+      split.style.cursor=horizontal?'col-resize':'row-resize';
+      let extra=document.getElementById('mobileSplitResizerThird');
+      if(slots.length===3){
+        if(!extra){
+          extra=split.cloneNode(false);extra.id='mobileSplitResizerThird';
+          workspace.appendChild(extra);
+        }
+        extra.style.display='block';
+        extra.style.gridColumn=horizontal?'4':'1';
+        extra.style.gridRow=horizontal?'1':'4';
+        extra.style.width=horizontal?'7px':'auto';
+        extra.style.height=horizontal?'auto':'7px';
+        extra.style.background='var(--border)';
+      }else extra?.remove();
+      workspace.style.overflowX='hidden';workspace.style.overflowY='hidden';
+      workspace.scrollLeft=0;
+      workspace.classList.remove('view-single');
+      requestAnimationFrame(()=>{syncDayHeights();restoreDayScroll();});
+      return;
+    }
+    document.getElementById('mobileSplitResizerThird')?.remove();
+    split.style.display='';
+    VIEW_PANES.forEach(name=>{
+      const pane=document.getElementById(name+'Pane');
+      pane.classList.toggle('view-hidden',!visiblePanes.includes(name));
+      pane.style.gridColumn='';pane.style.gridRow='';pane.style.width='';
+    });
+    split.style.gridColumn='';split.style.gridRow='';
+    workspace.style.gridTemplateRows='minmax(0,1fr)';
+    const tracks=[];
+    let slot=1;
+    const width=workspace.clientWidth || window.innerWidth;
+    // Desktop defaults to fitting visible panes. Custom widths still work,
+    // but never force Reference entirely outside the viewport on first load.
+    const desktopFit=!phone && visiblePanes.length>1 && !localStorage.getItem(COLUMN_STORAGE_KEY);
+    const available=Math.max(0,width-(visiblePanes.length-1));
+    const baseTotal=visiblePanes.reduce((n,name)=>n+Math.max(120,Number(columnWidths[name])||420),0);
+    visiblePanes.forEach((name,index)=>{
+      const pane=document.getElementById(name+'Pane');
+      pane.style.gridColumn=String(slot++);pane.style.gridRow='1';
+      if(phone)tracks.push(`${Math.max(280,width)}px`);
+      else if(visiblePanes.length===1)tracks.push('minmax(0,1fr)');
+      else if(desktopFit)tracks.push(`minmax(0,${Math.max(120,Math.round(available*(columnWidths[name]||420)/baseTotal))}fr)`);
+      else tracks.push(`${Math.max(120,Number(columnWidths[name])||420)}px`);
+      if(!phone && index<visiblePanes.length-1){
+        const handle=handles[index];
+        handle.dataset.left=name;handle.dataset.right=visiblePanes[index+1];
+        handle.style.display='block';handle.style.gridColumn=String(slot++);handle.style.gridRow='1';
+        tracks.push('1px');
+      }
+    });
+    workspace.style.gridTemplateColumns=tracks.join(' ');
+    workspace.style.justifyContent='start';
+    workspace.style.overflowX=visiblePanes.length>1?'auto':'hidden';
+    workspace.style.overflowY='hidden';
+    workspace.style.scrollSnapType='none';
+    workspace.classList.toggle('view-single',visiblePanes.length===1);
+    requestAnimationFrame(()=>{syncDayHeights();restoreDayScroll();});
+  }
+  function updateColumnsLabel(){
+    const label = isSplitActive()
+      ? 'Columns (split)'
+      : visiblePanes.length === 3 ? 'Columns' : `Columns (${visiblePanes.length})`;
+    document.querySelectorAll('.view-menu-trigger').forEach(trigger => trigger.textContent = label);
+  }
+  function applyWorkspaceView(selection){
+    if(typeof selection === 'string') selection = selection === 'all' ? [...VIEW_PANES] : [selection];
+    if(!Array.isArray(selection)) selection = [...VIEW_PANES];
+    visiblePanes = VIEW_PANES.filter(name => selection.includes(name));
+    if(!visiblePanes.length) visiblePanes = ['today'];
+    VIEW_PANES.forEach(name => {
+      document.getElementById(name + 'Pane').classList.toggle('view-hidden',!visiblePanes.includes(name));
+    });
+    document.querySelectorAll('[data-view-menu]').forEach(menu => {
+      menu.querySelectorAll('[data-pane-toggle]').forEach(input => {
+        input.checked = visiblePanes.includes(input.dataset.paneToggle);
+      });
+    });
+    updateColumnsLabel();
+    localStorage.setItem(VIEW_STORAGE_KEY,JSON.stringify(visiblePanes));
+    document.getElementById('workspace').scrollLeft = 0;
+    updateWorkspaceLayout();
+  }
+  function columnsMenuHtml(){
+    const paneOptions = withNone =>
+      (withNone ? '<option value="none">None (2 columns)</option>' : '') +
+      VIEW_PANES.map(name => `<option value="${name}">${PANE_LABELS[name]}</option>`).join('');
+    const rows = VIEW_PANES.map(name =>
+      `<div class="view-menu-row"><label><input type="checkbox" data-pane-toggle="${name}">${PANE_LABELS[name]}</label><button class="btn" type="button" data-pane-solo="${name}">Solo</button></div>`
+    ).join('');
+    return rows +
+      `<div class="view-menu-section">
+        <div class="view-menu-heading">Split <span class="split-state" data-split-state></span></div>
+        <label class="split-field">First<select class="top-select" data-split="first">${paneOptions(false)}</select></label>
+        <label class="split-field">Second<select class="top-select" data-split="second">${paneOptions(false)}</select></label>
+        <label class="split-field">Third<select class="top-select" data-split="third">${paneOptions(true)}</select></label>
+        <label class="split-field">Layout<select class="top-select" data-split="orientation"><option value="vertical">Stacked (top / bottom)</option><option value="horizontal">Side by side</option></select></label>
+        <div class="view-menu-actions">
+          <button class="btn" type="button" data-split-apply>Apply split</button>
+          <button class="btn" type="button" data-split-exit>Exit split</button>
+        </div>
+      </div>`;
+  }
+  function closeColumnsMenus(){
+    document.querySelectorAll('.view-menu-popup').forEach(popup=>popup.hidden=true);
+    document.querySelectorAll('.view-menu-trigger').forEach(button=>button.setAttribute('aria-expanded','false'));
+  }
+  function initWorkspaceView(){
+    let saved = localStorage.getItem(VIEW_STORAGE_KEY) || 'all';
+    try{ saved = JSON.parse(saved); }catch(e){}
+    document.querySelectorAll('[data-view-menu]').forEach(menu=>{
+      const trigger = menu.querySelector('.view-menu-trigger');
+      const popup = menu.querySelector('.view-menu-popup');
+      popup.innerHTML = columnsMenuHtml();
+      trigger.addEventListener('click',()=>{
+        releaseEditor();
+        const open = popup.hidden;
+        closeColumnsMenus();
+        if(!open) return;
+        normalizeSplitOptions();
+        popup.querySelectorAll('[data-split]').forEach(select => { select.value = splitOptions[select.dataset.split]; });
+        popup.querySelectorAll('[data-split-exit]').forEach(btn => btn.disabled = !isSplitActive());
+        popup.hidden = false;
+        trigger.setAttribute('aria-expanded','true');
+      });
+      menu.querySelectorAll('[data-pane-toggle]').forEach(input=>input.addEventListener('change',()=>{
+        const next = new Set(visiblePanes);
+        if(input.checked) next.add(input.dataset.paneToggle);
+        else next.delete(input.dataset.paneToggle);
+        if(isSplitActive()) setSplit(false);
+        applyWorkspaceView([...next]);
+      }));
+      menu.querySelectorAll('[data-pane-solo]').forEach(button=>button.addEventListener('click',()=>{
+        if(isSplitActive()) setSplit(false);
+        applyWorkspaceView([button.dataset.paneSolo]);
+        closeColumnsMenus();
+      }));
+      popup.querySelector('[data-split-apply]').addEventListener('click',()=>{
+        popup.querySelectorAll('[data-split]').forEach(select => { splitOptions[select.dataset.split] = select.value; });
+        normalizeSplitOptions();
+        localStorage.setItem(MOBILE_SPLIT_OPTIONS_KEY,JSON.stringify(splitOptions));
+        closeColumnsMenus();
+        setSplit(true);
+      });
+      popup.querySelector('[data-split-exit]').addEventListener('click',()=>{
+        closeColumnsMenus();
+        setSplit(false);
+      });
+    });
+    applyWorkspaceView(saved);
+    // Start with the selected columns visible; split only when explicitly chosen.
+    setSplit(false);
+  }
+  function initMobileEditing(){
+    document.addEventListener('selectionchange',() => {
+      const selection = window.getSelection();
+      const node = selection?.anchorNode;
+      const element = node?.nodeType === 3 ? node.parentElement : node;
+      const ed = element?.closest?.('.editor,.ref-cell');
+      if(ed && ed.isContentEditable) rememberSelection(ed);
+    });
+    window.addEventListener('resize',()=>{
+      // Mobile keyboard resizes the viewport. Rebuilding the grid while
+      // selecting text can shift the native selection handles several lines.
+      if(isActualMobileDevice() && editableFocused())return;
+      updateWorkspaceLayout();
+    });
+  }
+  /* =========================================================
+     COLUMN RESIZING / FOCUS MODE
+     ========================================================= */
+  function loadColumnWidths(){
+    let v={today:420,journal:420,reference:399};
+    try{v={...v,...JSON.parse(localStorage.getItem(COLUMN_STORAGE_KEY)||'{}')};}catch(e){}
+    return v;
+  }
+
+  function applyColumnWidths(){
+    const root=document.documentElement;
+    root.style.setProperty('--col-today',columnWidths.today+'px');
+    root.style.setProperty('--col-journal',columnWidths.journal+'px');
+    root.style.setProperty('--col-reference',columnWidths.reference+'px');
+    updateWorkspaceLayout();
+  }
+  function initColumnResizers(){
+    applyColumnWidths();
+    const edge=document.getElementById('referenceEdgeResize');
+    edge?.addEventListener('pointerdown',e=>{
+      if(isMobileLayout() || isSplitActive())return;
+      e.preventDefault();e.stopPropagation();edge.setPointerCapture(e.pointerId);edge.classList.add('dragging');
+      const x=e.clientX,w=columnWidths.reference;
+      const move=ev=>{columnWidths.reference=Math.max(120,Math.round(w+ev.clientX-x));applyColumnWidths();};
+      const end=()=>{edge.classList.remove('dragging');edge.removeEventListener('pointermove',move);edge.removeEventListener('pointerup',end);edge.removeEventListener('pointercancel',end);localStorage.setItem(COLUMN_STORAGE_KEY,JSON.stringify(columnWidths));};
+      edge.addEventListener('pointermove',move);edge.addEventListener('pointerup',end);edge.addEventListener('pointercancel',end);
+    });
+    document.querySelectorAll('.column-resizer').forEach(handle=>{
+      handle.addEventListener('pointerdown',e=>{
+        e.preventDefault();
+        handle.setPointerCapture(e.pointerId);
+        handle.classList.add('dragging');
+        const left=handle.dataset.left,right=handle.dataset.right,startX=e.clientX;
+        const startLeft=document.getElementById(left+'Pane').getBoundingClientRect().width;
+        const startRight=document.getElementById(right+'Pane').getBoundingClientRect().width;
+        const move=ev=>{
+          const dx=ev.clientX-startX;
+          const min=120;
+          let newLeft=Math.max(min,startLeft+dx);
+          let actualDx=newLeft-startLeft;
+          let newRight=Math.max(min,startRight-actualDx);
+          if(newRight===min){newLeft=startLeft+(startRight-min);}
+          columnWidths[left]=Math.round(newLeft);columnWidths[right]=Math.round(newRight);
+          applyColumnWidths();requestAnimationFrame(syncDayHeights);
+        };
+        const up=()=>{
+          handle.classList.remove('dragging');
+          handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);
+          localStorage.setItem(COLUMN_STORAGE_KEY,JSON.stringify(columnWidths));
+        };
+        handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
+      });
+    });
+  }
+  function setFocusMode(on){
+    document.body.classList.toggle('focus-mode',!!on);
+    localStorage.setItem(FOCUS_STORAGE_KEY,on?'1':'0');
+    requestAnimationFrame(() => { updateWorkspaceLayout(); positionTypeSettings(); });
+  }
+  function initFocusMode(){setFocusMode(localStorage.getItem(FOCUS_STORAGE_KEY)==='1');}
+  /* =========================================================
+     REFERENCE SEARCH
+     ========================================================= */
+  function filterReference(){
+    const q =
+      document
+        .getElementById(
+          'refSearch'
+        )
+        .value
+        .trim()
+        .toLowerCase();
+    document
+      .querySelectorAll(
+        '#referenceTree .ref-cell-wrapper'
+      )
+      .forEach(w => {
+        const matches =
+          !q ||
+          w.innerText
+            .toLowerCase()
+            .includes(q);
+        w.classList.toggle(
+          'hidden',
+          !matches
+        );
+        const disclosure =
+          w.querySelector('[data-toggle]');
+        if(q && matches){
+          /* Search expansion is temporary: reveal deep matches without
+             changing the item's saved expanded/collapsed preference. */
+          w.classList.remove('ref-collapsed');
+          if(disclosure){
+            disclosure.textContent = '▾';
+          }
+        }else if(!q){
+          const item = state.reference.find(
+            ref => String(ref.id) === String(w.dataset.id)
+          );
+          const expanded = !item || item.expanded !== false;
+          w.classList.toggle(
+            'ref-collapsed',
+            !expanded
+          );
+          if(disclosure){
+            disclosure.textContent = expanded ? '▾' : '▸';
+          }
+        }
+      });
+  }
+  document
+    .getElementById(
+      'refSearch'
+    )
+    .addEventListener(
+      'input',
+      filterReference
+    );
+  /* Reorder by the dedicated handle, without interfering with text selection. */
+  let refDragState=null;
+  function initReferenceDragHandle(wrap){
+    const handle=wrap.querySelector('.ref-drag');
+    handle?.addEventListener('pointerdown',e=>{
+      if(e.button!==0 || referenceSortMode!=='original'){
+        if(referenceSortMode!=='original')setStatus('Choose Original order to rearrange cells');
+        return;
+      }
+      e.preventDefault();handle.setPointerCapture(e.pointerId);
+      refDragState={wrap,handle,target:null,after:false,fromX:e.clientX,fromY:e.clientY,moved:false};
+      wrap.classList.add('ref-dragging');
+    });
+    handle?.addEventListener('pointermove',e=>{
+      const d=refDragState;if(!d||d.handle!==handle)return;
+      if(Math.abs(e.clientY-d.fromY)>4||Math.abs(e.clientX-d.fromX)>4)d.moved=true;
+      document.querySelectorAll('.ref-drop-before,.ref-drop-after').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after'));
+      const candidate=document.elementFromPoint(e.clientX,e.clientY)?.closest('#referenceTree .ref-cell-wrapper');
+      if(!candidate||candidate===wrap||candidate.classList.contains('hidden')){d.target=null;return;}
+      d.target=candidate;d.after=e.clientY>candidate.getBoundingClientRect().top+candidate.getBoundingClientRect().height/2;
+      candidate.classList.add(d.after?'ref-drop-after':'ref-drop-before');
+      const sc=document.getElementById('referenceScroll'),r=sc.getBoundingClientRect();
+      if(e.clientY<r.top+32)sc.scrollTop-=16;else if(e.clientY>r.bottom-32)sc.scrollTop+=16;
+    });
+    const end=()=>{
+      const d=refDragState;if(!d||d.handle!==handle)return;
+      refDragState=null;wrap.classList.remove('ref-dragging');
+      document.querySelectorAll('.ref-drop-before,.ref-drop-after').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after'));
+      if(!d.moved||!d.target)return;
+      d.target.parentNode.insertBefore(wrap,d.after?d.target.nextSibling:d.target);
+      const ids=[...document.querySelectorAll('#referenceTree > .ref-cell-wrapper')].map(n=>String(n.dataset.id));
+      const order=ids.map((id,index)=>({id,sort:(index+1)*1000}));
+      order.forEach(entry=>{
+        const item=state.reference.find(x=>String(x.id)===entry.id);
+        if(item) item.sort=entry.sort; // Pending text saves keep running.
+      });
+      if(!order.length){setStatus('Saved');return;}
+      setStatus('Saving reference order…');
+      google.script.run
+        .withSuccessHandler(()=>setStatus('Saved'))
+        .withFailureHandler(err=>setStatus('Order save error: '+err.message))
+        .saveReferenceOrder(order);
+    };
+    handle?.addEventListener('pointerup',end);
+    handle?.addEventListener('pointercancel',()=>{if(refDragState?.handle===handle){refDragState=null;wrap.classList.remove('ref-dragging');document.querySelectorAll('.ref-drop-before,.ref-drop-after').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after'));}});
+  }
+  function resetColumnSizes(){
+    columnWidths={today:420,journal:420,reference:399};
+    localStorage.removeItem(COLUMN_STORAGE_KEY);
+    applyColumnWidths();
+    setStatus('Column sizes reset');
+  }
+  function fitColumnsToWindow(){
+    const names=visiblePanes;
+    const available=Math.max(240,document.getElementById('workspace').clientWidth-(names.length-1));
+    const sum=names.reduce((n,k)=>n+(Number(columnWidths[k])||420),0);
+    const min=120;
+    let remaining=available;
+    names.forEach((k,i)=>{
+      const rest=names.length-i-1;
+      const desired=i===names.length-1?remaining:Math.round(available*(Number(columnWidths[k])||420)/sum);
+      columnWidths[k]=Math.max(min,Math.min(desired,remaining-rest*min));remaining-=columnWidths[k];
+    });
+    localStorage.setItem(COLUMN_STORAGE_KEY,JSON.stringify(columnWidths));applyColumnWidths();
+  }
+  function insertJournalTemplate(){
+    const template=state.reference.find(x=>referenceTitle(x).trim().toLowerCase()==='journal template');
+    if(!template){setStatus('Create a Reference cell titled Journal Template first');return;}
+    const editor=document.querySelector('#journalScroll .journal-editor:focus') || (activeEditor?.matches?.('.journal-editor') && activeEditor.isConnected ? activeEditor : null);
+    if(!editor){setStatus('Tap inside a Notes day first, then press + Template');return;}
+    const html=storedToHtml(stripReferenceMetadata(template.content||''));
+    const temp=document.createElement('div');temp.innerHTML=html;
+    temp.firstElementChild?.remove(); // Do not copy the title.
+    if(!temp.innerHTML.trim()){setStatus('Journal Template has no body content');return;}
+    if(editor.textContent.trim() && !confirm('Append Journal Template to this journal entry?'))return;
+    captureBeforeEdit(editor);editor.insertAdjacentHTML('beforeend',temp.innerHTML);
+    normalizeEditorTasks(editor);finishEditorEdit(editor);
+    // Grow the row now (and again after layout settles) so it never spills.
+    syncDayHeightStable(editor.dataset.date);
+    saveEditorOwner(editor);
+    setStatus('Journal template inserted');
+  }
+  document.getElementById('journalTemplateButton')?.addEventListener('pointerdown',e=>e.preventDefault());
+  document.getElementById('journalTemplateButton')?.addEventListener('click',insertJournalTemplate);
+  /* =========================================================
+     TOP-BAR BUTTONS (none of these need the keyboard)
+     ========================================================= */
+  function runLayoutAction(action){
+    if(action === 'today') jumpToday();
+    else if(action === 'scale') toggleTypeSettings();
+    else if(action === 'fit'){ fitColumnsToWindow(); setStatus('Columns fitted to window'); }
+    else if(action === 'reset-columns') resetColumnSizes();
+    else if(action === 'reference') toggleReferenceCollapse();
+    else if(action === 'focus') setFocusMode(true);
+    else if(action === 'show-toolbar') setFocusMode(false);
+  }
+  function initLayoutButtons(){
+    document.querySelectorAll('[data-layout]').forEach(btn => btn.addEventListener('click',() => {
+      releaseEditor();
+      runLayoutAction(btn.dataset.layout);
+    }));
+  }
+  /* =========================================================
+     ON-SCREEN KEYBOARD
+     ========================================================= */
+  /* When the phone keyboard is closed with its own button, the cell keeps focus
+     and Chrome can need extra taps. Watching the visible area grow back lets the
+     app release the cell, so one tap closes the keyboard. */
+  let lastViewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  function onViewportChange(){
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    const zoomed = vv && vv.scale > 1.02;
+    if(!zoomed && h - lastViewportHeight > 120 && (navigator.maxTouchPoints || 0) > 0 && editableFocused()){
+      document.activeElement.blur();
+    }
+    lastViewportHeight = h;
+    positionTypeSettings();
+    positionContextMenu();
+  }
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',onViewportChange);
+  }
+  window.addEventListener('resize',onViewportChange);
+  /* =========================================================
+     START
+     ========================================================= */
+  initTypographyControls();
+  initReferenceSort();
+  initMobileScale();
+  initPadScale();
+  initAppDisplay();
+  initLayoutButtons();
+  initContextMenu();
+  /* Every open menu/panel closes when you press anywhere outside it (or press Escape).
+     Runs in the capture phase so nothing else can swallow the press first. */
+  function closeAllMenus(exceptTarget){
+    const t = exceptTarget instanceof Element ? exceptTarget : null;
+    document.querySelectorAll('[data-view-menu]').forEach(menu=>{
+      if(t && menu.contains(t)) return;
+      const popup = menu.querySelector('.view-menu-popup');
+      if(popup && !popup.hidden){
+        popup.hidden = true;
+        menu.querySelector('.view-menu-trigger')?.setAttribute('aria-expanded','false');
+      }
+    });
+    const settings = document.getElementById('typeSettings');
+    if(settings && !settings.classList.contains('hidden')){
+      const insidePanel = t && settings.contains(t);
+      const onToggle = t && t.closest('[data-layout="scale"]');
+      if(!insidePanel && !onToggle) settings.classList.add('hidden');
+    }
+    if(!(t && ctxMenu.contains(t))) hideContextMenu();
+  }
+  function initOutsideClickClose(){
+    document.addEventListener('pointerdown',e=>closeAllMenus(e.target),true);
+    document.addEventListener('keydown',e=>{ if(e.key === 'Escape') closeAllMenus(null); },true);
+  }
+  /* Scroll guards: only real user scrolling counts as "scrolling", and the
+     overflow:hidden containers around the day lists can never be scrolled by
+     the browser (it does that to reveal the caret, which made the whole
+     view slide while typing). */
+  function initScrollGuards(){
+    const mark = () => { lastUserScrollAt = Date.now(); };
+    ['wheel','touchstart','touchmove'].forEach(type=>document.addEventListener(type,mark,{capture:true,passive:true}));
+    document.addEventListener('keydown',e=>{
+      if(['PageUp','PageDown','Home','End'].includes(e.key)) mark();
+    },true);
+    ['app','workspace','todayPane','journalPane','referencePane'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.addEventListener('scroll',()=>{ if(el.scrollTop) el.scrollTop = 0; },{passive:true});
+    });
+    window.addEventListener('scroll',()=>{ if(window.scrollY || window.scrollX) window.scrollTo(0,0); },{passive:true});
+  }
+  initOutsideClickClose();
+  initScrollGuards();
+  initWorkspaceView();
+  initMobileEditing();
+  function initWorkspaceHorizontalSwipe(){
+    const workspace=document.getElementById('workspace');
+    // Rely on native touch panning: forced preventDefault caused sticky diagonal swipes.
+    // The workspace itself owns horizontal overflow; each pane owns vertical overflow.
+    /* Drag empty pane headers to pan horizontally with a mouse. */
+    let drag=null;
+    workspace.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='touch' || e.button!==0 || !e.target.closest('.pane-header') ||
+         e.target.closest('button,input,select,a') || workspace.scrollWidth<=workspace.clientWidth+2 ||
+         isSplitActive())return;
+      drag={x:e.clientX,left:workspace.scrollLeft};
+      workspace.setPointerCapture(e.pointerId);
+    });
+    workspace.addEventListener('pointermove',e=>{
+      if(!drag)return;
+      const dx=e.clientX-drag.x;
+      if(Math.abs(dx)>2)workspace.scrollLeft=drag.left-dx;
+    });
+    ['pointerup','pointercancel','lostpointercapture'].forEach(type=>workspace.addEventListener(type,()=>{drag=null;}));
+    /* Nested day/reference containers have overflow-x:hidden and consume
+       macOS two-finger sideways gestures before they can reach #workspace.
+       Capture from anywhere in the app and send just the horizontal motion
+       to the shared workspace scroller. Vertical wheel movement remains native. */
+    document.addEventListener('wheel',e=>{
+      if(!document.getElementById('app').contains(e.target) ||
+         isSplitActive() ||
+         workspace.scrollWidth<=workspace.clientWidth+2 ||
+         e.ctrlKey || e.metaKey)return;  // preserve trackpad pinch/browser zoom
+      // On most trackpads a sideways swipe is deltaX. Shift+wheel is a
+      // convenient alternative for ordinary mice and external keyboards.
+      const shiftPan=e.shiftKey && Math.abs(e.deltaY)>Math.abs(e.deltaX);
+      const amount=shiftPan ? e.deltaY : e.deltaX;
+      if(Math.abs(amount)<.01)return;
+      e.preventDefault();
+      workspace.scrollLeft+=amount;
+    },{capture:true,passive:false});
+  }
+  initColumnResizers();
+  initWorkspaceHorizontalSwipe();
+  initFocusMode();
+  loadWorkspace();
+</script>
+</body>
+</html>

@@ -16,24 +16,16 @@ jobs:
           node-version: 20
 
       - name: Install clasp
-        run: npm install -g @google/clasp
+        run: npm install -g @google/clasp@3.4.1
 
       - name: Restore clasp login
         run: printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
         env:
           CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
 
-      - name: Check credentials file
-        run: |
-          test -s ~/.clasprc.json && echo "file has content" || echo "FILE IS EMPTY"
-          jq 'keys' ~/.clasprc.json
-          clasp --version
-
       - name: Push code to Apps Script
         run: clasp push --force
 
       - name: Update web app deployment
         if: ${{ vars.DEPLOYMENT_ID != '' }}
-        run: clasp deploy --deploymentId "${{ vars.DEPLOYMENT_ID }}" --description "CI ${{ github.sha }}"
-
-
+        run: clasp update-deployment "${{ vars.DEPLOYMENT_ID }}" --description "CI ${{ github.sha }}"

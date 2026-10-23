@@ -23,6 +23,12 @@ jobs:
         env:
           CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
 
+      - name: Check credentials file
+        run: |
+          test -s ~/.clasprc.json && echo "file has content" || echo "FILE IS EMPTY"
+          jq 'keys' ~/.clasprc.json
+          clasp --version
+
       - name: Push code to Apps Script
         run: clasp push --force
 

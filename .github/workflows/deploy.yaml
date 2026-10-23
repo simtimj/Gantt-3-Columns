@@ -35,3 +35,5 @@ jobs:
       - name: Update web app deployment
         if: ${{ vars.DEPLOYMENT_ID != '' }}
         run: clasp deploy --deploymentId "${{ vars.DEPLOYMENT_ID }}" --description "CI ${{ github.sha }}"
+
+

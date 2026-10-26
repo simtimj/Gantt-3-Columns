@@ -1117,7 +1117,8 @@
   <button class="btn" type="button" tabindex="-1" data-ctx="rule">Line</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="outdent">← Outdent</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="indent">Indent →</button>
-  <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="subtask">+ Subtask</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="checkbox">☐ Checkbox</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="subtask">+ Subtask</button>
 </div>
 <script>
   /* Filled in by Apps Script (Code.gs doGet), so the first screen needs no
@@ -2744,6 +2745,34 @@
       changeIndent(line,action === 'indent' ? 1 : -1);
       finishEditorEdit(ed);
       rememberSelection(ed);
+      return;
+    }
+    // Turn the current line into a task (2026-10-26, Julius): same result as
+    // typing [] + Space at its start; the line's text and formatting stay.
+    if(action === 'checkbox'){
+      if(line && line.classList.contains('check-line')){ setStatus('That line is already a task'); return; }
+      if(line && line.closest('pre')){ setStatus('Not inside a code block'); return; }
+      if(ed.classList.contains('ref-cell') && line && line === ed.firstElementChild && line.tagName === 'H2'){ setStatus('The title line can’t be a task'); return; }
+      captureBeforeEdit(ed);
+      const level = line && line !== ed ? Math.max(0,Math.min(6,Number(line.dataset.level) || Math.round((parseFloat(line.style.marginLeft) || 0) / 24))) : 0;
+      const task = createCheckboxLine(level);
+      const text = task.querySelector('.check-text');
+      if(line && line !== ed && line.parentNode){
+        while(line.firstChild) text.appendChild(line.firstChild);
+        if(text.childNodes.length === 1 && text.firstChild.nodeName === 'BR') text.innerHTML = '';
+        if(line.tagName === 'LI'){
+          const list = line.parentElement;
+          list.after(task); line.remove();
+          if(list && !list.children.length) list.remove();
+        }else line.replaceWith(task);
+      }else{
+        ed.appendChild(task);
+      }
+      wireCheckbox(task.querySelector('input'));
+      placeEnd(text);
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
       return;
     }
     if(action === 'subtask'){

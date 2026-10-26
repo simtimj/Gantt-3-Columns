@@ -461,7 +461,7 @@
         min-height:0;height:calc(var(--ref-line) + 6px);
         padding:0 10px;display:inline-flex;align-items:center;
       }
-      #referenceTree .ref-cell-wrapper:focus-within{padding-right:calc(72px * var(--mobile-scale,1))!important;}
+      #referenceTree .ref-cell-wrapper:has(> .ref-cell:focus){padding-right:calc(72px * var(--mobile-scale,1))!important;}
     }
     #archiveOverlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;padding:8vh 12px;}
     .archive-box{background:#fff;border:1px solid var(--border);border-radius:10px;width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.2);}
@@ -537,8 +537,10 @@
       top:4px;
       gap:3px;
     }
-    .ref-cell-wrapper:hover .ref-actions,
-    .ref-cell-wrapper:focus-within .ref-actions{
+    /* Own Delete only (nested cells, 2026-10-26): a parent's button stays
+       hidden while you're in one of its children. */
+    .ref-cell-wrapper:hover:not(:has(.ref-children .ref-cell-wrapper:hover)) > .ref-actions,
+    .ref-cell-wrapper:has(> .ref-cell:focus) > .ref-actions{
       display:flex;
     }
     .tiny{
@@ -946,6 +948,15 @@
     .urg-subtask.done{text-decoration:line-through;opacity:.7;}
     .check-line.urg-flash{animation:urgflash 1.3s ease-out;}
     @keyframes urgflash{from{background:#fff3b0;}to{background:transparent;}}
+    /* Nested Reference cells (2026-10-26): a cell can hold other cells.
+       Hold a dragged cell on another cell's title to drop it inside. */
+    #referenceTree .ref-children{margin:6px 0 0 calc(-1 * var(--ref-line));padding-left:6px;border-left:2px solid #e4e4e4;}
+    #referenceTree .ref-children:empty{display:none;}
+    #referenceTree .ref-collapsed > .ref-children{display:none!important;}
+    #referenceTree .ref-children > .ref-cell-wrapper:last-child{border-bottom:0;}
+    #referenceTree .ref-cell-wrapper:hover:has(.ref-children .ref-cell-wrapper:hover){background:transparent;}
+    .ref-drop-into > .ref-cell{background:#e8f0fe!important;box-shadow:inset 0 0 0 2px #1a73e8;border-radius:6px;}
+    .ref-hold > .ref-cell > h2:first-child{background:#f1f5ff;border-radius:4px;}
   </style>
 </head>
 <body>
@@ -3314,7 +3325,7 @@
     const tree = document.getElementById('referenceTree');
     sortedReferenceItems().forEach(item => {
       const node = tree.querySelector(`.ref-cell-wrapper[data-id="${CSS.escape(String(item.id))}"]`);
-      if(node) tree.appendChild(node);
+      if(node) node.parentNode.appendChild(node); // Re-orders among its siblings only.
     });
   }
   function initReferenceSort(){
@@ -3463,13 +3474,26 @@
         '</div>';
       return;
     }
-    items.forEach(
-      item =>
-        createReferenceCell(item)
-    );
+    // Nested cells (2026-10-26): parents first, children inside them.
+    const ids = new Set(items.map(x => String(x.id)));
+    const kids = new Map();
+    items.forEach(item => {
+      const pid = item.parentId && ids.has(String(item.parentId)) && String(item.parentId) !== String(item.id) ? String(item.parentId) : '';
+      if(!kids.has(pid)) kids.set(pid,[]);
+      kids.get(pid).push(item);
+    });
+    const done = new Set();
+    const build = (pid,container) => (kids.get(pid) || []).forEach(item => {
+      if(done.has(item.id)) return; // Guards against a loop in the sheet.
+      done.add(item.id);
+      const wrap = createReferenceCell(item,container);
+      build(String(item.id),wrap.querySelector(':scope > .ref-children'));
+    });
+    build('',tree);
+    items.filter(item => !done.has(item.id)).forEach(item => createReferenceCell(item,tree));
     filterReference();
   }
-  function createReferenceCell(item){
+  function createReferenceCell(item,container){
     const wrap =
       document.createElement(
         'div'
@@ -3494,12 +3518,9 @@
           data-del>
           Delete
         </button>
-      </div>`;
-    document
-      .getElementById(
-        'referenceTree'
-      )
-      .appendChild(wrap);
+      </div>
+      <div class="ref-children"></div>`;
+    (container || document.getElementById('referenceTree')).appendChild(wrap);
     const ed =
       wrap.querySelector(
         '.ref-cell'
@@ -3565,7 +3586,7 @@
       wireCheckbox
     );
     wrap.querySelector(
-      '[data-toggle]'
+      ':scope > [data-toggle]'
     ).onclick = e => {
       e.preventDefault();
       e.stopPropagation();
@@ -3575,7 +3596,7 @@
       google.script.run.saveReferenceItem(item);
     };
     wrap.querySelector(
-      '[data-del]'
+      ':scope > .ref-actions [data-del]'
     ).onclick =
       () =>
         deleteReference(
@@ -3596,7 +3617,7 @@
     if(!wrap || !item){
       return;
     }
-    const refCell = wrap.querySelector('.ref-cell');
+    const refCell = wrap.querySelector(':scope > .ref-cell');
     refCell?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
     item.content = writeReferenceMetadata(refCell?.innerHTML || '',Date.now());
     clearTimeout(
@@ -3749,15 +3770,18 @@
     const tmp = document.createElement('div');
     tmp.innerHTML = stripReferenceMetadata(item.content || item.title || '');
     const name = ((tmp.firstElementChild || tmp).textContent || '').trim().slice(0, 60) || 'this cell';
-    const kids = (state.reference || []).filter(x => x.parentId === id).length;
+    const kids = (function count(pid){ return (state.reference || []).filter(x => String(x.parentId) === String(pid)).reduce((n,x) => n + 1 + count(x.id),0); })(id);
     if(!confirm('Delete "' + name + '"' + (kids ? ' and the ' + kids + ' cell' + (kids === 1 ? '' : 's') + ' inside it' : '')
       + '?\n\nIt goes to the Archive, so you can restore it.')) return;
     google.script.run
       .withSuccessHandler(() => {
-        state.reference =
-          state.reference.filter(
-            x => x.id !== id
-          );
+        const gone = new Set([String(id)]);
+        let more = true;
+        while(more){
+          more = false;
+          state.reference.forEach(x => { if(gone.has(String(x.parentId)) && !gone.has(String(x.id))){ gone.add(String(x.id)); more = true; } });
+        }
+        state.reference = state.reference.filter(x => !gone.has(String(x.id)));
         renderReference();
       })
       .deleteReferenceItem(id);
@@ -3771,7 +3795,7 @@
       const item = items.find(x => x.id === w.dataset.id);
       const collapsed = item ? item.expanded === false : referenceCollapsed;
       w.classList.toggle('ref-collapsed', collapsed);
-      const arrow = w.querySelector('[data-toggle]');
+      const arrow = w.querySelector(':scope > [data-toggle]');
       if(arrow) arrow.textContent = collapsed ? '▸' : '▾';
     });
     document.querySelectorAll('[data-layout="reference"]').forEach(btn => {
@@ -4132,7 +4156,7 @@
           !matches
         );
         const disclosure =
-          w.querySelector('[data-toggle]');
+          w.querySelector(':scope > [data-toggle]');
         if(q && matches){
           /* Search expansion is temporary: reveal deep matches without
              changing the item's saved expanded/collapsed preference. */
@@ -4163,51 +4187,112 @@
       'input',
       filterReference
     );
-  /* Reorder by the dedicated handle, without interfering with text selection. */
+  /* Reorder by the dedicated handle, without interfering with text selection.
+     Nesting (2026-10-26, Julius): hold the dragged cell over another cell's
+     title for a moment → that cell opens and lights up blue → drop to put the
+     dragged cell inside it (as its last child). Dropping above/below a cell
+     puts it next to that cell at the same level, which is also how a cell
+     comes back out of a folder. Children always move with their parent. */
+  const REF_NEST_HOLD_MS = 550;
   let refDragState=null;
+  function refClearDropMarks(){
+    document.querySelectorAll('.ref-drop-before,.ref-drop-after,.ref-drop-into,.ref-hold').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after','ref-drop-into','ref-hold'));
+  }
+  function refOwnerId(container){
+    return container?.classList?.contains('ref-children') ? String(container.parentElement.dataset.id) : '';
+  }
+  function refExpand(wrap){
+    const item=state.reference.find(x=>String(x.id)===String(wrap.dataset.id));
+    if(!item||item.expanded!==false)return;
+    item.expanded=true;
+    wrap.classList.remove('ref-collapsed');
+    const arrow=wrap.querySelector(':scope > [data-toggle]');if(arrow)arrow.textContent='▾';
+    google.script.run.saveReferenceItem(item);
+  }
   function initReferenceDragHandle(wrap){
-    const handle=wrap.querySelector('.ref-drag');
+    const handle=wrap.querySelector(':scope > .ref-drag');
     handle?.addEventListener('pointerdown',e=>{
       if(e.button!==0 || referenceSortMode!=='original'){
         if(referenceSortMode!=='original')setStatus('Choose Original order to rearrange cells');
         return;
       }
       e.preventDefault();handle.setPointerCapture(e.pointerId);
-      refDragState={wrap,handle,target:null,after:false,fromX:e.clientX,fromY:e.clientY,moved:false};
+      refDragState={wrap,handle,target:null,after:false,into:false,hold:null,holdTimer:null,fromX:e.clientX,fromY:e.clientY,moved:false};
       wrap.classList.add('ref-dragging');
     });
     handle?.addEventListener('pointermove',e=>{
       const d=refDragState;if(!d||d.handle!==handle)return;
       if(Math.abs(e.clientY-d.fromY)>4||Math.abs(e.clientX-d.fromX)>4)d.moved=true;
       document.querySelectorAll('.ref-drop-before,.ref-drop-after').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after'));
-      const candidate=document.elementFromPoint(e.clientX,e.clientY)?.closest('#referenceTree .ref-cell-wrapper');
-      if(!candidate||candidate===wrap||candidate.classList.contains('hidden')){d.target=null;return;}
-      d.target=candidate;d.after=e.clientY>candidate.getBoundingClientRect().top+candidate.getBoundingClientRect().height/2;
-      candidate.classList.add(d.after?'ref-drop-after':'ref-drop-before');
       const sc=document.getElementById('referenceScroll'),r=sc.getBoundingClientRect();
       if(e.clientY<r.top+32)sc.scrollTop-=16;else if(e.clientY>r.bottom-32)sc.scrollTop+=16;
+      const candidate=document.elementFromPoint(e.clientX,e.clientY)?.closest('#referenceTree .ref-cell-wrapper');
+      const valid=candidate&&!wrap.contains(candidate)&&!candidate.classList.contains('hidden');
+      // Over a cell's title line? Start (or keep) the hold-to-nest timer.
+      let onTitle=false;
+      if(valid){
+        const cell=candidate.querySelector(':scope > .ref-cell');
+        const title=cell?.firstElementChild;
+        const tr=(title||cell).getBoundingClientRect();
+        onTitle=e.clientY>=tr.top-4&&e.clientY<=tr.bottom+4;
+      }
+      if(!onTitle||d.hold!==candidate){
+        clearTimeout(d.holdTimer);d.holdTimer=null;
+        if(d.hold&&d.hold!==candidate){d.hold.classList.remove('ref-hold','ref-drop-into');}
+        if(d.into&&d.hold!==candidate)d.into=false;
+        d.hold=null;
+      }
+      if(onTitle&&!d.hold){
+        d.hold=candidate;candidate.classList.add('ref-hold');
+        d.holdTimer=setTimeout(()=>{
+          if(refDragState!==d||d.hold!==candidate)return;
+          d.into=true;d.target=candidate;
+          candidate.classList.remove('ref-hold');candidate.classList.add('ref-drop-into');
+          refExpand(candidate);
+          if(navigator.vibrate)try{navigator.vibrate(12);}catch(err){}
+        },REF_NEST_HOLD_MS);
+      }
+      if(d.into&&d.hold===candidate)return; // Stay in "drop inside" while on that title.
+      if(!valid){d.target=null;return;}
+      d.target=candidate;const cr=candidate.getBoundingClientRect();
+      d.after=e.clientY>cr.top+cr.height/2;
+      candidate.classList.add(d.after?'ref-drop-after':'ref-drop-before');
     });
     const end=()=>{
       const d=refDragState;if(!d||d.handle!==handle)return;
-      refDragState=null;wrap.classList.remove('ref-dragging');
-      document.querySelectorAll('.ref-drop-before,.ref-drop-after').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after'));
+      refDragState=null;clearTimeout(d.holdTimer);wrap.classList.remove('ref-dragging');
+      refClearDropMarks();
       if(!d.moved||!d.target)return;
-      d.target.parentNode.insertBefore(wrap,d.after?d.target.nextSibling:d.target);
-      const ids=[...document.querySelectorAll('#referenceTree > .ref-cell-wrapper')].map(n=>String(n.dataset.id));
+      const item=state.reference.find(x=>String(x.id)===String(wrap.dataset.id));
+      if(d.into){
+        d.target.querySelector(':scope > .ref-children').appendChild(wrap);
+      }else{
+        d.target.parentNode.insertBefore(wrap,d.after?d.target.nextSibling:d.target);
+      }
+      const newParent=refOwnerId(wrap.parentNode);
+      const parentChanged=item&&String(item.parentId||'')!==newParent;
+      if(item)item.parentId=newParent;
+      // Document order = sort order (siblings keep their relative order).
+      const ids=[...document.querySelectorAll('#referenceTree .ref-cell-wrapper')].map(n=>String(n.dataset.id));
       const order=ids.map((id,index)=>({id,sort:(index+1)*1000}));
       order.forEach(entry=>{
-        const item=state.reference.find(x=>String(x.id)===entry.id);
-        if(item) item.sort=entry.sort; // Pending text saves keep running.
+        const it=state.reference.find(x=>String(x.id)===entry.id);
+        if(it) it.sort=entry.sort; // Pending text saves keep running.
       });
-      if(!order.length){setStatus('Saved');return;}
-      setStatus('Saving reference order…');
-      google.script.run
+      setStatus(d.into?'Moved inside — saving…':'Saving reference order…');
+      const saveOrder=()=>google.script.run
         .withSuccessHandler(()=>setStatus('Saved'))
         .withFailureHandler(err=>setStatus('Order save error: '+err.message))
         .saveReferenceOrder(order);
+      if(parentChanged){
+        google.script.run
+          .withSuccessHandler(saveOrder)
+          .withFailureHandler(err=>setStatus('Move save error: '+err.message))
+          .saveReferenceItem(item);
+      }else saveOrder();
     };
     handle?.addEventListener('pointerup',end);
-    handle?.addEventListener('pointercancel',()=>{if(refDragState?.handle===handle){refDragState=null;wrap.classList.remove('ref-dragging');document.querySelectorAll('.ref-drop-before,.ref-drop-after').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after'));}});
+    handle?.addEventListener('pointercancel',()=>{if(refDragState?.handle===handle){clearTimeout(refDragState.holdTimer);refDragState=null;wrap.classList.remove('ref-dragging');refClearDropMarks();}});
   }
   function resetColumnSizes(){
     columnWidths={today:420,journal:420,reference:399};

@@ -122,8 +122,27 @@ function getWorkspaceData() {
       addDaysToDateString_(today, INITIAL_FUTURE_DAYS)
     ),
     reference: getReference_(),
+    urgent: getUrgentDays_(),
     today: today
   };
+}
+
+
+// Days whose Today text has an urgency-tagged task (data-urg), for the
+// Urgent panel in Reference. Reads only the Date and Today columns.
+function getUrgentDays_() {
+  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const values = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  const out = [];
+  values.forEach(row => {
+    const html = String(row[1] || '');
+    if (html.indexOf('data-urg=') < 0) return;
+    const key = formatDate_(row[0]);
+    if (key) out.push({ date: key, tasks: html });
+  });
+  return out;
 }
 
 

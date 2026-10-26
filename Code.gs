@@ -12,6 +12,8 @@
 
 const DAYS_HEADERS = ['Date', 'Today', 'Journal'];
 const REF_HEADERS = ['ID', 'ParentID', 'Type', 'Title', 'Content', 'Expanded', 'Sort'];
+// Deleted Reference cells go here (same columns + when) instead of vanishing.
+const ARCHIVE_HEADERS = REF_HEADERS.concat(['DeletedAt']);
 
 // The browser keeps 7 days before today and 3 after on first load.
 const INITIAL_PAST_DAYS = 7;
@@ -437,8 +439,8 @@ function deleteReferenceItem(id) {
     return true;
   }
 
-  // ID and ParentID only.
-  const values = sheet.getRange(1, 1, lastRow, 2).getValues();
+  // Whole rows, so deleted cells can be archived before they go.
+  const values = sheet.getRange(1, 1, lastRow, REF_HEADERS.length).getValues();
 
   const idsToDelete = new Set([
     String(id)
@@ -463,6 +465,16 @@ function deleteReferenceItem(id) {
     }
   }
 
+  // Archive first (cell + its children, one timestamp), then delete.
+  const deletedAt = new Date().toISOString();
+  const archived = values.slice(1)
+    .filter(row => idsToDelete.has(String(row[0])))
+    .map(row => row.concat([deletedAt]));
+  if (archived.length) {
+    const archive = getOrCreateSheet_('Archive', ARCHIVE_HEADERS);
+    archive.getRange(archive.getLastRow() + 1, 1, archived.length, ARCHIVE_HEADERS.length).setValues(archived);
+  }
+
   for (let i = values.length - 1; i >= 1; i--) {
     if (idsToDelete.has(String(values[i][0]))) {
       sheet.deleteRow(i + 1);
@@ -470,6 +482,83 @@ function deleteReferenceItem(id) {
   }
 
   return true;
+}
+
+
+/* =========================================================
+   ARCHIVE — deleted Reference cells, restorable
+   ========================================================= */
+
+function archiveRows_() {
+  const sheet = getOrCreateSheet_('Archive', ARCHIVE_HEADERS);
+  const values = sheet.getDataRange().getValues();
+  return values.slice(1).map((row, i) => ({
+    row: i + 2,
+    id: String(row[0] || ''),
+    parentId: String(row[1] || ''),
+    type: String(row[2] || 'item'),
+    title: String(row[3] || ''),
+    content: String(row[4] || ''),
+    expanded: row[5] !== false,
+    sort: Number(row[6]) || 0,
+    deletedAt: row[7] instanceof Date ? row[7].toISOString() : String(row[7] || '')
+  })).filter(x => x.id);
+}
+
+// Top-level deleted cells (children ride along), newest first.
+function getArchive() {
+  const rows = archiveRows_();
+  const key = x => x.deletedAt + '|' + x.id;
+  const keys = new Set(rows.map(key));
+  return rows
+    .filter(x => !keys.has(x.deletedAt + '|' + x.parentId))
+    .map(x => ({
+      id: x.id,
+      deletedAt: x.deletedAt,
+      title: x.title,
+      content: x.content,
+      children: rows.filter(y => y.deletedAt === x.deletedAt && y.id !== x.id).length
+    }))
+    .reverse();
+}
+
+// Puts a deleted cell (and the children deleted with it) back in Reference.
+// If its parent is gone, it comes back at the top level. Returns Reference.
+function restoreArchivedItem(id, deletedAt) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const archive = getOrCreateSheet_('Archive', ARCHIVE_HEADERS);
+    const rows = archiveRows_().filter(x => x.deletedAt === String(deletedAt));
+    const root = rows.find(x => x.id === String(id));
+    if (!root) throw new Error('That cell is no longer in the archive.');
+
+    const ids = new Set([root.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      rows.forEach(x => {
+        if (ids.has(x.parentId) && !ids.has(x.id)) { ids.add(x.id); changed = true; }
+      });
+    }
+    const batch = rows.filter(x => ids.has(x.id));
+
+    const ref = getOrCreateSheet_('Reference', REF_HEADERS);
+    const existing = referenceRowMap_(ref);
+    const toAdd = batch.filter(x => !existing.has(x.id)).map(x => [
+      x.id,
+      x.id === root.id && x.parentId && !existing.has(x.parentId) ? '' : x.parentId,
+      x.type, x.title, x.content, x.expanded, x.sort
+    ]);
+    if (toAdd.length) {
+      ref.getRange(ref.getLastRow() + 1, 1, toAdd.length, REF_HEADERS.length).setValues(toAdd);
+    }
+
+    batch.map(x => x.row).sort((a, b) => b - a).forEach(r => archive.deleteRow(r));
+  } finally {
+    lock.releaseLock();
+  }
+  return getReference_();
 }
 
 

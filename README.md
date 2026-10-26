@@ -65,6 +65,7 @@ Last updated: 2026-10-26
 - **☐ Checkbox** in the hold / right-click menu: turns the line you're on into a task (checkbox at the start, text and formatting kept, indent kept) — same as typing `[]` + Space. Not on titles or in code blocks; says so if the line is already a task.
 
 - **Reference Options button** (next to Sort): the Urgent panel settings moved here from the main Options — **Wrap long text** (on by default, so long urgent tasks aren't cut off), Show day made, Due date style. Main Options keeps scale, padding and fonts.
+- Hold menu on a phone no longer overlaps the phone's own Cut / Copy / Paste bar: it's placed from the actual selection, on the opposite side from that bar, and moves if the selection changes.
 - Sort row: the − / + and Options buttons are now the same small size as the Sort dropdown, and the row wraps onto a second line on narrow screens instead of getting cut off.
 - **More due date styles** (Reference Options → Due date): added **Oct 27 · 3d** and **October 27th · 3d**, alongside Tue 10/27, Tue 10/27 · 3d and 3d.
 - **− / + collapse buttons**: a boxed − / + next to Sort collapses or expands every Reference cell; the toolbar button reads Ref − / Ref +; each cell's ▾ / ▸ arrow is now a boxed − / +; the Urgent and Inbox headers use the same − / +.

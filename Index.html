@@ -857,6 +857,39 @@
       text-overflow:ellipsis;
     }
     #referenceTree .ref-collapsed .ref-cell > *:not(:first-child){display:none!important;}
+
+    /* =========================================================
+       2026-10-26: task cards and priority
+       ========================================================= */
+    .check-line[data-priority="1"]{--prio:#e03131;}
+    .check-line[data-priority="2"]{--prio:#f59f00;}
+    .check-line[data-priority="3"]{--prio:#1c7ed6;}
+    .check-line[data-priority] > input[type=checkbox]{accent-color:var(--prio);outline:2px solid var(--prio);outline-offset:0;border-radius:3px;}
+    body:not(.cards-off) :is(.editor,.ref-cell,.card-ghost) > .check-line{
+      position:relative;margin-top:3px;margin-bottom:3px;padding:6px 0 6px 8px;
+      background:#fff;border:1px solid #e2e2e2;border-left:4px solid var(--prio,#d6d6d6);
+      border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.06);
+    }
+    body:not(.cards-off) :is(.editor,.ref-cell,.card-ghost) > .check-line.done{background:#f7f7f7;}
+    body:not(.cards-off) :is(.editor,.ref-cell,.card-ghost) > .check-line:not([data-level="0"]){padding-top:4px;padding-bottom:4px;}
+    /* Drag handle; a pseudo-element, so it is never saved with the text. */
+    body:not(.cards-off) :is(.editor,.ref-cell,.card-ghost) > .check-line::after{
+      content:'⠿';flex:0 0 30px;align-self:stretch;display:flex;align-items:center;justify-content:center;
+      margin:-6px 0;color:#aaa;font-size:16px;line-height:1;cursor:grab;
+    }
+    .card-dragging{opacity:.35;}
+    .card-ghost{position:fixed;pointer-events:none;z-index:4000;opacity:.92;transform:rotate(1deg);}
+    .card-drop-line{position:fixed;height:3px;background:#1c7ed6;border-radius:2px;pointer-events:none;z-index:4001;}
+    body.card-drag-active,body.card-drag-active *{cursor:grabbing!important;user-select:none;-webkit-user-select:none;}
+    #referenceTree .ref-collapsed .ref-cell > .check-line{padding:0!important;margin:0!important;border:0!important;box-shadow:none!important;background:none!important;}
+    #referenceTree .ref-collapsed .ref-cell > .check-line::after{display:none;}
+    .ctx-prio{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+    .ctx-menu .prio-btn{text-align:center;font-weight:700;}
+    .ctx-menu .prio-btn.prio-1{color:#e03131;}
+    .ctx-menu .prio-btn.prio-2{color:#d08700;}
+    .ctx-menu .prio-btn.prio-3{color:#1c7ed6;}
+    #typeSettings .ts-check{display:flex;align-items:center;gap:8px;margin:10px 0;font-weight:700;}
+    #typeSettings .ts-check input{width:20px;height:20px;margin:0;}
   </style>
 </head>
 <body>
@@ -864,10 +897,10 @@
   <div id="focusControls">
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
     <div class="view-menu" data-view-menu>
-      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Columns</button>
+      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" title="Columns">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
-    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale / Fonts</button>
+    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale</button>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
     <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref ▾</button>
@@ -900,12 +933,13 @@
       <input id="paragraphSize" class="font-size-input" type="number" min="8" max="48" step="1" value="14" aria-label="Text size in pixels">
       <button class="btn tiny" type="button" onclick="resetTypographySettings()">Reset</button>
     </div>
+    <label class="ts-check"><input id="taskCardsToggle" type="checkbox" checked> Task cards (drag ⠿ to move)</label>
   </div>
   <div id="toolbar">
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
-    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale / Fonts</button>
+    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale</button>
     <div class="view-menu" data-view-menu>
-      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Columns</button>
+      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" title="Columns">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
@@ -976,6 +1010,7 @@
           Right-click or long-press = formatting menu (Shift+right-click = browser menu) ·
           Enter = new line · ⌘/Ctrl+Enter = new cell ·
           type [] + Space = checkbox · Tab / Shift+Tab = indent / outdent ·
+          drag a task card's ⠿ to move it (with its subtasks) · menu !1 !2 !3 = priority ·
           ⌘/Ctrl+B/U = bold/underline · ⌘/Ctrl+Shift+X = strike task ·
           ``` + Enter = code block; ``` + Enter on its last line = exit
         </div>
@@ -990,8 +1025,14 @@
   <button class="btn" type="button" tabindex="-1" data-ctx="underline"><u>Underline</u></button>
   <button class="btn" type="button" tabindex="-1" data-ctx="strike"><s>Strike</s></button>
   <button class="btn" type="button" tabindex="-1" data-ctx="rule">Line</button>
-  <button class="btn" type="button" tabindex="-1" data-ctx="indent">Indent →</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="outdent">← Outdent</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="indent">Indent →</button>
+  <div class="ctx-prio ctx-wide" role="group" aria-label="Priority">
+    <button class="btn prio-btn prio-1" type="button" tabindex="-1" data-ctx="priority-1" title="High priority">!1</button>
+    <button class="btn prio-btn prio-2" type="button" tabindex="-1" data-ctx="priority-2" title="Medium priority">!2</button>
+    <button class="btn prio-btn prio-3" type="button" tabindex="-1" data-ctx="priority-3" title="Low priority">!3</button>
+    <button class="btn prio-btn" type="button" tabindex="-1" data-ctx="priority-0" title="Remove priority">None</button>
+  </div>
   <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="subtask">+ Subtask</button>
 </div>
 <script>
@@ -1526,7 +1567,8 @@
     root.querySelectorAll('.check-line').forEach(line => {
       line.classList.remove('check-text');
       const cb = line.querySelector('input[type=checkbox]');
-      if(!cb){ line.classList.remove('check-line','done','task-struck'); return; }
+      if(!cb){ line.classList.remove('check-line','done','task-struck'); line.removeAttribute('data-priority'); return; }
+      if(line.hasAttribute('data-priority') && !/^[123]$/.test(line.dataset.priority)) line.removeAttribute('data-priority');
       let text = [...line.children].find(n => n.classList.contains('check-text'));
       if(!text){ text = root.ownerDocument.createElement('span'); text.className = 'check-text'; }
       // Keep all selected text and inline formatting in a single flex item.
@@ -1568,14 +1610,20 @@
     });
   }
 
-  function toggleTaskStrike(el){
+  // Task lines under the caret or touched by the selection.
+  function selectedTaskLines(el){
     const sel = window.getSelection();
-    if(!sel?.rangeCount || !el.contains(sel.anchorNode) || !el.contains(sel.focusNode)) return;
+    if(!sel?.rangeCount || !el.contains(sel.anchorNode) || !el.contains(sel.focusNode)) return null;
     const range = sel.getRangeAt(0);
-    const tasks = [...el.querySelectorAll('.check-line')].filter(line => {
+    return [...el.querySelectorAll('.check-line')].filter(line => {
       if(sel.isCollapsed) return line.contains(sel.anchorNode);
       return range.intersectsNode(line);
     });
+  }
+
+  function toggleTaskStrike(el){
+    const tasks = selectedTaskLines(el);
+    if(!tasks) return;
     captureBeforeEdit(el);
     if(tasks.length){
       const strike = !tasks.every(line => line.classList.contains('task-struck'));
@@ -1845,6 +1893,7 @@
       if(node.classList.contains('check-line')){
         const level = Math.max(0, Math.min(6, Math.floor(Number(node.dataset.level) || 0)));
         keep['data-level'] = String(level);
+        if(/^[123]$/.test(node.dataset.priority || '')) keep['data-priority'] = node.dataset.priority;
         cleanStyle.marginLeft = level ? `${level * 24}px` : '';
         keep.style = cleanStyle.cssText;
       }
@@ -2582,6 +2631,23 @@
       toggleTaskStrike(ed);
       return;
     }
+    if(action.startsWith('priority-')){
+      const priority = action.slice(9);
+      const tasks = selectedTaskLines(ed) || [];
+      if(!tasks.length){
+        setStatus('Place the cursor on a task first');
+        return;
+      }
+      captureBeforeEdit(ed);
+      tasks.forEach(line => {
+        if(priority === '0') line.removeAttribute('data-priority');
+        else line.dataset.priority = priority;
+      });
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
+      return;
+    }
     if(action === 'bold' || action === 'underline'){
       captureBeforeEdit(ed);
       document.execCommand(action,false,null);
@@ -2731,6 +2797,181 @@
         runEditAction(btn.dataset.ctx, ed);
       });
     });
+  }
+  /* =========================================================
+     TASK CARDS (drag the ⠿ handle to move a task and its subtasks)
+     ========================================================= */
+  const TASK_CARDS_KEY = 'focusWorkspaceTaskCardsV1';
+  const CARD_HANDLE_WIDTH = 30;
+  let cardDrag = null;
+  function cardsEnabled(){
+    return !document.body.classList.contains('cards-off');
+  }
+  // The top-level task whose drag handle is under (x, y), if any.
+  function cardAtHandle(target,x){
+    if(!cardsEnabled()) return null;
+    const el = target instanceof Element ? target : target?.parentElement;
+    const line = el?.closest?.('.check-line');
+    const ed = line?.parentElement;
+    if(!ed?.matches('.editor,.ref-cell') || !ed.isContentEditable || line.closest('.ref-collapsed')) return null;
+    const r = line.getBoundingClientRect();
+    return x >= r.right - CARD_HANDLE_WIDTH && x <= r.right ? line : null;
+  }
+  // A task plus the deeper-indented lines right after it.
+  function cardGroup(line){
+    const base = Number(line.dataset.level || 0);
+    const group = [line];
+    let next = line.nextElementSibling;
+    while(next && Number(next.dataset.level || 0) > base){ group.push(next); next = next.nextElementSibling; }
+    return group;
+  }
+  function cardDropEditor(x,y){
+    const el = document.elementFromPoint(x,y);
+    if(!el) return null;
+    let ed = el.closest('.editor,.ref-cell');
+    if(!ed) ed = el.closest('.day-row,.ref-cell-wrapper')?.querySelector('.editor,.ref-cell');
+    return ed && ed.isContentEditable && !ed.closest('[data-split-mirror]') ? ed : null;
+  }
+  function updateCardDrop(){
+    const d = cardDrag;
+    if(!d) return;
+    d.ghost.style.left = (d.ghostLeft + d.x - d.startX) + 'px';
+    d.ghost.style.top = (d.ghostTop + d.y - d.startY) + 'px';
+    const ed = cardDropEditor(d.x,d.y);
+    d.drop = null;
+    d.line.hidden = true;
+    if(ed){
+      const edRect = ed.getBoundingClientRect();
+      let before = null;
+      let lineY = edRect.top + 2;
+      if(!ed.closest('.ref-collapsed')){
+        for(const child of ed.children){
+          if(d.group.includes(child) || Number(child.dataset.level || 0) > d.level) continue;
+          const r = child.getBoundingClientRect();
+          if(!r.height) continue;
+          if(r.top + r.height / 2 > d.y){ before = child; lineY = r.top - 2; break; }
+          lineY = r.bottom + 1;
+        }
+      }else lineY = edRect.bottom - 2;
+      d.drop = {ed,before};
+      d.line.hidden = false;
+      d.line.style.left = edRect.left + 'px';
+      d.line.style.width = edRect.width + 'px';
+      d.line.style.top = Math.round(lineY - 1) + 'px';
+    }
+  }
+  function cardAutoScroll(){
+    const d = cardDrag;
+    if(!d) return;
+    const el = document.elementFromPoint(d.x,d.y);
+    const scroller = el?.closest('.scroll');
+    if(scroller){
+      const r = scroller.getBoundingClientRect();
+      const edge = 50;
+      let delta = 0;
+      if(d.y < r.top + edge) delta = -Math.ceil((r.top + edge - d.y) / 4);
+      else if(d.y > r.bottom - edge) delta = Math.ceil((d.y - (r.bottom - edge)) / 4);
+      if(delta){ scroller.scrollTop += delta; updateCardDrop(); }
+    }
+    d.frame = requestAnimationFrame(cardAutoScroll);
+  }
+  function startCardDrag(line,e){
+    const source = line.parentElement;
+    const group = cardGroup(line);
+    const edRect = source.getBoundingClientRect();
+    const first = line.getBoundingClientRect();
+    const ghost = document.createElement('div');
+    ghost.className = 'card-ghost';
+    const style = getComputedStyle(source);
+    ghost.style.font = style.font;
+    ghost.style.lineHeight = style.lineHeight;
+    ghost.style.width = edRect.width + 'px';
+    group.forEach(n => ghost.appendChild(n.cloneNode(true)));
+    ghost.querySelectorAll('input').forEach(cb => { cb.disabled = true; });
+    document.body.appendChild(ghost);
+    const dropLine = document.createElement('div');
+    dropLine.className = 'card-drop-line';
+    dropLine.hidden = true;
+    document.body.appendChild(dropLine);
+    group.forEach(n => n.classList.add('card-dragging'));
+    document.body.classList.add('card-drag-active');
+    hideContextMenu();
+    cancelLongPress();
+    cardDrag = {
+      pointerId:e.pointerId, source, group, level:Number(line.dataset.level || 0),
+      ghost, line:dropLine, drop:null,
+      startX:e.clientX, startY:e.clientY, x:e.clientX, y:e.clientY,
+      ghostLeft:edRect.left, ghostTop:first.top - parseFloat(getComputedStyle(line).marginTop || 0)
+    };
+    updateCardDrop();
+    cardDrag.frame = requestAnimationFrame(cardAutoScroll);
+  }
+  function endCardDrag(commit){
+    const d = cardDrag;
+    if(!d) return;
+    cardDrag = null;
+    cancelAnimationFrame(d.frame);
+    d.ghost.remove();
+    d.line.remove();
+    d.group.forEach(n => n.classList.remove('card-dragging'));
+    document.body.classList.remove('card-drag-active');
+    const drop = d.drop;
+    if(!commit || !drop) return;
+    if(drop.ed === d.source && drop.before === d.group[d.group.length - 1].nextElementSibling) return;
+    const target = drop.ed;
+    captureBeforeEdit(d.source);
+    if(target !== d.source) captureBeforeEdit(target);
+    d.group.forEach(n => target.insertBefore(n,drop.before));
+    finishEditorEdit(d.source);
+    saveEditorOwner(d.source);
+    if(target !== d.source){
+      finishEditorEdit(target);
+      saveEditorOwner(target);
+    }
+    setStatus(d.group.length > 1 ? 'Task and subtasks moved' : 'Task moved');
+  }
+  function setTaskCards(on){
+    document.body.classList.toggle('cards-off',!on);
+    const toggle = document.getElementById('taskCardsToggle');
+    if(toggle) toggle.checked = on;
+    try{ localStorage.setItem(TASK_CARDS_KEY,on ? '1' : '0'); }catch(e){}
+    requestAnimationFrame(() => syncDayHeights());
+  }
+  function initTaskCards(){
+    let saved = null;
+    try{ saved = localStorage.getItem(TASK_CARDS_KEY); }catch(e){}
+    setTaskCards(saved !== '0');
+    document.getElementById('taskCardsToggle')?.addEventListener('change',e => setTaskCards(e.target.checked));
+    // Touch: stop the page from scrolling (and the long-press menu) when the handle is pressed.
+    document.addEventListener('touchstart',e => {
+      if(e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if(cardAtHandle(e.target,t.clientX)){ e.preventDefault(); cancelLongPress(); }
+    },{capture:true,passive:false});
+    document.addEventListener('touchmove',e => { if(cardDrag) e.preventDefault(); },{capture:true,passive:false});
+    document.addEventListener('contextmenu',e => {
+      if(cardDrag || cardAtHandle(e.target,e.clientX)){ e.preventDefault(); e.stopPropagation(); }
+    },true);
+    document.addEventListener('pointerdown',e => {
+      if(cardDrag || e.button > 0) return;
+      const line = cardAtHandle(e.target,e.clientX);
+      if(!line) return;
+      e.preventDefault();
+      startCardDrag(line,e);
+    },true);
+    document.addEventListener('pointermove',e => {
+      if(!cardDrag || e.pointerId !== cardDrag.pointerId) return;
+      cardDrag.x = e.clientX;
+      cardDrag.y = e.clientY;
+      updateCardDrop();
+    },true);
+    document.addEventListener('pointerup',e => {
+      if(cardDrag && e.pointerId === cardDrag.pointerId) endCardDrag(true);
+    },true);
+    document.addEventListener('pointercancel',e => {
+      if(cardDrag && e.pointerId === cardDrag.pointerId) endCardDrag(false);
+    },true);
+    document.addEventListener('keydown',e => { if(e.key === 'Escape') endCardDrag(false); },true);
   }
   /* =========================================================
      DAY HEIGHT / SCROLL
@@ -3666,7 +3907,7 @@
         [...mirror.querySelectorAll('.scroll')].forEach((el,i)=>{ el.scrollTop=keep[i]||0; });
       });
     });
-    observer.observe(source,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','checked','style']});
+    observer.observe(source,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','checked','style','data-priority','data-level']});
     splitMirrorObservers.push(observer);
     return mirror;
   }
@@ -3771,8 +4012,8 @@
   }
   function updateColumnsLabel(){
     const label = isSplitActive()
-      ? 'Columns (split)'
-      : visiblePanes.length === 3 ? 'Columns' : `Columns (${visiblePanes.length})`;
+      ? 'Cols (split)'
+      : visiblePanes.length === 3 ? 'Cols' : `Cols (${visiblePanes.length})`;
     document.querySelectorAll('.view-menu-trigger').forEach(trigger => trigger.textContent = label);
   }
   function applyWorkspaceView(selection){
@@ -4130,6 +4371,7 @@
   initAppDisplay();
   initLayoutButtons();
   initContextMenu();
+  initTaskCards();
   /* Every open menu/panel closes when you press anywhere outside it (or press Escape).
      Runs in the capture phase so nothing else can swallow the press first. */
   function closeAllMenus(exceptTarget){

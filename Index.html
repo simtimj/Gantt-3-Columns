@@ -861,6 +861,29 @@
     .refresh-btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:inherit;font-size:16px;line-height:1;}
     .refresh-btn.spin{animation:refresh-spin .8s linear infinite;}
     @keyframes refresh-spin{to{transform:rotate(360deg);}}
+    /* Phone camera / notch (2026-10-26, Julius): keep the toolbars clear of it. */
+    #toolbar{
+      padding-top:max(var(--tb-pad,4px), env(safe-area-inset-top));
+      padding-left:max(8px, env(safe-area-inset-left));
+      padding-right:max(8px, env(safe-area-inset-right));
+    }
+    #focusControls{
+      top:calc(3px + env(safe-area-inset-top));
+      right:calc(8px + env(safe-area-inset-right));
+    }
+    /* Status ("Ready") on the same line as the buttons (2026-10-26, Julius):
+       on narrow screens the toolbar is one line that scrolls sideways, and the
+       status stays pinned at its right end. */
+    @media(max-width:900px){
+      #toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+      #toolbar::-webkit-scrollbar{display:none;}
+      #toolbar > *{flex-shrink:0;}
+      #dateLabel:empty{display:none;}
+      #status.status{
+        position:sticky;right:0;flex:0 0 auto;min-width:0;margin-left:auto;
+        background:#fff;padding-left:8px;box-shadow:-8px 0 8px -4px #fff;
+      }
+    }
   </style>
 </head>
 <body>

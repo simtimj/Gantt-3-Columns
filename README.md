@@ -78,6 +78,7 @@ Last updated: 2026-10-26
 
 ## 📋 To do
 
+- **Claude's suggested day in Notes** (asked 2026-10-26): when Julius asks "suggest my day", Claude writes the plan (what to do, at what times, from the priorities and calendar gaps) into that day's **Notes** cell, e.g. under Monday, Oct 26, 2026, as a "Claude's plan for today" block. Same route as the Inbox: Claude adds it to a repo file (e.g. `dayplan.js`), and the app inserts it into that date's Notes cell once. The plan is also saved on Claude's side (Daily Work Log), so Julius can say "take today's plan, make these changes, and push it to my calendar", and Claude updates the plan and creates the calendar events.
 - Draggable task cards: every task becomes a card you can drag; dragging a task carries its subtasks, dragging a subtask carries only it and what's nested below.
 - Hide the "created by a Google Apps Script user" banner — only if the Exercise Tracker's wrapper experiment works out (it's shelved there for being slow).
 

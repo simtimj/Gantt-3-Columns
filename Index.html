@@ -449,6 +449,20 @@
     #referenceScroll{
       padding:6px 5px 40px;
     }
+    /* Phone (2026-10-26, Julius): Delete sits at the right end of the title
+       line instead of on its own row below, so tapping a cell doesn't make
+       it taller. The title makes room for it while the cell is active. */
+    @media(max-width:900px){
+      #referenceTree .ref-actions{
+        position:absolute;right:4px;margin:0;
+        top:calc(8px * var(--pad-y,1) - 3px);
+      }
+      #referenceTree .ref-actions .btn{
+        min-height:0;height:calc(var(--ref-line) + 6px);
+        padding:0 10px;display:inline-flex;align-items:center;
+      }
+      #referenceTree .ref-cell-wrapper:focus-within{padding-right:calc(72px * var(--mobile-scale,1))!important;}
+    }
     #archiveOverlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;padding:8vh 12px;}
     .archive-box{background:#fff;border:1px solid var(--border);border-radius:10px;width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.2);}
     .archive-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);}

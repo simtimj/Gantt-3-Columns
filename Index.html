@@ -1139,6 +1139,8 @@
               <option value="date">Tue 10/27</option>
               <option value="days">Tue 10/27 · 3d</option>
               <option value="left">3d</option>
+              <option value="month">Oct 27 · 3d</option>
+              <option value="long">October 27th · 3d</option>
             </select>
           </label>
           <div class="ts-sub">Tips</div>
@@ -4900,7 +4902,7 @@
   function showMadeDate(){ return urgOpt('fw.showMade','1') !== '0'; }
   function dueStyle(){
     const v = urgOpt('fw.dueStyle',urgOpt('fw.dueCountdown','1') === '0' ? 'date' : 'days');
-    return ['date','days','left'].includes(v) ? v : 'days';
+    return ['date','days','left','month','long'].includes(v) ? v : 'days';
   }
   function initDueOptions(){
     const made = document.getElementById('optShowMade');
@@ -4917,6 +4919,14 @@
     const rel = left === 1 ? 'Tmrw' : left > 0 ? left + 'd' : (-left) + 'd late';
     const style = dueStyle();
     if(style === 'left') return rel;
+    // Month-name styles (2026-10-26, Julius): "Oct 27 · 3d", "October 27th · 3d".
+    if(style === 'month' || style === 'long'){
+      const d = dateObj(due);
+      const mon = d.toLocaleDateString('en-US',{month:style === 'long' ? 'long' : 'short'});
+      const day = d.getDate();
+      const ord = style === 'long' ? (day % 100 >= 11 && day % 100 <= 13 ? 'th' : ({1:'st',2:'nd',3:'rd'}[day % 10] || 'th')) : '';
+      return mon + ' ' + day + ord + ' · ' + rel;
+    }
     return wd(due) + ' ' + md(due) + (style === 'days' ? ' · ' + rel : '');
   }
   // Every task with a due date, from every day we know about.

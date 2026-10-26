@@ -933,6 +933,13 @@
     .urg-box{flex:0 0 auto;width:13px;height:13px;border:2px solid var(--urg);border-radius:3px;}
     .urg-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .urg-date{flex:0 0 auto;font-size:11px;color:var(--muted);}
+    .urg-date.overdue{color:#e5484d;font-weight:700;}
+    .urg-date.due-today{color:#c27c00;font-weight:700;}
+    .urg-picker{flex-wrap:wrap;max-width:200px;}
+    .urg-due-row{flex:1 0 100%;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+    .urg-due-row input{flex:1;min-width:0;font-size:14px;padding:3px 4px;border:1px solid var(--border);border-radius:6px;}
+    .urg-due-clear{font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:#fff;}
+    .check-line[data-due-label]::after{content:"📅 " attr(data-due-label);flex:0 0 auto;margin-left:8px;font-size:11px;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
     .urg-subtask{font-size:12px;color:var(--muted);padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .urg-row.done .urg-box{background:var(--urg);}
     .urg-row.done .urg-text{text-decoration:line-through;opacity:.6;}
@@ -1929,6 +1936,10 @@
         const level = Math.max(0, Math.min(6, Math.floor(Number(node.dataset.level) || 0)));
         keep['data-level'] = String(level);
         if(/^[123]$/.test(node.dataset.urg || '')) keep['data-urg'] = node.dataset.urg;
+        if(/^\d{4}-\d{2}-\d{2}$/.test(node.dataset.due || '')){
+          keep['data-due'] = node.dataset.due;
+          keep['data-due-label'] = dueLabel(node.dataset.due);
+        }
         cleanStyle.marginLeft = level ? `${level * 24}px` : '';
         keep.style = cleanStyle.cssText;
       }
@@ -4335,7 +4346,7 @@
           if(l2 <= level) break;
           subs.push({text:lineText(lines[j]),level:l2 - level,done:!!lines[j].querySelector('input[checked]')});
         }
-        out.push({date,urg:Number(urg),index:i,text:lineText(line),subs,done});
+        out.push({date,urg:Number(urg),index:i,text:lineText(line),subs,done,due:/^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : ''});
       });
     });
     return out;
@@ -4343,6 +4354,18 @@
   function lineText(line){
     const t = line.querySelector('.check-text');
     return ((t ? t.textContent : line.textContent) || '').replace(/\s+/g,' ').trim() || '(empty task)';
+  }
+  // Due dates (2026-10-26): "Wed, Oct 29".
+  function dueLabel(s){
+    return dateObj(s).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  }
+  function setDue(line,iso){
+    if(iso){ line.dataset.due = iso; line.dataset.dueLabel = dueLabel(iso); }
+    else { delete line.dataset.due; delete line.dataset.dueLabel; }
+  }
+  function localToday(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
   function shortDate(s){
     const d = dateObj(s);
@@ -4373,7 +4396,8 @@
     panel.appendChild(head);
     if(!urgentOpen) return;
     [1,2,3].forEach(u => {
-      const group = items.filter(x => x.urg === u);
+      const group = items.filter(x => x.urg === u)
+        .sort((a,b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || (a.due || '').localeCompare(b.due || ''));
       if(!group.length) return;
       const wrap = document.createElement('div');
       wrap.className = 'urg-group';
@@ -4391,7 +4415,16 @@
         row.title = 'Go to ' + item.date;
         const box = document.createElement('span'); box.className = 'urg-box';
         const text = document.createElement('span'); text.className = 'urg-text'; text.textContent = item.text;
-        const date = document.createElement('span'); date.className = 'urg-date'; date.textContent = shortDate(item.date);
+        const date = document.createElement('span'); date.className = 'urg-date';
+        if(item.due){
+          const today = localToday();
+          date.textContent = 'Due ' + (item.due === today ? 'today · ' : '') + dueLabel(item.due);
+          if(!item.done && item.due < today) date.classList.add('overdue');
+          else if(!item.done && item.due === today) date.classList.add('due-today');
+        }else{
+          date.textContent = dueLabel(item.date);
+          date.title = 'Day it’s on — hold the checkbox to set a due date';
+        }
         row.append(box,text,date);
         row.addEventListener('click',() => goToTask(item.date,item.index));
         wrap.appendChild(row);
@@ -4436,6 +4469,26 @@
       });
       p.appendChild(b);
     });
+    const dueRow = document.createElement('label');
+    dueRow.className = 'urg-due-row';
+    dueRow.append('Due ');
+    const input = document.createElement('input');
+    input.type = 'date';
+    input.value = line.dataset.due || '';
+    input.addEventListener('change',() => {
+      setDue(line,input.value);
+      saveEditorOwner(cb.closest('.editor,.ref-cell'));
+      renderUrgent();
+    });
+    dueRow.appendChild(input);
+    if(line.dataset.due){
+      const clr = document.createElement('button');
+      clr.type = 'button'; clr.className = 'urg-due-clear'; clr.textContent = 'Clear';
+      clr.addEventListener('pointerdown',e => e.preventDefault());
+      clr.addEventListener('click',() => { setDue(line,''); hideUrgencyPicker(); saveEditorOwner(cb.closest('.editor,.ref-cell')); renderUrgent(); });
+      dueRow.appendChild(clr);
+    }
+    p.appendChild(dueRow);
     document.body.appendChild(p);
     const r = p.getBoundingClientRect();
     p.style.left = Math.max(6,Math.min(window.innerWidth - r.width - 6,x - 12)) + 'px';

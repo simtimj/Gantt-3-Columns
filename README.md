@@ -37,7 +37,7 @@ Last updated: 2026-10-26
 - Notes **+ Template** inserts the Reference cell titled "Journal Template" into the selected Notes day.
 
 **Urgency** (like TickTick)
-- Hold a checkbox (or right-click it) → pick 1 red (Urgent) / 2 yellow (Soon) / 3 blue (Later) / none.
+- Hold a checkbox (or right-click it) → pick 1 red (Urgent) / 2 yellow (Soon) / 3 blue (Later) / none, and optionally a due date.
 - Urgent panel at the top of Reference lists every urgent task from every day, grouped 1/2/3, with its subtasks underneath. Tap a task to jump to it in Today. Panel is collapsible.
 
 **Reference**
@@ -54,6 +54,7 @@ Last updated: 2026-10-26
 - Urgent panel keeps finished urgent tasks (struck through) until the urgency is cleared by hand.
 - Reference follows the Padding left/right slider the same way Today does (one shared setting for now).
 - Urgent panel: the red bar down the whole panel is gone; each level (1 Urgent, 2 Soon, 3 Later) has its own left bar and heading in its own color (red / yellow / blue).
+- Due dates on urgent tasks: hold the checkbox → the urgency picker has a **Due** date box (and Clear). The task line shows 📅 Wed, Oct 29; the Urgent panel shows "Due Wed, Oct 29" (bold yellow when due today, bold red when overdue) and lists dated tasks first, soonest first. Tasks without a due date show the day they're on with its weekday.
 
 ## 🔧 To be improved
 

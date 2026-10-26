@@ -1148,6 +1148,8 @@
               <option value="left">3d</option>
               <option value="month">Oct 27 · 3d</option>
               <option value="long">October 27th · 3d</option>
+              <option value="wkmonth">Tue, Oct 27 · 3d</option>
+              <option value="wklong">Tuesday, October 27th · 3d</option>
             </select>
           </label>
           <div class="ts-sub">Tips</div>
@@ -4938,7 +4940,7 @@
   function showMadeDate(){ return urgOpt('fw.showMade','1') !== '0'; }
   function dueStyle(){
     const v = urgOpt('fw.dueStyle',urgOpt('fw.dueCountdown','1') === '0' ? 'date' : 'days');
-    return ['date','days','left','month','long'].includes(v) ? v : 'days';
+    return ['date','days','left','month','long','wkmonth','wklong'].includes(v) ? v : 'days';
   }
   function initDueOptions(){
     const made = document.getElementById('optShowMade');
@@ -4956,12 +4958,15 @@
     const style = dueStyle();
     if(style === 'left') return rel;
     // Month-name styles (2026-10-26, Julius): "Oct 27 · 3d", "October 27th · 3d".
-    if(style === 'month' || style === 'long'){
+    // With the weekday too: "Tue, Oct 27 · 3d", "Tuesday, October 27th · 3d".
+    if(['month','long','wkmonth','wklong'].includes(style)){
       const d = dateObj(due);
-      const mon = d.toLocaleDateString('en-US',{month:style === 'long' ? 'long' : 'short'});
+      const long = style === 'long' || style === 'wklong';
+      const mon = d.toLocaleDateString('en-US',{month:long ? 'long' : 'short'});
       const day = d.getDate();
-      const ord = style === 'long' ? (day % 100 >= 11 && day % 100 <= 13 ? 'th' : ({1:'st',2:'nd',3:'rd'}[day % 10] || 'th')) : '';
-      return mon + ' ' + day + ord + ' · ' + rel;
+      const ord = long ? (day % 100 >= 11 && day % 100 <= 13 ? 'th' : ({1:'st',2:'nd',3:'rd'}[day % 10] || 'th')) : '';
+      const wk = style.startsWith('wk') ? d.toLocaleDateString('en-US',{weekday:long ? 'long' : 'short'}) + ', ' : '';
+      return wk + mon + ' ' + day + ord + ' · ' + rel;
     }
     return wd(due) + ' ' + md(due) + (style === 'days' ? ' · ' + rel : '');
   }

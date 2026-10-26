@@ -2882,16 +2882,44 @@
     const {x,y,touch} = ctxAnchor;
     const box = visibleBox();
     const r = ctxMenu.getBoundingClientRect();
-    // On touch, sit below the finger so Chrome's own Copy / Paste bar
-    // (which appears above the selection) stays visible.
     let left = touch ? x - r.width / 2 : x;
-    let top = touch ? y + 36 : y;
-    if(top + r.height > box.height - 8) top = touch ? y - r.height - 72 : y - r.height;
+    let top = y;
+    if(touch){
+      /* Keep clear of the phone's own Cut / Copy / Paste bar (2026-10-26, Julius:
+         they overlapped). That bar sits just above the selection, or just below it
+         when the selection is near the top. Work from the real selection box, leave
+         room for that bar (~60px) and the selection handles (~30px), and put ours
+         on the other side. */
+      const sel = selectionRect();
+      const sTop = sel ? sel.top : y - 12, sBottom = sel ? sel.bottom : y + 12;
+      const BAR = 64, HANDLES = 34;
+      const nativeBelow = sTop < BAR + 16;           // no room above → the bar goes below
+      let below = sBottom + HANDLES + (nativeBelow ? BAR : 0);
+      let above = (nativeBelow ? sTop : sTop - BAR) - 8 - r.height;
+      if(below + r.height <= box.height - 8) top = below;
+      else if(above >= 8) top = above;
+      else top = below;                              // tall menu on a short screen: scroll-free best effort
+    } else if(top + r.height > box.height - 8) top = y - r.height;
     left = Math.max(8, Math.min(left, box.width - r.width - 8));
     top = Math.max(8, Math.min(top, box.height - r.height - 8));
     ctxMenu.style.left = Math.round(left) + 'px';
     ctxMenu.style.top = Math.round(top) + 'px';
   }
+  function selectionRect(){
+    const sel = window.getSelection && window.getSelection();
+    if(!sel || !sel.rangeCount) return null;
+    const rg = sel.getRangeAt(0);
+    let rc = rg.getBoundingClientRect();
+    if(!rc || (!rc.width && !rc.height)){
+      const rs = rg.getClientRects();
+      rc = rs && rs.length ? rs[0] : null;
+    }
+    return rc && (rc.width || rc.height) ? rc : null;
+  }
+  // The phone may grow the selection (and move its bar) after the menu opens.
+  document.addEventListener('selectionchange',() => {
+    if(ctxAnchor && ctxAnchor.touch && !ctxMenu.hidden) requestAnimationFrame(positionContextMenu);
+  });
   function showContextMenu(ed,x,y,touch){
     ctxEditor = ed;
     ctxAnchor = {x,y,touch:!!touch};
@@ -2900,6 +2928,7 @@
     ctxMenu.classList.toggle('ctx-touch',!!touch);
     ctxMenu.hidden = false;
     positionContextMenu();
+    if(touch) setTimeout(positionContextMenu,250); // after the phone's selection settles
   }
   function hideContextMenu(){
     if(ctxMenu.hidden) return;

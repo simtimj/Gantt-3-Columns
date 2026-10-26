@@ -970,6 +970,17 @@
     #referenceTree .ref-cell-wrapper:hover:has(.ref-children .ref-cell-wrapper:hover){background:transparent;}
     .ref-drop-into > .ref-cell{background:#e8f0fe!important;box-shadow:inset 0 0 0 2px #1a73e8;border-radius:6px;}
     .ref-hold > .ref-cell > h2:first-child{background:#f1f5ff;border-radius:4px;}
+    #typeSettings .ts-check{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:13px;}
+    #typeSettings .ts-check input{width:18px;height:18px;margin:0;}
+    /* Due on this day (2026-10-26): tasks due on a day show under its label. */
+    .due-block{margin:0 0 4px;display:flex;flex-direction:column;gap:1px;}
+    .due-item{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:0;border-left:3px solid var(--urg,#999);padding:2px 6px;font-size:12px;color:inherit;cursor:pointer;border-radius:0 4px 4px 0;}
+    .due-item[data-urg="1"]{--urg:#e5484d;}.due-item[data-urg="2"]{--urg:#f0b000;}.due-item[data-urg="3"]{--urg:#3b82f6;}
+    .due-item:hover{background:#f6f6f6;}
+    .due-item .di-tag{flex:0 0 auto;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+    .due-item .di-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .due-item .di-from{flex:0 0 auto;font-size:10px;color:var(--muted);}
+    .due-item.done .di-text{text-decoration:line-through;opacity:.6;}
   </style>
 </head>
 <body>
@@ -981,14 +992,14 @@
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
-    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale</button>
+    <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts, urgent panel">Options</button>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
     <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref ▾</button>
     <button class="btn" type="button" data-layout="show-toolbar" title="Show toolbar">Show toolbar</button>
   </div>
   <div id="typeSettings" class="type-settings hidden" role="dialog" aria-label="Scale, padding and fonts">
-    <div class="ts-head"><strong>Scale / Fonts</strong><button class="btn tiny" id="closeTypeSettings" type="button">Close</button></div>
+    <div class="ts-head"><strong>Options</strong><button class="btn tiny" id="closeTypeSettings" type="button">Close</button></div>
     <div class="ts-row">
       <span class="ts-label">Scale</span>
       <input id="mobileScale" type="range" min="50" max="200" step="10" value="100" aria-label="Workspace scale">
@@ -1013,11 +1024,12 @@
       <input id="paragraphSize" class="font-size-input" type="number" min="8" max="48" step="1" value="14" aria-label="Text size in pixels">
       <button class="btn tiny" type="button" onclick="resetTypographySettings()">Reset</button>
     </div>
+    <label class="ts-check"><input type="checkbox" id="optDueCountdown"> Urgent: show days until due</label>
   </div>
   <div id="toolbar">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
-    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale</button>
+    <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts, urgent panel">Options</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
@@ -1025,7 +1037,8 @@
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
     <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref ▾</button>
-    <button class="btn" type="button" data-layout="focus" title="Hide the top toolbar">Focus</button>
+    <!-- Focus (hide toolbar) shelved 2026-10-26 — code kept; put this back to restore:
+    <button class="btn" type="button" data-layout="focus" title="Hide the top toolbar">Focus</button> -->
     <span id="dateLabel"></span>
     <span
       id="status"
@@ -1447,7 +1460,11 @@
     wireEditor(
       ed,
       type
-    );
+    );    // New days (incl. lazily loaded weeks) pick up tasks due on them.
+    if(type === 'day'){
+      clearTimeout(appendDayRow._due);
+      appendDayRow._due = setTimeout(() => { try{ renderDueBlocks(); }catch(e){} },0);
+    }
   }
   /* =========================================================
      SELECTION
@@ -4141,7 +4158,8 @@
     localStorage.setItem(FOCUS_STORAGE_KEY,on?'1':'0');
     requestAnimationFrame(() => { updateWorkspaceLayout(); positionTypeSettings(); });
   }
-  function initFocusMode(){setFocusMode(localStorage.getItem(FOCUS_STORAGE_KEY)==='1');}
+  // Focus is shelved (2026-10-26): always start with the toolbar showing.
+  function initFocusMode(){setFocusMode(false);}
   /* =========================================================
      REFERENCE SEARCH
      ========================================================= */
@@ -4423,7 +4441,7 @@
   }
   function noteUrgentDay(date,html,render=true){
     if(!date) return;
-    if(html && /data-urg=/.test(html)) urgentSource.set(date,String(html));
+    if(html && /data-(urg|due)=/.test(html)) urgentSource.set(date,String(html));
     else urgentSource.delete(date);
     if(render) renderUrgent();
   }
@@ -4472,6 +4490,7 @@
     return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
   }
   function renderUrgent(){
+    try{ renderDueBlocks(); }catch(e){}
     const tree = document.getElementById('referenceTree');
     if(!tree) return;
     let panel = document.getElementById('urgentPanel');
@@ -4523,7 +4542,11 @@
         const date = document.createElement('span'); date.className = 'urg-date';
         if(item.due){
           const today = localToday();
-          date.textContent = 'Due ' + (item.due === today ? 'today' : dueLabel(item.due));
+          const left = Math.round((dateObj(item.due) - dateObj(today)) / 86400000);
+          const short = dateObj(item.due).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(item.due).getMonth() + 1) + '/' + dateObj(item.due).getDate();
+          date.textContent = 'Due ' + (left === 0 ? 'today' : short + (showDueCountdown()
+            ? ' · ' + (left === 1 ? 'tomorrow' : left > 0 ? left + ' days' : (-left) + (left === -1 ? ' day' : ' days') + ' late')
+            : ''));
           if(!item.done && item.due < today) date.classList.add('overdue');
           else if(!item.done && item.due === today) date.classList.add('due-today');
         }
@@ -4539,6 +4562,69 @@
           wrap.appendChild(r);
         });
       });
+    });
+  }
+  // Options: days-until-due countdown in the Urgent panel (default on).
+  function showDueCountdown(){
+    try{ return localStorage.getItem('fw.dueCountdown') !== '0'; }catch(e){ return true; }
+  }
+  function initDueOptions(){
+    const box = document.getElementById('optDueCountdown');
+    if(!box) return;
+    box.checked = showDueCountdown();
+    box.addEventListener('change',() => {
+      try{ localStorage.setItem('fw.dueCountdown',box.checked ? '1' : '0'); }catch(e){}
+      renderUrgent();
+    });
+  }
+  // Every task with a due date, from every day we know about.
+  function collectDue(){
+    const out = [];
+    [...urgentSource.keys()].sort().forEach(date => {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = urgentSource.get(date);
+      tpl.content.querySelectorAll('.check-line').forEach((line,i) => {
+        const due = line.dataset.due || '';
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(due) || due === date) return;
+        const cb = line.querySelector('input[type=checkbox]');
+        out.push({date,index:i,due,urg:line.dataset.urg || '',text:lineText(line),done:!!(cb && cb.hasAttribute('checked'))});
+      });
+    });
+    return out;
+  }
+  // Tasks due on a day show at the top of that day's Today cell (read-only;
+  // tap one to jump to where it lives).
+  function renderDueBlocks(){
+    const byDay = new Map();
+    collectDue().forEach(it => { if(!byDay.has(it.due)) byDay.set(it.due,[]); byDay.get(it.due).push(it); });
+    document.querySelectorAll('#todayScroll .day-row').forEach(row => {
+      const list = byDay.get(row.dataset.date) || [];
+      let block = row.querySelector(':scope > .due-block');
+      const sig = JSON.stringify(list);
+      if(block && block.dataset.sig === sig) return;
+      if(!list.length){ if(block){ block.remove(); syncDayHeightStable(row.dataset.date); } return; }
+      if(!block){
+        block = document.createElement('div');
+        block.className = 'due-block';
+        const label = row.querySelector(':scope > .day-label');
+        if(label) label.after(block); else row.prepend(block);
+      }
+      block.dataset.sig = sig;
+      block.innerHTML = '';
+      list.forEach(it => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'due-item' + (it.done ? ' done' : '');
+        if(it.urg) b.dataset.urg = it.urg;
+        const tag = document.createElement('span'); tag.className = 'di-tag'; tag.textContent = 'Due';
+        const tx = document.createElement('span'); tx.className = 'di-text'; tx.textContent = (it.done ? '☑ ' : '☐ ') + it.text;
+        const from = document.createElement('span'); from.className = 'di-from';
+        from.textContent = 'from ' + dateObj(it.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(it.date).getMonth() + 1) + '/' + dateObj(it.date).getDate();
+        b.append(tag,tx,from);
+        b.addEventListener('click',() => goToTask(it.date,it.index));
+        block.appendChild(b);
+      });
+      syncDayHeightStable(row.dataset.date);
     });
   }
   function goToTask(date,index){
@@ -4719,6 +4805,7 @@
   }
   initContextMenu();
   initUrgency();
+  initDueOptions();
   /* Every open menu/panel closes when you press anywhere outside it (or press Escape).
      Runs in the capture phase so nothing else can swallow the press first. */
   function closeAllMenus(exceptTarget){

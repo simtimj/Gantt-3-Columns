@@ -15,3 +15,9 @@
 - Claude can't reach Google from its workspace, so this file is the pipeline. Dismissed / sent-to-Today ids are stored in the app's user properties (`inboxDone`), so handled items stay hidden; prune entries older than ~30 days when editing the file.
 - Items typed in the app live in user properties (`inboxItems`). Server: `getInbox()`, `addInboxItem()`, `dismissInboxItem()` in `Code.gs`; client: `renderInbox()`, `addTaskToToday()` in `Index.html`.
 - Urgent panel create: `holdForCreate()` / `openCreateMenu()` / `createRow()` → `addTaskToToday(title, details, urg)` appends a check-line to today's Today cell. Reference options live in `#refOptions` (`initRefOptions()`); `fw.urgWrap` toggles wrapping (default on).
+
+## Done-with-Claude log (2026-10-26, Julius: standing rule)
+
+- **Whenever Julius finishes something through Claude (any project, not just this repo), add a line to `CLAUDE_DONE` in `donelog.js` and push**: `{ id: 'd-YYYYMMDD-short-slug', date: 'YYYY-MM-DD', title: 'Short name', details: 'what was done' }` (his labeling style: short name, colon, details). One entry per finished task; unique ids, never reused; prune entries older than ~30 days.
+- `applyClaudeDone_()` in `Code.gs` runs at the start of `getWorkspaceData()`: appends each new entry once to its day's Today cell as a checked `check-line` with `data-cid="<id>"`, and records applied ids in script properties `claudeDoneApplied` (so a line he deletes stays deleted). Creates the day row if missing.
+- Caveat: an already-open app tab that saves today's cell can overwrite merged lines (they're marked applied, so they won't come back) — Julius was told to tap ↻ first.

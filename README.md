@@ -41,7 +41,7 @@ Last updated: 2026-10-26
 - Urgent panel at the top of Reference lists every urgent task from every day, grouped 1/2/3, with its subtasks underneath. Tap a task to jump to it in Today. Panel is collapsible.
 
 **Reference**
-- Cells with a title line and body; collapse/expand each, or all at once with **Ref ▾**.
+- Cells with a title line and body; collapse/expand each, or all at once with **Ref −/+**.
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
@@ -63,6 +63,11 @@ Last updated: 2026-10-26
 - **Due tasks show on their day:** a task due Oct 27 also appears at the top of the Oct 27 cell in Today/Tasks, as a small "Due ☐ task · from Mon 10/26" line in its urgency color (struck through once done). Tap it to jump to the task where it lives. Works for any task with a due date, urgent or not. (It's a pointer, not a copy — the task still lives on its original day.)
 
 - **☐ Checkbox** in the hold / right-click menu: turns the line you're on into a task (checkbox at the start, text and formatting kept, indent kept) — same as typing `[]` + Space. Not on titles or in code blocks; says so if the line is already a task.
+
+- **Reference Options button** (next to Sort): the Urgent panel settings moved here from the main Options — **Wrap long text** (on by default, so long urgent tasks aren't cut off), Show day made, Due date style. Main Options keeps scale, padding and fonts.
+- **− / + collapse buttons**: a boxed − / + next to Sort collapses or expands every Reference cell; the toolbar button reads Ref − / Ref +; each cell's ▾ / ▸ arrow is now a boxed − / +; the Urgent and Inbox headers use the same − / +.
+- **Make tasks in the Urgent panel**: hold (or right-click) a level heading like "2 · Soon", hold the Urgent header, or tap **+ Task** → *Create Urgent / Soon / Later task* → type → Enter. It's added at the end of today's Today cell with that urgency, so it shows in the panel right away. Typing `Title: details` makes the title bold. The panel now always shows (even with nothing urgent) so + Task is always there.
+- **Inbox** under Urgent (collapsed by default): quick captures shown as **Title**: details. Type one in at the bottom, or tell Claude ("add to my Gantt inbox: …") and it shows up about a minute later, tagged Claude. **→ Today** turns it into a task in today; **✕** dismisses it.
 
 ## 🔧 To be improved
 
@@ -89,6 +94,7 @@ Last updated: 2026-10-26
 
 ## Files
 
-- `Code.gs` — server: serves the page, sets up the sheets, loads/saves days and Reference cells, archive, urgent days.
+- `Code.gs` — server: serves the page, sets up the sheets, loads/saves days and Reference cells, archive, urgent days, inbox.
+- `inbox.js` — Inbox items Claude adds (`CLAUDE_INBOX`).
 - `Index.html` — the whole client UI (styles + script).
 - `appsscript.json` — Apps Script manifest.

@@ -938,9 +938,21 @@
     .urg-date.overdue{color:#e5484d;font-weight:700;}
     .urg-date.due-today{color:#c27c00;font-weight:700;}
     .urg-picker{flex-wrap:wrap;max-width:200px;}
-    .urg-due-row{flex:1 0 100%;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
-    .urg-due-row input{flex:1;min-width:0;font-size:14px;padding:3px 4px;border:1px solid var(--border);border-radius:6px;}
-    .urg-due-clear{font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:#fff;}
+    .urg-due-row{flex:1 0 100%;display:flex;align-items:center;gap:4px;}
+    .urg-due-chip{flex:1;min-width:0;text-align:left;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+    .urg-due-chip.set{color:inherit;font-weight:600;}
+    .urg-due-clear{font-size:13px;line-height:1;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);}
+    .urg-cal{position:fixed;z-index:3001;width:196px;padding:6px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-size:12px;}
+    .uc-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;margin-bottom:4px;}
+    .uc-nav{border:0;background:none;font-size:16px;line-height:1;padding:2px 8px;cursor:pointer;color:inherit;}
+    .uc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;text-align:center;}
+    .uc-wd{font-size:10px;color:var(--muted);padding:2px 0;}
+    .uc-day{border:0;background:none;border-radius:6px;padding:4px 0;font-size:12px;cursor:pointer;color:inherit;}
+    .uc-day.past{color:#aaa;}
+    .uc-day.today{box-shadow:inset 0 0 0 1px #1a73e8;}
+    .uc-day.sel{background:#1a73e8;color:#fff;}
+    .uc-today{margin-top:4px;width:100%;font-size:11px;padding:3px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;}
+    .urg-box{cursor:pointer;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
     .check-line[data-due-label]::after{content:"📅 " attr(data-due-label);flex:0 0 auto;margin-left:8px;font-size:11px;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
     .urg-subtask{font-size:12px;color:var(--muted);padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .urg-row.done .urg-box{background:var(--urg);}
@@ -4394,6 +4406,8 @@
   let urgentOpen = true;
   try{ urgentOpen = localStorage.getItem('fw.urgentOpen') !== '0'; }catch(e){}
   function urgencyCheckbox(t){
+    const box = t && t.closest ? t.closest('#urgentPanel .urg-box') : null;
+    if(box) return box;
     const cb = t && t.closest ? t.closest('input[type=checkbox]') : null;
     if(!cb) return null;
     const line = cb.closest('.check-line');
@@ -4498,7 +4512,7 @@
         row.className = 'urg-row' + (item.done ? ' done' : '');
         row.dataset.urg = u;
         row.title = 'Go to ' + item.date;
-        const box = document.createElement('span'); box.className = 'urg-box';
+        const box = document.createElement('span'); box.className = 'urg-box'; box.dataset.date = item.date; box.dataset.index = item.index; box.title = 'Hold (or right-click) to change urgency or due date';
         const text = document.createElement('span'); text.className = 'urg-text'; text.textContent = item.text;
         const date = document.createElement('span'); date.className = 'urg-date';
         if(item.due){
@@ -4533,10 +4547,29 @@
   }
   // Picker
   let urgPicker = null, urgPress = null, urgSuppressClick = false;
+  // What a picker press acts on: a real checkbox in an editor, or a box in
+  // the Urgent panel (2026-10-26, Julius) — that one edits the task back in
+  // its Today day, which has to be loaded.
+  function urgTarget(el){
+    if(el.classList && el.classList.contains('urg-box')){
+      const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(el.dataset.date || '')}"]`);
+      const line = ed ? ed.querySelectorAll('.check-line')[Number(el.dataset.index)] : null;
+      return line ? {line,owner:ed} : null;
+    }
+    const line = el.closest('.check-line');
+    return line ? {line,owner:el.closest('.editor,.ref-cell')} : null;
+  }
+  function urgChanged(owner){
+    saveEditorOwner(owner);
+    if(owner && owner.dataset && owner.dataset.date) noteUrgentDay(owner.dataset.date,owner.innerHTML);
+    else renderUrgent();
+  }
   function showUrgencyPicker(cb,x,y){
     hideUrgencyPicker();
     if(typeof hideContextMenu === 'function') hideContextMenu();
-    const line = cb.closest('.check-line');
+    const t = urgTarget(cb);
+    if(!t){ setStatus('Scroll Today to that day first, then change it'); return; }
+    const {line,owner} = t;
     const p = document.createElement('div');
     p.className = 'urg-picker';
     [[1,'1'],[2,'2'],[3,'3'],[0,'✕']].forEach(([u,label]) => {
@@ -4550,27 +4583,33 @@
       b.addEventListener('click',() => {
         if(u) line.dataset.urg = String(u); else delete line.dataset.urg;
         hideUrgencyPicker();
-        saveEditorOwner(cb.closest('.editor,.ref-cell'));
+        urgChanged(owner);
       });
       p.appendChild(b);
     });
-    const dueRow = document.createElement('label');
+    // Due date: one small chip; tapping it opens a little calendar beside the
+    // picker (no phone date sheet, no grayed-out screen).
+    const dueRow = document.createElement('div');
     dueRow.className = 'urg-due-row';
-    dueRow.append('Due ');
-    const input = document.createElement('input');
-    input.type = 'date';
-    input.value = line.dataset.due || '';
-    input.addEventListener('change',() => {
-      setDue(line,input.value);
-      saveEditorOwner(cb.closest('.editor,.ref-cell'));
-      renderUrgent();
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'urg-due-chip' + (line.dataset.due ? ' set' : '');
+    chip.textContent = '📅 ' + (line.dataset.due ? dueLabel(line.dataset.due) : 'Due date');
+    chip.addEventListener('pointerdown',e => e.preventDefault());
+    chip.addEventListener('click',() => {
+      if(urgCal){ hideUrgCal(); return; }
+      showUrgCal(chip,line.dataset.due || '',iso => {
+        setDue(line,iso);
+        hideUrgencyPicker();
+        urgChanged(owner);
+      });
     });
-    dueRow.appendChild(input);
+    dueRow.appendChild(chip);
     if(line.dataset.due){
       const clr = document.createElement('button');
-      clr.type = 'button'; clr.className = 'urg-due-clear'; clr.textContent = 'Clear';
+      clr.type = 'button'; clr.className = 'urg-due-clear'; clr.textContent = '×'; clr.title = 'Clear due date';
       clr.addEventListener('pointerdown',e => e.preventDefault());
-      clr.addEventListener('click',() => { setDue(line,''); hideUrgencyPicker(); saveEditorOwner(cb.closest('.editor,.ref-cell')); renderUrgent(); });
+      clr.addEventListener('click',() => { setDue(line,''); hideUrgencyPicker(); urgChanged(owner); });
       dueRow.appendChild(clr);
     }
     p.appendChild(dueRow);
@@ -4580,13 +4619,64 @@
     p.style.top = Math.max(6,Math.min(window.innerHeight - r.height - 6,y + 14)) + 'px';
     urgPicker = p;
   }
+  // Mini calendar popover: placed right of the anchor if it fits, else left,
+  // else below/above. Tap a day = done.
+  let urgCal = null;
+  function hideUrgCal(){ if(urgCal){ urgCal.remove(); urgCal = null; } }
+  function showUrgCal(anchor,value,onPick){
+    hideUrgCal();
+    const today = localToday();
+    let view = dateObj(value || today); view.setDate(1);
+    const cal = document.createElement('div');
+    cal.className = 'urg-cal';
+    const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const btn = (text,cls,fn) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = cls; b.textContent = text;
+      b.addEventListener('pointerdown',e => e.preventDefault());
+      b.addEventListener('click',e => { e.stopPropagation(); fn(); });
+      return b;
+    };
+    const draw = () => {
+      cal.innerHTML = '';
+      const head = document.createElement('div'); head.className = 'uc-head';
+      const label = document.createElement('span');
+      label.textContent = view.toLocaleDateString(undefined,{month:'short',year:'numeric'});
+      head.append(btn('‹','uc-nav',() => { view.setMonth(view.getMonth() - 1); draw(); }),label,
+        btn('›','uc-nav',() => { view.setMonth(view.getMonth() + 1); draw(); }));
+      const grid = document.createElement('div'); grid.className = 'uc-grid';
+      ['S','M','T','W','T','F','S'].forEach(w => { const h = document.createElement('span'); h.className = 'uc-wd'; h.textContent = w; grid.appendChild(h); });
+      for(let i = 0; i < view.getDay(); i++) grid.appendChild(document.createElement('span'));
+      const d = new Date(view);
+      while(d.getMonth() === view.getMonth()){
+        const k = iso(d);
+        grid.appendChild(btn(String(d.getDate()),'uc-day' + (k === today ? ' today' : '') + (k === value ? ' sel' : '') + (k < today ? ' past' : ''),() => { hideUrgCal(); onPick(k); }));
+        d.setDate(d.getDate() + 1);
+      }
+      cal.append(head,grid,btn('Today','uc-today',() => { hideUrgCal(); onPick(today); }));
+    };
+    draw();
+    document.body.appendChild(cal);
+    const a = (urgPicker || anchor).getBoundingClientRect(), c = cal.getBoundingClientRect();
+    let left, top = Math.min(window.innerHeight - c.height - 6,Math.max(6,a.top));
+    if(a.right + 6 + c.width <= window.innerWidth - 6) left = a.right + 6;
+    else if(a.left - 6 - c.width >= 6) left = a.left - 6 - c.width;
+    else {
+      left = Math.max(6,Math.min(window.innerWidth - c.width - 6,a.left));
+      top = a.bottom + 6 + c.height <= window.innerHeight - 6 ? a.bottom + 6 : Math.max(6,a.top - 6 - c.height);
+    }
+    cal.style.left = left + 'px'; cal.style.top = top + 'px';
+    urgCal = cal;
+  }
   function hideUrgencyPicker(){
+    hideUrgCal();
     if(urgPicker){ urgPicker.remove(); urgPicker = null; }
   }
   function initUrgency(){
     document.addEventListener('pointerdown',e => {
-      if(urgPicker && !urgPicker.contains(e.target)) hideUrgencyPicker();
-      if(!(urgPicker && urgPicker.contains(e.target))) urgSuppressClick = false;
+      const inPicker = (urgPicker && urgPicker.contains(e.target)) || (urgCal && urgCal.contains(e.target));
+      if(urgPicker && !inPicker) hideUrgencyPicker();
+      if(!inPicker) urgSuppressClick = false;
       const cb = urgencyCheckbox(e.target);
       if(!cb) return;
       if(e.button === 2){ return; }

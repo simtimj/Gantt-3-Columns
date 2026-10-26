@@ -922,7 +922,11 @@
     .urg-pick.on{background:var(--urg,#eee);color:#fff;}
     .urg-pick[data-urg="0"]{--urg:#999;}
     .urg-pick[data-urg="0"].on{color:#fff;}
-    #urgentPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-left:3px solid #e5484d;border-radius:8px;background:#fff;}
+    #urgentPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    /* Each urgency level gets its own left bar in its own color (2026-10-26). */
+    .urg-group{margin-top:6px;padding-left:8px;border-left:3px solid var(--urg);}
+    .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}
+    .urg-group .urg-sub{margin-top:0;color:var(--urg);}
     .urg-head{display:block;width:100%;text-align:left;background:none;border:0;padding:2px 0;font-weight:700;font-size:13px;cursor:pointer;color:inherit;}
     .urg-sub{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     .urg-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;padding:4px 0;cursor:pointer;color:inherit;font-size:13px;}
@@ -4371,10 +4375,14 @@
     [1,2,3].forEach(u => {
       const group = items.filter(x => x.urg === u);
       if(!group.length) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'urg-group';
+      wrap.dataset.urg = u;
+      panel.appendChild(wrap);
       const sub = document.createElement('div');
       sub.className = 'urg-sub';
       sub.textContent = u + ' · ' + URG_NAMES[u];
-      panel.appendChild(sub);
+      wrap.appendChild(sub);
       group.forEach(item => {
         const row = document.createElement('button');
         row.type = 'button';
@@ -4386,13 +4394,13 @@
         const date = document.createElement('span'); date.className = 'urg-date'; date.textContent = shortDate(item.date);
         row.append(box,text,date);
         row.addEventListener('click',() => goToTask(item.date,item.index));
-        panel.appendChild(row);
+        wrap.appendChild(row);
         item.subs.forEach(st => {
           const r = document.createElement('div');
           r.className = 'urg-subtask' + (st.done ? ' done' : '');
           r.style.paddingLeft = (22 + (st.level - 1) * 14) + 'px';
           r.textContent = (st.done ? '☑ ' : '☐ ') + st.text;
-          panel.appendChild(r);
+          wrap.appendChild(r);
         });
       });
     });

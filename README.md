@@ -53,6 +53,7 @@ Last updated: 2026-10-26
 - Urgency: the extra colored square around the checkbox removed — the checkbox itself is drawn in the urgency color, checked or not.
 - Urgent panel keeps finished urgent tasks (struck through) until the urgency is cleared by hand.
 - Reference follows the Padding left/right slider the same way Today does (one shared setting for now).
+- Urgent panel: the red bar down the whole panel is gone; each level (1 Urgent, 2 Soon, 3 Later) has its own left bar and heading in its own color (red / yellow / blue).
 
 ## 🔧 To be improved
 

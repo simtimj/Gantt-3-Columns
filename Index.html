@@ -933,9 +933,9 @@
     .urg-sub{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     .urg-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;padding:4px 0;cursor:pointer;color:inherit;font-size:13px;}
     .urg-box{flex:0 0 auto;width:13px;height:13px;border:2px solid var(--urg);border-radius:3px;}
-    .urg-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .urg-text{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .urg-date{flex:0 0 auto;margin-left:auto;padding-left:8px;font-size:11px;color:var(--muted);}
-    .urg-made{flex:0 0 50px;font-size:10px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
+    .urg-made{flex:0 0 auto;margin-left:-2px;font-size:10px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;opacity:.8;}
     .urg-date.overdue{color:#e5484d;font-weight:700;}
     .urg-date.due-today{color:#c27c00;font-weight:700;}
     .urg-picker{flex-wrap:wrap;max-width:200px;}
@@ -972,6 +972,8 @@
     .ref-hold > .ref-cell > h2:first-child{background:#f1f5ff;border-radius:4px;}
     #typeSettings .ts-check{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:13px;}
     #typeSettings .ts-check input{width:18px;height:18px;margin:0;}
+    #typeSettings .ts-check select{min-height:30px;padding:2px 6px;font-size:13px;}
+    #typeSettings .ts-sub{margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     /* Due on this day (2026-10-26): tasks due on a day show under its label. */
     .due-block{margin:0 0 4px;display:flex;flex-direction:column;gap:1px;}
     .due-item{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:0;border-left:3px solid var(--urg,#999);padding:2px 6px;font-size:12px;color:inherit;cursor:pointer;border-radius:0 4px 4px 0;}
@@ -1024,7 +1026,15 @@
       <input id="paragraphSize" class="font-size-input" type="number" min="8" max="48" step="1" value="14" aria-label="Text size in pixels">
       <button class="btn tiny" type="button" onclick="resetTypographySettings()">Reset</button>
     </div>
-    <label class="ts-check"><input type="checkbox" id="optDueCountdown"> Urgent: show days until due</label>
+    <div class="ts-sub">Urgent panel</div>
+    <label class="ts-check"><input type="checkbox" id="optShowMade"> Show day made (10/26)</label>
+    <label class="ts-check">Due date
+      <select id="optDueStyle" class="top-select">
+        <option value="date">Tue 10/27</option>
+        <option value="days">Tue 10/27 · 3d</option>
+        <option value="left">3d</option>
+      </select>
+    </label>
   </div>
   <div id="toolbar">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
@@ -4563,48 +4573,59 @@
         row.title = 'Go to ' + item.date;
         const box = document.createElement('span'); box.className = 'urg-box'; box.dataset.date = item.date; box.dataset.index = item.index; box.title = 'Hold (or right-click) to change urgency or due date';
         const text = document.createElement('span'); text.className = 'urg-text'; text.textContent = item.text;
-        // Left: the day it's on (small, fixed width so titles line up).
-        // Right: the due date, only when one is set (2026-10-26, Julius).
-        const made = document.createElement('span'); made.className = 'urg-made';
-        made.textContent = dateObj(item.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(item.date).getMonth() + 1) + '/' + dateObj(item.date).getDate();
-        made.title = 'Day it’s on';
-        const date = document.createElement('span'); date.className = 'urg-date';
+        // Text first (always at the left), then the day it's on, small;
+        // the due date hugs the right (2026-10-26, Julius).
+        row.append(box,text);
+        if(showMadeDate()){
+          const made = document.createElement('span'); made.className = 'urg-made';
+          made.textContent = md(item.date); made.title = 'Made ' + wd(item.date) + ' ' + md(item.date);
+          row.append(made);
+        }
         if(item.due){
           const today = localToday();
-          const left = Math.round((dateObj(item.due) - dateObj(today)) / 86400000);
-          const short = dateObj(item.due).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(item.due).getMonth() + 1) + '/' + dateObj(item.due).getDate();
-          date.textContent = 'Due ' + (left === 0 ? 'today' : short + (showDueCountdown()
-            ? ' · ' + (left === 1 ? 'tomorrow' : left > 0 ? left + ' days' : (-left) + (left === -1 ? ' day' : ' days') + ' late')
-            : ''));
+          const date = document.createElement('span'); date.className = 'urg-date';
+          date.textContent = dueText(item.due,today);
+          date.title = 'Due ' + dueLabel(item.due);
           if(!item.done && item.due < today) date.classList.add('overdue');
           else if(!item.done && item.due === today) date.classList.add('due-today');
+          row.append(date);
         }
-        row.append(box,made,text);
-        if(item.due) row.append(date);
         row.addEventListener('click',() => goToTask(item.date,item.index));
         wrap.appendChild(row);
         item.subs.forEach(st => {
           const r = document.createElement('div');
           r.className = 'urg-subtask' + (st.done ? ' done' : '');
-          r.style.paddingLeft = (79 + (st.level - 1) * 14) + "px";
+          r.style.paddingLeft = (22 + (st.level - 1) * 14) + "px";
           r.textContent = (st.done ? '☑ ' : '☐ ') + st.text;
           wrap.appendChild(r);
         });
       });
     });
   }
-  // Options: days-until-due countdown in the Urgent panel (default on).
-  function showDueCountdown(){
-    try{ return localStorage.getItem('fw.dueCountdown') !== '0'; }catch(e){ return true; }
+  // Options for the Urgent panel (2026-10-26, Julius: keep it concise).
+  function urgOpt(key,def){ try{ const v = localStorage.getItem(key); return v == null ? def : v; }catch(e){ return def; } }
+  function setUrgOpt(key,v){ try{ localStorage.setItem(key,v); }catch(e){} renderUrgent(); }
+  function showMadeDate(){ return urgOpt('fw.showMade','1') !== '0'; }
+  function dueStyle(){
+    const v = urgOpt('fw.dueStyle',urgOpt('fw.dueCountdown','1') === '0' ? 'date' : 'days');
+    return ['date','days','left'].includes(v) ? v : 'days';
   }
   function initDueOptions(){
-    const box = document.getElementById('optDueCountdown');
-    if(!box) return;
-    box.checked = showDueCountdown();
-    box.addEventListener('change',() => {
-      try{ localStorage.setItem('fw.dueCountdown',box.checked ? '1' : '0'); }catch(e){}
-      renderUrgent();
-    });
+    const made = document.getElementById('optShowMade');
+    if(made){ made.checked = showMadeDate(); made.addEventListener('change',() => setUrgOpt('fw.showMade',made.checked ? '1' : '0')); }
+    const style = document.getElementById('optDueStyle');
+    if(style){ style.value = dueStyle(); style.addEventListener('change',() => setUrgOpt('fw.dueStyle',style.value)); }
+  }
+  const md = s => (dateObj(s).getMonth() + 1) + '/' + dateObj(s).getDate();
+  const wd = s => dateObj(s).toLocaleDateString(undefined,{weekday:'short'});
+  // "Tue 10/27", "Tue 10/27 · 3d", or "3d"; today → "Today", tomorrow → "Tmrw".
+  function dueText(due,today){
+    const left = Math.round((dateObj(due) - dateObj(today)) / 86400000);
+    if(left === 0) return 'Today';
+    const rel = left === 1 ? 'Tmrw' : left > 0 ? left + 'd' : (-left) + 'd late';
+    const style = dueStyle();
+    if(style === 'left') return rel;
+    return wd(due) + ' ' + md(due) + (style === 'days' ? ' · ' + rel : '');
   }
   // Every task with a due date, from every day we know about.
   function collectDue(){

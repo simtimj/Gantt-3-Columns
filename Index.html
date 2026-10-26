@@ -864,10 +864,10 @@
   <div id="focusControls">
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
     <div class="view-menu" data-view-menu>
-      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Columns</button>
+      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
-    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale / Fonts</button>
+    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale</button>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
     <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref ▾</button>
@@ -903,9 +903,9 @@
   </div>
   <div id="toolbar">
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
-    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale / Fonts</button>
+    <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale</button>
     <div class="view-menu" data-view-menu>
-      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Columns</button>
+      <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
@@ -990,8 +990,8 @@
   <button class="btn" type="button" tabindex="-1" data-ctx="underline"><u>Underline</u></button>
   <button class="btn" type="button" tabindex="-1" data-ctx="strike"><s>Strike</s></button>
   <button class="btn" type="button" tabindex="-1" data-ctx="rule">Line</button>
-  <button class="btn" type="button" tabindex="-1" data-ctx="indent">Indent →</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="outdent">← Outdent</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="indent">Indent →</button>
   <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="subtask">+ Subtask</button>
 </div>
 <script>
@@ -3771,8 +3771,8 @@
   }
   function updateColumnsLabel(){
     const label = isSplitActive()
-      ? 'Columns (split)'
-      : visiblePanes.length === 3 ? 'Columns' : `Columns (${visiblePanes.length})`;
+      ? 'Cols (split)'
+      : visiblePanes.length === 3 ? 'Cols' : `Cols (${visiblePanes.length})`;
     document.querySelectorAll('.view-menu-trigger').forEach(trigger => trigger.textContent = label);
   }
   function applyWorkspaceView(selection){

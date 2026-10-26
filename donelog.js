@@ -13,4 +13,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-gantt-sort-row', date: '2026-10-26', title: 'Gantt', details: 'Sort row buttons shrunk and wrap on phones' },
   { id: 'd-20261026-gantt-hold-menu', date: '2026-10-26', title: 'Gantt', details: 'hold menu stays clear of the phone Cut/Copy/Paste bar' },
   { id: 'd-20261026-gantt-done-log', date: '2026-10-26', title: 'Gantt', details: 'work done through Claude now lands as checked tasks in the Today cell' },
+  { id: 'd-20261026-et-fit-screens', date: '2026-10-26', title: 'Exercise Tracker', details: 'fits phone, tablet and desktop (sections no longer cut off on the right)' },
 ];

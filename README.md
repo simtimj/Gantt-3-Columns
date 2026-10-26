@@ -32,7 +32,7 @@ Last updated: 2026-10-26
 **Today / Tasks and Notes**
 - One row per day; loads 7 days back and 3 ahead, then more weeks as you scroll (lazy week loading). **Today** button jumps to today.
 - Rich text editor: `[]` + Space = checkbox, Tab / Shift+Tab = indent/outdent (subtasks), code blocks with ```.
-- Right-click / long-press formatting menu: bold, underline, strike, indent, outdent, subtask, horizontal rule.
+- Right-click / long-press formatting menu: bold, underline, strike, indent, outdent, checkbox, subtask, horizontal rule.
 - Each day saves automatically to the sheet.
 - Notes **+ Template** inserts the Reference cell titled "Journal Template" into the selected Notes day.
 
@@ -61,6 +61,8 @@ Last updated: 2026-10-26
 - **Options button** replaces "Scale": same panel (scale, padding, font), now titled Options and meant to hold every setting. New setting: **Urgent: show days until due** (on by default).
 - Urgent panel due dates read "Due Tue 10/27 · tomorrow" / "· 3 days" / "· 2 days late" ("Due today" on the day). With the option off it's just the date.
 - **Due tasks show on their day:** a task due Oct 27 also appears at the top of the Oct 27 cell in Today/Tasks, as a small "Due ☐ task · from Mon 10/26" line in its urgency color (struck through once done). Tap it to jump to the task where it lives. Works for any task with a due date, urgent or not. (It's a pointer, not a copy — the task still lives on its original day.)
+
+- **☐ Checkbox** in the hold / right-click menu: turns the line you're on into a task (checkbox at the start, text and formatting kept, indent kept) — same as typing `[]` + Space. Not on titles or in code blocks; says so if the line is already a task.
 
 ## 🔧 To be improved
 

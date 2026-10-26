@@ -67,6 +67,7 @@ Last updated: 2026-10-26
 - **Reference Options button** (next to Sort): the Urgent panel settings moved here from the main Options — **Wrap long text** (on by default, so long urgent tasks aren't cut off), Show day made, Due date style. Main Options keeps scale, padding and fonts.
 - Hold menu on a phone no longer overlaps the phone's own Cut / Copy / Paste bar: it's placed from the actual selection, on the opposite side from that bar, and moves if the selection changes.
 - Sort row: the − / + and Options buttons are now the same small size as the Sort dropdown, and the row wraps onto a second line on narrow screens instead of getting cut off.
+- **Done with Claude log**: work you do through Claude shows up in that day's Today / Tasks cell as checked tasks (**Short name**: what was done), added the next time the app loads. Deleting one keeps it deleted. Tap ↻ before editing today's cell, so an older open copy of the app doesn't save over the new lines.
 - Day abbreviations in the Urgent panel's due dates are now Sun, Mon, **Tues**, Wed, **Thurs**, Fri, Sat (e.g. "Tues 10/27").
 - **More due date styles** (Reference Options → Due date): added **Oct 27 · 3d**, **October 27th · 3d**, **Tue, Oct 27 · 3d** and **Tuesday, October 27th · 3d**, alongside Tue 10/27, Tue 10/27 · 3d and 3d.
 - **− / + collapse buttons**: a boxed − / + next to Sort collapses or expands every Reference cell; the toolbar button reads Ref − / Ref +; each cell's ▾ / ▸ arrow is now a boxed − / +; the Urgent and Inbox headers use the same − / +.
@@ -101,5 +102,6 @@ Last updated: 2026-10-26
 
 - `Code.gs` — server: serves the page, sets up the sheets, loads/saves days and Reference cells, archive, urgent days, inbox.
 - `inbox.js` — Inbox items Claude adds (`CLAUDE_INBOX`).
+- `donelog.js` — work done through Claude (`CLAUDE_DONE`), merged into each day's Today cell.
 - `Index.html` — the whole client UI (styles + script).
 - `appsscript.json` — Apps Script manifest.

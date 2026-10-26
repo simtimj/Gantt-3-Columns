@@ -115,6 +115,7 @@ function ensureSetup_() {
 
 function getWorkspaceData() {
   ensureSetup_();
+  try { applyClaudeDone_(); } catch (e) { console.error(e); }
 
   const today = todayString_();
 
@@ -815,4 +816,53 @@ function dismissInboxItem(id) {
     }
   } finally { lock.releaseLock(); }
   return getInbox();
+}
+
+
+/* =========================================================
+   DONE WITH CLAUDE (2026-10-26, Julius)
+   Work Julius does through Claude lands in that day's Today / Tasks cell
+   as a checked task, as a log of the day. Claude adds entries to
+   CLAUDE_DONE in donelog.js and pushes; on the next load each new entry is
+   appended once to its day (ids remembered in script properties
+   "claudeDoneApplied", so deleting a line in the app keeps it deleted).
+   ========================================================= */
+function doneEsc_(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function doneLineHtml_(item) {
+  const title = String(item.title || '').trim();
+  const details = String(item.details || '').trim();
+  const text = title && details ? '<b>' + doneEsc_(title) + '</b>: ' + doneEsc_(details)
+    : title ? '<b>' + doneEsc_(title) + '</b>' : doneEsc_(details);
+  return '<div class="check-line done" data-level="0" data-cid="' + doneEsc_(item.id) + '">' +
+    '<input type="checkbox" checked><span class="check-text">' + text + '</span></div>';
+}
+function applyClaudeDone_() {
+  const list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
+  if (!list.length) return;
+  const props = PropertiesService.getScriptProperties();
+  let applied = [];
+  try { applied = JSON.parse(props.getProperty('claudeDoneApplied') || '[]'); } catch (e) { applied = []; }
+  const fresh = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') && applied.indexOf(String(x.id)) < 0);
+  if (!fresh.length) return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    const byDate = {};
+    fresh.forEach(x => { (byDate[x.date] = byDate[x.date] || []).push(x); });
+    Object.keys(byDate).forEach(date => {
+      let row = findDayRow_(sheet, date);
+      if (!row) { sheet.appendRow([parseDate_(date), '', '']); row = sheet.getLastRow(); }
+      const cell = sheet.getRange(row, 2);
+      let html = String(cell.getValue() || '');
+      byDate[date].forEach(x => {
+        if (html.indexOf('data-cid="' + doneEsc_(x.id) + '"') < 0) html += doneLineHtml_(x);
+        applied.push(String(x.id));
+      });
+      cell.setValue(html);
+    });
+    props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));
+  } finally { lock.releaseLock(); }
 }

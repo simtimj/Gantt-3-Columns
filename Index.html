@@ -857,11 +857,16 @@
       text-overflow:ellipsis;
     }
     #referenceTree .ref-collapsed .ref-cell > *:not(:first-child){display:none!important;}
+    /* Refresh (2026-10-26): reloads the whole app at its /exec URL — new deploys and data. */
+    .refresh-btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:inherit;font-size:16px;line-height:1;}
+    .refresh-btn.spin{animation:refresh-spin .8s linear infinite;}
+    @keyframes refresh-spin{to{transform:rotate(360deg);}}
   </style>
 </head>
 <body>
 <div id="app">
   <div id="focusControls">
+    <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
@@ -902,6 +907,7 @@
     </div>
   </div>
   <div id="toolbar">
+    <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
     <button class="btn" type="button" data-layout="scale" title="Scale, fonts and padding">Scale</button>
     <div class="view-menu" data-view-menu>

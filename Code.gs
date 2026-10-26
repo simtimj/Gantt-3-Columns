@@ -42,6 +42,9 @@ function doGet() {
     .replace(/\u2028/g, '\\u2028')
     .replace(/\u2029/g, '\\u2029');
 
+  // Refresh button target: the app's own URL, opened in the top window.
+  try { template.appUrl = ScriptApp.getService().getUrl(); } catch (err) { template.appUrl = ''; }
+
   return template.evaluate()
     .setTitle('Focus Workspace')
     .addMetaTag('viewport', VIEWPORT)

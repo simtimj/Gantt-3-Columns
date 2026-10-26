@@ -934,7 +934,8 @@
     .urg-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;padding:4px 0;cursor:pointer;color:inherit;font-size:13px;}
     .urg-box{flex:0 0 auto;width:13px;height:13px;border:2px solid var(--urg);border-radius:3px;}
     .urg-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .urg-date{flex:0 0 auto;font-size:11px;color:var(--muted);}
+    .urg-date{flex:0 0 auto;margin-left:auto;padding-left:8px;font-size:11px;color:var(--muted);}
+    .urg-made{flex:0 0 50px;font-size:10px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
     .urg-date.overdue{color:#e5484d;font-weight:700;}
     .urg-date.due-today{color:#c27c00;font-weight:700;}
     .urg-picker{flex-wrap:wrap;max-width:200px;}
@@ -4514,23 +4515,26 @@
         row.title = 'Go to ' + item.date;
         const box = document.createElement('span'); box.className = 'urg-box'; box.dataset.date = item.date; box.dataset.index = item.index; box.title = 'Hold (or right-click) to change urgency or due date';
         const text = document.createElement('span'); text.className = 'urg-text'; text.textContent = item.text;
+        // Left: the day it's on (small, fixed width so titles line up).
+        // Right: the due date, only when one is set (2026-10-26, Julius).
+        const made = document.createElement('span'); made.className = 'urg-made';
+        made.textContent = dateObj(item.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(item.date).getMonth() + 1) + '/' + dateObj(item.date).getDate();
+        made.title = 'Day it’s on';
         const date = document.createElement('span'); date.className = 'urg-date';
         if(item.due){
           const today = localToday();
-          date.textContent = 'Due ' + (item.due === today ? 'today · ' : '') + dueLabel(item.due);
+          date.textContent = 'Due ' + (item.due === today ? 'today' : dueLabel(item.due));
           if(!item.done && item.due < today) date.classList.add('overdue');
           else if(!item.done && item.due === today) date.classList.add('due-today');
-        }else{
-          date.textContent = dueLabel(item.date);
-          date.title = 'Day it’s on — hold the checkbox to set a due date';
         }
-        row.append(box,text,date);
+        row.append(box,made,text);
+        if(item.due) row.append(date);
         row.addEventListener('click',() => goToTask(item.date,item.index));
         wrap.appendChild(row);
         item.subs.forEach(st => {
           const r = document.createElement('div');
           r.className = 'urg-subtask' + (st.done ? ' done' : '');
-          r.style.paddingLeft = (22 + (st.level - 1) * 14) + 'px';
+          r.style.paddingLeft = (79 + (st.level - 1) * 14) + "px";
           r.textContent = (st.done ? '☑ ' : '☐ ') + st.text;
           wrap.appendChild(r);
         });

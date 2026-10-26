@@ -125,6 +125,7 @@ function getWorkspaceData() {
     ),
     reference: getReference_(),
     urgent: getUrgentDays_(),
+    inbox: (function () { try { return getInbox(); } catch (e) { return []; } })(),
     today: today
   };
 }
@@ -754,4 +755,64 @@ function parseDate_(dateString) {
     parts[1] - 1,
     parts[2]
   );
+}
+
+/* =========================================================
+   INBOX (2026-10-26, Julius)
+   Quick captures that aren't scheduled yet. Two sources:
+   - CLAUDE_INBOX in inbox.js — Claude adds items by editing that file and
+     pushing to main (Claude can't reach Google directly).
+   - Items typed into the app, kept in user properties ("inboxItems").
+   Dismissed / sent-to-Today ids are remembered in "inboxDone", so Claude's
+   items stay gone even though they're still in inbox.js.
+   ========================================================= */
+function inboxRead_(key, def) {
+  try {
+    const v = PropertiesService.getUserProperties().getProperty(key);
+    return v ? JSON.parse(v) : def;
+  } catch (e) { return def; }
+}
+function inboxWrite_(key, value) {
+  PropertiesService.getUserProperties().setProperty(key, JSON.stringify(value));
+}
+function getInbox() {
+  const done = inboxRead_('inboxDone', []);
+  const mine = inboxRead_('inboxItems', []);
+  const claude = (typeof CLAUDE_INBOX !== 'undefined' && Array.isArray(CLAUDE_INBOX)) ? CLAUDE_INBOX : [];
+  return claude.map(x => Object.assign({ from: 'claude' }, x))
+    .concat(mine.map(x => Object.assign({ from: 'app' }, x)))
+    .filter(x => x && x.id && done.indexOf(String(x.id)) < 0)
+    .map(x => ({
+      id: String(x.id), title: String(x.title || ''), details: String(x.details || ''),
+      added: String(x.added || ''), from: x.from
+    }));
+}
+function addInboxItem(title, details) {
+  title = String(title || '').trim();
+  details = String(details || '').trim();
+  if (!title && !details) return getInbox();
+  const lock = LockService.getUserLock();
+  lock.waitLock(10000);
+  try {
+    const mine = inboxRead_('inboxItems', []);
+    mine.push({ id: 'a' + Date.now(), title: title, details: details, added: todayString_() });
+    inboxWrite_('inboxItems', mine.slice(-200));
+  } finally { lock.releaseLock(); }
+  return getInbox();
+}
+function dismissInboxItem(id) {
+  id = String(id || '');
+  const lock = LockService.getUserLock();
+  lock.waitLock(10000);
+  try {
+    const mine = inboxRead_('inboxItems', []);
+    const kept = mine.filter(x => String(x.id) !== id);
+    if (kept.length !== mine.length) inboxWrite_('inboxItems', kept);
+    else {
+      const done = inboxRead_('inboxDone', []);
+      if (done.indexOf(id) < 0) done.push(id);
+      inboxWrite_('inboxDone', done.slice(-300));
+    }
+  } finally { lock.releaseLock(); }
+  return getInbox();
 }

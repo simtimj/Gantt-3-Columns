@@ -983,6 +983,46 @@
     .due-item .di-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .due-item .di-from{flex:0 0 auto;font-size:10px;color:var(--muted);}
     .due-item.done .di-text{text-decoration:line-through;opacity:.6;}
+    /* Reference options, Urgent create, Inbox, −/+ toggles (2026-10-26, Julius). */
+    .reference-sort-bar .ref-collapse-all{min-width:26px;font-weight:700;padding:1px 6px;}
+    .reference-sort-bar #refOptionsBtn.on{background:#eef2ff;border-color:#1a73e8;}
+    .ref-options{margin:0 0 10px;padding:6px 10px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;}
+    .ref-options .ts-check{display:flex;align-items:center;gap:8px;margin:8px 0 2px;}
+    .ref-options .ts-check input{width:18px;height:18px;margin:0;}
+    .ref-options .ts-check select{min-height:28px;padding:2px 6px;font-size:13px;}
+    .ref-options .ts-sub{margin-top:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+    .ref-opt-tip{margin-top:4px;font-size:12px;color:var(--muted);}
+    .pm-box{display:inline-grid;place-content:center;box-sizing:border-box;width:1.15em;height:1.15em;margin-right:6px;border:1.5px solid currentColor;border-radius:4px;font-size:.95em;line-height:1;font-weight:700;opacity:.75;vertical-align:-.15em;}
+    .urg-head{display:flex;align-items:center;}
+    .urg-head-row{display:flex;align-items:center;gap:6px;}
+    .urg-head-row .urg-head{flex:1;min-width:0;}
+    .urg-add{flex:0 0 auto;font-size:11px;padding:1px 7px;}
+    .urg-head,.urg-sub{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+    .urg-sub{cursor:context-menu;}
+    .urg-empty{font-size:12px;color:var(--muted);padding:4px 0 2px;}
+    #urgentPanel.wrap .urg-row{align-items:flex-start;}
+    #urgentPanel.wrap .urg-row .urg-box{margin-top:2px;}
+    #urgentPanel.wrap .urg-text,#urgentPanel.wrap .urg-subtask{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+    .urg-create-menu{position:fixed;z-index:3002;display:flex;flex-direction:column;min-width:170px;padding:4px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);}
+    .ucm-item{display:flex;align-items:center;gap:8px;text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;font-size:13px;cursor:pointer;color:inherit;}
+    .ucm-item::before{content:"";width:10px;height:10px;border-radius:3px;border:2px solid var(--urg);}
+    .ucm-item[data-urg="1"]{--urg:#e5484d;}.ucm-item[data-urg="2"]{--urg:#f0b000;}.ucm-item[data-urg="3"]{--urg:#3b82f6;}
+    .ucm-item.first{font-weight:700;}
+    .ucm-item:hover{background:#f3f4f6;}
+    .urg-create{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:4px;}
+    .urg-create input,.inbox-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;}
+    #inboxPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    .inbox-row{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:13px;}
+    .inbox-row:first-of-type{border-top:0;}
+    .inbox-text{flex:1;min-width:0;overflow-wrap:anywhere;}
+    .inbox-from{margin-left:6px;font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+    .inbox-row .btn.tiny{flex:0 0 auto;font-size:11px;padding:1px 6px;}
+    .inbox-add{display:flex;gap:6px;margin-top:6px;}
+    /* Reference cell toggles: boxed − / + instead of ▾ / ▸. Done in CSS so every
+       code path that sets the arrow text still works. */
+    #referenceTree .ref-disclosure{font-size:0!important;color:#777;}
+    #referenceTree .ref-disclosure::before{content:"−";display:inline-grid;place-content:center;box-sizing:border-box;width:1.05em;height:1.05em;border:1.5px solid currentColor;border-radius:4px;font-size:calc(var(--paragraph-size) * var(--workspace-scale,1) * .95);line-height:1;font-weight:700;vertical-align:middle;}
+    #referenceTree .ref-cell-wrapper.ref-collapsed > .ref-disclosure::before{content:"+";}
   </style>
 </head>
 <body>
@@ -994,10 +1034,10 @@
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
-    <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts, urgent panel">Options</button>
+    <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
-    <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref ▾</button>
+    <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref −</button>
     <button class="btn" type="button" data-layout="show-toolbar" title="Show toolbar">Show toolbar</button>
   </div>
   <div id="typeSettings" class="type-settings hidden" role="dialog" aria-label="Scale, padding and fonts">
@@ -1026,27 +1066,18 @@
       <input id="paragraphSize" class="font-size-input" type="number" min="8" max="48" step="1" value="14" aria-label="Text size in pixels">
       <button class="btn tiny" type="button" onclick="resetTypographySettings()">Reset</button>
     </div>
-    <div class="ts-sub">Urgent panel</div>
-    <label class="ts-check"><input type="checkbox" id="optShowMade"> Show day made (10/26)</label>
-    <label class="ts-check">Due date
-      <select id="optDueStyle" class="top-select">
-        <option value="date">Tue 10/27</option>
-        <option value="days">Tue 10/27 · 3d</option>
-        <option value="left">3d</option>
-      </select>
-    </label>
   </div>
   <div id="toolbar">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
-    <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts, urgent panel">Options</button>
+    <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
-    <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref ▾</button>
+    <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref −</button>
     <!-- Focus (hide toolbar) shelved 2026-10-26 — code kept; put this back to restore:
     <button class="btn" type="button" data-layout="focus" title="Hide the top toolbar">Focus</button> -->
     <span id="dateLabel"></span>
@@ -1096,6 +1127,22 @@
             <option value="title">Title A–Z</option>
             <option value="modified">Last modified · newest first</option>
           </select>
+          <button class="btn tiny ref-collapse-all" type="button" data-layout="reference" title="Collapse or expand all Reference cells" aria-label="Collapse or expand all Reference cells">−</button>
+          <button class="btn tiny" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: Urgent panel, Inbox">Options</button>
+        </div>
+        <div id="refOptions" class="ref-options" hidden>
+          <div class="ts-sub">Urgent panel</div>
+          <label class="ts-check"><input type="checkbox" id="optUrgWrap"> Wrap long text</label>
+          <label class="ts-check"><input type="checkbox" id="optShowMade"> Show day made (10/26)</label>
+          <label class="ts-check">Due date
+            <select id="optDueStyle" class="top-select">
+              <option value="date">Tue 10/27</option>
+              <option value="days">Tue 10/27 · 3d</option>
+              <option value="left">3d</option>
+            </select>
+          </label>
+          <div class="ts-sub">Tips</div>
+          <div class="ref-opt-tip">Hold a level heading in Urgent (or tap + Task) to make a task there. Inbox items go to Today with → Today.</div>
         </div>
         <div class="ref-toolbar">
           <input
@@ -1353,6 +1400,7 @@
     renderReference();
     applyReferenceCollapseState();
     initUrgentSource(data.urgent);
+    setInbox(data.inbox);
     setStatus('Ready');
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
   }
@@ -3868,7 +3916,10 @@
       if(arrow) arrow.textContent = collapsed ? '▸' : '▾';
     });
     document.querySelectorAll('[data-layout="reference"]').forEach(btn => {
-      btn.textContent = referenceCollapsed ? 'Ref ▸' : 'Ref ▾';
+      // Plus/minus instead of arrows (2026-10-26, Julius): + = expand, − = collapse.
+      btn.textContent = btn.classList.contains('ref-collapse-all')
+        ? (referenceCollapsed ? '+' : '−')
+        : (referenceCollapsed ? 'Ref +' : 'Ref −');
     });
   }
   function toggleReferenceCollapse(){
@@ -4536,23 +4587,42 @@
     if(!panel){
       panel = document.createElement('div');
       panel.id = 'urgentPanel';
-      tree.parentNode.insertBefore(panel,tree);
+      tree.parentNode.insertBefore(panel,document.getElementById('inboxPanel') || tree);
     }
     const items = collectUrgent();
     panel.innerHTML = '';
-    panel.hidden = !items.length;
-    if(!items.length) return;
+    panel.hidden = false; // Always shown, so you can add a task even when it's empty.
+    panel.classList.toggle('wrap', urgWrap());
+    const headRow = document.createElement('div');
+    headRow.className = 'urg-head-row';
     const head = document.createElement('button');
     head.type = 'button';
     head.className = 'urg-head';
-    head.textContent = (urgentOpen ? '▾ ' : '▸ ') + 'Urgent · ' + items.length;
+    head.append(pmBox(urgentOpen), document.createTextNode('Urgent · ' + items.length));
+    head.title = 'Tap to collapse/expand · hold to add a task';
     head.addEventListener('click',() => {
+      if(urgCreateSuppress){ urgCreateSuppress = false; return; }
       urgentOpen = !urgentOpen;
       try{ localStorage.setItem('fw.urgentOpen',urgentOpen ? '1' : '0'); }catch(e){}
       renderUrgent();
     });
-    panel.appendChild(head);
+    holdForCreate(head,null);
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'btn tiny urg-add';
+    add.textContent = '+ Task';
+    add.title = 'Make an Urgent / Soon / Later task (goes in today)';
+    add.addEventListener('click',e => openCreateMenu(add,null));
+    headRow.append(head,add);
+    panel.appendChild(headRow);
     if(!urgentOpen) return;
+    if(urgCreating) panel.appendChild(createRow(urgCreating));
+    if(!items.length && !urgCreating){
+      const empty = document.createElement('div');
+      empty.className = 'urg-empty';
+      empty.textContent = 'Nothing urgent. Tap + Task to add one.';
+      panel.appendChild(empty);
+    }
     [1,2,3].forEach(u => {
       const group = items.filter(x => x.urg === u)
         .sort((a,b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || (a.due || '').localeCompare(b.due || ''));
@@ -4564,6 +4634,8 @@
       const sub = document.createElement('div');
       sub.className = 'urg-sub';
       sub.textContent = u + ' · ' + URG_NAMES[u];
+      sub.title = 'Hold (or right-click) to make a ' + URG_NAMES[u] + ' task';
+      holdForCreate(sub,u);
       wrap.appendChild(sub);
       group.forEach(item => {
         const row = document.createElement('button');
@@ -4602,6 +4674,226 @@
       });
     });
   }
+  /* ---------------------------------------------------------
+     Make tasks right in the Urgent panel (2026-10-26, Julius).
+     Hold (or right-click) a level heading or the panel head, or tap
+     + Task → Create Urgent / Soon / Later task → type → Enter.
+     The task goes at the end of today's Today cell with that urgency.
+     "Title: details" makes the title bold.
+     --------------------------------------------------------- */
+  let urgCreating = 0, urgCreateSuppress = false, urgCreateMenu = null;
+  // A small boxed minus / plus (collapse / expand).
+  function pmBox(open){
+    const b = document.createElement('span');
+    b.className = 'pm-box';
+    b.textContent = open ? '−' : '+';
+    b.setAttribute('aria-hidden','true');
+    return b;
+  }
+  function holdForCreate(el,level){
+    let timer = null, start = null;
+    const fire = () => { timer = null; urgCreateSuppress = el.classList.contains('urg-head'); openCreateMenu(el,level); };
+    el.addEventListener('pointerdown',e => {
+      if(e.button > 0) return;
+      start = {x:e.clientX,y:e.clientY};
+      timer = setTimeout(fire,500);
+    });
+    el.addEventListener('pointermove',e => {
+      if(timer && start && Math.hypot(e.clientX - start.x,e.clientY - start.y) > 8){ clearTimeout(timer); timer = null; }
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(t => el.addEventListener(t,() => { if(timer){ clearTimeout(timer); timer = null; } }));
+    el.addEventListener('contextmenu',e => { e.preventDefault(); urgCreateSuppress = false; openCreateMenu(el,level); });
+    el.style.webkitTouchCallout = 'none';
+  }
+  function closeCreateMenu(){ if(urgCreateMenu){ urgCreateMenu.remove(); urgCreateMenu = null; } }
+  function openCreateMenu(anchor,level){
+    closeCreateMenu();
+    const m = document.createElement('div');
+    m.className = 'urg-create-menu';
+    const levels = level ? [level].concat([1,2,3].filter(x => x !== level)) : [1,2,3];
+    levels.forEach(u => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.urg = u;
+      b.className = 'ucm-item' + (u === level ? ' first' : '');
+      b.textContent = 'Create ' + URG_NAMES[u] + ' task';
+      b.addEventListener('click',() => {
+        closeCreateMenu();
+        urgCreating = u;
+        urgentOpen = true;
+        renderUrgent();
+        const inp = document.querySelector('#urgentPanel .urg-create input');
+        if(inp) inp.focus();
+      });
+      m.appendChild(b);
+    });
+    document.body.appendChild(m);
+    const r = anchor.getBoundingClientRect();
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(8,Math.min(r.left,window.innerWidth - w - 8)) + 'px';
+    m.style.top = (r.bottom + h + 8 < window.innerHeight ? r.bottom + 4 : Math.max(8,r.top - h - 4)) + 'px';
+    urgCreateMenu = m;
+    setTimeout(() => {
+      const off = e => { if(urgCreateMenu && !urgCreateMenu.contains(e.target)){ closeCreateMenu(); document.removeEventListener('pointerdown',off,true); } };
+      document.addEventListener('pointerdown',off,true);
+    },0);
+  }
+  function createRow(u){
+    const row = document.createElement('form');
+    row.className = 'urg-create urg-group';
+    row.dataset.urg = u;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = 'New ' + URG_NAMES[u] + ' task — Title: details';
+    inp.enterKeyHint = 'done';
+    const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'btn tiny'; ok.textContent = 'Add';
+    const no = document.createElement('button'); no.type = 'button'; no.className = 'btn tiny'; no.textContent = '✕';
+    no.title = 'Cancel';
+    no.addEventListener('click',() => { urgCreating = 0; renderUrgent(); });
+    inp.addEventListener('keydown',e => { if(e.key === 'Escape'){ urgCreating = 0; renderUrgent(); } });
+    row.addEventListener('submit',e => {
+      e.preventDefault();
+      const p = splitTitle(inp.value);
+      if(!p.title && !p.details){ inp.focus(); return; }
+      if(addTaskToToday(p.title,p.details,u)){
+        urgCreating = 0;
+        renderUrgent();
+        setStatus(URG_NAMES[u] + ' task added to today');
+      }
+    });
+    row.append(inp,ok,no);
+    return row;
+  }
+  // "Fix calendar: find which calendar the nap block is on" → title + details.
+  function splitTitle(text){
+    const t = String(text || '').trim();
+    const i = t.indexOf(':');
+    if(i > 0 && i < 80) return {title:t.slice(0,i).trim(),details:t.slice(i + 1).trim()};
+    return {title:t,details:''};
+  }
+  // Add a task (checkbox line) at the end of today's Today cell.
+  function addTaskToToday(title,details,urg){
+    const date = localToday();
+    const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+    if(!ed){ setStatus('Today isn’t loaded — tap Today, then try again'); return false; }
+    captureBeforeEdit(ed);
+    const c = document.createElement('div');
+    c.className = 'check-line';
+    c.dataset.level = '0';
+    if(urg) c.dataset.urg = String(urg);
+    c.innerHTML = '<input type="checkbox"><span class="check-text"></span>';
+    const t = c.querySelector('.check-text');
+    if(title && details){
+      const b = document.createElement('b'); b.textContent = title;
+      t.append(b,document.createTextNode(': ' + details));
+    } else if(title){
+      const b = document.createElement('b'); b.textContent = title; t.append(b);
+    } else t.textContent = details;
+    const blank = !ed.textContent.trim() && !ed.querySelector('input,img,hr');
+    if(blank) ed.replaceChildren(c); else ed.appendChild(c);
+    wireCheckbox(c.querySelector('input'));
+    finishEditorEdit(ed);
+    saveEditorOwner(ed);
+    noteUrgentDay(date,ed.innerHTML);
+    return true;
+  }
+
+  /* ---------------------------------------------------------
+     INBOX (2026-10-26, Julius): quick captures under Urgent.
+     Claude adds items through inbox.js (pushed from GitHub); you can type
+     them here too. Shown as **Title**: details. → Today makes it a task in
+     today's cell; ✕ dismisses. Collapsed by default.
+     --------------------------------------------------------- */
+  let inboxItems = [];
+  let inboxOpen = false;
+  try{ inboxOpen = localStorage.getItem('fw.inboxOpen') === '1'; }catch(e){}
+  function setInbox(list){ inboxItems = Array.isArray(list) ? list : []; renderInbox(); }
+  function renderInbox(){
+    const tree = document.getElementById('referenceTree');
+    if(!tree) return;
+    let panel = document.getElementById('inboxPanel');
+    if(!panel){
+      panel = document.createElement('div');
+      panel.id = 'inboxPanel';
+      tree.parentNode.insertBefore(panel,tree);
+    }
+    panel.innerHTML = '';
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'urg-head';
+    head.append(pmBox(inboxOpen),document.createTextNode('Inbox · ' + inboxItems.length));
+    head.addEventListener('click',() => {
+      inboxOpen = !inboxOpen;
+      try{ localStorage.setItem('fw.inboxOpen',inboxOpen ? '1' : '0'); }catch(e){}
+      renderInbox();
+    });
+    panel.appendChild(head);
+    if(!inboxOpen) return;
+    inboxItems.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'inbox-row';
+      const text = document.createElement('div');
+      text.className = 'inbox-text';
+      if(it.title){ const b = document.createElement('b'); b.textContent = it.title; text.append(b); }
+      if(it.details) text.append(document.createTextNode((it.title ? ': ' : '') + it.details));
+      if(it.from === 'claude'){ const tag = document.createElement('span'); tag.className = 'inbox-from'; tag.textContent = 'Claude'; text.append(tag); }
+      const go = document.createElement('button'); go.type = 'button'; go.className = 'btn tiny'; go.textContent = '→ Today';
+      go.title = 'Make it a task in today';
+      go.addEventListener('click',() => { if(addTaskToToday(it.title,it.details,0)) dismissInbox(it.id,'Sent to today'); });
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'btn tiny'; x.textContent = '✕';
+      x.title = 'Dismiss';
+      x.addEventListener('click',() => dismissInbox(it.id,'Dismissed'));
+      row.append(text,go,x);
+      panel.appendChild(row);
+    });
+    const form = document.createElement('form');
+    form.className = 'inbox-add';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.placeholder = 'Add to inbox — Title: details'; inp.enterKeyHint = 'done';
+    const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'btn tiny'; ok.textContent = 'Add';
+    form.append(inp,ok);
+    form.addEventListener('submit',e => {
+      e.preventDefault();
+      const p = splitTitle(inp.value);
+      if(!p.title && !p.details) return;
+      const temp = {id:'tmp' + Date.now(),title:p.title,details:p.details,from:'app'};
+      inboxItems = inboxItems.concat(temp); renderInbox();
+      google.script.run
+        .withSuccessHandler(list => { setInbox(list); setStatus('Added to inbox'); })
+        .withFailureHandler(err => { inboxItems = inboxItems.filter(x => x !== temp); renderInbox(); setStatus('Inbox error: ' + err.message); })
+        .addInboxItem(p.title,p.details);
+      const again = document.querySelector('#inboxPanel .inbox-add input'); if(again) again.focus();
+    });
+    panel.appendChild(form);
+  }
+  function dismissInbox(id,msg){
+    const before = inboxItems;
+    inboxItems = inboxItems.filter(x => x.id !== id); renderInbox();
+    google.script.run
+      .withSuccessHandler(list => { setInbox(list); setStatus(msg); })
+      .withFailureHandler(err => { inboxItems = before; renderInbox(); setStatus('Inbox error: ' + err.message); })
+      .dismissInboxItem(id);
+  }
+
+  // Reference options panel (2026-10-26): Urgent panel + Inbox settings live
+  // next to Sort, separate from the main Options.
+  function initRefOptions(){
+    const btn = document.getElementById('refOptionsBtn');
+    const box = document.getElementById('refOptions');
+    if(!btn || !box) return;
+    btn.addEventListener('click',() => {
+      box.hidden = !box.hidden;
+      btn.setAttribute('aria-expanded',box.hidden ? 'false' : 'true');
+      btn.classList.toggle('on',!box.hidden);
+    });
+    document.addEventListener('pointerdown',e => {
+      if(!box.hidden && !box.contains(e.target) && e.target !== btn){ box.hidden = true; btn.setAttribute('aria-expanded','false'); btn.classList.remove('on'); }
+    },true);
+    const wrapCb = document.getElementById('optUrgWrap');
+    if(wrapCb){ wrapCb.checked = urgWrap(); wrapCb.addEventListener('change',() => setUrgOpt('fw.urgWrap',wrapCb.checked ? '1' : '0')); }
+  }
+  function urgWrap(){ return urgOpt('fw.urgWrap','1') !== '0'; }
+
   // Options for the Urgent panel (2026-10-26, Julius: keep it concise).
   function urgOpt(key,def){ try{ const v = localStorage.getItem(key); return v == null ? def : v; }catch(e){ return def; } }
   function setUrgOpt(key,v){ try{ localStorage.setItem(key,v); }catch(e){} renderUrgent(); }
@@ -4856,6 +5148,7 @@
   initContextMenu();
   initUrgency();
   initDueOptions();
+  initRefOptions();
   /* Every open menu/panel closes when you press anywhere outside it (or press Escape).
      Runs in the capture phase so nothing else can swallow the press first. */
   function closeAllMenus(exceptTarget){

@@ -1143,12 +1143,12 @@
           <label class="ts-check"><input type="checkbox" id="optShowMade"> Show day made (10/26)</label>
           <label class="ts-check">Due date
             <select id="optDueStyle" class="top-select">
-              <option value="date">Tue 10/27</option>
-              <option value="days">Tue 10/27 · 3d</option>
+              <option value="date">Tues 10/27</option>
+              <option value="days">Tues 10/27 · 3d</option>
               <option value="left">3d</option>
               <option value="month">Oct 27 · 3d</option>
               <option value="long">October 27th · 3d</option>
-              <option value="wkmonth">Tue, Oct 27 · 3d</option>
+              <option value="wkmonth">Tues, Oct 27 · 3d</option>
               <option value="wklong">Tuesday, October 27th · 3d</option>
             </select>
           </label>
@@ -4949,7 +4949,9 @@
     if(style){ style.value = dueStyle(); style.addEventListener('change',() => setUrgOpt('fw.dueStyle',style.value)); }
   }
   const md = s => (dateObj(s).getMonth() + 1) + '/' + dateObj(s).getDate();
-  const wd = s => dateObj(s).toLocaleDateString(undefined,{weekday:'short'});
+  // Julius's day abbreviations (2026-10-26): Tues and Thurs, the rest 3 letters.
+  const WD_SHORT = ['Sun','Mon','Tues','Wed','Thurs','Fri','Sat'];
+  const wd = s => WD_SHORT[dateObj(s).getDay()];
   // "Tue 10/27", "Tue 10/27 · 3d", or "3d"; today → "Today", tomorrow → "Tmrw".
   function dueText(due,today){
     const left = Math.round((dateObj(due) - dateObj(today)) / 86400000);
@@ -4965,7 +4967,7 @@
       const mon = d.toLocaleDateString('en-US',{month:long ? 'long' : 'short'});
       const day = d.getDate();
       const ord = long ? (day % 100 >= 11 && day % 100 <= 13 ? 'th' : ({1:'st',2:'nd',3:'rd'}[day % 10] || 'th')) : '';
-      const wk = style.startsWith('wk') ? d.toLocaleDateString('en-US',{weekday:long ? 'long' : 'short'}) + ', ' : '';
+      const wk = style.startsWith('wk') ? (long ? d.toLocaleDateString('en-US',{weekday:'long'}) : WD_SHORT[d.getDay()]) + ', ' : '';
       return wk + mon + ' ' + day + ord + ' · ' + rel;
     }
     return wd(due) + ' ' + md(due) + (style === 'days' ? ' · ' + rel : '');

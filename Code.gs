@@ -140,7 +140,7 @@ function getUrgentDays_() {
   const out = [];
   values.forEach(row => {
     const html = String(row[1] || '');
-    if (html.indexOf('data-urg=') < 0) return;
+    if (html.indexOf('data-urg=') < 0 && html.indexOf('data-due=') < 0) return; // urgent or has a due date
     const key = formatDate_(row[0]);
     if (key) out.push({ date: key, tasks: html });
   });

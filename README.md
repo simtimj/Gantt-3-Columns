@@ -56,6 +56,8 @@ Last updated: 2026-10-26
 - Urgent panel: the red bar down the whole panel is gone; each level (1 Urgent, 2 Soon, 3 Later) has its own left bar and heading in its own color (red / yellow / blue).
 - Due dates on urgent tasks: hold the checkbox → the urgency picker has a **Due** date box (and Clear). The task line shows 📅 Wed, Oct 29; the Urgent panel shows "Due Wed, Oct 29" (bold yellow when due today, bold red when overdue) and lists dated tasks first, soonest first. Tasks without a due date show the day they're on with its weekday.
 
+- **Nested Reference cells (folders):** drag a cell by its ⠿ handle and hold it on another cell's title for about half a second — that cell opens and lights up blue — then let go to drop it inside (it goes to the end). Nested cells keep everything: their own collapse/expand, editing, drag, delete. Children show indented under a thin guide line and fold away when the parent is collapsed. Dropping a cell above/below another puts it beside that cell at the same level (that's also how you take one back out). Moving or deleting a parent takes its children with it; search shows a parent when something inside matches. Sorting by Title/Last modified sorts within each level.
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

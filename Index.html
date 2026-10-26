@@ -3731,6 +3731,14 @@
       .getArchive();
   }
   function deleteReference(id){
+    // Confirm first (2026-10-26, Julius: too easy to delete by accident).
+    const item = (state.reference || []).find(x => x.id === id) || {};
+    const tmp = document.createElement('div');
+    tmp.innerHTML = stripReferenceMetadata(item.content || item.title || '');
+    const name = ((tmp.firstElementChild || tmp).textContent || '').trim().slice(0, 60) || 'this cell';
+    const kids = (state.reference || []).filter(x => x.parentId === id).length;
+    if(!confirm('Delete "' + name + '"' + (kids ? ' and the ' + kids + ' cell' + (kids === 1 ? '' : 's') + ' inside it' : '')
+      + '?\n\nIt goes to the Archive, so you can restore it.')) return;
     google.script.run
       .withSuccessHandler(() => {
         state.reference =

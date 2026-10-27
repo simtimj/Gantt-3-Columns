@@ -93,7 +93,7 @@
 
 ## Day sections (2026-10-27, Julius)
 
-- `ensureDaySections(ed)` (called first in `refreshCards`) adds saved `<div data-tl="1" data-sec="morning|afternoon|evening"><b>Name</b></div>` lines to today's `#todayScroll` day editor when missing, then `saveEditorOwner`. `titleCovered()` for a `data-sec` title runs to the next `data-sec` (skips blanks, includes nested titles). `DAY_SECS` / `daySecsOn` (localStorage `fw.daySecs`, `#daySecsOn`) are declared next to `cardsOn`. Style `.editor > [data-sec]`. His blocks: morning ~9–2, nap, then afternoon + evening ~3:45–9:30 (Tuesdays).
+- `ensureDaySections(ed)` (called first in `refreshCards`) adds saved `<div data-tl="1" data-sec="morning|afternoon|evening"><b>Name</b></div>` lines to today's `#todayScroll` day editor when missing, then `saveEditorOwner`. `titleCovered()` for a `data-sec` title runs to the next `data-sec` (skips blanks, includes nested titles). `DAY_SECS` / `daySecsOn` (localStorage `fw.daySecs`, `#daySecsOn`) are declared next to `cardsOn`. Style `.editor > [data-sec]`. Boxes: `paintDaySecs(ed)` (rAF from `refreshCards` + ResizeObserver) draws render-only `.sec-boxes > i` in the editor's parent (`.sec-host`, appended at the end so the dash chip stays right before the editor); colors `--sec-{m,a,e}-bd` / `--sec-{m,a,e}`. His blocks: morning ~9–2, nap, then afternoon + evening ~3:45–9:30 (Tuesdays).
 
 ## Saved looks → defaults (2026-10-27, Julius)
 

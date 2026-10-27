@@ -6583,11 +6583,20 @@
   /* Day sections (Julius, 2026-10-27): Morning / Afternoon / Evening separators in the Today cell. */
   .editor > [data-sec]{margin:10px 0 4px;padding:0 0 2px;border-bottom:2px solid var(--note-line-adj,var(--border));font-size:.82em;letter-spacing:.06em;text-transform:uppercase;color:var(--note-line-adj,var(--muted));}
   .editor > [data-sec]:first-child{margin-top:0;}
-  /* Day section tints (Julius, 2026-10-27): sun colors behind each section — morning light yellow,
-     afternoon deeper yellow-orange, evening sunset purple. Painted as one gradient on the editor (paintDaySecs). */
-  :root{--sec-m:rgba(255,221,87,.24);--sec-a:rgba(255,160,50,.26);--sec-e:rgba(150,95,205,.20);}
-  @media (prefers-color-scheme: dark){:root{--sec-m:rgba(255,214,90,.10);--sec-a:rgba(255,140,40,.13);--sec-e:rgba(150,90,210,.20);}}
-  .editor.sec-painted{background-attachment:local;background-repeat:no-repeat;}
+  /* Day section boxes (Julius, 2026-10-27): each section is its own rounded box like the Suggested Day —
+     bright outline + soft fill along the sun (morning yellow, afternoon orange, evening sunset purple).
+     Drawn render-only behind the editor by paintDaySecs (.sec-boxes is never saved). */
+  :root{--sec-m-bd:#f2c200;--sec-m:rgba(255,221,87,.16);--sec-a-bd:#f08a1c;--sec-a:rgba(255,160,50,.15);--sec-e-bd:#9b5fd6;--sec-e:rgba(150,95,205,.13);}
+  @media (prefers-color-scheme: dark){:root{--sec-m-bd:#d9ad12;--sec-m:rgba(255,214,90,.08);--sec-a-bd:#d9771a;--sec-a:rgba(255,140,40,.09);--sec-e-bd:#9b63d9;--sec-e:rgba(150,90,210,.12);}}
+  .sec-host{position:relative;}
+  .sec-host > .editor.sec-painted{position:relative;z-index:1;}
+  .sec-boxes{position:absolute;inset:0;pointer-events:none;z-index:0;}
+  .editor > [data-sec]{margin-top:16px;}
+  .editor > [data-sec="morning"]{border-bottom-color:var(--sec-m-bd);color:var(--sec-m-bd);}
+  .editor > [data-sec="afternoon"]{border-bottom-color:var(--sec-a-bd);color:var(--sec-a-bd);}
+  .editor > [data-sec="evening"]{border-bottom-color:var(--sec-e-bd);color:var(--sec-e-bd);}
+  .editor > [data-sec]:first-child{margin-top:6px;}
+  .sec-boxes > i{position:absolute;box-sizing:border-box;border:1.5px solid var(--bd);border-radius:10px;background:var(--fill);}
   /* Subject color in the checkbox (Julius, 2026-10-27; default): card stays neutral, the subject
      fills the checkbox, urgency is its border (gray when none), done = the check mark.
      The mark is white with a dark outline so it reads on any fill. Option "Subject color: whole card" brings back the tinted cards. */
@@ -6896,27 +6905,33 @@
     if(typeof saveEditorOwner === 'function') saveEditorOwner(ed);
     return true;
   }
-  /* Paint the day sections' sun tints as one background gradient on the editor (not saved content).
-     Each band runs from its section line to the next one; re-run when the editor resizes (typing, folding). */
-  const SEC_TINT = {morning:'var(--sec-m)', afternoon:'var(--sec-a)', evening:'var(--sec-e)'};
+  /* Day section boxes (Julius, 2026-10-27): one rounded box per section, from its line down to just above the next.
+     The boxes live in a render-only .sec-boxes layer beside the editor (not saved); re-drawn when the editor resizes. */
+  const SEC_TINT = {morning:['var(--sec-m-bd)','var(--sec-m)'], afternoon:['var(--sec-a-bd)','var(--sec-a)'], evening:['var(--sec-e-bd)','var(--sec-e)']};
   const secRO = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => paintDaySecs(e.target))) : null;
   function paintDaySecs(ed){
     if(!ed || !ed.isConnected) return;
+    const host = ed.parentElement; if(!host) return;
+    let layer = host.querySelector(':scope > .sec-boxes');
     const secs = daySecsOn ? [...ed.children].filter(n => n.dataset && SEC_TINT[n.dataset.sec] && n.offsetParent !== null) : [];
     if(!secs.length){
-      if(ed.classList.contains('sec-painted')){ ed.classList.remove('sec-painted'); ed.style.backgroundImage = ''; }
+      if(layer) layer.remove();
+      ed.classList.remove('sec-painted'); host.classList.remove('sec-host');
       return;
     }
-    if(!ed.classList.contains('sec-painted')){ ed.classList.add('sec-painted'); if(secRO) secRO.observe(ed); }
-    const top0 = ed.getBoundingClientRect().top - ed.scrollTop;
-    const ys = secs.map(n => Math.max(0, Math.round(n.getBoundingClientRect().top - top0 - 4)));
-    const stops = ['transparent 0px', 'transparent ' + ys[0] + 'px'];
+    if(!ed.classList.contains('sec-painted')){ ed.classList.add('sec-painted'); host.classList.add('sec-host'); if(secRO) secRO.observe(ed); }
+    if(!layer){ layer = document.createElement('div'); layer.className = 'sec-boxes'; layer.setAttribute('aria-hidden','true'); host.appendChild(layer); }
+    const hr = host.getBoundingClientRect(), er = ed.getBoundingClientRect();
+    const left = Math.round(er.left - hr.left) - 6, width = Math.round(er.width) + 12;
+    const ys = secs.map(n => Math.round(n.getBoundingClientRect().top - hr.top) - 5);
+    const bottom = Math.round(er.bottom - hr.top) + 4;
+    while(layer.children.length < secs.length) layer.appendChild(document.createElement('i'));
+    while(layer.children.length > secs.length) layer.lastChild.remove();
     secs.forEach((n,i) => {
-      const c = SEC_TINT[n.dataset.sec], end = i + 1 < ys.length ? ys[i + 1] + 'px' : '100%';
-      stops.push(c + ' ' + ys[i] + 'px', c + ' ' + end);
+      const box = layer.children[i], [bd,fill] = SEC_TINT[n.dataset.sec];
+      const top = ys[i], end = i + 1 < ys.length ? ys[i + 1] - 4 : bottom;
+      box.style.cssText = '--bd:' + bd + ';--fill:' + fill + ';left:' + left + 'px;width:' + width + 'px;top:' + top + 'px;height:' + Math.max(18,end - top) + 'px;';
     });
-    const img = 'linear-gradient(to bottom,' + stops.join(',') + ')';
-    if(ed.style.backgroundImage !== img) ed.style.backgroundImage = img;
   }
   function refreshTitleLines(ed){
     let changed = false;

@@ -114,6 +114,8 @@ Last updated: 2026-10-27
 
 - **Made date by the text (2026-10-27)**: in Urgent, the day-made date (10/26) now sits at the end of the task's text in its muted color, instead of near the right edge; due date stays on the right (with Wrap long text on)
 
+- **Urgency boxes in dark mode (2026-10-27)**: urgency checkboxes are dark inside with the colored border (were white squares); checked ones fill with the urgency color
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

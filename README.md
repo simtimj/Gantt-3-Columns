@@ -116,6 +116,8 @@ Last updated: 2026-10-27
 
 - **Urgency boxes in dark mode (2026-10-27)**: urgency checkboxes are dark inside with the colored border (were white squares); checked ones fill with the urgency color
 
+- **Full Due tasks on their day (2026-10-27)**: a task due on a day shows at the top of that day's Today cell as the whole task — real urgency-colored checkboxes, full wrapped text in the normal size, and its subtasks indented; ticking a box ticks the real task, tapping the text jumps to it (day it lives on must be loaded)
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

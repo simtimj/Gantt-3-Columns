@@ -1014,13 +1014,16 @@
     #typeSettings .ts-sub{margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     /* Due on this day (2026-10-26): tasks due on a day show under its label. */
     .due-block{margin:0 0 4px;display:flex;flex-direction:column;gap:1px;}
-    .due-item{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:0;border-left:3px solid var(--urg,#999);padding:2px 6px;font-size:12px;color:inherit;cursor:pointer;border-radius:0 4px 4px 0;}
+    .due-item{display:block;width:100%;box-sizing:border-box;text-align:left;border-left:3px solid var(--urg,#999);padding:3px 6px;margin:0 0 3px;color:inherit;border-radius:0 4px 4px 0;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     .due-item[data-urg="1"]{--urg:#e5484d;}.due-item[data-urg="2"]{--urg:#f0b000;}.due-item[data-urg="3"]{--urg:#3b82f6;}
-    .due-item:hover{background:#f6f6f6;}
-    .due-item .di-tag{flex:0 0 auto;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
-    .due-item .di-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .due-item .di-from{flex:0 0 auto;font-size:10px;color:var(--muted);}
-    .due-item.done .di-text{text-decoration:line-through;opacity:.6;}
+    .di-line{display:flex;align-items:flex-start;gap:6px;padding:1px 0;cursor:pointer;}
+    .di-line[data-urg="1"]{--urg:#e5484d;}.di-line[data-urg="2"]{--urg:#f0b000;}.di-line[data-urg="3"]{--urg:#3b82f6;}
+    .di-box{flex:0 0 auto;width:calc(17px * var(--workspace-scale,1));height:calc(17px * var(--workspace-scale,1));margin:1px 0 0;padding:0;border:2px solid var(--urg,#8a8f98);border-radius:3px;background:transparent;cursor:pointer;display:inline-grid;place-content:center;}
+    .di-line.done > .di-box{background:var(--urg,#8a8f98);}
+    .di-line.done > .di-box::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
+    .di-text{flex:1;min-width:0;overflow-wrap:anywhere;}
+    .di-from{font-size:.75em;color:var(--muted);margin-left:4px;}
+    .di-line.done > .di-text{text-decoration:line-through;opacity:.6;}
     /* Reference options, Urgent create, Inbox, −/+ toggles (2026-10-26, Julius). */
     /* Sort-row buttons match the Sort dropdown's size, and the row wraps instead
        of running off a phone screen (2026-10-26, Julius). */
@@ -1113,7 +1116,7 @@
       #urgentPanel,#calPanel,#inboxPanel,.ref-options{background:#111;color:var(--dm-text);}
       .ref-cell{color:var(--dm-text);}
       .ref-hold > .ref-cell > h2:first-child{background:#1d2738;}
-      .due-item:hover,.ucm-item:hover{background:#222;}
+      .ucm-item:hover{background:#222;}
       /* Pop-ups and menus: dark too */
       .ctx-menu,.urg-picker,.urg-cal,.urg-create-menu,.send-menu,.archive-box,.view-menu-popup,.type-settings{background:#161616;color:var(--dm-text);}
       .urg-pick{background:#1c1c1c;}
@@ -5549,11 +5552,23 @@
       const {date,pane} = urgKeyParts(key);
       const tpl = document.createElement('template');
       tpl.innerHTML = urgentSource.get(key);
-      tpl.content.querySelectorAll('.check-line').forEach((line,i) => {
+      const lines = [...tpl.content.querySelectorAll('.check-line')];
+      let nestedUntil = -1;
+      const isDone = l => !!(l.classList.contains('done') || l.querySelector('input[type=checkbox][checked]'));
+      const html = l => { const t = l.querySelector('.check-text'); return t ? t.innerHTML : lineText(l); };
+      lines.forEach((line,i) => {
+        if(i <= nestedUntil) return;
         const due = line.dataset.due || '';
         if(!/^\d{4}-\d{2}-\d{2}$/.test(due) || due === date) return;
-        const cb = line.querySelector('input[type=checkbox]');
-        out.push({date,pane,index:i,due,urg:line.dataset.urg || '',text:lineText(line),done:!!(cb && cb.hasAttribute('checked'))});
+        // The whole task: its subtasks come along (Julius, 2026-10-27).
+        const level = Number(line.dataset.level) || 0, subs = [];
+        for(let j = i + 1; j < lines.length; j++){
+          const l2 = Number(lines[j].dataset.level) || 0;
+          if(l2 <= level) break;
+          subs.push({index:j,level:l2 - level,urg:lines[j].dataset.urg || '',html:html(lines[j]),done:isDone(lines[j])});
+          nestedUntil = j;
+        }
+        out.push({date,pane,index:i,due,urg:line.dataset.urg || '',text:lineText(line),html:html(line),subs,done:isDone(line)});
       });
     });
     return out;
@@ -5577,21 +5592,43 @@
       }
       block.dataset.sig = sig;
       block.innerHTML = '';
+      // Full task (Julius, 2026-10-27): checkbox, full wrapped text and subtasks,
+      // like it looks where it lives. Checkboxes tick the real task; text jumps to it.
       list.forEach(it => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'due-item' + (it.done ? ' done' : '');
-        if(it.urg) b.dataset.urg = it.urg;
-        const tag = document.createElement('span'); tag.className = 'di-tag'; tag.textContent = 'Due';
-        const tx = document.createElement('span'); tx.className = 'di-text'; tx.textContent = (it.done ? '☑ ' : '☐ ') + it.text;
-        const from = document.createElement('span'); from.className = 'di-from';
-        from.textContent = 'from ' + dateObj(it.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(it.date).getMonth() + 1) + '/' + dateObj(it.date).getDate();
-        b.append(tag,tx,from);
-        b.addEventListener('click',() => goToTask(it.date,it.index,it.pane));
-        block.appendChild(b);
+        const card = document.createElement('div');
+        card.className = 'due-item' + (it.done ? ' done' : '');
+        if(it.urg) card.dataset.urg = it.urg;
+        const from = 'Due · from ' + dateObj(it.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(it.date).getMonth() + 1) + '/' + dateObj(it.date).getDate();
+        const mk = (t,level,isMain) => {
+          const r = document.createElement('div');
+          r.className = 'di-line' + (t.done ? ' done' : '');
+          if(t.urg) r.dataset.urg = t.urg;
+          if(level) r.style.paddingLeft = (level * 1.4) + 'em';
+          const box = document.createElement('button'); box.type = 'button'; box.className = 'di-box';
+          box.setAttribute('aria-label', t.done ? 'Mark not done' : 'Mark done');
+          box.addEventListener('click',e => { e.stopPropagation(); toggleDueTask(it.date,t.index,it.pane); });
+          const tx = document.createElement('span'); tx.className = 'di-text'; tx.innerHTML = t.html;
+          if(isMain){ const f = document.createElement('span'); f.className = 'di-from'; f.textContent = from; tx.append(' ',f); }
+          r.append(box,tx);
+          r.addEventListener('click',() => goToTask(it.date,t.index,it.pane));
+          return r;
+        };
+        card.appendChild(mk(it,0,true));
+        (it.subs || []).forEach(st => card.appendChild(mk(st,st.level,false)));
+        block.appendChild(card);
       });
       syncDayHeightStable(row.dataset.date);
     });
+  }
+  // Tick a task where it lives, from its Due copy (needs that day loaded).
+  function toggleDueTask(date,index,pane){
+    const ed = urgEditor(date,pane);
+    const line = ed ? ed.querySelectorAll('.check-line')[index] : null;
+    const cb = line ? line.querySelector('input[type=checkbox]') : null;
+    if(!cb){ setStatus('That day isn’t loaded — scroll to ' + shortDate(date)); return; }
+    cb.checked = !cb.checked;
+    cb.dispatchEvent(new Event('change',{bubbles:true}));
+    urgChanged(ed);
   }
   function goToTask(date,index,pane){
     const ed = urgEditor(date,pane);

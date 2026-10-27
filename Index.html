@@ -1088,7 +1088,7 @@
     .urg-count{font-weight:700;}
     .urg-count[data-urg="1"]{color:#e5484d;}.urg-count[data-urg="2"]{color:#d29e00;}.urg-count[data-urg="3"]{color:#3b82f6;}.urg-count[data-urg="0"]{color:#8a8f98;}
     /* Mini dashboard (2026-10-27): today's tasks done, in the toolbar. */
-    .dash-chip{flex:0 0 auto;margin-left:8px;padding:1px 8px;font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:999px;color:var(--muted);white-space:nowrap;}
+    .dash-chip{display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:0 0 6px;padding:1px 8px;font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:999px;color:var(--muted);white-space:nowrap;}
     .dash-chip:empty{display:none;}
     .dash-chip b{color:inherit;}
     .dash-chip .dash-bar{display:inline-block;vertical-align:middle;width:46px;height:5px;margin-left:6px;border-radius:3px;background:rgba(127,127,127,.25);overflow:hidden;}
@@ -1413,7 +1413,6 @@
     <!-- Focus (hide toolbar) shelved 2026-10-26 — code kept; put this back to restore:
     <button class="btn" type="button" data-layout="focus" title="Hide the top toolbar">Focus</button> -->
     <span id="dateLabel"></span>
-    <span id="dashChip" class="dash-chip" title="Today's tasks done (Today / Tasks column)"></span>
     <span
       id="status"
       class="status">
@@ -6796,10 +6795,16 @@
   function updateDash(){
     clearTimeout(dashTimer);
     dashTimer = setTimeout(() => {
-      const chip = document.getElementById('dashChip'); if(!chip) return;
+      // (Julius, 2026-10-27) lives inside today's Today cell, right under the date line.
       const today = (typeof state !== 'undefined' && state && state.today) || localToday();
       const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(today)}"]`);
-      if(!ed){ chip.textContent = ''; return; }
+      document.querySelectorAll('.dash-chip').forEach(c => { if(!ed || c.nextElementSibling !== ed) c.remove(); });
+      if(!ed) return;
+      let chip = ed.previousElementSibling;
+      if(!chip || !chip.classList.contains('dash-chip')){
+        chip = document.createElement('div'); chip.className = 'dash-chip'; chip.id = 'dashChip';
+        chip.title = "Today's tasks done"; ed.parentNode.insertBefore(chip,ed);
+      }
       const lines = [...ed.querySelectorAll('.check-line')];
       const done = lines.filter(l => l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
       const pct = lines.length ? Math.round(done / lines.length * 100) : 0;

@@ -1025,7 +1025,7 @@ function noteLineHtml_(line, opt) {
 // ('__Area__' header lines too, for the wrap-up's Focus and Priority check, Julius 2026-10-26).
 function noteBlockHtml_(item) {
   const kind = item.kind === 'wrap' ? 'wrap' : 'plan';
-  const title = item.title || (kind === 'wrap' ? 'Day wrap-up' : 'Suggested day');
+  const title = item.title || (kind === 'wrap' ? 'Day Wrap-Up' : 'Suggested Day');
   const rows = [];
   let cur = '<div><b><u>' + doneEsc_(title) + '</u></b> <i>· Claude</i></div>';
   let first = true; // first entry in the current cell gets no gap
@@ -1045,7 +1045,7 @@ function noteBlockHtml_(item) {
 // Pre-box flat form, only to find and convert blocks written before 2026-10-26 boxing.
 function noteBlockFlatHtml_(item) {
   const kind = item.kind === 'wrap' ? 'wrap' : 'plan';
-  const title = item.title || (kind === 'wrap' ? 'Day wrap-up' : 'Suggested day');
+  const title = item.title || (kind === 'wrap' ? 'Day Wrap-Up' : 'Suggested Day');
   let html = '<div data-cnote="' + doneEsc_(item.id) + '"><b><u>' + doneEsc_(title) + '</u></b> <i>· Claude</i></div>';
   (item.lines || []).forEach(line => {
     line = String(line == null ? '' : line);

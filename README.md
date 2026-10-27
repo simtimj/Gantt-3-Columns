@@ -47,6 +47,7 @@ Last updated: 2026-10-27
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Light / dark toggle, saved per device (2026-10-27):** ☾/☀ button next to Today flips the theme and saves it on that device only; hold it to go back to the device default. Defaults: MacBook/desktop light, phone and tablet dark (ignores the OS setting). Also in Options → Theme (Auto / Light / Dark).
 - **Smaller Reference panels (2026-10-27):** Urgent, Calendar and Inbox use tighter padding and spacing; the Inbox add box moved to a small **+ Add** button on its header line.
 
 - **Swipe between columns in single view (2026-10-27)**: with one column showing, swipe sideways to the next one in order: Today/Tasks ↔ Notes ↔ Reference (no wrap; nothing left of Today or right of Reference). The next column slides in under your finger; let go past ~30% to switch, less to snap back. Trackpad: a sideways two-finger swipe moves one column.

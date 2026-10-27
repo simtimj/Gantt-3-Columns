@@ -69,4 +69,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-eh-tags-column', date: '2026-10-27', project: 'Userscripts', title: 'EH recent tags column', details: 'Recent tags moved out of the filter panel into a full-height left column; drawer + Tags tab on narrow screens (v2.9.0)' },
   { id: 'd-20261027-gantt-single-swipe', date: '2026-10-27', project: 'Gantt', title: 'Swipe between columns + hold to split', details: 'one column showing: swipe to the next in order (Today, Notes, Reference); hold mid-swipe for a split prompt' },
   { id: 'd-20261027-gantt-compact-ref', date: '2026-10-27', project: 'Gantt', title: 'Compact Reference panels', details: 'Urgent, Calendar, Inbox tighter; Inbox add box replaced by a small + Add on its header line' },
+  { id: 'd-20261027-gantt-theme-toggle', date: '2026-10-27', project: 'Gantt', title: 'Light / dark toggle per device', details: 'toolbar ☾/☀ + Options → Theme; saved per device; defaults Mac light, phone/tablet dark' },
 ];

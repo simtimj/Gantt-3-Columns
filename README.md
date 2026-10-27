@@ -37,7 +37,7 @@ Last updated: 2026-10-27
 - Notes **+ Template** inserts the Reference cell titled "Journal Template" into the selected Notes day.
 
 **Urgency** (like TickTick)
-- Hold a checkbox (or right-click it) → pick 1 red (Urgent) / 2 yellow (Soon) / 3 blue (Later) / none, and optionally a due date.
+- Hold a checkbox (or right-click it) → pick 1 red (Urgent) / 2 yellow (Soon) / 3 blue (Can be later) / none, and optionally a due date.
 - Urgent panel at the top of Reference lists every urgent task from every day, grouped 1/2/3, with its subtasks underneath. Tap a task to jump to it in Today. Panel is collapsible.
 
 **Reference**
@@ -47,6 +47,8 @@ Last updated: 2026-10-27
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+
+- **Urgency 3 renamed "Can be later" (2026-10-27)**: blue level reads *Can be later* (nice to do, not pressing) instead of *Later* in the hold menu, Urgent panel headings and + Task.
 - **Edit card subjects (2026-10-27)**: Options → **Card subjects**: set each subject's color, name and the words that auto-pick it; **+ Subject** adds one, ✕ removes one, **Reset to defaults** brings back the starting list. Saved to your account, so phone and tablet match. New default colors: Code green, Career light green, Study lavender, Work slate gray, Health pink, Life teal, Fun orange
 - **Compact Options (2026-10-27)**: each setting is one line (label, slider, value, Reset) with smaller buttons and shorter labels (full name on hover); on wider screens the panel spreads into columns to the right instead of getting longer
 - **Task cards (2026-10-27)**: every task is a card — checkbox + text, with its subtasks inside the same card (rounded box, a little space between cards). In Today, Notes and Reference cells. Turn off in Options → **Show tasks as cards**
@@ -81,7 +83,7 @@ Last updated: 2026-10-27
 
 - **Done log spacing (2026-10-26):** a blank line before and after each project group, so groups don't run together.
 
-- **Due group in Urgent (2026-10-26):** tasks with a due date but no urgency show in a grey **Due** group at the bottom of the Urgent panel, soonest first (they leave once checked). Urgent / Soon / Later keep sorting by due date, soonest first, undated last. Header reads `Urgent · N · Due N`.
+- **Due group in Urgent (2026-10-26):** tasks with a due date but no urgency show in a grey **Due** group at the bottom of the Urgent panel, soonest first (they leave once checked). Urgent / Soon / Can be later keep sorting by due date, soonest first, undated last. Header reads `Urgent · N · Due N`.
 - **Tapping a cell keeps your place (2026-10-26):** tapping into Notes (or Today) no longer moves the view; leaving a cell resizes its row without scrolling.
 
 - **Done-with-Claude log, grouped (2026-10-26):** work done through Claude is batched under a bold, underlined project header (Exercise Tracker, Gantt…), each line leading with what was done (e.g. **In Today marker**: purple marker on grid cells). Today's lines were regrouped too.
@@ -91,7 +93,7 @@ Last updated: 2026-10-27
 - Urgency: the extra colored square around the checkbox removed — the checkbox itself is drawn in the urgency color, checked or not.
 - Urgent panel keeps finished urgent tasks (struck through) until the urgency is cleared by hand.
 - Reference follows the Padding left/right slider the same way Today does (one shared setting for now).
-- Urgent panel: the red bar down the whole panel is gone; each level (1 Urgent, 2 Soon, 3 Later) has its own left bar and heading in its own color (red / yellow / blue).
+- Urgent panel: the red bar down the whole panel is gone; each level (1 Urgent, 2 Soon, 3 Can be later) has its own left bar and heading in its own color (red / yellow / blue).
 - Due dates on urgent tasks: hold the checkbox → under the 1/2/3 buttons is a small **📅 Due date** chip; tap it and a little month calendar pops up beside the picker (right side if there's room, otherwise left/below — no phone date sheet, no grayed-out screen). Tap a day (or Today) and it's set; × clears it. The task line shows 📅 Wed, Oct 29; the Urgent panel shows the due date hugging the right ("Due Thu, Oct 29" / "Due today" bold yellow / bold red when overdue) and lists dated tasks first, soonest first. 
 - Change urgency/due date from the Urgent panel: hold (or right-click) a task's colored box in the panel → same picker; it edits the task in its Today day (that day must be loaded — otherwise it says to scroll to it). A plain tap still jumps to the task.
 - **Nested Reference cells (folders):** drag a cell by its ⠿ handle and hold it on another cell's title for about half a second — that cell opens and lights up blue — then let go to drop it inside (it goes to the end). Nested cells keep everything: their own collapse/expand, editing, drag, delete. Children show indented under a thin guide line and fold away when the parent is collapsed. Dropping a cell above/below another puts it beside that cell at the same level (that's also how you take one back out). Moving or deleting a parent takes its children with it; search shows a parent when something inside matches. Sorting by Title/Last modified sorts within each level.
@@ -109,7 +111,7 @@ Last updated: 2026-10-27
 - Day abbreviations in the Urgent panel's due dates are now Sun, Mon, **Tues**, Wed, **Thurs**, Fri, Sat (e.g. "Tues 10/27").
 - **More due date styles** (Reference Options → Due date): added **Oct 27 · 3d**, **October 27th · 3d**, **Tue, Oct 27 · 3d** and **Tuesday, October 27th · 3d**, alongside Tue 10/27, Tue 10/27 · 3d and 3d.
 - **− / + collapse buttons**: a boxed − / + next to Sort collapses or expands every Reference cell; the toolbar button reads Ref − / Ref +; each cell's ▾ / ▸ arrow is now a boxed − / +; the Urgent and Inbox headers use the same − / +.
-- **Make tasks in the Urgent panel**: hold (or right-click) a level heading like "2 · Soon", hold the Urgent header, or tap **+ Task** → *Create Urgent / Soon / Later task* → type → Enter. It's added at the end of today's Today cell with that urgency, so it shows in the panel right away. Typing `Title: details` makes the title bold. The panel now always shows (even with nothing urgent) so + Task is always there.
+- **Make tasks in the Urgent panel**: hold (or right-click) a level heading like "2 · Soon", hold the Urgent header, or tap **+ Task** → *Create Urgent / Soon / Can be later task* → type → Enter. It's added at the end of today's Today cell with that urgency, so it shows in the panel right away. Typing `Title: details` makes the title bold. The panel now always shows (even with nothing urgent) so + Task is always there.
 - **Inbox** under Urgent (collapsed by default): quick captures shown as **Title**: details. Type one in at the bottom, or tell Claude ("add to my Gantt inbox: …") and it shows up about a minute later, tagged Claude. **→ Today** turns it into a task in today; **✕** dismisses it.
 
 - **Text brightness fix (2026-10-27)**: all dark mode text now follows the Text brightness slider — dimmer labels, done tasks, quotes, code blocks, the calendar's today line and dark pasted/inline-colored text (that last stayed near-black before)

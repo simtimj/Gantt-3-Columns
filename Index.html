@@ -4860,7 +4860,7 @@
      the day. The Urgent panel at the top of Reference lists every open
      urgent task from every day, with the subtasks under it.
      ========================================================= */
-  const URG_NAMES = {1:'Urgent',2:'Soon',3:'Later'};
+  const URG_NAMES = {1:'Urgent',2:'Soon',3:'Can be later'};
   const urgentSource = new Map();   // date (Today) or date+'|j' (Notes) -> html that has urgency
   // Urgency set on a task in Notes counts too (Julius, 2026-10-27: it showed, then vanished on save).
   function urgKey(date,pane){ return pane === 'journal' ? date + '|j' : date; }
@@ -4978,7 +4978,7 @@
     add.type = 'button';
     add.className = 'btn tiny urg-add';
     add.textContent = '+ Task';
-    add.title = 'Make an Urgent / Soon / Later task (goes in today)';
+    add.title = 'Make an Urgent / Soon / Can be later task (goes in today)';
     add.addEventListener('click',e => openCreateMenu(add,null));
     headRow.append(head,add);
     panel.appendChild(headRow);
@@ -5060,7 +5060,7 @@
   /* ---------------------------------------------------------
      Make tasks right in the Urgent panel (2026-10-26, Julius).
      Hold (or right-click) a level heading or the panel head, or tap
-     + Task → Create Urgent / Soon / Later task → type → Enter.
+     + Task → Create Urgent / Soon / Can be later task → type → Enter.
      The task goes at the end of today's Today cell with that urgency.
      "Title: details" makes the title bold.
      --------------------------------------------------------- */

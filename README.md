@@ -47,7 +47,7 @@ Last updated: 2026-10-27
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
-- **Urgent header counts (2026-10-27):** the Urgent header reads **Urgent 1 2 0** — one number per level in its color (red Urgent, yellow Soon, blue Can be later; a grey Due count appears only when there are due-only tasks). Updates on every change. Hover a number for its name. Plain numbers for now; little colored squares are an option later.
+- **Urgent header counts (2026-10-27):** the Urgent header reads **Urgent 1(1/4) 2 0** — one number per level in its color (red Urgent, yellow Soon, blue Can be later, always all three even at 0; a grey Due count appears only when there are due-only tasks). Numbers count **tasks, not subtasks**; when a level's tasks have subtasks, (done/total) follows its number. A subtask with its own different color counts as an item in that color. Hover a number for details.
 - **Dark cells slider (2026-10-27):** Options → **Dark cells** sets the dark-mode background of the Today, Notes and Reference cells from black (0%) to gray (30%). Default is now a little grayer (11%, was ~7%). Saves on this device as you drag; Reset goes back to 11%. Headers and toolbar stay as they were. Tell Claude the number you settle on and it becomes the default.
 - **Mini dashboard (2026-10-27):** at the very top, next to the date: **Today: 7 out of 9 tasks done** with a small progress bar. Counts every task (and subtask) in today's Today/Tasks cell, including Claude's logged ones; updates as you tick. Minimal on purpose — grow it from here.
 - **Title lines (2026-10-27):** fold a run of lines to save room. Make a title: hold a task's checkbox → **▤ Make title line**, or right-click / long-press any line → **▤ Title** (same again removes it). Claude's done-log project headers (e.g. **Gantt**) are title lines automatically. A title covers every line under it down to the first empty line (or the next title). Tap the − at its right end to fold; folded it shows a score like **+ 26 out of 27 done** (just **+ 5 hidden** when there are no tasks) — tap that to open. The − / + sits right after the line's text. Folded/open is saved with the cell. Works in Today, Notes and Reference.
@@ -147,14 +147,13 @@ Last updated: 2026-10-27
 
 - **Task count in today's cell** (2026-10-27): "Today: X out of Y tasks done" bar moved from the toolbar to right under the date in today's Today cell.
 
-- **Light day colors for dark cells** (2026-10-27): the M–S pickers now start on the light day colors; the dark cell keeps that color's hue and the Dark cells slider sets how light it is. Default restores them.
+- **Dark day colors, no inversion** (2026-10-27): the M–S pickers now hold the exact dark-mode cell color — what you pick is what you see (they used to hold the light color and convert it, which turned Tuesday brown). Defaults: Tuesday orange, Wednesday blue, Monday gray, Thu/Sat tan, Fri/Sun gold. Default restores them. The Dark cells slider now only affects Reference cells and days when matching is off.
 - **Saved looks** (2026-10-27): top of Options — pick Light / Dark / Custom, Save stores every look setting (theme, colors, sliders, cards, fonts, padding, scale) on this device; Load applies it and refreshes.
 - **Options alignment** (2026-10-27): Dark cells, the match toggle and the day pickers stay together in one column.
 
 - **Day sections** (2026-10-27): today's Today cell always has Morning / Afternoon / Evening separators (added if missing; existing tasks start under Morning). Each folds with − / + like a title line and covers everything down to the next section. Options toggle to turn off.
 - **Day section boxes** (2026-10-27): each section is its own rounded box like the Suggested Day — Morning bright yellow outline, Afternoon orange, Evening sunset purple, each with a soft matching fill and a colored header line (softer in dark mode). Tell Claude if a shade is off.
 
-- **Dark day colors reset** (2026-10-27): the M–S dark day colors were reset once to the light-mode day colors, ready to tweak.
 - **Saved looks → Claude** (2026-10-27): Options → Save also copies the look to the Sheet's "Looks" tab (per slot + device), so you can ask Claude "how is it set now?" or "make what I saved the default."
 
 ## 🔧 To be improved

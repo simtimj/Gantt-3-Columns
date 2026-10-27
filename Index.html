@@ -1248,7 +1248,6 @@
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
       <div class="ts-group ts-cats">
       <div class="ts-sub">Card subjects</div>
-      <div class="ts-hint">Color, name and the words that auto-pick it (comma separated). Saved for all your devices.</div>
       <div id="cardCatList"></div>
       <div class="ts-cat-actions"><button class="btn tiny" id="cardCatAdd" type="button">+ Subject</button><button class="btn tiny" id="cardCatReset" type="button">Reset to defaults</button></div>
     </div>
@@ -6119,6 +6118,10 @@
     {key:'fun',    name:'Fun',    color:'#f97316', words:'guitar, music, sing, singing, game, games, gaming, movie, movies, youtube, fun, spanish, japanese, language'},
   ];
   let CARD_CATS = [], CARD_CAT_BY_KEY = {};
+  // Declared before the first setCardCats() call: it refreshes cards, which reads these.
+  let cardsOn = true, cardsAuto = true;
+  try{ cardsOn = localStorage.getItem('fw.cards') !== '0'; cardsAuto = localStorage.getItem('fw.cardsAuto') !== '0'; }catch(e){}
+  const cardHeadOf = new WeakMap(); // line -> its card's head line
   function cardCatRegex(words){
     const list = String(words || '').split(',').map(w => w.trim()).filter(Boolean)
       .sort((x,y) => y.length - x.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+'));
@@ -6134,7 +6137,7 @@
     });
     return out;
   }
-  function setCardCats(list,save){
+  function setCardCats(list,save,noRefresh){
     // An empty or unreadable list (e.g. an old cached copy) falls back to the starting subjects.
     const got = cleanCardCats(list);
     const clean = (got && got.length) ? got : CARD_CATS_DEFAULT.map(c => ({...c}));
@@ -6151,16 +6154,13 @@
       clearTimeout(setCardCats.t);
       setCardCats.t = setTimeout(() => { try{ google.script.run.withFailureHandler(e => setStatus('Subjects not saved: ' + e.message)).saveCardCats(plain); }catch(e){} },600);
     }
-    if(typeof refreshAllCards === 'function') refreshAllCards();
+    if(!noRefresh) refreshAllCards();
   }
   (function(){
     let local = null;
     try{ local = JSON.parse(localStorage.getItem('fw.cardCats') || 'null'); }catch(e){}
-    setCardCats(local,false);
+    setCardCats(local,false,true); // first load: the card code below isn't set up yet; it refreshes itself
   })();
-  let cardsOn = true, cardsAuto = true;
-  try{ cardsOn = localStorage.getItem('fw.cards') !== '0'; cardsAuto = localStorage.getItem('fw.cardsAuto') !== '0'; }catch(e){}
-  const cardHeadOf = new WeakMap(); // line -> its card's head line
 
   (function(){
     let css = '';

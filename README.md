@@ -51,7 +51,7 @@ Last updated: 2026-10-26
 - **Carry-over tasks + → Day** (2026-10-26): Carries over items are checkboxes; tap **→ Day** on the right to move one to Today, Tomorrow or a picked date's Today cell.
 - **Re-render note blocks** (2026-10-26): bumping an entry's `rev` in dayplan.js updates that block in place.
 
-- **Boxed plan and wrap-up (2026-10-26):** Claude's Suggested day (top of Notes, blue edge) and Day wrap-up (bottom of Notes, purple edge) now sit in their own rounded box, so they're clearly separate from your notes. Tonight's two blocks get boxed on the next load.
+- **Boxed plan and wrap-up (2026-10-26):** Claude's Suggested day (top of Notes) and Day wrap-up (bottom of Notes) now sit in their own rounded box, so they're clearly separate from your notes. Tonight's two blocks get boxed on the next load.
 
 - **\* marks Claude's work (2026-10-26):** every line Claude logs in the Today cell starts with `*` (no space), e.g. **\*In Today marker**: purple marker on grid cells, so you can tell Claude's lines from your own. Past days were updated once too.
 

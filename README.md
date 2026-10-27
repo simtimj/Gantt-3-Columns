@@ -47,6 +47,9 @@ Last updated: 2026-10-26
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Wrap-up Priority check**: a 0–10 score on whether the day's time went to the right things, with what's still open on the priority and the fix for tomorrow
+- **Carry-over subtasks**: carry-overs with parts show them as subtasks; → Day on the parent sends it with all its subtasks, → Day on a subtask sends just that one. Every carry-over is **Name**: details
+- **Divided Suggested day**: each section (Must do, Next, …) sits in its own cell; each entry is a bold name with its time blocks on lines underneath, small gaps between entries (testing)
 - **Note blocks restyled** (2026-10-26): no colored left edge; list lines use dashes (Must do too); wrap-up skips empty stats; Focus ordered by most time, area underlined with a one-line item list under it.
 - **Carry-over tasks + → Day** (2026-10-26): Carries over items are checkboxes; tap **→ Day** on the right to move one to Today, Tomorrow or a picked date's Today cell.
 - **Re-render note blocks** (2026-10-26): bumping an entry's `rev` in dayplan.js updates that block in place.

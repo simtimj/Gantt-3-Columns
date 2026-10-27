@@ -996,23 +996,47 @@ function noteInline_(s) {
 }
 // One rendered line of a note block (2026-10-26, Julius): '- x' keeps a real dash (no dots),
 // '[] x' is a checkbox task with a "→ Day" send button (data-send), '__x__' underlines.
-function noteLineHtml_(line) {
+// Leading spaces nest (2 per level, Julius 2026-10-26): '  [] x' is a subtask under the task
+// above (sending the parent takes its subtasks); '  x' is an indented detail line under an item.
+// opt.gap adds a little space above a '- ' item (cells mode: entries are separated without blank lines).
+function noteLineHtml_(line, opt) {
   line = String(line == null ? '' : line);
   if (!line.trim()) return '<div><br></div>';
+  const lead = (line.match(/^ */) || [''])[0].length;
+  const level = Math.min(6, Math.floor(lead / 2));
+  line = line.replace(/^ +/, '');
   if (/^##\s+/.test(line)) return '<div><b><u>' + noteInline_(line.replace(/^##\s+/, '')) + '</u></b></div>';
-  if (/^\[\s?\]\s+/.test(line)) return '<div class="check-line" data-level="0" data-send="1">' + doneCheck_(false) +
+  if (/^\[\s?\]\s+/.test(line)) return '<div class="check-line" data-level="' + level + '" data-send="1"' +
+    (level ? ' style="margin-left: ' + (level * 24) + 'px;"' : '') + '>' + doneCheck_(false) +
     '<span class="check-text">' + noteInline_(line.replace(/^\[\s?\]\s+/, '')) + '</span></div>';
-  if (/^-\s+/.test(line)) return '<div>- ' + noteInline_(line.replace(/^-\s+/, '')) + '</div>';
+  if (/^-\s+/.test(line)) {
+    const st = (opt && opt.gap ? 'padding-top: 6px;' : '') + (level ? ' padding-left: ' + (level * 16) + 'px;' : '');
+    return '<div' + (st ? ' style="' + st.trim() + '"' : '') + '>- ' + noteInline_(line.replace(/^-\s+/, '')) + '</div>';
+  }
+  if (level) return '<div style="padding-left: ' + (level * 14) + 'px;">' + noteInline_(line) + '</div>';
   return '<div>' + noteInline_(line) + '</div>';
 }
-// Boxed (Julius, 2026-10-26): the whole block sits in a one-cell table so it
-// reads as a contained card; styled by .editor table[data-cnote] in Index.html.
+// Boxed (Julius, 2026-10-26): the whole block sits in a table so it reads as a contained card;
+// styled by .editor table[data-cnote] in Index.html. cells:true (tried for the Suggested day,
+// Julius 2026-10-26): each '##' section gets its own row (divided cells) and '- ' entries get a
+// small gap above instead of blank lines, to stay space efficient.
 function noteBlockHtml_(item) {
   const kind = item.kind === 'wrap' ? 'wrap' : 'plan';
   const title = item.title || (kind === 'wrap' ? 'Day wrap-up' : 'Suggested day');
-  let inner = '<div><b><u>' + doneEsc_(title) + '</u></b> <i>· Claude</i></div>';
-  (item.lines || []).forEach(line => { inner += noteLineHtml_(line); });
-  return '<table data-cnote="' + doneEsc_(item.id) + '" data-ckind="' + kind + '"><tbody><tr><td>' + inner + '</td></tr></tbody></table>';
+  const rows = [];
+  let cur = '<div><b><u>' + doneEsc_(title) + '</u></b> <i>· Claude</i></div>';
+  let first = true; // first entry in the current cell gets no gap
+  (item.lines || []).forEach(line => {
+    const raw = String(line == null ? '' : line);
+    if (item.cells && /^##\s+/.test(raw)) { rows.push(cur); cur = ''; first = true; }
+    if (item.cells && !raw.trim()) return; // cells mode spaces entries itself
+    const isItem = /^-\s+/.test(raw);
+    cur += noteLineHtml_(raw, { gap: item.cells && isItem && !first });
+    if (isItem) first = false;
+  });
+  rows.push(cur);
+  return '<table data-cnote="' + doneEsc_(item.id) + '" data-ckind="' + kind + '"' + (item.cells ? ' data-ccells="1"' : '') +
+    '><tbody>' + rows.map(r => '<tr><td>' + r + '</td></tr>').join('') + '</tbody></table>';
 }
 
 // Pre-box flat form, only to find and convert blocks written before 2026-10-26 boxing.
@@ -1147,6 +1171,29 @@ function authorizeCalendar() {
   return CalendarApp.getDefaultCalendar().getName();
 }
 
+
+/* Send several tasks (a task and its subtasks) to a day's Today cell in one write
+   (2026-10-26, Julius): items = [{html, level}], levels relative to the sent task. */
+function appendTasksToDay(dateString, items) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateString || ''))) throw new Error('Bad date');
+  if (!Array.isArray(items) || !items.length) return false;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    let row = findDayRow_(sheet, dateString);
+    if (!row) { sheet.appendRow([parseDate_(dateString), '', '']); row = sheet.getLastRow(); }
+    const cell = sheet.getRange(row, 2);
+    let html = String(cell.getValue() || '');
+    items.forEach(it => {
+      const level = Math.max(0, Math.min(6, Math.floor(Number(it && it.level) || 0)));
+      html += '<div class="check-line" data-level="' + level + '"' + (level ? ' style="margin-left: ' + (level * 24) + 'px;"' : '') + '>' +
+        doneCheck_(false) + '<span class="check-text">' + String((it && it.html) || '') + '</span></div>';
+    });
+    cell.setValue(html);
+    return true;
+  } finally { lock.releaseLock(); }
+}
 
 /* Send a task to a day's Today cell (2026-10-26, Julius): used by the "→ Day"
    button on carry-over tasks when that day isn't loaded in the app. */

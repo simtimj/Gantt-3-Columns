@@ -28,6 +28,8 @@
 //   '- **Dog walks**: 11:15 Brittany · 12:00 Catherine · 12:30 David', or '- **Dog walks**: none today'.
 //   Must do names are bold + underlined: '- **__CDCR application__**: …'. Important = matters but not the most
 //   urgent (yellow). Stretch = bonus if there's time. Later = blue, can wait.
+// Look (Julius, 2026-10-27): box outline and dividers are the same 2px day-colored line; fill is a slightly darker
+//   day tint; every underlined line (Focus areas, Priority check entries) shows bold too.
 // rev: bump (2, 3, …) to re-render an already-inserted block in place; a block he deleted stays deleted.
 // Each entry is applied once (ids in script property "claudeNotesApplied"); deleting it in the app keeps it deleted.
 // Ids must be unique and never reused. Prune entries older than ~30 days.

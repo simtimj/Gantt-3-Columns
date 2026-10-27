@@ -1297,6 +1297,9 @@
   const VIEW_PANES = ['today','journal','reference'];
   const PANE_LABELS = {today:'Today / Tasks',journal:'Notes',reference:'Reference'};
   let visiblePanes = [...VIEW_PANES];
+  // Swipe to the hidden third column in 2-column view — paused (Julius, 2026-10-27):
+  // it broke things in 2-column mode. Set PEEK_ENABLED true to bring it back.
+  var PEEK_ENABLED=false, PEEK_SIDE_KEY='fw.peekSide', lastPeekKey='', peekRevealing=false;
   const COLUMN_STORAGE_KEY = 'focusWorkspaceColumnsV1';
   const FOCUS_STORAGE_KEY = 'focusWorkspaceFocusV1';
   const REF_COLLAPSE_STORAGE_KEY = 'focusWorkspaceRefCollapsedV1';
@@ -4176,7 +4179,7 @@
     split.style.display='';
     // Two columns chosen: keep the third one just off-screen (left or right,
     // see PEEK_SIDE_KEY) so a swipe past the edge always reaches it.
-    const peek=visiblePanes.length===2 ? VIEW_PANES.find(n=>!visiblePanes.includes(n)) : null;
+    const peek=PEEK_ENABLED && visiblePanes.length===2 ? VIEW_PANES.find(n=>!visiblePanes.includes(n)) : null;
     const peekSide=peek ? getPeekSide() : null;
     VIEW_PANES.forEach(name=>{
       const pane=document.getElementById(name+'Pane');
@@ -4239,9 +4242,6 @@
   /* ---- Hidden third column (2-column view) ----
      Swipe past the edge to reach it. Over-swiping at the other edge moves
      it to that side, so the swipe direction decides where it lives. */
-  const PEEK_SIDE_KEY='fw.peekSide';
-  let lastPeekKey='';
-  let peekRevealing=false;
   function getPeekSide(){
     try{ return localStorage.getItem(PEEK_SIDE_KEY)==='left' ? 'left' : 'right'; }catch(e){ return 'right'; }
   }
@@ -4264,7 +4264,7 @@
     const workspace=document.getElementById('workspace');
     const atLeft=()=>workspace.scrollLeft<=2;
     const atRight=()=>workspace.scrollLeft>=workspace.scrollWidth-workspace.clientWidth-2;
-    const active=()=>!isSplitActive() && visiblePanes.length===2;
+    const active=()=>PEEK_ENABLED && !isSplitActive() && visiblePanes.length===2;
     // Touch: a clearly sideways swipe that starts and ends pinned at an edge.
     let t=null;
     document.addEventListener('touchstart',e=>{

@@ -48,6 +48,8 @@ Last updated: 2026-10-26
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Boxed plan and wrap-up (2026-10-26):** Claude's Suggested day (top of Notes, blue edge) and Day wrap-up (bottom of Notes, purple edge) now sit in their own rounded box, so they're clearly separate from your notes. Tonight's two blocks get boxed on the next load.
+
 - **\* marks Claude's work (2026-10-26):** every line Claude logs in the Today cell starts with `*` (no space), e.g. **\*In Today marker**: purple marker on grid cells, so you can tell Claude's lines from your own. Past days were updated once too.
 
 - **Nightly suggested day + day wrap-up (2026-10-26):** every night at ~10 pm a scheduled Claude run writes two blocks into the **Notes** column: a **Day wrap-up** at the end of today's Notes cell (how many tasks got done vs. planned, what you focused on, what carries over) and a **Suggested day** at the top of tomorrow's Notes cell (most urgent first from the Urgent panel, due dates, the Daily Work Log priorities and tomorrow's calendar gaps; then what can wait, stretch, for fun). They land the next time the app loads; delete one and it stays deleted. Done at 10 pm (not 8–9) so late work counts before the plan is made. Already planned tomorrow with Claude earlier? The nightly run skips it. Wrote your own plan? You still get Claude's suggestions above it. Calendar already blocked out? The plan starts with a **Scheduled** list of those blocks as a reminder (it never touches the calendar). Wrap-up details still to be worked out together.

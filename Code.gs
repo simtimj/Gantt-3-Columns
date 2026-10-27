@@ -994,7 +994,24 @@ function applyClaudeDone_() {
 function noteInline_(s) {
   return doneEsc_(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
 }
+// Boxed (Julius, 2026-10-26): the whole block sits in a one-cell table so it
+// reads as a contained card; styled by .editor table[data-cnote] in Index.html.
 function noteBlockHtml_(item) {
+  const kind = item.kind === 'wrap' ? 'wrap' : 'plan';
+  const title = item.title || (kind === 'wrap' ? 'Day wrap-up' : 'Suggested day');
+  let inner = '<div><b><u>' + doneEsc_(title) + '</u></b> <i>· Claude</i></div>';
+  (item.lines || []).forEach(line => {
+    line = String(line == null ? '' : line);
+    if (!line.trim()) inner += '<div><br></div>';
+    else if (/^##\s+/.test(line)) inner += '<div><b><u>' + noteInline_(line.replace(/^##\s+/, '')) + '</u></b></div>';
+    else if (/^-\s+/.test(line)) inner += '<div>• ' + noteInline_(line.replace(/^-\s+/, '')) + '</div>';
+    else inner += '<div>' + noteInline_(line) + '</div>';
+  });
+  return '<table data-cnote="' + doneEsc_(item.id) + '" data-ckind="' + kind + '"><tbody><tr><td>' + inner + '</td></tr></tbody></table>';
+}
+
+// Pre-box flat form, only to find and convert blocks written before 2026-10-26 boxing.
+function noteBlockFlatHtml_(item) {
   const kind = item.kind === 'wrap' ? 'wrap' : 'plan';
   const title = item.title || (kind === 'wrap' ? 'Day wrap-up' : 'Suggested day');
   let html = '<div data-cnote="' + doneEsc_(item.id) + '"><b><u>' + doneEsc_(title) + '</u></b> <i>· Claude</i></div>';
@@ -1007,6 +1024,7 @@ function noteBlockHtml_(item) {
   });
   return html;
 }
+
 function applyClaudeNotes_() {
   const list = (typeof CLAUDE_NOTES !== 'undefined' && Array.isArray(CLAUDE_NOTES)) ? CLAUDE_NOTES : [];
   if (!list.length) return;
@@ -1014,7 +1032,8 @@ function applyClaudeNotes_() {
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeNotesApplied') || '[]'); } catch (e) { applied = []; }
   const fresh = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') && applied.indexOf(String(x.id)) < 0);
-  if (!fresh.length) return;
+  const box = props.getProperty('claudeNotesBoxed') !== '1';
+  if (!fresh.length && !box) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -1034,6 +1053,18 @@ function applyClaudeNotes_() {
       }
       applied.push(String(x.id));
     });
+    if (box) {
+      // One-time: put blocks written before boxing into the box (2026-10-26).
+      list.filter(x => x && x.id && applied.indexOf(String(x.id)) >= 0).forEach(x => {
+        const row = findDayRow_(sheet, x.date);
+        if (!row) return;
+        const cell = sheet.getRange(row, 3);
+        const html = String(cell.getValue() || '');
+        const flat = noteBlockFlatHtml_(x);
+        if (html.indexOf(flat) >= 0) cell.setValue(html.replace(flat, noteBlockHtml_(x)));
+      });
+      props.setProperty('claudeNotesBoxed', '1');
+    }
     props.setProperty('claudeNotesApplied', JSON.stringify(applied.slice(-1000)));
   } finally { lock.releaseLock(); }
 }

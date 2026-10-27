@@ -400,6 +400,11 @@
       padding:1px 4px;
       border-radius:3px;
     }
+    /* Claude's nightly plan / wrap-up box in Notes (2026-10-26) */
+    .editor table[data-cnote]{width:100%;border-collapse:separate;border-spacing:0;margin:6px 0;border:1px solid var(--border);border-radius:10px;background:var(--panel);}
+    .editor table[data-cnote][data-ckind="plan"]{border-left:4px solid var(--accent);}
+    .editor table[data-cnote][data-ckind="wrap"]{border-left:4px solid #8a63d2;}
+    .editor table[data-cnote] td{padding:8px 10px;vertical-align:top;border:none;}
     .check-line{
       display:flex;
       align-items:flex-start;

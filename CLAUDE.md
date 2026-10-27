@@ -53,6 +53,7 @@
 ## Dark text, day colors, Reference header (2026-10-27, Julius)
 
 - Dark mode text: JS sets `--dm-l` (20–100); `--dm-text`, `--dm-muted`, `--muted`, `--done`, `--text` derive from it. Dark inline colors (luminance < .35, e.g. pasted black) get `data-dkc` from a MutationObserver and are painted `--dm-text` in dark mode.
+- Dark cell background: `--dm-cell` from `--dm-cell-l` (0–30, default 11); `.day-row.dow-*` and `.ref-cell-wrapper` use it in dark mode. Slider `#dmCell` in Options, localStorage `fw.dmCell`.
 - Day colors: per-day bases `--day-bg` (light bg), `--note-line`, `--today-border`; always use `--note-line-adj` / `--today-border-adj` (mixed with white `--dc-w` / black `--dc-k` from the `#dayColorAdj` slider, localStorage `fw.dayColorAdj`).
 - Reference header holds `.reference-sort-bar` (Sort select, −, Options). Reference-only padding: `--ref-pad-x` / `--ref-pad-y` (sliders in `#refOptions`, localStorage `fw.refPadX`/`fw.refPadY`), multiplied with the main `--pad-x`/`--pad-y`.
 

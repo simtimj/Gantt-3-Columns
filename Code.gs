@@ -843,6 +843,11 @@ function doneHeaderHtml_(project) {
   return '<div data-cgrp="' + doneEsc_(project) + '"><b><u>' + doneEsc_(project) + '</u></b></div>';
 }
 function doneItemHtml_(name, details, checked, cid) {
+  // Claude's lines start with "*" (no space) so Julius can tell them from his own (2026-10-26).
+  if (cid) {
+    if (name) name = '*' + String(name).replace(/^\*+/, '');
+    else details = '*' + String(details || '').replace(/^\*+/, '');
+  }
   const text = name && details ? '<b>' + doneEsc_(name) + '</b>: ' + doneEsc_(details)
     : name ? '<b>' + doneEsc_(name) + '</b>' : doneEsc_(details);
   return '<div class="check-line' + (checked ? ' done' : '') + '" data-level="0"' +
@@ -948,7 +953,8 @@ function applyClaudeDone_() {
   const valid = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || ''));
   const fresh = valid.filter(x => applied.indexOf(String(x.id)) < 0);
   // One-time pass: regroup days already written in the old flat style.
-  const migrate = props.getProperty('claudeDoneGrouped') !== '1';
+  // '2' (2026-10-26): re-render past days once so old lines get the "*" prefix.
+  const migrate = props.getProperty('claudeDoneGrouped') !== '2';
   if (!fresh.length && !migrate) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -974,7 +980,7 @@ function applyClaudeDone_() {
       if (html !== before) cell.setValue(html);
     });
     props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));
-    props.setProperty('claudeDoneGrouped', '1');
+    props.setProperty('claudeDoneGrouped', '2');
   } finally { lock.releaseLock(); }
 }
 

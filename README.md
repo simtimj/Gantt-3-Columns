@@ -48,6 +48,8 @@ Last updated: 2026-10-26
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **\* marks Claude's work (2026-10-26):** every line Claude logs in the Today cell starts with `*` (no space), e.g. **\*In Today marker**: purple marker on grid cells, so you can tell Claude's lines from your own. Past days were updated once too.
+
 - **Nightly suggested day + day wrap-up (2026-10-26):** every night at ~10 pm a scheduled Claude run writes two blocks into the **Notes** column: a **Day wrap-up** at the end of today's Notes cell (how many tasks got done vs. planned, what you focused on, what carries over) and a **Suggested day** at the top of tomorrow's Notes cell (most urgent first from the Urgent panel, due dates, the Daily Work Log priorities and tomorrow's calendar gaps; then what can wait, stretch, for fun). They land the next time the app loads; delete one and it stays deleted. Done at 10 pm (not 8–9) so late work counts before the plan is made. Wrap-up details still to be worked out together.
 
 - **Calendar panel in Reference (2026-10-26):** between Urgent and Inbox, collapsible. **Today** first (times, what's on now highlighted, past dimmed), then the next 3 days as upcoming. Reads your main calendar and Events straight from Google Calendar, so anything Claude adds (and the dog-walk block later) shows up. ↻ reloads; also refreshes when you come back to the app after 5+ min. Tap an event to open it in Google Calendar.

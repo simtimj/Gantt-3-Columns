@@ -47,6 +47,9 @@ Last updated: 2026-10-27
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Task cards (2026-10-27)**: every task is a card — checkbox + text, with its subtasks inside the same card (rounded box, a little space between cards). In Today, Notes and Reference cells. Turn off in Options → **Show tasks as cards**
+- **Drag cards (2026-10-27)**: drag a task by its checkbox (quick drag, or hold then drag) to move it; its subtasks come along. Dragging a subtask takes only it and what's nested under it. Drop anywhere in the same cell, another day (Today or Notes) or a Reference cell — a blue line shows where it lands; the list scrolls when you drag near the top/bottom. Drag right while moving to nest it under the task above, left to take it out. A tap still ticks, holding still still opens the urgency menu
+- **Card colors by subject (2026-10-27)**: each card's background shows its subject — Code (green), Career (purple), Study (blue), Work (brown, dog walks), Health (pink), Life (teal), Fun (orange). Hold the checkbox → **Card color · subject** to pick one, **Auto** to let the app guess, **None** for plain. Auto guesses from the task's words, then the header it sits under (e.g. Claude's Gantt group → Code). Options → **Color cards by subject automatically** turns guessing off (picked colors stay)
 - **Urgent subtasks nest (2026-10-27)**: a task's subtasks show right under it in the Urgent panel as real checkbox rows (same box and text size as the task, indented); they're no longer listed again as separate tasks even when they share the parent's urgency. Tap one to jump to it, hold its box to change urgency
 - **Urgency on Notes tasks sticks (2026-10-27)**: setting 1/2/3 on a task in Notes (e.g. a carry-over) now stays in the Urgent panel instead of vanishing a second later; tapping it jumps to the Notes line
 - **Dark mode (2026-10-27)**: the app's own dark mode instead of the phone inverting it: black background, every cell (Today, Notes, Reference) is the same dark #121212 as the column headers, with gray text whose brightness is set by the **Text brightness · dark mode** slider in Options (black → white, default 52%, saved per device) and slightly dimmed day-colored lines, the day name is in the day's light color, and the note box lines and today outline use the day's light color (Tuesday light orange, Wednesday light blue…), panels and menus dark. Colors to adjust as we go
@@ -126,7 +129,7 @@ Last updated: 2026-10-27
 - **Idea: built-in time tracking → plan vs actual (2026-10-27)**: own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)
 - **Mirrored tasks (Today ↔ Reference)**: send a carry-over to Today but keep it tracked in its Reference area (e.g. CDCR under State / IT Associate); one linked task in both places, so checking it off in Today also checks it in Reference. Approach to work out (shared task id, show it in both, one source of truth)
 
-- Draggable task cards: every task becomes a card you can drag; dragging a task carries its subtasks, dragging a subtask carries only it and what's nested below.
+- Card subjects: let Julius edit the subject list and keywords in Options (for now they're fixed in `Index.html` → `CARD_CATS`).
 - Hide the "created by a Google Apps Script user" banner — only if the Exercise Tracker's wrapper experiment works out (it's shelved there for being slow).
 
 ---

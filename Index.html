@@ -1204,6 +1204,9 @@
       <output id="dayColorAdjValue">0</output>
       <button class="btn tiny" id="resetDayColorAdj" type="button">Reset</button>
     </div>
+    <div class="ts-sub">Task cards</div>
+    <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
+    <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
     <div class="ts-row ts-font">
       <span class="ts-label">Text font · size</span>
       <select id="paragraphFont" class="top-select font-family-select"></select>
@@ -2201,6 +2204,7 @@
         const level = Math.max(0, Math.min(6, Math.floor(Number(node.dataset.level) || 0)));
         keep['data-level'] = String(level);
         if(/^[123]$/.test(node.dataset.urg || '')) keep['data-urg'] = node.dataset.urg;
+        if(/^[a-z]{2,12}$/.test(node.dataset.cat || '')) keep['data-cat'] = node.dataset.cat;
         if(/^\d{4}-\d{2}-\d{2}$/.test(node.dataset.due || '')){
           keep['data-due'] = node.dataset.due;
           keep['data-due-label'] = dueLabel(node.dataset.due);
@@ -3580,6 +3584,14 @@
     setStatus('Unsaved…');
     saveTimers[date]=setTimeout(()=>saveDay(date),700);
   }
+  /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
+  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag'];
+  function cardCleanHtml(el){
+    if(!el.querySelector('[data-tc],[data-tcdrag]')) return el.innerHTML;
+    const c = el.cloneNode(true);
+    c.querySelectorAll('[data-tc],[data-tcdrag]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    return c.innerHTML;
+  }
   function saveDay(date){
     clearTimeout(saveTimers[date]);
     const info=daySaveState.get(date)||{inFlight:false,pending:true};
@@ -3593,8 +3605,8 @@
     /* Runtime wiring markers must never be persisted. */
     t?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
     j?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
-    const tasks=t?.innerHTML||'';
-    const journal=j?.innerHTML||'';
+    const tasks=t?cardCleanHtml(t):'';
+    const journal=j?cardCleanHtml(j):'';
     const d=state.days.find(x=>x.date===date);
     if(d){d.tasks=tasks;d.journal=journal;}
     if(j) noteUrgentDay(date,journal,false,'journal');
@@ -3952,7 +3964,7 @@
     }
     const refCell = wrap.querySelector(':scope > .ref-cell');
     refCell?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
-    item.content = writeReferenceMetadata(refCell?.innerHTML || '',Date.now());
+    item.content = writeReferenceMetadata(refCell ? cardCleanHtml(refCell) : '',Date.now());
     clearTimeout(
       item._timer
     );
@@ -5715,6 +5727,7 @@
       dueRow.appendChild(clr);
     }
     p.appendChild(dueRow);
+    if(typeof addCardSubjectRow === 'function') addCardSubjectRow(p,line,owner);
     document.body.appendChild(p);
     const r = p.getBoundingClientRect();
     p.style.left = Math.max(6,Math.min(window.innerWidth - r.width - 6,x - 12)) + 'px';
@@ -6009,5 +6022,360 @@
     if(r) r.addEventListener('click',() => { set('x',100); set('y',100); });
   })();
 </script>
+<style>
+  /* ===== Task cards (Julius, 2026-10-27) =====
+     A card = one task (checkbox + text) with its subtasks underneath. Drawn with
+     render-only data-tc* attributes (stripped on save by cardCleanHtml). */
+  :root{--tc-base:rgba(255,255,255,.62);--tc-bd:rgba(0,0,0,.14);--tc-mix:24%;}
+  .check-line[data-tc]{
+    position:relative;box-sizing:border-box;
+    margin-left:calc(var(--tch,0) * 24px)!important;
+    padding:2px 8px 2px calc(8px + var(--tcr,0) * 22px);
+    background:linear-gradient(var(--tc-tint,transparent),var(--tc-tint,transparent)),var(--tc-base);
+    border-left:1px solid var(--tc-bd);border-right:1px solid var(--tc-bd);
+  }
+  .check-line[data-tc^="f"]{border-top:1px solid var(--tc-bd);border-top-left-radius:8px;border-top-right-radius:8px;margin-top:5px;padding-top:4px;}
+  .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
+  .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
+  .check-line[data-tcdrag]{opacity:.3;}
+  /* Drag the checkbox to move the card; the page doesn't scroll from a checkbox. */
+  .editor .check-line > input[type=checkbox],.ref-cell .check-line > input[type=checkbox]{touch-action:none;}
+  body.tc-dragging,body.tc-dragging *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important;}
+  .tc-ghost{position:fixed;z-index:4000;pointer-events:none;opacity:.92;box-shadow:0 10px 28px rgba(0,0,0,.28);border-radius:8px;transform:rotate(1deg);}
+  .tc-ghost .check-line{margin-top:0!important;margin-bottom:0!important;}
+  .tc-drop{position:fixed;z-index:3999;height:3px;border-radius:2px;background:#3b82f6;pointer-events:none;box-shadow:0 0 0 2px rgba(59,130,246,.25);}
+  .tc-drop::before{content:"";position:absolute;left:-4px;top:-3px;width:9px;height:9px;border-radius:50%;background:#3b82f6;}
+  /* Subject row in the hold menu */
+  .urg-picker{max-width:252px;}
+  .urg-cat-row{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;padding-top:6px;border-top:1px solid var(--border);}
+  .urg-cat-row .uc-head{flex:1 0 100%;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+  .urg-cat{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border:1px solid var(--border);border-radius:999px;background:transparent;color:inherit;font-size:11px;line-height:1.3;cursor:pointer;}
+  .urg-cat i{width:9px;height:9px;border-radius:50%;background:var(--c,#bbb);display:inline-block;}
+  .urg-cat.on{border-color:var(--c,#888);background:color-mix(in srgb,var(--c,#888) 22%,transparent);font-weight:700;}
+  @media (prefers-color-scheme: dark){
+    :root{--tc-base:rgba(255,255,255,.045);--tc-bd:rgba(255,255,255,.14);--tc-mix:22%;}
+    .urg-cat-row{border-top-color:#333;}
+  }
+</style>
+<script>
+  /* ===== Task cards + subject colors (Julius, 2026-10-27) =====
+     - Every task is a card: checkbox + text, subtasks inside the same card.
+     - Drag a task's checkbox (or hold it, then drag) to move the card with its
+       subtasks; a subtask moves with only what's nested under it. Works within
+       a cell and across days, Notes and Reference cells. Drag right/left while
+       moving to nest it under the task above / take it back out.
+     - Card background = subject (Code, Career, …): set it from the checkbox hold
+       menu, or let the app guess from the words (and the header it sits under). */
+  const CARD_CATS = [
+    {key:'code',   name:'Code',   color:'#22c55e', re:/\b(gantt|exercise tracker|userscripts?|scripts?|apps? script|clasp|github|repo|code|coding|bugs?|features?|readme|deploy|tampermonkey|violentmonkey|react|typescript|next\.?js|tailwind|javascript|api|css|html|apps?|ui|playnite|endpoint|dashboard|planner hub)\b/i},
+    {key:'career', name:'Career', color:'#8b5cf6', re:/\b(resumes?|résumé|jobs?|job search|applications?|apply|interviews?|linkedin|career|cover letter|recruiters?|ats|cdcr|calcareers|it associate|hiring|portfolio|networking)\b/i},
+    {key:'study',  name:'Study',  color:'#0ea5e9', re:/(^|[^\w])(a\+)(?!\w)|\b(comptia|study|studying|course|class|quiz|exam|practice test|flashcards?|learn|lessons?)\b/i},
+    {key:'work',   name:'Work',   color:'#b45309', re:/\b(dog ?walks?|dog ?walking|walks?|clients?|rover|invoices?)\b/i},
+    {key:'health', name:'Health', color:'#ec4899', re:/\b(exercises?|workout|gym|stretch(ing)?|pt|physical therapy|sleep|doctor|dentist|skincare|running|lift(ing)?|rehab)\b/i},
+    {key:'life',   name:'Life',   color:'#14b8a6', re:/\b(errands?|clean(ing)?|laundry|groceries|grocery|car|oil change|home|garden|bills?|bank|appointments?|dmv|shopping|cook(ing)?|dishes)\b/i},
+    {key:'fun',    name:'Fun',    color:'#f97316', re:/\b(guitar|music|sing(ing)?|games?|gaming|movies?|youtube|fun|spanish|japanese|language)\b/i},
+  ];
+  const CARD_CAT_BY_KEY = Object.fromEntries(CARD_CATS.map(c => [c.key,c]));
+  let cardsOn = true, cardsAuto = true;
+  try{ cardsOn = localStorage.getItem('fw.cards') !== '0'; cardsAuto = localStorage.getItem('fw.cardsAuto') !== '0'; }catch(e){}
+  const cardHeadOf = new WeakMap(); // line -> its card's head line
+
+  (function(){
+    let css = '';
+    for(let i = 1; i <= 6; i++) css += `.check-line[data-tchead="${i}"]{--tch:${i};}.check-line[data-tcrel="${i}"]{--tcr:${i};}`;
+    CARD_CATS.forEach(c => { css += `.check-line[data-tccat="${c.key}"]{--tc-cat:${c.color};}`; });
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  })();
+
+  const tcLvl = n => Math.max(0,Math.min(6,Math.floor(Number(n.dataset.level) || 0)));
+  const tcText = n => (n.textContent || '').replace(/\s+/g,' ').trim().replace(/^\*/,'');
+  function guessCardCat(text){
+    if(!text) return '';
+    for(const c of CARD_CATS) if(c.re.test(text)) return c.key;
+    return '';
+  }
+  function isHeaderLike(n){
+    if(n.matches('h1,h2,h3,[data-cgrp]')) return true;
+    const t = tcText(n);
+    if(!t || t.length > 40) return false;
+    const b = n.querySelector('b,strong,u');
+    return !!b && tcText(b) === t;
+  }
+  function cardEditors(){ return document.querySelectorAll('#todayScroll .day-editor,#journalScroll .journal-editor,#referenceTree .ref-cell'); }
+  function setAttr(n,name,val){
+    if(val === null || val === undefined || val === ''){ if(n.hasAttribute(name)){ n.removeAttribute(name); return true; } return false; }
+    if(n.getAttribute(name) !== String(val)){ n.setAttribute(name,String(val)); return true; }
+    return false;
+  }
+  function refreshCards(ed){
+    if(!ed || !ed.isConnected) return false;
+    let changed = false;
+    const plan = new Map(); // node -> {tc,head,rel,cat}
+    let members = [], headLvl = 0, ctx = '';
+    const flush = () => {
+      if(!members.length) return;
+      const head = members[0];
+      let cat = head.dataset.cat || '';
+      if(cat === 'none') cat = '';
+      else if(!CARD_CAT_BY_KEY[cat]){
+        cat = '';
+        if(cardsAuto) cat = guessCardCat(tcText(head)) || guessCardCat(ctx) || guessCardCat(members.slice(1).map(tcText).join(' '));
+      }
+      members.forEach((m,i) => {
+        cardHeadOf.set(m,head);
+        const first = i === 0, last = i === members.length - 1;
+        plan.set(m,{tc:(first ? 'f' : 'm') + (last ? 'l' : ''), head:headLvl, rel:tcLvl(m) - headLvl, cat});
+      });
+      members = [];
+    };
+    if(cardsOn){
+      for(const n of ed.children){
+        if(n.classList.contains('check-line')){
+          const lv = tcLvl(n);
+          if(members.length && lv > headLvl){ members.push(n); continue; }
+          flush(); members = [n]; headLvl = lv;
+        }else{
+          flush();
+          if(n.tagName === 'HR') ctx = '';
+          else if(isHeaderLike(n)) ctx = tcText(n);
+        }
+      }
+      flush();
+    }
+    for(const n of ed.querySelectorAll(':scope > [data-tc]')) if(!plan.has(n)){ ['data-tc','data-tchead','data-tcrel','data-tccat'].forEach(a => n.removeAttribute(a)); changed = true; }
+    plan.forEach((p,n) => {
+      if(setAttr(n,'data-tc',p.tc)) changed = true;
+      if(setAttr(n,'data-tchead',p.head || '')) changed = true;
+      if(setAttr(n,'data-tcrel',p.rel > 0 ? Math.min(6,p.rel) : '')) changed = true;
+      setAttr(n,'data-tccat',p.cat);
+    });
+    // Card edges add a little height; keep the day row fitted.
+    if(changed && ed.dataset.date && typeof syncDayHeightStable === 'function') requestAnimationFrame(() => syncDayHeightStable(ed.dataset.date));
+    return changed;
+  }
+  function refreshAllCards(){ cardEditors().forEach(refreshCards); }
+
+  // Keep cards in step with edits, loads and new days (debounced).
+  (function(){
+    const root = document.getElementById('workspace') || document.body;
+    const dirty = new Set(); let timer = 0;
+    const editorOf = n => { const el = n && (n.nodeType === 1 ? n : n.parentElement); return el ? el.closest('.day-editor,.journal-editor,.ref-cell') : null; };
+    const obs = new MutationObserver(muts => {
+      for(const m of muts){
+        const ed = editorOf(m.target); if(ed) dirty.add(ed);
+        m.addedNodes.forEach(n => {
+          if(n.nodeType !== 1) return;
+          if(n.matches('.day-editor,.journal-editor,.ref-cell')) dirty.add(n);
+          n.querySelectorAll && n.querySelectorAll('.day-editor,.journal-editor,.ref-cell').forEach(e => dirty.add(e));
+        });
+      }
+      if(dirty.size && !timer) timer = setTimeout(run,180);
+    });
+    function run(){
+      timer = 0;
+      const list = [...dirty]; dirty.clear();
+      list.forEach(refreshCards);
+      obs.takeRecords(); // our own attribute changes aren't edits
+    }
+    obs.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-level','data-cat','class']});
+    refreshAllCards();
+  })();
+
+  // Options: cards on/off, auto subject colors on/off.
+  (function(){
+    const on = document.getElementById('cardsOn'), auto = document.getElementById('cardsAuto');
+    if(on){ on.checked = cardsOn; on.addEventListener('change',() => { cardsOn = on.checked; try{ localStorage.setItem('fw.cards',cardsOn ? '1' : '0'); }catch(e){} refreshAllCards(); cardsSyncHeights(); }); }
+    if(auto){ auto.checked = cardsAuto; auto.addEventListener('change',() => { cardsAuto = auto.checked; try{ localStorage.setItem('fw.cardsAuto',cardsAuto ? '1' : '0'); }catch(e){} refreshAllCards(); }); }
+  })();
+  function cardsSyncHeights(){
+    if(typeof syncDayHeights === 'function') requestAnimationFrame(() => syncDayHeights());
+  }
+
+  // Subject row in the checkbox hold menu (called from showUrgencyPicker).
+  function addCardSubjectRow(p,line,owner){
+    const head = cardHeadOf.get(line) || line;
+    const row = document.createElement('div');
+    row.className = 'urg-cat-row';
+    const h = document.createElement('span'); h.className = 'uc-head'; h.textContent = 'Card color · subject'; row.appendChild(h);
+    const cur = head.dataset.cat || '';
+    const guess = guessCardCat(tcText(head));
+    const opts = [...CARD_CATS.map(c => [c.key,c.name,c.color]), ['', 'Auto' + (guess && !cur ? ' (' + CARD_CAT_BY_KEY[guess].name + ')' : ''), '#bbb'], ['none','None','transparent']];
+    opts.forEach(([key,name,color]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'urg-cat' + (key === cur ? ' on' : '');
+      b.style.setProperty('--c',color);
+      b.innerHTML = '<i></i>'; b.append(name);
+      b.addEventListener('pointerdown',e => e.preventDefault());
+      b.addEventListener('click',() => {
+        if(owner && typeof captureBeforeEdit === 'function') captureBeforeEdit(owner);
+        if(key) head.dataset.cat = key; else delete head.dataset.cat;
+        row.querySelectorAll('.urg-cat').forEach(x => x.classList.toggle('on',x === b));
+        if(owner){ refreshCards(owner); if(typeof finishEditorEdit === 'function') finishEditorEdit(owner); saveEditorOwner(owner); }
+      });
+      row.appendChild(b);
+    });
+    p.appendChild(row);
+  }
+
+  /* ---- Drag a card by its checkbox ---- */
+  (function(){
+    let press = null, drag = null, suppressUntil = 0;
+    const editorOf = el => el && el.closest ? el.closest('.day-editor,.journal-editor,.ref-cell') : null;
+    function startPoint(e){
+      if(e.button === 2) return;
+      const cb = e.target && e.target.closest ? e.target.closest('input[type=checkbox]') : null;
+      if(!cb) return;
+      const line = cb.closest('.check-line'), ed = editorOf(line);
+      if(!line || !ed || line.parentElement !== ed) return; // not inside note boxes etc.
+      press = {cb,line,ed,x:e.clientX,y:e.clientY,id:e.pointerId};
+    }
+    function block(line){
+      const base = tcLvl(line), out = [line];
+      for(let n = line.nextElementSibling; n && n.classList.contains('check-line') && tcLvl(n) > base; n = n.nextElementSibling) out.push(n);
+      return out;
+    }
+    function begin(e){
+      const {line,ed} = press;
+      const nodes = block(line);
+      if(typeof hideUrgencyPicker === 'function') hideUrgencyPicker();
+      if(typeof hideContextMenu === 'function') hideContextMenu();
+      if(typeof cancelLongPress === 'function') try{ cancelLongPress(); }catch(err){}
+      try{ urgPress && clearTimeout(urgPress.timer); urgPress = null; }catch(err){}
+      try{ document.activeElement && document.activeElement.blur && document.activeElement.blur(); }catch(err){}
+      window.getSelection && window.getSelection().removeAllRanges();
+      const r = line.getBoundingClientRect(), er = ed.getBoundingClientRect();
+      const ghost = document.createElement('div');
+      ghost.className = 'tc-ghost';
+      const cs = getComputedStyle(ed);
+      ghost.style.font = cs.font; ghost.style.color = cs.color; ghost.style.width = Math.min(er.width,window.innerWidth - 12) + 'px';
+      nodes.forEach(n => { const c = n.cloneNode(true); c.removeAttribute('data-tcdrag'); c.style.marginLeft = '0'; c.setAttribute('data-tchead','0'); ghost.appendChild(c); });
+      if(nodes.length === 1) ghost.firstChild.setAttribute('data-tc','fl');
+      else { ghost.firstChild.setAttribute('data-tc','f'); ghost.lastChild.setAttribute('data-tc','l'); }
+      document.body.appendChild(ghost);
+      const ind = document.createElement('div'); ind.className = 'tc-drop'; ind.hidden = true; document.body.appendChild(ind);
+      nodes.forEach(n => n.setAttribute('data-tcdrag',''));
+      document.body.classList.add('tc-dragging');
+      if(navigator.vibrate) try{ navigator.vibrate(10); }catch(err){}
+      drag = {nodes,src:ed,line,ghost,ind,offX:e.clientX - r.left,offY:e.clientY - r.top,x0:e.clientX,x:e.clientX,y:e.clientY,base:tcLvl(line),target:null};
+      try{ press.cb.setPointerCapture(press.id); }catch(err){}
+      press = null;
+      move(e);
+      drag.raf = requestAnimationFrame(autoScroll);
+    }
+    function targetAt(x,y){
+      const el = document.elementFromPoint(x,y);
+      let ed = editorOf(el);
+      if(ed && ed.closest('table[data-cnote]')) ed = null;
+      if(!ed){
+        // Between cells: use the day row's editor in that column.
+        const row = el && el.closest ? el.closest('.day-row,.ref-cell-wrapper') : null;
+        if(row) ed = row.querySelector('.day-editor,.journal-editor,:scope > .ref-cell');
+      }
+      if(!ed || !ed.isContentEditable) return null;
+      const kids = [...ed.children].filter(n => !drag.nodes.includes(n));
+      let before = null;
+      for(const k of kids){
+        const r = k.getBoundingClientRect();
+        if(r.height === 0) continue;
+        if(y < r.top + r.height / 2){ before = k; break; }
+      }
+      // Reference cells keep their title first.
+      if(ed.classList.contains('ref-cell') && before && before === ed.firstElementChild && before.tagName === 'H2') before = kids[kids.indexOf(before) + 1] || null;
+      let prev = before ? before.previousElementSibling : ed.lastElementChild;
+      while(prev && drag.nodes.includes(prev)) prev = prev.previousElementSibling;
+      const maxLvl = prev && prev.classList.contains('check-line') ? Math.min(6,tcLvl(prev) + 1) : 0;
+      const want = drag.base + Math.round((x - drag.x0) / 28);
+      const level = Math.max(0,Math.min(maxLvl,want));
+      return {ed,before,prev,level};
+    }
+    function move(e){
+      if(!drag) return;
+      drag.x = e.clientX; drag.y = e.clientY;
+      drag.ghost.style.left = Math.max(4,Math.min(window.innerWidth - drag.ghost.offsetWidth - 4,e.clientX - Math.min(drag.offX,40))) + 'px';
+      drag.ghost.style.top = (e.clientY - drag.offY) + 'px';
+      placeIndicator();
+    }
+    function placeIndicator(){
+      const t = drag.target = targetAt(drag.x,drag.y);
+      const ind = drag.ind;
+      if(!t){ ind.hidden = true; return; }
+      const er = t.ed.getBoundingClientRect();
+      let y;
+      if(t.before){ const r = t.before.getBoundingClientRect(); y = r.top - 2; }
+      else if(t.prev){ const r = t.prev.getBoundingClientRect(); y = r.bottom + 1; }
+      else y = er.top + 4;
+      const pad = parseFloat(getComputedStyle(t.ed).paddingLeft) || 0;
+      const left = er.left + pad + t.level * 24;
+      ind.hidden = false;
+      ind.style.left = left + 'px';
+      ind.style.width = Math.max(30,er.right - left - (parseFloat(getComputedStyle(t.ed).paddingRight) || 0)) + 'px';
+      ind.style.top = y + 'px';
+    }
+    function scrollerAt(x,y){
+      let el = document.elementFromPoint(x,y);
+      while(el && el !== document.body){
+        const cs = getComputedStyle(el);
+        if(/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 2) return el;
+        el = el.parentElement;
+      }
+      return null;
+    }
+    function autoScroll(){
+      if(!drag) return;
+      const sc = scrollerAt(drag.x,drag.y);
+      if(sc){
+        const r = sc.getBoundingClientRect(), edge = 56;
+        let dy = 0;
+        if(drag.y < r.top + edge) dy = -Math.ceil((r.top + edge - drag.y) / 4);
+        else if(drag.y > r.bottom - edge) dy = Math.ceil((drag.y - (r.bottom - edge)) / 4);
+        if(dy){ sc.scrollTop += dy; placeIndicator(); }
+      }
+      drag.raf = requestAnimationFrame(autoScroll);
+    }
+    function finish(cancelled){
+      const d = drag; drag = null;
+      cancelAnimationFrame(d.raf);
+      d.ghost.remove(); d.ind.remove();
+      document.body.classList.remove('tc-dragging');
+      d.nodes.forEach(n => n.removeAttribute('data-tcdrag'));
+      suppressUntil = Date.now() + 450;
+      const t = cancelled ? null : d.target;
+      if(!t) return;
+      const shift = t.level - d.base;
+      const samePlace = t.ed === d.src && shift === 0 && (t.before === d.nodes[d.nodes.length - 1].nextElementSibling);
+      if(samePlace) return;
+      captureBeforeEdit(d.src);
+      if(t.ed !== d.src) captureBeforeEdit(t.ed);
+      d.nodes.forEach(n => {
+        const lv = Math.max(0,Math.min(6,tcLvl(n) + shift));
+        n.dataset.level = String(lv);
+        n.style.marginLeft = lv ? (lv * 24) + 'px' : '';
+        if(t.before) t.ed.insertBefore(n,t.before); else t.ed.appendChild(n);
+      });
+      if(!d.src.children.length) d.src.innerHTML = '<p><br></p>';
+      [d.src,t.ed].forEach(ed => { refreshCards(ed); finishEditorEdit(ed); });
+      urgChanged(d.src);
+      if(t.ed !== d.src) urgChanged(t.ed);
+      if(typeof renderDueBlocks === 'function') try{ renderDueBlocks(); }catch(err){}
+      d.nodes[0].classList.add('urg-flash');
+      setTimeout(() => d.nodes[0].classList.remove('urg-flash'),1400);
+      setStatus(t.ed === d.src ? 'Task moved' : 'Task moved to ' + (t.ed.dataset.date ? (typeof shortDayLabel === 'function' ? shortDayLabel(t.ed.dataset.date) : t.ed.dataset.date) : 'Reference'));
+    }
+    document.addEventListener('pointerdown',startPoint,true);
+    document.addEventListener('pointermove',e => {
+      if(drag){ e.preventDefault(); move(e); return; }
+      if(!press || e.pointerId !== press.id) return;
+      if(Math.abs(e.clientX - press.x) > 8 || Math.abs(e.clientY - press.y) > 8) begin(e);
+    },{capture:true,passive:false});
+    document.addEventListener('pointerup',e => { press = null; if(drag) finish(false); },true);
+    document.addEventListener('pointercancel',e => { press = null; if(drag) finish(true); },true);
+    document.addEventListener('keydown',e => { if(e.key === 'Escape' && drag) finish(true); },true);
+    // A drag must not also tick the box.
+    document.addEventListener('click',e => {
+      if(Date.now() < suppressUntil){ e.preventDefault(); e.stopPropagation(); suppressUntil = 0; }
+    },true);
+  })();
+</script>
+
 </body>
 </html>

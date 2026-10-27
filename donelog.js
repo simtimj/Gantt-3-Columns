@@ -56,5 +56,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-ref-header', date: '2026-10-27', project: 'Gantt', title: 'Compact Reference top', details: 'Sort / − / Options in the Reference header; shorter search row; Reference-only padding in its Options' },
   { id: 'd-20261027-gantt-made-inline', date: '2026-10-27', project: 'Gantt', title: 'Made date by the text', details: 'Urgent tasks show the day made at the end of their text, not at the right edge' },
   { id: 'd-20261027-gantt-urg-dark-box', date: '2026-10-27', project: 'Gantt', title: 'Dark urgency boxes', details: 'urgency checkboxes no longer white squares in dark mode' },
+  { id: 'd-20261027-gantt-task-cards', date: '2026-10-27', project: 'Gantt', title: 'Task cards', details: 'tasks are cards with subtasks inside; drag by the checkbox to move (across days too); background color by subject, auto-guessed or picked from the hold menu' },
   { id: 'd-20261027-gantt-full-due', date: '2026-10-27', project: 'Gantt', title: 'Full Due tasks', details: 'tasks due on a day show in full at the top of that day: checkboxes, full text, subtasks' },
 ];

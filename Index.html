@@ -5393,6 +5393,13 @@
     if(owner && owner.dataset && owner.dataset.date) noteUrgentDay(owner.dataset.date,owner.innerHTML);
     else renderUrgent();
   }
+  // A task line plus the subtasks nested under it (following lines with a deeper level).
+  function urgSubtree(line){
+    const lvl = n => Number(n.dataset.level) || 0;
+    const base = lvl(line), out = [line];
+    for(let n = line.nextElementSibling; n && n.classList.contains('check-line') && lvl(n) > base; n = n.nextElementSibling) out.push(n);
+    return out;
+  }
   function showUrgencyPicker(cb,x,y){
     hideUrgencyPicker();
     if(typeof hideContextMenu === 'function') hideContextMenu();
@@ -5410,8 +5417,10 @@
       b.title = u ? u + ' · ' + URG_NAMES[u] : 'No urgency';
       b.addEventListener('pointerdown',e => e.preventDefault());
       b.addEventListener('click',() => {
-        if(u) line.dataset.urg = String(u); else delete line.dataset.urg;
-        hideUrgencyPicker();
+        // Subtasks follow their task's urgency (Julius, 2026-10-26).
+        urgSubtree(line).forEach(l => { if(u) l.dataset.urg = String(u); else delete l.dataset.urg; });
+        // Stay open so a due date can be set right after (Julius, 2026-10-26).
+        p.querySelectorAll('.urg-pick').forEach(x => x.classList.toggle('on', x === b));
         urgChanged(owner);
       });
       p.appendChild(b);

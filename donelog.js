@@ -44,4 +44,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-dividers-dark', date: '2026-10-27', project: 'Gantt', title: 'Bolder note dividers + Must do label', details: 'deeper day colors so Monday shows in dark mode; Must do · urgent + important' },
   { id: 'd-20261027-gantt-peek-swipe', date: '2026-10-27', project: 'Gantt', title: 'Swipe to hidden third column', details: 'with 2 columns showing, swipe past the edge to reach the third; swipe direction picks its side' },
   { id: 'd-20261027-gantt-note-box-fill', date: '2026-10-27', project: 'Gantt', title: 'Note boxes match the day', details: 'same thick line all around, day-tinted fill instead of white, Focus and Priority check names bold' },
+  { id: 'd-20261027-gantt-notes-urgency', date: '2026-10-27', project: 'Gantt', title: 'Urgency on Notes tasks sticks', details: 'urgent tasks set in Notes stay in the Urgent panel instead of vanishing on save' },
+  { id: 'd-20261027-gantt-dark-mode', date: '2026-10-27', project: 'Gantt', title: 'Own dark mode', details: 'black background, day cells keep light-mode colors; note box inside = day color' },
 ];

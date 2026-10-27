@@ -1068,6 +1068,8 @@
     #typeSettings .ts-daycols label{display:inline-flex;flex-direction:column;align-items:center;font-size:10px;color:var(--muted);gap:1px;}
     #typeSettings .ts-daycols input[type=color]{width:24px;height:20px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;min-height:0!important;}
     body:not(.dm-daymatch) #typeSettings .ts-daycols{opacity:.45;}
+    #typeSettings .ts-dmgroup{break-inside:avoid;}
+    #typeSettings .ts-looks{grid-template-columns:76px minmax(60px,1fr) auto auto!important;}
     #typeSettings .ts-tint-label{display:flex;align-items:center;gap:4px;}
     #typeSettings #dmTint{width:20px;height:18px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;flex:none;min-height:0!important;}
     #typeSettings .ts-sub{margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
@@ -1222,15 +1224,15 @@
       .day-row.dow-6{background:var(--dm-cell);--note-line:#b59d79;}
       .day-row.dow-0{background:var(--dm-cell);--note-line:#c2b562;}
       /* Day-colored dark cells (Julius, 2026-10-27): each day's cell = black → that day's color,
-         same Dark cells slider. Colors per day in Options (defaults = the day line colors). */
-      body.dm-daymatch .day-row[class*="dow-"]{--dm-cell:color-mix(in srgb,var(--dmd) calc(var(--dm-cell-l) * 1.5%),#000);}
-      body.dm-daymatch .day-row.dow-1{--dmd:var(--dmd-1,#ababab);}
-      body.dm-daymatch .day-row.dow-2{--dmd:var(--dmd-2,#c29f7b);}
-      body.dm-daymatch .day-row.dow-3{--dmd:var(--dmd-3,#87a4c0);}
-      body.dm-daymatch .day-row.dow-4{--dmd:var(--dmd-4,#b09b82);}
-      body.dm-daymatch .day-row.dow-5{--dmd:var(--dmd-5,#c0ae62);}
-      body.dm-daymatch .day-row.dow-6{--dmd:var(--dmd-6,#b59d79);}
-      body.dm-daymatch .day-row.dow-0{--dmd:var(--dmd-0,#c2b562);}
+         same Dark cells slider. Colors per day in Options (defaults = the light day colors). */
+      body.dm-daymatch .day-row[class*="dow-"]{--dm-cell:hsl(var(--dmd-h,0) var(--dmd-s,0%) calc(var(--dm-cell-l) * 1%));}
+      body.dm-daymatch .day-row.dow-1{--dmd-h:var(--dmd-h-1,0);--dmd-s:var(--dmd-s-1,0%);}
+      body.dm-daymatch .day-row.dow-2{--dmd-h:var(--dmd-h-2,0);--dmd-s:var(--dmd-s-2,0%);}
+      body.dm-daymatch .day-row.dow-3{--dmd-h:var(--dmd-h-3,0);--dmd-s:var(--dmd-s-3,0%);}
+      body.dm-daymatch .day-row.dow-4{--dmd-h:var(--dmd-h-4,0);--dmd-s:var(--dmd-s-4,0%);}
+      body.dm-daymatch .day-row.dow-5{--dmd-h:var(--dmd-h-5,0);--dmd-s:var(--dmd-s-5,0%);}
+      body.dm-daymatch .day-row.dow-6{--dmd-h:var(--dmd-h-6,0);--dmd-s:var(--dmd-s-6,0%);}
+      body.dm-daymatch .day-row.dow-0{--dmd-h:var(--dmd-h-0,0);--dmd-s:var(--dmd-s-0,0%);}
       .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
       /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text var(--dm-text) (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
       .day-row[class*="dow-"] .day-label{color:var(--note-line-adj);}
@@ -1335,6 +1337,12 @@
   <div id="typeSettings" class="type-settings hidden" role="dialog" aria-label="Scale, padding and fonts">
     <div class="ts-head"><strong>Options</strong><button class="btn tiny" id="closeTypeSettings" type="button">Close</button></div>
     <div class="ts-body">
+    <div class="ts-row ts-looks">
+      <span class="ts-label" title="Save or load all look settings (colors, sliders, theme, fonts, padding) on this device">Saved looks</span>
+      <select id="lookSlot" aria-label="Saved look"><option value="light">Light</option><option value="dark">Dark</option><option value="custom">Custom</option></select>
+      <button class="btn tiny" id="lookSave" type="button">Save</button>
+      <button class="btn tiny" id="lookLoad" type="button">Load</button>
+    </div>
     <div class="ts-row">
       <span class="ts-label">Scale</span>
       <input id="mobileScale" type="range" min="50" max="200" step="10" value="100" aria-label="Workspace scale">
@@ -1363,6 +1371,7 @@
       <output id="dmTextValue">52%</output>
       <button class="btn tiny" id="resetDmText" type="button">Reset</button>
     </div>
+    <div class="ts-dmgroup">
     <div class="ts-row">
       <span class="ts-label ts-tint-label" title="Cell background · dark mode (black → tint color)">Dark cells <input id="dmTint" type="color" value="#ffffff" title="Tint color (white = plain gray)" aria-label="Dark cell tint color"></span>
       <input id="dmCell" type="range" min="0" max="30" step="1" value="11" aria-label="Dark mode cell background, black toward the tint color">
@@ -1373,6 +1382,7 @@
     <div class="ts-daycols" id="dmDayCols">
       <label>M<input type="color" data-dow="1"></label><label>T<input type="color" data-dow="2"></label><label>W<input type="color" data-dow="3"></label><label>T<input type="color" data-dow="4"></label><label>F<input type="color" data-dow="5"></label><label>S<input type="color" data-dow="6"></label><label>S<input type="color" data-dow="0"></label>
       <button class="btn tiny" id="dmDayDefault" type="button">Default</button>
+    </div>
     </div>
     <div class="ts-row">
       <span class="ts-label" title="Day colors · darker / lighter">Day colors</span>
@@ -6423,12 +6433,19 @@
     applyTint(st,false);
     if(tint) tint.addEventListener('input',() => applyTint(tint.value,true));
     // Day-colored dark cells (Julius, 2026-10-27): on by default; per-day colors, Default restores.
-    const DDEF = {1:'#ababab',2:'#c29f7b',3:'#87a4c0',4:'#b09b82',5:'#c0ae62',6:'#b59d79',0:'#c2b562'}, dm = document.getElementById('dmDayMatch');
+    const DDEF = {1:'#eeeeee',2:'#fff0df',3:'#e6f1fb',4:'#ead8c2',5:'#fff0bd',6:'#d9b98c',0:'#fff4a8'}, dm = document.getElementById('dmDayMatch');
     let dcols = {}; try{ dcols = JSON.parse(localStorage.getItem('fw.dmDayColors') || '{}') || {}; }catch(e){ dcols = {}; }
     function applyDays(){
       document.querySelectorAll('#dmDayCols input[data-dow]').forEach(inp => {
         const d = inp.dataset.dow, c = /^#[0-9a-f]{6}$/i.test(dcols[d] || '') ? dcols[d] : DDEF[d];
-        inp.value = c; document.documentElement.style.setProperty('--dmd-' + d,c);
+        inp.value = c;
+        // Keep the hue, cap saturation; the Dark cells slider sets how light (so a pale picker color still tints).
+        const n = parseInt(c.slice(1),16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+        const mx = Math.max(r,g,b), mn = Math.min(r,g,b), l = (mx + mn) / 2, dl = mx - mn;
+        let h = 0, sat = 0;
+        if(dl){ sat = dl / (1 - Math.abs(2 * l - 1)); h = mx === r ? ((g - b) / dl) % 6 : mx === g ? (b - r) / dl + 2 : (r - g) / dl + 4; h = Math.round(h * 60 + 360) % 360; }
+        document.documentElement.style.setProperty('--dmd-h-' + d,String(h));
+        document.documentElement.style.setProperty('--dmd-s-' + d,Math.round(Math.min(sat,1) * 55) + '%');
       });
     }
     applyDays();
@@ -7202,6 +7219,31 @@
     });
     if(sel) sel.addEventListener('change',() => fwTheme.set(sel.value));
     fwTheme.collect();
+  })();
+</script>
+<script>
+  // Saved looks (Julius, 2026-10-27): Light / Dark / Custom slots that save every look setting on this device.
+  (function(){
+    const KEYS = ['fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
+    const sel = document.getElementById('lookSlot'), sv = document.getElementById('lookSave'), ld = document.getElementById('lookLoad');
+    if(!sel || !sv || !ld) return;
+    const all = () => { try{ return JSON.parse(localStorage.getItem('fw.looks') || '{}') || {}; }catch(e){ return {}; } };
+    function mark(){ const a = all(); [...sel.options].forEach(o => { o.textContent = o.value[0].toUpperCase() + o.value.slice(1) + (a[o.value] ? '' : ' (empty)'); }); }
+    try{ const last = localStorage.getItem('fw.lookSlot'); if(last) sel.value = last; }catch(e){}
+    mark();
+    sel.addEventListener('change',() => { try{ localStorage.setItem('fw.lookSlot',sel.value); }catch(e){} });
+    sv.addEventListener('click',() => {
+      const a = all(), snap = {};
+      KEYS.forEach(k => { try{ const v = localStorage.getItem(k); if(v !== null) snap[k] = v; }catch(e){} });
+      a[sel.value] = snap; try{ localStorage.setItem('fw.looks',JSON.stringify(a)); }catch(e){}
+      mark(); sv.textContent = 'Saved ✓'; setTimeout(() => { sv.textContent = 'Save'; },1200);
+    });
+    ld.addEventListener('click',() => {
+      const snap = all()[sel.value];
+      if(!snap){ alert('Nothing saved in "' + sel.value + '" yet. Set things up, then tap Save.'); return; }
+      KEYS.forEach(k => { try{ if(k in snap) localStorage.setItem(k,snap[k]); else localStorage.removeItem(k); }catch(e){} });
+      const r = document.querySelector('.refresh-btn'); if(r) r.click(); else location.reload();
+    });
   })();
 </script>
 </body>

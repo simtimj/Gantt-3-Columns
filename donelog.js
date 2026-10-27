@@ -78,4 +78,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-dark-tint-checkbox-subjects', date: '2026-10-27', project: 'Gantt', title: 'Dark tint + checkbox subjects', details: 'Dark cells tint color picker; Card subjects folded into chips; subject color now fills the checkbox (urgency = border), whole-card color is an Options toggle' },
   { id: 'd-20261027-day-dark-cells', date: '2026-10-27', project: 'Gantt', title: 'Day-colored dark cells', details: 'dark day cells now black → the day color (Dark cells slider); per-day color pickers with a Default button in Options; urgency checkbox borders thicker with a glow' },
   { id: 'd-20261027-dash-in-cell', date: '2026-10-27', project: 'Gantt', title: 'Task count under the date', details: 'Today: X out of Y tasks done bar moved from the toolbar into today\'s Today cell, right under the date' },
+  { id: 'd-20261027-saved-looks', date: '2026-10-27', project: 'Gantt', title: 'Saved looks + light day colors', details: 'day pickers start on the light day colors (dark cells keep their hue); Light / Dark / Custom saved looks in Options; Dark cells controls kept in one column' },
 ];

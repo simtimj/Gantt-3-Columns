@@ -87,3 +87,5 @@
 - `--dm-cell` = `color-mix(in srgb, var(--dm-tint) L%, #000)`; `#dmTint` color input (localStorage `fw.dmTint`, default white = old gray). Light cells + transparent card tints looked brown — that's why cards moved to checkbox fill.
 - Card subjects editor: `.ts-cats` gets `.open` (localStorage `fw.cardCatsOpen`, default closed); `#cardCatChips` filled in `renderCardCatEditor()`.
 - `body.tc-boxfill` (localStorage `fw.cardsBoxFill`, default on, `#cardsBoxFill`): card tint off; checkbox background = `--tc-cat`, border = `--urg` (or subject mixed with gray), checked mark white with dark drop-shadow.
+- Day-colored dark cells: `body.dm-daymatch` (localStorage `fw.dmDayMatch`, default on, `#dmDayMatch`) redefines `--dm-cell` on `.day-row` as `color-mix(var(--dmd) L*1.5%, #000)`; `--dmd-<dow>` set from `#dmDayCols` pickers (localStorage `fw.dmDayColors` JSON, defaults = dark `--note-line` colors; `#dmDayDefault` clears).
+- Urgency checkboxes: border 2.5px + glow; in boxfill mode a 1.5px padding with `background-clip:content-box` separates urgency border from subject fill.

@@ -76,4 +76,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-dark-cells', date: '2026-10-27', project: 'Gantt', title: 'Dark cells slider', details: 'Options → Dark cells: Today/Notes/Reference cell background black → gray, saved per device; default a bit grayer' },
   { id: 'd-20261027-gantt-urg-counts', date: '2026-10-27', project: 'Gantt', title: 'Urgent header counts', details: 'Urgent header shows red/yellow/blue counts per level (grey Due when present), live' },
   { id: 'd-20261027-dark-tint-checkbox-subjects', date: '2026-10-27', project: 'Gantt', title: 'Dark tint + checkbox subjects', details: 'Dark cells tint color picker; Card subjects folded into chips; subject color now fills the checkbox (urgency = border), whole-card color is an Options toggle' },
+  { id: 'd-20261027-day-dark-cells', date: '2026-10-27', project: 'Gantt', title: 'Day-colored dark cells', details: 'dark day cells now black → the day color (Dark cells slider); per-day color pickers with a Default button in Options; urgency checkbox borders thicker with a glow' },
 ];

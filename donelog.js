@@ -80,4 +80,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-dash-in-cell', date: '2026-10-27', project: 'Gantt', title: 'Task count under the date', details: 'Today: X out of Y tasks done bar moved from the toolbar into today\'s Today cell, right under the date' },
   { id: 'd-20261027-saved-looks', date: '2026-10-27', project: 'Gantt', title: 'Saved looks + light day colors', details: 'day pickers start on the light day colors (dark cells keep their hue); Light / Dark / Custom saved looks in Options; Dark cells controls kept in one column' },
   { id: 'd-20261027-day-sections', date: '2026-10-27', project: 'Gantt', title: 'Day sections', details: 'Morning / Afternoon / Evening separators in today\'s Today cell, foldable like title lines, Options toggle' },
+  { id: 'd-20261027-day-section-tints', date: '2026-10-27', project: 'Gantt', title: 'Day section colors', details: 'Morning light yellow, Afternoon yellow-orange, Evening sunset purple bands behind the day sections' },
+  { id: 'd-20261027-looks-to-claude', date: '2026-10-27', project: 'Gantt', title: 'Dark day colors reset + looks for Claude', details: 'dark day colors reset to the light-mode defaults; Options → Save also copies the look to the Sheet\'s Looks tab so Claude can make it the default' },
 ];

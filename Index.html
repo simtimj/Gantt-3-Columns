@@ -1645,8 +1645,10 @@
       }
     );
     el.addEventListener('blur', () => {
-      if(el.dataset.date) requestAnimationFrame(() => syncDayHeight(el.dataset.date));
+      // Stable: resizing the row you just left must not move the view (2026-10-26).
+      if(el.dataset.date) requestAnimationFrame(() => syncDayHeightStable(el.dataset.date));
     });
+    el.addEventListener('pointerdown', holdDayView, {passive:true});
     el.addEventListener(
       'keydown',
       e => {
@@ -3043,6 +3045,27 @@
       ref.scrollTop += delta;
       [a,b].forEach(el => { if(el && el !== ref && el.clientHeight > 0) el.scrollTop = ref.scrollTop; });
     }
+  }
+  /* Tapping into a Today or Notes cell must not move the view (2026-10-26,
+     Julius: tapping Notes jumped the panel). Remember both scroll positions
+     on pointerdown; for the next ~400ms, if they change without the person
+     scrolling (wheel / touch move), put them back. */
+  let dayViewHold = null;
+  function holdDayView(){
+    const a = document.getElementById('todayScroll');
+    const b = document.getElementById('journalScroll');
+    if(!a || !b) return;
+    const hold = dayViewHold = {a:a.scrollTop, b:b.scrollTop, moved:false};
+    const mark = () => { hold.moved = true; };
+    ['wheel','touchmove'].forEach(t => window.addEventListener(t, mark, {once:true, passive:true, capture:true}));
+    const fix = () => {
+      if(dayViewHold !== hold || hold.moved) return;
+      if(Math.abs(a.scrollTop - hold.a) > 0.5) a.scrollTop = hold.a;
+      if(Math.abs(b.scrollTop - hold.b) > 0.5) b.scrollTop = hold.b;
+    };
+    requestAnimationFrame(() => { fix(); requestAnimationFrame(fix); });
+    [60, 150, 300, 400].forEach(ms => setTimeout(fix, ms));
+    setTimeout(() => { if(dayViewHold === hold) dayViewHold = null; }, 450);
   }
   function syncDayHeightStable(date){
     if(!date) return;

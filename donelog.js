@@ -22,4 +22,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-et-compact-today', date: '2026-10-26', project: 'Exercise Tracker', title: 'Compact Today, two columns', details: 'Simple view Today cards two per row, smaller text', },
   { id: 'd-20261026-et-grid-hide', date: '2026-10-26', project: 'Exercise Tracker', title: 'Hide grid toggle', details: '▴ Hide folds the sticky grid down to just the tabs' },
   { id: 'd-20261026-gantt-grouped-log', date: '2026-10-26', project: 'Gantt', title: 'Grouped done log', details: 'Claude work batched under an underlined project header' },
+  { id: 'd-20261026-gantt-due-group', date: '2026-10-26', project: 'Gantt', title: 'Due group in Urgent', details: 'due-dated tasks with no urgency listed at the bottom, soonest first' },
+  { id: 'd-20261026-gantt-tap-no-jump', date: '2026-10-26', project: 'Gantt', title: 'No jump when tapping Notes', details: 'tapping into a Notes or Today cell keeps the view where it was' },
 ];

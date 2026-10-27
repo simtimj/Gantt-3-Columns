@@ -18,6 +18,12 @@
 //   name); a task with parts gets each part as a '  [] ' subtask, also **Name**: details.
 // Plan (Julius, 2026-10-26): cells:true (each section its own row, no blank lines needed). Each entry is a
 //   '- **Name**: one-line summary' with its time blocks / steps underneath as '  ' detail lines ('9:00–12:00 · …').
+//   Section order: '## Calendar' → '## Must do' → '## Stretch' → '## Soon' → '## Later'. No For fun section.
+//   Calendar: only real events (e.g. '- **CalCareers block**: 4:00–6:30'); never wake, routine, nap, chill or
+//   other fixed daily blocks. Always a dog-walk line from the Time To Pet calendar with client first names:
+//   '- **Dog walks**: 11:15 Brittany · 12:00 Catherine · 12:30 David', or '- **Dog walks**: none today'.
+//   Must do names are bold + underlined: '- **__CDCR application__**: …'. Stretch = important, OK if it slips.
+//   Soon = yellow tasks to chip away at if there's time (matches the Urgent panel's Soon). Later = blue, can wait.
 // rev: bump (2, 3, …) to re-render an already-inserted block in place; a block he deleted stays deleted.
 // Each entry is applied once (ids in script property "claudeNotesApplied"); deleting it in the app keeps it deleted.
 // Ids must be unique and never reused. Prune entries older than ~30 days.
@@ -56,30 +62,30 @@ const CLAUDE_NOTES = [
     '[] **Frictionless capture**: button opens Claude listening; Claude cleans the idea into Title: details and adds it to the Inbox',
     '[] **Halloween gig (Fri 10/30)**: rock show for a friend; final prep check before Friday',
   ] },
-  { id: 'n-20261027-plan', rev: 3, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested day · Tue 10/27', lines: [
-    'Fixed: wake 7:30 · routine 8–8:45 · nap 2–3 · CalCareers block 4–6:30 · chill 9:30 pm · no dog walks',
+  { id: 'n-20261027-plan', rev: 4, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested day · Tue 10/27', lines: [
+    '## Calendar',
+    '- **CalCareers block**: 4:00–6:30',
+    '- **Dog walks**: none today',
     '## Must do',
-    '- **CDCR application**: due end of day today',
+    '- **__CDCR application__**: due end of day today',
     '  9:00–10:45 · SOQ, 2 pages against the duty statement',
     '  10:45–12:00 · cover letter, one page',
-    '- **Submit it**: in the 4:00–6:30 CalCareers block',
+    '- **__Submit it__**: in the 4:00–6:30 CalCareers block',
     '  4:00–5:15 · fill STD 678 to match the résumé',
     '  5:15–6:30 · attach résumé, cover letter, SOQ, then submit',
-    '## Next',
+    '## Stretch · important, OK if it slips',
+    '- **IT lab (AD / M365)**: target ~Nov 6',
+    '  7:30–8:30 pm · next lab step',
+    '- **A+ review**: modular vs non-modular PSUs',
+    '## Soon · yellow, chip away if there\'s time',
     '- **Halloween gig (Fri 10/30)**: prep check',
     '  7:00–7:30 pm · setlist and gear',
     '- **Claude-to-Gantt pipeline**: only after submitting',
     '  12:30–1:45 · plan the Apps Script endpoint',
     '- **Calendar visibility**: confirm Claude sees every calendar before scheduling',
-    '## Can wait',
+    '## Later · can wait',
     '- **Cleanup IT Associate ref**: after submitting',
     '- **Pin references to top**: stay put when sorting',
     '- **Move out ex thing** · **Frictionless capture**',
-    '## Stretch',
-    '- **IT lab (AD / M365)**: target ~Nov 6',
-    '  7:30–8:30 pm · next lab step',
-    '- **A+ review**: modular vs non-modular PSUs',
-    '## For fun',
-    '- **Chill**: from 9:30 pm',
   ] },
 ];

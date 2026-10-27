@@ -47,6 +47,8 @@ Last updated: 2026-10-26
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Urgency picker stays open**: picking 1/2/3/✕ keeps the menu up so you can set the due date next; tap outside to close
+- **Subtasks follow urgency**: setting (or clearing) a task's urgency applies it to all its subtasks too
 - **Reference Options pop-up**: Options opens as a small pop-up over Reference (nothing gets pushed down); tap outside or scroll to close
 - **Send menu dates**: Today and Tomorrow show the actual date underneath in small text (e.g. 10/28 Wed)
 - **→ Reference**: the send menu has a Reference picker; the task (with its subtasks) goes to the end of that Reference cell and leaves the note. Preselects the cell whose title matches the task's words, else the last one used

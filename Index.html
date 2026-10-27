@@ -1088,6 +1088,7 @@
     /* Urgent header counts (2026-10-27): one number per level in its color. */
     .urg-counts{display:inline-flex;gap:7px;margin-left:8px;font-variant-numeric:tabular-nums;}
     .urg-count{font-weight:700;}
+    .urg-sub{font-weight:600;font-size:.8em;margin-left:2px;opacity:.85;}
     .urg-count[data-urg="1"]{color:#e5484d;}.urg-count[data-urg="2"]{color:#d29e00;}.urg-count[data-urg="3"]{color:#3b82f6;}.urg-count[data-urg="0"]{color:#8a8f98;}
     /* Mini dashboard (2026-10-27): today's tasks done, in the toolbar. */
     .dash-chip{display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:0 0 6px;padding:1px 8px;font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:999px;color:var(--muted);white-space:nowrap;}
@@ -1225,14 +1226,14 @@
       .day-row.dow-0{background:var(--dm-cell);--note-line:#c2b562;}
       /* Day-colored dark cells (Julius, 2026-10-27): each day's cell = black → that day's color,
          same Dark cells slider. Colors per day in Options (defaults = the light day colors). */
-      body.dm-daymatch .day-row[class*="dow-"]{--dm-cell:hsl(var(--dmd-h,0) var(--dmd-s,0%) calc(var(--dm-cell-l) * 1%));}
-      body.dm-daymatch .day-row.dow-1{--dmd-h:var(--dmd-h-1,0);--dmd-s:var(--dmd-s-1,0%);}
-      body.dm-daymatch .day-row.dow-2{--dmd-h:var(--dmd-h-2,0);--dmd-s:var(--dmd-s-2,0%);}
-      body.dm-daymatch .day-row.dow-3{--dmd-h:var(--dmd-h-3,0);--dmd-s:var(--dmd-s-3,0%);}
-      body.dm-daymatch .day-row.dow-4{--dmd-h:var(--dmd-h-4,0);--dmd-s:var(--dmd-s-4,0%);}
-      body.dm-daymatch .day-row.dow-5{--dmd-h:var(--dmd-h-5,0);--dmd-s:var(--dmd-s-5,0%);}
-      body.dm-daymatch .day-row.dow-6{--dmd-h:var(--dmd-h-6,0);--dmd-s:var(--dmd-s-6,0%);}
-      body.dm-daymatch .day-row.dow-0{--dmd-h:var(--dmd-h-0,0);--dmd-s:var(--dmd-s-0,0%);}
+      /* (Julius, 2026-10-27) no inversion: the cell is exactly the color in the Options picker. */
+      body.dm-daymatch .day-row.dow-1{--dm-cell:var(--dmd-c-1,#2b2b2b);}
+      body.dm-daymatch .day-row.dow-2{--dm-cell:var(--dmd-c-2,#7a3c06);}
+      body.dm-daymatch .day-row.dow-3{--dm-cell:var(--dmd-c-3,#173a5e);}
+      body.dm-daymatch .day-row.dow-4{--dm-cell:var(--dmd-c-4,#4a3520);}
+      body.dm-daymatch .day-row.dow-5{--dm-cell:var(--dmd-c-5,#5e4a0a);}
+      body.dm-daymatch .day-row.dow-6{--dm-cell:var(--dmd-c-6,#523716);}
+      body.dm-daymatch .day-row.dow-0{--dm-cell:var(--dmd-c-0,#5c520a);}
       .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
       /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text var(--dm-text) (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
       .day-row[class*="dow-"] .day-label{color:var(--note-line-adj);}
@@ -5133,10 +5134,23 @@
     head.type = 'button';
     head.className = 'urg-head';
     // Per-level counts in each level's color (Julius, 2026-10-27): red · yellow · blue (+ grey Due).
-    const cnt = u => items.filter(x => String(x.urg || 0) === String(u)).length;
+    // Tasks counted, not subtasks; subtask progress shown as (done/total) after the number.
+    // A subtask with its own different color counts as an item in that color (Julius, 2026-10-27).
+    const tally = {0:{n:0,d:0,t:0},1:{n:0,d:0,t:0},2:{n:0,d:0,t:0},3:{n:0,d:0,t:0}};
+    items.forEach(x => {
+      const u = x.urg || 0; tally[u].n++;
+      (x.subs || []).forEach(s => {
+        if(s.urg && s.urg !== u){ if(!s.done) tally[s.urg].n++; return; }
+        tally[u].t++; if(s.done) tally[u].d++;
+      });
+    });
+    const cnt = u => tally[u].n;
     const counts = document.createElement('span'); counts.className = 'urg-counts';
     [[1,'Urgent'],[2,'Soon'],[3,'Can be later']].concat(cnt(0) ? [[0,'Due']] : []).forEach(([u,name]) => {
-      const n = document.createElement('span'); n.className = 'urg-count'; n.dataset.urg = u; n.textContent = cnt(u); n.title = name + ': ' + cnt(u);
+      const t = tally[u], n = document.createElement('span'); n.className = 'urg-count'; n.dataset.urg = u;
+      n.textContent = t.n;
+      if(t.t){ const sp = document.createElement('small'); sp.className = 'urg-sub'; sp.textContent = '(' + t.d + '/' + t.t + ')'; n.append(sp); }
+      n.title = name + ': ' + t.n + (t.t ? ' · subtasks ' + t.d + '/' + t.t + ' done' : '');
       counts.append(n);
     });
     head.append(pmBox(urgentOpen), document.createTextNode('Urgent'), counts);
@@ -6434,29 +6448,24 @@
     applyTint(st,false);
     if(tint) tint.addEventListener('input',() => applyTint(tint.value,true));
     // Day-colored dark cells (Julius, 2026-10-27): on by default; per-day colors, Default restores.
-    const DDEF = {1:'#eeeeee',2:'#fff0df',3:'#e6f1fb',4:'#ead8c2',5:'#fff0bd',6:'#d9b98c',0:'#fff4a8'}, dm = document.getElementById('dmDayMatch');
-    // One-time reset (Julius, 2026-10-27): drop his custom dark day colors so they start from the light day colors again.
-    try{ if(localStorage.getItem('fw.dmDayReset') !== '1'){ localStorage.removeItem('fw.dmDayColors'); localStorage.setItem('fw.dmDayReset','1'); } }catch(e){}
-    let dcols = {}; try{ dcols = JSON.parse(localStorage.getItem('fw.dmDayColors') || '{}') || {}; }catch(e){ dcols = {}; }
+    // Dark day colors are what you see (Julius, 2026-10-27): no inversion from the light colors; Tuesday = orange.
+    const DDEF = {1:'#2b2b2b',2:'#7a3c06',3:'#173a5e',4:'#4a3520',5:'#5e4a0a',6:'#523716',0:'#5c520a'}, dm = document.getElementById('dmDayMatch');
+    // Old saved values (fw.dmDayColors) were LIGHT colors that got inverted, so they're dropped once.
+    try{ localStorage.removeItem('fw.dmDayColors'); }catch(e){}
+    let dcols = {}; try{ dcols = JSON.parse(localStorage.getItem('fw.dmDayColors2') || '{}') || {}; }catch(e){ dcols = {}; }
     function applyDays(){
       document.querySelectorAll('#dmDayCols input[data-dow]').forEach(inp => {
         const d = inp.dataset.dow, c = /^#[0-9a-f]{6}$/i.test(dcols[d] || '') ? dcols[d] : DDEF[d];
         inp.value = c;
-        // Keep the hue, cap saturation; the Dark cells slider sets how light (so a pale picker color still tints).
-        const n = parseInt(c.slice(1),16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-        const mx = Math.max(r,g,b), mn = Math.min(r,g,b), l = (mx + mn) / 2, dl = mx - mn;
-        let h = 0, sat = 0;
-        if(dl){ sat = dl / (1 - Math.abs(2 * l - 1)); h = mx === r ? ((g - b) / dl) % 6 : mx === g ? (b - r) / dl + 2 : (r - g) / dl + 4; h = Math.round(h * 60 + 360) % 360; }
-        document.documentElement.style.setProperty('--dmd-h-' + d,String(h));
-        document.documentElement.style.setProperty('--dmd-s-' + d,Math.round(Math.min(sat,1) * 55) + '%');
+        document.documentElement.style.setProperty('--dmd-c-' + d,c);
       });
     }
     applyDays();
     document.querySelectorAll('#dmDayCols input[data-dow]').forEach(inp => inp.addEventListener('input',() => {
-      dcols[inp.dataset.dow] = inp.value; try{ localStorage.setItem('fw.dmDayColors',JSON.stringify(dcols)); }catch(e){} applyDays();
+      dcols[inp.dataset.dow] = inp.value; try{ localStorage.setItem('fw.dmDayColors2',JSON.stringify(dcols)); }catch(e){} applyDays();
     }));
     const dd = document.getElementById('dmDayDefault');
-    if(dd) dd.addEventListener('click',() => { dcols = {}; try{ localStorage.removeItem('fw.dmDayColors'); }catch(e){} applyDays(); });
+    if(dd) dd.addEventListener('click',() => { dcols = {}; try{ localStorage.removeItem('fw.dmDayColors2'); }catch(e){} applyDays(); });
     let match = true; try{ match = localStorage.getItem('fw.dmDayMatch') !== '0'; }catch(e){}
     document.body.classList.toggle('dm-daymatch',match);
     if(dm){ dm.checked = match; dm.addEventListener('change',() => { document.body.classList.toggle('dm-daymatch',dm.checked); try{ localStorage.setItem('fw.dmDayMatch',dm.checked ? '1' : '0'); }catch(e){} }); }
@@ -7308,7 +7317,7 @@
 <script>
   // Saved looks (Julius, 2026-10-27): Light / Dark / Custom slots that save every look setting on this device.
   (function(){
-    const KEYS = ['fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
+    const KEYS = ['fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors2','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
     const sel = document.getElementById('lookSlot'), sv = document.getElementById('lookSave'), ld = document.getElementById('lookLoad');
     if(!sel || !sv || !ld) return;
     const all = () => { try{ return JSON.parse(localStorage.getItem('fw.looks') || '{}') || {}; }catch(e){ return {}; } };

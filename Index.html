@@ -1145,8 +1145,12 @@
       #dateLabel,.format-hint,.empty,.ref-drag,#referenceTree .ref-disclosure,.uc-day.past,.editor:empty:before,.ref-cell:empty:before{color:var(--dm-muted);}
       .editor pre.code-block,.ref-cell pre.code-block{background:#1a1a1a;border-color:#333;color:var(--dm-text);}
       [data-dkc]{color:var(--dm-text)!important;}
+      /* Urgency checkboxes: dark inside with the colored border, not white (Julius, 2026-10-27) */
+      .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{background:#121212;}
+      .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]:checked{background:var(--urg);}
+      .urg-pick:not(.on){background:#1c1c1c;}
       .reference-sort-bar #refOptionsBtn.on{background:#1d2738;border-color:#3f74a6;}
-      .urg-picker,.urg-pick,.urg-due-chip,.uc-today,#calPanel,#inboxPanel{background:#161616;}
+      .urg-picker,.urg-due-chip,.uc-today,#calPanel,#inboxPanel{background:#161616;}
     }
 </style>
 </head>

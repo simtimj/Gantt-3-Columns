@@ -927,7 +927,7 @@
     #urgentPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     /* Each urgency level gets its own left bar in its own color (2026-10-26). */
     .urg-group{margin-top:6px;padding-left:8px;border-left:3px solid var(--urg);}
-    .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}
+    .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}.urg-group[data-urg="0"],.urg-row[data-urg="0"]{--urg:#8a8f98;}
     .urg-group .urg-sub{margin-top:0;color:var(--urg);}
     .urg-head{display:block;width:100%;text-align:left;background:none;border:0;padding:2px 0;font-weight:700;font-size:13px;cursor:pointer;color:inherit;}
     .urg-sub{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
@@ -4583,10 +4583,12 @@
       tpl.innerHTML = urgentSource.get(date);
       const lines = [...tpl.content.querySelectorAll('.check-line')];
       lines.forEach((line,i) => {
-        const urg = line.dataset.urg;
-        if(!/^[123]$/.test(urg || '')) return;
+        const urg = /^[123]$/.test(line.dataset.urg || '') ? line.dataset.urg : '0';
+        const hasDue = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '');
         const cb = line.querySelector('input[type=checkbox]');
         const done = !!(cb && cb.hasAttribute('checked')); // Stays listed until urgency is cleared.
+        // Due date but no urgency → the "Due" group at the bottom, while open (2026-10-26, Julius).
+        if(urg === '0' && (!hasDue || done)) return;
         const level = Number(line.dataset.level) || 0;
         const subs = [];
         for(let j = i + 1; j < lines.length; j++){
@@ -4638,7 +4640,7 @@
     const head = document.createElement('button');
     head.type = 'button';
     head.className = 'urg-head';
-    head.append(pmBox(urgentOpen), document.createTextNode('Urgent · ' + items.length));
+    head.append(pmBox(urgentOpen), document.createTextNode('Urgent · ' + items.filter(x => x.urg).length + (items.some(x => !x.urg) ? ' · Due ' + items.filter(x => !x.urg).length : '')));
     head.title = 'Tap to collapse/expand · hold to add a task';
     head.addEventListener('click',() => {
       if(urgCreateSuppress){ urgCreateSuppress = false; return; }
@@ -4663,7 +4665,7 @@
       empty.textContent = 'Nothing urgent. Tap + Task to add one.';
       panel.appendChild(empty);
     }
-    [1,2,3].forEach(u => {
+    [1,2,3,0].forEach(u => {
       const group = items.filter(x => x.urg === u)
         .sort((a,b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || (a.due || '').localeCompare(b.due || ''));
       if(!group.length) return;
@@ -4673,9 +4675,14 @@
       panel.appendChild(wrap);
       const sub = document.createElement('div');
       sub.className = 'urg-sub';
-      sub.textContent = u + ' · ' + URG_NAMES[u];
-      sub.title = 'Hold (or right-click) to make a ' + URG_NAMES[u] + ' task';
-      holdForCreate(sub,u);
+      if(u){
+        sub.textContent = u + ' · ' + URG_NAMES[u];
+        sub.title = 'Hold (or right-click) to make a ' + URG_NAMES[u] + ' task';
+        holdForCreate(sub,u);
+      } else {
+        sub.textContent = 'Due';
+        sub.title = 'Tasks with a due date but no urgency, soonest first';
+      }
       wrap.appendChild(sub);
       group.forEach(item => {
         const row = document.createElement('button');

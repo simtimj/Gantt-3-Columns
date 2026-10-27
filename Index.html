@@ -6594,10 +6594,10 @@
   .editor > [data-sec]{margin:10px 0 4px;padding:0 0 2px;border-bottom:2px solid var(--note-line-adj,var(--border));font-size:.82em;letter-spacing:.06em;text-transform:uppercase;color:var(--note-line-adj,var(--muted));}
   .editor > [data-sec]:first-child{margin-top:0;}
   /* Day section boxes (Julius, 2026-10-27): each section is its own rounded box like the Suggested Day —
-     bright outline + soft fill along the sun (morning yellow, afternoon orange, evening sunset purple).
+     bright outline + soft fill along the sun (morning midday-sun yellow, afternoon bright orange — 2026-10-27 retune; afternoon orange, evening sunset purple).
      Drawn render-only behind the editor by paintDaySecs (.sec-boxes is never saved). */
-  :root{--sec-m-bd:#f2c200;--sec-m:transparent;--sec-a-bd:#f6b366;--sec-a:transparent;--sec-e-bd:#bf97e8;--sec-e:transparent;}
-  @media (prefers-color-scheme: dark){:root{--sec-m-bd:#d9ad12;--sec-m:transparent;--sec-a-bd:#e8a35c;--sec-a:transparent;--sec-e-bd:#b98ee6;--sec-e:transparent;}}
+  :root{--sec-m-bd:#ffd60a;--sec-m:transparent;--sec-a-bd:#ff8a1f;--sec-a:transparent;--sec-e-bd:#bf97e8;--sec-e:transparent;}
+  @media (prefers-color-scheme: dark){:root{--sec-m-bd:#ffe14d;--sec-m:transparent;--sec-a-bd:#ff9a33;--sec-a:transparent;--sec-e-bd:#b98ee6;--sec-e:transparent;}}
   .sec-host{position:relative;}
   .sec-host > .editor.sec-painted{position:relative;z-index:1;padding-left:15px!important;padding-right:15px!important;padding-bottom:8px!important;}
   .sec-boxes{position:absolute;inset:0;pointer-events:none;z-index:0;}

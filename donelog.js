@@ -89,4 +89,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-sec-typing-line', date: '2026-10-27', project: 'Gantt', title: 'Day section typing line + lighter look', details: 'each section always keeps an empty line to type in; afternoon and evening outlines lighter; box fills removed' },
   { id: 'd-20261027-sec-times', date: '2026-10-27', project: 'Gantt', title: 'Day section times', details: 'Morning 8:30 am – 2 pm, Afternoon 3:45 – 6:30 pm, Evening 6:30 – 9:30 pm shown on each section line' },
   { id: 'd-20261027-sec-bottom-line', date: '2026-10-27', project: 'Gantt', title: 'Room at the bottom of each section', details: 'every section always ends with an empty line to type into; typing on it adds a fresh one below' },
+  { id: 'd-20261027-sec-colors', date: '2026-10-27', project: 'Gantt', title: 'Brighter day section colors', details: 'Morning outline now a light midday-sun yellow, Afternoon a brighter true orange (light and dark mode)' },
 ];

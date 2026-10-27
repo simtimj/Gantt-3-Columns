@@ -3,7 +3,7 @@
 //   kind 'wrap' → today's Day wrap-up, added at the END of that day's Notes cell
 //   kind 'plan' → tomorrow's Suggested day, added at the TOP of that day's Notes cell
 // Format: { id: 'n-YYYYMMDD-plan' | 'n-YYYYMMDD-wrap', date: 'YYYY-MM-DD', kind: 'plan' | 'wrap',
-//           title: 'Suggested day · Tue 10/27', lines: ['## Must do · urgent + important', '**Resume**: finish bullets', '- plain line'] }
+//           title: 'Suggested day · Tue 10/27', lines: ['## Must Do / Urgent + Important', '**Resume**: finish bullets', '- plain line'] }
 // Line markup: '## x' = bold underlined sub-header, '**x**' = bold, '__x__' = underlined, '- x' = dash list item
 //   (every list line starts with '- ', shown as a dash), '[] x' = checkbox task with a "→ Day" send button, '' = blank line.
 // Style (Julius, 2026-10-26): Must do lines are '- ' items too. In the wrap-up, don't mention what's absent
@@ -22,11 +22,11 @@
 //   each part as a '  [] ' subtask, also **Name**: details.
 // Plan (Julius, 2026-10-26): cells:true (each section its own row, no blank lines needed). Each entry is a
 //   '- **Name**: one-line summary' with its time blocks / steps underneath as '  ' detail lines ('9:00–12:00 · …').
-//   Section order: '## Calendar' → '## Must do · urgent + important' → '## Important' → '## Stretch' → '## Later'. No For fun section.
+//   Section order: '## Calendar' → '## Must Do / Urgent + Important' → '## Important / not the most urgent' → '## Stretch' → '## Later'. No For fun section.
 //   Calendar: only real events (e.g. '- **CalCareers block**: 4:00–6:30'); never wake, routine, nap, chill or
 //   other fixed daily blocks. Always a dog-walk line from the Time To Pet calendar with client first names:
 //   '- **Dog walks**: 11:15 Brittany · 12:00 Catherine · 12:30 David', or '- **Dog walks**: none today'.
-//   Must do names are bold + underlined: '- **__CDCR application__**: …'. Important = matters but not the most
+//   Must Do names are bold + underlined and Title Cased (every word capitalized): '- **__CDCR Application__**: …' (Julius, 2026-10-27). Important = matters but not the most
 //   urgent (yellow). Stretch = bonus if there's time. Later = blue, can wait.
 // Look (Julius, 2026-10-27): box outline and dividers are the same thin 1px day-colored line; fill is a slightly darker
 //   day tint; every underlined line (Focus areas, Priority check entries) shows bold too.
@@ -66,18 +66,18 @@ const CLAUDE_NOTES = [
     '[] **Frictionless capture**: button opens Claude listening; Claude cleans the idea into Title: details and adds it to the Inbox',
     '[] **Halloween gig (Fri 10/30)**: rock show for a friend; final prep check before Friday',
   ] },
-  { id: 'n-20261027-plan', rev: 6, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested day · Tue 10/27', lines: [
+  { id: 'n-20261027-plan', rev: 7, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested day · Tue 10/27', lines: [
     '## Calendar',
     '- **CalCareers block**: 4:00–6:30',
     '- **Dog walks**: none today',
-    '## Must do · urgent + important',
-    '- **__CDCR application__**: due end of day today',
+    '## Must Do / Urgent + Important',
+    '- **__CDCR Application__**: due end of day today',
     '  9:00–10:45 · SOQ, 2 pages against the duty statement',
     '  10:45–12:00 · cover letter, one page',
-    '- **__Submit it__**: in the 4:00–6:30 CalCareers block',
+    '- **__Submit It__**: in the 4:00–6:30 CalCareers block',
     '  4:00–5:15 · fill STD 678 to match the résumé',
     '  5:15–6:30 · attach résumé, cover letter, SOQ, then submit',
-    '## Important · not the most urgent',
+    '## Important / not the most urgent',
     '- **Halloween gig (Fri 10/30)**: prep check',
     '  7:00–7:30 pm · setlist and gear',
     '- **Claude-to-Gantt pipeline**: only after submitting',

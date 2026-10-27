@@ -1105,6 +1105,8 @@
       .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
       /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text var(--dm-text) (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
       .day-row[class*="dow-"] .day-label{color:var(--note-line);}
+      /* Experiment (Julius, 2026-10-27): Suggested Day outer border = white with a heavy splash of the day color */
+      .day-row[class*="dow-"] .editor table[data-ckind="plan"]{border-color:#ddd;border-color:color-mix(in srgb, var(--note-line) 55%, #fff);}
       .pane,#toolbar,#focusControls,.pane-header{background:#121212;}
       .ref-cell-wrapper{background:#121212;border-bottom-color:#333;}
       .ref-cell-wrapper:hover{background:#1a1a1a;}

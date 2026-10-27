@@ -3,7 +3,7 @@
 //   kind 'wrap' → today's Day wrap-up, added at the END of that day's Notes cell
 //   kind 'plan' → tomorrow's Suggested day, added at the TOP of that day's Notes cell
 // Format: { id: 'n-YYYYMMDD-plan' | 'n-YYYYMMDD-wrap', date: 'YYYY-MM-DD', kind: 'plan' | 'wrap',
-//           title: 'Suggested day · Tue 10/27', lines: ['## Must do', '**Resume**: finish bullets', '- plain line'] }
+//           title: 'Suggested day · Tue 10/27', lines: ['## Must do · urgent + important', '**Resume**: finish bullets', '- plain line'] }
 // Line markup: '## x' = bold underlined sub-header, '**x**' = bold, '__x__' = underlined, '- x' = dash list item
 //   (every list line starts with '- ', shown as a dash), '[] x' = checkbox task with a "→ Day" send button, '' = blank line.
 // Style (Julius, 2026-10-26): Must do lines are '- ' items too. In the wrap-up, don't mention what's absent
@@ -22,7 +22,7 @@
 //   each part as a '  [] ' subtask, also **Name**: details.
 // Plan (Julius, 2026-10-26): cells:true (each section its own row, no blank lines needed). Each entry is a
 //   '- **Name**: one-line summary' with its time blocks / steps underneath as '  ' detail lines ('9:00–12:00 · …').
-//   Section order: '## Calendar' → '## Must do' → '## Important' → '## Stretch' → '## Later'. No For fun section.
+//   Section order: '## Calendar' → '## Must do · urgent + important' → '## Important' → '## Stretch' → '## Later'. No For fun section.
 //   Calendar: only real events (e.g. '- **CalCareers block**: 4:00–6:30'); never wake, routine, nap, chill or
 //   other fixed daily blocks. Always a dog-walk line from the Time To Pet calendar with client first names:
 //   '- **Dog walks**: 11:15 Brittany · 12:00 Catherine · 12:30 David', or '- **Dog walks**: none today'.
@@ -64,11 +64,11 @@ const CLAUDE_NOTES = [
     '[] **Frictionless capture**: button opens Claude listening; Claude cleans the idea into Title: details and adds it to the Inbox',
     '[] **Halloween gig (Fri 10/30)**: rock show for a friend; final prep check before Friday',
   ] },
-  { id: 'n-20261027-plan', rev: 5, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested day · Tue 10/27', lines: [
+  { id: 'n-20261027-plan', rev: 6, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested day · Tue 10/27', lines: [
     '## Calendar',
     '- **CalCareers block**: 4:00–6:30',
     '- **Dog walks**: none today',
-    '## Must do',
+    '## Must do · urgent + important',
     '- **__CDCR application__**: due end of day today',
     '  9:00–10:45 · SOQ, 2 pages against the duty statement',
     '  10:45–12:00 · cover letter, one page',

@@ -41,4 +41,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-gantt-note-dividers', date: '2026-10-26', project: 'Gantt', title: 'Note dividers in day color', details: 'wrap-up and plan section lines thicker, deeper day color, more space' },
   { id: 'd-20261026-gantt-ref-options-popup', date: '2026-10-26', project: 'Gantt', title: 'Reference Options pop-up', details: 'opens over Reference instead of pushing cells down; closes on tap outside' },
   { id: 'd-20261026-gantt-urg-picker-open', date: '2026-10-26', project: 'Gantt', title: 'Urgency picker stays open', details: 'pick a color, then set the due date without reopening; subtasks get the same urgency' },
+  { id: 'd-20261027-gantt-dividers-dark', date: '2026-10-27', project: 'Gantt', title: 'Bolder note dividers + Must do label', details: 'deeper day colors so Monday shows in dark mode; Must do · urgent + important' },
 ];

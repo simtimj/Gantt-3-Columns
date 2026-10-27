@@ -1235,6 +1235,8 @@
       body.dm-daymatch .day-row.dow-5{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-5,#fff0bd), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
       body.dm-daymatch .day-row.dow-6{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-6,#d9b98c), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
       body.dm-daymatch .day-row.dow-0{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-0,#fff4a8), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      /* Match off (Julius, 2026-10-27): plain dark cells, whatever else sets a day background. */
+      body:not(.dm-daymatch) .day-row[class*="dow-"]{background:var(--dm-cell)!important;}
       .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
       /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text var(--dm-text) (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
       .day-row[class*="dow-"] .day-label{color:var(--note-line-adj);}
@@ -1391,6 +1393,12 @@
       <input id="dayColorAdj" type="range" min="-60" max="60" step="5" value="0" aria-label="Day colors, darker to lighter">
       <output id="dayColorAdjValue">0</output>
       <button class="btn tiny" id="resetDayColorAdj" type="button">Reset</button>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label" title="Task card fill · clear → white (separate for light and dark mode)">Card fill</span>
+      <input id="cardFill" type="range" min="0" max="80" step="2" value="62" aria-label="Task card fill, clear to white">
+      <output id="cardFillValue">62%</output>
+      <button class="btn tiny" id="resetCardFill" type="button">Reset</button>
     </div>
     <div class="ts-row ts-font">
       <span class="ts-label" title="Text font · size">Font</span>
@@ -6578,7 +6586,7 @@
   /* ===== Task cards (Julius, 2026-10-27) =====
      A card = one task (checkbox + text) with its subtasks underneath. Drawn with
      render-only data-tc* attributes (stripped on save by cardCleanHtml). */
-  :root{--tc-base:rgba(255,255,255,.62);--tc-bd:rgba(0,0,0,.14);--tc-mix:24%;}
+  :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fl,62) * 1%),transparent);--tc-bd:rgba(0,0,0,.14);--tc-mix:24%;}
   .check-line[data-tc]{
     position:relative;box-sizing:border-box;
     margin-left:calc(var(--tch,0) * 24px)!important;
@@ -6647,7 +6655,7 @@
   .urg-cat i{width:9px;height:9px;border-radius:50%;background:var(--c,#bbb);display:inline-block;}
   .urg-cat.on{border-color:var(--c,#888);background:color-mix(in srgb,var(--c,#888) 22%,transparent);font-weight:700;}
   @media (prefers-color-scheme: dark){
-    :root{--tc-base:rgba(255,255,255,.045);--tc-bd:rgba(255,255,255,.14);--tc-mix:22%;}
+    :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fd,12) * 1%),transparent);--tc-bd:rgba(255,255,255,.14);--tc-mix:22%;}
     .urg-cat-row{border-top-color:#333;}
   }
 </style>
@@ -7355,9 +7363,30 @@
   })();
 </script>
 <script>
+  // Card fill slider (Julius, 2026-10-27): how light the inside of a task card is (white overlay %),
+  // saved separately for light (fw.cardFillL, default 62) and dark mode (fw.cardFillD, default 12).
+  (function(){
+    const el = document.getElementById('cardFill'), out = document.getElementById('cardFillValue'), rs = document.getElementById('resetCardFill');
+    const DEF = {light:62, dark:12}, KEY = {light:'fw.cardFillL', dark:'fw.cardFillD'}, VAR = {light:'--tc-fl', dark:'--tc-fd'};
+    const mode = () => (window.fwTheme && fwTheme.current() === 'dark') ? 'dark' : 'light';
+    function get(m){ let v = DEF[m]; try{ const x = localStorage.getItem(KEY[m]); if(x !== null && x !== '' && isFinite(+x)) v = +x; }catch(e){} return v; }
+    function show(){ const v = get(mode()); if(el) el.value = v; if(out) out.textContent = v + '%'; }
+    function apply(m,v,save){
+      v = Math.max(0,Math.min(80,Number(v))); if(!isFinite(v)) v = DEF[m];
+      document.documentElement.style.setProperty(VAR[m],String(v));
+      if(save) try{ localStorage.setItem(KEY[m],String(v)); }catch(e){}
+      if(m === mode()) show();
+    }
+    apply('light',get('light'),false); apply('dark',get('dark'),false); show();
+    if(el) el.addEventListener('input',() => apply(mode(),el.value,true));
+    if(rs) rs.addEventListener('click',() => { const m = mode(); try{ localStorage.removeItem(KEY[m]); }catch(e){} apply(m,DEF[m],false); });
+    new MutationObserver(show).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+  })();
+</script>
+<script>
   // Saved looks (Julius, 2026-10-27): Light / Dark / Custom slots that save every look setting on this device.
   (function(){
-    const KEYS = ['fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
+    const KEYS = ['fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.cardFillL','fw.cardFillD','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
     const sel = document.getElementById('lookSlot'), sv = document.getElementById('lookSave'), ld = document.getElementById('lookLoad');
     if(!sel || !sv || !ld) return;
     const all = () => { try{ return JSON.parse(localStorage.getItem('fw.looks') || '{}') || {}; }catch(e){ return {}; } };

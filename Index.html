@@ -6135,7 +6135,9 @@
     return out;
   }
   function setCardCats(list,save){
-    const clean = cleanCardCats(list) || CARD_CATS_DEFAULT.map(c => ({...c}));
+    // An empty or unreadable list (e.g. an old cached copy) falls back to the starting subjects.
+    const got = cleanCardCats(list);
+    const clean = (got && got.length) ? got : CARD_CATS_DEFAULT.map(c => ({...c}));
     CARD_CATS = clean.map(c => ({...c, re:cardCatRegex(c.words)}));
     CARD_CAT_BY_KEY = Object.fromEntries(CARD_CATS.map(c => [c.key,c]));
     const plain = CARD_CATS.map(({re,...c}) => c);

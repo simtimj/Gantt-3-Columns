@@ -58,5 +58,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-urg-dark-box', date: '2026-10-27', project: 'Gantt', title: 'Dark urgency boxes', details: 'urgency checkboxes no longer white squares in dark mode' },
   { id: 'd-20261027-gantt-task-cards', date: '2026-10-27', project: 'Gantt', title: 'Task cards', details: 'tasks are cards with subtasks inside; drag by the checkbox to move (across days too); background color by subject, auto-guessed or picked from the hold menu' },
   { id: 'd-20261027-gantt-card-subjects', date: '2026-10-27', project: 'Gantt', title: 'Editable card subjects + compact Options', details: 'set each subject\'s color, name and words in Options (synced across devices); Options rows on one line, panel spreads into columns' },
+  { id: 'd-20261027-gantt-subjects-fallback', date: '2026-10-27', project: 'Gantt', title: 'Card subjects always filled', details: 'Options → Card subjects starts with Code, Career, Study, Work, Health, Life, Fun; an empty saved list falls back to them' },
   { id: 'd-20261027-gantt-full-due', date: '2026-10-27', project: 'Gantt', title: 'Full Due tasks', details: 'tasks due on a day show in full at the top of that day: checkboxes, full text, subtasks' },
 ];

@@ -47,6 +47,8 @@ Last updated: 2026-10-27
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Due today group in Notes (2026-10-27):** tasks due that day (any urgency, with subtasks) sit in a boxed group under the Suggested day in the Notes cell, so Today/Tasks stays clear. − / + collapses it (open by default on today, closed on other days; remembered per day on this device); collapsed it shows "3 hidden · 1 done" and an urgency dot per task. Edit a task's text right there — it edits the real task (Enter finishes). Tap the box = done. Hold or right-click the box = the usual urgency / due date / subject menu plus **↗ Go to task** (a plain tap no longer jumps). The Urgent panel's hold menu has **↗ Go to task** too. Needs the task's own day loaded to edit it.
+- **Theme button in the main toolbar (2026-10-27):** ☾/☀ now sits next to Today in the normal toolbar (it was only in Focus mode's bar); dark mode cards fixed to match the old dark look.
 - **Light / dark toggle, saved per device (2026-10-27):** ☾/☀ button next to Today flips the theme and saves it on that device only; hold it to go back to the device default. Defaults: MacBook/desktop light, phone and tablet dark (ignores the OS setting). Also in Options → Theme (Auto / Light / Dark).
 - **Smaller Reference panels (2026-10-27):** Urgent, Calendar and Inbox use tighter padding and spacing; the Inbox add box moved to a small **+ Add** button on its header line.
 
@@ -105,7 +107,7 @@ Last updated: 2026-10-27
 
 - **Options button** replaces "Scale": same panel (scale, padding, font), now titled Options and meant to hold every setting, plus the Urgent panel settings below.
 - Urgent panel rows (concise): task text always starts at the left, then the day it was made in small gray ("10/26"), and the due date hugs the right. Options → Urgent panel: **Show day made** on/off, and **Due date** style — "Tue 10/27", "Tue 10/27 · 3d" (default), or just "3d". Due today shows "Today" (bold yellow), tomorrow "Tmrw", overdue "2d late" (bold red); hover/hold shows the full date.
-- **Due tasks show on their day:** a task due Oct 27 also appears at the top of the Oct 27 cell in Today/Tasks, as a small "Due ☐ task · from Mon 10/26" line in its urgency color (struck through once done). Tap it to jump to the task where it lives. Works for any task with a due date, urgent or not. (It's a pointer, not a copy — the task still lives on its original day.)
+- **Due tasks show on their day — in Notes (moved 2026-10-27):** a task due Oct 27 shows in the Oct 27 **Notes** cell (no longer in Today/Tasks) as its own boxed **Due today** group, right under Claude's Suggested day (or at the top). See 🧪 for details. It's a live copy — the task still lives on its original day.
 
 - **☐ Checkbox** in the hold / right-click menu: turns the line you're on into a task (checkbox at the start, text and formatting kept, indent kept) — same as typing `[]` + Space. Not on titles or in code blocks; says so if the line is already a task.
 

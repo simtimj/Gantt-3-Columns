@@ -1064,6 +1064,18 @@
     .di-text{flex:1;min-width:0;overflow-wrap:anywhere;}
     .di-from{font-size:.75em;color:var(--muted);margin-left:4px;}
     .di-line.done > .di-text{text-decoration:line-through;opacity:.6;}
+    /* Due group in Notes (2026-10-27): its own box under the Suggested day, collapsible. */
+    .due-notes{margin:6px 0;padding:4px 8px 5px;border:1.5px solid var(--note-line-adj,var(--border));border-radius:10px;-webkit-user-select:text;user-select:text;}
+    .dn-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.92em;cursor:pointer;-webkit-user-select:none;user-select:none;padding:1px 0;}
+    .dn-dots{display:inline-flex;gap:3px;margin-left:auto;}
+    .dn-dots i{width:8px;height:8px;border-radius:50%;background:#8a8f98;}
+    .dn-dots i[data-urg="1"]{background:#e5484d;}.dn-dots i[data-urg="2"]{background:#f0b000;}.dn-dots i[data-urg="3"]{background:#3b82f6;}
+    .due-notes .due-item{margin:2px 0 0;padding:2px 0;}
+    .due-notes .di-line{cursor:default;}
+    .due-notes .di-text{outline:none;cursor:text;border-radius:3px;}
+    .due-notes .di-text[contenteditable="true"]:focus{background:rgba(127,127,127,.12);}
+    .due-notes .di-from{flex:0 0 auto;align-self:center;}
+    .urg-goto{flex:1 0 100%;margin-top:4px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:left;}
     /* Reference options, Urgent create, Inbox, −/+ toggles (2026-10-26, Julius). */
     /* Sort-row buttons match the Sort dropdown's size, and the row wraps instead
        of running off a phone screen (2026-10-26, Julius). */
@@ -1237,6 +1249,8 @@
         }
       });
       if(add) st.textContent += add;
+      // Must come after every other stylesheet, or later light rules win.
+      (document.body || document.head).appendChild(st);
       apply();
     }
     function apply(){
@@ -1245,8 +1259,7 @@
       document.documentElement.style.colorScheme = t;
       darkStyle().disabled = t !== 'dark';
       const m = document.getElementById('themeColorMeta'); if(m) m.content = t === 'dark' ? '#000000' : '#f6f7f8';
-      const b = document.getElementById('themeToggle');
-      if(b){ b.textContent = t === 'dark' ? '☀' : '☾'; b.title = (t === 'dark' ? 'Switch to light' : 'Switch to dark') + ' · saved on this ' + DEVICE + (saved() === 'auto' ? ' (now: device default)' : '') + ' · hold for device default'; }
+      document.querySelectorAll('.theme-toggle').forEach(b => { b.textContent = t === 'dark' ? '☀' : '☾'; b.title = (t === 'dark' ? 'Switch to light' : 'Switch to dark') + ' · saved on this ' + DEVICE + (saved() === 'auto' ? ' (now: device default)' : '') + ' · hold for device default'; })
       const sel = document.getElementById('themeSelect');
       if(sel){ sel.value = saved(); const o = sel.querySelector('option[value=auto]'); if(o) o.textContent = 'Auto (' + DEVICE + ': ' + DEVICE_DEFAULT + ')'; }
     }
@@ -1262,7 +1275,7 @@
   <div id="focusControls">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
-    <button class="btn" type="button" id="themeToggle" aria-label="Light / dark">☾</button>
+    <button class="btn theme-toggle" type="button" aria-label="Light / dark">☾</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
@@ -1329,6 +1342,7 @@
   <div id="toolbar">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
+    <button class="btn theme-toggle" type="button" id="themeToggle" aria-label="Light / dark">☾</button>
     <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
@@ -3700,8 +3714,9 @@
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
   const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag'];
   function cardCleanHtml(el){
-    if(!el.querySelector('[data-tc],[data-tcdrag]')) return el.innerHTML;
+    if(!el.querySelector('[data-tc],[data-tcdrag],[data-render-due]')) return el.innerHTML;
     const c = el.cloneNode(true);
+    c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
     c.querySelectorAll('[data-tc],[data-tcdrag]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
   }
@@ -4946,7 +4961,7 @@
   let urgentOpen = true;
   try{ urgentOpen = localStorage.getItem('fw.urgentOpen') !== '0'; }catch(e){}
   function urgencyCheckbox(t){
-    const box = t && t.closest ? t.closest('#urgentPanel .urg-box') : null;
+    const box = t && t.closest ? t.closest('#urgentPanel .urg-box, .due-notes .di-box') : null;
     if(box) return box;
     const cb = t && t.closest ? t.closest('input[type=checkbox]') : null;
     if(!cb) return null;
@@ -5720,51 +5735,140 @@
     });
     return out;
   }
-  // Tasks due on a day show at the top of that day's Today cell (read-only;
-  // tap one to jump to where it lives).
+  // Tasks due on a day show in that day's NOTES cell (Julius, 2026-10-27:
+  // Today was filling up), as their own boxed, collapsible group right under
+  // Claude's Suggested day (or at the top). Render-only: the group is
+  // contenteditable=false, marked data-render-due, and stripped on save
+  // (cardCleanHtml). Edit a task's text right in the group (it edits the
+  // real task); tap the box = done; hold / right-click the box = urgency
+  // picker with "Go to task". Events are delegated (initDueNotes), so a
+  // group restored by undo still works.
+  function dueNotesOpen(date){
+    try{ const m = JSON.parse(localStorage.getItem('fw.dueNotesOpen') || '{}'); if(date in m) return !!m[date]; }catch(e){}
+    return date === localToday();
+  }
+  function setDueNotesOpen(date,open){
+    try{
+      const m = JSON.parse(localStorage.getItem('fw.dueNotesOpen') || '{}');
+      m[date] = open ? 1 : 0;
+      const keys = Object.keys(m).sort(); while(keys.length > 60) delete m[keys.shift()];
+      localStorage.setItem('fw.dueNotesOpen',JSON.stringify(m));
+    }catch(e){}
+  }
   function renderDueBlocks(){
+    // The old Today-cell copies are gone.
+    document.querySelectorAll('#todayScroll .day-row > .due-block').forEach(b => { const d = b.closest('.day-row').dataset.date; b.remove(); syncDayHeightStable(d); });
     const byDay = new Map();
     collectDue().forEach(it => { if(!byDay.has(it.due)) byDay.set(it.due,[]); byDay.get(it.due).push(it); });
-    document.querySelectorAll('#todayScroll .day-row').forEach(row => {
-      const list = byDay.get(row.dataset.date) || [];
-      let block = row.querySelector(':scope > .due-block');
-      const sig = JSON.stringify(list);
-      if(block && block.dataset.sig === sig) return;
-      if(!list.length){ if(block){ block.remove(); syncDayHeightStable(row.dataset.date); } return; }
+    document.querySelectorAll('#journalScroll .journal-editor[data-date]').forEach(ed => {
+      const date = ed.dataset.date;
+      const list = byDay.get(date) || [];
+      const all = [...ed.querySelectorAll('.due-notes')];
+      all.slice(1).forEach(x => x.remove());
+      let block = all[0] || null;
+      if(block && document.activeElement && document.activeElement.closest && document.activeElement.closest('.di-text') && block.contains(document.activeElement)) return; // don't redraw while typing in it
+      const open = dueNotesOpen(date);
+      const sig = JSON.stringify([open,list]);
+      if(block && block.dataset.sig === sig && block.dataset.listened === '1' && block.isConnected){ placeDueNotes(ed,block); return; }
+      if(!list.length){ if(block){ block.remove(); syncDayHeightStable(date); } return; }
       if(!block){
         block = document.createElement('div');
-        block.className = 'due-block';
-        const label = row.querySelector(':scope > .day-label');
-        if(label) label.after(block); else row.prepend(block);
+        block.className = 'due-notes';
+        block.setAttribute('contenteditable','false');
+        block.dataset.renderDue = '1';
       }
       block.dataset.sig = sig;
+      block.dataset.listened = '1';
+      block.dataset.date = date;
       block.innerHTML = '';
-      // Full task (Julius, 2026-10-27): checkbox, full wrapped text and subtasks,
-      // like it looks where it lives. Checkboxes tick the real task; text jumps to it.
-      list.forEach(it => {
-        const card = document.createElement('div');
-        card.className = 'due-item' + (it.done ? ' done' : '');
-        if(it.urg) card.dataset.urg = it.urg;
-        const from = 'Due · from ' + dateObj(it.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(it.date).getMonth() + 1) + '/' + dateObj(it.date).getDate();
-        const mk = (t,level,isMain) => {
-          const r = document.createElement('div');
-          r.className = 'di-line' + (t.done ? ' done' : '');
-          if(t.urg) r.dataset.urg = t.urg;
-          if(level) r.style.paddingLeft = (level * 1.4) + 'em';
-          const box = document.createElement('button'); box.type = 'button'; box.className = 'di-box';
-          box.setAttribute('aria-label', t.done ? 'Mark not done' : 'Mark done');
-          box.addEventListener('click',e => { e.stopPropagation(); toggleDueTask(it.date,t.index,it.pane); });
-          const tx = document.createElement('span'); tx.className = 'di-text'; tx.innerHTML = t.html;
-          if(isMain){ const f = document.createElement('span'); f.className = 'di-from'; f.textContent = from; tx.append(' ',f); }
-          r.append(box,tx);
-          r.addEventListener('click',() => goToTask(it.date,t.index,it.pane));
-          return r;
-        };
-        card.appendChild(mk(it,0,true));
-        (it.subs || []).forEach(st => card.appendChild(mk(st,st.level,false)));
-        block.appendChild(card);
-      });
-      syncDayHeightStable(row.dataset.date);
+      const count = list.length + list.reduce((n,it) => n + (it.subs || []).length,0);
+      const done = list.reduce((n,it) => n + (it.done ? 1 : 0) + (it.subs || []).filter(s => s.done).length,0);
+      const head = document.createElement('div');
+      head.className = 'dn-head';
+      head.append(pmBox(open));
+      const ht = document.createElement('span');
+      ht.textContent = 'Due today · ' + list.length + (open ? '' : '  (' + count + ' hidden · ' + done + ' done)');
+      head.append(ht);
+      // Urgency dots so a collapsed group still shows how hot it is.
+      const dots = document.createElement('span'); dots.className = 'dn-dots';
+      list.forEach(it => { const d = document.createElement('i'); d.dataset.urg = it.urg || '0'; dots.append(d); });
+      head.append(dots);
+      block.appendChild(head);
+      if(open){
+        list.forEach(it => {
+          const card = document.createElement('div');
+          card.className = 'due-item' + (it.done ? ' done' : '');
+          if(it.urg) card.dataset.urg = it.urg;
+          const live = !!urgEditor(it.date,it.pane);
+          const from = 'from ' + dateObj(it.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(it.date).getMonth() + 1) + '/' + dateObj(it.date).getDate();
+          const mk = (t,level,isMain) => {
+            const r = document.createElement('div');
+            r.className = 'di-line' + (t.done ? ' done' : '');
+            if(t.urg) r.dataset.urg = t.urg;
+            if(level) r.style.paddingLeft = (level * 1.4) + 'em';
+            const box = document.createElement('button'); box.type = 'button'; box.className = 'di-box';
+            box.dataset.date = it.date; box.dataset.index = String(t.index); box.dataset.pane = it.pane;
+            box.setAttribute('aria-label', t.done ? 'Mark not done' : 'Mark done');
+            box.title = 'Tap: done · hold or right-click: urgency, due date, go to task';
+            const tx = document.createElement('span'); tx.className = 'di-text'; tx.innerHTML = t.html;
+            tx.dataset.date = it.date; tx.dataset.index = String(t.index); tx.dataset.pane = it.pane;
+            tx.setAttribute('contenteditable', live ? 'true' : 'false');
+            tx.spellcheck = false;
+            if(!live) tx.title = 'Scroll to ' + shortDate(it.date) + ' in its column to edit here';
+            r.append(box,tx);
+            if(isMain){ const f = document.createElement('span'); f.className = 'di-from'; f.setAttribute('contenteditable','false'); f.textContent = from; r.append(f); }
+            return r;
+          };
+          card.appendChild(mk(it,0,true));
+          (it.subs || []).forEach(st => card.appendChild(mk(st,st.level,false)));
+          block.appendChild(card);
+        });
+      }
+      placeDueNotes(ed,block);
+      syncDayHeightStable(date);
+    });
+  }
+  // Right under Claude's Suggested day box if there is one, else at the top.
+  function placeDueNotes(ed,block){
+    const plan = ed.querySelector(':scope > table[data-cnote][data-ckind="plan"]');
+    if(plan){ if(plan.nextSibling !== block) plan.after(block); }
+    else if(ed.firstChild !== block) ed.prepend(block);
+  }
+  // Edit a due task's text in the Notes group → writes to the real task.
+  let dueEditTimer = 0;
+  function dueSource(el){
+    const ed = urgEditor(el.dataset.date || '',el.dataset.pane);
+    const line = ed ? ed.querySelectorAll('.check-line')[Number(el.dataset.index)] : null;
+    return line ? {ed,line,text:line.querySelector('.check-text')} : null;
+  }
+  function initDueNotes(){
+    const inGroup = t => t && t.closest ? t.closest('.due-notes') : null;
+    document.addEventListener('click',e => {
+      const g = inGroup(e.target); if(!g) return;
+      const head = e.target.closest('.dn-head');
+      if(head){ e.preventDefault(); setDueNotesOpen(g.dataset.date,!dueNotesOpen(g.dataset.date)); g.dataset.sig = ''; renderDueBlocks(); return; }
+      const box = e.target.closest('.di-box');
+      if(box){ e.preventDefault(); e.stopPropagation(); toggleDueTask(box.dataset.date,Number(box.dataset.index),box.dataset.pane); }
+    });
+    // Typing inside the group must not count as editing the Notes cell itself.
+    ['beforeinput','input','keydown','keyup','paste'].forEach(type => document.addEventListener(type,e => {
+      const tx = e.target && e.target.closest ? e.target.closest('.due-notes .di-text') : null;
+      if(!tx) return;
+      e.stopPropagation();
+      if(type === 'keydown' && e.key === 'Enter'){ e.preventDefault(); tx.blur(); return; }
+      if(type === 'paste'){ e.preventDefault(); document.execCommand('insertText',false,(e.clipboardData || window.clipboardData).getData('text/plain')); return; }
+      if(type !== 'input') return;
+      const src = dueSource(tx);
+      if(!src || !src.text){ setStatus('That task isn’t loaded — scroll to ' + shortDate(tx.dataset.date)); return; }
+      src.text.innerHTML = tx.innerHTML;
+      clearTimeout(dueEditTimer);
+      dueEditTimer = setTimeout(() => urgChanged(src.ed),600);
+    },true));
+    document.addEventListener('focusout',e => {
+      if(!(e.target && e.target.closest && e.target.closest('.due-notes .di-text'))) return;
+      const src = dueSource(e.target);
+      if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; if(src) urgChanged(src.ed); }
+      setTimeout(() => { try{ renderDueBlocks(); }catch(err){} },0);
     });
   }
   // Tick a task where it lives, from its Due copy (needs that day loaded).
@@ -5791,7 +5895,7 @@
   // the Urgent panel (2026-10-26, Julius) — that one edits the task back in
   // its Today day, which has to be loaded.
   function urgTarget(el){
-    if(el.classList && el.classList.contains('urg-box')){
+    if(el.classList && (el.classList.contains('urg-box') || el.classList.contains('di-box'))){
       const ed = urgEditor(el.dataset.date || '',el.dataset.pane);
       const line = ed ? ed.querySelectorAll('.check-line')[Number(el.dataset.index)] : null;
       return line ? {line,owner:ed} : null;
@@ -5863,6 +5967,14 @@
     }
     p.appendChild(dueRow);
     if(typeof addCardSubjectRow === 'function') addCardSubjectRow(p,line,owner);
+    // From a copy (Due group in Notes, Urgent panel): jump to where it lives (Julius, 2026-10-27).
+    if(cb.classList && (cb.classList.contains('di-box') || cb.classList.contains('urg-box'))){
+      const go = document.createElement('button');
+      go.type = 'button'; go.className = 'urg-goto'; go.textContent = '↗ Go to task';
+      go.addEventListener('pointerdown',e => e.preventDefault());
+      go.addEventListener('click',() => { hideUrgencyPicker(); goToTask(cb.dataset.date,Number(cb.dataset.index),cb.dataset.pane); });
+      p.appendChild(go);
+    }
     document.body.appendChild(p);
     const r = p.getBoundingClientRect();
     p.style.left = Math.max(6,Math.min(window.innerWidth - r.width - 6,x - 12)) + 'px';
@@ -5965,6 +6077,7 @@
   }
   initContextMenu();
   initUrgency();
+  initDueNotes();
   initDueOptions();
   initRefOptions();
   /* Every open menu/panel closes when you press anywhere outside it (or press Escape).
@@ -6791,14 +6904,14 @@
 
 <script>
   (function(){
-    const b = document.getElementById('themeToggle'), sel = document.getElementById('themeSelect');
-    if(b){
+    const sel = document.getElementById('themeSelect');
+    document.querySelectorAll('.theme-toggle').forEach(b => {
       let t = 0, held = false;
       b.addEventListener('pointerdown',() => { held = false; clearTimeout(t); t = setTimeout(() => { held = true; fwTheme.set('auto'); if(window.setStatus) setStatus('Theme: device default (' + fwTheme.deviceDefault + ')'); },600); });
       ['pointerup','pointerleave','pointercancel'].forEach(ev => b.addEventListener(ev,() => clearTimeout(t)));
       b.addEventListener('click',e => { if(held){ held = false; return; } fwTheme.toggle(); if(window.setStatus) setStatus('Theme: ' + fwTheme.current() + ' (saved on this ' + fwTheme.device + ')'); });
       b.addEventListener('contextmenu',e => e.preventDefault());
-    }
+    });
     if(sel) sel.addEventListener('change',() => fwTheme.set(sel.value));
     fwTheme.collect();
   })();

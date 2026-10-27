@@ -69,3 +69,9 @@
 ## Light / dark theme (2026-10-27, Julius)
 
 - `fwTheme` (script at end of `<head>`): `collect()` moves every `@media (prefers-color-scheme: dark)` rule into `<style id="themeDarkCss">`, enabled only when the theme is dark; called after each `<style>` block and at the end of `<body>`. **Write new dark CSS the same way** (inside `@media (prefers-color-scheme: dark)`) and it gets picked up. Device default from `deviceType()`: desktop → light, phone/tablet → dark; saved choice in localStorage `fw.theme` (none = Auto). UI: `#themeToggle` (tap flips, hold 600ms → Auto), `#themeSelect` in Options.
+
+## Due today group in Notes (2026-10-27, Julius)
+
+- `renderDueBlocks()` now draws `.due-notes` (contenteditable=false, `data-render-due`) INSIDE each `#journalScroll .journal-editor`, placed by `placeDueNotes()` right after `table[data-cnote][data-ckind=plan]` or at the top. Render-only: `cardCleanHtml()` removes `[data-render-due]` on save — keep it that way. Old `#todayScroll .due-block` copies are removed. Collapse per date in localStorage `fw.dueNotesOpen` (default open only on today).
+- Events are delegated in `initDueNotes()` (survives undo restoring stale HTML): head click toggles; `.di-box` click → `toggleDueTask`; `.di-text` (contenteditable when the source day is loaded) input → writes source `.check-text` via `dueSource()`, debounced `urgChanged(src.ed)`; input/keydown events are stopped in capture so the Notes editor doesn't treat them as its own edits; no redraw while a `.di-text` has focus. `.di-box` counts as an urgency box (`urgencyCheckbox`, `urgTarget`); picker adds `.urg-goto` (↗ Go to task) for `.di-box` / `.urg-box`.
+- Theme: `.theme-toggle` buttons (main toolbar `#themeToggle` + focus bar); `themeDarkCss` is moved to the end of `<body>` on each `collect()` so it wins the cascade.

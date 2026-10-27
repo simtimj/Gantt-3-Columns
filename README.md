@@ -48,6 +48,9 @@ Last updated: 2026-10-27
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Swipe between columns in single view (2026-10-27)**: with one column showing, swipe sideways to the next one in order: Today/Tasks ↔ Notes ↔ Reference (no wrap; nothing left of Today or right of Reference). The next column slides in under your finger; let go past ~30% to switch, less to snap back. Trackpad: a sideways two-finger swipe moves one column.
+- **Hold mid-swipe to split (2026-10-27)**: while swiping, hold still with the dividing line near the middle (it turns blue) → prompt: *Split A | B* (side by side, at the size you held), *Split stacked A / B*, *Go to B*, or *Cancel*. Exit split from Cols as usual.
+
 - **Urgency 3 renamed "Can be later" (2026-10-27)**: blue level reads *Can be later* (nice to do, not pressing) instead of *Later* in the hold menu, Urgent panel headings and + Task.
 - **Edit card subjects (2026-10-27)**: Options → **Card subjects**: set each subject's color, name and the words that auto-pick it; **+ Subject** adds one, ✕ removes one, **Reset to defaults** brings back the starting list. Saved to your account, so phone and tablet match. New default colors: Code green, Career light green, Study lavender, Work slate gray, Health pink, Life teal, Fun orange
 - **Compact Options (2026-10-27)**: each setting is one line (label, slider, value, Reset) with smaller buttons and shorter labels (full name on hover); on wider screens the panel spreads into columns to the right instead of getting longer

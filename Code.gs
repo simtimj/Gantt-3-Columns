@@ -128,6 +128,7 @@ function getWorkspaceData() {
     reference: getReference_(),
     urgent: getUrgentDays_(),
     inbox: (function () { try { return getInbox(); } catch (e) { return []; } })(),
+    cardCats: inboxRead_('cardCats', null),
     today: today
   };
 }
@@ -778,6 +779,17 @@ function inboxRead_(key, def) {
 }
 function inboxWrite_(key, value) {
   PropertiesService.getUserProperties().setProperty(key, JSON.stringify(value));
+}
+// Card subjects (name, color, keywords) edited in Options — one list for all devices (2026-10-27).
+function saveCardCats(list) {
+  if (!Array.isArray(list)) return false;
+  const clean = list.filter(c => c && /^[a-z]{2,12}$/.test(c.key || '')).slice(0, 30).map(c => ({
+    key: c.key, name: String(c.name || c.key).slice(0, 24),
+    color: /^#[0-9a-f]{6}$/i.test(c.color || '') ? c.color : '#9ca3af',
+    words: String(c.words || '').slice(0, 2000)
+  }));
+  inboxWrite_('cardCats', clean);
+  return true;
 }
 function getInbox() {
   const done = inboxRead_('inboxDone', []);

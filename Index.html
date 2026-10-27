@@ -2,7 +2,9 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="theme-color" content="#f6f7f8">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f7f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Focus Workspace">
   <base target="_top">
@@ -424,11 +426,8 @@
     .day-row.dow-0{--note-line:#a3870a;}
     .editor table[data-cnote]{border-color:var(--note-line,var(--border));}
     .editor table[data-cnote] tr + tr > td{border-top:2px solid var(--note-line,var(--border));padding-top:10px;padding-bottom:10px;}
-    /* Uniform 2px lines + a fill a touch darker than the day's color, light enough that the lines still stand out (Julius, 2026-10-27) */
-    .editor table[data-cnote]{border-width:2px;background:var(--note-bg,var(--panel));}
-    .day-row.dow-1{--note-bg:#e4e4e4;} .day-row.dow-2{--note-bg:#fbe4c9;} .day-row.dow-3{--note-bg:#d9e8f6;}
-    .day-row.dow-4{--note-bg:#e2cbae;} .day-row.dow-5{--note-bg:#fbe6a3;} .day-row.dow-6{--note-bg:#d0ab78;}
-    .day-row.dow-0{--note-bg:#f9eb8c;}
+    /* Uniform 2px lines; inside shows the day's own color (Julius, 2026-10-27) */
+    .editor table[data-cnote]{border-width:2px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
     /* Underlined names (Focus areas, Priority check entries) read bold, like the Suggested day */
     .editor table[data-cnote] u{font-weight:700;}
     .check-line{
@@ -1071,7 +1070,32 @@
     #referenceTree .ref-disclosure{font-size:0!important;color:#777;}
     #referenceTree .ref-disclosure::before{content:"−";display:inline-grid;place-content:center;box-sizing:border-box;width:1.05em;height:1.05em;border:1.5px solid currentColor;border-radius:4px;font-size:calc(var(--paragraph-size) * var(--workspace-scale,1) * .95);line-height:1;font-weight:700;vertical-align:middle;}
     #referenceTree .ref-cell-wrapper.ref-collapsed > .ref-disclosure::before{content:"+";}
-  </style>
+  
+    /* =========================================================
+       DARK MODE (Julius, 2026-10-27): our own, so the phone doesn't auto-invert.
+       Black background; the day colors stay exactly as in light mode
+       (Wednesday stays blue) with dark text on them. Adjust from here.
+       ========================================================= */
+    @media (prefers-color-scheme: dark){
+      :root{--bg:#000;--panel:#000;--border:#3a3a3a;--muted:#a0a0a0;color-scheme:dark;}
+      html,body{background:#000;color:#e6e6e6;}
+      #toolbar,#focusControls,.pane-header,.pane{background:#000;color:#e6e6e6;}
+      .btn,.top-select,.send-menu button,.urg-due-clear,.uc-today{background:#1c1c1c;color:#e6e6e6;border-color:#444;}
+      .btn:hover{background:#2a2a2a;}
+      #urgentPanel,#calPanel,#inboxPanel,.ref-options{background:#111;color:#e6e6e6;}
+      .ref-cell{color:#e6e6e6;}
+      .ref-hold > .ref-cell > h2:first-child{background:#1d2738;}
+      .due-item:hover,.ucm-item:hover{background:#222;}
+      /* Pop-ups and menus: dark too */
+      .ctx-menu,.urg-picker,.urg-cal,.urg-create-menu,.send-menu,.archive-box,.view-menu-popup,.type-settings{background:#161616;color:#e6e6e6;}
+      .urg-pick{background:#1c1c1c;}
+      input,select,textarea{background:#1c1c1c;color:#e6e6e6;}
+      /* Day cells keep their light-mode colors, so their text stays dark */
+      .day-row{color:#222;}
+      .day-row .day-label{color:#555;}
+      .day-row .editor table[data-cnote] .check-line[data-send]::after{background:#fff;color:#555;}
+    }
+</style>
 </head>
 <body>
 <div id="app">
@@ -1417,7 +1441,7 @@
       state.days.map(d => [d.date,d])
     );
     newDays.forEach(
-      d => { map.set(d.date,d); noteUrgentDay(d.date,d.tasks,false); }
+      d => { map.set(d.date,d); noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); }
     );
     renderUrgent();
     state.days = [
@@ -3488,6 +3512,7 @@
     const journal=j?.innerHTML||'';
     const d=state.days.find(x=>x.date===date);
     if(d){d.tasks=tasks;d.journal=journal;}
+    if(j) noteUrgentDay(date,journal,false,'journal');
     noteUrgentDay(date,tasks);
     info.inFlight=true;
     info.pending=false;
@@ -4702,7 +4727,15 @@
      urgent task from every day, with the subtasks under it.
      ========================================================= */
   const URG_NAMES = {1:'Urgent',2:'Soon',3:'Later'};
-  const urgentSource = new Map();   // date -> Today html that has urgency
+  const urgentSource = new Map();   // date (Today) or date+'|j' (Notes) -> html that has urgency
+  // Urgency set on a task in Notes counts too (Julius, 2026-10-27: it showed, then vanished on save).
+  function urgKey(date,pane){ return pane === 'journal' ? date + '|j' : date; }
+  function urgKeyParts(key){ const i = key.indexOf('|'); return i < 0 ? {date:key,pane:'today'} : {date:key.slice(0,i),pane:'journal'}; }
+  function urgEditor(date,pane){
+    return pane === 'journal'
+      ? document.querySelector(`#journalScroll .journal-editor[data-date="${CSS.escape(date)}"]`)
+      : document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+  }
   let urgentOpen = true;
   try{ urgentOpen = localStorage.getItem('fw.urgentOpen') !== '0'; }catch(e){}
   function urgencyCheckbox(t){
@@ -4716,22 +4749,24 @@
   }
   function initUrgentSource(list){
     urgentSource.clear();
-    (Array.isArray(list) ? list : []).forEach(d => noteUrgentDay(d.date,d.tasks,false));
-    (state.days || []).forEach(d => noteUrgentDay(d.date,d.tasks,false));
+    (Array.isArray(list) ? list : []).forEach(d => { noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); });
+    (state.days || []).forEach(d => { noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); });
     renderUrgent();
   }
-  function noteUrgentDay(date,html,render=true){
+  function noteUrgentDay(date,html,render=true,pane='today'){
     if(!date) return;
-    if(html && /data-(urg|due)=/.test(html)) urgentSource.set(date,String(html));
-    else urgentSource.delete(date);
+    const key = urgKey(date,pane);
+    if(html && /data-(urg|due)=/.test(html)) urgentSource.set(key,String(html));
+    else urgentSource.delete(key);
     if(render) renderUrgent();
   }
   // Open urgent tasks with their subtasks (lines below with a deeper level).
   function collectUrgent(){
     const out = [];
-    [...urgentSource.keys()].sort().forEach(date => {
+    [...urgentSource.keys()].sort().forEach(key => {
+      const {date,pane} = urgKeyParts(key);
       const tpl = document.createElement('template');
-      tpl.innerHTML = urgentSource.get(date);
+      tpl.innerHTML = urgentSource.get(key);
       const lines = [...tpl.content.querySelectorAll('.check-line')];
       lines.forEach((line,i) => {
         const urg = /^[123]$/.test(line.dataset.urg || '') ? line.dataset.urg : '0';
@@ -4747,7 +4782,7 @@
           if(l2 <= level) break;
           subs.push({text:lineText(lines[j]),level:l2 - level,done:!!lines[j].querySelector('input[checked]')});
         }
-        out.push({date,urg:Number(urg),index:i,text:lineText(line),subs,done,due:/^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : ''});
+        out.push({date,pane,urg:Number(urg),index:i,text:lineText(line),subs,done,due:/^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : ''});
       });
     });
     return out;
@@ -4841,7 +4876,7 @@
         row.className = 'urg-row' + (item.done ? ' done' : '');
         row.dataset.urg = u;
         row.title = 'Go to ' + item.date;
-        const box = document.createElement('span'); box.className = 'urg-box'; box.dataset.date = item.date; box.dataset.index = item.index; box.title = 'Hold (or right-click) to change urgency or due date';
+        const box = document.createElement('span'); box.className = 'urg-box'; box.dataset.date = item.date; box.dataset.pane = item.pane; box.dataset.index = item.index; box.title = 'Hold (or right-click) to change urgency or due date';
         const text = document.createElement('span'); text.className = 'urg-text'; text.textContent = item.text;
         // Text first (always at the left), then the day it's on, small;
         // the due date hugs the right (2026-10-26, Julius).
@@ -4860,7 +4895,7 @@
           else if(!item.done && item.due === today) date.classList.add('due-today');
           row.append(date);
         }
-        row.addEventListener('click',() => goToTask(item.date,item.index));
+        row.addEventListener('click',() => goToTask(item.date,item.index,item.pane));
         wrap.appendChild(row);
         item.subs.forEach(st => {
           const r = document.createElement('div');
@@ -5415,14 +5450,15 @@
   // Every task with a due date, from every day we know about.
   function collectDue(){
     const out = [];
-    [...urgentSource.keys()].sort().forEach(date => {
+    [...urgentSource.keys()].sort().forEach(key => {
+      const {date,pane} = urgKeyParts(key);
       const tpl = document.createElement('template');
-      tpl.innerHTML = urgentSource.get(date);
+      tpl.innerHTML = urgentSource.get(key);
       tpl.content.querySelectorAll('.check-line').forEach((line,i) => {
         const due = line.dataset.due || '';
         if(!/^\d{4}-\d{2}-\d{2}$/.test(due) || due === date) return;
         const cb = line.querySelector('input[type=checkbox]');
-        out.push({date,index:i,due,urg:line.dataset.urg || '',text:lineText(line),done:!!(cb && cb.hasAttribute('checked'))});
+        out.push({date,pane,index:i,due,urg:line.dataset.urg || '',text:lineText(line),done:!!(cb && cb.hasAttribute('checked'))});
       });
     });
     return out;
@@ -5456,14 +5492,14 @@
         const from = document.createElement('span'); from.className = 'di-from';
         from.textContent = 'from ' + dateObj(it.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(it.date).getMonth() + 1) + '/' + dateObj(it.date).getDate();
         b.append(tag,tx,from);
-        b.addEventListener('click',() => goToTask(it.date,it.index));
+        b.addEventListener('click',() => goToTask(it.date,it.index,it.pane));
         block.appendChild(b);
       });
       syncDayHeightStable(row.dataset.date);
     });
   }
-  function goToTask(date,index){
-    const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+  function goToTask(date,index,pane){
+    const ed = urgEditor(date,pane);
     if(!ed){ setStatus('That day isn’t loaded — scroll to ' + shortDate(date)); return; }
     const line = ed.querySelectorAll('.check-line')[index] || ed;
     line.scrollIntoView({block:'center',behavior:'smooth'});
@@ -5477,7 +5513,7 @@
   // its Today day, which has to be loaded.
   function urgTarget(el){
     if(el.classList && el.classList.contains('urg-box')){
-      const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(el.dataset.date || '')}"]`);
+      const ed = urgEditor(el.dataset.date || '',el.dataset.pane);
       const line = ed ? ed.querySelectorAll('.check-line')[Number(el.dataset.index)] : null;
       return line ? {line,owner:ed} : null;
     }
@@ -5486,7 +5522,7 @@
   }
   function urgChanged(owner){
     saveEditorOwner(owner);
-    if(owner && owner.dataset && owner.dataset.date) noteUrgentDay(owner.dataset.date,owner.innerHTML);
+    if(owner && owner.dataset && owner.dataset.date) noteUrgentDay(owner.dataset.date,owner.innerHTML,true,owner.classList.contains('journal-editor') ? 'journal' : 'today');
     else renderUrgent();
   }
   // A task line plus the subtasks nested under it (following lines with a deeper level).

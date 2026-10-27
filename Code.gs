@@ -133,19 +133,21 @@ function getWorkspaceData() {
 }
 
 
-// Days whose Today text has an urgency-tagged task (data-urg), for the
+// Days whose Today or Notes text has an urgency-tagged task (data-urg), for the
 // Urgent panel in Reference. Reads only the Date and Today columns.
 function getUrgentDays_() {
   const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  const values = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  // Today and Journal (Notes) columns: urgency set on a task in Notes counts too (Julius, 2026-10-27).
+  const values = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
   const out = [];
+  const has = h => h.indexOf('data-urg=') >= 0 || h.indexOf('data-due=') >= 0; // urgent or has a due date
   values.forEach(row => {
-    const html = String(row[1] || '');
-    if (html.indexOf('data-urg=') < 0 && html.indexOf('data-due=') < 0) return; // urgent or has a due date
+    const html = String(row[1] || ''), journal = String(row[2] || '');
+    if (!has(html) && !has(journal)) return;
     const key = formatDate_(row[0]);
-    if (key) out.push({ date: key, tasks: html });
+    if (key) out.push({ date: key, tasks: has(html) ? html : '', journal: has(journal) ? journal : '' });
   });
   return out;
 }

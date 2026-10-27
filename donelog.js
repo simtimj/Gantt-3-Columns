@@ -35,4 +35,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-gantt-notes-restyle', date: '2026-10-26', project: 'Gantt', title: 'Wrap-up + plan restyle', details: 'no colored edge, dash lists, Focus by time spent, carry-over checkboxes with → Day send button' },
   { id: 'd-20261026-gantt-wrap-priority', date: '2026-10-26', project: 'Gantt', title: 'Priority check + carry-over subtasks', details: 'wrap-up scores priorities 0–10; carry-overs nest subtasks and → Day sends a parent with them' },
   { id: 'd-20261026-gantt-plan-cells', date: '2026-10-26', project: 'Gantt', title: 'Divided Suggested day', details: 'sections in their own cells; entries split onto lines with small gaps' },
+  { id: 'd-20261026-gantt-send-ref', date: '2026-10-26', project: 'Gantt', title: 'Send menu: dates + → Reference', details: 'Today/Tomorrow show the date (10/27 Tue); carry-overs can go to a Reference cell' },
 ];

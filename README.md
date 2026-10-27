@@ -47,6 +47,8 @@ Last updated: 2026-10-26
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Send menu dates**: Today and Tomorrow show the actual date underneath in small text (e.g. 10/28 Wed)
+- **→ Reference**: the send menu has a Reference picker; the task (with its subtasks) goes to the end of that Reference cell and leaves the note. Preselects the cell whose title matches the task's words, else the last one used
 - **Wrap-up Priority check**: a 0–10 score on whether the day's time went to the right things, with what's still open on the priority and the fix for tomorrow
 - **Carry-over subtasks**: carry-overs with parts show them as subtasks; → Day on the parent sends it with all its subtasks, → Day on a subtask sends just that one. Every carry-over is **Name**: details
 - **Divided Suggested day**: each section (Must do, Next, …) sits in its own cell; each entry is a bold name with its time blocks on lines underneath, small gaps between entries (testing)
@@ -100,6 +102,7 @@ Last updated: 2026-10-26
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+- **Mirrored tasks (Today ↔ Reference)**: send a carry-over to Today but keep it tracked in its Reference area (e.g. CDCR under State / IT Associate); one linked task in both places, so checking it off in Today also checks it in Reference. Approach to work out (shared task id, show it in both, one source of truth)
 
 - Draggable task cards: every task becomes a card you can drag; dragging a task carries its subtasks, dragging a subtask carries only it and what's nested below.
 - Hide the "created by a Google Apps Script user" banner — only if the Exercise Tracker's wrapper experiment works out (it's shelved there for being slow).

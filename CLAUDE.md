@@ -16,6 +16,10 @@
 - Items typed in the app live in user properties (`inboxItems`). Server: `getInbox()`, `addInboxItem()`, `dismissInboxItem()` in `Code.gs`; client: `renderInbox()`, `addTaskToToday()` in `Index.html`.
 - Urgent panel create: `holdForCreate()` / `openCreateMenu()` / `createRow()` → `addTaskToToday(title, details, urg)` appends a check-line to today's Today cell. Reference options live in `#refOptions` (`initRefOptions()`); `fw.urgWrap` toggles wrapping (default on).
 
+## Claude adds open tasks (2026-10-27, Julius)
+
+- "Add this to the Gantt …" = an open task, not an inbox item: append to `CLAUDE_TASKS` in `tasks.js` `{ id: 't-YYYYMMDD-slug', date: 'YYYY-MM-DD' (usually today), title, urg: 1|2|3, subtasks: [...] }` and push. His urgency words: "for later" / "can be later" = 3 (blue), "next" / "kind of urgent" = 2 (yellow), "must do" / "really important" = 1 (red). `applyClaudeTasks_()` (Code.gs, in `getWorkspaceData()` after notes) appends them once at the end of that day's Today cell (head line `data-tid`, subtasks level 1 with the same `data-urg`); applied ids in script property `claudeTasksApplied`. Same open-tab caveat as the done log (tap ↻ first).
+
 ## Done-with-Claude log (2026-10-26, Julius: standing rule)
 
 - **Whenever Julius finishes something through Claude (any project, not just this repo), add a line to `CLAUDE_DONE` in `donelog.js` and push**: `{ id: 'd-YYYYMMDD-short-slug', date: 'YYYY-MM-DD', project: 'Exercise Tracker', title: 'Short substantive name', details: 'what was done' }`. `project` = the app/area (Exercise Tracker, Gantt, …) and becomes the group header; `title` is the main point of the work (e.g. "In Today marker", "Reference Options button"), never the project name again (Julius, 2026-10-26). One entry per finished task; unique ids, never reused; prune entries older than ~30 days.

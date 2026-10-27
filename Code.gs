@@ -117,6 +117,7 @@ function getWorkspaceData() {
   ensureSetup_();
   try { applyClaudeDone_(); } catch (e) { console.error(e); }
   try { applyClaudeNotes_(); } catch (e) { console.error(e); }
+  try { applyClaudeTasks_(); } catch (e) { console.error(e); }
 
   const today = todayString_();
 
@@ -1067,6 +1068,39 @@ function noteBlockFlatHtml_(item) {
     else html += '<div>' + noteInline_(line) + '</div>';
   });
   return html;
+}
+
+/* Open tasks from Claude (2026-10-27, Julius): CLAUDE_TASKS in tasks.js → open check-lines (with urgency
+   and subtasks) appended once to that day's Today cell. data-tid marks the head line. */
+function applyClaudeTasks_() {
+  const list = (typeof CLAUDE_TASKS !== 'undefined' && Array.isArray(CLAUDE_TASKS)) ? CLAUDE_TASKS : [];
+  const props = PropertiesService.getScriptProperties();
+  let applied = [];
+  try { applied = JSON.parse(props.getProperty('claudeTasksApplied') || '[]'); } catch (e) { applied = []; }
+  const fresh = list.filter(x => x && x.id && x.title && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') && applied.indexOf(String(x.id)) < 0);
+  if (!fresh.length) return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    fresh.forEach(x => {
+      let row = findDayRow_(sheet, x.date);
+      if (!row) { sheet.appendRow([parseDate_(x.date), '', '']); row = sheet.getLastRow(); }
+      const cell = sheet.getRange(row, 2);
+      let html = String(cell.getValue() || '');
+      if (html.indexOf('data-tid="' + doneEsc_(x.id) + '"') < 0) {
+        const u = [1, 2, 3].indexOf(Number(x.urg)) >= 0 ? ' data-urg="' + Number(x.urg) + '"' : '';
+        const line = (text, level, tid) => '<div class="check-line" data-level="' + level + '"' + u +
+          (tid ? ' data-tid="' + doneEsc_(tid) + '"' : '') + (level ? ' style="margin-left: ' + (level * 24) + 'px;"' : '') + '>' +
+          doneCheck_(false) + '<span class="check-text">' + doneEsc_(text) + '</span></div>';
+        html += line(x.title, 0, x.id);
+        (Array.isArray(x.subtasks) ? x.subtasks : []).forEach(t => { html += line(t, 1, ''); });
+        cell.setValue(html);
+      }
+      applied.push(String(x.id));
+    });
+    props.setProperty('claudeTasksApplied', JSON.stringify(applied.slice(-1000)));
+  } finally { lock.releaseLock(); }
 }
 
 function applyClaudeNotes_() {

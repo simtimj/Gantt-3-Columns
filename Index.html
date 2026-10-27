@@ -6074,14 +6074,14 @@
     background:linear-gradient(var(--tc-tint,transparent),var(--tc-tint,transparent)),var(--tc-base);
     border-left:1px solid var(--tc-bd);border-right:1px solid var(--tc-bd);
   }
-  .check-line[data-tc^="f"]{border-top:1px solid var(--tc-bd);border-top-left-radius:5px;border-top-right-radius:5px;margin-top:5px;padding-top:4px;}
-  .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:5px;border-bottom-right-radius:5px;margin-bottom:5px;padding-bottom:4px;}
+  .check-line[data-tc^="f"]{border-top:1px solid var(--tc-bd);border-top-left-radius:8px;border-top-right-radius:8px;margin-top:5px;padding-top:4px;}
+  .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
   .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
   .check-line[data-tcdrag]{opacity:.3;}
   /* Drag the checkbox to move the card; the page doesn't scroll from a checkbox. */
   .editor .check-line > input[type=checkbox],.ref-cell .check-line > input[type=checkbox]{touch-action:none;}
   body.tc-dragging,body.tc-dragging *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important;}
-  .tc-ghost{position:fixed;z-index:4000;pointer-events:none;opacity:.92;box-shadow:0 10px 28px rgba(0,0,0,.28);border-radius:5px;transform:rotate(1deg);}
+  .tc-ghost{position:fixed;z-index:4000;pointer-events:none;opacity:.92;box-shadow:0 10px 28px rgba(0,0,0,.28);border-radius:8px;transform:rotate(1deg);}
   .tc-ghost .check-line{margin-top:0!important;margin-bottom:0!important;}
   .tc-drop{position:fixed;z-index:3999;height:3px;border-radius:2px;background:#3b82f6;pointer-events:none;box-shadow:0 0 0 2px rgba(59,130,246,.25);}
   .tc-drop::before{content:"";position:absolute;left:-4px;top:-3px;width:9px;height:9px;border-radius:50%;background:#3b82f6;}

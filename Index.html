@@ -970,7 +970,7 @@
     .urg-pick.on{background:var(--urg,#eee);color:#fff;}
     .urg-pick[data-urg="0"]{--urg:#999;}
     .urg-pick[data-urg="0"].on{color:#fff;}
-    #urgentPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    #urgentPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     /* Each urgency level gets its own left bar in its own color (2026-10-26). */
     .urg-group{margin-top:6px;padding-left:8px;border-left:3px solid var(--urg);}
     .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}.urg-group[data-urg="0"],.urg-row[data-urg="0"]{--urg:#8a8f98;}
@@ -1102,7 +1102,7 @@
     .ucm-item:hover{background:#f3f4f6;}
     .urg-create{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:4px;}
     .urg-create input,.inbox-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;}
-    #calPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    #calPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     .cal-sub.cal-today{color:var(--text,#222);}
     .cal-row{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;background:none;border:0;padding:3px 0;cursor:pointer;color:inherit;font-size:13px;}
     .cal-time{flex:0 0 auto;min-width:6.4em;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
@@ -1110,7 +1110,7 @@
     .cal-row.past{opacity:.5;}
     .cal-row.now .cal-title{font-weight:700;}
     .cal-now{flex:0 0 auto;font-size:10px;font-weight:700;text-transform:uppercase;color:#fff;background:#3b82f6;border-radius:4px;padding:0 5px;}
-    #inboxPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    #inboxPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     .inbox-row{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:13px;}
     .inbox-row:first-of-type{border-top:0;}
     .inbox-text{flex:1;min-width:0;overflow-wrap:anywhere;}
@@ -5469,6 +5469,7 @@
   }
   let inboxItems = [];
   let inboxOpen = false;
+  let inboxAdding = false;
   try{ inboxOpen = localStorage.getItem('fw.inboxOpen') === '1'; }catch(e){}
   function setInbox(list){ inboxItems = Array.isArray(list) ? list : []; renderInbox(); }
   function renderInbox(){
@@ -5487,11 +5488,30 @@
     head.append(pmBox(inboxOpen),document.createTextNode('Inbox · ' + inboxItems.length));
     head.addEventListener('click',() => {
       inboxOpen = !inboxOpen;
+      if(!inboxOpen) inboxAdding = false;
       try{ localStorage.setItem('fw.inboxOpen',inboxOpen ? '1' : '0'); }catch(e){}
       renderInbox();
     });
-    panel.appendChild(head);
+    // Small "+ Add" on the header line (2026-10-27, Julius: save space) —
+    // the add box only shows after tapping it.
+    const headRow = document.createElement('div');
+    headRow.className = 'urg-head-row';
+    const add = document.createElement('button');
+    add.type = 'button'; add.className = 'btn tiny urg-add'; add.textContent = '+ Add';
+    add.title = 'Add to inbox';
+    add.addEventListener('click',() => {
+      inboxAdding = !inboxAdding;
+      if(inboxAdding){ inboxOpen = true; try{ localStorage.setItem('fw.inboxOpen','1'); }catch(e){} }
+      renderInbox();
+      const f = document.querySelector('#inboxPanel .inbox-add input'); if(f) f.focus();
+    });
+    headRow.append(head,add);
+    panel.appendChild(headRow);
     if(!inboxOpen) return;
+    if(!inboxItems.length && !inboxAdding){
+      const empty = document.createElement('div'); empty.className = 'urg-empty'; empty.textContent = 'Empty. Tap + Add.';
+      panel.appendChild(empty);
+    }
     inboxItems.forEach(it => {
       const row = document.createElement('div');
       row.className = 'inbox-row';
@@ -5509,16 +5529,18 @@
       row.append(text,go,x);
       panel.appendChild(row);
     });
+    if(!inboxAdding) return;
     const form = document.createElement('form');
     form.className = 'inbox-add';
     const inp = document.createElement('input');
     inp.type = 'text'; inp.placeholder = 'Add to inbox — Title: details'; inp.enterKeyHint = 'done';
     const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'btn tiny'; ok.textContent = 'Add';
     form.append(inp,ok);
+    inp.addEventListener('keydown',e => { if(e.key === 'Escape'){ inboxAdding = false; renderInbox(); } });
     form.addEventListener('submit',e => {
       e.preventDefault();
       const p = splitTitle(inp.value);
-      if(!p.title && !p.details) return;
+      if(!p.title && !p.details){ inboxAdding = false; renderInbox(); return; }
       const temp = {id:'tmp' + Date.now(),title:p.title,details:p.details,from:'app'};
       inboxItems = inboxItems.concat(temp); renderInbox();
       google.script.run

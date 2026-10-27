@@ -1014,6 +1014,8 @@
     .ref-options .ts-check select{max-width:100%;}
     .reference-sort-bar #refOptionsBtn.on{background:#eef2ff;border-color:#1a73e8;}
     .ref-options{margin:0 0 10px;padding:6px 10px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;}
+    /* Pop-up over the content instead of pushing it down (Julius, 2026-10-26); closes on tap outside */
+    .ref-options{position:fixed;z-index:3000;margin:0;width:min(300px,calc(100vw - 32px));max-height:70vh;overflow:auto;box-shadow:0 6px 20px rgba(0,0,0,.18);border-radius:10px;}
     .ref-options .ts-check{display:flex;align-items:center;gap:8px;margin:8px 0 2px;}
     .ref-options .ts-check input{width:18px;height:18px;margin:0;}
     .ref-options .ts-check select{min-height:28px;padding:2px 6px;font-size:13px;}
@@ -5252,14 +5254,25 @@
     const btn = document.getElementById('refOptionsBtn');
     const box = document.getElementById('refOptions');
     if(!btn || !box) return;
+    const close = () => { if(box.hidden) return; box.hidden = true; btn.setAttribute('aria-expanded','false'); btn.classList.remove('on'); };
+    // Placed under the button, kept on screen.
+    const place = () => {
+      const r = btn.getBoundingClientRect();
+      const w = box.offsetWidth, h = box.offsetHeight;
+      box.style.left = Math.max(16, Math.min(r.right - w, innerWidth - w - 16)) + 'px';
+      box.style.top = (r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
+    };
     btn.addEventListener('click',() => {
-      box.hidden = !box.hidden;
-      btn.setAttribute('aria-expanded',box.hidden ? 'false' : 'true');
-      btn.classList.toggle('on',!box.hidden);
+      if(!box.hidden) return close();
+      box.hidden = false; place();
+      btn.setAttribute('aria-expanded','true');
+      btn.classList.add('on');
     });
     document.addEventListener('pointerdown',e => {
-      if(!box.hidden && !box.contains(e.target) && e.target !== btn){ box.hidden = true; btn.setAttribute('aria-expanded','false'); btn.classList.remove('on'); }
+      if(!box.hidden && !box.contains(e.target) && !btn.contains(e.target)) close();
     },true);
+    document.getElementById('referenceScroll')?.addEventListener('scroll',close,{passive:true});
+    window.addEventListener('resize',() => { if(!box.hidden) place(); });
     const wrapCb = document.getElementById('optUrgWrap');
     if(wrapCb){ wrapCb.checked = urgWrap(); wrapCb.addEventListener('change',() => setUrgOpt('fw.urgWrap',wrapCb.checked ? '1' : '0')); }
   }

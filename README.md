@@ -47,6 +47,7 @@ Last updated: 2026-10-26
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Reference Options pop-up**: Options opens as a small pop-up over Reference (nothing gets pushed down); tap outside or scroll to close
 - **Send menu dates**: Today and Tomorrow show the actual date underneath in small text (e.g. 10/28 Wed)
 - **→ Reference**: the send menu has a Reference picker; the task (with its subtasks) goes to the end of that Reference cell and leaves the note. Preselects the cell whose title matches the task's words, else the last one used
 - **Wrap-up Priority check**: a 0–10 score on whether the day's time went to the right things, with what's still open on the priority and the fix for tomorrow

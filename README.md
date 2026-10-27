@@ -124,11 +124,12 @@ Last updated: 2026-10-27
 - **Full Due tasks on their day (2026-10-27)**: a task due on a day shows at the top of that day's Today cell as the whole task — real urgency-colored checkboxes, full wrapped text in the normal size, and its subtasks indented (no colored edge line); ticking a box ticks the real task, tapping the text jumps to it (day it lives on must be loaded)
 
 ## 🔧 To be improved
+- **Card subject guessing misfires (2026-10-27)**: keyword matching picks the wrong subject, e.g. a Gantt done-log line mentioning "stretch" (Suggested day section) turned Health. Lines under a Claude project group like Gantt are code work and should be Code; approach to figure out
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
-- **Title lines with − / + collapse (2026-10-27)**: mark a parent task line as a title line (e.g. the CDCR IT application in Tuesday's Today cell); its subtasks fold away with − and come back with +. Use the − / + convention, not arrows
+- **Title lines with − / + collapse (2026-10-27)**: mark a parent task line as a title line (e.g. the CDCR IT application in Tuesday's Today cell); its subtasks fold away with − and come back with +. Use the − / + convention, not arrows. Also for long runs of tasks under one heading, e.g. Claude's **Gantt** done-log group becomes a title line so all that work folds away
 - **Idea: built-in time tracking → plan vs actual (2026-10-27)**: own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)
 - **Mirrored tasks (Today ↔ Reference)**: send a carry-over to Today but keep it tracked in its Reference area (e.g. CDCR under State / IT Associate); one linked task in both places, so checking it off in Today also checks it in Reference. Approach to work out (shared task id, show it in both, one source of truth)
 

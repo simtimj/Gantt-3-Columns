@@ -155,6 +155,7 @@ Last updated: 2026-10-27
 - **Day section boxes** (2026-10-27): each section is its own rounded box like the Suggested Day — Morning bright yellow outline, Afternoon orange, Evening sunset purple, each with a soft matching fill and a colored header line (softer in dark mode). Tell Claude if a shade is off.
 - **Day section spacing** (2026-10-27): the Morning / Afternoon / Evening boxes sit inside the cell with a small margin on both sides (no longer running into the cell edges), and there is always an empty line between sections — a clear gap between the boxes, and room to put something between them. Deleting that line brings it back.
 - **Day section look + typing line** (2026-10-27): every section (Morning / Afternoon / Evening) always keeps at least one empty line inside it, so you can tap in and type right away; it comes back if the section is emptied. Afternoon (orange) and Evening (purple) outlines are lighter, and the boxes have no fill — just the cell's own color.
+- **Day section times** (2026-10-27): each section line shows its time frame — Morning 8:30 am – 2 pm, Afternoon 3:45 – 6:30 pm (after the nap), Evening 6:30 – 9:30 pm. Display only; tell Claude to change them.
 
 - **Saved looks → Claude** (2026-10-27): Options → Save also copies the look to the Sheet's "Looks" tab (per slot + device), so you can ask Claude "how is it set now?" or "make what I saved the default."
 

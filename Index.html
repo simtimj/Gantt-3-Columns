@@ -6596,8 +6596,8 @@
   /* Day section boxes (Julius, 2026-10-27): each section is its own rounded box like the Suggested Day —
      bright outline + soft fill along the sun (morning yellow, afternoon orange, evening sunset purple).
      Drawn render-only behind the editor by paintDaySecs (.sec-boxes is never saved). */
-  :root{--sec-m-bd:#f2c200;--sec-m:rgba(255,221,87,.16);--sec-a-bd:#f08a1c;--sec-a:rgba(255,160,50,.15);--sec-e-bd:#9b5fd6;--sec-e:rgba(150,95,205,.13);}
-  @media (prefers-color-scheme: dark){:root{--sec-m-bd:#d9ad12;--sec-m:rgba(255,214,90,.08);--sec-a-bd:#d9771a;--sec-a:rgba(255,140,40,.09);--sec-e-bd:#9b63d9;--sec-e:rgba(150,90,210,.12);}}
+  :root{--sec-m-bd:#f2c200;--sec-m:transparent;--sec-a-bd:#f6b366;--sec-a:transparent;--sec-e-bd:#bf97e8;--sec-e:transparent;}
+  @media (prefers-color-scheme: dark){:root{--sec-m-bd:#d9ad12;--sec-m:transparent;--sec-a-bd:#e8a35c;--sec-a:transparent;--sec-e-bd:#b98ee6;--sec-e:transparent;}}
   .sec-host{position:relative;}
   .sec-host > .editor.sec-painted{position:relative;z-index:1;padding-left:15px!important;padding-right:15px!important;padding-bottom:8px!important;}
   .sec-boxes{position:absolute;inset:0;pointer-events:none;z-index:0;}
@@ -6920,6 +6920,15 @@
      the boxes and room to put something between sections. Re-added if deleted. */
   function ensureSecGaps(ed,noSave){
     let added = false;
+    // Every section keeps at least one empty line inside it to type into (Julius, 2026-10-27).
+    const blank = () => { const d = document.createElement('div'); d.appendChild(document.createElement('br')); return d; };
+    [...ed.children].filter(n => n.dataset && n.dataset.sec).forEach(n => {
+      const inside = [];
+      for(let x = n.nextElementSibling; x && !(x.dataset && x.dataset.sec); x = x.nextElementSibling) inside.push(x);
+      const nextSec = inside.length ? inside[inside.length - 1].nextElementSibling : n.nextElementSibling;
+      if(nextSec && inside.length && isEmptyLine(inside[inside.length - 1])) inside.pop(); // the gap line belongs between boxes
+      if(!inside.length){ ed.insertBefore(blank(),n.nextSibling); added = true; }
+    });
     [...ed.children].forEach(n => {
       if(!n.dataset || !n.dataset.sec || n.dataset.sec === DAY_SECS[0][0]) return;
       const prev = n.previousElementSibling;

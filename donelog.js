@@ -92,4 +92,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-sec-colors', date: '2026-10-27', project: 'Gantt', title: 'Brighter day section colors', details: 'Morning outline now a light midday-sun yellow, Afternoon a brighter true orange (light and dark mode)' },
   { id: 'd-20261027-card-fill', date: '2026-10-27', project: 'Gantt', title: 'Card fill slider + day match off fix', details: 'Options → Card fill (separate for light/dark; dark default lighter); match-off now forces plain dark cells' },
   { id: 'd-20261027-daymatch-light', date: '2026-10-27', project: 'Gantt', title: 'Day color toggle in light mode', details: 'Day cells match the day color now works in light mode too (off = plain white cells)' },
+  { id: 'd-20261027-fold-protect', date: '2026-10-27', project: 'Gantt', title: 'Folded lines protected', details: 'folded sections hide their blank lines too; hidden lines can no longer be deleted or changed (unfold first)' },
 ];

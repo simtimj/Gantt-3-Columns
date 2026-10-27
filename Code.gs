@@ -1228,3 +1228,19 @@ function appendTaskToDay(dateString, textHtml) {
     return true;
   } finally { lock.releaseLock(); }
 }
+
+
+/* Saved looks → Sheet (Julius, 2026-10-27): Options → Save also writes the snapshot to the "Looks" tab
+   (one row per slot + device, newest wins) so Claude can read it via the Sheets connector and bake it in as the default. */
+function saveLookSnapshot(slot, json, ua) {
+  slot = String(slot || 'custom').slice(0, 20);
+  try { JSON.parse(json); } catch (e) { return false; }
+  const dev = /iPhone|Android.*Mobile/.test(ua || '') ? 'phone' : /iPad|Android|Tablet/.test(ua || '') ? 'tablet' : 'desktop';
+  const sh = getOrCreateSheet_('Looks', ['Slot', 'Device', 'Saved', 'Settings (JSON)']);
+  const vals = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 2).getValues();
+  let row = 0;
+  for (let i = 1; i < vals.length; i++) if (vals[i][0] === slot && vals[i][1] === dev) { row = i + 1; break; }
+  if (!row) row = sh.getLastRow() + 1;
+  sh.getRange(row, 1, 1, 4).setValues([[slot, dev, new Date(), String(json).slice(0, 45000)]]);
+  return true;
+}

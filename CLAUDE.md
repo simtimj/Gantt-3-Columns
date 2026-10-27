@@ -94,3 +94,8 @@
 ## Day sections (2026-10-27, Julius)
 
 - `ensureDaySections(ed)` (called first in `refreshCards`) adds saved `<div data-tl="1" data-sec="morning|afternoon|evening"><b>Name</b></div>` lines to today's `#todayScroll` day editor when missing, then `saveEditorOwner`. `titleCovered()` for a `data-sec` title runs to the next `data-sec` (skips blanks, includes nested titles). `DAY_SECS` / `daySecsOn` (localStorage `fw.daySecs`, `#daySecsOn`) are declared next to `cardsOn`. Style `.editor > [data-sec]`. His blocks: morning ~9–2, nap, then afternoon + evening ~3:45–9:30 (Tuesdays).
+
+## Saved looks → defaults (2026-10-27, Julius)
+
+- Options → Save (saved looks) also calls server `saveLookSnapshot(slot, json, ua)` → Sheet tab **Looks** (Slot / Device / Saved / Settings JSON, one row per slot+device). When Julius asks "how is it now" or "make my latest changes the default", read that tab with the Google Sheets connector (newest Saved row, or the slot/device he names) and bake the values into the defaults in `Index.html` (e.g. `DDEF` day colors from `fw.dmDayColors`, `fw.dmCell` default, `fw.dmTint` TDEF, `fw.dayColorAdj`, padding/typography). He must tap Save first.
+- One-time reset flag `fw.dmDayReset` cleared his custom dark day colors (2026-10-27).

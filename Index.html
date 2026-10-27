@@ -6598,7 +6598,7 @@
   :root{--sec-m-bd:#f2c200;--sec-m:rgba(255,221,87,.16);--sec-a-bd:#f08a1c;--sec-a:rgba(255,160,50,.15);--sec-e-bd:#9b5fd6;--sec-e:rgba(150,95,205,.13);}
   @media (prefers-color-scheme: dark){:root{--sec-m-bd:#d9ad12;--sec-m:rgba(255,214,90,.08);--sec-a-bd:#d9771a;--sec-a:rgba(255,140,40,.09);--sec-e-bd:#9b63d9;--sec-e:rgba(150,90,210,.12);}}
   .sec-host{position:relative;}
-  .sec-host > .editor.sec-painted{position:relative;z-index:1;}
+  .sec-host > .editor.sec-painted{position:relative;z-index:1;padding-left:15px!important;padding-right:15px!important;padding-bottom:8px!important;}
   .sec-boxes{position:absolute;inset:0;pointer-events:none;z-index:0;}
   .editor > [data-sec]{margin-top:16px;}
   .editor > [data-sec="morning"]{border-bottom-color:var(--sec-m-bd);color:var(--sec-m-bd);}
@@ -6899,7 +6899,7 @@
     const today = (typeof state !== 'undefined' && state && state.today) || localToday();
     if(ed.dataset.date !== today) return false;
     const have = new Set([...ed.children].filter(n => n.dataset && n.dataset.sec).map(n => n.dataset.sec));
-    if(have.size === DAY_SECS.length) return false;
+    if(have.size === DAY_SECS.length) return ensureSecGaps(ed);
     const mk = (k,label) => { const d = document.createElement('div'); d.dataset.tl = '1'; d.dataset.sec = k; d.innerHTML = '<b>' + label + '</b>'; return d; };
     DAY_SECS.forEach(([k,label],i) => {
       if(have.has(k)) return;
@@ -6911,8 +6911,23 @@
         if(next) ed.insertBefore(el,next); else ed.appendChild(el);
       }
     });
+    ensureSecGaps(ed,true);
     if(typeof saveEditorOwner === 'function') saveEditorOwner(ed);
     return true;
+  }
+  /* (Julius, 2026-10-27) always an empty line above Afternoon and Evening, so there's a gap between
+     the boxes and room to put something between sections. Re-added if deleted. */
+  function ensureSecGaps(ed,noSave){
+    let added = false;
+    [...ed.children].forEach(n => {
+      if(!n.dataset || !n.dataset.sec || n.dataset.sec === DAY_SECS[0][0]) return;
+      const prev = n.previousElementSibling;
+      if(prev && isEmptyLine(prev) && !(prev.dataset && prev.dataset.sec)) return;
+      const gap = document.createElement('div'); gap.appendChild(document.createElement('br'));
+      ed.insertBefore(gap,n); added = true;
+    });
+    if(added && !noSave && typeof saveEditorOwner === 'function') saveEditorOwner(ed);
+    return added;
   }
   /* Day section boxes (Julius, 2026-10-27): one rounded box per section, from its line down to just above the next.
      The boxes live in a render-only .sec-boxes layer beside the editor (not saved); re-drawn when the editor resizes. */
@@ -6931,14 +6946,22 @@
     if(!ed.classList.contains('sec-painted')){ ed.classList.add('sec-painted'); host.classList.add('sec-host'); if(secRO) secRO.observe(ed); }
     if(!layer){ layer = document.createElement('div'); layer.className = 'sec-boxes'; layer.setAttribute('aria-hidden','true'); host.appendChild(layer); }
     const hr = host.getBoundingClientRect(), er = ed.getBoundingClientRect();
-    const left = Math.round(er.left - hr.left) - 6, width = Math.round(er.width) + 12;
+    // Boxes sit INSIDE the editor with a small side margin (Julius, 2026-10-27: they melted into the cell edges);
+    // the editor gets extra side padding (.editor.sec-painted) so the text stays inside the box.
+    const left = Math.round(er.left - hr.left) + 5, width = Math.round(er.width) - 10;
     const ys = secs.map(n => Math.round(n.getBoundingClientRect().top - hr.top) - 5);
-    const bottom = Math.round(er.bottom - hr.top) + 4;
+    // A box ends just above the empty gap line before the next section.
+    const ends = secs.map((n,i) => {
+      const nx = secs[i + 1]; if(!nx) return null;
+      const gap = nx.previousElementSibling;
+      return gap && gap !== n && isEmptyLine(gap) ? Math.round(gap.getBoundingClientRect().top - hr.top) - 1 : ys[i + 1] - 8;
+    });
+    const bottom = Math.round(er.bottom - hr.top) - 3;
     while(layer.children.length < secs.length) layer.appendChild(document.createElement('i'));
     while(layer.children.length > secs.length) layer.lastChild.remove();
     secs.forEach((n,i) => {
       const box = layer.children[i], [bd,fill] = SEC_TINT[n.dataset.sec];
-      const top = ys[i], end = i + 1 < ys.length ? ys[i + 1] - 4 : bottom;
+      const top = ys[i], end = ends[i] != null ? ends[i] : bottom;
       box.style.cssText = '--bd:' + bd + ';--fill:' + fill + ';left:' + left + 'px;width:' + width + 'px;top:' + top + 'px;height:' + Math.max(18,end - top) + 'px;';
     });
   }

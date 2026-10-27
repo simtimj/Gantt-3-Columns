@@ -84,4 +84,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-looks-to-claude', date: '2026-10-27', project: 'Gantt', title: 'Dark day colors reset + looks for Claude', details: 'dark day colors reset to the light-mode defaults; Options → Save also copies the look to the Sheet\'s Looks tab so Claude can make it the default' },
   { id: 'd-20261027-urg-subcounts', date: '2026-10-27', project: 'Gantt', title: 'Urgent counts with subtasks', details: 'header counts tasks per color (red · yellow · blue, blue always shown); subtask progress as (done/total) after the number; a subtask with its own color counts in that color' },
   { id: 'd-20261027-dark-days-exact', date: '2026-10-27', project: 'Gantt', title: 'Dark day colors without inversion', details: 'M–S pickers now hold the exact dark cell color (what you pick is what you see); new dark defaults with Tuesday orange' },
+  { id: 'd-20261027-sec-spacing', date: '2026-10-27', project: 'Gantt', title: 'Day section spacing', details: 'Morning / Afternoon / Evening boxes get a side margin inside the cell and an always-there empty line between them' },
 ];

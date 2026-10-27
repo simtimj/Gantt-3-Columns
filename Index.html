@@ -1226,14 +1226,15 @@
       .day-row.dow-0{background:var(--dm-cell);--note-line:#c2b562;}
       /* Day-colored dark cells (Julius, 2026-10-27): each day's cell = black → that day's color,
          same Dark cells slider. Colors per day in Options (defaults = the light day colors). */
-      /* (Julius, 2026-10-27) no inversion: the cell is exactly the color in the Options picker. */
-      body.dm-daymatch .day-row.dow-1{--dm-cell:var(--dmd-c-1,#2b2b2b);}
-      body.dm-daymatch .day-row.dow-2{--dm-cell:var(--dmd-c-2,#7a3c06);}
-      body.dm-daymatch .day-row.dow-3{--dm-cell:var(--dmd-c-3,#173a5e);}
-      body.dm-daymatch .day-row.dow-4{--dm-cell:var(--dmd-c-4,#4a3520);}
-      body.dm-daymatch .day-row.dow-5{--dm-cell:var(--dmd-c-5,#5e4a0a);}
-      body.dm-daymatch .day-row.dow-6{--dm-cell:var(--dmd-c-6,#523716);}
-      body.dm-daymatch .day-row.dow-0{--dm-cell:var(--dmd-c-0,#5c520a);}
+      /* (Julius, 2026-10-27) no inversion: the cell is the picker color as-is (defaults = the LIGHT day colors),
+         then the Day colors slider makes it darker / lighter, same as in light mode. */
+      body.dm-daymatch .day-row.dow-1{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-1,#eeeeee), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-2{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-2,#fff0df), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-3{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-3,#e6f1fb), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-4{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-4,#ead8c2), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-5{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-5,#fff0bd), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-6{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-6,#d9b98c), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-0{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-0,#fff4a8), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
       .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
       /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text var(--dm-text) (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
       .day-row[class*="dow-"] .day-label{color:var(--note-line-adj);}
@@ -6448,11 +6449,11 @@
     applyTint(st,false);
     if(tint) tint.addEventListener('input',() => applyTint(tint.value,true));
     // Day-colored dark cells (Julius, 2026-10-27): on by default; per-day colors, Default restores.
-    // Dark day colors are what you see (Julius, 2026-10-27): no inversion from the light colors; Tuesday = orange.
-    const DDEF = {1:'#2b2b2b',2:'#7a3c06',3:'#173a5e',4:'#4a3520',5:'#5e4a0a',6:'#523716',0:'#5c520a'}, dm = document.getElementById('dmDayMatch');
+    // Dark day colors are what you see (Julius, 2026-10-27): no inversion; defaults = the light day colors, tweak from there.
+    const DDEF = {1:'#eeeeee',2:'#fff0df',3:'#e6f1fb',4:'#ead8c2',5:'#fff0bd',6:'#d9b98c',0:'#fff4a8'}, dm = document.getElementById('dmDayMatch');
     // Old saved values (fw.dmDayColors) were LIGHT colors that got inverted, so they're dropped once.
-    try{ localStorage.removeItem('fw.dmDayColors'); }catch(e){}
-    let dcols = {}; try{ dcols = JSON.parse(localStorage.getItem('fw.dmDayColors2') || '{}') || {}; }catch(e){ dcols = {}; }
+    try{ localStorage.removeItem('fw.dmDayColors'); localStorage.removeItem('fw.dmDayColors2'); }catch(e){}
+    let dcols = {}; try{ dcols = JSON.parse(localStorage.getItem('fw.dmDayColors3') || '{}') || {}; }catch(e){ dcols = {}; }
     function applyDays(){
       document.querySelectorAll('#dmDayCols input[data-dow]').forEach(inp => {
         const d = inp.dataset.dow, c = /^#[0-9a-f]{6}$/i.test(dcols[d] || '') ? dcols[d] : DDEF[d];
@@ -6462,10 +6463,10 @@
     }
     applyDays();
     document.querySelectorAll('#dmDayCols input[data-dow]').forEach(inp => inp.addEventListener('input',() => {
-      dcols[inp.dataset.dow] = inp.value; try{ localStorage.setItem('fw.dmDayColors2',JSON.stringify(dcols)); }catch(e){} applyDays();
+      dcols[inp.dataset.dow] = inp.value; try{ localStorage.setItem('fw.dmDayColors3',JSON.stringify(dcols)); }catch(e){} applyDays();
     }));
     const dd = document.getElementById('dmDayDefault');
-    if(dd) dd.addEventListener('click',() => { dcols = {}; try{ localStorage.removeItem('fw.dmDayColors2'); }catch(e){} applyDays(); });
+    if(dd) dd.addEventListener('click',() => { dcols = {}; try{ localStorage.removeItem('fw.dmDayColors3'); }catch(e){} applyDays(); });
     let match = true; try{ match = localStorage.getItem('fw.dmDayMatch') !== '0'; }catch(e){}
     document.body.classList.toggle('dm-daymatch',match);
     if(dm){ dm.checked = match; dm.addEventListener('change',() => { document.body.classList.toggle('dm-daymatch',dm.checked); try{ localStorage.setItem('fw.dmDayMatch',dm.checked ? '1' : '0'); }catch(e){} }); }
@@ -7340,7 +7341,7 @@
 <script>
   // Saved looks (Julius, 2026-10-27): Light / Dark / Custom slots that save every look setting on this device.
   (function(){
-    const KEYS = ['fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors2','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
+    const KEYS = ['fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
     const sel = document.getElementById('lookSlot'), sv = document.getElementById('lookSave'), ld = document.getElementById('lookLoad');
     if(!sel || !sv || !ld) return;
     const all = () => { try{ return JSON.parse(localStorage.getItem('fw.looks') || '{}') || {}; }catch(e){ return {}; } };

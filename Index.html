@@ -1064,6 +1064,10 @@
     .di-text{flex:1;min-width:0;overflow-wrap:anywhere;}
     .di-from{font-size:.75em;color:var(--muted);margin-left:4px;}
     .di-line.done > .di-text{text-decoration:line-through;opacity:.6;}
+    /* Urgent header counts (2026-10-27): one number per level in its color. */
+    .urg-counts{display:inline-flex;gap:7px;margin-left:8px;font-variant-numeric:tabular-nums;}
+    .urg-count{font-weight:700;}
+    .urg-count[data-urg="1"]{color:#e5484d;}.urg-count[data-urg="2"]{color:#d29e00;}.urg-count[data-urg="3"]{color:#3b82f6;}.urg-count[data-urg="0"]{color:#8a8f98;}
     /* Mini dashboard (2026-10-27): today's tasks done, in the toolbar. */
     .dash-chip{flex:0 0 auto;margin-left:8px;padding:1px 8px;font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:999px;color:var(--muted);white-space:nowrap;}
     .dash-chip:empty{display:none;}
@@ -5082,7 +5086,14 @@
     const head = document.createElement('button');
     head.type = 'button';
     head.className = 'urg-head';
-    head.append(pmBox(urgentOpen), document.createTextNode('Urgent · ' + items.filter(x => x.urg).length + (items.some(x => !x.urg) ? ' · Due ' + items.filter(x => !x.urg).length : '')));
+    // Per-level counts in each level's color (Julius, 2026-10-27): red · yellow · blue (+ grey Due).
+    const cnt = u => items.filter(x => String(x.urg || 0) === String(u)).length;
+    const counts = document.createElement('span'); counts.className = 'urg-counts';
+    [[1,'Urgent'],[2,'Soon'],[3,'Can be later']].concat(cnt(0) ? [[0,'Due']] : []).forEach(([u,name]) => {
+      const n = document.createElement('span'); n.className = 'urg-count'; n.dataset.urg = u; n.textContent = cnt(u); n.title = name + ': ' + cnt(u);
+      counts.append(n);
+    });
+    head.append(pmBox(urgentOpen), document.createTextNode('Urgent'), counts);
     head.title = 'Tap to collapse/expand · hold to add a task';
     head.addEventListener('click',() => {
       if(urgCreateSuppress){ urgCreateSuppress = false; return; }

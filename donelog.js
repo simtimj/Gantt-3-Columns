@@ -74,4 +74,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-title-lines', date: '2026-10-27', project: 'Gantt', title: 'Title lines that fold', details: 'mark any line as a title (checkbox hold menu or ▤ Title); − / + folds lines under it, shows N hidden · M done; done-log headers fold too' },
   { id: 'd-20261027-gantt-dash-score', date: '2026-10-27', project: 'Gantt', title: 'Fold score + mini dashboard', details: 'folded titles read 26 out of 27 done with − / + right after the text; toolbar shows Today: X out of Y tasks done with a bar' },
   { id: 'd-20261027-gantt-dark-cells', date: '2026-10-27', project: 'Gantt', title: 'Dark cells slider', details: 'Options → Dark cells: Today/Notes/Reference cell background black → gray, saved per device; default a bit grayer' },
+  { id: 'd-20261027-gantt-urg-counts', date: '2026-10-27', project: 'Gantt', title: 'Urgent header counts', details: 'Urgent header shows red/yellow/blue counts per level (grey Due when present), live' },
 ];

@@ -6605,6 +6605,11 @@
   .editor > [data-sec="morning"]{border-bottom-color:var(--sec-m-bd);color:var(--sec-m-bd);}
   .editor > [data-sec="afternoon"]{border-bottom-color:var(--sec-a-bd);color:var(--sec-a-bd);}
   .editor > [data-sec="evening"]{border-bottom-color:var(--sec-e-bd);color:var(--sec-e-bd);}
+  /* Time frames on the section lines (Julius, 2026-10-27; display only, not saved): his day runs ~8:30 am – 9:30 pm with a nap after 2. */
+  .editor > [data-sec] > b:first-child::after{font-weight:500;opacity:.8;letter-spacing:.02em;}
+  .editor > [data-sec="morning"] > b:first-child::after{content:" · 8:30 am – 2 pm";}
+  .editor > [data-sec="afternoon"] > b:first-child::after{content:" · 3:45 – 6:30 pm";}
+  .editor > [data-sec="evening"] > b:first-child::after{content:" · 6:30 – 9:30 pm";}
   .editor > [data-sec]:first-child{margin-top:6px;}
   .sec-boxes > i{position:absolute;box-sizing:border-box;border:1.5px solid var(--bd);border-radius:10px;background:var(--fill);}
   /* Subject color in the checkbox (Julius, 2026-10-27; default): card stays neutral, the subject

@@ -87,4 +87,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-sec-spacing', date: '2026-10-27', project: 'Gantt', title: 'Day section spacing', details: 'Morning / Afternoon / Evening boxes get a side margin inside the cell and an always-there empty line between them' },
   { id: 'd-20261027-dark-days-light', date: '2026-10-27', project: 'Gantt', title: 'Dark day cells start light', details: 'dark-mode day cells default to the light day colors as-is; tweak with the M–S pickers or the Day colors slider' },
   { id: 'd-20261027-sec-typing-line', date: '2026-10-27', project: 'Gantt', title: 'Day section typing line + lighter look', details: 'each section always keeps an empty line to type in; afternoon and evening outlines lighter; box fills removed' },
+  { id: 'd-20261027-sec-times', date: '2026-10-27', project: 'Gantt', title: 'Day section times', details: 'Morning 8:30 am – 2 pm, Afternoon 3:45 – 6:30 pm, Evening 6:30 – 9:30 pm shown on each section line' },
 ];

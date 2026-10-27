@@ -112,8 +112,6 @@ Last updated: 2026-10-27
 - **Reference header (2026-10-27)**: Sort / − / Options moved up into the REFERENCE header on the right (one less row); search, + Cell and Archive row is shorter
 - **Reference padding (2026-10-27)**: Reference → Options has its own Left/right and Top/bottom padding sliders that apply only to Reference (on top of the main padding sliders)
 
-- **Day text color (2026-10-27)**: Options → **Day text color**: Gray (uses the Text brightness slider) or Day color (Tue orange, Wed blue…), with its own **Day text · darker / lighter** slider, separate from the Day colors slider for lines/borders; done tasks stay dimmed
-
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

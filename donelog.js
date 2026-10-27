@@ -85,4 +85,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-urg-subcounts', date: '2026-10-27', project: 'Gantt', title: 'Urgent counts with subtasks', details: 'header counts tasks per color (red · yellow · blue, blue always shown); subtask progress as (done/total) after the number; a subtask with its own color counts in that color' },
   { id: 'd-20261027-dark-days-exact', date: '2026-10-27', project: 'Gantt', title: 'Dark day colors without inversion', details: 'M–S pickers now hold the exact dark cell color (what you pick is what you see); new dark defaults with Tuesday orange' },
   { id: 'd-20261027-sec-spacing', date: '2026-10-27', project: 'Gantt', title: 'Day section spacing', details: 'Morning / Afternoon / Evening boxes get a side margin inside the cell and an always-there empty line between them' },
+  { id: 'd-20261027-dark-days-light', date: '2026-10-27', project: 'Gantt', title: 'Dark day cells start light', details: 'dark-mode day cells default to the light day colors as-is; tweak with the M–S pickers or the Day colors slider' },
 ];

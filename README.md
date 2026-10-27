@@ -147,7 +147,7 @@ Last updated: 2026-10-27
 
 - **Task count in today's cell** (2026-10-27): "Today: X out of Y tasks done" bar moved from the toolbar to right under the date in today's Today cell.
 
-- **Dark day colors, no inversion** (2026-10-27): the M–S pickers now hold the exact dark-mode cell color — what you pick is what you see (they used to hold the light color and convert it, which turned Tuesday brown). Defaults: Tuesday orange, Wednesday blue, Monday gray, Thu/Sat tan, Fri/Sun gold. Default restores them. The Dark cells slider now only affects Reference cells and days when matching is off.
+- **Dark day colors, no inversion** (2026-10-27): in dark mode the day cells now default to the same light day colors as light mode, shown as-is (they used to be converted to a dark version, which turned Tuesday brown). Tweak them with the M–S pickers (what you pick is what you see) or the Day colors darker/lighter slider; the Dark text slider sets the text. Default restores the light colors.
 - **Saved looks** (2026-10-27): top of Options — pick Light / Dark / Custom, Save stores every look setting (theme, colors, sliders, cards, fonts, padding, scale) on this device; Load applies it and refreshes.
 - **Options alignment** (2026-10-27): Dark cells, the match toggle and the day pickers stay together in one column.
 

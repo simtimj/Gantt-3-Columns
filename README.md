@@ -147,6 +147,10 @@ Last updated: 2026-10-27
 
 - **Task count in today's cell** (2026-10-27): "Today: X out of Y tasks done" bar moved from the toolbar to right under the date in today's Today cell.
 
+- **Light day colors for dark cells** (2026-10-27): the M–S pickers now start on the light day colors; the dark cell keeps that color's hue and the Dark cells slider sets how light it is. Default restores them.
+- **Saved looks** (2026-10-27): top of Options — pick Light / Dark / Custom, Save stores every look setting (theme, colors, sliders, cards, fonts, padding, scale) on this device; Load applies it and refreshes.
+- **Options alignment** (2026-10-27): Dark cells, the match toggle and the day pickers stay together in one column.
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

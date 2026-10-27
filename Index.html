@@ -7003,7 +7003,15 @@
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
       on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? done + ' out of ' + tasks.length + ' done' : cov.length + ' hidden'});
-      if(fold) cov.forEach(x => hide.add(x));
+      if(fold){
+        cov.forEach(x => hide.add(x));
+        // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);
+        // only the gap line right before the next section stays, so the boxes keep their gap.
+        if(n.dataset.sec) for(let x = n.nextElementSibling; x && !(x.dataset && x.dataset.sec); x = x.nextElementSibling){
+          const nx = x.nextElementSibling;
+          if(isEmptyLine(x) && !(nx && nx.dataset && nx.dataset.sec)) hide.add(x);
+        }
+      }
     }
     for(const n of ed.querySelectorAll(':scope > [data-tlon]')) if(!on.has(n)){ n.removeAttribute('data-tlon'); n.removeAttribute('data-tlinfo'); changed = true; }
     for(const n of ed.querySelectorAll(':scope > [data-tlhid]')) if(!hide.has(n)){ n.removeAttribute('data-tlhid'); changed = true; }
@@ -7011,6 +7019,39 @@
     hide.forEach(n => { if(setAttr(n,'data-tlhid','1')) changed = true; });
     return changed;
   }
+
+  /* Folded lines can't be changed (Julius, 2026-10-27: deleting blank lines under a folded Morning ate the hidden
+     tasks, 51/53 → 2/4). Any edit whose range touches a hidden line, or a Backspace/Delete that would merge into one,
+     is blocked. Unfold first to edit. */
+  function hiddenEditBlocked(e){
+    const sel = window.getSelection(); if(!sel || !sel.rangeCount) return false;
+    const r = sel.getRangeAt(0), ed = r.startContainer.nodeType === 1 ? r.startContainer.closest && r.startContainer.closest('.editor') : r.startContainer.parentElement && r.startContainer.parentElement.closest('.editor');
+    if(!ed || !ed.querySelector(':scope > [data-tlhid]')) return false;
+    const hid = [...ed.querySelectorAll(':scope > [data-tlhid]')];
+    if(!r.collapsed) return hid.some(h => r.intersectsNode(h));
+    const t = e.type === 'keydown' ? (e.key === 'Backspace' ? 'deleteContentBackward' : e.key === 'Delete' ? 'deleteContentForward' : '') : (e.inputType || '');
+    if(!/^delete/.test(t)) return false;
+    let line = r.startContainer; while(line && line.parentElement !== ed) line = line.parentElement;
+    if(!line || line === ed) return false;
+    const pre = document.createRange(); pre.selectNodeContents(line);
+    if(/Backward$/.test(t)){
+      pre.setEnd(r.startContainer,r.startOffset);
+      const atStart = !pre.toString().replace(/[\s\u200b\u00a0]/g,'') && !pre.cloneContents().querySelector('input,img');
+      const pv = line.previousElementSibling;
+      return atStart && !!(pv && pv.hasAttribute('data-tlhid'));
+    }
+    pre.setStart(r.startContainer,r.startOffset);
+    const atEnd = !pre.toString().replace(/[\s\u200b\u00a0]/g,'');
+    const nx = line.nextElementSibling;
+    return atEnd && !!(nx && nx.hasAttribute('data-tlhid'));
+  }
+  ['beforeinput','keydown'].forEach(type => document.addEventListener(type,e => {
+    if(type === 'keydown' && e.key !== 'Backspace' && e.key !== 'Delete' && !(e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey) && e.key !== 'Enter') return;
+    if(!e.target || !e.target.closest || !e.target.closest('.editor')) return;
+    if(!hiddenEditBlocked(e)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if(typeof setStatus === 'function') setStatus('Folded lines are protected — tap + to unfold before editing them');
+  },true));
   function titleEditDone(ed){
     finishEditorEdit(ed);
     refreshCards(ed);

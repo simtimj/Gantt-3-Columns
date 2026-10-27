@@ -1018,6 +1018,14 @@
     .ucm-item:hover{background:#f3f4f6;}
     .urg-create{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:4px;}
     .urg-create input,.inbox-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;}
+    #calPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    .cal-sub.cal-today{color:var(--text,#222);}
+    .cal-row{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;background:none;border:0;padding:3px 0;cursor:pointer;color:inherit;font-size:13px;}
+    .cal-time{flex:0 0 auto;min-width:6.4em;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
+    .cal-title{flex:1;min-width:0;}
+    .cal-row.past{opacity:.5;}
+    .cal-row.now .cal-title{font-weight:700;}
+    .cal-now{flex:0 0 auto;font-size:10px;font-weight:700;text-transform:uppercase;color:#fff;background:#3b82f6;border-radius:4px;padding:0 5px;}
     #inboxPanel{margin:0 0 10px;padding:6px 8px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     .inbox-row{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:13px;}
     .inbox-row:first-of-type{border-top:0;}
@@ -1412,6 +1420,7 @@
     applyReferenceCollapseState();
     initUrgentSource(data.urgent);
     setInbox(data.inbox);
+    loadCalendar();
     setStatus('Ready');
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
   }
@@ -4652,7 +4661,7 @@
     if(!panel){
       panel = document.createElement('div');
       panel.id = 'urgentPanel';
-      tree.parentNode.insertBefore(panel,document.getElementById('inboxPanel') || tree);
+      tree.parentNode.insertBefore(panel,document.getElementById('calPanel') || document.getElementById('inboxPanel') || tree);
     }
     const items = collectUrgent();
     panel.innerHTML = '';
@@ -4874,6 +4883,115 @@
      them here too. Shown as **Title**: details. → Today makes it a task in
      today's cell; ✕ dismisses. Collapsed by default.
      --------------------------------------------------------- */
+
+  /* ---------------------------------------------------------
+     Calendar events (2026-10-26, Julius): between Urgent and Inbox.
+     Today's events first, then the next few days, straight from Google
+     Calendar (getCalendarEvents in Code.gs). Loaded after the app opens,
+     refreshed with ↻ or when the app comes back to the front.
+     --------------------------------------------------------- */
+  let calData = null, calOpen = true, calLoading = false, calLoadedAt = 0, calError = '';
+  try{ calOpen = localStorage.getItem('fw.calOpen') !== '0'; }catch(e){}
+  function loadCalendar(){
+    if(calLoading) return;
+    calLoading = true; renderCalendar();
+    google.script.run
+      .withSuccessHandler(d => { calLoading = false; calError = ''; calData = d; calLoadedAt = Date.now(); renderCalendar(); })
+      .withFailureHandler(e => { calLoading = false; calError = e.message || String(e); renderCalendar(); })
+      .getCalendarEvents();
+  }
+  document.addEventListener('visibilitychange',() => {
+    if(document.visibilityState === 'visible' && calLoadedAt && Date.now() - calLoadedAt > 5 * 60000) loadCalendar();
+  });
+  function calTime(ms){
+    const d = new Date(ms);
+    let h = d.getHours(); const m = d.getMinutes(); const ap = h < 12 ? 'a' : 'p';
+    h = h % 12 || 12;
+    return h + (m ? ':' + String(m).padStart(2,'0') : '') + ap;
+  }
+  function calDayLabel(date, today){
+    if(date === today) return 'Today';
+    const t = dateObj(today); t.setDate(t.getDate() + 1);
+    const tom = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+    if(date === tom) return 'Tomorrow';
+    return dateObj(date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  }
+  function renderCalendar(){
+    const tree = document.getElementById('referenceTree');
+    if(!tree) return;
+    let panel = document.getElementById('calPanel');
+    if(!panel){
+      panel = document.createElement('div');
+      panel.id = 'calPanel';
+      tree.parentNode.insertBefore(panel,document.getElementById('inboxPanel') || tree);
+    }
+    panel.innerHTML = '';
+    const events = (calData && calData.events) || [];
+    const today = (calData && calData.today) || localToday();
+    const todays = events.filter(ev => ev.date <= today && ev.endDate >= today);
+    const headRow = document.createElement('div');
+    headRow.className = 'urg-head-row';
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'urg-head';
+    head.append(pmBox(calOpen),document.createTextNode('Calendar · Today ' + (calData ? todays.length : '…')));
+    head.title = 'Today’s events, then the next few days';
+    head.addEventListener('click',() => {
+      calOpen = !calOpen;
+      try{ localStorage.setItem('fw.calOpen',calOpen ? '1' : '0'); }catch(e){}
+      renderCalendar();
+    });
+    const ref = document.createElement('button');
+    ref.type = 'button'; ref.className = 'btn tiny'; ref.textContent = calLoading ? '…' : '↻';
+    ref.title = 'Reload events'; ref.disabled = calLoading;
+    ref.addEventListener('click',loadCalendar);
+    headRow.append(head,ref);
+    panel.appendChild(headRow);
+    if(!calOpen) return;
+    if(calError){
+      const er = document.createElement('div'); er.className = 'urg-empty';
+      er.textContent = 'Couldn’t load the calendar: ' + calError;
+      panel.appendChild(er);
+      return;
+    }
+    if(!calData){ const w = document.createElement('div'); w.className = 'urg-empty'; w.textContent = 'Loading events…'; panel.appendChild(w); return; }
+    const now = Date.now();
+    const days = [];
+    events.forEach(ev => {
+      const d = ev.date < today ? today : ev.date;
+      let g = days.find(x => x.date === d);
+      if(!g){ g = {date:d, list:[]}; days.push(g); }
+      g.list.push(ev);
+    });
+    if(!days.some(g => g.date === today)) days.unshift({date:today, list:[]});
+    days.sort((a,b) => a.date.localeCompare(b.date));
+    days.forEach(g => {
+      const isToday = g.date === today;
+      const sub = document.createElement('div');
+      sub.className = 'urg-sub cal-sub' + (isToday ? ' cal-today' : '');
+      sub.textContent = calDayLabel(g.date, today) + (isToday ? '' : ' · upcoming');
+      panel.appendChild(sub);
+      if(!g.list.length){
+        const e = document.createElement('div'); e.className = 'urg-empty'; e.textContent = 'Nothing on the calendar.';
+        panel.appendChild(e);
+      }
+      g.list.forEach(ev => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        const past = !ev.allDay && ev.end <= now;
+        const live = !ev.allDay && ev.start <= now && ev.end > now;
+        row.className = 'cal-row' + (past ? ' past' : '') + (live ? ' now' : '');
+        const t = document.createElement('span'); t.className = 'cal-time';
+        t.textContent = ev.allDay ? 'All day' : calTime(ev.start) + '–' + calTime(ev.end);
+        const tx = document.createElement('span'); tx.className = 'cal-title'; tx.textContent = ev.title;
+        row.append(t,tx);
+        if(live){ const n = document.createElement('span'); n.className = 'cal-now'; n.textContent = 'now'; row.append(n); }
+        row.title = ev.title + (ev.location ? ' · ' + ev.location : '') + ' · ' + ev.cal;
+        if(ev.link) row.addEventListener('click',() => window.open(ev.link,'_blank'));
+        panel.appendChild(row);
+      });
+    });
+  }
   let inboxItems = [];
   let inboxOpen = false;
   try{ inboxOpen = localStorage.getItem('fw.inboxOpen') === '1'; }catch(e){}

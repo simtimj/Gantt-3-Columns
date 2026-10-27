@@ -138,6 +138,10 @@ Last updated: 2026-10-27
 
 - **Smarter card subjects (2026-10-27)**: end a task with ` · Gantt` or ` · Code` (middle dot) to set its subject outright; any subject name or a word from its list works (Gantt → Code). Claude's done-log lines follow their project header (Gantt group → Code). Otherwise words are weighed instead of first-match: longer phrases win ("exercise tracker" = Code, not Health), the task's words count double, a header above counts triple, subtasks once; most points wins.
 
+- **Dark cells tint** (2026-10-27): color picker next to the Dark cells slider in Options; the slider goes from black toward that color (e.g. purple → a touch of purple, still dark). White = plain gray. Reset clears both.
+- **Card subjects collapsed** (2026-10-27): Options → Card subjects is closed by default and shows small color chips; tap the header or chips to open the editor (rows now one line each).
+- **Subject color in the checkbox** (2026-10-27): cards are neutral; the subject fills the checkbox, urgency is its border, the check mark shows done (white mark with dark outline for contrast). Options toggle switches back to whole-card color. Colors/contrast to be tuned over time.
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

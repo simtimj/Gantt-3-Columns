@@ -48,6 +48,8 @@ Last updated: 2026-10-26
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Done log spacing (2026-10-26):** a blank line before and after each project group, so groups don't run together.
+
 - **Due group in Urgent (2026-10-26):** tasks with a due date but no urgency show in a grey **Due** group at the bottom of the Urgent panel, soonest first (they leave once checked). Urgent / Soon / Later keep sorting by due date, soonest first, undated last. Header reads `Urgent · N · Due N`.
 - **Tapping a cell keeps your place (2026-10-26):** tapping into Notes (or Today) no longer moves the view; leaving a cell resizes its row without scrolling.
 

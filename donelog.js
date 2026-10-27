@@ -24,4 +24,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-gantt-grouped-log', date: '2026-10-26', project: 'Gantt', title: 'Grouped done log', details: 'Claude work batched under an underlined project header' },
   { id: 'd-20261026-gantt-due-group', date: '2026-10-26', project: 'Gantt', title: 'Due group in Urgent', details: 'due-dated tasks with no urgency listed at the bottom, soonest first' },
   { id: 'd-20261026-gantt-tap-no-jump', date: '2026-10-26', project: 'Gantt', title: 'No jump when tapping Notes', details: 'tapping into a Notes or Today cell keeps the view where it was' },
+  { id: 'd-20261026-gantt-group-spacing', date: '2026-10-26', project: 'Gantt', title: 'Done log spacing', details: 'blank line between project groups' },
+  { id: 'd-20261026-gantt-concise-tasks', date: '2026-10-26', project: 'Gantt', title: 'Concise tasks', details: "today's long tasks shortened to Title: details" },
 ];

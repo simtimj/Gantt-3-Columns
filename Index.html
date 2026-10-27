@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f6f7f8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" id="themeColorMeta" content="#f6f7f8">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Focus Workspace">
   <base target="_top">
@@ -1197,12 +1196,73 @@
       .urg-picker,.urg-due-chip,.uc-today,#calPanel,#inboxPanel{background:#161616;}
     }
 </style>
+<script>
+  /* ===== Light / dark toggle, saved per device (Julius, 2026-10-27) =====
+     Default by device: MacBook/desktop → light; phone and tablet → dark.
+     Tap ☾/☀ in the toolbar (or Options → Theme) to switch; the choice is
+     saved on this device only (localStorage fw.theme; Auto = device default).
+     All "@media (prefers-color-scheme: dark)" CSS is moved into one
+     <style id="themeDarkCss"> that is switched on/off, so the OS setting no
+     longer decides. */
+  (function(){
+    function deviceType(){
+      const ua = navigator.userAgent || '', touch = (navigator.maxTouchPoints || 0) > 1;
+      if(/iPhone|iPod/.test(ua) || (/Android/.test(ua) && /Mobile/.test(ua))) return 'phone';
+      if(/iPad|Tablet/.test(ua) || (/Macintosh/.test(ua) && touch) || /Android/.test(ua)) return 'tablet';
+      try{ if(matchMedia('(pointer:coarse)').matches) return Math.min(screen.width,screen.height) < 600 ? 'phone' : 'tablet'; }catch(e){}
+      return 'desktop';
+    }
+    const DEVICE = deviceType();
+    const DEVICE_DEFAULT = DEVICE === 'desktop' ? 'light' : 'dark';
+    function saved(){ try{ const v = localStorage.getItem('fw.theme'); return v === 'light' || v === 'dark' ? v : 'auto'; }catch(e){ return 'auto'; } }
+    function current(){ const v = saved(); return v === 'auto' ? DEVICE_DEFAULT : v; }
+    function darkStyle(){
+      let st = document.getElementById('themeDarkCss');
+      if(!st){ st = document.createElement('style'); st.id = 'themeDarkCss'; document.head.appendChild(st); }
+      return st;
+    }
+    // Move dark-scheme media rules (from every sheet loaded so far) into our own style.
+    function collect(){
+      const st = darkStyle(); let add = '';
+      [...document.styleSheets].forEach(sh => {
+        if(sh.ownerNode === st) return;
+        let rules; try{ rules = sh.cssRules; }catch(e){ return; }
+        for(let i = rules.length - 1; i >= 0; i--){
+          const r = rules[i];
+          if(!(r instanceof CSSMediaRule) || !/prefers-color-scheme:\s*dark/.test(r.conditionText || r.media.mediaText)) continue;
+          const cond = (r.conditionText || r.media.mediaText).replace(/(\s+and\s+)?\(prefers-color-scheme:\s*dark\)(\s+and\s+)?/,'').trim();
+          const inner = [...r.cssRules].map(x => x.cssText).join('\n');
+          add = (cond ? '@media ' + cond + '{' + inner + '}' : inner) + '\n' + add;
+          sh.deleteRule(i);
+        }
+      });
+      if(add) st.textContent += add;
+      apply();
+    }
+    function apply(){
+      const t = current();
+      document.documentElement.dataset.theme = t;
+      document.documentElement.style.colorScheme = t;
+      darkStyle().disabled = t !== 'dark';
+      const m = document.getElementById('themeColorMeta'); if(m) m.content = t === 'dark' ? '#000000' : '#f6f7f8';
+      const b = document.getElementById('themeToggle');
+      if(b){ b.textContent = t === 'dark' ? '☀' : '☾'; b.title = (t === 'dark' ? 'Switch to light' : 'Switch to dark') + ' · saved on this ' + DEVICE + (saved() === 'auto' ? ' (now: device default)' : '') + ' · hold for device default'; }
+      const sel = document.getElementById('themeSelect');
+      if(sel){ sel.value = saved(); const o = sel.querySelector('option[value=auto]'); if(o) o.textContent = 'Auto (' + DEVICE + ': ' + DEVICE_DEFAULT + ')'; }
+    }
+    function set(v){ try{ if(v === 'auto') localStorage.removeItem('fw.theme'); else localStorage.setItem('fw.theme',v); }catch(e){} apply(); }
+    window.fwTheme = {collect, apply, set, current, saved, device:DEVICE, deviceDefault:DEVICE_DEFAULT,
+      toggle(){ set(current() === 'dark' ? 'light' : 'dark'); }};
+  })();
+</script>
+<script>fwTheme.collect();</script>
 </head>
 <body>
 <div id="app">
   <div id="focusControls">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
+    <button class="btn" type="button" id="themeToggle" aria-label="Light / dark">☾</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
@@ -1233,6 +1293,10 @@
       <input id="padY" type="range" min="0" max="300" step="10" value="100" aria-label="Top and bottom cell padding">
       <output id="padYValue">100%</output>
       <button class="btn tiny" id="resetPadY" type="button">Reset</button>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label" title="Light / dark, saved on this device">Theme</span>
+      <select id="themeSelect" aria-label="Theme on this device"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select>
     </div>
     <div class="ts-row">
       <span class="ts-label" title="Text brightness · dark mode">Dark text</span>
@@ -6269,6 +6333,7 @@
     .urg-cat-row{border-top-color:#333;}
   }
 </style>
+<script>fwTheme.collect();</script>
 <script>
   /* ===== Task cards + subject colors (Julius, 2026-10-27) =====
      - Every task is a card: checkbox + text, subtasks inside the same card.
@@ -6724,5 +6789,19 @@
   })();
 </script>
 
+<script>
+  (function(){
+    const b = document.getElementById('themeToggle'), sel = document.getElementById('themeSelect');
+    if(b){
+      let t = 0, held = false;
+      b.addEventListener('pointerdown',() => { held = false; clearTimeout(t); t = setTimeout(() => { held = true; fwTheme.set('auto'); if(window.setStatus) setStatus('Theme: device default (' + fwTheme.deviceDefault + ')'); },600); });
+      ['pointerup','pointerleave','pointercancel'].forEach(ev => b.addEventListener(ev,() => clearTimeout(t)));
+      b.addEventListener('click',e => { if(held){ held = false; return; } fwTheme.toggle(); if(window.setStatus) setStatus('Theme: ' + fwTheme.current() + ' (saved on this ' + fwTheme.device + ')'); });
+      b.addEventListener('contextmenu',e => e.preventDefault());
+    }
+    if(sel) sel.addEventListener('change',() => fwTheme.set(sel.value));
+    fwTheme.collect();
+  })();
+</script>
 </body>
 </html>

@@ -65,3 +65,7 @@
 ## Single-column swipe + split prompt (2026-10-27, Julius)
 
 - `initSingleSwipe()` (Index.html, before `initColumnResizers()`): active when `visiblePanes.length===1` and not split. Touch: lock horizontal after 10px (|dx| > 1.5·|dy|, no text selection), then `preventDefault` and slide the current pane + neighbor (`.swipe-cur` / `.swipe-next`, absolutely placed beside it) with `#swipeSeam`; release past 30% → `applyWorkspaceView([next])`. Order is `VIEW_PANES`, no wrap. Holding ~450ms with the seam in 30–70% opens `#swipeSplitMenu` → `setSplit(true)` with `splitOptions` first/second in column order (side by side uses the seam as `mobileSplitRatio`). Skips inputs/buttons/links (so card checkbox drag is untouched). Wheel deltaX > 160 → one column. The 2-column peek (`PEEK_ENABLED`) is still paused.
+
+## Light / dark theme (2026-10-27, Julius)
+
+- `fwTheme` (script at end of `<head>`): `collect()` moves every `@media (prefers-color-scheme: dark)` rule into `<style id="themeDarkCss">`, enabled only when the theme is dark; called after each `<style>` block and at the end of `<body>`. **Write new dark CSS the same way** (inside `@media (prefers-color-scheme: dark)`) and it gets picked up. Device default from `deviceType()`: desktop → light, phone/tablet → dark; saved choice in localStorage `fw.theme` (none = Auto). UI: `#themeToggle` (tap flips, hold 600ms → Auto), `#themeSelect` in Options.

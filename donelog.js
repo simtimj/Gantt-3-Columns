@@ -32,4 +32,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-gantt-star-prefix', date: '2026-10-26', project: 'Gantt', title: 'Claude lines marked with *', details: 'done-log lines start with * so you can tell them from your own' },
   { id: 'd-20261026-cal-calcareers-4pm', date: '2026-10-26', project: 'Calendar', title: 'CalCareers application block', details: 'moved to Tue 4–6:30 pm' },
   { id: 'd-20261026-gantt-boxed-notes', date: '2026-10-26', project: 'Gantt', title: 'Boxed plan and wrap-up', details: 'Suggested day and Day wrap-up sit in their own box in Notes' },
+  { id: 'd-20261026-gantt-notes-restyle', date: '2026-10-26', project: 'Gantt', title: 'Wrap-up + plan restyle', details: 'no colored edge, dash lists, Focus by time spent, carry-over checkboxes with → Day send button' },
 ];

@@ -992,7 +992,18 @@ function applyClaudeDone_() {
    end. Applied once per id (script property "claudeNotesApplied").
    ========================================================= */
 function noteInline_(s) {
-  return doneEsc_(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  return doneEsc_(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/__(.+?)__/g, '<u>$1</u>');
+}
+// One rendered line of a note block (2026-10-26, Julius): '- x' keeps a real dash (no dots),
+// '[] x' is a checkbox task with a "→ Day" send button (data-send), '__x__' underlines.
+function noteLineHtml_(line) {
+  line = String(line == null ? '' : line);
+  if (!line.trim()) return '<div><br></div>';
+  if (/^##\s+/.test(line)) return '<div><b><u>' + noteInline_(line.replace(/^##\s+/, '')) + '</u></b></div>';
+  if (/^\[\s?\]\s+/.test(line)) return '<div class="check-line" data-level="0" data-send="1">' + doneCheck_(false) +
+    '<span class="check-text">' + noteInline_(line.replace(/^\[\s?\]\s+/, '')) + '</span></div>';
+  if (/^-\s+/.test(line)) return '<div>- ' + noteInline_(line.replace(/^-\s+/, '')) + '</div>';
+  return '<div>' + noteInline_(line) + '</div>';
 }
 // Boxed (Julius, 2026-10-26): the whole block sits in a one-cell table so it
 // reads as a contained card; styled by .editor table[data-cnote] in Index.html.
@@ -1000,13 +1011,7 @@ function noteBlockHtml_(item) {
   const kind = item.kind === 'wrap' ? 'wrap' : 'plan';
   const title = item.title || (kind === 'wrap' ? 'Day wrap-up' : 'Suggested day');
   let inner = '<div><b><u>' + doneEsc_(title) + '</u></b> <i>· Claude</i></div>';
-  (item.lines || []).forEach(line => {
-    line = String(line == null ? '' : line);
-    if (!line.trim()) inner += '<div><br></div>';
-    else if (/^##\s+/.test(line)) inner += '<div><b><u>' + noteInline_(line.replace(/^##\s+/, '')) + '</u></b></div>';
-    else if (/^-\s+/.test(line)) inner += '<div>• ' + noteInline_(line.replace(/^-\s+/, '')) + '</div>';
-    else inner += '<div>' + noteInline_(line) + '</div>';
-  });
+  (item.lines || []).forEach(line => { inner += noteLineHtml_(line); });
   return '<table data-cnote="' + doneEsc_(item.id) + '" data-ckind="' + kind + '"><tbody><tr><td>' + inner + '</td></tr></tbody></table>';
 }
 
@@ -1031,9 +1036,14 @@ function applyClaudeNotes_() {
   const props = PropertiesService.getScriptProperties();
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeNotesApplied') || '[]'); } catch (e) { applied = []; }
-  const fresh = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') && applied.indexOf(String(x.id)) < 0);
+  const valid = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || ''));
+  const fresh = valid.filter(x => applied.indexOf(String(x.id)) < 0);
+  // rev (2026-10-26): bumping an entry's rev re-renders its block in place, once per rev.
+  // If he deleted the block, it stays deleted.
+  const revKey = x => String(x.id) + '@' + x.rev;
+  const redo = valid.filter(x => x.rev && applied.indexOf(String(x.id)) >= 0 && applied.indexOf(revKey(x)) < 0);
   const box = props.getProperty('claudeNotesBoxed') !== '1';
-  if (!fresh.length && !box) return;
+  if (!fresh.length && !redo.length && !box) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -1052,6 +1062,17 @@ function applyClaudeNotes_() {
         cell.setValue(html);
       }
       applied.push(String(x.id));
+      if (x.rev) applied.push(revKey(x));
+    });
+    redo.forEach(x => {
+      const row = findDayRow_(sheet, x.date);
+      if (row) {
+        const cell = sheet.getRange(row, 3);
+        const html = String(cell.getValue() || '');
+        const re = new RegExp('<table[^>]*data-cnote="' + doneEsc_(x.id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"[^>]*>[\\s\\S]*?<\\/table>');
+        if (re.test(html)) cell.setValue(html.replace(re, function () { return noteBlockHtml_(x); }));
+      }
+      applied.push(revKey(x));
     });
     if (box) {
       // One-time: put blocks written before boxing into the box (2026-10-26).
@@ -1124,4 +1145,24 @@ function getCalendarEvents() {
 // Run once from the script editor if the app ever asks for calendar access.
 function authorizeCalendar() {
   return CalendarApp.getDefaultCalendar().getName();
+}
+
+
+/* Send a task to a day's Today cell (2026-10-26, Julius): used by the "→ Day"
+   button on carry-over tasks when that day isn't loaded in the app. */
+function appendTaskToDay(dateString, textHtml) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateString || ''))) throw new Error('Bad date');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    let row = findDayRow_(sheet, dateString);
+    if (!row) { sheet.appendRow([parseDate_(dateString), '', '']); row = sheet.getLastRow(); }
+    const cell = sheet.getRange(row, 2);
+    const before = String(cell.getValue() || '');
+    const line = '<div class="check-line" data-level="0">' + doneCheck_(false) +
+      '<span class="check-text">' + String(textHtml || '') + '</span></div>';
+    cell.setValue(before + line);
+    return true;
+  } finally { lock.releaseLock(); }
 }

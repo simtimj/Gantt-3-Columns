@@ -40,3 +40,10 @@
 - `applyClaudeNotes_()` in `Code.gs` runs in `getWorkspaceData()` after `applyClaudeDone_()`; each id is applied once (script property `claudeNotesApplied`); each block is a one-cell table `<table data-cnote="id" data-ckind="plan|wrap"><tbody><tr><td>…lines…</td></tr></tbody></table>` (boxed, Julius 2026-10-26; styled by `.editor table[data-cnote]` in `Index.html`). Pre-box flat blocks were converted once (`noteBlockFlatHtml_`, script property `claudeNotesBoxed`).
 - Counting in the Today cell: a `check-line` is a task; `done` class or `checked` = finished; `data-urg` 1/2/3 = urgency; `data-cid` = logged by Claude.
 - **Skip only what Claude already did (Julius, 2026-10-26):** if he plans tomorrow early with Claude in a chat, that Claude writes the plan as `n-<YYYYMMDD>-plan` in `dayplan.js` and pushes, so the nightly run skips it (same for an existing wrap-up id or Claude wrap-up block). It does NOT skip when he wrote his own plan in Notes (he still wants Claude's input, so it adds the Suggested day above his), or when tomorrow's calendar is already blocked out (then the plan opens with a `## Scheduled` list of those blocks as a reminder, plus only tasks not on the calendar). The nightly run never creates or changes calendar events.
+
+## Note block markup + send button (2026-10-26, Julius)
+
+- `noteLineHtml_()` in `Code.gs`: `- x` → dash line (no dots), `[] x` → unchecked check-line with `data-send="1"`, `__x__` → underline. Style rules for wrap/plan are in the `dayplan.js` header.
+- `rev` on a CLAUDE_NOTES entry: re-renders an already-applied block in place once per rev (applied key `id@rev`); deleted blocks stay deleted.
+- "→ Day" is a CSS `::after` on `table[data-cnote] .check-line[data-send]`; `maybeOpenSendMenu()` (journal editors, pointerdown capture, right ~72px of the line) → `openSendMenu()` → `sendNoteTask()`: client `addTaskToDay()` when that day is loaded, else server `appendTaskToDay(date, html)`; then the line is removed from the note.
+- Drag-and-drop to days waits on the task-card work.

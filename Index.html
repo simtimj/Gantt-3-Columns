@@ -425,9 +425,9 @@
     .day-row.dow-4{--note-line:#7d5630;} .day-row.dow-5{--note-line:#9a7a12;} .day-row.dow-6{--note-line:#6e4a24;}
     .day-row.dow-0{--note-line:#a3870a;}
     .editor table[data-cnote]{border-color:var(--note-line,var(--border));}
-    .editor table[data-cnote] tr + tr > td{border-top:2px solid var(--note-line,var(--border));padding-top:10px;padding-bottom:10px;}
-    /* Uniform 2px lines; inside shows the day's own color (Julius, 2026-10-27) */
-    .editor table[data-cnote]{border-width:2px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
+    .editor table[data-cnote] tr + tr > td{border-top:1px solid var(--note-line,var(--border));padding-top:10px;padding-bottom:10px;}
+    /* Uniform thin 1px lines (2px was too thick); inside shows the day's own color (Julius, 2026-10-27) */
+    .editor table[data-cnote]{border-width:1px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
     /* Underlined names (Focus areas, Priority check entries) read bold, like the Suggested day */
     .editor table[data-cnote] u{font-weight:700;}
     .check-line{

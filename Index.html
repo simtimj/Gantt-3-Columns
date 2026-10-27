@@ -424,6 +424,13 @@
     .day-row.dow-0{--note-line:#a3870a;}
     .editor table[data-cnote]{border-color:var(--note-line,var(--border));}
     .editor table[data-cnote] tr + tr > td{border-top:2px solid var(--note-line,var(--border));padding-top:10px;padding-bottom:10px;}
+    /* Uniform 2px lines + a fill a touch darker than the day's color, light enough that the lines still stand out (Julius, 2026-10-27) */
+    .editor table[data-cnote]{border-width:2px;background:var(--note-bg,var(--panel));}
+    .day-row.dow-1{--note-bg:#e4e4e4;} .day-row.dow-2{--note-bg:#fbe4c9;} .day-row.dow-3{--note-bg:#d9e8f6;}
+    .day-row.dow-4{--note-bg:#e2cbae;} .day-row.dow-5{--note-bg:#fbe6a3;} .day-row.dow-6{--note-bg:#d0ab78;}
+    .day-row.dow-0{--note-bg:#f9eb8c;}
+    /* Underlined names (Focus areas, Priority check entries) read bold, like the Suggested day */
+    .editor table[data-cnote] u{font-weight:700;}
     .check-line{
       display:flex;
       align-items:flex-start;

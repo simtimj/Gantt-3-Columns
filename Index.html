@@ -1011,6 +1011,38 @@
     #typeSettings .ts-check{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:13px;}
     #typeSettings .ts-check input{width:18px;height:18px;margin:0;}
     #typeSettings .ts-check select{min-height:30px;padding:2px 6px;font-size:13px;}
+    /* Options grows to the right in columns instead of getting longer (Julius, 2026-10-27) */
+    #typeSettings{width:min(1000px,calc(100vw - 16px))!important;}
+    #typeSettings .ts-body{column-width:300px;column-gap:22px;column-rule:1px solid var(--border);}
+    #typeSettings .ts-row,#typeSettings .ts-check,#typeSettings .ts-sub,#typeSettings .ts-cat{break-inside:avoid;}
+    #typeSettings .ts-sub{break-after:avoid;}
+    #typeSettings .ts-row:first-child{margin-top:4px;}
+    /* Compact rows: label, slider, value and Reset on one line, smaller controls (Julius, 2026-10-27) */
+    #typeSettings .ts-row{grid-template-columns:76px minmax(60px,1fr) 38px auto!important;gap:6px!important;margin:6px 0!important;}
+    #typeSettings .ts-row.ts-font{grid-template-columns:76px minmax(0,1fr) 52px auto!important;}
+    #typeSettings .ts-label{grid-column:auto!important;font-size:12px!important;line-height:1.15;}
+    #typeSettings input[type=range]{min-height:22px!important;}
+    #typeSettings output{font-size:12px!important;}
+    #typeSettings .btn,#typeSettings .top-select,#typeSettings .font-size-input{min-height:26px!important;padding:2px 7px!important;font-size:11px!important;}
+    #typeSettings .ts-check{margin:6px 0 2px!important;font-size:12px!important;}
+    #typeSettings .ts-check input{width:16px!important;height:16px!important;}
+    #typeSettings .ts-sub{margin-top:10px!important;}
+    body #typeSettings .btn,body #typeSettings .top-select,body #typeSettings .font-size-input{min-height:26px!important;height:26px!important;padding:1px 7px!important;font-size:11px!important;line-height:1!important;}
+    body #typeSettings label.ts-check{min-height:0!important;padding:0!important;margin:5px 0!important;}
+    #typeSettings .ts-cat{grid-template-columns:28px minmax(0,1fr) 26px!important;gap:4px!important;margin:0 0 6px!important;padding-bottom:6px!important;}
+    #typeSettings .ts-cat input[type=color]{width:28px!important;height:26px!important;}
+    #typeSettings .ts-cat input[type=text]{min-height:26px!important;height:26px!important;padding:2px 6px!important;font-size:12px!important;}
+    #typeSettings .ts-cat .ts-cat-del{width:26px!important;height:26px!important;}
+    body #typeSettings .ts-check input,body #typeSettings .ts-cat input{min-height:0!important;}
+    body #typeSettings .ts-check input{height:16px!important;}
+    #typeSettings .ts-hint{font-size:11px;color:var(--muted);margin:2px 0 6px;}
+    #typeSettings .ts-cat{display:grid;grid-template-columns:34px minmax(0,1fr) 28px;gap:4px 6px;align-items:center;margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+    #typeSettings .ts-cat input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;}
+    #typeSettings .ts-cat input[type=text]{min-width:0;min-height:30px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:13px;background:transparent;color:inherit;}
+    #typeSettings .ts-cat .ts-cat-name{font-weight:700;}
+    #typeSettings .ts-cat .ts-cat-words{grid-column:1 / -1;font-size:12px!important;}
+    #typeSettings .ts-cat .ts-cat-del{width:28px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;}
+    #typeSettings .ts-cat-actions{display:flex;gap:6px;flex-wrap:wrap;}
     #typeSettings .ts-sub{margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     /* Due on this day (2026-10-26): tasks due on a day show under its label. */
     .due-block{margin:0 0 4px;display:flex;flex-direction:column;gap:1px;}
@@ -1174,6 +1206,7 @@
   </div>
   <div id="typeSettings" class="type-settings hidden" role="dialog" aria-label="Scale, padding and fonts">
     <div class="ts-head"><strong>Options</strong><button class="btn tiny" id="closeTypeSettings" type="button">Close</button></div>
+    <div class="ts-body">
     <div class="ts-row">
       <span class="ts-label">Scale</span>
       <input id="mobileScale" type="range" min="50" max="200" step="10" value="100" aria-label="Workspace scale">
@@ -1181,37 +1214,44 @@
       <button class="btn tiny" id="resetMobileScale" type="button">Reset</button>
     </div>
     <div class="ts-row">
-      <span class="ts-label">Padding · left / right</span>
+      <span class="ts-label" title="Padding · left / right">Padding ↔</span>
       <input id="padX" type="range" min="0" max="300" step="10" value="100" aria-label="Left and right cell padding">
       <output id="padXValue">100%</output>
       <button class="btn tiny" id="resetPadX" type="button">Reset</button>
     </div>
     <div class="ts-row">
-      <span class="ts-label">Padding · top / bottom</span>
+      <span class="ts-label" title="Padding · top / bottom">Padding ↕</span>
       <input id="padY" type="range" min="0" max="300" step="10" value="100" aria-label="Top and bottom cell padding">
       <output id="padYValue">100%</output>
       <button class="btn tiny" id="resetPadY" type="button">Reset</button>
     </div>
     <div class="ts-row">
-      <span class="ts-label">Text brightness · dark mode</span>
+      <span class="ts-label" title="Text brightness · dark mode">Dark text</span>
       <input id="dmText" type="range" min="20" max="100" step="2" value="52" aria-label="Dark mode text brightness, black to white">
       <output id="dmTextValue">52%</output>
       <button class="btn tiny" id="resetDmText" type="button">Reset</button>
     </div>
     <div class="ts-row">
-      <span class="ts-label">Day colors · darker / lighter</span>
+      <span class="ts-label" title="Day colors · darker / lighter">Day colors</span>
       <input id="dayColorAdj" type="range" min="-60" max="60" step="5" value="0" aria-label="Day colors, darker to lighter">
       <output id="dayColorAdjValue">0</output>
       <button class="btn tiny" id="resetDayColorAdj" type="button">Reset</button>
     </div>
-    <div class="ts-sub">Task cards</div>
-    <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
-    <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
     <div class="ts-row ts-font">
-      <span class="ts-label">Text font · size</span>
+      <span class="ts-label" title="Text font · size">Font</span>
       <select id="paragraphFont" class="top-select font-family-select"></select>
       <input id="paragraphSize" class="font-size-input" type="number" min="8" max="48" step="1" value="14" aria-label="Text size in pixels">
       <button class="btn tiny" type="button" onclick="resetTypographySettings()">Reset</button>
+    </div>
+    <div class="ts-sub">Task cards</div>
+    <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
+    <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
+      <div class="ts-group ts-cats">
+      <div class="ts-sub">Card subjects</div>
+      <div class="ts-hint">Color, name and the words that auto-pick it (comma separated). Saved for all your devices.</div>
+      <div id="cardCatList"></div>
+      <div class="ts-cat-actions"><button class="btn tiny" id="cardCatAdd" type="button">+ Subject</button><button class="btn tiny" id="cardCatReset" type="button">Reset to defaults</button></div>
+    </div>
     </div>
   </div>
   <div id="toolbar">
@@ -1565,6 +1605,7 @@
     applyReferenceCollapseState();
     initUrgentSource(data.urgent);
     setInbox(data.inbox);
+    if(typeof applyServerCardCats === 'function') applyServerCardCats(data.cardCats); else window.__FW_CARDCATS__ = data.cardCats;
     loadCalendar();
     setStatus('Ready');
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
@@ -6066,16 +6107,55 @@
        moving to nest it under the task above / take it back out.
      - Card background = subject (Code, Career, …): set it from the checkbox hold
        menu, or let the app guess from the words (and the header it sits under). */
-  const CARD_CATS = [
-    {key:'code',   name:'Code',   color:'#22c55e', re:/\b(gantt|exercise tracker|userscripts?|scripts?|apps? script|clasp|github|repo|code|coding|bugs?|features?|readme|deploy|tampermonkey|violentmonkey|react|typescript|next\.?js|tailwind|javascript|api|css|html|apps?|ui|playnite|endpoint|dashboard|planner hub)\b/i},
-    {key:'career', name:'Career', color:'#8b5cf6', re:/\b(resumes?|résumé|jobs?|job search|applications?|apply|interviews?|linkedin|career|cover letter|recruiters?|ats|cdcr|calcareers|it associate|hiring|portfolio|networking)\b/i},
-    {key:'study',  name:'Study',  color:'#0ea5e9', re:/(^|[^\w])(a\+)(?!\w)|\b(comptia|study|studying|course|class|quiz|exam|practice test|flashcards?|learn|lessons?)\b/i},
-    {key:'work',   name:'Work',   color:'#b45309', re:/\b(dog ?walks?|dog ?walking|walks?|clients?|rover|invoices?)\b/i},
-    {key:'health', name:'Health', color:'#ec4899', re:/\b(exercises?|workout|gym|stretch(ing)?|pt|physical therapy|sleep|doctor|dentist|skincare|running|lift(ing)?|rehab)\b/i},
-    {key:'life',   name:'Life',   color:'#14b8a6', re:/\b(errands?|clean(ing)?|laundry|groceries|grocery|car|oil change|home|garden|bills?|bank|appointments?|dmv|shopping|cook(ing)?|dishes)\b/i},
-    {key:'fun',    name:'Fun',    color:'#f97316', re:/\b(guitar|music|sing(ing)?|games?|gaming|movies?|youtube|fun|spanish|japanese|language)\b/i},
+  // Subjects are editable in Options (Julius, 2026-10-27): name, color, keywords.
+  // Saved to the account (user properties, all devices) with a local copy for a fast start.
+  const CARD_CATS_DEFAULT = [
+    {key:'code',   name:'Code',   color:'#22c55e', words:'gantt, exercise tracker, userscript, userscripts, script, scripts, apps script, clasp, github, repo, code, coding, bug, bugs, feature, features, readme, deploy, tampermonkey, violentmonkey, react, typescript, next.js, nextjs, tailwind, javascript, api, css, html, app, apps, ui, playnite, endpoint, dashboard, planner hub'},
+    {key:'career', name:'Career', color:'#86efac', words:'resume, resumes, résumé, job, jobs, job search, application, applications, apply, interview, interviews, linkedin, career, cover letter, recruiter, recruiters, ats, cdcr, calcareers, it associate, hiring, portfolio, networking, soq'},
+    {key:'study',  name:'Study',  color:'#a78bfa', words:'a+, comptia, study, studying, course, class, quiz, exam, practice test, flashcard, flashcards, learn, lesson, lessons'},
+    {key:'work',   name:'Work',   color:'#94a3b8', words:'dog walk, dog walks, dog walking, walk, walks, client, clients, rover, invoice, invoices'},
+    {key:'health', name:'Health', color:'#ec4899', words:'exercise, exercises, workout, gym, stretch, stretching, pt, physical therapy, sleep, doctor, dentist, skincare, running, lift, lifting, rehab'},
+    {key:'life',   name:'Life',   color:'#14b8a6', words:'errand, errands, clean, cleaning, laundry, groceries, grocery, car, oil change, home, garden, bill, bills, bank, appointment, appointments, dmv, shopping, cook, cooking, dishes'},
+    {key:'fun',    name:'Fun',    color:'#f97316', words:'guitar, music, sing, singing, game, games, gaming, movie, movies, youtube, fun, spanish, japanese, language'},
   ];
-  const CARD_CAT_BY_KEY = Object.fromEntries(CARD_CATS.map(c => [c.key,c]));
+  let CARD_CATS = [], CARD_CAT_BY_KEY = {};
+  function cardCatRegex(words){
+    const list = String(words || '').split(',').map(w => w.trim()).filter(Boolean)
+      .sort((x,y) => y.length - x.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+'));
+    return list.length ? new RegExp('(^|[^\\w])(' + list.join('|') + ')(?=$|[^\\w])','i') : null;
+  }
+  function cleanCardCats(list){
+    if(!Array.isArray(list)) return null;
+    const seen = new Set(), out = [];
+    list.forEach(c => {
+      if(!c || !/^[a-z]{2,12}$/.test(c.key || '') || c.key === 'none' || seen.has(c.key)) return;
+      seen.add(c.key);
+      out.push({key:c.key, name:String(c.name || c.key).slice(0,24), color:/^#[0-9a-f]{6}$/i.test(c.color || '') ? c.color : '#9ca3af', words:String(c.words || '').slice(0,2000)});
+    });
+    return out;
+  }
+  function setCardCats(list,save){
+    const clean = cleanCardCats(list) || CARD_CATS_DEFAULT.map(c => ({...c}));
+    CARD_CATS = clean.map(c => ({...c, re:cardCatRegex(c.words)}));
+    CARD_CAT_BY_KEY = Object.fromEntries(CARD_CATS.map(c => [c.key,c]));
+    const plain = CARD_CATS.map(({re,...c}) => c);
+    try{ localStorage.setItem('fw.cardCats',JSON.stringify(plain)); }catch(e){}
+    let css = '';
+    CARD_CATS.forEach(c => { css += `.check-line[data-tccat="${c.key}"]{--tc-cat:${c.color};}`; });
+    let st = document.getElementById('cardCatCss');
+    if(!st){ st = document.createElement('style'); st.id = 'cardCatCss'; document.head.appendChild(st); }
+    st.textContent = css;
+    if(save){
+      clearTimeout(setCardCats.t);
+      setCardCats.t = setTimeout(() => { try{ google.script.run.withFailureHandler(e => setStatus('Subjects not saved: ' + e.message)).saveCardCats(plain); }catch(e){} },600);
+    }
+    if(typeof refreshAllCards === 'function') refreshAllCards();
+  }
+  (function(){
+    let local = null;
+    try{ local = JSON.parse(localStorage.getItem('fw.cardCats') || 'null'); }catch(e){}
+    setCardCats(local,false);
+  })();
   let cardsOn = true, cardsAuto = true;
   try{ cardsOn = localStorage.getItem('fw.cards') !== '0'; cardsAuto = localStorage.getItem('fw.cardsAuto') !== '0'; }catch(e){}
   const cardHeadOf = new WeakMap(); // line -> its card's head line
@@ -6083,7 +6163,6 @@
   (function(){
     let css = '';
     for(let i = 1; i <= 6; i++) css += `.check-line[data-tchead="${i}"]{--tch:${i};}.check-line[data-tcrel="${i}"]{--tcr:${i};}`;
-    CARD_CATS.forEach(c => { css += `.check-line[data-tccat="${c.key}"]{--tc-cat:${c.color};}`; });
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   })();
 
@@ -6091,7 +6170,7 @@
   const tcText = n => (n.textContent || '').replace(/\s+/g,' ').trim().replace(/^\*/,'');
   function guessCardCat(text){
     if(!text) return '';
-    for(const c of CARD_CATS) if(c.re.test(text)) return c.key;
+    for(const c of CARD_CATS) if(c.re && c.re.test(text)) return c.key;
     return '';
   }
   function isHeaderLike(n){
@@ -6187,6 +6266,50 @@
     if(on){ on.checked = cardsOn; on.addEventListener('change',() => { cardsOn = on.checked; try{ localStorage.setItem('fw.cards',cardsOn ? '1' : '0'); }catch(e){} refreshAllCards(); cardsSyncHeights(); }); }
     if(auto){ auto.checked = cardsAuto; auto.addEventListener('change',() => { cardsAuto = auto.checked; try{ localStorage.setItem('fw.cardsAuto',cardsAuto ? '1' : '0'); }catch(e){} refreshAllCards(); }); }
   })();
+  // Subject editor in Options.
+  function renderCardCatEditor(){
+    const box = document.getElementById('cardCatList');
+    if(!box) return;
+    box.innerHTML = '';
+    const plain = () => CARD_CATS.map(({re,...c}) => c);
+    CARD_CATS.forEach((c,i) => {
+      const row = document.createElement('div'); row.className = 'ts-cat';
+      const col = document.createElement('input'); col.type = 'color'; col.value = c.color; col.title = 'Card color';
+      const name = document.createElement('input'); name.type = 'text'; name.className = 'ts-cat-name'; name.value = c.name; name.placeholder = 'Name';
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'ts-cat-del'; del.textContent = '✕'; del.title = 'Remove subject';
+      const words = document.createElement('input'); words.type = 'text'; words.className = 'ts-cat-words'; words.value = c.words; words.placeholder = 'words that auto-pick it, comma separated';
+      const upd = () => { const l = plain(); l[i] = {...l[i], color:col.value, name:name.value.trim() || c.key, words:words.value}; setCardCats(l,true); };
+      col.addEventListener('input',upd); name.addEventListener('change',upd); words.addEventListener('change',upd);
+      del.addEventListener('click',() => {
+        if(!confirm('Remove the subject "' + c.name + '"? Cards set to it go back to Auto.')) return;
+        const l = plain(); l.splice(i,1); setCardCats(l,true); renderCardCatEditor();
+      });
+      row.append(col,name,del,words); box.appendChild(row);
+    });
+  }
+  (function(){
+    const add = document.getElementById('cardCatAdd'), reset = document.getElementById('cardCatReset');
+    if(add) add.addEventListener('click',() => {
+      const l = CARD_CATS.map(({re,...c}) => c);
+      let key = ''; do{ key = 's' + Math.random().toString(36).replace(/[^a-z]/g,'').slice(0,6); }while(key.length < 3 || l.some(c => c.key === key));
+      l.push({key,name:'New subject',color:'#f59e0b',words:''});
+      setCardCats(l,true); renderCardCatEditor();
+      const rows = document.querySelectorAll('#cardCatList .ts-cat-name'); const last = rows[rows.length - 1]; if(last){ last.focus(); last.select(); }
+    });
+    if(reset) reset.addEventListener('click',() => {
+      if(!confirm('Reset card subjects to the defaults?')) return;
+      setCardCats(CARD_CATS_DEFAULT,true); renderCardCatEditor();
+    });
+    renderCardCatEditor();
+  })();
+  // Account copy wins once the workspace data arrives (keeps devices in step).
+  function applyServerCardCats(list){
+    if(!Array.isArray(list) || !list.length) return;
+    const cur = JSON.stringify(CARD_CATS.map(({re,...c}) => c));
+    if(JSON.stringify(cleanCardCats(list)) === cur) return;
+    setCardCats(list,false); renderCardCatEditor();
+  }
+  if(window.__FW_CARDCATS__) applyServerCardCats(window.__FW_CARDCATS__);
   function cardsSyncHeights(){
     if(typeof syncDayHeights === 'function') requestAnimationFrame(() => syncDayHeights());
   }

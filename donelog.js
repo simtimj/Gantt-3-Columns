@@ -28,4 +28,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-gantt-concise-tasks', date: '2026-10-26', project: 'Gantt', title: 'Concise tasks', details: "today's long tasks shortened to Title: details" },
   { id: 'd-20261026-gantt-calendar-panel', date: '2026-10-26', project: 'Gantt', title: 'Calendar panel', details: "today's events then the next 3 days, between Urgent and Inbox" },
   { id: 'd-20261026-faq-write', date: '2026-10-26', project: 'FAQ', title: 'Claude can write to the FAQ', details: 'entries filed by topic tab; coffee cooling time added under Productivity' },
+  { id: 'd-20261026-gantt-nightly-notes', date: '2026-10-26', project: 'Gantt', title: 'Nightly wrap-up + plan', details: '10:05 pm run writes Day wrap-up in Notes and tomorrow\'s Suggested day' },
 ];

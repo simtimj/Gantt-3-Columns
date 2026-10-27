@@ -1014,12 +1014,13 @@ function noteLineHtml_(line, opt) {
     return '<div' + (st ? ' style="' + st.trim() + '"' : '') + '>- ' + noteInline_(line.replace(/^-\s+/, '')) + '</div>';
   }
   if (level) return '<div style="padding-left: ' + (level * 14) + 'px;">' + noteInline_(line) + '</div>';
-  return '<div>' + noteInline_(line) + '</div>';
+  return '<div' + (opt && opt.gap ? ' style="padding-top: 6px;"' : '') + '>' + noteInline_(line) + '</div>';
 }
 // Boxed (Julius, 2026-10-26): the whole block sits in a table so it reads as a contained card;
 // styled by .editor table[data-cnote] in Index.html. cells:true (tried for the Suggested day,
 // Julius 2026-10-26): each '##' section gets its own row (divided cells) and '- ' entries get a
-// small gap above instead of blank lines, to stay space efficient.
+// small gap above instead of blank lines, to stay space efficient
+// ('__Area__' header lines too, for the wrap-up's Focus and Priority check, Julius 2026-10-26).
 function noteBlockHtml_(item) {
   const kind = item.kind === 'wrap' ? 'wrap' : 'plan';
   const title = item.title || (kind === 'wrap' ? 'Day wrap-up' : 'Suggested day');
@@ -1030,7 +1031,7 @@ function noteBlockHtml_(item) {
     const raw = String(line == null ? '' : line);
     if (item.cells && /^##\s+/.test(raw)) { rows.push(cur); cur = ''; first = true; }
     if (item.cells && !raw.trim()) return; // cells mode spaces entries itself
-    const isItem = /^-\s+/.test(raw);
+    const isItem = /^(-\s+|__)/.test(raw); // '- ' entries and '__Area__' headers start a spaced entry
     cur += noteLineHtml_(raw, { gap: item.cells && isItem && !first });
     if (isItem) first = false;
   });

@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` deploys automatically (`.github/workflows/deploy.yaml` → `clasp push` + update deployment).
 
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 
 ## Status key
 
@@ -47,6 +47,7 @@ Last updated: 2026-10-26
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Hidden third column by swipe (2026-10-27)**: with only two columns showing, the third sits just off-screen — swipe (or trackpad-scroll) past the edge to reach it. Starts on the right; pull past the left edge instead and it moves to the left side (remembered). Works from anywhere on the screen
 - **Urgency picker stays open**: picking 1/2/3/✕ keeps the menu up so you can set the due date next; tap outside to close
 - **Subtasks follow urgency**: setting (or clearing) a task's urgency applies it to all its subtasks too
 - **Reference Options pop-up**: Options opens as a small pop-up over Reference (nothing gets pushed down); tap outside or scroll to close

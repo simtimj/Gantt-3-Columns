@@ -855,10 +855,10 @@ function doneLineHtml_(item) {
     '<span class="check-text">' + doneEsc_(doneItemName_(item) ? doneItemName_(item) + ': ' : '') + doneEsc_(item.details || '') + '</span></div>';
 }
 
-// Split cell HTML into top-level blocks (div depth tracking).
+// Split cell HTML into top-level blocks (div / p depth tracking).
 function doneBlocks_(html) {
   const out = [];
-  const re = /<\/?div\b[^>]*>/gi;
+  const re = /<\/?(div|p)\b[^>]*>/gi; // <p> lines are blocks too
   let depth = 0, start = 0, m, last = 0;
   while ((m = re.exec(html))) {
     if (m[0][1] !== '/') { if (depth === 0) { if (m.index > last) out.push(html.slice(last, m.index)); start = m.index; } depth++; }
@@ -919,10 +919,23 @@ function groupClaudeDone_(html, list) {
     current = null;
     slots.push({ block: b });
   });
-  const out = slots.map(s => s.group != null
-    ? (groups[s.group].length ? doneHeaderHtml_(s.group) + groups[s.group].join('') : '')
-    : s.block).join('');
-  return out;
+  // A blank line before and after each group so groups don't run together
+  // (Julius, 2026-10-26); existing blank lines are reused, never doubled.
+  const BLANK = '<p><br></p>';
+  const isBlank = b => /^<(p|div)\b[^>]*>(\s|&nbsp;|<br\b[^>]*>)*<\/(p|div)>$/i.test(b);
+  const parts = [];
+  slots.forEach((s, i) => {
+    if (s.group == null) {
+      if (parts.length && parts[parts.length - 1].group && !isBlank(s.block)) parts.push({ block: BLANK });
+      parts.push(s);
+      return;
+    }
+    if (!groups[s.group].length) return;
+    const prev = parts[parts.length - 1];
+    if (prev && (prev.group || !isBlank(prev.block))) parts.push({ block: BLANK });
+    parts.push({ group: s.group, html: doneHeaderHtml_(s.group) + groups[s.group].join('') });
+  });
+  return parts.map(p => p.group ? p.html : p.block).join('');
 }
 
 function applyClaudeDone_() {

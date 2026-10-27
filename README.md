@@ -50,7 +50,6 @@ Last updated: 2026-10-27
 - **Urgency on Notes tasks sticks (2026-10-27)**: setting 1/2/3 on a task in Notes (e.g. a carry-over) now stays in the Urgent panel instead of vanishing a second later; tapping it jumps to the Notes line
 - **Dark mode (2026-10-27)**: the app's own dark mode instead of the phone inverting it: black background, day cells keep their light-mode colors (Wednesday blue) with dark text, panels and menus dark. Colors to adjust as we go
 - **Note boxes match the day (2026-10-27)**: Suggested day / Day wrap-up boxes have the same thick line all around as between sections, the inside is the day's own color (no white), and the Focus areas and Priority check names (Gantt, Exercise Tracker, Time went to apps, Fix for tomorrow…) are bold
-- **Hidden third column by swipe (2026-10-27)**: with only two columns showing, the third sits just off-screen — swipe (or trackpad-scroll) past the edge to reach it. Starts on the right; pull past the left edge instead and it moves to the left side (remembered). Works from anywhere on the screen
 - **Urgency picker stays open**: picking 1/2/3/✕ keeps the menu up so you can set the due date next; tap outside to close
 - **Subtasks follow urgency**: setting (or clearing) a task's urgency applies it to all its subtasks too
 - **Reference Options pop-up**: Options opens as a small pop-up over Reference (nothing gets pushed down); tap outside or scroll to close
@@ -120,6 +119,7 @@ Last updated: 2026-10-27
 ---
 
 ## 💤 Shelved
+- **Hidden third column by swipe** (built 2026-10-27, paused same day — broke 2-column mode; `PEEK_ENABLED` in Index.html): with only two columns showing, the third sits just off-screen — swipe (or trackpad-scroll) past the edge to reach it. Starts on the right; pull past the left edge instead and it moves to the left side (remembered). Works from anywhere on the screen
 
 - **Focus** button (hid the top toolbar; Show toolbar brought it back) — button hidden 2026-10-26, code kept. To restore, un-comment the Focus button in `Index.html` and put back `initFocusMode()`'s saved state.
 

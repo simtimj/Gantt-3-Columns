@@ -145,6 +145,8 @@ Last updated: 2026-10-27
 - **Day-colored dark cells** (2026-10-27): in dark mode each day cell is black → its day color (Dark cells slider sets how much). Options: "Dark day cells match the day color" toggle, 7 color pickers (M–S) defaulting to the day line colors, Default button. Reference cells keep the tint picker.
 - **Stronger urgency borders** (2026-10-27): urgency checkboxes have a thicker colored border, a dark gap before the subject fill and a soft glow.
 
+- **Task count in today's cell** (2026-10-27): "Today: X out of Y tasks done" bar moved from the toolbar to right under the date in today's Today cell.
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

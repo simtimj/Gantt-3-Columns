@@ -80,7 +80,7 @@
 ## Title lines (2026-10-27, Julius)
 
 - Saved attrs: `data-tl="1"` (marked title) and `data-fold="1"` (folded) on a direct child of an editor; `[data-cgrp]` headers count as titles automatically. Render-only: `data-tlon` (o/c), `data-tlinfo` ("N hidden · M done"), `data-tlhid` on covered lines — stripped in `cardCleanHtml()`. `refreshTitleLines(ed)` runs at the end of `refreshCards(ed)` (observer also watches `data-tl`/`data-fold`). Covered = following siblings until an empty line (`isEmptyLine`) or another title. The − / + is a `::before` with `order:100` at the line's right end; hits are measured from the right edge in a capture pointerdown → `toggleTitleFold()`. Mark/unmark: `toggleTitleLine()` from the checkbox hold menu or context menu `data-ctx="title"`. Button sits right after the text (`::before` order 1, due label `::after` order 2, title `.check-text` flex 0 1 auto); hit zone measured from the end of the line's content. Folded label: "D out of T done" (tasks) or "N hidden".
-- Mini dashboard: `#dashChip` in the toolbar after `#dateLabel`; `updateDash()` (debounced) counts check-lines in today's `#todayScroll .day-editor`; called from `refreshCards` for day editors and on checkbox `change`.
+- Mini dashboard: `.dash-chip` (`#dashChip`) is created by `updateDash()` inside today's `#todayScroll` day row, right before the editor (under the date; Julius 2026-10-27, was in the toolbar); `updateDash()` (debounced) counts check-lines in today's `#todayScroll .day-editor`; called from `refreshCards` for day editors and on checkbox `change`.
 
 ## Dark tint, subject chips, checkbox fill (2026-10-27, Julius)
 

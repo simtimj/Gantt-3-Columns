@@ -1090,10 +1090,20 @@
       .ctx-menu,.urg-picker,.urg-cal,.urg-create-menu,.send-menu,.archive-box,.view-menu-popup,.type-settings{background:#161616;color:#e6e6e6;}
       .urg-pick{background:#1c1c1c;}
       input,select,textarea{background:#1c1c1c;color:#e6e6e6;}
-      /* Day cells keep their light-mode colors, so their text stays dark */
-      .day-row{color:#222;}
-      .day-row .day-label{color:#555;}
-      .day-row .editor table[data-cnote] .check-line[data-send]::after{background:#fff;color:#555;}
+      /* Day cells (Julius, 2026-10-27): back to dark day colors like the phone's
+         original dark mode (light ones were too bright), light text; the lines
+         (note boxes, today outline) use the day's LIGHT color. */
+      .day-row{color:#e6e6e6;}
+      .day-row .day-label{color:#b0b0b0;}
+      .day-row.dow-1{background:#262626;--note-line:#d6d6d6;}
+      .day-row.dow-2{background:#3a2a1a;--note-line:#f2c79a;}
+      .day-row.dow-3{background:#18283a;--note-line:#a9cdf0;}
+      .day-row.dow-4{background:#33271b;--note-line:#dcc2a3;}
+      .day-row.dow-5{background:#3a3216;--note-line:#f0d97a;}
+      .day-row.dow-6{background:#3a2c18;--note-line:#e2c497;}
+      .day-row.dow-0{background:#3a3412;--note-line:#f2e27a;}
+      .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
+      .day-row .editor table[data-cnote] .check-line[data-send]::after{background:#1c1c1c;color:#bbb;border-color:#555;}
     }
 </style>
 </head>

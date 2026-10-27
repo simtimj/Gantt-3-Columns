@@ -73,7 +73,7 @@ const CLAUDE_NOTES = [
     '[] **Frictionless Capture**: button opens Claude listening; idea becomes Title: details in the Inbox',
     '[] **Halloween Gig (Fri 10/30)**: rock show for a friend; final prep check',
   ] },
-  { id: 'n-20261027-plan', rev: 10, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested Day · Tue 10/27', lines: [
+  { id: 'n-20261027-plan', rev: 11, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested Day · Tue 10/27', lines: [
     '## Calendar',
     '- **CalCareers Block**: **4:00–6:30**',
     '- **Dog Walks**: none today',
@@ -85,11 +85,11 @@ const CLAUDE_NOTES = [
     '  **4:00–5:15** · **STD 678**: match the résumé',
     '  **5:15–6:30** · **Attach + Submit**: résumé, cover letter, SOQ',
     '## Important / Not The Most Urgent',
-    '- **Halloween Gig (Fri 10/30)**: prep check',
-    '  **7:00–7:30 pm** · **Setlist + Gear**: final check',
     '- **Claude-To-Gantt Pipeline**: only after submitting',
     '  **12:30–1:45** · **Endpoint Plan**: Apps Script endpoint',
     '- **Calendar Visibility**: confirm Claude sees every calendar before scheduling',
+    '- **Dog Walk Scheduler**: auto walking blocks from the walk calendar',
+    '  **7:00–7:30 pm** · **Plan It**: travel-time list per client, 30-min gap split, update on walk changes',
     '## Stretch · Bonus If There\'s Time',
     '- **IT Lab (AD / M365)**: target ~Nov 6',
     '  **7:30–8:30 pm** · **Next Lab Step**: AD / M365',

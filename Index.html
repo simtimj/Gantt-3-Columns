@@ -1147,6 +1147,15 @@
       .reference-sort-bar #refOptionsBtn.on{background:#1d2738;border-color:#3f74a6;}
       .urg-picker,.urg-pick,.urg-due-chip,.uc-today,#calPanel,#inboxPanel{background:#161616;}
     }
+
+    /* Day-colored text option (Julius, 2026-10-27): text in day cells takes the day's
+       color, with its own darker/lighter slider (--dt-w / --dt-k), separate from the
+       Day colors slider for lines and borders. */
+    html.day-text .day-row[class*="dow-"]{--day-text:color-mix(in srgb, color-mix(in srgb, var(--note-line, currentColor), #fff var(--dt-w,0%)), #000 var(--dt-k,0%));color:var(--day-text);}
+    html.day-text .day-row[class*="dow-"] [data-dkc]{color:var(--day-text)!important;}
+    html.day-text .day-row .check-line.done > .check-text,
+    html.day-text .day-row .check-line > input[type="checkbox"]:checked + .check-text{color:inherit;opacity:.6;}
+    #dayTextAdjRow.off{opacity:.45;}
 </style>
 </head>
 <body>
@@ -1195,6 +1204,19 @@
       <input id="dayColorAdj" type="range" min="-60" max="60" step="5" value="0" aria-label="Day colors, darker to lighter">
       <output id="dayColorAdjValue">0</output>
       <button class="btn tiny" id="resetDayColorAdj" type="button">Reset</button>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label">Day text color</span>
+      <select id="dayTextMode" class="top-select" aria-label="Text color in day cells">
+        <option value="gray">Gray (brightness slider)</option>
+        <option value="day">Day color (Tue orange…)</option>
+      </select>
+    </div>
+    <div class="ts-row" id="dayTextAdjRow">
+      <span class="ts-label">Day text · darker / lighter</span>
+      <input id="dayTextAdj" type="range" min="-60" max="60" step="5" value="0" aria-label="Day-colored text, darker to lighter">
+      <output id="dayTextAdjValue">0</output>
+      <button class="btn tiny" id="resetDayTextAdj" type="button">Reset</button>
     </div>
     <div class="ts-row ts-font">
       <span class="ts-label">Text font · size</span>
@@ -5962,6 +5984,35 @@
     });
     const r = document.getElementById('resetRefPad');
     if(r) r.addEventListener('click',() => { set('x',100); set('y',100); });
+  })();
+
+  // Day text color toggle + its own slider (Julius, 2026-10-27).
+  (function(){
+    const mode = document.getElementById('dayTextMode'), el = document.getElementById('dayTextAdj'),
+          out = document.getElementById('dayTextAdjValue'), row = document.getElementById('dayTextAdjRow');
+    function setMode(m,save){
+      m = m === 'day' ? 'day' : 'gray';
+      document.documentElement.classList.toggle('day-text', m === 'day');
+      if(mode) mode.value = m;
+      if(row) row.classList.toggle('off', m !== 'day');
+      if(save !== false){ try{ localStorage.setItem('fw.dayTextMode',m); }catch(e){} }
+    }
+    function setAdj(v,save){
+      v = Math.max(-60,Math.min(60,Math.round(Number(v) || 0)));
+      const root = document.documentElement.style;
+      root.setProperty('--dt-w',(v > 0 ? v : 0) + '%');
+      root.setProperty('--dt-k',(v < 0 ? -v : 0) + '%');
+      if(el) el.value = v;
+      if(out) out.textContent = (v > 0 ? '+' : '') + v;
+      if(save !== false){ try{ localStorage.setItem('fw.dayTextAdj',String(v)); }catch(e){} }
+    }
+    let m = 'gray', a = 0;
+    try{ m = localStorage.getItem('fw.dayTextMode') || 'gray'; a = localStorage.getItem('fw.dayTextAdj') || 0; }catch(e){}
+    setMode(m,false); setAdj(a,false);
+    if(mode) mode.addEventListener('change',() => setMode(mode.value));
+    if(el) el.addEventListener('input',() => setAdj(el.value));
+    const r = document.getElementById('resetDayTextAdj');
+    if(r) r.addEventListener('click',() => setAdj(0));
   })();
 </script>
 </body>

@@ -114,6 +114,9 @@
     #workspace .pane.view-hidden{
       display:none!important;
     }
+    /* 2-column view: the third column sits just off-screen (swipe to it). */
+    #workspace .pane.peek-pane{border-left:1px solid var(--border);}
+    #workspace .pane.peek-pane.peek-left{border-left:0;border-right:1px solid var(--border);}
     #workspace.view-single .pane:not(.view-hidden){
       width:100%;
       min-width:0;
@@ -4139,9 +4142,15 @@
     }
     document.getElementById('mobileSplitResizerThird')?.remove();
     split.style.display='';
+    // Two columns chosen: keep the third one just off-screen (left or right,
+    // see PEEK_SIDE_KEY) so a swipe past the edge always reaches it.
+    const peek=visiblePanes.length===2 ? VIEW_PANES.find(n=>!visiblePanes.includes(n)) : null;
+    const peekSide=peek ? getPeekSide() : null;
     VIEW_PANES.forEach(name=>{
       const pane=document.getElementById(name+'Pane');
-      pane.classList.toggle('view-hidden',!visiblePanes.includes(name));
+      pane.classList.toggle('view-hidden',!visiblePanes.includes(name) && name!==peek);
+      pane.classList.toggle('peek-pane',name===peek);
+      pane.classList.toggle('peek-left',name===peek && peekSide==='left');
       pane.style.gridColumn='';pane.style.gridRow='';pane.style.width='';
     });
     split.style.gridColumn='';split.style.gridRow='';
@@ -4154,11 +4163,21 @@
     const desktopFit=!phone && visiblePanes.length>1 && !localStorage.getItem(COLUMN_STORAGE_KEY);
     const available=Math.max(0,width-(visiblePanes.length-1));
     const baseTotal=visiblePanes.reduce((n,name)=>n+Math.max(120,Number(columnWidths[name])||420),0);
+    const peekWidth=peek ? (phone ? Math.max(280,width) : Math.max(160,Number(columnWidths[peek])||420)) : 0;
+    const placePeek=()=>{
+      const pane=document.getElementById(peek+'Pane');
+      pane.style.gridColumn=String(slot++);pane.style.gridRow='1';
+      tracks.push(`${peekWidth}px`);
+    };
+    if(peek && peekSide==='left')placePeek();
     visiblePanes.forEach((name,index)=>{
       const pane=document.getElementById(name+'Pane');
       pane.style.gridColumn=String(slot++);pane.style.gridRow='1';
       if(phone)tracks.push(`${Math.max(280,width)}px`);
       else if(visiblePanes.length===1)tracks.push('minmax(0,1fr)');
+      // With a peek pane the visible ones need fixed widths, or fr tracks
+      // would shrink to make room for it instead of the workspace scrolling.
+      else if(desktopFit && peek)tracks.push(`${Math.max(120,Math.floor(available*(columnWidths[name]||420)/baseTotal))}px`);
       else if(desktopFit)tracks.push(`minmax(0,${Math.max(120,Math.round(available*(columnWidths[name]||420)/baseTotal))}fr)`);
       else tracks.push(`${Math.max(120,Number(columnWidths[name])||420)}px`);
       if(!phone && index<visiblePanes.length-1){
@@ -4168,13 +4187,82 @@
         tracks.push('1px');
       }
     });
+    if(peek && peekSide!=='left')placePeek();
     workspace.style.gridTemplateColumns=tracks.join(' ');
     workspace.style.justifyContent='start';
     workspace.style.overflowX=visiblePanes.length>1?'auto':'hidden';
     workspace.style.overflowY='hidden';
     workspace.style.scrollSnapType='none';
     workspace.classList.toggle('view-single',visiblePanes.length===1);
-    requestAnimationFrame(()=>{syncDayHeights();restoreDayScroll();});
+    const peekKey=peek ? peek+':'+peekSide : '';
+    const peekChanged=peekKey!==lastPeekKey;
+    lastPeekKey=peekKey;
+    requestAnimationFrame(()=>{
+      // Land on the two chosen columns, with the peek pane just out of view.
+      if(peek && peekChanged && !peekRevealing)
+        workspace.scrollLeft=peekSide==='left' ? peekWidth : 0;
+      syncDayHeights();restoreDayScroll();
+    });
+  }
+  /* ---- Hidden third column (2-column view) ----
+     Swipe past the edge to reach it. Over-swiping at the other edge moves
+     it to that side, so the swipe direction decides where it lives. */
+  const PEEK_SIDE_KEY='fw.peekSide';
+  let lastPeekKey='';
+  let peekRevealing=false;
+  function getPeekSide(){
+    try{ return localStorage.getItem(PEEK_SIDE_KEY)==='left' ? 'left' : 'right'; }catch(e){ return 'right'; }
+  }
+  function movePeekTo(side){
+    const workspace=document.getElementById('workspace');
+    if(isSplitActive() || visiblePanes.length!==2 || getPeekSide()===side)return;
+    try{ localStorage.setItem(PEEK_SIDE_KEY,side); }catch(e){}
+    peekRevealing=true;
+    // Rebuild with the pane on the new side, start where the view was, then glide to it.
+    updateWorkspaceLayout();
+    const peekPane=document.querySelector('#workspace .peek-pane');
+    const w=peekPane ? peekPane.getBoundingClientRect().width : 0;
+    workspace.scrollLeft=side==='left' ? w : 0;
+    requestAnimationFrame(()=>{
+      workspace.scrollTo({left:side==='left' ? 0 : workspace.scrollWidth,behavior:'smooth'});
+      setTimeout(()=>{peekRevealing=false;},500);
+    });
+  }
+  function initPeekSwipe(){
+    const workspace=document.getElementById('workspace');
+    const atLeft=()=>workspace.scrollLeft<=2;
+    const atRight=()=>workspace.scrollLeft>=workspace.scrollWidth-workspace.clientWidth-2;
+    const active=()=>!isSplitActive() && visiblePanes.length===2;
+    // Touch: a clearly sideways swipe that starts and ends pinned at an edge.
+    let t=null;
+    document.addEventListener('touchstart',e=>{
+      if(!active() || e.touches.length!==1 || !document.getElementById('app').contains(e.target)){t=null;return;}
+      const p=e.touches[0];
+      t={x:p.clientX,y:p.clientY,left:atLeft(),right:atRight()};
+    },{capture:true,passive:true});
+    document.addEventListener('touchend',e=>{
+      if(!t || !active())return;
+      const p=e.changedTouches[0];
+      const dx=p.clientX-t.x, dy=p.clientY-t.y;
+      const start=t; t=null;
+      if(Math.abs(dx)<70 || Math.abs(dx)<Math.abs(dy)*1.5)return;
+      if(dx>0 && start.left && atLeft())movePeekTo('left');      // pulled right at the left edge
+      else if(dx<0 && start.right && atRight())movePeekTo('right'); // pulled left at the right edge
+    },{capture:true,passive:true});
+    document.addEventListener('touchcancel',()=>{t=null;},{capture:true,passive:true});
+    // Trackpad: keep pushing sideways against an edge.
+    let push=0, pushAt=0;
+    document.addEventListener('wheel',e=>{
+      if(!active() || e.ctrlKey || e.metaKey || Math.abs(e.deltaX)<=Math.abs(e.deltaY))return;
+      const now=Date.now();
+      if(now-pushAt>400)push=0;
+      pushAt=now;
+      if(e.deltaX<0 && atLeft())push=Math.min(0,push)+e.deltaX;
+      else if(e.deltaX>0 && atRight())push=Math.max(0,push)+e.deltaX;
+      else {push=0;return;}
+      if(push<-180){push=0;movePeekTo('left');}
+      else if(push>180){push=0;movePeekTo('right');}
+    },{capture:true,passive:true});
   }
   function updateColumnsLabel(){
     const label = isSplitActive()
@@ -5640,6 +5728,7 @@
   }
   initColumnResizers();
   initWorkspaceHorizontalSwipe();
+  initPeekSwipe();
   initFocusMode();
   loadWorkspace();
 </script>

@@ -48,6 +48,9 @@ Last updated: 2026-10-26
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Due group in Urgent (2026-10-26):** tasks with a due date but no urgency show in a grey **Due** group at the bottom of the Urgent panel, soonest first (they leave once checked). Urgent / Soon / Later keep sorting by due date, soonest first, undated last. Header reads `Urgent · N · Due N`.
+- **Tapping a cell keeps your place (2026-10-26):** tapping into Notes (or Today) no longer moves the view; leaving a cell resizes its row without scrolling.
+
 - **Done-with-Claude log, grouped (2026-10-26):** work done through Claude is batched under a bold, underlined project header (Exercise Tracker, Gantt…), each line leading with what was done (e.g. **In Today marker**: purple marker on grid cells). Today's lines were regrouped too.
 
 - Sort dropdown in Reference shrunk to fit its text.

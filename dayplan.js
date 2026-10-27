@@ -36,6 +36,7 @@
 // Bold names (Julius, 2026-10-27): every bold or underlined name is Title Cased (each word capitalized) and
 //   written **Name**: short details. Time-block detail lines too: '  9:00–10:45 · **SOQ**: 2 pages …'. Wrap-up
 //   stat lines likewise ('**Done**: 28 / 36 tasks', '**Urgent**: …'); Priority Check entries '__Time Went To Apps__'.
+// Times (Julius, 2026-10-27): in the Suggested Day every time or time range is bold: '  **9:00–10:45** · **SOQ**: …'.
 // rev: bump (2, 3, …) to re-render an already-inserted block in place; a block he deleted stays deleted.
 // Each entry is applied once (ids in script property "claudeNotesApplied"); deleting it in the app keeps it deleted.
 // Ids must be unique and never reused. Prune entries older than ~30 days.
@@ -72,26 +73,26 @@ const CLAUDE_NOTES = [
     '[] **Frictionless Capture**: button opens Claude listening; idea becomes Title: details in the Inbox',
     '[] **Halloween Gig (Fri 10/30)**: rock show for a friend; final prep check',
   ] },
-  { id: 'n-20261027-plan', rev: 9, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested Day · Tue 10/27', lines: [
+  { id: 'n-20261027-plan', rev: 10, cells: true, date: '2026-10-27', kind: 'plan', title: 'Suggested Day · Tue 10/27', lines: [
     '## Calendar',
-    '- **CalCareers Block**: 4:00–6:30',
+    '- **CalCareers Block**: **4:00–6:30**',
     '- **Dog Walks**: none today',
     '## Must Do / Urgent + Important',
     '- **__CDCR Application__**: due end of day today',
-    '  9:00–10:45 · **SOQ**: 2 pages against the duty statement',
-    '  10:45–12:00 · **Cover Letter**: one page',
-    '- **__Submit It__**: in the 4:00–6:30 CalCareers block',
-    '  4:00–5:15 · **STD 678**: match the résumé',
-    '  5:15–6:30 · **Attach + Submit**: résumé, cover letter, SOQ',
+    '  **9:00–10:45** · **SOQ**: 2 pages against the duty statement',
+    '  **10:45–12:00** · **Cover Letter**: one page',
+    '- **__Submit It__**: in the **4:00–6:30** CalCareers block',
+    '  **4:00–5:15** · **STD 678**: match the résumé',
+    '  **5:15–6:30** · **Attach + Submit**: résumé, cover letter, SOQ',
     '## Important / Not The Most Urgent',
     '- **Halloween Gig (Fri 10/30)**: prep check',
-    '  7:00–7:30 pm · **Setlist + Gear**: final check',
+    '  **7:00–7:30 pm** · **Setlist + Gear**: final check',
     '- **Claude-To-Gantt Pipeline**: only after submitting',
-    '  12:30–1:45 · **Endpoint Plan**: Apps Script endpoint',
+    '  **12:30–1:45** · **Endpoint Plan**: Apps Script endpoint',
     '- **Calendar Visibility**: confirm Claude sees every calendar before scheduling',
     '## Stretch · Bonus If There\'s Time',
     '- **IT Lab (AD / M365)**: target ~Nov 6',
-    '  7:30–8:30 pm · **Next Lab Step**: AD / M365',
+    '  **7:30–8:30 pm** · **Next Lab Step**: AD / M365',
     '- **A+ Review**: modular vs non-modular PSUs',
     '## Later · Can Wait',
     '- **Cleanup IT Associate Ref**: after submitting',

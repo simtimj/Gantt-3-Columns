@@ -65,4 +65,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-subject-weighing', date: '2026-10-27', project: 'Gantt', title: 'Smarter card subjects', details: 'end a task with · Gantt / · Code to set it; Claude lines follow their project header; otherwise words are weighed, longest phrase wins' },
   { id: 'd-20261027-ex-upnext-marker', date: '2026-10-27', project: 'Exercise Tracker', title: 'Up next marker', details: 'Up next exercises show a lighter purple cell with no ring; Today keeps the ring' },
   { id: 'd-20261027-eh-tag-sections', date: '2026-10-27', project: 'Userscripts', title: 'EH recent tags in sections', details: 'grouped by type, plain keywords like english on top, then language, female, male, artist…; bigger box (v2.8.0)' },
+  { id: 'd-20261027-gantt-can-be-later', date: '2026-10-27', project: 'Gantt', title: 'Can be later urgency', details: 'blue level 3 renamed from Later: nice to do, not pressing' },
+  { id: 'd-20261027-eh-tags-column', date: '2026-10-27', project: 'Userscripts', title: 'EH recent tags column', details: 'Recent tags moved out of the filter panel into a full-height left column; drawer + Tags tab on narrow screens (v2.9.0)' },
 ];

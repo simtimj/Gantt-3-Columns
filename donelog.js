@@ -38,4 +38,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-gantt-send-ref', date: '2026-10-26', project: 'Gantt', title: 'Send menu: dates + → Reference', details: 'Today/Tomorrow show the date (10/27 Tue); carry-overs can go to a Reference cell' },
   { id: 'd-20261026-gantt-plan-sections', date: '2026-10-26', project: 'Gantt', title: 'Suggested day sections', details: 'Calendar with dog walks, underlined Must do, Stretch moved up, Next/Can wait renamed Soon/Later' },
   { id: 'd-20261026-gantt-wrap-cells', date: '2026-10-26', project: 'Gantt', title: 'Divided Day wrap-up', details: 'Focus, Priority check, Carries over in their own cells; Soon renamed Important and moved above Stretch' },
+  { id: 'd-20261026-gantt-note-dividers', date: '2026-10-26', project: 'Gantt', title: 'Note dividers in day color', details: 'wrap-up and plan section lines thicker, deeper day color, more space' },
 ];

@@ -46,4 +46,5 @@
 - `noteLineHtml_()` in `Code.gs`: `- x` → dash line (no dots), `[] x` → unchecked check-line with `data-send="1"`, `__x__` → underline. Style rules for wrap/plan are in the `dayplan.js` header.
 - `rev` on a CLAUDE_NOTES entry: re-renders an already-applied block in place once per rev (applied key `id@rev`); deleted blocks stay deleted.
 - "→ Day" is a CSS `::after` on `table[data-cnote] .check-line[data-send]`; `maybeOpenSendMenu()` (journal editors, pointerdown capture, right ~72px of the line) → `openSendMenu()` → `sendNoteTask()`: client `addTaskToDay()` when that day is loaded, else server `appendTaskToDay(date, html)`; then the line is removed from the note.
+- Nesting + cells (2026-10-26, Julius): leading spaces in a line (2 per level) → `[]` subtasks get `data-level`/margin, plain lines get padding (detail lines). `cells:true` on an entry splits each `##` section into its own `<tr>` (`data-ccells`), drops blank lines and gives `- ` entries `padding-top:6px`. "→ Day" uses `noteTaskTree()` (the line + following deeper check-lines) → `addTasksToDay()` or server `appendTasksToDay(date, [{html, level}])`.
 - Drag-and-drop to days waits on the task-card work.

@@ -408,6 +408,8 @@
     .send-menu button{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;}
     .send-menu input[type=date]{font-size:13px;padding:3px;}
     .editor table[data-cnote] td{padding:8px 10px;vertical-align:top;border:none;}
+    /* Divided cells (Julius, 2026-10-26): each section of a cells-mode block is its own row */
+    .editor table[data-cnote] tr + tr > td{border-top:1px solid var(--border);padding-top:6px;padding-bottom:6px;}
     .check-line{
       display:flex;
       align-items:flex-start;
@@ -4924,22 +4926,56 @@
     m.style.top = Math.max(8, Math.min(y + 12, innerHeight - h - 8)) + 'px';
     setTimeout(() => document.addEventListener('pointerdown', closeSendMenu, {once:true}), 0);
   }
+  // A carry-over task plus the subtasks nested under it (Julius, 2026-10-26): sending a
+  // parent takes all its subtasks; sending a subtask takes only it and what's below it.
+  function noteTaskTree(line){
+    const lvl = n => Number(n.dataset.level) || 0;
+    const base = lvl(line), out = [line];
+    for(let n = line.nextElementSibling; n; n = n.nextElementSibling){
+      if(!n.classList.contains('check-line') || lvl(n) <= base) break;
+      out.push(n);
+    }
+    return out.map(n => ({ node:n, level: lvl(n) - base, html: n.querySelector('.check-text')?.innerHTML || '' }));
+  }
+  function addTasksToDay(date, items){
+    const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+    if(!ed){ setStatus('That day isn’t loaded'); return false; }
+    captureBeforeEdit(ed);
+    const blank = !ed.textContent.trim() && !ed.querySelector('input,img,hr');
+    if(blank) ed.replaceChildren();
+    items.forEach(it => {
+      const c = document.createElement('div');
+      c.className = 'check-line';
+      c.dataset.level = String(it.level);
+      if(it.level) c.style.marginLeft = `${it.level * 24}px`;
+      c.innerHTML = '<input type="checkbox"><span class="check-text"></span>';
+      c.querySelector('.check-text').innerHTML = it.html;
+      ed.appendChild(c);
+      wireCheckbox(c.querySelector('input'));
+    });
+    finishEditorEdit(ed);
+    saveEditorOwner(ed);
+    noteUrgentDay(date,ed.innerHTML);
+    return true;
+  }
   function sendNoteTask(line, ed, date){
-    const html = line.querySelector('.check-text')?.innerHTML || '';
+    const tree = noteTaskTree(line);
+    const items = tree.map(t => ({ level:t.level, html:t.html }));
     const label = formatDate(date);
-    const removeLine = () => {
-      captureBeforeEdit(ed); line.remove(); finishEditorEdit(ed); saveEditorOwner(ed);
+    const what = items.length > 1 ? `${items.length} tasks` : 'task';
+    const removeLines = () => {
+      captureBeforeEdit(ed); tree.forEach(t => t.node.remove()); finishEditorEdit(ed); saveEditorOwner(ed);
     };
     const loaded = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
     if(loaded){
-      if(addTaskToDay(date,'','',0,html)){ removeLine(); setStatus('Sent to ' + label); }
+      if(addTasksToDay(date, items)){ removeLines(); setStatus(`Sent ${what} to ${label}`); }
       return;
     }
     setStatus('Sending…');
     google.script.run
-      .withSuccessHandler(() => { removeLine(); setStatus('Sent to ' + label); })
+      .withSuccessHandler(() => { removeLines(); setStatus(`Sent ${what} to ${label}`); })
       .withFailureHandler(err => setStatus('Send error: ' + (err.message || err)))
-      .appendTaskToDay(date, html);
+      .appendTasksToDay(date, items);
   }
 
   /* ---------------------------------------------------------

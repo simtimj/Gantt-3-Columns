@@ -158,7 +158,7 @@ Last updated: 2026-10-27
 - **Day section times** (2026-10-27): each section line shows its time frame — Morning 8:30 am – 2 pm, Afternoon 3:45 – 6:30 pm (after the nap), Evening 6:30 – 9:30 pm. Display only; tell Claude to change them.
 - **Day section colors** (2026-10-27): Morning outline + header line now a light, bright midday-sun yellow; Afternoon a brighter, true orange (both brighter in dark mode too). Evening purple unchanged.
 - **Card fill slider** (2026-10-27): Options → Card fill sets how light the inside of task cards is (clear → white), saved separately for light and dark mode; dark mode default is lighter than before (12%, was ~5%).
-- **Dark day cells match off** (2026-10-27): with the toggle off, day cells are forced to the plain Dark cells color, no day color. Tested working; tell Claude if a day color still shows.
+- **Day cells match the day color** (2026-10-27): the toggle now works in light mode too — off = plain white cells in light mode, plain Dark cells color in dark mode. (Before, it only did anything in dark mode.)
 
 - **Saved looks → Claude** (2026-10-27): Options → Save also copies the look to the Sheet's "Looks" tab (per slot + device), so you can ask Claude "how is it set now?" or "make what I saved the default."
 

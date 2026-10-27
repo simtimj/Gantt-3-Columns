@@ -252,6 +252,8 @@
     /* Day color brightness slider (Julius, 2026-10-27): every day-colored thing
        goes through --dc-w (mix with white) / --dc-k (mix with black). */
     .day-row[class*="dow-"]{background:color-mix(in srgb, color-mix(in srgb, var(--day-bg), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+    /* Match off in light mode too (Julius, 2026-10-27): plain white cells. Dark mode has its own rule. */
+    body:not(.dm-daymatch) .day-row[class*="dow-"]{background:var(--panel,#fff);}
     .day-row{
       --note-line-adj:color-mix(in srgb, color-mix(in srgb, var(--note-line, var(--border)), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));
       --today-border-adj:color-mix(in srgb, color-mix(in srgb, var(--today-border, transparent), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));
@@ -1382,7 +1384,7 @@
       <output id="dmCellValue">11%</output>
       <button class="btn tiny" id="resetDmCell" type="button">Reset</button>
     </div>
-    <label class="ts-check"><input type="checkbox" id="dmDayMatch" checked> Dark day cells match the day color</label>
+    <label class="ts-check"><input type="checkbox" id="dmDayMatch" checked> Day cells match the day color</label>
     <div class="ts-daycols" id="dmDayCols">
       <label>M<input type="color" data-dow="1"></label><label>T<input type="color" data-dow="2"></label><label>W<input type="color" data-dow="3"></label><label>T<input type="color" data-dow="4"></label><label>F<input type="color" data-dow="5"></label><label>S<input type="color" data-dow="6"></label><label>S<input type="color" data-dow="0"></label>
       <button class="btn tiny" id="dmDayDefault" type="button">Default</button>

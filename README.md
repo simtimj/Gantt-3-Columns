@@ -129,6 +129,7 @@ Last updated: 2026-10-27
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+- **Hold anywhere on a card to move it (2026-10-27)**: hold and grab a card (not just its checkbox) to drag it; a plain tap on the card still goes into the text for editing, selecting, highlighting
 - **Title lines with − / + collapse (2026-10-27)**: mark a parent task line as a title line (e.g. the CDCR IT application in Tuesday's Today cell); its subtasks fold away with − and come back with +. Use the − / + convention, not arrows. Also for long runs of tasks under one heading, e.g. Claude's **Gantt** done-log group becomes a title line so all that work folds away
 - **Idea: built-in time tracking → plan vs actual (2026-10-27)**: own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)
 - **Mirrored tasks (Today ↔ Reference)**: send a carry-over to Today but keep it tracked in its Reference area (e.g. CDCR under State / IT Associate); one linked task in both places, so checking it off in Today also checks it in Reference. Approach to work out (shared task id, show it in both, one source of truth)

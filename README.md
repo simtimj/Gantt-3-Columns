@@ -154,6 +154,9 @@ Last updated: 2026-10-27
 - **Day sections** (2026-10-27): today's Today cell always has Morning / Afternoon / Evening separators (added if missing; existing tasks start under Morning). Each folds with − / + like a title line and covers everything down to the next section. Options toggle to turn off.
 - **Day section colors** (2026-10-27): each section is tinted along the sun, top to bottom — Morning light yellow, Afternoon deeper yellow-orange, Evening sunset purple (softer in dark mode). Cards sit on the color. Tell Claude if a shade is off.
 
+- **Dark day colors reset** (2026-10-27): the M–S dark day colors were reset once to the light-mode day colors, ready to tweak.
+- **Saved looks → Claude** (2026-10-27): Options → Save also copies the look to the Sheet's "Looks" tab (per slot + device), so you can ask Claude "how is it set now?" or "make what I saved the default."
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

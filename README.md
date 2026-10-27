@@ -142,6 +142,9 @@ Last updated: 2026-10-27
 - **Card subjects collapsed** (2026-10-27): Options → Card subjects is closed by default and shows small color chips; tap the header or chips to open the editor (rows now one line each).
 - **Subject color in the checkbox** (2026-10-27): cards are neutral; the subject fills the checkbox, urgency is its border, the check mark shows done (white mark with dark outline for contrast). Options toggle switches back to whole-card color. Colors/contrast to be tuned over time.
 
+- **Day-colored dark cells** (2026-10-27): in dark mode each day cell is black → its day color (Dark cells slider sets how much). Options: "Dark day cells match the day color" toggle, 7 color pickers (M–S) defaulting to the day line colors, Default button. Reference cells keep the tint picker.
+- **Stronger urgency borders** (2026-10-27): urgency checkboxes have a thicker colored border, a dark gap before the subject fill and a soft glow.
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

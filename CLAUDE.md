@@ -27,3 +27,9 @@
 
 - `collectUrgent()` also returns open lines with `data-due` but no `data-urg` as `urg: 0`; `renderUrgent()` draws them last as a grey **Due** group (no hold-to-create). Every group sorts dated first, soonest due first.
 - `holdDayView()` (pointerdown on day/journal editors) restores `todayScroll` / `journalScroll` for ~400ms after a tap unless the person wheels or touch-moves; editor blur uses `syncDayHeightStable()`.
+
+## Calendar panel (2026-10-26, Julius)
+
+- `#calPanel` in Reference, between `#urgentPanel` and `#inboxPanel` (Urgent inserts before `calPanel`). Client: `loadCalendar()` (called from `applyWorkspaceData` after `setInbox`, on ↻, and on `visibilitychange` if >5 min old) → `renderCalendar()`; collapse state localStorage `fw.calOpen`. Server: `getCalendarEvents()` in `Code.gs` reads `EVENT_CALENDARS` (main + Events) for today through `EVENT_DAYS_AHEAD` (3) days and returns `{today, events:[{title, cal, allDay, date, endDate, start, end, location, link}]}`. Loaded async so it can't slow or break startup.
+- Needs the Calendar scope: if the app asks for access, approve it; or run `authorizeCalendar()` once in the script editor.
+- Everything Claude puts on his calendar shows here automatically; the planned dog-walk "walking block" events will too once that script writes them to the main calendar.

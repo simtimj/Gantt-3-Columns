@@ -26,4 +26,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261026-gantt-tap-no-jump', date: '2026-10-26', project: 'Gantt', title: 'No jump when tapping Notes', details: 'tapping into a Notes or Today cell keeps the view where it was' },
   { id: 'd-20261026-gantt-group-spacing', date: '2026-10-26', project: 'Gantt', title: 'Done log spacing', details: 'blank line between project groups' },
   { id: 'd-20261026-gantt-concise-tasks', date: '2026-10-26', project: 'Gantt', title: 'Concise tasks', details: "today's long tasks shortened to Title: details" },
+  { id: 'd-20261026-gantt-calendar-panel', date: '2026-10-26', project: 'Gantt', title: 'Calendar panel', details: "today's events then the next 3 days, between Urgent and Inbox" },
+  { id: 'd-20261026-faq-write', date: '2026-10-26', project: 'FAQ', title: 'Claude can write to the FAQ', details: 'entries filed by topic tab; coffee cooling time added under Productivity' },
 ];

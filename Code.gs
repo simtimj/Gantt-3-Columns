@@ -976,3 +976,60 @@ function applyClaudeDone_() {
     props.setProperty('claudeDoneGrouped', '1');
   } finally { lock.releaseLock(); }
 }
+
+
+/* =========================================================
+   CALENDAR EVENTS (2026-10-26, Julius)
+   Reference panel between Urgent and Inbox: today's events, then the next
+   few days. Read straight from Google Calendar, so anything Claude or a
+   script (e.g. the dog-walk "walking block") adds shows up on reload.
+   Calendars: his main one plus "Events" (gigs etc.). Add ids to
+   EVENT_CALENDARS to include more.
+   ========================================================= */
+const EVENT_CALENDARS = [
+  'juliussimtim@gmail.com',
+  'd9463b07581a50b3e95948fa273e7971bdcde4f97ebf8070c4cf0b215e8f063b@group.calendar.google.com' // Events
+];
+const EVENT_DAYS_AHEAD = 3;
+
+function getCalendarEvents() {
+  const tz = Session.getScriptTimeZone();
+  const today = todayString_();
+  const start = parseDate_(today);
+  const end = parseDate_(addDaysToDateString_(today, EVENT_DAYS_AHEAD + 1));
+  const out = [];
+  EVENT_CALENDARS.forEach(id => {
+    let cal = null;
+    try { cal = CalendarApp.getCalendarById(id); } catch (e) { cal = null; }
+    if (!cal) return;
+    const calName = cal.getName();
+    cal.getEvents(start, end).forEach(ev => {
+      const allDay = ev.isAllDayEvent();
+      const s = allDay ? ev.getAllDayStartDate() : ev.getStartTime();
+      const e = allDay ? ev.getAllDayEndDate() : ev.getEndTime();
+      let link = '';
+      try {
+        link = 'https://www.google.com/calendar/event?eid=' +
+          Utilities.base64EncodeWebSafe(ev.getId().split('@')[0] + ' ' + id).replace(/=+$/, '');
+      } catch (err) { link = ''; }
+      out.push({
+        title: ev.getTitle() || '(no title)',
+        cal: calName,
+        allDay: allDay,
+        date: Utilities.formatDate(s, tz, 'yyyy-MM-dd'),
+        endDate: Utilities.formatDate(allDay ? new Date(e.getTime() - 1) : e, tz, 'yyyy-MM-dd'),
+        start: s.getTime(),
+        end: e.getTime(),
+        location: ev.getLocation() || '',
+        link: link
+      });
+    });
+  });
+  out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (b.allDay - a.allDay) || a.start - b.start);
+  return { today: today, events: out };
+}
+
+// Run once from the script editor if the app ever asks for calendar access.
+function authorizeCalendar() {
+  return CalendarApp.getDefaultCalendar().getName();
+}

@@ -1064,6 +1064,11 @@
     .di-text{flex:1;min-width:0;overflow-wrap:anywhere;}
     .di-from{font-size:.75em;color:var(--muted);margin-left:4px;}
     .di-line.done > .di-text{text-decoration:line-through;opacity:.6;}
+    /* Title lines (2026-10-27): − / + at the right end folds the lines under it. */
+    [data-tlon]{display:flex!important;align-items:center;}
+    [data-tlon]::before{content:"−";order:100;flex:0 0 auto;margin-left:auto;padding:0 5px;min-width:1.1em;font-size:12px;font-weight:700;line-height:1.45;text-align:center;border:1px solid var(--border);border-radius:5px;color:var(--muted);background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
+    [data-tlon="c"]::before{content:"+  " attr(data-tlinfo);font-weight:600;}
+    [data-tlhid]{display:none!important;}
     /* Due group in Notes (2026-10-27): its own box under the Suggested day, collapsible. */
     .due-notes{margin:6px 0;padding:4px 8px 5px;border:1.5px solid var(--note-line-adj,var(--border));border-radius:10px;-webkit-user-select:text;user-select:text;}
     .dn-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.92em;cursor:pointer;-webkit-user-select:none;user-select:none;padding:1px 0;}
@@ -1463,6 +1468,7 @@
   <button class="btn" type="button" tabindex="-1" data-ctx="indent">Indent →</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="checkbox">☐ Checkbox</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="subtask">+ Subtask</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="title" title="Make this line a title: − / + folds the lines under it, down to the next empty line">▤ Title</button>
 </div>
 <script>
   /* Filled in by Apps Script (Code.gs doGet), so the first screen needs no
@@ -3069,6 +3075,13 @@
       return;
     }
     restoreSelection();
+    if(action === 'title'){
+      let n = savedRange.startContainer; if(n.nodeType !== 1) n = n.parentElement;
+      while(n && n.parentElement !== ed) n = n.parentElement;
+      if(!n || n === ed){ setStatus('Tap a line first'); return; }
+      toggleTitleLine(n,ed);
+      return;
+    }
     if(action === 'strike'){
       toggleTaskStrike(ed);
       return;
@@ -3714,8 +3727,9 @@
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
   const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag'];
   function cardCleanHtml(el){
-    if(!el.querySelector('[data-tc],[data-tcdrag],[data-render-due]')) return el.innerHTML;
+    if(!el.querySelector('[data-tc],[data-tcdrag],[data-render-due],[data-tlon],[data-tlhid]')) return el.innerHTML;
     const c = el.cloneNode(true);
+    c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid'].forEach(a => n.removeAttribute(a)));
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
     c.querySelectorAll('[data-tc],[data-tcdrag]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
@@ -5967,6 +5981,15 @@
     }
     p.appendChild(dueRow);
     if(typeof addCardSubjectRow === 'function') addCardSubjectRow(p,line,owner);
+    // Title line toggle (2026-10-27) for tasks in an editor.
+    if(owner && line.parentElement === owner && !(cb.classList && (cb.classList.contains('di-box') || cb.classList.contains('urg-box')))){
+      const tb = document.createElement('button');
+      tb.type = 'button'; tb.className = 'urg-goto';
+      tb.textContent = line.dataset.tl === '1' ? '▤ Title line: on (tap to remove)' : '▤ Make title line (fold what’s under it)';
+      tb.addEventListener('pointerdown',e => e.preventDefault());
+      tb.addEventListener('click',() => { hideUrgencyPicker(); toggleTitleLine(line,owner); });
+      p.appendChild(tb);
+    }
     // From a copy (Due group in Notes, Urgent panel): jump to where it lives (Julius, 2026-10-27).
     if(cb.classList && (cb.classList.contains('di-box') || cb.classList.contains('urg-box'))){
       const go = document.createElement('button');
@@ -6630,11 +6653,93 @@
       if(setAttr(n,'data-tcrel',p.rel > 0 ? Math.min(6,p.rel) : '')) changed = true;
       setAttr(n,'data-tccat',p.cat);
     });
+    if(refreshTitleLines(ed)) changed = true;
     // Card edges add a little height; keep the day row fitted.
     if(changed && ed.dataset.date && typeof syncDayHeightStable === 'function') requestAnimationFrame(() => syncDayHeightStable(ed.dataset.date));
     return changed;
   }
   function refreshAllCards(){ cardEditors().forEach(refreshCards); }
+  /* ===== Title lines (Julius, 2026-10-27: save room) =====
+     A title line = a line marked data-tl="1" (hold a task's checkbox → Make
+     title line, or right-click / long-press any line → ▤ Title), and every
+     Claude done-log group header (data-cgrp). It covers every following
+     line with something in it until the first empty line (or the next
+     title line). − / + at its right end folds them; folded it shows
+     "+ 20 hidden · 18 done". data-tl and data-fold are saved; data-tlon,
+     data-tlinfo and data-tlhid are render-only (stripped in cardCleanHtml). */
+  function isTitleLine(n){ return n.nodeType === 1 && (n.dataset.tl === '1' || n.hasAttribute('data-cgrp')); }
+  function isEmptyLine(n){
+    if(n.tagName === 'BR' || n.tagName === 'HR') return true;
+    if(n.querySelector && n.querySelector('input,img,table,video,iframe')) return false;
+    return !(n.textContent || '').replace(/[\s​ ]/g,'');
+  }
+  function titleCovered(t){
+    const out = [];
+    for(let n = t.nextElementSibling; n; n = n.nextElementSibling){
+      if(isEmptyLine(n) || isTitleLine(n)) break;
+      out.push(n);
+    }
+    return out;
+  }
+  function refreshTitleLines(ed){
+    let changed = false;
+    const hide = new Set(), on = new Map();
+    for(const n of ed.children){
+      if(!isTitleLine(n)) continue;
+      const cov = titleCovered(n);
+      if(!cov.length && n.dataset.tl !== '1') continue;
+      const fold = n.dataset.fold === '1' && cov.length > 0;
+      const tasks = cov.filter(x => x.classList.contains('check-line'));
+      const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
+      on.set(n,{state:fold ? 'c' : 'o', info:cov.length + ' hidden' + (tasks.length ? ' · ' + done + ' done' : '')});
+      if(fold) cov.forEach(x => hide.add(x));
+    }
+    for(const n of ed.querySelectorAll(':scope > [data-tlon]')) if(!on.has(n)){ n.removeAttribute('data-tlon'); n.removeAttribute('data-tlinfo'); changed = true; }
+    for(const n of ed.querySelectorAll(':scope > [data-tlhid]')) if(!hide.has(n)){ n.removeAttribute('data-tlhid'); changed = true; }
+    on.forEach((v,n) => { if(setAttr(n,'data-tlon',v.state)) changed = true; setAttr(n,'data-tlinfo',v.info); });
+    hide.forEach(n => { if(setAttr(n,'data-tlhid','1')) changed = true; });
+    return changed;
+  }
+  function titleEditDone(ed){
+    finishEditorEdit(ed);
+    refreshCards(ed);
+    saveEditorOwner(ed);
+    if(ed.dataset && ed.dataset.date) requestAnimationFrame(() => syncDayHeightStable(ed.dataset.date));
+  }
+  function toggleTitleLine(n,ed){
+    captureBeforeEdit(ed);
+    if(n.dataset.tl === '1'){ delete n.dataset.tl; delete n.dataset.fold; setStatus('Title line removed'); }
+    else{ n.dataset.tl = '1'; setStatus('Title line — tap − at its right end to fold'); }
+    titleEditDone(ed);
+  }
+  function toggleTitleFold(n,ed){
+    captureBeforeEdit(ed);
+    if(n.dataset.fold === '1') delete n.dataset.fold; else n.dataset.fold = '1';
+    titleEditDone(ed);
+  }
+  // Tap the − / + (a ::before at the line's right end): measured from the right edge.
+  (function(){
+    const meas = document.createElement('span');
+    meas.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font-size:12px;font-weight:600;padding:0 5px;border:1px solid transparent;';
+    document.body.appendChild(meas);
+    let suppress = null;
+    function hit(e){
+      const t = e.target && e.target.closest ? e.target.closest('[data-tlon]') : null;
+      if(!t || !t.parentElement || !t.parentElement.matches('.day-editor,.journal-editor,.ref-cell')) return null;
+      const r = t.getBoundingClientRect();
+      meas.textContent = t.dataset.tlon === 'c' ? '+  ' + (t.dataset.tlinfo || '') : '−';
+      const w = Math.max(28,meas.getBoundingClientRect().width + 10);
+      return e.clientX >= r.right - w && e.clientX <= r.right + 4 ? t : null;
+    }
+    document.addEventListener('pointerdown',e => {
+      const t = hit(e); if(!t) return;
+      e.preventDefault(); e.stopPropagation();
+      suppress = t;
+      toggleTitleFold(t,t.parentElement);
+    },true);
+    document.addEventListener('click',e => { if(suppress){ const s = suppress; suppress = null; if(s.contains(e.target)){ e.preventDefault(); e.stopPropagation(); } } },true);
+  })();
+
 
   // Keep cards in step with edits, loads and new days (debounced).
   (function(){
@@ -6658,7 +6763,7 @@
       list.forEach(refreshCards);
       obs.takeRecords(); // our own attribute changes aren't edits
     }
-    obs.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-level','data-cat','class']});
+    obs.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-level','data-cat','class','data-tl','data-fold']});
     refreshAllCards();
   })();
 

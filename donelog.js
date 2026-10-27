@@ -48,4 +48,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-dark-mode', date: '2026-10-27', project: 'Gantt', title: 'Own dark mode', details: 'black background, day cells keep light-mode colors; note box inside = day color' },
   { id: 'd-20261027-gantt-urg-subtasks', date: '2026-10-27', project: 'Gantt', title: 'Urgent subtasks nest', details: 'subtasks show as checkbox rows under their task, not as separate urgent tasks' },
   { id: 'd-20261027-gantt-note-lines-mid', date: '2026-10-27', project: 'Gantt', title: 'Note box lines 1.5px', details: 'between the old thick and thin outline and dividers' },
+  { id: 'd-20261027-gantt-dark-days', date: '2026-10-27', project: 'Gantt', title: 'Darker days in dark mode', details: 'day cells back to dark colors; note box lines and today outline in the day\'s light color' },
 ];

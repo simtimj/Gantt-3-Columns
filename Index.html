@@ -6925,14 +6925,16 @@
      the boxes and room to put something between sections. Re-added if deleted. */
   function ensureSecGaps(ed,noSave){
     let added = false;
-    // Every section keeps at least one empty line inside it to type into (Julius, 2026-10-27).
+    // Every section keeps an empty line inside it to type into (Julius, 2026-10-27)...
     const blank = () => { const d = document.createElement('div'); d.appendChild(document.createElement('br')); return d; };
     [...ed.children].filter(n => n.dataset && n.dataset.sec).forEach(n => {
       const inside = [];
       for(let x = n.nextElementSibling; x && !(x.dataset && x.dataset.sec); x = x.nextElementSibling) inside.push(x);
       const nextSec = inside.length ? inside[inside.length - 1].nextElementSibling : n.nextElementSibling;
       if(nextSec && inside.length && isEmptyLine(inside[inside.length - 1])) inside.pop(); // the gap line belongs between boxes
-      if(!inside.length){ ed.insertBefore(blank(),n.nextSibling); added = true; }
+      // ...and that empty line is always the section's LAST line, so there's room at the bottom (Julius, 2026-10-27).
+      const last = inside[inside.length - 1];
+      if(!last || !isEmptyLine(last)){ ed.insertBefore(blank(),(last || n).nextSibling); added = true; }
     });
     [...ed.children].forEach(n => {
       if(!n.dataset || !n.dataset.sec || n.dataset.sec === DAY_SECS[0][0]) return;

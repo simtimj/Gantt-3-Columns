@@ -973,6 +973,7 @@
     .urg-text{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .urg-date{flex:0 0 auto;margin-left:auto;padding-left:8px;font-size:11px;color:var(--muted);}
     .urg-made{flex:0 0 auto;margin-left:-2px;font-size:10px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;opacity:.8;}
+    .urg-made.inline{margin-left:4px;display:inline;}
     .urg-date.overdue{color:#e5484d;font-weight:700;}
     .urg-date.due-today{color:#c27c00;font-weight:700;}
     .urg-picker{flex-wrap:wrap;max-width:200px;}
@@ -4963,7 +4964,10 @@
         if(showMadeDate()){
           const made = document.createElement('span'); made.className = 'urg-made';
           made.textContent = md(item.date); made.title = 'Made ' + wd(item.date) + ' ' + md(item.date);
-          row.append(made);
+          // Made date rides at the end of the text itself (Julius, 2026-10-27), so with
+          // long wrapped text it stays by the words instead of at the right edge.
+          if(urgWrap()){ made.classList.add('inline'); text.append(' ',made); }
+          else row.append(made);
         }
         if(item.due){
           const today = localToday();

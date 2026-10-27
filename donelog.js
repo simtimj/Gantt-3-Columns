@@ -54,4 +54,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-dm-text-fix', date: '2026-10-27', project: 'Gantt', title: 'All text follows brightness slider', details: 'labels, done tasks and dark pasted text no longer stay near-black in dark mode' },
   { id: 'd-20261027-gantt-day-color-slider', date: '2026-10-27', project: 'Gantt', title: 'Day colors slider', details: 'Options slider makes every day color (Tue orange, Wed blue…) darker or lighter' },
   { id: 'd-20261027-gantt-ref-header', date: '2026-10-27', project: 'Gantt', title: 'Compact Reference top', details: 'Sort / − / Options in the Reference header; shorter search row; Reference-only padding in its Options' },
+  { id: 'd-20261027-gantt-made-inline', date: '2026-10-27', project: 'Gantt', title: 'Made date by the text', details: 'Urgent tasks show the day made at the end of their text, not at the right edge' },
 ];

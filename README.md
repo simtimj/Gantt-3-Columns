@@ -112,6 +112,8 @@ Last updated: 2026-10-27
 - **Reference header (2026-10-27)**: Sort / − / Options moved up into the REFERENCE header on the right (one less row); search, + Cell and Archive row is shorter
 - **Reference padding (2026-10-27)**: Reference → Options has its own Left/right and Top/bottom padding sliders that apply only to Reference (on top of the main padding sliders)
 
+- **Made date by the text (2026-10-27)**: in Urgent, the day-made date (10/26) now sits at the end of the task's text in its muted color, instead of near the right edge; due date stays on the right (with Wrap long text on)
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

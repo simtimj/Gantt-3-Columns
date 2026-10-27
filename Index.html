@@ -1051,6 +1051,21 @@
     #typeSettings .ts-cat .ts-cat-words{grid-column:1 / -1;font-size:12px!important;}
     #typeSettings .ts-cat .ts-cat-del{width:28px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;}
     #typeSettings .ts-cat-actions{display:flex;gap:6px;flex-wrap:wrap;}
+    /* Card subjects (Julius, 2026-10-27): collapsed to a row of chips by default; tap to edit. Rows on one line. */
+    #typeSettings .ts-cats-toggle{display:block;width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;font-family:inherit;}
+    #typeSettings .ts-cats-arrow{display:inline-block;width:10px;transition:transform .15s;}
+    #typeSettings .ts-cats.open .ts-cats-arrow{transform:rotate(90deg);}
+    #typeSettings .ts-cats:not(.open) #cardCatList,#typeSettings .ts-cats:not(.open) .ts-cat-actions,#typeSettings .ts-cats.open .ts-cat-chips{display:none;}
+    #typeSettings .ts-cat-chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 2px;cursor:pointer;}
+    #typeSettings .ts-cat-chip{display:inline-flex;align-items:center;gap:4px;padding:1px 7px 1px 4px;border:1px solid var(--border);border-radius:10px;font-size:11px;line-height:16px;}
+    #typeSettings .ts-cat-chip i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+    #typeSettings .ts-cats .ts-cat{grid-template-columns:24px 76px minmax(0,1fr) 22px!important;gap:4px!important;margin:0 0 4px!important;padding-bottom:4px!important;}
+    #typeSettings .ts-cats .ts-cat input[type=color]{width:24px!important;height:22px!important;}
+    #typeSettings .ts-cats .ts-cat input[type=text]{min-height:22px!important;height:22px!important;padding:1px 5px!important;font-size:12px!important;}
+    #typeSettings .ts-cats .ts-cat .ts-cat-words{grid-column:auto!important;font-size:11px!important;}
+    #typeSettings .ts-cats .ts-cat .ts-cat-del{width:22px!important;height:22px!important;font-size:11px;}
+    #typeSettings .ts-tint-label{display:flex;align-items:center;gap:4px;}
+    #typeSettings #dmTint{width:20px;height:18px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;flex:none;min-height:0!important;}
     #typeSettings .ts-sub{margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     /* Due on this day (2026-10-26): tasks due on a day show under its label. */
     .due-block{margin:0 0 4px;display:flex;flex-direction:column;gap:1px;}
@@ -1177,7 +1192,7 @@
        (Wednesday stays blue) with dark text on them. Adjust from here.
        ========================================================= */
     @media (prefers-color-scheme: dark){
-      :root{--dm-cell-l:11;--dm-cell:hsl(0 0% calc(var(--dm-cell-l) * 1%));--dm-l:52;--dm-text:hsl(0 0% calc(var(--dm-l) * 1%));--dm-muted:hsl(0 0% calc(var(--dm-l) * .82%));--muted:var(--dm-muted);--done:hsl(0 0% calc(var(--dm-l) * .75%));--text:var(--dm-text);--bg:#000;--panel:#000;--border:#3a3a3a;color-scheme:dark;}
+      :root{--dm-cell-l:11;--dm-tint:#ffffff;--dm-cell:color-mix(in srgb,var(--dm-tint) calc(var(--dm-cell-l) * 1%),#000);--dm-l:52;--dm-text:hsl(0 0% calc(var(--dm-l) * 1%));--dm-muted:hsl(0 0% calc(var(--dm-l) * .82%));--muted:var(--dm-muted);--done:hsl(0 0% calc(var(--dm-l) * .75%));--text:var(--dm-text);--bg:#000;--panel:#000;--border:#3a3a3a;color-scheme:dark;}
       html,body{background:#121212;color:var(--dm-text);}
       #toolbar,#focusControls,.pane-header,.pane{background:#121212;color:var(--dm-text);}
       .btn,.top-select,.send-menu button,.urg-due-clear,.uc-today{background:#1c1c1c;color:var(--dm-text);border-color:#444;}
@@ -1335,8 +1350,8 @@
       <button class="btn tiny" id="resetDmText" type="button">Reset</button>
     </div>
     <div class="ts-row">
-      <span class="ts-label" title="Cell background · dark mode (black → gray)">Dark cells</span>
-      <input id="dmCell" type="range" min="0" max="30" step="1" value="11" aria-label="Dark mode cell background, black to gray">
+      <span class="ts-label ts-tint-label" title="Cell background · dark mode (black → tint color)">Dark cells <input id="dmTint" type="color" value="#ffffff" title="Tint color (white = plain gray)" aria-label="Dark cell tint color"></span>
+      <input id="dmCell" type="range" min="0" max="30" step="1" value="11" aria-label="Dark mode cell background, black toward the tint color">
       <output id="dmCellValue">11%</output>
       <button class="btn tiny" id="resetDmCell" type="button">Reset</button>
     </div>
@@ -1355,8 +1370,10 @@
     <div class="ts-sub">Task cards</div>
     <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
+    <label class="ts-check"><input type="checkbox" id="cardsBoxFill" checked> Subject color in the checkbox (off = whole card)</label>
       <div class="ts-group ts-cats">
-      <div class="ts-sub">Card subjects</div>
+      <button type="button" class="ts-sub ts-cats-toggle" id="cardCatToggle" aria-expanded="false"><span class="ts-cats-arrow">▸</span> Card subjects</button>
+      <div id="cardCatChips" class="ts-cat-chips" title="Tap to edit"></div>
       <div id="cardCatList"></div>
       <div class="ts-cat-actions"><button class="btn tiny" id="cardCatAdd" type="button">+ Subject</button><button class="btn tiny" id="cardCatReset" type="button">Reset to defaults</button></div>
     </div>
@@ -6375,8 +6392,20 @@
     try{ const x = localStorage.getItem('fw.dmCell'); if(x !== null && x !== '') saved = Number(x); }catch(e){}
     apply(saved,false);
     if(el) el.addEventListener('input',() => apply(el.value,true));
+    // Tint color (Julius, 2026-10-27): the slider goes from black toward this color, e.g. purple →
+    // a touch of purple, still dark. White = plain gray (the old look). Saved on this device.
+    const tint = document.getElementById('dmTint'), TDEF = '#ffffff';
+    function applyTint(c,save){
+      if(!/^#[0-9a-f]{6}$/i.test(c || '')) c = TDEF;
+      document.documentElement.style.setProperty('--dm-tint',c);
+      if(tint) tint.value = c;
+      if(save) try{ localStorage.setItem('fw.dmTint',c); }catch(e){}
+    }
+    let st = TDEF; try{ st = localStorage.getItem('fw.dmTint') || TDEF; }catch(e){}
+    applyTint(st,false);
+    if(tint) tint.addEventListener('input',() => applyTint(tint.value,true));
     const r = document.getElementById('resetDmCell');
-    if(r) r.addEventListener('click',() => { apply(DEF,false); try{ localStorage.removeItem('fw.dmCell'); }catch(e){} });
+    if(r) r.addEventListener('click',() => { apply(DEF,false); applyTint(TDEF,false); try{ localStorage.removeItem('fw.dmCell'); localStorage.removeItem('fw.dmTint'); }catch(e){} });
   })();
   // Dark mode text brightness slider (Julius, 2026-10-27): gray level of all text, black → white.
   (function(){
@@ -6495,6 +6524,20 @@
   .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
   .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
   .check-line[data-tcdrag]{opacity:.3;}
+  /* Subject color in the checkbox (Julius, 2026-10-27; default): card stays neutral, the subject
+     fills the checkbox, urgency is its border (gray when none), done = the check mark.
+     The mark is white with a dark outline so it reads on any fill. Option "Subject color: whole card" brings back the tinted cards. */
+  body.tc-boxfill .check-line[data-tccat]{--tc-tint:transparent;}
+  body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]{
+    -webkit-appearance:none!important;appearance:none!important;box-sizing:border-box;
+    width:1.05em;height:1.05em;border:2px solid var(--urg,#8a8f98)!important;border-radius:3px;
+    background:var(--tc-cat)!important;display:inline-grid;place-content:center;cursor:pointer;
+  }
+  body.tc-boxfill .check-line[data-tccat]:not([data-urg]) > input[type=checkbox]{border-color:color-mix(in srgb,var(--tc-cat) 55%,#555)!important;}
+  body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]:checked::after{
+    content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2.5px 2.5px 0;
+    transform:rotate(45deg) translate(-8%,-12%);filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+  }
   /* Drag the checkbox to move the card; the page doesn't scroll from a checkbox. */
   .editor .check-line > input[type=checkbox],.ref-cell .check-line > input[type=checkbox]{touch-action:none;}
   body.tc-dragging,body.tc-dragging *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important;}
@@ -6841,6 +6884,10 @@
   (function(){
     const on = document.getElementById('cardsOn'), auto = document.getElementById('cardsAuto');
     if(on){ on.checked = cardsOn; on.addEventListener('change',() => { cardsOn = on.checked; try{ localStorage.setItem('fw.cards',cardsOn ? '1' : '0'); }catch(e){} refreshAllCards(); cardsSyncHeights(); }); }
+    const bf = document.getElementById('cardsBoxFill');
+    let boxFill = true; try{ boxFill = localStorage.getItem('fw.cardsBoxFill') !== '0'; }catch(e){}
+    document.body.classList.toggle('tc-boxfill',boxFill);
+    if(bf){ bf.checked = boxFill; bf.addEventListener('change',() => { document.body.classList.toggle('tc-boxfill',bf.checked); try{ localStorage.setItem('fw.cardsBoxFill',bf.checked ? '1' : '0'); }catch(e){} }); }
     if(auto){ auto.checked = cardsAuto; auto.addEventListener('change',() => { cardsAuto = auto.checked; try{ localStorage.setItem('fw.cardsAuto',cardsAuto ? '1' : '0'); }catch(e){} refreshAllCards(); }); }
   })();
   // Subject editor in Options.
@@ -6863,7 +6910,25 @@
       });
       row.append(col,name,del,words); box.appendChild(row);
     });
+    const chips = document.getElementById('cardCatChips');
+    if(chips){
+      chips.innerHTML = '';
+      CARD_CATS.forEach(c => { const s = document.createElement('span'); s.className = 'ts-cat-chip'; const d = document.createElement('i'); d.style.background = c.color; s.append(d,document.createTextNode(c.name)); chips.appendChild(s); });
+    }
   }
+  // Card subjects open / closed (Julius, 2026-10-27): closed by default, remembered on this device.
+  (function(){
+    const grp = document.querySelector('#typeSettings .ts-cats'), btn = document.getElementById('cardCatToggle'), chips = document.getElementById('cardCatChips');
+    if(!grp || !btn) return;
+    function setOpen(o,save){
+      grp.classList.toggle('open',o); btn.setAttribute('aria-expanded',o ? 'true' : 'false');
+      if(save) try{ localStorage.setItem('fw.cardCatsOpen',o ? '1' : '0'); }catch(e){}
+    }
+    let o = false; try{ o = localStorage.getItem('fw.cardCatsOpen') === '1'; }catch(e){}
+    setOpen(o,false);
+    btn.addEventListener('click',() => setOpen(!grp.classList.contains('open'),true));
+    if(chips) chips.addEventListener('click',() => setOpen(true,true));
+  })();
   (function(){
     const add = document.getElementById('cardCatAdd'), reset = document.getElementById('cardCatReset');
     if(add) add.addEventListener('click',() => {

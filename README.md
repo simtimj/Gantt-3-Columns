@@ -47,6 +47,7 @@ Last updated: 2026-10-27
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Smaller Reference panels (2026-10-27):** Urgent, Calendar and Inbox use tighter padding and spacing; the Inbox add box moved to a small **+ Add** button on its header line.
 
 - **Swipe between columns in single view (2026-10-27)**: with one column showing, swipe sideways to the next one in order: Today/Tasks ↔ Notes ↔ Reference (no wrap; nothing left of Today or right of Reference). The next column slides in under your finger; let go past ~30% to switch, less to snap back. Trackpad: a sideways two-finger swipe moves one column.
 - **Hold mid-swipe to split (2026-10-27)**: while swiping, hold still with the dividing line near the middle (it turns blue) → prompt: *Split A | B* (side by side, at the size you held), *Split stacked A / B*, *Go to B*, or *Cancel*. Exit split from Cols as usual.
@@ -115,7 +116,7 @@ Last updated: 2026-10-27
 - **More due date styles** (Reference Options → Due date): added **Oct 27 · 3d**, **October 27th · 3d**, **Tue, Oct 27 · 3d** and **Tuesday, October 27th · 3d**, alongside Tue 10/27, Tue 10/27 · 3d and 3d.
 - **− / + collapse buttons**: a boxed − / + next to Sort collapses or expands every Reference cell; the toolbar button reads Ref − / Ref +; each cell's ▾ / ▸ arrow is now a boxed − / +; the Urgent and Inbox headers use the same − / +.
 - **Make tasks in the Urgent panel**: hold (or right-click) a level heading like "2 · Soon", hold the Urgent header, or tap **+ Task** → *Create Urgent / Soon / Can be later task* → type → Enter. It's added at the end of today's Today cell with that urgency, so it shows in the panel right away. Typing `Title: details` makes the title bold. The panel now always shows (even with nothing urgent) so + Task is always there.
-- **Inbox** under Urgent (collapsed by default): quick captures shown as **Title**: details. Type one in at the bottom, or tell Claude ("add to my Gantt inbox: …") and it shows up about a minute later, tagged Claude. **→ Today** turns it into a task in today; **✕** dismisses it.
+- **Inbox** under Urgent (collapsed by default): quick captures shown as **Title**: details. Tap the small **+ Add** on the Inbox header line to type one in (the add box stays hidden otherwise; empty Add or Esc closes it), or tell Claude ("add to my Gantt inbox: …") and it shows up about a minute later, tagged Claude. **→ Today** turns it into a task in today; **✕** dismisses it.
 
 - **Text brightness fix (2026-10-27)**: all dark mode text now follows the Text brightness slider — dimmer labels, done tasks, quotes, code blocks, the calendar's today line and dark pasted/inline-colored text (that last stayed near-black before)
 - **Day colors slider (2026-10-27)**: Options → **Day colors · darker / lighter** (−60…+60, default 0, saved per device) lightens or darkens everything in a day's color (Tue orange, Wed blue…): day names, note box lines, today outline, and the light-mode day backgrounds

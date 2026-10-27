@@ -6581,6 +6581,11 @@
   /* Day sections (Julius, 2026-10-27): Morning / Afternoon / Evening separators in the Today cell. */
   .editor > [data-sec]{margin:10px 0 4px;padding:0 0 2px;border-bottom:2px solid var(--note-line-adj,var(--border));font-size:.82em;letter-spacing:.06em;text-transform:uppercase;color:var(--note-line-adj,var(--muted));}
   .editor > [data-sec]:first-child{margin-top:0;}
+  /* Day section tints (Julius, 2026-10-27): sun colors behind each section — morning light yellow,
+     afternoon deeper yellow-orange, evening sunset purple. Painted as one gradient on the editor (paintDaySecs). */
+  :root{--sec-m:rgba(255,221,87,.24);--sec-a:rgba(255,160,50,.26);--sec-e:rgba(150,95,205,.20);}
+  @media (prefers-color-scheme: dark){:root{--sec-m:rgba(255,214,90,.10);--sec-a:rgba(255,140,40,.13);--sec-e:rgba(150,90,210,.20);}}
+  .editor.sec-painted{background-attachment:local;background-repeat:no-repeat;}
   /* Subject color in the checkbox (Julius, 2026-10-27; default): card stays neutral, the subject
      fills the checkbox, urgency is its border (gray when none), done = the check mark.
      The mark is white with a dark outline so it reads on any fill. Option "Subject color: whole card" brings back the tinted cards. */
@@ -6767,6 +6772,7 @@
   function refreshCards(ed){
     if(!ed || !ed.isConnected) return false;
     let changed = ensureDaySections(ed);
+    requestAnimationFrame(() => paintDaySecs(ed));
     const plan = new Map(); // node -> {tc,head,rel,cat}
     let members = [], headLvl = 0, ctx = '', ctxGrp = false;
     const flush = () => {
@@ -6887,6 +6893,28 @@
     });
     if(typeof saveEditorOwner === 'function') saveEditorOwner(ed);
     return true;
+  }
+  /* Paint the day sections' sun tints as one background gradient on the editor (not saved content).
+     Each band runs from its section line to the next one; re-run when the editor resizes (typing, folding). */
+  const SEC_TINT = {morning:'var(--sec-m)', afternoon:'var(--sec-a)', evening:'var(--sec-e)'};
+  const secRO = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => paintDaySecs(e.target))) : null;
+  function paintDaySecs(ed){
+    if(!ed || !ed.isConnected) return;
+    const secs = daySecsOn ? [...ed.children].filter(n => n.dataset && SEC_TINT[n.dataset.sec] && n.offsetParent !== null) : [];
+    if(!secs.length){
+      if(ed.classList.contains('sec-painted')){ ed.classList.remove('sec-painted'); ed.style.backgroundImage = ''; }
+      return;
+    }
+    if(!ed.classList.contains('sec-painted')){ ed.classList.add('sec-painted'); if(secRO) secRO.observe(ed); }
+    const top0 = ed.getBoundingClientRect().top - ed.scrollTop;
+    const ys = secs.map(n => Math.max(0, Math.round(n.getBoundingClientRect().top - top0 - 4)));
+    const stops = ['transparent 0px', 'transparent ' + ys[0] + 'px'];
+    secs.forEach((n,i) => {
+      const c = SEC_TINT[n.dataset.sec], end = i + 1 < ys.length ? ys[i + 1] + 'px' : '100%';
+      stops.push(c + ' ' + ys[i] + 'px', c + ' ' + end);
+    });
+    const img = 'linear-gradient(to bottom,' + stops.join(',') + ')';
+    if(ed.style.backgroundImage !== img) ed.style.backgroundImage = img;
   }
   function refreshTitleLines(ed){
     let changed = false;

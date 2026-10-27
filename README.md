@@ -151,14 +151,14 @@ Last updated: 2026-10-27
 - **Saved looks** (2026-10-27): top of Options — pick Light / Dark / Custom, Save stores every look setting (theme, colors, sliders, cards, fonts, padding, scale) on this device; Load applies it and refreshes.
 - **Options alignment** (2026-10-27): Dark cells, the match toggle and the day pickers stay together in one column.
 
-- **Day sections** (2026-10-27): today's Today cell always has Morning / Afternoon / Evening separators (added if missing; existing tasks start under Morning). Each folds with − / + like a title line and covers everything down to the next section. Options toggle to turn off. Next: maybe boxed cells/borders around each section.
+- **Day sections** (2026-10-27): today's Today cell always has Morning / Afternoon / Evening separators (added if missing; existing tasks start under Morning). Each folds with − / + like a title line and covers everything down to the next section. Options toggle to turn off.
+- **Day section colors** (2026-10-27): each section is tinted along the sun, top to bottom — Morning light yellow, Afternoon deeper yellow-orange, Evening sunset purple (softer in dark mode). Cards sit on the color. Tell Claude if a shade is off.
 
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
-- **Time windows in Today/Tasks (idea, 2026-10-27, not urgent):** split each day's Today cell into time-of-day cells (maybe 3: morning / afternoon / night — to figure out), each tinted along the sun: morning-sun yellow fading through the day to dark purple at night.
 - **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)
 - **Hold anywhere on a card to move it (2026-10-27)**: hold and grab a card (not just its checkbox) to drag it; a plain tap on the card still goes into the text for editing, selecting, highlighting
 - **Idea: built-in time tracking → plan vs actual (2026-10-27)**: own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)

@@ -230,25 +230,32 @@
       min-height:0;
     }
     .day-row.dow-1{
-      background:#eeeeee;
+      --day-bg:#eeeeee;
     }
     .day-row.dow-2{
-      background:#fff0df;
+      --day-bg:#fff0df;
     }
     .day-row.dow-3{
-      background:#e6f1fb;
+      --day-bg:#e6f1fb;
     }
     .day-row.dow-4{
-      background:#ead8c2;
+      --day-bg:#ead8c2;
     }
     .day-row.dow-5{
-      background:#fff0bd;
+      --day-bg:#fff0bd;
     }
     .day-row.dow-6{
-      background:#d9b98c;
+      --day-bg:#d9b98c;
     }
     .day-row.dow-0{
-      background:#fff4a8;
+      --day-bg:#fff4a8;
+    }
+    /* Day color brightness slider (Julius, 2026-10-27): every day-colored thing
+       goes through --dc-w (mix with white) / --dc-k (mix with black). */
+    .day-row[class*="dow-"]{background:color-mix(in srgb, color-mix(in srgb, var(--day-bg), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+    .day-row{
+      --note-line-adj:color-mix(in srgb, color-mix(in srgb, var(--note-line, var(--border)), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));
+      --today-border-adj:color-mix(in srgb, color-mix(in srgb, var(--today-border, transparent), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));
     }
     /*
      * Current-day border.
@@ -263,17 +270,17 @@
     }
     .day-row.today.day-pane-row{
       box-shadow:
-        inset 0 2px 0 var(--today-border),
-        inset 0 -2px 0 var(--today-border),
-        inset 2px 0 0 var(--today-border),
-        inset -1px 0 0 var(--today-border);
+        inset 0 2px 0 var(--today-border-adj),
+        inset 0 -2px 0 var(--today-border-adj),
+        inset 2px 0 0 var(--today-border-adj),
+        inset -1px 0 0 var(--today-border-adj);
     }
     .day-row.today.journal-pane-row{
       box-shadow:
-        inset 0 2px 0 var(--today-border),
-        inset 0 -2px 0 var(--today-border),
-        inset -2px 0 0 var(--today-border),
-        inset 1px 0 0 var(--today-border);
+        inset 0 2px 0 var(--today-border-adj),
+        inset 0 -2px 0 var(--today-border-adj),
+        inset -2px 0 0 var(--today-border-adj),
+        inset 1px 0 0 var(--today-border-adj);
     }
     .day-row.today.dow-1{
       --today-border:#8a8a8a;
@@ -424,8 +431,8 @@
     .day-row.dow-1{--note-line:#4d4d4d;} .day-row.dow-2{--note-line:#b06a2c;} .day-row.dow-3{--note-line:#3f74a6;}
     .day-row.dow-4{--note-line:#7d5630;} .day-row.dow-5{--note-line:#9a7a12;} .day-row.dow-6{--note-line:#6e4a24;}
     .day-row.dow-0{--note-line:#a3870a;}
-    .editor table[data-cnote]{border-color:var(--note-line,var(--border));}
-    .editor table[data-cnote] tr + tr > td{border-top:1.5px solid var(--note-line,var(--border));padding-top:10px;padding-bottom:10px;}
+    .editor table[data-cnote]{border-color:var(--note-line-adj);}
+    .editor table[data-cnote] tr + tr > td{border-top:1.5px solid var(--note-line-adj);padding-top:10px;padding-bottom:10px;}
     /* Uniform 1.5px lines (between the old 2px and 1px, Julius 2026-10-27); inside shows the day's own color (Julius, 2026-10-27) */
     .editor table[data-cnote]{border-width:1.5px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
     /* Underlined names (Focus areas, Priority check entries) read bold, like the Suggested day */
@@ -485,7 +492,7 @@
     @media(max-width:900px){
       #referenceTree .ref-actions{
         position:absolute;right:4px;margin:0;
-        top:calc(8px * var(--pad-y,1) - 3px);
+        top:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1) - 3px);
       }
       #referenceTree .ref-actions .btn{
         min-height:0;height:calc(var(--ref-line) + 6px);
@@ -526,7 +533,7 @@
     .ref-cell-wrapper{
       position:relative;
       border-bottom:1px solid #eee;
-      padding:calc(8px * var(--pad-y,1)) 4px calc(10px * var(--pad-y,1));
+      padding:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1)) 4px calc(10px * var(--pad-y,1) * var(--ref-pad-y,1));
       min-height:38px;
     }
     .ref-cell-wrapper:hover{
@@ -637,11 +644,11 @@
         overflow-x:hidden;
       }
     }
-    .day-row.today.day-pane-row{box-shadow:inset 0 1px 0 var(--today-border),inset 0 -1px 0 var(--today-border),inset 1px 0 0 var(--today-border),inset -1px 0 0 var(--today-border);}
-    .day-row.today.journal-pane-row{box-shadow:inset 0 1px 0 var(--today-border),inset 0 -1px 0 var(--today-border),inset -1px 0 0 var(--today-border);}
+    .day-row.today.day-pane-row{box-shadow:inset 0 1px 0 var(--today-border-adj),inset 0 -1px 0 var(--today-border-adj),inset 1px 0 0 var(--today-border-adj),inset -1px 0 0 var(--today-border-adj);}
+    .day-row.today.journal-pane-row{box-shadow:inset 0 1px 0 var(--today-border-adj),inset 0 -1px 0 var(--today-border-adj),inset -1px 0 0 var(--today-border-adj);}
     #todayPane,#journalPane{border-right:0;}
     .day-row.today .day-label{color:#444;}
-    .day-row.today .today-pill{color:var(--today-border);font-weight:700;}
+    .day-row.today .today-pill{color:var(--today-border-adj);font-weight:700;}
     .editor.day-editor,.editor.journal-editor{min-height:5.9em;flex-shrink:0;}
     .pane,.scroll{overscroll-behavior:contain;}
     @media(max-width:900px){
@@ -803,7 +810,7 @@
     .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale));height:calc(17px * var(--workspace-scale));}
     body.mobile-mode .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale))!important;height:calc(17px * var(--workspace-scale))!important;min-width:calc(17px * var(--workspace-scale))!important;}
     /* 2026-10-26: Reference follows the left/right padding slider like Today. */
-    #referenceScroll{padding-left:calc(8px * var(--workspace-scale,1) * var(--pad-x,1));padding-right:calc(8px * var(--workspace-scale,1) * var(--pad-x,1));}
+    #referenceScroll{padding-left:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1));padding-right:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1));}
     .type-settings{z-index:3100;}
 
     /* 2026-10-15 */
@@ -864,14 +871,14 @@
     :root{--ref-line:calc(var(--paragraph-size) * var(--workspace-scale,1) * 1.3);}
     #referenceTree .ref-cell-wrapper{
       min-height:0;
-      padding-top:calc(8px * var(--pad-y,1));
-      padding-bottom:calc(10px * var(--pad-y,1));
+      padding-top:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1));
+      padding-bottom:calc(10px * var(--pad-y,1) * var(--ref-pad-y,1));
       padding-right:1px;
       padding-left:calc(var(--ref-line) * 2 + 6px)!important;
     }
     #referenceTree .ref-disclosure{
       left:0;
-      top:calc(8px * var(--pad-y,1));
+      top:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1));
       width:calc(var(--ref-line) * 1.1);
       height:var(--ref-line);
       line-height:var(--ref-line);
@@ -880,7 +887,7 @@
     }
     #referenceTree .ref-drag{
       left:calc(var(--ref-line) * 1.1 + 2px);
-      top:calc(8px * var(--pad-y,1));
+      top:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1));
       width:calc(var(--ref-line) * .8);
       height:var(--ref-line);
       line-height:var(--ref-line);
@@ -891,7 +898,7 @@
       height:auto!important;
       min-height:0!important;
       max-height:none!important;
-      padding-bottom:calc(8px * var(--pad-y,1));
+      padding-bottom:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1));
       overflow:hidden;
     }
     #referenceTree .ref-collapsed .ref-cell{
@@ -1071,13 +1078,33 @@
     #referenceTree .ref-disclosure::before{content:"−";display:inline-grid;place-content:center;box-sizing:border-box;width:1.05em;height:1.05em;border:1.5px solid currentColor;border-radius:4px;font-size:calc(var(--paragraph-size) * var(--workspace-scale,1) * .95);line-height:1;font-weight:700;vertical-align:middle;}
     #referenceTree .ref-cell-wrapper.ref-collapsed > .ref-disclosure::before{content:"+";}
   
+
+    /* (Julius, 2026-10-27) Reference: Sort / − / Options sit in the REFERENCE header
+       on the right; search row is shorter; Reference has its own padding sliders. */
+    .ref-pane-header{gap:6px;min-width:0;}
+    .ref-pane-title{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ref-pane-header .reference-sort-bar{margin:0 0 0 auto;flex-wrap:nowrap;font-weight:400;gap:5px;min-width:0;}
+    .ref-pane-header .ref-sort-label{display:none;}
+    .ref-pane-header #referenceSort{flex:0 1 auto;min-width:3.5em;max-width:42vw;text-overflow:ellipsis;}
+    .ref-pane-header .reference-sort-bar .btn{flex:0 0 auto;}
+    .ref-toolbar .btn{white-space:nowrap;}
+    .ref-toolbar{padding-bottom:4px;margin-bottom:2px;gap:5px;}
+    .ref-toolbar .ref-search{padding:3px 8px;min-height:0;}
+    .ref-toolbar .btn{padding:2px 8px;min-height:0;}
+    @media(max-width:900px){
+      .ref-toolbar .ref-search{min-height:calc(30px * var(--mobile-scale,1))!important;font-size:calc(15px * var(--mobile-scale,1));}
+      .ref-toolbar .btn{min-height:calc(30px * var(--mobile-scale,1))!important;}
+    }
+    .ref-pad-row{display:grid!important;grid-template-columns:6.6em 1fr 3.2em;align-items:center;gap:8px;}
+    .ref-pad-row input[type=range]{flex:1;min-width:0;width:auto!important;height:auto!important;}
+    .ref-pad-row output{min-width:3.2em;text-align:right;font-variant-numeric:tabular-nums;}
     /* =========================================================
        DARK MODE (Julius, 2026-10-27): our own, so the phone doesn't auto-invert.
        Black background; the day colors stay exactly as in light mode
        (Wednesday stays blue) with dark text on them. Adjust from here.
        ========================================================= */
     @media (prefers-color-scheme: dark){
-      :root{--dm-text:#858585;--bg:#000;--panel:#000;--border:#3a3a3a;--muted:#a0a0a0;color-scheme:dark;}
+      :root{--dm-l:52;--dm-text:hsl(0 0% calc(var(--dm-l) * 1%));--dm-muted:hsl(0 0% calc(var(--dm-l) * .82%));--muted:var(--dm-muted);--done:hsl(0 0% calc(var(--dm-l) * .75%));--text:var(--dm-text);--bg:#000;--panel:#000;--border:#3a3a3a;color-scheme:dark;}
       html,body{background:#121212;color:var(--dm-text);}
       #toolbar,#focusControls,.pane-header,.pane{background:#121212;color:var(--dm-text);}
       .btn,.top-select,.send-menu button,.urg-due-clear,.uc-today{background:#1c1c1c;color:var(--dm-text);border-color:#444;}
@@ -1104,13 +1131,21 @@
       .day-row.dow-0{background:#121212;--note-line:#c2b562;}
       .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
       /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text var(--dm-text) (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
-      .day-row[class*="dow-"] .day-label{color:var(--note-line);}
+      .day-row[class*="dow-"] .day-label{color:var(--note-line-adj);}
       .pane,#toolbar,#focusControls,.pane-header{background:#121212;}
       .ref-cell-wrapper{background:#121212;border-bottom-color:#333;}
       .ref-cell-wrapper:hover{background:#1a1a1a;}
       .ref-toolbar{background:#121212;}
       .ref-search{background:#1e1e1e;color:var(--dm-text);border-color:#444;}
       .day-row .editor table[data-cnote] .check-line[data-send]::after{background:#1c1c1c;color:#bbb;border-color:#555;}
+      /* (Julius, 2026-10-27) text that ignored the brightness slider: fixed grays and
+         dark inline colors (e.g. pasted text) now follow --dm-text / --dm-muted. */
+      body,.ref-cell blockquote{color:var(--dm-text);}
+      #dateLabel,.format-hint,.empty,.ref-drag,#referenceTree .ref-disclosure,.uc-day.past,.editor:empty:before,.ref-cell:empty:before{color:var(--dm-muted);}
+      .editor pre.code-block,.ref-cell pre.code-block{background:#1a1a1a;border-color:#333;color:var(--dm-text);}
+      [data-dkc]{color:var(--dm-text)!important;}
+      .reference-sort-bar #refOptionsBtn.on{background:#1d2738;border-color:#3f74a6;}
+      .urg-picker,.urg-pick,.urg-due-chip,.uc-today,#calPanel,#inboxPanel{background:#161616;}
     }
 </style>
 </head>
@@ -1154,6 +1189,12 @@
       <input id="dmText" type="range" min="20" max="100" step="2" value="52" aria-label="Dark mode text brightness, black to white">
       <output id="dmTextValue">52%</output>
       <button class="btn tiny" id="resetDmText" type="button">Reset</button>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label">Day colors · darker / lighter</span>
+      <input id="dayColorAdj" type="range" min="-60" max="60" step="5" value="0" aria-label="Day colors, darker to lighter">
+      <output id="dayColorAdjValue">0</output>
+      <button class="btn tiny" id="resetDayColorAdj" type="button">Reset</button>
     </div>
     <div class="ts-row ts-font">
       <span class="ts-label">Text font · size</span>
@@ -1209,22 +1250,22 @@
     <section
       class="pane"
       id="referencePane">
-      <div class="pane-header">
-        REFERENCE
+      <div class="pane-header ref-pane-header">
+        <span class="ref-pane-title">REFERENCE</span>
+          <div class="reference-sort-bar">
+            <label for="referenceSort" class="ref-sort-label">Sort</label>
+            <select id="referenceSort" class="top-select">
+              <option value="original">Original order</option>
+              <option value="title">Title A–Z</option>
+              <option value="modified">Last modified · newest first</option>
+            </select>
+            <button class="btn tiny ref-collapse-all" type="button" data-layout="reference" title="Collapse or expand all Reference cells" aria-label="Collapse or expand all Reference cells">−</button>
+            <button class="btn tiny" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: Urgent panel, Inbox">Options</button>
+        </div>
       </div>
       <div
         class="scroll"
         id="referenceScroll">
-        <div class="reference-sort-bar">
-          <label for="referenceSort">Sort</label>
-          <select id="referenceSort" class="top-select">
-            <option value="original">Original order</option>
-            <option value="title">Title A–Z</option>
-            <option value="modified">Last modified · newest first</option>
-          </select>
-          <button class="btn tiny ref-collapse-all" type="button" data-layout="reference" title="Collapse or expand all Reference cells" aria-label="Collapse or expand all Reference cells">−</button>
-          <button class="btn tiny" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: Urgent panel, Inbox">Options</button>
-        </div>
         <div id="refOptions" class="ref-options" hidden>
           <div class="ts-sub">Urgent panel</div>
           <label class="ts-check"><input type="checkbox" id="optUrgWrap"> Wrap long text</label>
@@ -1240,6 +1281,16 @@
               <option value="wklong">Tuesday, October 27th · 3d</option>
             </select>
           </label>
+          <div class="ts-sub">Reference padding</div>
+          <label class="ts-check ref-pad-row">Left / right
+            <input id="refPadX" type="range" min="0" max="300" step="10" value="100" aria-label="Reference left and right padding">
+            <output id="refPadXValue">100%</output>
+          </label>
+          <label class="ts-check ref-pad-row">Top / bottom
+            <input id="refPadY" type="range" min="0" max="300" step="10" value="100" aria-label="Reference top and bottom padding">
+            <output id="refPadYValue">100%</output>
+          </label>
+          <button class="btn tiny" id="resetRefPad" type="button">Reset padding</button>
           <div class="ts-sub">Tips</div>
           <div class="ref-opt-tip">Hold a level heading in Urgent (or tap + Task) to make a task there. Inbox items go to Today with → Today.</div>
         </div>
@@ -5817,7 +5868,7 @@
     const DEF = 52, el = document.getElementById('dmText'), out = document.getElementById('dmTextValue');
     function apply(v){
       v = Math.max(20,Math.min(100,Number(v) || DEF));
-      document.documentElement.style.setProperty('--dm-text','hsl(0 0% ' + v + '%)');
+      document.documentElement.style.setProperty('--dm-l',String(v)); // text, muted and done text all scale from this
       if(el) el.value = v;
       if(out) out.textContent = v + '%';
       try{ localStorage.setItem('fw.dmText',String(v)); }catch(e){}
@@ -5828,6 +5879,89 @@
     if(el) el.addEventListener('input',() => apply(el.value));
     const r = document.getElementById('resetDmText');
     if(r) r.addEventListener('click',() => apply(DEF));
+  })();
+
+  // Day color brightness slider (Julius, 2026-10-27): lightens/darkens every day color
+  // (Tue orange, Wed blue…: backgrounds, note boxes, today outline, day names).
+  (function(){
+    const el = document.getElementById('dayColorAdj'), out = document.getElementById('dayColorAdjValue');
+    function apply(v){
+      v = Math.max(-60,Math.min(60,Math.round(Number(v) || 0)));
+      const root = document.documentElement.style;
+      root.setProperty('--dc-w',(v > 0 ? v : 0) + '%');
+      root.setProperty('--dc-k',(v < 0 ? -v : 0) + '%');
+      if(el) el.value = v;
+      if(out) out.textContent = (v > 0 ? '+' : '') + v;
+      try{ localStorage.setItem('fw.dayColorAdj',String(v)); }catch(e){}
+    }
+    let saved = 0;
+    try{ saved = localStorage.getItem('fw.dayColorAdj') || 0; }catch(e){}
+    apply(saved);
+    if(el) el.addEventListener('input',() => apply(el.value));
+    const r = document.getElementById('resetDayColorAdj');
+    if(r) r.addEventListener('click',() => apply(0));
+  })();
+
+  // Dark inline text colors (e.g. pasted black text) ignored the dark mode text slider.
+  // Mark them data-dkc; the dark mode CSS then paints them with --dm-text (Julius, 2026-10-27).
+  (function(){
+    const probe = document.createElement('span');
+    function lum(c){
+      probe.style.color = ''; probe.style.color = c;
+      if(!probe.style.color) return 1;
+      document.body.appendChild(probe);
+      const m = getComputedStyle(probe).color.match(/[\d.]+/g);
+      probe.remove();
+      if(!m) return 1;
+      const [r,g,b] = m.map(Number), a = m.length > 3 ? m[3] : 1;
+      if(a < .1) return 1;
+      return (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+    }
+    function check(node){
+      if(!node || node.nodeType !== 1) return;
+      const c = (node.style && node.style.color) || (node.tagName === 'FONT' && node.getAttribute('color')) || '';
+      const dark = c && lum(c) < .35;
+      if(dark && !node.hasAttribute('data-dkc')) node.setAttribute('data-dkc','');
+      else if(!dark && node.hasAttribute('data-dkc')) node.removeAttribute('data-dkc');
+    }
+    function scan(root){
+      if(!root || root.nodeType !== 1) return;
+      if(root.matches('[style*="color"],font[color]')) check(root);
+      root.querySelectorAll('[style*="color"],font[color],[data-dkc]').forEach(check);
+    }
+    let pending = new Set(), raf = 0;
+    function flush(){ raf = 0; const list = [...pending]; pending.clear(); list.forEach(scan); }
+    const app = document.getElementById('app') || document.body;
+    new MutationObserver(muts => {
+      muts.forEach(m => {
+        if(m.type === 'attributes') pending.add(m.target);
+        else m.addedNodes.forEach(n => { if(n.nodeType === 1) pending.add(n); });
+      });
+      if(!raf) raf = requestAnimationFrame(flush);
+    }).observe(app,{subtree:true,childList:true,attributes:true,attributeFilter:['style','color']});
+    scan(app);
+  })();
+
+  // Reference-only padding (Julius, 2026-10-27): multiplies the main padding sliders, Reference only.
+  (function(){
+    const keys = {x:'fw.refPadX', y:'fw.refPadY'};
+    function set(axis,v,save){
+      v = Math.max(0,Math.min(300,Math.round((Number(v) || (v === 0 || v === '0' ? 0 : 100)) / 10) * 10));
+      document.documentElement.style.setProperty('--ref-pad-' + axis,String(v / 100));
+      const up = axis.toUpperCase(), el = document.getElementById('refPad' + up), out = document.getElementById('refPad' + up + 'Value');
+      if(el) el.value = v;
+      if(out) out.textContent = v + '%';
+      if(save !== false){ try{ localStorage.setItem(keys[axis],String(v)); }catch(e){} }
+    }
+    ['x','y'].forEach(axis => {
+      let saved = 100;
+      try{ const v = localStorage.getItem(keys[axis]); if(v !== null) saved = v; }catch(e){}
+      set(axis,saved,false);
+      const el = document.getElementById('refPad' + axis.toUpperCase());
+      if(el) el.addEventListener('input',() => set(axis,el.value));
+    });
+    const r = document.getElementById('resetRefPad');
+    if(r) r.addEventListener('click',() => { set('x',100); set('y',100); });
   })();
 </script>
 </body>

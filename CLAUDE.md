@@ -49,3 +49,9 @@
 - Nesting + cells (2026-10-26, Julius): leading spaces in a line (2 per level) → `[]` subtasks get `data-level`/margin, plain lines get padding (detail lines). `cells:true` on an entry splits each `##` section into its own `<tr>` (`data-ccells`), drops blank lines and gives `- ` entries and `__Area__` lines `padding-top:6px`. "→ Day" uses `noteTaskTree()` (the line + following deeper check-lines) → `addTasksToDay()` or server `appendTasksToDay(date, [{html, level}])`.
 - Send menu (2026-10-26, Julius): Today / Tomorrow show `shortDayLabel()` ("10/27 Tue") in a `<small>`. Second row "Reference" `<select>` (`referenceTargets()`: every `.ref-cell-wrapper` in tree order, title = its `h2`, indented by depth; `guessReferenceTarget()` matches title words to the task, else localStorage `fw.sendRef`) → `sendNoteToReference()` appends the task tree as open check-lines to that ref cell and removes it from the note. Mirroring Today ↔ Reference is a 📋 to-do.
 - Drag-and-drop to days waits on the task-card work.
+
+## Dark text, day colors, Reference header (2026-10-27, Julius)
+
+- Dark mode text: JS sets `--dm-l` (20–100); `--dm-text`, `--dm-muted`, `--muted`, `--done`, `--text` derive from it. Dark inline colors (luminance < .35, e.g. pasted black) get `data-dkc` from a MutationObserver and are painted `--dm-text` in dark mode.
+- Day colors: per-day bases `--day-bg` (light bg), `--note-line`, `--today-border`; always use `--note-line-adj` / `--today-border-adj` (mixed with white `--dc-w` / black `--dc-k` from the `#dayColorAdj` slider, localStorage `fw.dayColorAdj`).
+- Reference header holds `.reference-sort-bar` (Sort select, −, Options). Reference-only padding: `--ref-pad-x` / `--ref-pad-y` (sliders in `#refOptions`, localStorage `fw.refPadX`/`fw.refPadY`), multiplied with the main `--pad-x`/`--pad-y`.

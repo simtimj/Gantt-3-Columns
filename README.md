@@ -107,6 +107,11 @@ Last updated: 2026-10-27
 - **Make tasks in the Urgent panel**: hold (or right-click) a level heading like "2 · Soon", hold the Urgent header, or tap **+ Task** → *Create Urgent / Soon / Later task* → type → Enter. It's added at the end of today's Today cell with that urgency, so it shows in the panel right away. Typing `Title: details` makes the title bold. The panel now always shows (even with nothing urgent) so + Task is always there.
 - **Inbox** under Urgent (collapsed by default): quick captures shown as **Title**: details. Type one in at the bottom, or tell Claude ("add to my Gantt inbox: …") and it shows up about a minute later, tagged Claude. **→ Today** turns it into a task in today; **✕** dismisses it.
 
+- **Text brightness fix (2026-10-27)**: all dark mode text now follows the Text brightness slider — dimmer labels, done tasks, quotes, code blocks, the calendar's today line and dark pasted/inline-colored text (that last stayed near-black before)
+- **Day colors slider (2026-10-27)**: Options → **Day colors · darker / lighter** (−60…+60, default 0, saved per device) lightens or darkens everything in a day's color (Tue orange, Wed blue…): day names, note box lines, today outline, and the light-mode day backgrounds
+- **Reference header (2026-10-27)**: Sort / − / Options moved up into the REFERENCE header on the right (one less row); search, + Cell and Archive row is shorter
+- **Reference padding (2026-10-27)**: Reference → Options has its own Left/right and Top/bottom padding sliders that apply only to Reference (on top of the main padding sliders)
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

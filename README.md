@@ -172,6 +172,7 @@ Last updated: 2026-10-27
 - **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)
 - **Hold anywhere on a card to move it (2026-10-27)**: hold and grab a card (not just its checkbox) to drag it; a plain tap on the card still goes into the text for editing, selecting, highlighting
 - **Idea: built-in time tracking → plan vs actual (2026-10-27)**: own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)
+- **Archive instead of delete (2026-10-27, plan only)**: when removing a task, choose Delete or Archive. Archive keeps the task and its subtasks where they are in Today, but takes them out of the Urgent panel and copies them into an "Archived urgent / important" section, as a log for things worth keeping (e.g. career/application steps). Details to work out: where the archive section lives (Reference?), how to un-archive, and how archived lines look in Today.
 - **Mirrored tasks (Today ↔ Reference)**: send a carry-over to Today but keep it tracked in its Reference area (e.g. CDCR under State / IT Associate); one linked task in both places, so checking it off in Today also checks it in Reference. Approach to work out (shared task id, show it in both, one source of truth)
 
 - Hide the "created by a Google Apps Script user" banner — only if the Exercise Tracker's wrapper experiment works out (it's shelved there for being slow).

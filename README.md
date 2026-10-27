@@ -47,6 +47,9 @@ Last updated: 2026-10-26
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Note blocks restyled** (2026-10-26): no colored left edge; list lines use dashes (Must do too); wrap-up skips empty stats; Focus ordered by most time, area underlined with a one-line item list under it.
+- **Carry-over tasks + → Day** (2026-10-26): Carries over items are checkboxes; tap **→ Day** on the right to move one to Today, Tomorrow or a picked date's Today cell.
+- **Re-render note blocks** (2026-10-26): bumping an entry's `rev` in dayplan.js updates that block in place.
 
 - **Boxed plan and wrap-up (2026-10-26):** Claude's Suggested day (top of Notes, blue edge) and Day wrap-up (bottom of Notes, purple edge) now sit in their own rounded box, so they're clearly separate from your notes. Tonight's two blocks get boxed on the next load.
 

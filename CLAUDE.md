@@ -90,3 +90,7 @@
 - Day-colored dark cells: `body.dm-daymatch` (localStorage `fw.dmDayMatch`, default on, `#dmDayMatch`) redefines `--dm-cell` on `.day-row` as `hsl(var(--dmd-h) var(--dmd-s) L%)`; JS turns each `#dmDayCols` picker color into `--dmd-h-<dow>` (hue) and `--dmd-s-<dow>` (saturation ×0.55) so pale colors still tint (localStorage `fw.dmDayColors` JSON, defaults = light `--day-bg` colors; `#dmDayDefault` clears). The Dark cells row + toggle + pickers sit in `.ts-dmgroup` (break-inside:avoid).
 - Urgency checkboxes: border 2.5px + glow; in boxfill mode a 1.5px padding with `background-clip:content-box` separates urgency border from subject fill.
 - Saved looks: `#lookSlot` (light/dark/custom) + `#lookSave` / `#lookLoad` at the top of Options (last `<script>` before `</body>`); snapshots the appearance `KEYS` list into localStorage `fw.looks`, Load writes them back and clicks ↻. Add any new look setting's storage key to `KEYS`.
+
+## Day sections (2026-10-27, Julius)
+
+- `ensureDaySections(ed)` (called first in `refreshCards`) adds saved `<div data-tl="1" data-sec="morning|afternoon|evening"><b>Name</b></div>` lines to today's `#todayScroll` day editor when missing, then `saveEditorOwner`. `titleCovered()` for a `data-sec` title runs to the next `data-sec` (skips blanks, includes nested titles). `DAY_SECS` / `daySecsOn` (localStorage `fw.daySecs`, `#daySecsOn`) are declared next to `cardsOn`. Style `.editor > [data-sec]`. His blocks: morning ~9–2, nap, then afternoon + evening ~3:45–9:30 (Tuesdays).

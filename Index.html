@@ -1399,6 +1399,7 @@
     <div class="ts-sub">Task cards</div>
     <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
+    <label class="ts-check"><input type="checkbox" id="daySecsOn" checked> Morning / Afternoon / Evening sections in Today</label>
     <label class="ts-check"><input type="checkbox" id="cardsBoxFill" checked> Subject color in the checkbox (off = whole card)</label>
       <div class="ts-group ts-cats">
       <button type="button" class="ts-sub ts-cats-toggle" id="cardCatToggle" aria-expanded="false"><span class="ts-cats-arrow">▸</span> Card subjects</button>
@@ -6577,6 +6578,9 @@
   .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
   .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
   .check-line[data-tcdrag]{opacity:.3;}
+  /* Day sections (Julius, 2026-10-27): Morning / Afternoon / Evening separators in the Today cell. */
+  .editor > [data-sec]{margin:10px 0 4px;padding:0 0 2px;border-bottom:2px solid var(--note-line-adj,var(--border));font-size:.82em;letter-spacing:.06em;text-transform:uppercase;color:var(--note-line-adj,var(--muted));}
+  .editor > [data-sec]:first-child{margin-top:0;}
   /* Subject color in the checkbox (Julius, 2026-10-27; default): card stays neutral, the subject
      fills the checkbox, urgency is its border (gray when none), done = the check mark.
      The mark is white with a dark outline so it reads on any fill. Option "Subject color: whole card" brings back the tinted cards. */
@@ -6640,6 +6644,8 @@
   let CARD_CATS = [], CARD_CAT_BY_KEY = {};
   // Declared before the first setCardCats() call: it refreshes cards, which reads these.
   let cardsOn = true, cardsAuto = true;
+  const DAY_SECS = [['morning','Morning'],['afternoon','Afternoon'],['evening','Evening']];
+  let daySecsOn = true; try{ daySecsOn = localStorage.getItem('fw.daySecs') !== '0'; }catch(e){}
   try{ cardsOn = localStorage.getItem('fw.cards') !== '0'; cardsAuto = localStorage.getItem('fw.cardsAuto') !== '0'; }catch(e){}
   const cardHeadOf = new WeakMap(); // line -> its card's head line
   function cardCatRegex(words){
@@ -6760,7 +6766,7 @@
   }
   function refreshCards(ed){
     if(!ed || !ed.isConnected) return false;
-    let changed = false;
+    let changed = ensureDaySections(ed);
     const plan = new Map(); // node -> {tc,head,rel,cat}
     let members = [], headLvl = 0, ctx = '', ctxGrp = false;
     const flush = () => {
@@ -6845,11 +6851,42 @@
   }
   function titleCovered(t){
     const out = [];
+    // Day sections (Morning / Afternoon / Evening) cover everything up to the next section, blank lines and other titles included.
+    if(t.dataset && t.dataset.sec){
+      for(let n = t.nextElementSibling; n; n = n.nextElementSibling){
+        if(n.nodeType === 1 && n.dataset.sec) break;
+        if(!isEmptyLine(n)) out.push(n);
+      }
+      return out;
+    }
     for(let n = t.nextElementSibling; n; n = n.nextElementSibling){
       if(isEmptyLine(n) || isTitleLine(n)) break;
       out.push(n);
     }
     return out;
+  }
+  /* Day sections (Julius, 2026-10-27): every day's Today cell gets Morning / Afternoon / Evening
+     title lines (data-tl="1" data-sec="…", saved) so tasks can be sorted into the day's blocks;
+     each folds like a title line. Added to today's cell when missing; Options toggle turns it off. */
+  function ensureDaySections(ed){
+    if(!daySecsOn || !ed || !ed.classList.contains('day-editor') || !ed.closest('#todayScroll')) return false;
+    const today = (typeof state !== 'undefined' && state && state.today) || localToday();
+    if(ed.dataset.date !== today) return false;
+    const have = new Set([...ed.children].filter(n => n.dataset && n.dataset.sec).map(n => n.dataset.sec));
+    if(have.size === DAY_SECS.length) return false;
+    const mk = (k,label) => { const d = document.createElement('div'); d.dataset.tl = '1'; d.dataset.sec = k; d.innerHTML = '<b>' + label + '</b>'; return d; };
+    DAY_SECS.forEach(([k,label],i) => {
+      if(have.has(k)) return;
+      const el = mk(k,label);
+      // Morning goes on top (existing tasks land under it); the others go after the previous section's block, else at the end.
+      if(i === 0) ed.insertBefore(el,ed.firstChild);
+      else{
+        const next = DAY_SECS.slice(i + 1).map(([nk]) => ed.querySelector(':scope > [data-sec="' + nk + '"]')).find(Boolean);
+        if(next) ed.insertBefore(el,next); else ed.appendChild(el);
+      }
+    });
+    if(typeof saveEditorOwner === 'function') saveEditorOwner(ed);
+    return true;
   }
   function refreshTitleLines(ed){
     let changed = false;
@@ -6949,6 +6986,8 @@
   (function(){
     const on = document.getElementById('cardsOn'), auto = document.getElementById('cardsAuto');
     if(on){ on.checked = cardsOn; on.addEventListener('change',() => { cardsOn = on.checked; try{ localStorage.setItem('fw.cards',cardsOn ? '1' : '0'); }catch(e){} refreshAllCards(); cardsSyncHeights(); }); }
+    const ds = document.getElementById('daySecsOn');
+    if(ds){ ds.checked = daySecsOn; ds.addEventListener('change',() => { daySecsOn = ds.checked; try{ localStorage.setItem('fw.daySecs',daySecsOn ? '1' : '0'); }catch(e){} refreshAllCards(); }); }
     const bf = document.getElementById('cardsBoxFill');
     let boxFill = true; try{ boxFill = localStorage.getItem('fw.cardsBoxFill') !== '0'; }catch(e){}
     document.body.classList.toggle('tc-boxfill',boxFill);

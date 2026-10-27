@@ -151,6 +151,8 @@ Last updated: 2026-10-27
 - **Saved looks** (2026-10-27): top of Options — pick Light / Dark / Custom, Save stores every look setting (theme, colors, sliders, cards, fonts, padding, scale) on this device; Load applies it and refreshes.
 - **Options alignment** (2026-10-27): Dark cells, the match toggle and the day pickers stay together in one column.
 
+- **Day sections** (2026-10-27): today's Today cell always has Morning / Afternoon / Evening separators (added if missing; existing tasks start under Morning). Each folds with − / + like a title line and covers everything down to the next section. Options toggle to turn off. Next: maybe boxed cells/borders around each section.
+
 ## 🔧 To be improved
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.

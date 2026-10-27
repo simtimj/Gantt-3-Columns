@@ -116,6 +116,7 @@ function ensureSetup_() {
 function getWorkspaceData() {
   ensureSetup_();
   try { applyClaudeDone_(); } catch (e) { console.error(e); }
+  try { applyClaudeNotes_(); } catch (e) { console.error(e); }
 
   const today = todayString_();
 
@@ -974,6 +975,60 @@ function applyClaudeDone_() {
     });
     props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));
     props.setProperty('claudeDoneGrouped', '1');
+  } finally { lock.releaseLock(); }
+}
+
+
+/* =========================================================
+   CLAUDE NOTES: suggested day + day wrap-up (2026-10-26, Julius)
+   A nightly (~10 pm) Claude run adds entries to CLAUDE_NOTES in dayplan.js:
+   'plan' goes at the top of that date's Notes (Journal) cell, 'wrap' at the
+   end. Applied once per id (script property "claudeNotesApplied").
+   ========================================================= */
+function noteInline_(s) {
+  return doneEsc_(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
+function noteBlockHtml_(item) {
+  const kind = item.kind === 'wrap' ? 'wrap' : 'plan';
+  const title = item.title || (kind === 'wrap' ? 'Day wrap-up' : 'Suggested day');
+  let html = '<div data-cnote="' + doneEsc_(item.id) + '"><b><u>' + doneEsc_(title) + '</u></b> <i>· Claude</i></div>';
+  (item.lines || []).forEach(line => {
+    line = String(line == null ? '' : line);
+    if (!line.trim()) html += '<div><br></div>';
+    else if (/^##\s+/.test(line)) html += '<div><b><u>' + noteInline_(line.replace(/^##\s+/, '')) + '</u></b></div>';
+    else if (/^-\s+/.test(line)) html += '<div>• ' + noteInline_(line.replace(/^-\s+/, '')) + '</div>';
+    else html += '<div>' + noteInline_(line) + '</div>';
+  });
+  return html;
+}
+function applyClaudeNotes_() {
+  const list = (typeof CLAUDE_NOTES !== 'undefined' && Array.isArray(CLAUDE_NOTES)) ? CLAUDE_NOTES : [];
+  if (!list.length) return;
+  const props = PropertiesService.getScriptProperties();
+  let applied = [];
+  try { applied = JSON.parse(props.getProperty('claudeNotesApplied') || '[]'); } catch (e) { applied = []; }
+  const fresh = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') && applied.indexOf(String(x.id)) < 0);
+  if (!fresh.length) return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    fresh.forEach(x => {
+      let row = findDayRow_(sheet, x.date);
+      if (!row) { sheet.appendRow([parseDate_(x.date), '', '']); row = sheet.getLastRow(); }
+      const cell = sheet.getRange(row, 3);
+      const before = String(cell.getValue() || '');
+      if (before.indexOf('data-cnote="' + doneEsc_(x.id) + '"') < 0) {
+        const block = noteBlockHtml_(x);
+        const gap = '<div><br></div>';
+        const html = !before.trim() ? block
+          : x.kind === 'wrap' ? before + gap + block
+          : block + gap + before;
+        cell.setValue(html);
+      }
+      applied.push(String(x.id));
+    });
+    props.setProperty('claudeNotesApplied', JSON.stringify(applied.slice(-1000)));
   } finally { lock.releaseLock(); }
 }
 

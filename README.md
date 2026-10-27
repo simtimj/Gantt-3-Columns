@@ -48,6 +48,8 @@ Last updated: 2026-10-26
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Nightly suggested day + day wrap-up (2026-10-26):** every night at ~10 pm a scheduled Claude run writes two blocks into the **Notes** column: a **Day wrap-up** at the end of today's Notes cell (how many tasks got done vs. planned, what you focused on, what carries over) and a **Suggested day** at the top of tomorrow's Notes cell (most urgent first from the Urgent panel, due dates, the Daily Work Log priorities and tomorrow's calendar gaps; then what can wait, stretch, for fun). They land the next time the app loads; delete one and it stays deleted. Done at 10 pm (not 8–9) so late work counts before the plan is made. Wrap-up details still to be worked out together.
+
 - **Calendar panel in Reference (2026-10-26):** between Urgent and Inbox, collapsible. **Today** first (times, what's on now highlighted, past dimmed), then the next 3 days as upcoming. Reads your main calendar and Events straight from Google Calendar, so anything Claude adds (and the dog-walk block later) shows up. ↻ reloads; also refreshes when you come back to the app after 5+ min. Tap an event to open it in Google Calendar.
 
 - **Done log spacing (2026-10-26):** a blank line before and after each project group, so groups don't run together.
@@ -89,7 +91,6 @@ Last updated: 2026-10-26
 
 ## 📋 To do
 
-- **Claude's suggested day in Notes** (asked 2026-10-26): when Julius asks "suggest my day", Claude writes the plan (what to do, at what times, from the priorities and calendar gaps) into that day's **Notes** cell, e.g. under Monday, Oct 26, 2026, as a "Claude's plan for today" block. Same route as the Inbox: Claude adds it to a repo file (e.g. `dayplan.js`), and the app inserts it into that date's Notes cell once. The plan is also saved on Claude's side (Daily Work Log), so Julius can say "take today's plan, make these changes, and push it to my calendar", and Claude updates the plan and creates the calendar events.
 - Draggable task cards: every task becomes a card you can drag; dragging a task carries its subtasks, dragging a subtask carries only it and what's nested below.
 - Hide the "created by a Google Apps Script user" banner — only if the Exercise Tracker's wrapper experiment works out (it's shelved there for being slow).
 

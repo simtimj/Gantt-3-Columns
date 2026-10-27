@@ -33,3 +33,9 @@
 - `#calPanel` in Reference, between `#urgentPanel` and `#inboxPanel` (Urgent inserts before `calPanel`). Client: `loadCalendar()` (called from `applyWorkspaceData` after `setInbox`, on ↻, and on `visibilitychange` if >5 min old) → `renderCalendar()`; collapse state localStorage `fw.calOpen`. Server: `getCalendarEvents()` in `Code.gs` reads `EVENT_CALENDARS` (main + Events) for today through `EVENT_DAYS_AHEAD` (3) days and returns `{today, events:[{title, cal, allDay, date, endDate, start, end, location, link}]}`. Loaded async so it can't slow or break startup.
 - Needs the Calendar scope: if the app asks for access, approve it; or run `authorizeCalendar()` once in the script editor.
 - Everything Claude puts on his calendar shows here automatically; the planned dog-walk "walking block" events will too once that script writes them to the main calendar.
+
+## Nightly plan + wrap-up (2026-10-26, Julius)
+
+- A scheduled task ("Gantt: nightly wrap-up + plan", ~10 pm Pacific) reads the Sheet "New Gantt Sheet" (id `1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`, tab `Days`: Date / Today / Journal) via the Google Sheets connector, plus the Daily Work Log, `donelog.js` and Google Calendar, then appends two entries to `CLAUDE_NOTES` in `dayplan.js` and pushes: `kind:'wrap'` for today (end of Notes cell) and `kind:'plan'` for tomorrow (top of Notes cell). Format and line markup are in the file header.
+- `applyClaudeNotes_()` in `Code.gs` runs in `getWorkspaceData()` after `applyClaudeDone_()`; each id is applied once (script property `claudeNotesApplied`); blocks start with `<div data-cnote="id">`.
+- Counting in the Today cell: a `check-line` is a task; `done` class or `checked` = finished; `data-urg` 1/2/3 = urgency; `data-cid` = logged by Claude.

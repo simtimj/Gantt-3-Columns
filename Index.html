@@ -551,6 +551,15 @@
     #referenceEdgeResize:hover,#referenceEdgeResize.dragging{background:#1a73e833;}
     body.mobile-mode #referenceEdgeResize,body.mobile-split #referenceEdgeResize{display:none;}
     #workspace{position:relative;}
+    /* Single-column swipe (2026-10-27): next column slides in; hold mid-way for a split prompt. */
+    #workspace .pane.swipe-next{position:absolute;top:0;bottom:0;z-index:5;}
+    #workspace .pane.swipe-cur,#workspace .pane.swipe-next{will-change:transform;}
+    #workspace.swipe-anim .pane.swipe-cur,#workspace.swipe-anim .pane.swipe-next,#workspace.swipe-anim #swipeSeam{transition:transform .18s ease-out;}
+    #swipeSeam{position:absolute;top:0;bottom:0;left:0;width:3px;margin-left:-1px;z-index:6;background:var(--border);pointer-events:none;}
+    #swipeSeam.mid{background:#1a73e8;}
+    #swipeSplitMenu{position:fixed;z-index:3000;min-width:210px;padding:6px;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:4px;font-size:14px;}
+    #swipeSplitMenu .ssm-h{font-size:11px;opacity:.7;padding:0 4px 2px;}
+    #swipeSplitMenu button{text-align:left;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
     .editor hr,.ref-cell hr{border:0;border-top:1px solid #aaa;margin:7px 0;}
     .ref-disclosure{
       position:absolute;
@@ -5954,9 +5963,150 @@
       workspace.scrollLeft+=amount;
     },{capture:true,passive:false});
   }
+  /* Single-column swipe (Julius, 2026-10-27): with one column showing, swipe
+     sideways to the neighbor in order — Today/Tasks ↔ Notes ↔ Reference, no
+     wrap-around. The neighbor slides in under the finger. Hold still with the
+     dividing line near the middle → quick prompt to split those two. */
+  function initSingleSwipe(){
+    const ws=document.getElementById('workspace');
+    const active=()=>!isSplitActive() && visiblePanes.length===1;
+    const neighbor=dir=>VIEW_PANES[VIEW_PANES.indexOf(visiblePanes[0])+dir]||null;
+    const MID_LO=.3, MID_HI=.7, HOLD_MS=450;
+    let s=null;
+    const seamX=()=>s.dir>0 ? s.w+s.dx : s.dx;           // divider position in px
+    const isMid=()=>{const f=seamX()/s.w; return f>=MID_LO && f<=MID_HI;};
+    function begin(dir){
+      const next=neighbor(dir);
+      if(!next)return false;
+      s.dir=dir; s.next=next;
+      s.cur=document.getElementById(visiblePanes[0]+'Pane');
+      s.nextPane=document.getElementById(next+'Pane');
+      s.w=ws.clientWidth;
+      s.nextPane.classList.remove('view-hidden');
+      s.nextPane.classList.add('swipe-next');
+      s.nextPane.style.width=s.w+'px';
+      s.nextPane.style.left=(dir>0 ? s.w : -s.w)+'px';
+      s.cur.classList.add('swipe-cur');
+      s.seam=document.createElement('div'); s.seam.id='swipeSeam';
+      ws.appendChild(s.seam);
+      return true;
+    }
+    function paint(){
+      const t='translateX('+s.dx+'px)';
+      s.cur.style.transform=t; s.nextPane.style.transform=t;
+      s.seam.style.transform='translateX('+seamX()+'px)';
+      s.seam.classList.toggle('mid',isMid());
+    }
+    function cleanup(){
+      if(!s)return;
+      clearTimeout(s.hold);
+      ws.classList.remove('swipe-anim');
+      if(s.cur){s.cur.classList.remove('swipe-cur');s.cur.style.transform='';}
+      if(s.nextPane){
+        s.nextPane.classList.remove('swipe-next');
+        s.nextPane.style.transform='';s.nextPane.style.left='';s.nextPane.style.width='';
+        if(!visiblePanes.includes(s.next))s.nextPane.classList.add('view-hidden');
+      }
+      s.seam?.remove();
+      document.getElementById('swipeSplitMenu')?.remove();
+      s=null;
+    }
+    function settle(go){
+      if(!s || !s.cur){cleanup();return;}
+      ws.classList.add('swipe-anim');
+      s.dx=go ? -s.dir*s.w : 0;
+      paint();
+      const next=s.next;
+      setTimeout(()=>{cleanup(); if(go)applyWorkspaceView([next]);},190);
+    }
+    function armHold(){
+      clearTimeout(s.hold);
+      s.hold=setTimeout(()=>{ if(s && s.cur && !s.menu && isMid())openMenu(); },HOLD_MS);
+    }
+    function openMenu(){
+      s.menu=true;
+      try{navigator.vibrate && navigator.vibrate(15);}catch(e){}
+      const [a,b]=s.dir>0 ? [visiblePanes[0],s.next] : [s.next,visiblePanes[0]];
+      const ratio=Math.max(.2,Math.min(.8,seamX()/s.w));
+      const short=n=>n==='today' ? 'Today' : PANE_LABELS[n];
+      const m=document.createElement('div'); m.id='swipeSplitMenu';
+      const item=(label,fn)=>{const btn=document.createElement('button');btn.type='button';btn.textContent=label;
+        btn.addEventListener('click',e=>{e.stopPropagation();fn();});m.appendChild(btn);};
+      const h=document.createElement('div');h.className='ssm-h';h.textContent='Split view?';m.appendChild(h);
+      item('Split '+short(a)+' | '+short(b),()=>split(a,b,'horizontal',ratio));
+      item('Split stacked '+short(a)+' / '+short(b),()=>split(a,b,'vertical',.5));
+      item('Go to '+short(s.next),()=>settle(true));
+      item('Cancel',()=>settle(false));
+      document.body.appendChild(m);
+      const r=ws.getBoundingClientRect(), mw=m.offsetWidth, mh=m.offsetHeight;
+      m.style.left=Math.max(8,Math.min(window.innerWidth-mw-8,r.left+seamX()-mw/2))+'px';
+      m.style.top=Math.max(8,r.top+(r.height-mh)/2)+'px';
+    }
+    function split(a,b,orientation,ratio){
+      splitOptions.first=a; splitOptions.second=b; splitOptions.third='none'; splitOptions.orientation=orientation;
+      try{localStorage.setItem(MOBILE_SPLIT_OPTIONS_KEY,JSON.stringify(splitOptions));}catch(e){}
+      if(orientation==='horizontal'){
+        mobileSplitRatio=ratio;
+        try{localStorage.setItem(MOBILE_SPLIT_SIZE_KEY,String(ratio));}catch(e){}
+      }
+      cleanup();
+      setSplit(true);
+    }
+    const skip=t=>!t || !document.getElementById('app').contains(t) ||
+      t.closest('input,select,textarea,button,a,.view-menu-popup,#typeSettings,#swipeSplitMenu,.column-resizer');
+    document.addEventListener('touchstart',e=>{
+      if(s && s.menu)return;                     // waiting on the prompt
+      cleanup();
+      if(!active() || e.touches.length!==1 || skip(e.target))return;
+      const p=e.touches[0];
+      s={x:p.clientX,y:p.clientY,dx:0,lock:null,lastX:p.clientX};
+    },{capture:true,passive:true});
+    document.addEventListener('touchmove',e=>{
+      if(!s || s.menu || e.touches.length!==1)return;
+      const p=e.touches[0], dx=p.clientX-s.x, dy=p.clientY-s.y;
+      if(!s.lock){
+        if(Math.abs(dx)<10 && Math.abs(dy)<10)return;
+        if(Math.abs(dx)<Math.abs(dy)*1.5 || (window.getSelection && String(window.getSelection()).length)){s=null;return;}
+        if(!begin(dx<0 ? 1 : -1)){s=null;return;}   // nothing that way (e.g. left of Today)
+        s.lock='h';
+      }
+      e.preventDefault();
+      // Stay on the side we started toward; resist past the edges.
+      s.dx=s.dir>0 ? Math.max(-s.w,Math.min(0,dx)) : Math.min(s.w,Math.max(0,dx));
+      paint();
+      if(Math.abs(p.clientX-s.lastX)>12){s.lastX=p.clientX;armHold();}
+      else if(!s.hold)armHold();
+    },{capture:true,passive:false});
+    const end=()=>{
+      if(!s || s.menu)return;
+      if(!s.cur){s=null;return;}
+      settle(Math.abs(s.dx)>s.w*.3);
+    };
+    document.addEventListener('touchend',end,{capture:true,passive:true});
+    document.addEventListener('touchcancel',()=>{ if(s && !s.menu)settle(false); },{capture:true,passive:true});
+    // Tap outside the prompt = cancel.
+    document.addEventListener('pointerdown',e=>{
+      if(s && s.menu && !e.target.closest('#swipeSplitMenu')){e.stopPropagation();settle(false);}
+    },true);
+    // Trackpad: a sideways two-finger swipe moves one column (no drag preview).
+    let push=0,pushAt=0,lockUntil=0;
+    document.addEventListener('wheel',e=>{
+      if(!active() || e.ctrlKey || e.metaKey || Math.abs(e.deltaX)<=Math.abs(e.deltaY))return;
+      const now=Date.now();
+      if(now<lockUntil)return;
+      if(now-pushAt>300)push=0;
+      pushAt=now; push+=e.deltaX;
+      if(Math.abs(push)>160){
+        const next=neighbor(push>0 ? 1 : -1);
+        push=0; lockUntil=now+700;
+        if(next)applyWorkspaceView([next]);
+      }
+    },{capture:true,passive:true});
+  }
   initColumnResizers();
   initWorkspaceHorizontalSwipe();
   initPeekSwipe();
+  initSingleSwipe();
   initFocusMode();
   loadWorkspace();
 </script>

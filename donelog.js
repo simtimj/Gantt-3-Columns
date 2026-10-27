@@ -61,4 +61,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-gantt-subjects-fallback', date: '2026-10-27', project: 'Gantt', title: 'Card subjects always filled', details: 'Options → Card subjects starts with Code, Career, Study, Work, Health, Life, Fun; an empty saved list falls back to them' },
   { id: 'd-20261027-gantt-full-due', date: '2026-10-27', project: 'Gantt', title: 'Full Due tasks', details: 'tasks due on a day show in full at the top of that day: checkboxes, full text, subtasks' },
   { id: 'd-20261027-ex-options-confirmed', date: '2026-10-27', project: 'Exercise Tracker', title: '⋯ options confirmed', details: 'tap outside closes it, drag-scrolling keeps it open; README moved to Working' },
+  { id: 'd-20261027-eh-recent-tags', date: '2026-10-27', project: 'Userscripts', title: 'EH recent tags box', details: 'past tags in a scrolling 3-wide box beside Active; Recent searches scroll in place; panel closes on tap only, not drag (v2.7.0)' },
 ];

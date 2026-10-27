@@ -425,9 +425,9 @@
     .day-row.dow-4{--note-line:#7d5630;} .day-row.dow-5{--note-line:#9a7a12;} .day-row.dow-6{--note-line:#6e4a24;}
     .day-row.dow-0{--note-line:#a3870a;}
     .editor table[data-cnote]{border-color:var(--note-line,var(--border));}
-    .editor table[data-cnote] tr + tr > td{border-top:1px solid var(--note-line,var(--border));padding-top:10px;padding-bottom:10px;}
-    /* Uniform thin 1px lines (2px was too thick); inside shows the day's own color (Julius, 2026-10-27) */
-    .editor table[data-cnote]{border-width:1px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
+    .editor table[data-cnote] tr + tr > td{border-top:1.5px solid var(--note-line,var(--border));padding-top:10px;padding-bottom:10px;}
+    /* Uniform 1.5px lines (between the old 2px and 1px, Julius 2026-10-27); inside shows the day's own color (Julius, 2026-10-27) */
+    .editor table[data-cnote]{border-width:1.5px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
     /* Underlined names (Focus areas, Priority check entries) read bold, like the Suggested day */
     .editor table[data-cnote] u{font-weight:700;}
     .check-line{
@@ -4768,7 +4768,11 @@
       const tpl = document.createElement('template');
       tpl.innerHTML = urgentSource.get(key);
       const lines = [...tpl.content.querySelectorAll('.check-line')];
+      // Subtasks already shown under a listed parent aren't listed again on
+      // their own, even with the parent's urgency (2026-10-27, Julius).
+      let nestedUntil = -1;
       lines.forEach((line,i) => {
+        if(i <= nestedUntil) return;
         const urg = /^[123]$/.test(line.dataset.urg || '') ? line.dataset.urg : '0';
         const hasDue = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '');
         const cb = line.querySelector('input[type=checkbox]');
@@ -4780,7 +4784,8 @@
         for(let j = i + 1; j < lines.length; j++){
           const l2 = Number(lines[j].dataset.level) || 0;
           if(l2 <= level) break;
-          subs.push({text:lineText(lines[j]),level:l2 - level,done:!!lines[j].querySelector('input[checked]')});
+          subs.push({text:lineText(lines[j]),level:l2 - level,index:j,urg:/^[123]$/.test(lines[j].dataset.urg || '') ? Number(lines[j].dataset.urg) : 0,done:!!(lines[j].classList.contains('done') || lines[j].querySelector('input[checked]'))});
+          nestedUntil = j;
         }
         out.push({date,pane,urg:Number(urg),index:i,text:lineText(line),subs,done,due:/^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : ''});
       });
@@ -4897,11 +4902,19 @@
         }
         row.addEventListener('click',() => goToTask(item.date,item.index,item.pane));
         wrap.appendChild(row);
+        // Subtasks: real checkbox rows like their task, indented under it
+        // (2026-10-27, Julius). Same hold-for-urgency box and tap-to-go.
         item.subs.forEach(st => {
-          const r = document.createElement('div');
-          r.className = 'urg-subtask' + (st.done ? ' done' : '');
-          r.style.paddingLeft = (22 + (st.level - 1) * 14) + "px";
-          r.textContent = (st.done ? '☑ ' : '☐ ') + st.text;
+          const r = document.createElement('button');
+          r.type = 'button';
+          r.className = 'urg-row urg-subrow' + (st.done ? ' done' : '');
+          r.dataset.urg = u;
+          r.style.paddingLeft = (st.level * 21) + 'px';
+          r.title = 'Go to ' + item.date;
+          const sbox = document.createElement('span'); sbox.className = 'urg-box'; sbox.dataset.date = item.date; sbox.dataset.pane = item.pane; sbox.dataset.index = st.index; sbox.title = 'Hold (or right-click) to change urgency or due date';
+          const stext = document.createElement('span'); stext.className = 'urg-text'; stext.textContent = st.text;
+          r.append(sbox,stext);
+          r.addEventListener('click',() => goToTask(item.date,st.index,item.pane));
           wrap.appendChild(r);
         });
       });

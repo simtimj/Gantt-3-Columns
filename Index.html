@@ -1078,22 +1078,22 @@
        ========================================================= */
     @media (prefers-color-scheme: dark){
       :root{--bg:#000;--panel:#000;--border:#3a3a3a;--muted:#a0a0a0;color-scheme:dark;}
-      html,body{background:#121212;color:#a8a8a8;}
-      #toolbar,#focusControls,.pane-header,.pane{background:#121212;color:#a8a8a8;}
-      .btn,.top-select,.send-menu button,.urg-due-clear,.uc-today{background:#1c1c1c;color:#a8a8a8;border-color:#444;}
+      html,body{background:#121212;color:#939393;}
+      #toolbar,#focusControls,.pane-header,.pane{background:#121212;color:#939393;}
+      .btn,.top-select,.send-menu button,.urg-due-clear,.uc-today{background:#1c1c1c;color:#939393;border-color:#444;}
       .btn:hover{background:#2a2a2a;}
-      #urgentPanel,#calPanel,#inboxPanel,.ref-options{background:#111;color:#a8a8a8;}
-      .ref-cell{color:#a8a8a8;}
+      #urgentPanel,#calPanel,#inboxPanel,.ref-options{background:#111;color:#939393;}
+      .ref-cell{color:#939393;}
       .ref-hold > .ref-cell > h2:first-child{background:#1d2738;}
       .due-item:hover,.ucm-item:hover{background:#222;}
       /* Pop-ups and menus: dark too */
-      .ctx-menu,.urg-picker,.urg-cal,.urg-create-menu,.send-menu,.archive-box,.view-menu-popup,.type-settings{background:#161616;color:#a8a8a8;}
+      .ctx-menu,.urg-picker,.urg-cal,.urg-create-menu,.send-menu,.archive-box,.view-menu-popup,.type-settings{background:#161616;color:#939393;}
       .urg-pick{background:#1c1c1c;}
-      input,select,textarea{background:#1c1c1c;color:#a8a8a8;}
+      input,select,textarea{background:#1c1c1c;color:#939393;}
       /* Day cells (Julius, 2026-10-27): back to dark day colors like the phone's
          original dark mode (light ones were too bright), light text; the lines
          (note boxes, today outline) use the day's LIGHT color. */
-      .day-row{color:#a8a8a8;}
+      .day-row{color:#939393;}
       .day-row .day-label{color:#969696;}
       .day-row.dow-1{background:#121212;--note-line:#ababab;}
       .day-row.dow-2{background:#121212;--note-line:#c29f7b;}
@@ -1103,13 +1103,15 @@
       .day-row.dow-6{background:#121212;--note-line:#b59d79;}
       .day-row.dow-0{background:#121212;--note-line:#c2b562;}
       .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
-      /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text #a8a8a8 (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
+      /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text #939393 (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
       .day-row[class*="dow-"] .day-label{color:var(--note-line);}
+      /* Day text: gray with a touch of the day's color (Julius, 2026-10-27) */
+      .day-row[class*="dow-"]{color:#8f8f8f;color:color-mix(in srgb, var(--note-line) 30%, #8a8a8a);}
       .pane,#toolbar,#focusControls,.pane-header{background:#121212;}
       .ref-cell-wrapper{background:#121212;border-bottom-color:#333;}
       .ref-cell-wrapper:hover{background:#1a1a1a;}
       .ref-toolbar{background:#121212;}
-      .ref-search{background:#1e1e1e;color:#a8a8a8;border-color:#444;}
+      .ref-search{background:#1e1e1e;color:#939393;border-color:#444;}
       .day-row .editor table[data-cnote] .check-line[data-send]::after{background:#1c1c1c;color:#bbb;border-color:#555;}
     }
 </style>

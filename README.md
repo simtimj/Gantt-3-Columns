@@ -123,8 +123,9 @@ Last updated: 2026-10-27
 
 - **Full Due tasks on their day (2026-10-27)**: a task due on a day shows at the top of that day's Today cell as the whole task — real urgency-colored checkboxes, full wrapped text in the normal size, and its subtasks indented (no colored edge line); ticking a box ticks the real task, tapping the text jumps to it (day it lives on must be loaded)
 
+- **Smarter card subjects (2026-10-27)**: end a task with ` · Gantt` or ` · Code` (middle dot) to set its subject outright; any subject name or a word from its list works (Gantt → Code). Claude's done-log lines follow their project header (Gantt group → Code). Otherwise words are weighed instead of first-match: longer phrases win ("exercise tracker" = Code, not Health), the task's words count double, a header above counts triple, subtasks once; most points wins.
+
 ## 🔧 To be improved
-- **Card subject guessing misfires (2026-10-27)**: keyword matching picks the wrong subject, e.g. a Gantt done-log line mentioning "stretch" (Suggested day section) turned Health. Lines under a Claude project group like Gantt are code work and should be Code; approach to figure out
 
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 

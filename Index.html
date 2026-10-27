@@ -6141,9 +6141,9 @@
     // An empty or unreadable list (e.g. an old cached copy) falls back to the starting subjects.
     const got = cleanCardCats(list);
     const clean = (got && got.length) ? got : CARD_CATS_DEFAULT.map(c => ({...c}));
-    CARD_CATS = clean.map(c => ({...c, re:cardCatRegex(c.words)}));
+    CARD_CATS = clean.map(c => { const re = cardCatRegex(c.words); return {...c, re, reG: re ? new RegExp(re.source,'gi') : null}; });
     CARD_CAT_BY_KEY = Object.fromEntries(CARD_CATS.map(c => [c.key,c]));
-    const plain = CARD_CATS.map(({re,...c}) => c);
+    const plain = CARD_CATS.map(({re,reG,...c}) => c);
     try{ localStorage.setItem('fw.cardCats',JSON.stringify(plain)); }catch(e){}
     let css = '';
     CARD_CATS.forEach(c => { css += `.check-line[data-tccat="${c.key}"]{--tc-cat:${c.color};}`; });
@@ -6170,10 +6170,60 @@
 
   const tcLvl = n => Math.max(0,Math.min(6,Math.floor(Number(n.dataset.level) || 0)));
   const tcText = n => (n.textContent || '').replace(/\s+/g,' ').trim().replace(/^\*/,'');
-  function guessCardCat(text){
-    if(!text) return '';
-    for(const c of CARD_CATS) if(c.re && c.re.test(text)) return c.key;
-    return '';
+  // Subject guessing (Julius, 2026-10-27: "stretch" in a Gantt line turned it Health).
+  // 1. Explicit tag at the end of the task: "… · Gantt" / "… · Code" (middle dot) wins.
+  // 2. A Claude project header (data-cgrp, e.g. "Gantt") decides for every line under it.
+  // 3. Otherwise words are weighed, not first-match: the longest phrase claims its words
+  //    ("exercise tracker" beats "exercise"), then the task text counts x2, a nearby
+  //    header x3, subtasks x1; most points wins (tie → whichever shows up first in the task).
+  function cardCatHits(text){
+    const hits = [];
+    if(!text) return hits;
+    CARD_CATS.forEach((c,ci) => {
+      if(!c.reG) return;
+      c.reG.lastIndex = 0;
+      let m;
+      while((m = c.reG.exec(text))){
+        const start = m.index + m[1].length;
+        hits.push({key:c.key, ci, start, end:start + m[2].length});
+        if(c.reG.lastIndex === m.index) c.reG.lastIndex++;
+      }
+    });
+    // Longest first claims its span; overlapping shorter words drop out.
+    hits.sort((a,b) => (b.end - b.start) - (a.end - a.start) || a.start - b.start);
+    const kept = [];
+    hits.forEach(h => { if(!kept.some(k => h.start < k.end && k.start < h.end)) kept.push(h); });
+    return kept;
+  }
+  function cardCatFromName(t){
+    const n = String(t || '').trim().toLowerCase();
+    if(!n) return '';
+    const byName = CARD_CATS.find(c => c.key === n || c.name.toLowerCase() === n);
+    if(byName) return byName.key;
+    return cardCatScore([[n,1]]).key;
+  }
+  function cardCatTag(text){
+    const m = String(text || '').match(/\s[·•]\s*([^·•]{1,40}?)\s*$/);
+    return m ? cardCatFromName(m[1]) : '';
+  }
+  function cardCatScore(parts){
+    const score = {}, first = {};
+    parts.forEach(([text,w],pi) => cardCatHits(text).forEach(h => {
+      score[h.key] = (score[h.key] || 0) + w;
+      const pos = pi * 1e6 + h.start;
+      if(!(h.key in first) || pos < first[h.key]) first[h.key] = pos;
+    }));
+    let best = '', bs = 0;
+    Object.keys(score).forEach(k => {
+      if(score[k] > bs || (score[k] === bs && first[k] < first[best])){ best = k; bs = score[k]; }
+    });
+    return {key:best, score:bs};
+  }
+  function guessCardCat(head,ctx,ctxGrp,rest){
+    const tag = cardCatTag(head);
+    if(tag) return tag;
+    if(ctxGrp){ const g = cardCatFromName(ctx); if(g) return g; }
+    return cardCatScore([[head || '',2],[ctx || '',3],[rest || '',1]]).key;
   }
   function isHeaderLike(n){
     if(n.matches('h1,h2,h3,[data-cgrp]')) return true;
@@ -6192,7 +6242,7 @@
     if(!ed || !ed.isConnected) return false;
     let changed = false;
     const plan = new Map(); // node -> {tc,head,rel,cat}
-    let members = [], headLvl = 0, ctx = '';
+    let members = [], headLvl = 0, ctx = '', ctxGrp = false;
     const flush = () => {
       if(!members.length) return;
       const head = members[0];
@@ -6200,7 +6250,7 @@
       if(cat === 'none') cat = '';
       else if(!CARD_CAT_BY_KEY[cat]){
         cat = '';
-        if(cardsAuto) cat = guessCardCat(tcText(head)) || guessCardCat(ctx) || guessCardCat(members.slice(1).map(tcText).join(' '));
+        if(cardsAuto) cat = guessCardCat(tcText(head), ctx, ctxGrp, members.slice(1).map(tcText).join(' '));
       }
       members.forEach((m,i) => {
         cardHeadOf.set(m,head);
@@ -6217,8 +6267,8 @@
           flush(); members = [n]; headLvl = lv;
         }else{
           flush();
-          if(n.tagName === 'HR') ctx = '';
-          else if(isHeaderLike(n)) ctx = tcText(n);
+          if(n.tagName === 'HR'){ ctx = ''; ctxGrp = false; }
+          else if(isHeaderLike(n)){ ctx = tcText(n); ctxGrp = n.matches('[data-cgrp]'); }
         }
       }
       flush();
@@ -6323,7 +6373,7 @@
     row.className = 'urg-cat-row';
     const h = document.createElement('span'); h.className = 'uc-head'; h.textContent = 'Card color · subject'; row.appendChild(h);
     const cur = head.dataset.cat || '';
-    const guess = guessCardCat(tcText(head));
+    const guess = cur ? '' : (head.dataset.tccat || guessCardCat(tcText(head)));
     const opts = [...CARD_CATS.map(c => [c.key,c.name,c.color]), ['', 'Auto' + (guess && !cur ? ' (' + CARD_CAT_BY_KEY[guess].name + ')' : ''), '#bbb'], ['none','None','transparent']];
     opts.forEach(([key,name,color]) => {
       const b = document.createElement('button');

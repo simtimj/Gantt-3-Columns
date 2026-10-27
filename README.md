@@ -55,9 +55,9 @@ Last updated: 2026-10-26
 - **Wrap-up Priority check**: a 0–10 score on whether the day's time went to the right things, with what's still open on the priority and the fix for tomorrow
 - **Carry-over subtasks**: carry-overs with parts show them as subtasks; → Day on the parent sends it with all its subtasks, → Day on a subtask sends just that one. Every carry-over is **Name**: details
 - **Divided Suggested day**: each section (Must do, Next, …) sits in its own cell; each entry is a bold name with its time blocks on lines underneath, small gaps between entries (testing)
-- **Suggested day sections**: Calendar (real events only, plus a dog-walk line with client first names or "none today") → Must do (names bold + underlined) → Important (not the most urgent) → Stretch (bonus) → Later; no For fun
+- **Suggested day sections**: Calendar (real events only, plus a dog-walk line with client first names or "none today") → Must do · urgent + important (names bold + underlined) → Important (not the most urgent) → Stretch (bonus) → Later; no For fun
 - **Divided Day wrap-up**: counts, Focus, Priority check and Carries over each in their own cell; Focus and Priority check entries are an underlined name with the details on the line below
-- **Note box dividers in the day's color**: the box outline and the lines between sections use a deeper shade of that day's color (Wed → deeper blue), thicker, with more space around each section
+- **Note box dividers in the day's color**: the box outline and the lines between sections use a deeper shade of that day's color (Wed → deeper blue; deepened again 2026-10-27 so Monday shows in dark mode), thicker, with more space around each section
 - **Note blocks restyled** (2026-10-26): no colored left edge; list lines use dashes (Must do too); wrap-up skips empty stats; Focus ordered by most time, area underlined with a one-line item list under it.
 - **Carry-over tasks + → Day** (2026-10-26): Carries over items are checkboxes; tap **→ Day** on the right to move one to Today, Tomorrow or a picked date's Today cell.
 - **Re-render note blocks** (2026-10-26): bumping an entry's `rev` in dayplan.js updates that block in place.

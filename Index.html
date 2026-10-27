@@ -415,9 +415,10 @@
     .editor table[data-cnote] td{padding:8px 10px;vertical-align:top;border:none;}
     /* Divided cells (Julius, 2026-10-26): each section of a cells-mode block is its own row */
     /* Dividers in the day's own deeper color (Julius, 2026-10-26: Wednesday blue → deeper blue), with more room */
-    .day-row.dow-1{--note-line:#8a8a8a;} .day-row.dow-2{--note-line:#c98545;} .day-row.dow-3{--note-line:#5f8fb9;}
-    .day-row.dow-4{--note-line:#9a6f42;} .day-row.dow-5{--note-line:#b9962e;} .day-row.dow-6{--note-line:#8b6237;}
-    .day-row.dow-0{--note-line:#c3a51f;}
+    /* Deeper than the today-border so they also stand out under the phone's dark mode (Monday gray was too faint) */
+    .day-row.dow-1{--note-line:#4d4d4d;} .day-row.dow-2{--note-line:#b06a2c;} .day-row.dow-3{--note-line:#3f74a6;}
+    .day-row.dow-4{--note-line:#7d5630;} .day-row.dow-5{--note-line:#9a7a12;} .day-row.dow-6{--note-line:#6e4a24;}
+    .day-row.dow-0{--note-line:#a3870a;}
     .editor table[data-cnote]{border-color:var(--note-line,var(--border));}
     .editor table[data-cnote] tr + tr > td{border-top:2px solid var(--note-line,var(--border));padding-top:10px;padding-bottom:10px;}
     .check-line{

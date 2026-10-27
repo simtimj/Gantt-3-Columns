@@ -830,39 +830,136 @@ function dismissInboxItem(id) {
 function doneEsc_(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-function doneLineHtml_(item) {
-  const title = String(item.title || '').trim();
-  const details = String(item.details || '').trim();
-  const text = title && details ? '<b>' + doneEsc_(title) + '</b>: ' + doneEsc_(details)
-    : title ? '<b>' + doneEsc_(title) + '</b>' : doneEsc_(details);
-  return '<div class="check-line done" data-level="0" data-cid="' + doneEsc_(item.id) + '">' +
-    '<input type="checkbox" checked><span class="check-text">' + text + '</span></div>';
+// Grouped layout (2026-10-26, Julius): one underlined project header per
+// project (plain line, his own header style), then each piece of work as a
+// checked task under it,
+// "<b>Short name</b>: details". Entries: { id, date, project, title, details }
+// (older entries without `project` used title = project).
+function doneProject_(item) { return String(item.project || item.title || '').trim(); }
+function doneItemName_(item) { return item.project ? String(item.title || '').trim() : ''; }
+function doneCheck_(checked) { return '<input type="checkbox"' + (checked ? ' checked' : '') + '>'; }
+function doneHeaderHtml_(project) {
+  return '<div data-cgrp="' + doneEsc_(project) + '"><b><u>' + doneEsc_(project) + '</u></b></div>';
 }
+function doneItemHtml_(name, details, checked, cid) {
+  const text = name && details ? '<b>' + doneEsc_(name) + '</b>: ' + doneEsc_(details)
+    : name ? '<b>' + doneEsc_(name) + '</b>' : doneEsc_(details);
+  return '<div class="check-line' + (checked ? ' done' : '') + '" data-level="0"' +
+    (cid ? ' data-cid="' + doneEsc_(cid) + '"' : '') + '>' + doneCheck_(checked) +
+    '<span class="check-text">' + text + '</span></div>';
+}
+// Old single-line form, still written first and then folded into its group.
+function doneLineHtml_(item) {
+  return '<div class="check-line done" data-level="0" data-cid="' + doneEsc_(item.id) + '"' +
+    ' data-cproj="' + doneEsc_(doneProject_(item)) + '">' + doneCheck_(true) +
+    '<span class="check-text">' + doneEsc_(doneItemName_(item) ? doneItemName_(item) + ': ' : '') + doneEsc_(item.details || '') + '</span></div>';
+}
+
+// Split cell HTML into top-level blocks (div depth tracking).
+function doneBlocks_(html) {
+  const out = [];
+  const re = /<\/?div\b[^>]*>/gi;
+  let depth = 0, start = 0, m, last = 0;
+  while ((m = re.exec(html))) {
+    if (m[0][1] !== '/') { if (depth === 0) { if (m.index > last) out.push(html.slice(last, m.index)); start = m.index; } depth++; }
+    else if (depth > 0) { depth--; if (depth === 0) { out.push(html.slice(start, re.lastIndex)); last = re.lastIndex; } }
+  }
+  if (last < html.length) out.push(html.slice(last));
+  return out.filter(b => b !== '');
+}
+const doneAttr_ = (b, name) => { const m = b.match(new RegExp('^<div\\b[^>]*\\s' + name + '="([^"]*)"', 'i')); return m ? m[1] : null; };
+const doneText_ = b => { const m = b.match(/<span class="check-text">([\s\S]*)<\/span>\s*<\/div>\s*$/i); return m ? m[1] : null; };
+const doneUnesc_ = s => String(s).replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const doneStrip_ = s => doneUnesc_(String(s).replace(/<[^>]*>/g, '')).replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+
+// Fold Claude's lines in one cell into project groups. Lines Julius wrote
+// himself stay where they are; a group sits where its first line was.
+function groupClaudeDone_(html, list) {
+  const byId = {}, byOld = {}, projects = {};
+  list.forEach(x => {
+    byId[x.id] = x;
+    projects[doneProject_(x)] = true;
+    if (x.was) byOld[doneProject_(x) + '|' + String(x.was).replace(/\s+/g, ' ').trim()] = x;
+  });
+  const blocks = doneBlocks_(html);
+  const order = [], groups = {}, slots = [];
+  const groupOf = p => { if (!groups[p]) { groups[p] = []; order.push(p); slots.push({ group: p }); } return groups[p]; };
+  let current = null;
+  blocks.forEach(b => {
+    const isLine = /^<div\b[^>]*class="[^"]*check-line/i.test(b);
+    const level = Number(doneAttr_(b, 'data-level') || 0);
+    const text = isLine ? doneText_(b) : null;
+    const checked = /<input\b[^>]*\schecked/i.test(b);
+    if (!isLine && /^<(div|p)\b/i.test(b)) {
+      const plain = doneStrip_(b);
+      const header = doneAttr_(b, 'data-cgrp') || (/<u\b/i.test(b) && /<(b|strong)\b/i.test(b) && projects[plain] ? plain : null);
+      if (header != null) { current = groupOf(doneUnesc_(header)); return; }
+    }
+    if (isLine && level === 0 && text != null) {
+      const cid = doneAttr_(b, 'data-cid');
+      let item = cid && byId[cid];
+      let proj = item ? doneProject_(item) : doneAttr_(b, 'data-cproj');
+      if (!proj) {
+        const m = text.match(/^\s*<(b|strong)>([\s\S]*?)<\/\1>\s*:\s*([\s\S]*)$/i);
+        if (m && projects[doneStrip_(m[2])]) {
+          proj = doneStrip_(m[2]);
+          item = item || byOld[proj + '|' + doneStrip_(m[3])];
+          if (!item) { groupOf(proj).push(doneItemHtml_('', doneStrip_(m[3]), checked, cid)); return; }
+        }
+      }
+      if (proj) {
+        proj = doneUnesc_(proj);
+        const name = item ? doneItemName_(item) : '';
+        const details = item ? String(item.details || '') : doneStrip_(text);
+        groupOf(proj).push(doneItemHtml_(name, details, checked, item ? item.id : cid));
+        return;
+      }
+    }
+    if (current && isLine) { current.push(b); return; }
+    current = null;
+    slots.push({ block: b });
+  });
+  const out = slots.map(s => s.group != null
+    ? (groups[s.group].length ? doneHeaderHtml_(s.group) + groups[s.group].join('') : '')
+    : s.block).join('');
+  return out;
+}
+
 function applyClaudeDone_() {
   const list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
   if (!list.length) return;
   const props = PropertiesService.getScriptProperties();
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeDoneApplied') || '[]'); } catch (e) { applied = []; }
-  const fresh = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') && applied.indexOf(String(x.id)) < 0);
-  if (!fresh.length) return;
+  const valid = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || ''));
+  const fresh = valid.filter(x => applied.indexOf(String(x.id)) < 0);
+  // One-time pass: regroup days already written in the old flat style.
+  const migrate = props.getProperty('claudeDoneGrouped') !== '1';
+  if (!fresh.length && !migrate) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
     const byDate = {};
     fresh.forEach(x => { (byDate[x.date] = byDate[x.date] || []).push(x); });
+    if (migrate) valid.forEach(x => { byDate[x.date] = byDate[x.date] || []; });
     Object.keys(byDate).forEach(date => {
       let row = findDayRow_(sheet, date);
-      if (!row) { sheet.appendRow([parseDate_(date), '', '']); row = sheet.getLastRow(); }
+      if (!row) {
+        if (!byDate[date].length) return;
+        sheet.appendRow([parseDate_(date), '', '']); row = sheet.getLastRow();
+      }
       const cell = sheet.getRange(row, 2);
-      let html = String(cell.getValue() || '');
+      const before = String(cell.getValue() || '');
+      let html = before;
       byDate[date].forEach(x => {
         if (html.indexOf('data-cid="' + doneEsc_(x.id) + '"') < 0) html += doneLineHtml_(x);
         applied.push(String(x.id));
       });
-      cell.setValue(html);
+      html = groupClaudeDone_(html, valid);
+      if (html !== before) cell.setValue(html);
     });
     props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));
+    props.setProperty('claudeDoneGrouped', '1');
   } finally { lock.releaseLock(); }
 }

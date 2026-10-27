@@ -48,6 +48,8 @@ Last updated: 2026-10-26
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Done-with-Claude log, grouped (2026-10-26):** work done through Claude is batched under a bold, underlined project header (Exercise Tracker, Gantt…), each line leading with what was done (e.g. **In Today marker**: purple marker on grid cells). Today's lines were regrouped too.
+
 - Sort dropdown in Reference shrunk to fit its text.
 - Instructions/tips block under the Reference search removed (shortcuts kept below in this README).
 - Urgency: the extra colored square around the checkbox removed — the checkbox itself is drawn in the urgency color, checked or not.

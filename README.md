@@ -47,7 +47,6 @@ Last updated: 2026-10-27
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
-- **Sharper card corners (2026-10-27)**: card corner roundness 8px → 5px
 - **Edit card subjects (2026-10-27)**: Options → **Card subjects**: set each subject's color, name and the words that auto-pick it; **+ Subject** adds one, ✕ removes one, **Reset to defaults** brings back the starting list. Saved to your account, so phone and tablet match. New default colors: Code green, Career light green, Study lavender, Work slate gray, Health pink, Life teal, Fun orange
 - **Compact Options (2026-10-27)**: each setting is one line (label, slider, value, Reset) with smaller buttons and shorter labels (full name on hover); on wider screens the panel spreads into columns to the right instead of getting longer
 - **Task cards (2026-10-27)**: every task is a card — checkbox + text, with its subtasks inside the same card (rounded box, a little space between cards). In Today, Notes and Reference cells. Turn off in Options → **Show tasks as cards**
@@ -130,6 +129,7 @@ Last updated: 2026-10-27
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+- **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)
 - **Hold anywhere on a card to move it (2026-10-27)**: hold and grab a card (not just its checkbox) to drag it; a plain tap on the card still goes into the text for editing, selecting, highlighting
 - **Title lines with − / + collapse (2026-10-27)**: mark a parent task line as a title line (e.g. the CDCR IT application in Tuesday's Today cell); its subtasks fold away with − and come back with +. Use the − / + convention, not arrows. Also for long runs of tasks under one heading, e.g. Claude's **Gantt** done-log group becomes a title line so all that work folds away. When collapsed, show how many it hid (e.g. "20 hidden · 20 done"). What a title line covers: every following line that has something in it (task, subtask or note) until the first empty line; the next line after that can be another title line
 - **Idea: built-in time tracking → plan vs actual (2026-10-27)**: own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)

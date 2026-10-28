@@ -221,7 +221,7 @@
        ========================================================= */
     .day-row{
       border-bottom:1px solid var(--border);
-      padding:calc(5px * var(--pad-y,1)) calc(8px * var(--pad-x,1)) calc(6px * var(--pad-y,1));
+      padding:calc(5px * var(--pad-y,1)) calc(8px * var(--pad-x,1) * var(--side-k,1)) calc(6px * var(--pad-y,1));
       position:relative;
       display:flex;
       flex-direction:column;
@@ -425,7 +425,7 @@
     .send-menu .send-row + .send-row{border-top:1px solid var(--border);padding-top:6px;}
     .send-menu select{font-size:13px;padding:3px;max-width:200px;}
     .send-menu .send-lbl{font-size:12px;color:var(--muted);}
-    .editor table[data-cnote] td{padding:8px 10px;vertical-align:top;border:none;}
+    .editor table[data-cnote] td{padding:8px calc(10px * var(--side-k,1));vertical-align:top;border:none;}
     /* Divided cells (Julius, 2026-10-26): each section of a cells-mode block is its own row */
     /* Dividers in the day's own deeper color (Julius, 2026-10-26: Wednesday blue → deeper blue), with more room */
     /* Deeper than the today-border so they also stand out under the phone's dark mode (Monday gray was too faint) */
@@ -681,7 +681,7 @@
       #dateLabel{display:none;}
       .status{font-size:calc(12px * var(--mobile-scale,1));}
       .pane-header{flex:0 0 calc(42px * var(--mobile-scale,1));padding:0 calc(12px * var(--mobile-scale,1));font-size:calc(15px * var(--mobile-scale,1));}
-      .day-row{padding:calc(8px * var(--mobile-scale,1) * var(--pad-y,1)) calc(12px * var(--mobile-scale,1) * var(--pad-x,1)) calc(10px * var(--mobile-scale,1) * var(--pad-y,1));}
+      .day-row{padding:calc(8px * var(--mobile-scale,1) * var(--pad-y,1)) calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1)) calc(10px * var(--mobile-scale,1) * var(--pad-y,1));}
       .day-label{font-size:calc(15px * var(--mobile-scale,1));line-height:1.35;margin-bottom:calc(6px * var(--mobile-scale,1));}
       .editor.day-editor,.editor.journal-editor{min-height:6.75em;}
       .check-line{gap:calc(8px * var(--mobile-scale,1));min-height:calc(28px * var(--mobile-scale,1));}
@@ -733,7 +733,7 @@
     body.mobile-mode .pane-header{font-size:calc(15px * var(--mobile-scale,1));flex-basis:calc(42px * var(--mobile-scale,1));}
     body.mobile-mode .day-label{font-size:calc(15px * var(--mobile-scale,1));}
     body.mobile-mode .check-line input[type=checkbox]{width:calc(22px * var(--mobile-scale,1));height:calc(22px * var(--mobile-scale,1));}
-    body.mobile-mode .day-row{padding:calc(8px * var(--mobile-scale,1) * var(--pad-y,1)) calc(12px * var(--mobile-scale,1) * var(--pad-x,1));}
+    body.mobile-mode .day-row{padding:calc(8px * var(--mobile-scale,1) * var(--pad-y,1)) calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1));}
     body.mobile-mode .btn{font-size:inherit;}
 
     /* Unified editor sizes. Reference's first line (the title) differs by weight only. */
@@ -831,7 +831,7 @@
     .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale));height:calc(17px * var(--workspace-scale));}
     body.mobile-mode .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale))!important;height:calc(17px * var(--workspace-scale))!important;min-width:calc(17px * var(--workspace-scale))!important;}
     /* 2026-10-26: Reference follows the left/right padding slider like Today. */
-    #referenceScroll{padding-left:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1));padding-right:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1));}
+    #referenceScroll{padding-left:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1) * var(--side-k,1));padding-right:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1) * var(--side-k,1));}
     .type-settings{z-index:3100;}
 
     /* 2026-10-15 */
@@ -982,7 +982,7 @@
     .urg-pick.on{background:var(--urg,#eee);color:#fff;}
     .urg-pick[data-urg="0"]{--urg:#999;}
     .urg-pick[data-urg="0"].on{color:#fff;}
-    #urgentPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    #urgentPanel{margin:0 0 6px;padding:4px calc(7px * var(--side-k,1)) 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     /* Each urgency level gets its own left bar in its own color (2026-10-26). */
     .urg-group{margin-top:6px;padding-left:8px;border-left:3px solid var(--urg);}
     .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}.urg-group[data-urg="0"],.urg-row[data-urg="0"]{--urg:#8a8f98;}
@@ -1223,7 +1223,7 @@
     .cal-row.past{opacity:.5;}
     .cal-row.now .cal-title{font-weight:700;}
     .cal-now{flex:0 0 auto;font-size:10px;font-weight:700;text-transform:uppercase;color:#fff;background:#3b82f6;border-radius:4px;padding:0 5px;}
-    #inboxPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    #inboxPanel{margin:0 0 6px;padding:4px calc(7px * var(--side-k,1)) 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     /* Inbox rows = task rows (2026-10-27, Julius): box + always-editable text, same as Urgent. */
     #inboxPanel .inbox-row{display:flex;align-items:flex-start;gap:6px;padding:4px 0;cursor:default;}
     #inboxPanel .inbox-row > .urg-box{margin-top:2px;touch-action:none;}
@@ -1423,6 +1423,12 @@
       <input id="mobileScale" type="range" min="50" max="200" step="10" value="100" aria-label="Workspace scale">
       <output id="mobileScaleValue">100%</output>
       <button class="btn tiny" id="resetMobileScale" type="button">Reset</button>
+    </div>
+    <div class="ts-row">
+      <span class="ts-label" title="Room left and right of the text in cells, section boxes and task cards (narrow columns get less automatically)">Side space</span>
+      <input id="sideSpace" type="range" min="20" max="150" step="5" value="70" aria-label="Side space in cells and task cards">
+      <output id="sideSpaceValue">70%</output>
+      <button class="btn tiny" id="resetSideSpace" type="button">Reset</button>
     </div>
     <div class="ts-row">
       <span class="ts-label" title="Padding · left / right">Padding ↔</span>
@@ -7137,6 +7143,23 @@
   loadWorkspace();
 </script>
 <script>
+  // Side space slider (Julius, 2026-10-28): fw.sideSpace, 20–150 %, default 70.
+  (function(){
+    const DEF = 70, el = document.getElementById('sideSpace'), out = document.getElementById('sideSpaceValue');
+    function apply(v,save){
+      v = Math.max(20,Math.min(150,Number(v))); if(!isFinite(v)) v = DEF;
+      document.documentElement.style.setProperty('--side',String(v / 100));
+      if(el) el.value = v; if(out) out.textContent = v + '%';
+      if(save) try{ localStorage.setItem('fw.sideSpace',String(v)); }catch(e){}
+      if(typeof paintDaySecs === 'function') document.querySelectorAll('.editor.sec-painted').forEach(ed => { try{ paintDaySecs(ed); }catch(e){} });
+    }
+    let saved = DEF;
+    try{ const x = localStorage.getItem('fw.sideSpace'); if(x !== null && x !== '') saved = Number(x); }catch(e){}
+    apply(saved,false);
+    if(el) el.addEventListener('input',() => apply(el.value,true));
+    const r = document.getElementById('resetSideSpace');
+    if(r) r.addEventListener('click',() => { apply(DEF,false); try{ localStorage.removeItem('fw.sideSpace'); }catch(e){} });
+  })();
   // Dark mode cell background slider (Julius, 2026-10-27): Today / Notes / Reference cells,
   // black (0) → gray (30). Default 11 (was #121212 ≈ 7). Saved on this device as you drag.
   (function(){
@@ -7299,7 +7322,7 @@
   .check-line[data-tc]{
     position:relative;box-sizing:border-box;
     margin-left:calc(var(--tch,0) * 24px)!important;
-    padding:2px 8px 2px calc(8px + var(--tcr,0) * 22px);
+    padding:2px calc(8px * var(--side-k,1)) 2px calc(8px * var(--side-k,1) + var(--tcr,0) * 22px);
     background:linear-gradient(var(--tc-tint,transparent),var(--tc-tint,transparent)),var(--tc-base);
     border-left:1px solid var(--tc-bd);border-right:1px solid var(--tc-bd);
   }
@@ -7307,6 +7330,10 @@
   .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
   .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
   .check-line[data-tcdrag]{opacity:.3;}
+  /* Side space (Julius, 2026-10-28): one multiplier for the left/right room in cells, section boxes and
+     cards — Options → Side space (fw.sideSpace, default 70%); narrow panes (<420px) take 60% of that. */
+  :root{--side-k:var(--side,.7);}
+  #workspace > .pane.pane-narrow{--side-k:calc(var(--side,.7) * .6);}
   /* Quiet cards (Julius, 2026-10-28): no card outline at rest — the borders stay transparent so
      nothing shifts. The line you're typing in gets a thin ring in its urgency color (gray if none),
      like editing a task in Urgent. data-tcfocus is render-only (stripped on save). */
@@ -7322,7 +7349,7 @@
   :root{--sec-m-bd:#ffd60a;--sec-m:transparent;--sec-a-bd:#ff8a1f;--sec-a:transparent;--sec-e-bd:#bf97e8;--sec-e:transparent;}
   @media (prefers-color-scheme: dark){:root{--sec-m-bd:#ffe14d;--sec-m:transparent;--sec-a-bd:#ff9a33;--sec-a:transparent;--sec-e-bd:#b98ee6;--sec-e:transparent;}}
   .sec-host{position:relative;}
-  .sec-host > .editor.sec-painted{position:relative;z-index:1;padding-left:15px!important;padding-right:15px!important;padding-bottom:8px!important;}
+  .sec-host > .editor.sec-painted{position:relative;z-index:1;padding-left:calc(15px * var(--side-k,1))!important;padding-right:calc(15px * var(--side-k,1))!important;padding-bottom:8px!important;}
   .sec-boxes{position:absolute;inset:0;pointer-events:none;z-index:0;}
   .editor > [data-sec]{margin-top:16px;}
   .editor > [data-sec="morning"]{border-bottom-color:var(--sec-m-bd);color:var(--sec-m-bd);}
@@ -7690,7 +7717,8 @@
     const hr = host.getBoundingClientRect(), er = ed.getBoundingClientRect();
     // Boxes sit INSIDE the editor with a small side margin (Julius, 2026-10-27: they melted into the cell edges);
     // the editor gets extra side padding (.editor.sec-painted) so the text stays inside the box.
-    const left = Math.round(er.left - hr.left) + 5, width = Math.round(er.width) - 10;
+    const inset = Math.max(2,Math.round((parseFloat(getComputedStyle(ed).paddingLeft) || 15) / 3));
+    const left = Math.round(er.left - hr.left) + inset, width = Math.round(er.width) - inset * 2;
     const ys = secs.map(n => Math.round(n.getBoundingClientRect().top - hr.top) - 5);
     // A box ends just above the empty gap line before the next section.
     const ends = secs.map((n,i) => {
@@ -8195,7 +8223,7 @@
 <script>
   // Saved looks (Julius, 2026-10-27): Light / Dark / Custom slots that save every look setting on this device.
   (function(){
-    const KEYS = ['fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.cardFillL','fw.cardFillD','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
+    const KEYS = ['fw.sideSpace','fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.cardFillL','fw.cardFillD','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
     const sel = document.getElementById('lookSlot'), sv = document.getElementById('lookSave'), ld = document.getElementById('lookLoad');
     if(!sel || !sv || !ld) return;
     const all = () => { try{ return JSON.parse(localStorage.getItem('fw.looks') || '{}') || {}; }catch(e){ return {}; } };

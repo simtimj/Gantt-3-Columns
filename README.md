@@ -48,6 +48,7 @@ Last updated: 2026-10-27
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Space savers only when narrow (2026-10-27):** all the space-saving layouts now kick in only when a column is under ~420px wide; wider columns keep everything on one line. When narrow: Urgent due dates stack as three short lines (Fri / 10/30 / 3d) on the right and the task text runs under its box; task lines and Notes tasks wrap under the checkbox with the due date under the text; the Notes due group's "from" date stacks. When wide: "Fri 10/30 · 3d" and "📅 Tue Oct 29" stay on one line.
 - **Notes send button is just → now (2026-10-27):** the "→ Day" button on Claude's plan/carry-over tasks is a small → (tap it for the same Today / Tomorrow / Reference menu). In narrow columns those Notes tasks also wrap under the checkbox, with the → at the top-right, so the text gets the full width.
 - **No highlight when holding a checkbox (2026-10-27):** holding a task's checkbox on the phone to open its menu no longer selects/highlights nearby text; anything the phone highlights anyway is cleared when the menu opens.
 - **Text wraps under the checkbox in narrow columns (2026-10-27):** when a column is under ~420px wide (e.g. 3 columns on the phone), a task's checkbox sits at the top-left and the 2nd line onward runs underneath it, using the full width. A due date shows right-aligned under the task text. Wide columns look the same as before.

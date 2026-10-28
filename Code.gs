@@ -1123,6 +1123,9 @@ function applyClaudeTasks_() {
         let head = line(x.title, 0, x.id);
         // Optional due date on the head line (2026-10-28): due: 'YYYY-MM-DD'.
         if (/^\d{4}-\d{2}-\d{2}$/.test(x.due || '')) head = head.replace('<div class="check-line"', '<div class="check-line" data-due="' + x.due + '"');
+        // Optional duration in minutes (2026-10-28, auto-reshuffle step 1): dur: 45.
+        const dur = Math.round(Number(x.dur));
+        if (dur >= 1 && dur <= 600) head = head.replace('<div class="check-line"', '<div class="check-line" data-dur="' + dur + '"');
         html += head;
         (Array.isArray(x.subtasks) ? x.subtasks : []).forEach(t => { html += line(t, 1, ''); });
         cell.setValue(html);

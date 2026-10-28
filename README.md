@@ -48,6 +48,7 @@ Last updated: 2026-10-27
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Full outline while typing (2026-10-27):** the add line and a task being edited in Urgent get a full rounded outline in the level's color (was only a bottom line).
 - **Edit tasks in the Urgent panel (2026-10-27):** tap a task's (or subtask's) text to edit it right there — it changes the real task; Enter finishes. Tap the box = done; tap the right side of a row (day made / due date) = jump to the task. Hold the box = urgency, due date, subject, Archive, Go to task. The task's day has to be loaded to edit it.
 - **Archive (2026-10-27):** hold a task's box → **🗄 Archive** — the task and its subtasks leave Urgent / Soon / Can be later and the Due group, and go into a collapsible **Archive** log at the bottom of the Urgent panel, grouped by the day archived (newest first). They stay where they are in Today (dimmed). Hold the box again → **↩ Unarchive**.
 

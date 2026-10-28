@@ -1199,6 +1199,9 @@
     /* Task fold − / + in Urgent (2026-10-28, Julius) */
     #urgentPanel .urg-text:empty::before{content:attr(data-ph);opacity:.45;font-style:italic;}
     #urgentPanel .urg-text:empty{min-width:4em;}
+    #urgentPanel .urg-text.urg-tx-hold{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+    .urg-text-menu{padding:6px;}
+    .urg-text-menu .urg-struct-row{margin-top:0;}
     .urg-struct-row{flex:1 0 100%;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;}
     .urg-struct{padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:center;}
     #urgentPanel .urg-fold{order:1;flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;background:none;border:0;padding:0 2px;margin:0;cursor:pointer;color:var(--muted);font:inherit;font-size:12px;line-height:1;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
@@ -6485,7 +6488,8 @@
       if(e.target && e.target.closest && e.target.closest('#urgentPanel .urg-text')){
         const src = dueSource(e.target);
         // A new line left empty is removed again (2026-10-28), unless it has subtasks.
-        if(src && src.text && !src.text.textContent.trim() && urgSubtree(src.line).length === 1 && src.line.isConnected){
+        const keep = urgTextKeepEmpty; urgTextKeepEmpty = false;
+        if(!keep && src && src.text && !src.text.textContent.trim() && urgSubtree(src.line).length === 1 && src.line.isConnected){
           if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; }
           captureBeforeEdit(src.ed); src.line.remove(); finishEditorEdit(src.ed); urgChanged(src.ed);
           return;
@@ -6629,23 +6633,6 @@
       dueRow.appendChild(clr);
     }
     p.appendChild(dueRow);
-    // Structure row (2026-10-28, Julius): + Task (same level), + Subtask, ← Outdent, Indent →.
-    // Works from any checkbox; from the Urgent panel the new line opens for typing right there.
-    {
-      const sr = document.createElement('div'); sr.className = 'urg-struct-row';
-      const fromPanel = !!(cb.classList && cb.classList.contains('urg-box'));
-      [['+ Task',() => urgAddLine(line,owner,'task',fromPanel)],
-       ['+ Subtask',() => urgAddLine(line,owner,'subtask',fromPanel)],
-       ['← Outdent',() => urgIndent(line,owner,-1)],
-       ['Indent →',() => urgIndent(line,owner,1)]].forEach(([label,fn]) => {
-        const b = document.createElement('button');
-        b.type = 'button'; b.className = 'urg-struct'; b.textContent = label;
-        b.addEventListener('pointerdown',e => e.preventDefault());
-        b.addEventListener('click',() => { hideUrgencyPicker(); fn(); });
-        sr.appendChild(b);
-      });
-      p.appendChild(sr);
-    }
     if(typeof addCardSubjectRow === 'function') addCardSubjectRow(p,line,owner);
     // Title line toggle (2026-10-27) for tasks in an editor.
     if(owner && line.parentElement === owner && !(cb.classList && (cb.classList.contains('di-box') || cb.classList.contains('urg-box')))){
@@ -6745,6 +6732,94 @@
       if(sel && sel.rangeCount && !sel.isCollapsed) sel.removeAllRanges();
     }catch(e){}
   }
+  /* Hold inside an Urgent task's text (2026-10-28, Julius): a small menu opens right where
+     you are — + Task / + Subtask / ← Outdent / Indent → — with nothing highlighted.
+     (Moved here from the checkbox hold menu.) Right-click does the same on desktop. */
+  let urgTextKeepEmpty = false, urgTextPress = null;
+  function urgTextPressEnd(){
+    const p = urgTextPress; urgTextPress = null;
+    if(!p) return;
+    clearTimeout(p.lock); clearTimeout(p.timer);
+    setTimeout(() => { p.tx.classList.remove('urg-tx-hold'); if(p.opened) clearPressSelection(); },350);
+  }
+  function showUrgTextMenu(tx,x,y){
+    hideUrgencyPicker();
+    if(typeof hideContextMenu === 'function') hideContextMenu();
+    if(!dueSource(tx) || !dueSource(tx).text){ setStatus('That task isn’t loaded — scroll to ' + shortDate(tx.dataset.date)); return; }
+    clearPressSelection();
+    const p = document.createElement('div');
+    p.className = 'urg-picker urg-text-menu';
+    const sr = document.createElement('div'); sr.className = 'urg-struct-row';
+    const run = fn => {
+      hideUrgencyPicker();
+      const src = dueSource(tx);
+      if(!src || !src.line || !src.line.isConnected) return;
+      if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; }
+      urgTextKeepEmpty = true;            // a fresh empty line stays while it's moved
+      if(document.activeElement === tx) tx.blur();
+      urgTextKeepEmpty = false;
+      fn(src.line,src.ed);
+    };
+    const keepFocus = (line,ed) => {
+      if(ed && ed.dataset.date) urgFocusWant = {date:ed.dataset.date,pane:ed.classList.contains('journal-editor') ? 'journal' : 'today',index:[...ed.querySelectorAll('.check-line')].indexOf(line)};
+    };
+    [['+ Task',(l,ed) => urgAddLine(l,ed,'task',true)],
+     ['+ Subtask',(l,ed) => urgAddLine(l,ed,'subtask',true)],
+     ['← Outdent',(l,ed) => { keepFocus(l,ed); urgIndent(l,ed,-1); }],
+     ['Indent →',(l,ed) => { keepFocus(l,ed); urgIndent(l,ed,1); }]].forEach(([label,fn]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'urg-struct'; b.textContent = label;
+      b.addEventListener('pointerdown',e => e.preventDefault());   // keyboard + caret stay put
+      b.addEventListener('mousedown',e => e.preventDefault());
+      b.addEventListener('click',() => run(fn));
+      sr.appendChild(b);
+    });
+    p.appendChild(sr);
+    document.body.appendChild(p);
+    const r = p.getBoundingClientRect();
+    p.style.left = Math.max(6,Math.min(window.innerWidth - r.width - 6,x - r.width / 2)) + 'px';
+    let top = y + 24;
+    if(top + r.height > window.innerHeight - 6) top = y - 24 - r.height;
+    p.style.top = Math.max(6,top) + 'px';
+    urgPicker = p;
+  }
+  (function initUrgTextHold(){
+    const txAt = t => t && t.closest ? t.closest('#urgentPanel .urg-text[contenteditable="true"]:not(.inbox-text)') : null;
+    document.addEventListener('pointerdown',e => {
+      if(urgTextPress){ clearTimeout(urgTextPress.lock); clearTimeout(urgTextPress.timer); urgTextPress.tx.classList.remove('urg-tx-hold'); urgTextPress = null; }
+      if(e.button === 2) return;
+      const tx = txAt(e.target);
+      if(!tx) return;
+      const p = {tx,x:e.clientX,y:e.clientY};
+      // Before the phone starts its own word selection, turn selection off on this text.
+      p.lock = setTimeout(() => { if(urgTextPress === p) tx.classList.add('urg-tx-hold'); },200);
+      p.timer = setTimeout(() => {
+        if(urgTextPress !== p) return;
+        p.opened = true;
+        if(navigator.vibrate) try{ navigator.vibrate(15); }catch(err){}
+        showUrgTextMenu(tx,p.x,p.y);
+      },450);
+      urgTextPress = p;
+    },true);
+    document.addEventListener('pointermove',e => {
+      const p = urgTextPress;
+      if(p && !p.opened && (Math.abs(e.clientX - p.x) > 10 || Math.abs(e.clientY - p.y) > 10)){
+        clearTimeout(p.lock); clearTimeout(p.timer); p.tx.classList.remove('urg-tx-hold'); urgTextPress = null;
+      }
+    },true);
+    ['pointerup','pointercancel','touchend','touchcancel'].forEach(t => document.addEventListener(t,urgTextPressEnd,true));
+    document.addEventListener('selectstart',e => {
+      const tx = txAt(e.target);
+      if(tx && (tx.classList.contains('urg-tx-hold') || (urgTextPress && urgTextPress.opened))) e.preventDefault();
+    },true);
+    document.addEventListener('contextmenu',e => {
+      const tx = txAt(e.target);
+      if(!tx) return;
+      e.preventDefault(); e.stopPropagation();
+      if(urgTextPress && urgTextPress.tx === tx){ if(!urgTextPress.opened){ clearTimeout(urgTextPress.timer); urgTextPress.opened = true; showUrgTextMenu(tx,urgTextPress.x,urgTextPress.y); } return; }
+      showUrgTextMenu(tx,e.clientX,e.clientY);
+    },true);
+  })();
   function hideUrgencyPicker(){
     hideUrgCal();
     if(urgPicker){ urgPicker.remove(); urgPicker = null; }

@@ -95,4 +95,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-fold-protect', date: '2026-10-27', project: 'Gantt', title: 'Folded lines protected', details: 'folded sections hide their blank lines too; hidden lines can no longer be deleted or changed (unfold first)' },
   { id: 'd-20261027-urg-inline-add', date: '2026-10-27', project: 'Gantt', title: 'Type tasks in the Urgent panel', details: 'each level has an add line; Enter adds the task to today with that urgency already set' },
   { id: 'd-20261027-urg-edit-archive', date: '2026-10-27', project: 'Gantt', title: 'Edit + archive in the Urgent panel', details: 'tap a task to edit it in place; hold the box → Archive moves it into a dated Archive log under Urgent' },
+  { id: 'd-20261027-due-stack', date: '2026-10-27', project: 'Gantt', title: 'Stacked due dates', details: 'due label on task lines and the Notes due group stack vertically (Tue over Oct 29) to save width' },
 ];

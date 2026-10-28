@@ -5498,8 +5498,18 @@
   }
   // Duration (2026-10-28, Julius: auto-reshuffle step 1): optional minutes on a task line,
   // saved as data-dur in the Sheet. Shown with the due date in the same corner label.
-  const DUR_MAX = 600;
+  // Up to 100h for big projects (Julius 2026-10-28: 10h, 15h, 20h+).
+  const DUR_MAX = 6000;
   function durMin(v){ const n = Math.round(Number(v)); return n >= 1 && n <= DUR_MAX ? n : 0; }
+  // Typed length → minutes: "90", "1h 30m", "1.5h", "15h", "2h15". 0 = none / unreadable.
+  function parseDur(v){
+    const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g,'');
+    if(!s) return 0;
+    if(/^\d+(\.\d+)?$/.test(s)) return durMin(s);
+    const m = /^(?:(\d+(?:\.\d+)?)h(?:ours?|rs?)?)?(?:(\d+)m?(?:in(?:utes?|s)?)?)?$/.exec(s);
+    if(!m || (!m[1] && !m[2])) return 0;
+    return durMin((Number(m[1]) || 0) * 60 + (Number(m[2]) || 0));
+  }
   function durLabel(m){
     m = durMin(m); if(!m) return '';
     const h = Math.floor(m / 60), r = m % 60;
@@ -6959,9 +6969,10 @@
       };
       quick.forEach(m => { const b = mk(durLabel(m),m + ' min',() => pick(m === durMin(line.dataset.dur) ? 0 : m),m === cur); b.dataset.m = m; });
       const other = mk(cur && quick.indexOf(cur) < 0 ? durLabel(cur) : '…','Other length (minutes)',() => {
-        const v = window.prompt('How many minutes? (empty = none)',durMin(line.dataset.dur) || '');
+        const v = window.prompt('How long? e.g. 90, 1h 30m, 15h (empty = none)',durLabel(line.dataset.dur) || '');
         if(v === null) return;
-        const m = durMin(v);
+        const m = parseDur(v);
+        if(String(v).trim() && !m){ setStatus('Couldn’t read that length (max 100h)'); return; }
         pick(m);
         other.textContent = m && quick.indexOf(m) < 0 ? durLabel(m) : '…';
         other.classList.toggle('on', !!m && quick.indexOf(m) < 0);

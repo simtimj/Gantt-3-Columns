@@ -1125,7 +1125,7 @@ function applyClaudeTasks_() {
         if (/^\d{4}-\d{2}-\d{2}$/.test(x.due || '')) head = head.replace('<div class="check-line"', '<div class="check-line" data-due="' + x.due + '"');
         // Optional duration in minutes (2026-10-28, auto-reshuffle step 1): dur: 45.
         const dur = Math.round(Number(x.dur));
-        if (dur >= 1 && dur <= 600) head = head.replace('<div class="check-line"', '<div class="check-line" data-dur="' + dur + '"');
+        if (dur >= 1 && dur <= 6000) head = head.replace('<div class="check-line"', '<div class="check-line" data-dur="' + dur + '"');
         html += head;
         (Array.isArray(x.subtasks) ? x.subtasks : []).forEach(t => { html += line(t, 1, ''); });
         cell.setValue(html);
@@ -1287,7 +1287,7 @@ function taskMetaAttrs_(m) {
   if (/^[a-z]{2,12}$/.test(String(m.cat || ''))) a += ' data-cat="' + m.cat + '"';
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(m.due || ''))) a += ' data-due="' + m.due + '"';
   const dur = Math.round(Number(m.dur));
-  if (dur >= 1 && dur <= 600) a += ' data-dur="' + dur + '"';
+  if (dur >= 1 && dur <= 6000) a += ' data-dur="' + dur + '"';
   return a;
 }
 
@@ -1321,7 +1321,7 @@ function parseTasks_(html) {
       done: /\bdone\b/.test(cls) || /<input\b[^>]*\bchecked\b/.test(seg),
       urg: urg,
       due: due,
-      dur: durN >= 1 && durN <= 600 ? durN : 0
+      dur: durN >= 1 && durN <= 6000 ? durN : 0
     });
   });
   return out;

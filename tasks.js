@@ -1,5 +1,5 @@
 // Open tasks added by Claude (2026-10-27, Julius: "add this to the Gantt for later in urgency").
-// Format: { id: 't-YYYYMMDD-short-slug', date: 'YYYY-MM-DD', title: 'Main task', urg: 1|2|3, due: 'YYYY-MM-DD' (optional), dur: minutes (optional, 1–600), subtasks: ['Sub one', 'Sub two'] }
+// Format: { id: 't-YYYYMMDD-short-slug', date: 'YYYY-MM-DD', title: 'Main task', urg: 1|2|3, due: 'YYYY-MM-DD' (optional), dur: minutes (optional, 1–6000 = up to 100h), subtasks: ['Sub one', 'Sub two'] }
 // urg: 1 = red / must do, 2 = yellow / next, 3 = blue / can be later. Subtasks get the parent's urgency.
 // applyClaudeTasks_() in Code.gs appends each entry once, as open check-lines at the end of that day's
 // Today cell (ids remembered in script property claudeTasksApplied, so a deleted task stays deleted).

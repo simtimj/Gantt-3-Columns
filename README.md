@@ -50,7 +50,7 @@ Last updated: 2026-10-28
 
 - **Cards match the cell (2026-10-28):** task cards have no fill of their own now — same background as the day cell (Card fill default 0%; old saved fill cleared once). Options → Card fill still adds one back if wanted.
 
-- **Drag grip (2026-10-28):** tap into any task or subtask and a small **⠿** pill sits on the **top middle** of that line (only the line you're in). Hold it and drag to move the task — reorder, drag left to turn a subtask into a task, right to nest it, or drop it into another day / Notes / Reference cell; its subtasks come along. Works in Today, Notes, Reference cells, the **Urgent** panel and the **Due today** group in Notes (from Urgent/Due you drag the real task into a cell; the panel itself re-sorts on its own). Not on the → lines inside Claude's Suggested-day boxes. The checkbox still works as before (tap = tick, hold = menu).
+- **Drag grip (2026-10-28):** tap into any task or subtask and a small **⠿** pill sits on the **bottom middle** of that line (only the line you're in). Hold it and drag to move the task — reorder, drag left to turn a subtask into a task, right to nest it, or drop it into another day / Notes / Reference cell; its subtasks come along. Works in Today, Notes, Reference cells, the **Urgent** panel and the **Due today** group in Notes (from Urgent/Due you drag the real task into a cell; the panel itself re-sorts on its own). Not on the → lines inside Claude's Suggested-day boxes. The checkbox still works as before (tap = tick, hold = menu).
 
 - **Slimmer urgency box (2026-10-28):** urgent checkboxes are the same size as the rest; the urgency color is a 2px border drawn over the subject color (no gap, no outer ring), with only a faint glow.
 

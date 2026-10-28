@@ -7999,7 +7999,7 @@
     grip.id = 'tcGrip'; grip.textContent = '⠿'; grip.hidden = true;
     grip.setAttribute('aria-label','Drag to move this task');
     document.body.appendChild(grip);
-    // Top middle of the line (Julius, 2026-10-28), sitting on its top edge.
+    // Bottom middle of the line, on its bottom edge (Julius, 2026-10-28: top hid where it was going under the finger).
     window.tcGripPlace = (line,copy) => {
       grip._line = null; grip._copy = null;
       let box = null;
@@ -8015,7 +8015,7 @@
       if(r.bottom < 0 || r.top > window.innerHeight || !r.height){ grip.hidden = true; return; }
       grip.hidden = false;
       grip.style.left = Math.round(r.left + r.width / 2 - 13) + 'px';
-      grip.style.top = Math.round(r.top - 7) + 'px';
+      grip.style.top = Math.round(r.bottom - 7) + 'px';
     };
     function startPoint(e){
       if(e.button === 2) return;

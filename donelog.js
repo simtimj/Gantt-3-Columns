@@ -98,4 +98,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-due-stack', date: '2026-10-27', project: 'Gantt', title: 'Stacked due dates', details: 'due label on task lines and the Notes due group stack vertically (Tue over Oct 29) to save width' },
   { id: 'd-20261027-row-layout', date: '2026-10-27', project: 'Gantt', title: 'Row + 2 columns layout', details: 'Cols → Split: Reference row on top, Today | Notes below (one-tap preset), plus rotate / swap buttons and draggable row + column bars' },
   { id: 'd-20261027-narrow-wrap', date: '2026-10-27', project: 'Gantt', title: 'Narrow column wrapping', details: 'in narrow columns task text wraps under the checkbox to use the full width; Urgent panel day-made date removed' },
+  { id: 'd-20261027-hold-noselect', date: '2026-10-27', project: 'Gantt', title: 'No highlight on checkbox hold', details: 'holding a checkbox to open its menu no longer highlights text on the phone' },
 ];

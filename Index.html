@@ -3891,15 +3891,20 @@
           if(l && ed && ed.isContentEditable && act && (act === ed || ed.contains(act)) && !l.closest('#urgentPanel,.due-notes')) line = l;
         }
       }catch(e){}
-      if(line === cur) return;
-      if(cur) cur.removeAttribute('data-tcfocus');
-      cur = line;
-      if(cur) cur.setAttribute('data-tcfocus','1');
+      if(line !== cur){
+        if(cur) cur.removeAttribute('data-tcfocus');
+        cur = line;
+        if(cur) cur.setAttribute('data-tcfocus','1');
+      }
+      if(typeof window.tcGripPlace === 'function') window.tcGripPlace(cur);
     };
     const later = () => { if(!raf) raf = requestAnimationFrame(update); };
     document.addEventListener('selectionchange',later);
     document.addEventListener('focusout',() => setTimeout(later,0),true);
     document.addEventListener('focusin',later,true);
+    document.addEventListener('scroll',later,true);
+    window.addEventListener('resize',later);
+    document.addEventListener('input',later,true);
   })();
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
   const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus'];
@@ -7339,6 +7344,12 @@
      like editing a task in Urgent. data-tcfocus is render-only (stripped on save). */
   .check-line[data-tc]{border-color:transparent!important;}
   .check-line[data-tcfocus]{box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:5px;}
+  /* Drag grip on the focused card line (Julius, 2026-10-28) — overlay, never part of the cell. */
+  #tcGrip{position:fixed;z-index:2900;width:20px;height:24px;display:grid;place-items:center;border-radius:6px;
+    font-size:14px;line-height:1;color:#555;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.18);
+    box-shadow:0 1px 3px rgba(0,0,0,.15);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;}
+  #tcGrip[hidden]{display:none;}
+  @media (prefers-color-scheme: dark){#tcGrip{color:#ccc;background:rgba(30,30,30,.92);border-color:rgba(255,255,255,.2);}}
   .check-line[data-tc][data-tcfocus]{border-radius:5px!important;}
   /* Day sections (Julius, 2026-10-27): Morning / Afternoon / Evening separators in the Today cell. */
   .editor > [data-sec]{margin:10px 0 4px;padding:0 0 2px;border-bottom:2px solid var(--note-line-adj,var(--border));font-size:.82em;letter-spacing:.06em;text-transform:uppercase;color:var(--note-line-adj,var(--muted));}
@@ -7980,6 +7991,20 @@
   (function(){
     let press = null, drag = null, suppressUntil = 0;
     const editorOf = el => el && el.closest ? el.closest('.day-editor,.journal-editor,.ref-cell') : null;
+    const grip = document.createElement('div');
+    grip.id = 'tcGrip'; grip.textContent = '⠿'; grip.hidden = true;
+    grip.setAttribute('aria-label','Drag to move this task');
+    document.body.appendChild(grip);
+    window.tcGripPlace = line => {
+      const ed = line && editorOf(line);
+      if(!line || !ed || line.parentElement !== ed || !cardsOn || drag){ grip.hidden = true; grip._line = null; return; }
+      const r = line.getBoundingClientRect(), er = ed.getBoundingClientRect();
+      if(r.bottom < 0 || r.top > window.innerHeight || !r.height){ grip.hidden = true; return; }
+      grip._line = line; grip.hidden = false;
+      const lh = Math.min(r.height,parseFloat(getComputedStyle(line).lineHeight) || 20);
+      grip.style.left = Math.round(Math.min(r.right,er.right) - 11) + 'px';
+      grip.style.top = Math.round(r.top + Math.max(0,(lh + 4 - 24) / 2)) + 'px';
+    };
     function startPoint(e){
       if(e.button === 2) return;
       // Inbox box: drag it out of the inbox into any cell (2026-10-27, Julius).
@@ -7987,6 +8012,14 @@
       if(ib){
         const it = typeof inboxById === 'function' ? inboxById(ib.dataset.iid) : null;
         if(it) press = {cb:ib,inbox:it,x:e.clientX,y:e.clientY,id:e.pointerId};
+        return;
+      }
+      // Drag grip (2026-10-28, Julius): ⠿ at the right end of the line you're in.
+      const gp = e.target && e.target.closest ? e.target.closest('#tcGrip') : null;
+      if(gp){
+        e.preventDefault(); // keep the editor focused until the drag starts
+        const gl = gp._line, ged = editorOf(gl);
+        if(gl && gl.isConnected && ged && gl.parentElement === ged) press = {cb:gp,line:gl,ed:ged,x:e.clientX,y:e.clientY,id:e.pointerId,grip:true};
         return;
       }
       const cb = e.target && e.target.closest ? e.target.closest('input[type=checkbox]') : null;
@@ -8022,6 +8055,7 @@
       const ind = document.createElement('div'); ind.className = 'tc-drop'; ind.hidden = true; document.body.appendChild(ind);
       nodes.forEach(n => n.setAttribute('data-tcdrag',''));
       document.body.classList.add('tc-dragging');
+      grip.hidden = true;
       if(navigator.vibrate) try{ navigator.vibrate(10); }catch(err){}
       drag = {nodes,src:ed,line,ghost,ind,offX:e.clientX - r.left,offY:e.clientY - r.top,x0:e.clientX,x:e.clientX,y:e.clientY,base:tcLvl(line),target:null};
       try{ press.cb.setPointerCapture(press.id); }catch(err){}
@@ -8046,6 +8080,7 @@
       const ind = document.createElement('div'); ind.className = 'tc-drop'; ind.hidden = true; document.body.appendChild(ind);
       if(row) row.classList.add('inbox-dragging');
       document.body.classList.add('tc-dragging');
+      grip.hidden = true;
       if(navigator.vibrate) try{ navigator.vibrate(10); }catch(err){}
       drag = {nodes:[line],inbox:it,row,src:null,line,ghost,ind,offX:e.clientX - r.left,offY:e.clientY - r.top,x0:e.clientX,x:e.clientX,y:e.clientY,base:0,target:null};
       try{ press.cb.setPointerCapture(press.id); }catch(err){}
@@ -8175,7 +8210,8 @@
     document.addEventListener('pointermove',e => {
       if(drag){ e.preventDefault(); move(e); return; }
       if(!press || e.pointerId !== press.id) return;
-      if(Math.abs(e.clientX - press.x) > 8 || Math.abs(e.clientY - press.y) > 8) begin(e);
+      const th = press.grip ? 3 : 8;
+      if(Math.abs(e.clientX - press.x) > th || Math.abs(e.clientY - press.y) > th) begin(e);
     },{capture:true,passive:false});
     document.addEventListener('pointerup',e => { press = null; if(drag) finish(false); },true);
     document.addEventListener('pointercancel',e => { press = null; if(drag) finish(true); },true);

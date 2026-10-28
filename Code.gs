@@ -1269,12 +1269,79 @@ function appendTasksToDay(dateString, items) {
     let html = String(cell.getValue() || '');
     items.forEach(it => {
       const level = Math.max(0, Math.min(6, Math.floor(Number(it && it.level) || 0)));
-      html += '<div class="check-line" data-level="' + level + '"' + (level ? ' style="margin-left: ' + (level * 24) + 'px;"' : '') + '>' +
+      html += '<div class="check-line" data-level="' + level + '"' + taskMetaAttrs_(it && it.meta) + (level ? ' style="margin-left: ' + (level * 24) + 'px;"' : '') + '>' +
         doneCheck_(false) + '<span class="check-text">' + String((it && it.html) || '') + '</span></div>';
     });
     cell.setValue(html);
     return true;
   } finally { lock.releaseLock(); }
+}
+
+/* Task fields kept when a line is sent to a day that isn't loaded (2026-10-28):
+   urgency, subject, due, duration. Validated like the client's save filter. The
+   corner label (data-due-label) is rebuilt by the app on load. */
+function taskMetaAttrs_(m) {
+  if (!m) return '';
+  let a = '';
+  if (/^[123]$/.test(String(m.urg || ''))) a += ' data-urg="' + m.urg + '"';
+  if (/^[a-z]{2,12}$/.test(String(m.cat || ''))) a += ' data-cat="' + m.cat + '"';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(m.due || ''))) a += ' data-due="' + m.due + '"';
+  const dur = Math.round(Number(m.dur));
+  if (dur >= 1 && dur <= 600) a += ' data-dur="' + dur + '"';
+  return a;
+}
+
+/* Planning data (2026-10-28, auto-reshuffle groundwork): the tasks in one day's
+   Today cell with the fields a scheduler needs. Read-only; no scheduling here.
+   Returns [{index, level, text, done, urg (0-3), due ('' or YYYY-MM-DD), dur (minutes, 0 = none)}]. */
+function getDayTasks(dateString) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateString || ''))) throw new Error('Bad date');
+  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+  const row = findDayRow_(sheet, dateString);
+  return row ? parseTasks_(String(sheet.getRange(row, 2).getValue() || '')) : [];
+}
+
+function parseTasks_(html) {
+  const out = [];
+  const re = /<div\b([^>]*\bclass="[^"]*\bcheck-line\b[^"]*"[^>]*)>/g;
+  const opens = [];
+  let m;
+  while ((m = re.exec(html))) opens.push({ attrs: m[1], start: m.index, end: re.lastIndex });
+  opens.forEach((o, i) => {
+    const seg = html.slice(o.end, i + 1 < opens.length ? opens[i + 1].start : html.length);
+    const attr = name => { const x = new RegExp('\\b' + name + '="([^"]*)"').exec(o.attrs); return x ? x[1] : ''; };
+    const urg = /^[123]$/.test(attr('data-urg')) ? Number(attr('data-urg')) : 0;
+    const due = /^\d{4}-\d{2}-\d{2}$/.test(attr('data-due')) ? attr('data-due') : '';
+    const durN = Math.round(Number(attr('data-dur')));
+    const cls = attr('class');
+    out.push({
+      index: i,
+      level: Math.max(0, Math.floor(Number(attr('data-level')) || 0)),
+      text: taskText_(seg),
+      done: /\bdone\b/.test(cls) || /<input\b[^>]*\bchecked\b/.test(seg),
+      urg: urg,
+      due: due,
+      dur: durN >= 1 && durN <= 600 ? durN : 0
+    });
+  });
+  return out;
+}
+
+// Text of the line's .check-text span (nested spans counted).
+function taskText_(seg) {
+  const s = seg.search(/<span\b[^>]*\bclass="check-text"[^>]*>/);
+  if (s < 0) return '';
+  const tag = /<\/?span\b[^>]*>/g;
+  tag.lastIndex = seg.indexOf('>', s) + 1;
+  const from = tag.lastIndex;
+  let depth = 1, t, to = seg.length;
+  while ((t = tag.exec(seg))) {
+    depth += t[0].charAt(1) === '/' ? -1 : 1;
+    if (!depth) { to = t.index; break; }
+  }
+  return seg.slice(from, to).replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ').trim();
 }
 
 /* Send a task to a day's Today cell (2026-10-26, Julius): used by the "→ Day"

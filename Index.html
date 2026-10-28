@@ -1002,6 +1002,11 @@
     .urg-due-chip{flex:1;min-width:0;text-align:left;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
     .urg-due-chip.set{color:inherit;font-weight:600;}
     .urg-due-clear{font-size:13px;line-height:1;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);}
+    .urg-dur-row{flex-wrap:wrap;gap:3px;}
+    .urg-dur-lab{font-size:12px;color:var(--muted);margin-right:1px;}
+    .urg-dur-pick{font-size:11px;line-height:1;padding:4px 5px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);cursor:pointer;}
+    .urg-dur-pick.on{background:#1a73e8;border-color:#1a73e8;color:#fff;font-weight:600;}
+    @media (prefers-color-scheme: dark){ .urg-dur-pick{background:#1c1c1c;color:var(--dm-text);border-color:#444;} .urg-dur-pick.on{background:#1a73e8;border-color:#1a73e8;color:#fff;} }
     .urg-cal{position:fixed;z-index:3001;width:196px;padding:6px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-size:12px;}
     .uc-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;margin-bottom:4px;}
     .uc-nav{border:0;background:none;font-size:16px;line-height:1;padding:2px 8px;cursor:pointer;color:inherit;}
@@ -2494,9 +2499,11 @@
         keep['data-level'] = String(level);
         if(/^[123]$/.test(node.dataset.urg || '')) keep['data-urg'] = node.dataset.urg;
         if(/^[a-z]{2,12}$/.test(node.dataset.cat || '')) keep['data-cat'] = node.dataset.cat;
-        if(/^\d{4}-\d{2}-\d{2}$/.test(node.dataset.due || '')){
-          keep['data-due'] = node.dataset.due;
-          keep['data-due-label'] = dueLabelStack(node.dataset.due);
+        if(/^\d{4}-\d{2}-\d{2}$/.test(node.dataset.due || '')) keep['data-due'] = node.dataset.due;
+        if(durMin(node.dataset.dur)) keep['data-dur'] = String(durMin(node.dataset.dur));
+        {
+          const ml = lineMetaLabel(keep['data-due'],keep['data-dur']);
+          if(ml) keep['data-due-label'] = ml;
         }
         cleanStyle.marginLeft = level ? `${level * 24}px` : '';
         keep.style = cleanStyle.cssText;
@@ -5489,9 +5496,35 @@
     const d = dateObj(s);
     return '📅 ' + d.toLocaleDateString(undefined,{weekday:'short'}) + '\n' + d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
   }
+  // Duration (2026-10-28, Julius: auto-reshuffle step 1): optional minutes on a task line,
+  // saved as data-dur in the Sheet. Shown with the due date in the same corner label.
+  const DUR_MAX = 600;
+  function durMin(v){ const n = Math.round(Number(v)); return n >= 1 && n <= DUR_MAX ? n : 0; }
+  function durLabel(m){
+    m = durMin(m); if(!m) return '';
+    const h = Math.floor(m / 60), r = m % 60;
+    return h ? h + 'h' + (r ? ' ' + r + 'm' : '') : r + 'm';
+  }
+  // Corner label = due (stacked) + duration; '' when neither is set.
+  function lineMetaLabel(due,dur){
+    const parts = [];
+    if(/^\d{4}-\d{2}-\d{2}$/.test(due || '')) parts.push(dueLabelStack(due));
+    if(durMin(dur)) parts.push('⏱ ' + durLabel(dur));
+    return parts.join('\n');
+  }
+  function syncMetaLabel(line){
+    const v = lineMetaLabel(line.dataset.due,line.dataset.dur);
+    if(v){ if(line.dataset.dueLabel !== v) line.dataset.dueLabel = v; }
+    else if(line.hasAttribute('data-due-label')) delete line.dataset.dueLabel;
+  }
   function setDue(line,iso){
-    if(iso){ line.dataset.due = iso; line.dataset.dueLabel = dueLabelStack(iso); }
-    else { delete line.dataset.due; delete line.dataset.dueLabel; }
+    if(iso) line.dataset.due = iso; else delete line.dataset.due;
+    syncMetaLabel(line);
+  }
+  function setDur(line,min){
+    const m = durMin(min);
+    if(m) line.dataset.dur = String(m); else delete line.dataset.dur;
+    syncMetaLabel(line);
   }
   function localToday(){
     const d = new Date();
@@ -6881,6 +6914,41 @@
       dueRow.appendChild(clr);
     }
     p.appendChild(dueRow);
+    // Duration (2026-10-28, Julius): optional; quick picks + custom. Stays open like urgency.
+    {
+      const durRow = document.createElement('div');
+      durRow.className = 'urg-due-row urg-dur-row';
+      const lab = document.createElement('span');
+      lab.className = 'urg-dur-lab'; lab.textContent = '⏱'; lab.title = 'How long it takes';
+      durRow.appendChild(lab);
+      const cur = durMin(line.dataset.dur);
+      const quick = [15,30,45,60,90,120];
+      const mk = (text,title,fn,on) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'urg-dur-pick' + (on ? ' on' : ''); b.textContent = text; b.title = title;
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',fn);
+        durRow.appendChild(b);
+        return b;
+      };
+      const pick = m => {
+        setDur(line,m);
+        durRow.querySelectorAll('.urg-dur-pick').forEach(x => x.classList.toggle('on', Number(x.dataset.m) === durMin(m)));
+        urgChanged(owner);
+      };
+      quick.forEach(m => { const b = mk(durLabel(m),m + ' min',() => pick(m === durMin(line.dataset.dur) ? 0 : m),m === cur); b.dataset.m = m; });
+      const other = mk(cur && quick.indexOf(cur) < 0 ? durLabel(cur) : '…','Other length (minutes)',() => {
+        const v = window.prompt('How many minutes? (empty = none)',durMin(line.dataset.dur) || '');
+        if(v === null) return;
+        const m = durMin(v);
+        pick(m);
+        other.textContent = m && quick.indexOf(m) < 0 ? durLabel(m) : '…';
+        other.classList.toggle('on', !!m && quick.indexOf(m) < 0);
+        other.dataset.m = m || '';
+      },cur && quick.indexOf(cur) < 0);
+      other.dataset.m = cur && quick.indexOf(cur) < 0 ? cur : '';
+      p.appendChild(durRow);
+    }
     if(typeof addCardSubjectRow === 'function') addCardSubjectRow(p,line,owner);
     // Title line toggle (2026-10-27) for tasks in an editor.
     if(owner && line.parentElement === owner && !(cb.classList && (cb.classList.contains('di-box') || cb.classList.contains('urg-box')))){
@@ -7805,7 +7873,7 @@
     let changed = ensureDaySections(ed);
     requestAnimationFrame(() => paintDaySecs(ed));
     // Older lines carry the one-line due label; switch them to the stacked one (display only).
-    try{ ed.querySelectorAll('.check-line[data-due]').forEach(l => { if(!/^\d{4}-\d{2}-\d{2}$/.test(l.dataset.due)) return; const v = dueLabelStack(l.dataset.due); if(l.dataset.dueLabel !== v) l.dataset.dueLabel = v; }); }catch(e){}
+    try{ ed.querySelectorAll('.check-line[data-due],.check-line[data-dur]').forEach(syncMetaLabel); }catch(e){}
     const plan = new Map(); // node -> {tc,head,rel,cat}
     let members = [], headLvl = 0, ctx = '', ctxGrp = false;
     const flush = () => {

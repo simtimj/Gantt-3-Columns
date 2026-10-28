@@ -48,6 +48,8 @@ Last updated: 2026-10-28
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Task duration (2026-10-28, auto-reshuffle step 1)**: hold a task's checkbox → **⏱** row: 15m · 30m · 45m · 1h · 1h 30m · 2h, or **…** for any length (minutes). Optional; tap the picked one again to clear. Shows as ⏱ 45m in the line's corner label (under the 📅 due date if it has one), saved with the task in the Sheet (`data-dur`). Deadline = the existing 📅 due date, priority = the existing red/yellow/blue urgency, so every task card now carries all three. Claude can add `dur` to tasks in `tasks.js`.
+
 - **Urgency mark off the box (2026-10-28)**: the checkbox keeps only its subject fill (plain gray-ish border); urgency shows as a thin red/yellow/blue **bar left of the box** (box height). Options → Task cards → **Urgency mark** to try *Line under box*, *Underline text* or the old *Box border*. Urgent panel / Notes Due boxes unchanged.
 - **Subtask due dates everywhere** (2026-10-28): a subtask's own due date shows on its line in Today and Reference cells, on its row in Urgent (with Today / overdue colors), and in Notes' Due-today list even when its task is due later. Urgent sorts each task by the soonest open date of the task or its subtasks.
 - **Urgent + Reference drag tracks like Today** (2026-10-28): in the Urgent panel the blue line follows your finger between rows like in a Today cell; slide right to make it a subtask, left to come out. When the card comes from another column, the level counts from where your finger rests for a moment (~0.3 s), so crossing from Today no longer forces a deep indent (this also fixes drops into Reference cells).
@@ -214,6 +216,7 @@ Last updated: 2026-10-28
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+- **Auto-reshuffle, Motion/Reclaim-style (Julius, 2026-10-28)**: ✅ step 1 task fields (duration above) · step 2 `Code.gs` reads today's calendar and finds free gaps, skipping the Chill and Repeat Tasks calendars · step 3 scheduler sorts by deadline + priority and puts each task in the first gap it fits · step 4 **Reshuffle** button that reruns it (auto-run later). Keep a manual mode too: set the parameters together with Claude in conversation. Target: Fri Nov 6.
 - **Calendar column, like Google Calendar** (Julius, 2026-10-28): a full calendar view as its own column (or swipe in from the right / a button that swaps it in for Reference), so while scheduling with Claude he can see the day at a glance on phone, tablet and computer. Details to settle: day vs 3-day vs week view, read-only first or drag tasks onto it.
 - **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)
 - **Hold anywhere on a card to move it (2026-10-27)**: hold and grab a card (not just its checkbox) to drag it; a plain tap on the card still goes into the text for editing, selecting, highlighting

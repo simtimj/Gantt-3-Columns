@@ -416,7 +416,7 @@
     /* Claude's nightly plan / wrap-up box in Notes (2026-10-26) */
     .editor table[data-cnote]{width:100%;border-collapse:separate;border-spacing:0;margin:6px 0;border:1px solid var(--border);border-radius:10px;background:var(--panel);}
     /* No colored left edge (Julius, 2026-10-26). Carry-over tasks get a "→ Day" send button. */
-    .editor table[data-cnote] .check-line[data-send]::after{content:"→ Day";flex:0 0 auto;margin-left:auto;padding:1px 8px;font-size:11px;line-height:1.5;border:1px solid var(--border);border-radius:6px;color:var(--muted);background:var(--bg,#fff);cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
+    .editor table[data-cnote] .check-line[data-send]::after{content:"→";flex:0 0 auto;margin-left:auto;padding:0 6px;font-size:12px;line-height:1.4;font-weight:700;border:1px solid var(--border);border-radius:6px;color:var(--muted);background:var(--bg,#fff);cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
     .send-menu{position:fixed;z-index:9999;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--panel,#fff);box-shadow:0 6px 20px rgba(0,0,0,.18);font-size:13px;max-width:calc(100vw - 32px);}
     .send-menu button{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;}
     .send-menu input[type=date]{font-size:13px;padding:3px;}
@@ -465,10 +465,13 @@
     /* Narrow columns (Julius, 2026-10-27): the checkbox floats at the top-left and the text's
        second line onward runs underneath it, using the full width. Due date goes under the text. */
     /* .pane-narrow is set by initNarrowPanes() when a pane is under 420px wide. */
-    .pane-narrow .check-line:not([data-tlon]):not([data-send]){display:flow-root;min-height:calc(18px * var(--workspace-scale,1));}
-    .pane-narrow .check-line:not([data-tlon]):not([data-send]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
-    .pane-narrow .check-line:not([data-tlon]):not([data-send]) > .check-text{display:block;}
-    .pane-narrow .check-line:not([data-tlon]):not([data-send])[data-due-label]::after{display:block;white-space:normal;text-align:right;margin:1px 0 0;}
+    .pane-narrow .check-line:not([data-tlon]){display:flow-root;min-height:calc(18px * var(--workspace-scale,1));}
+    .pane-narrow .check-line:not([data-tlon]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
+    .pane-narrow .check-line:not([data-tlon]) > .check-text{display:block;}
+    .pane-narrow .check-line:not([data-tlon])[data-due-label]::after{display:block;white-space:normal;text-align:right;margin:1px 0 0;}
+    /* Notes send lines when narrow: the → button floats top-right (as ::before so it comes first), text wraps under both. */
+    .pane-narrow .editor table[data-cnote] .check-line[data-send]::after{content:none;}
+    .pane-narrow .editor table[data-cnote] .check-line[data-send]::before{content:"→";float:right;margin:0 0 -10px 4px;padding:0 6px;font-size:12px;line-height:1.4;font-weight:700;border:1px solid var(--border);border-radius:6px;color:var(--muted);background:var(--bg,#fff);cursor:pointer;-webkit-user-select:none;user-select:none;}
     .check-line > .check-text{align-self:flex-start;}
     .editor pre.code-block,.ref-cell pre.code-block{
       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;
@@ -1282,7 +1285,7 @@
       .ref-cell-wrapper:hover{background:#1a1a1a;}
       .ref-toolbar{background:#121212;}
       .ref-search{background:#1e1e1e;color:var(--dm-text);border-color:#444;}
-      .day-row .editor table[data-cnote] .check-line[data-send]::after{background:#1c1c1c;color:#bbb;border-color:#555;}
+      .day-row .editor table[data-cnote] .check-line[data-send]::after,.day-row .editor table[data-cnote] .check-line[data-send]::before{background:#1c1c1c;color:#bbb;border-color:#555;}
       /* (Julius, 2026-10-27) text that ignored the brightness slider: fixed grays and
          dark inline colors (e.g. pasted text) now follow --dm-text / --dm-muted. */
       body,.ref-cell blockquote{color:var(--dm-text);}
@@ -5614,14 +5617,15 @@
 
   /* ---------------------------------------------------------
      SEND CARRY-OVERS (2026-10-26, Julius): tasks in Claude's note blocks
-     (check-line[data-send]) show "→ Day" on the right. Tap it → Today,
+     (check-line[data-send]) show a small → button on the right. Tap it → Today,
      Tomorrow or a picked date; the task moves to that day's Today cell.
      --------------------------------------------------------- */
   function maybeOpenSendMenu(e, ed){
     const line = e.target.closest?.('table[data-cnote] .check-line[data-send]');
     if(!line || !ed.contains(line)) return;
     const r = line.getBoundingClientRect();
-    if(e.clientX < r.right - 72) return; // only the button area on the right
+    // Only the small → button at the top-right of the line (Julius, 2026-10-27: was "→ Day").
+    if(e.clientX < r.right - 34 || e.clientY > r.top + 26) return;
     e.preventDefault(); e.stopPropagation();
     openSendMenu(line, ed, e.clientX, e.clientY);
   }

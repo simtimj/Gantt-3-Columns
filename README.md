@@ -52,7 +52,8 @@ Last updated: 2026-10-28
 - **Drag in Urgent (2026-10-28):** pick an Urgent row, drag its ⠿ grip like any card — into any cell, or onto another Urgent row: it lands right above/below that task in its own cell and takes that row's urgency.
 - **Short counts (2026-10-28):** counts read `12/22 done` instead of "12 out of 22 done" — title-line − / + (e.g. the Gantt group) and the Today chip at the top (`Today: 12/24 done`).
 - **Backlog (2026-10-28):** a Reference cell named **Backlog** (made automatically the first time) holds urgent tasks that aren't for a day yet. Tasks typed straight into Urgent now go there instead of today, and still show in Urgent with their color and due date. Hold a task's checkbox → **📥 Not today → Backlog** moves it (with subtasks) out of its day; in Backlog the same spot says **📅 Move to Today**. You can also drag tasks in and out of the Backlog cell.
-- **No keyboard on first tap, take 2 (2026-10-28):** the card's text is also switched to "no keyboard" mode before the first tap lands, so even if the phone focuses it, the keyboard stays down; the second tap turns typing back on.
+- **No cursor on first tap, take 3 (2026-10-28):** the first tap on any card (Today, Notes, Reference, Urgent, Inbox, Due today) doesn't put the cursor in it at all — the cell is briefly made non-editable during that tap, so you only get the ring + ⠿ grip. Second tap = cursor + keyboard.
+- **Drag in Reference (2026-10-28):** the ⠿ grip now works for tasks nested inside Reference cells too (it only worked for top-level lines before).
 
 - **Cards match the cell (2026-10-28):** task cards have no fill of their own now — same background as the day cell (Card fill default 0%; old saved fill cleared once). Options → Card fill still adds one back if wanted.
 

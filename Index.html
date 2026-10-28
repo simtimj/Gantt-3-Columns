@@ -3954,9 +3954,19 @@
        inputmode="none" before a first tap, so even if the phone focuses it, no keyboard shows.
        The second tap on the picked card clears it (and re-focuses), so the keyboard comes up. */
     const rootOf = el => isCopy(el) ? el : el.closest('.day-editor,.journal-editor,.ref-cell');
-    let tp = null, lastTouch = 0;
+    /* First tap must not put the cursor in the card at all (Julius, 2026-10-28): during that
+       touch the card's cell is made non-editable, so the phone has nothing to focus; it is
+       editable again right after. The second tap on the picked card is left alone → cursor + keyboard. */
+    let tp = null, lastTouch = 0, lockedRoot = null;
+    const unlock = (root,ms) => {
+      if(!root || root.dataset.tcLock !== '1') return;
+      const go = () => { if(root.dataset.tcLock === '1'){ delete root.dataset.tcLock; root.contentEditable = 'true'; } };
+      if(ms) setTimeout(go,ms); else go();
+    };
     document.addEventListener('touchstart',e => {
       lastTouch = Date.now();
+      if(tp && tp.root) unlock(tp.root);
+      if(lockedRoot){ unlock(lockedRoot); lockedRoot = null; } // a quick second tap types right away
       if(e.touches.length !== 1){ tp = null; return; }
       const p = e.touches[0];
       tp = {x:p.clientX,y:p.clientY,t:Date.now(),target:e.target,fold:window.__tlFoldAt || 0};
@@ -3972,9 +3982,16 @@
       if(!root) return;
       if(hit.el === picked){
         root.removeAttribute('inputmode');
-        const a = document.activeElement;
-        if(a && (a === root || root.contains(a))) try{ a.blur(); }catch(err){} // tap re-focuses → keyboard
-      } else if(!hit.editing) root.setAttribute('inputmode','none');
+        return; // second tap: type
+      }
+      if(hit.editing) return;
+      tp.hit = hit;
+      const a = document.activeElement;
+      if(a && (a === root || root.contains(a))) try{ a.blur(); }catch(err){}
+      root.setAttribute('inputmode','none');
+      root.dataset.tcLock = '1';
+      root.contentEditable = 'false';
+      tp.root = lockedRoot = root;
     },{capture:true,passive:true});
     // Leaving a cell drops pick mode, so ordinary (non-card) taps type as usual.
     document.addEventListener('focusout',e => {
@@ -3984,17 +4001,24 @@
     document.addEventListener('touchmove',e => {
       if(!tp) return;
       const p = e.touches[0];
-      if(!p || Math.abs(p.clientX - tp.x) > 10 || Math.abs(p.clientY - tp.y) > 10) tp = null;
+      if(!p || Math.abs(p.clientX - tp.x) > 10 || Math.abs(p.clientY - tp.y) > 10){ unlock(tp.root); tp = null; }
     },{capture:true,passive:true});
-    document.addEventListener('touchcancel',() => { tp = null; },{capture:true,passive:true});
+    document.addEventListener('touchcancel',() => { if(tp) unlock(tp.root); tp = null; },{capture:true,passive:true});
     document.addEventListener('touchend',e => {
       lastTouch = Date.now();
       const s = tp; tp = null;
-      if(!s || e.touches.length) return;
+      if(!s || e.touches.length){ if(s) unlock(s.root); return; }
       // The − / + of a title line was tapped: don't open the keyboard, don't pick.
-      if((window.__tlFoldAt || 0) !== s.fold){ if(e.cancelable) e.preventDefault(); return; }
-      if(Date.now() - s.t > 400) return;               // holds: menus / text selection / drag
-      if(document.body.classList.contains('tc-dragging')) return;
+      if((window.__tlFoldAt || 0) !== s.fold){ if(e.cancelable) e.preventDefault(); unlock(s.root,350); return; }
+      if(Date.now() - s.t > 400 || document.body.classList.contains('tc-dragging')){ unlock(s.root); return; } // holds: menus / selection / drag
+      if(s.hit){
+        if(e.cancelable) e.preventDefault();
+        try{ const sel = window.getSelection(); if(sel) sel.removeAllRanges(); }catch(err){}
+        picked = s.hit.el;
+        later();
+        unlock(s.root,350); // after the tap's focus / click would have happened
+        return;
+      }
       const t = s.target instanceof Element ? s.target : (s.target && s.target.parentElement);
       if(tap(t) && e.cancelable) e.preventDefault();
     },{capture:true,passive:false});
@@ -8196,7 +8220,7 @@
       if(drag){ grip.hidden = true; return; }
       if(line){
         const ed = editorOf(line);
-        if(ed && line.parentElement === ed){ grip._line = line; box = line; }
+        if(ed && ed.contains(line) && !line.closest('table[data-cnote],[data-render-due]')){ grip._line = line; box = line; }
       } else if(copy){
         grip._copy = copy; box = copy.closest('.urg-row,.di-line') || copy;
       }
@@ -8227,7 +8251,7 @@
           else { if(typeof setStatus === 'function') setStatus('Scroll to that day first, then drag it'); return; }
         }
         const ged = editorOf(gl);
-        if(gl && gl.isConnected && ged && gl.parentElement === ged) press = {cb:gp,line:gl,ed:ged,x:e.clientX,y:e.clientY,id:e.pointerId,grip:true};
+        if(gl && gl.isConnected && ged && ged.contains(gl) && !gl.closest('table[data-cnote],[data-render-due]')) press = {cb:gp,line:gl,ed:ged,x:e.clientX,y:e.clientY,id:e.pointerId,grip:true};
         return;
       }
       const cb = e.target && e.target.closest ? e.target.closest('input[type=checkbox]') : null;

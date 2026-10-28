@@ -3877,7 +3877,7 @@
   }
   /* Focus ring on the task/subtask line holding the caret (Julius, 2026-10-28). */
   (function initLineFocus(){
-    let cur = null, raf = 0;
+    let cur = null, raf = 0, picked = null;
     const update = () => {
       raf = 0;
       let line = null;
@@ -3891,6 +3891,10 @@
           if(l && ed && ed.isContentEditable && act && (act === ed || ed.contains(act)) && !l.closest('#urgentPanel,.due-notes')) line = l;
         }
       }catch(e){}
+      // Picked card (first tap) shows the ring + grip until you type somewhere or tap elsewhere.
+      if(line) picked = null;
+      else if(picked && picked.isConnected) line = picked;
+      else picked = null;
       if(line !== cur){
         if(cur) cur.removeAttribute('data-tcfocus');
         cur = line;
@@ -3903,6 +3907,26 @@
       if(typeof window.tcGripPlace === 'function') window.tcGripPlace(cur,copy);
     };
     const later = () => { if(!raf) raf = requestAnimationFrame(update); };
+    /* Tap once = pick the card (ring + grip, no keyboard); tap it again = type in it (Julius, 2026-10-28).
+       Uses mousedown: on a phone it only fires for a real tap (not a scroll), and preventing it stops
+       the caret / keyboard. The line you're already typing in edits normally. */
+    document.addEventListener('mousedown',e => {
+      if(e.button !== 0) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if(!t || t.closest('#tcGrip')) return;
+      const line = t.closest('.check-line');
+      const ed = line && line.parentElement;
+      const isCard = line && ed && ed.matches && ed.matches('.day-editor,.journal-editor,.ref-cell') && ed.isContentEditable;
+      if(!isCard || t.closest('input,button,a,[data-tlhid]')){ if(picked){ picked = null; later(); } return; }
+      if(line === picked || line === cur && document.activeElement && (document.activeElement === ed || ed.contains(document.activeElement)) && !picked){
+        picked = null; return; // second tap (or the line you're in): edit as usual
+      }
+      e.preventDefault();
+      try{ const a = document.activeElement; if(a && a !== document.body && a.blur) a.blur(); }catch(err){}
+      try{ const sel = window.getSelection(); if(sel) sel.removeAllRanges(); }catch(err){}
+      picked = line;
+      later();
+    },true);
     document.addEventListener('selectionchange',later);
     document.addEventListener('focusout',() => setTimeout(later,0),true);
     document.addEventListener('focusin',later,true);

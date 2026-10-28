@@ -1144,6 +1144,12 @@
     .urg-sub{cursor:context-menu;}
     .urg-empty{font-size:12px;color:var(--muted);padding:4px 0 2px;}
     #urgentPanel.wrap .urg-row{align-items:flex-start;}
+    /* Narrow panel (Julius, 2026-10-27): when text + dates don't fit on one line, the
+       dates drop to their own short line under the task instead of squeezing the text
+       into a tall column. Lines break by full (unwrapped) widths first. */
+    #urgentPanel.wrap .urg-row{flex-wrap:wrap;row-gap:0;}
+    #urgentPanel.wrap .urg-row > .urg-text{flex:0 1 auto;max-width:calc(100% - 25px);}
+    #urgentPanel .urg-date,#urgentPanel .urg-made{white-space:nowrap;}
     #urgentPanel.wrap .urg-row .urg-box{margin-top:2px;}
     #urgentPanel.wrap .urg-text,#urgentPanel.wrap .urg-subtask{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
     .urg-create-menu{position:fixed;z-index:3002;display:flex;flex-direction:column;min-width:170px;padding:4px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);}

@@ -108,4 +108,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-urg-add', date: '2026-10-28', project: 'Gantt', title: 'Add tasks + subtasks in Urgent', details: 'Enter on a task in Urgent = new same-level task below it; hold any checkbox → + Task, + Subtask, ← Outdent, Indent →' },
   { id: 'd-20261028-cal-off', date: '2026-10-28', project: 'Gantt', title: 'Calendar panel removed', details: 'gone from Reference; code kept under Shelved' },
   { id: 'd-20261028-urg-text-hold', date: '2026-10-28', project: 'Gantt', title: 'Urgent text hold menu', details: '+ Task / + Subtask / ← Outdent / Indent → moved off the checkbox hold; hold inside the task text where you are, no highlight' },
+  { id: 'd-20261028-quiet-cards', date: '2026-10-28', project: 'Gantt', title: 'Quiet cards + focus ring', details: 'card outlines hidden at rest; the task/subtask line you type in gets a thin urgency-colored ring (Urgent ring thinner too)' },
 ];

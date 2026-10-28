@@ -48,6 +48,8 @@ Last updated: 2026-10-28
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Quiet cards + focus ring (2026-10-28):** task cards no longer show an outline all the time. The task or subtask line you're typing in gets a thin ring in its urgency color (gray if none) — same as editing a task in Urgent, whose ring is now thinner too (1px). Also on the Due-today lines in Notes. Card fill (Options → Card fill) is unchanged.
+
 - **Add tasks + subtasks right in Urgent (2026-10-28):** while editing a task's text in Urgent, **Enter** makes a new task at the same level right below it (same parent card, same urgency), ready to type; Enter on an empty line just finishes. A new line left empty disappears. **Hold inside the task's text** (right where you're typing; right-click on desktop) → small menu **+ Task · + Subtask · ← Outdent · Indent →** with nothing highlighted (indent/outdent moves its subtasks too; the line stays open for typing). Moved off the checkbox hold menu 2026-10-28. From Urgent the new line opens for typing right there; a subtask added under a folded task unfolds it.
 - **Fold tasks in Urgent (2026-10-28):** any task with subtasks in Urgent / Soon / Can be later (and the Archive log) gets a small **− / +** right after its text (beside the dates when the column is narrow). Tap it to hide or show its subtasks; folded shows **done/total** (e.g. + 2/8). Saved per device; only folds the Urgent panel, not the Today cell.
 - **Claude tasks with a due date (2026-10-28):** `tasks.js` entries can carry `due: 'YYYY-MM-DD'`, which lands as the task's due date.

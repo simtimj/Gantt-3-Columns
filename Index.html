@@ -3997,8 +3997,17 @@
     if(!VIEW_PANES.includes(splitOptions.first)) splitOptions.first='today';
     if(!VIEW_PANES.includes(splitOptions.second)) splitOptions.second='reference';
     if(splitOptions.third!=='none' && !VIEW_PANES.includes(splitOptions.third)) splitOptions.third='none';
-    if(!['vertical','horizontal'].includes(splitOptions.orientation)) splitOptions.orientation='vertical';
+    if(!['vertical','horizontal','top','bottom'].includes(splitOptions.orientation)) splitOptions.orientation='vertical';
+    // Row + 2 columns layouts always use three panes: fill an empty third with the pane not picked yet.
+    if(isRowLayout() && splitOptions.third==='none') splitOptions.third=VIEW_PANES.find(n=>n!==splitOptions.first && n!==splitOptions.second) || splitOptions.first;
   }
+  // Row + 2 columns (Julius, 2026-10-27): 'top' = First is a full-width row on top,
+  // Second | Third side by side below; 'bottom' = First | Second on top, Third as a row below.
+  function isRowLayout(){ return splitOptions.orientation==='top' || splitOptions.orientation==='bottom'; }
+  const SPLIT_COLS_KEY = 'fw.splitColsRatio';
+  let splitColsRatio = .5;
+  try{ splitColsRatio = Math.max(.2,Math.min(.8,Number(localStorage.getItem(SPLIT_COLS_KEY)) || .5)); }catch(e){}
+  function saveSplitOptions(){ try{ localStorage.setItem(MOBILE_SPLIT_OPTIONS_KEY,JSON.stringify(splitOptions)); }catch(e){} }
   let mobileSplitRatio = Math.max(.2,Math.min(.8,Number(localStorage.getItem(MOBILE_SPLIT_SIZE_KEY)) || .5));
   function isActualMobileDevice(){
     // Prefer the browser's explicit mobile hint. Fall back to mobile OS signals.
@@ -4479,6 +4488,43 @@
         pane.classList.toggle('view-hidden',!used.has(name));
         pane.style.gridColumn='';pane.style.gridRow='';
       });
+      if(isRowLayout() && panes.length===3){
+        // One full-width row + two columns. Drag the long bar = row height, the short bar = column widths.
+        const top=splitOptions.orientation==='top';
+        const r=mobileSplitRatio, c=splitColsRatio;
+        workspace.style.gridTemplateColumns=`minmax(0,${c}fr) 7px minmax(0,${1-c}fr)`;
+        workspace.style.gridTemplateRows=`minmax(0,${r}fr) 7px minmax(0,${1-r}fr)`;
+        const rowPane=top?panes[0]:panes[2], colA=top?panes[1]:panes[0], colB=top?panes[2]:panes[1];
+        const rowLine=top?'1':'3', colLine=top?'3':'1';
+        rowPane.style.gridColumn='1 / 4';rowPane.style.gridRow=rowLine;
+        colA.style.gridColumn='1';colA.style.gridRow=colLine;
+        colB.style.gridColumn='3';colB.style.gridRow=colLine;
+        panes.forEach(p=>{p.style.width='100%';p.style.minWidth='0';p.style.minHeight='0';});
+        split.style.display='block';
+        split.style.gridColumn='1 / 4';split.style.gridRow='2';
+        split.style.width='auto';split.style.height='7px';split.style.cursor='row-resize';
+        let extra=document.getElementById('mobileSplitResizerThird');
+        if(!extra){ extra=split.cloneNode(false);extra.id='mobileSplitResizerThird';workspace.appendChild(extra); }
+        extra.style.display='block';extra.style.background='var(--border)';
+        extra.style.gridColumn='2';extra.style.gridRow=colLine;
+        extra.style.width='7px';extra.style.height='auto';extra.style.cursor='col-resize';
+        if(!extra._colDrag){
+          extra._colDrag=true;
+          extra.addEventListener('pointerdown',ev=>{
+            if(!isRowLayout())return;
+            ev.preventDefault();extra.setPointerCapture(ev.pointerId);
+            const rect=workspace.getBoundingClientRect();
+            const move=e=>{ splitColsRatio=Math.max(.2,Math.min(.8,(e.clientX-rect.left)/Math.max(1,rect.width))); updateWorkspaceLayout(); };
+            const up=()=>{ try{localStorage.setItem(SPLIT_COLS_KEY,String(splitColsRatio));}catch(e){} extra.removeEventListener('pointermove',move);extra.removeEventListener('pointerup',up);extra.removeEventListener('pointercancel',up); };
+            extra.addEventListener('pointermove',move);extra.addEventListener('pointerup',up);extra.addEventListener('pointercancel',up);
+          });
+        }
+        workspace.style.overflowX='hidden';workspace.style.overflowY='hidden';
+        workspace.scrollLeft=0;
+        workspace.classList.remove('view-single');
+        requestAnimationFrame(()=>{syncDayHeights();restoreDayScroll();});
+        return;
+      }
       const ratio=slots.length===2 ? mobileSplitRatio : 1/3;
       const tracks=slots.length===2
         ? [`minmax(0,${ratio}fr)`,'7px',`minmax(0,${1-ratio}fr)`]
@@ -4670,15 +4716,28 @@
     return rows +
       `<div class="view-menu-section">
         <div class="view-menu-heading">Split <span class="split-state" data-split-state></span></div>
-        <label class="split-field">First<select class="top-select" data-split="first">${paneOptions(false)}</select></label>
-        <label class="split-field">Second<select class="top-select" data-split="second">${paneOptions(false)}</select></label>
-        <label class="split-field">Third<select class="top-select" data-split="third">${paneOptions(true)}</select></label>
-        <label class="split-field">Layout<select class="top-select" data-split="orientation"><option value="vertical">Stacked (top / bottom)</option><option value="horizontal">Side by side</option></select></label>
+        <label class="split-field"><span data-split-label="first">First</span><select class="top-select" data-split="first">${paneOptions(false)}</select></label>
+        <label class="split-field"><span data-split-label="second">Second</span><select class="top-select" data-split="second">${paneOptions(false)}</select></label>
+        <label class="split-field"><span data-split-label="third">Third</span><select class="top-select" data-split="third">${paneOptions(true)}</select></label>
+        <label class="split-field">Layout<select class="top-select" data-split="orientation"><option value="vertical">Stacked (top / bottom)</option><option value="horizontal">Side by side</option><option value="top">Row on top + 2 columns</option><option value="bottom">2 columns + row below</option></select></label>
+        <div class="view-menu-actions">
+          <button class="btn" type="button" data-split-preset title="Reference across the top, Today / Tasks and Notes side by side below">Ref top · Today | Notes</button>
+          <button class="btn" type="button" data-split-rotate title="Move every pane one spot over, keeping the layout">↻ Rotate panes</button>
+          <button class="btn" type="button" data-split-swap title="Swap the two side-by-side panes">⇄ Swap columns</button>
+        </div>
         <div class="view-menu-actions">
           <button class="btn" type="button" data-split-apply>Apply split</button>
           <button class="btn" type="button" data-split-exit>Exit split</button>
         </div>
       </div>`;
+  }
+  // Slot names follow the chosen layout so it's clear where each pane goes.
+  function labelSplitFields(popup){
+    const o = popup.querySelector('[data-split="orientation"]')?.value;
+    const names = o === 'top' ? ['Top row','Bottom left','Bottom right']
+      : o === 'bottom' ? ['Top left','Top right','Bottom row']
+      : o === 'horizontal' ? ['Left','Middle','Right'] : ['Top','Middle','Bottom'];
+    ['first','second','third'].forEach((k,i) => { const el = popup.querySelector(`[data-split-label="${k}"]`); if(el) el.textContent = names[i]; });
   }
   function closeColumnsMenus(){
     document.querySelectorAll('.view-menu-popup').forEach(popup=>popup.hidden=true);
@@ -4698,6 +4757,7 @@
         if(!open) return;
         normalizeSplitOptions();
         popup.querySelectorAll('[data-split]').forEach(select => { select.value = splitOptions[select.dataset.split]; });
+        labelSplitFields(popup);
         popup.querySelectorAll('[data-split-exit]').forEach(btn => btn.disabled = !isSplitActive());
         popup.hidden = false;
         trigger.setAttribute('aria-expanded','true');
@@ -4717,9 +4777,30 @@
       popup.querySelector('[data-split-apply]').addEventListener('click',()=>{
         popup.querySelectorAll('[data-split]').forEach(select => { splitOptions[select.dataset.split] = select.value; });
         normalizeSplitOptions();
-        localStorage.setItem(MOBILE_SPLIT_OPTIONS_KEY,JSON.stringify(splitOptions));
+        saveSplitOptions();
         closeColumnsMenus();
         setSplit(true);
+      });
+      // One-tap layouts (Julius, 2026-10-27): preset, rotate the panes, swap the two columns.
+      const applySplitNow=()=>{ normalizeSplitOptions(); saveSplitOptions(); popup.querySelectorAll('[data-split]').forEach(sel => { sel.value = splitOptions[sel.dataset.split]; }); labelSplitFields(popup); setSplit(true); };
+      popup.querySelector('[data-split="orientation"]').addEventListener('change',()=>labelSplitFields(popup));
+      popup.querySelector('[data-split-preset]').addEventListener('click',()=>{
+        splitOptions={...splitOptions,first:'reference',second:'today',third:'journal',orientation:'top'};
+        applySplitNow(); closeColumnsMenus();
+      });
+      popup.querySelector('[data-split-rotate]').addEventListener('click',()=>{
+        popup.querySelectorAll('[data-split]').forEach(sel => { splitOptions[sel.dataset.split] = sel.value; });
+        normalizeSplitOptions();
+        if(splitOptions.third==='none') [splitOptions.first,splitOptions.second]=[splitOptions.second,splitOptions.first];
+        else [splitOptions.first,splitOptions.second,splitOptions.third]=[splitOptions.third,splitOptions.first,splitOptions.second];
+        applySplitNow();
+      });
+      popup.querySelector('[data-split-swap]').addEventListener('click',()=>{
+        popup.querySelectorAll('[data-split]').forEach(sel => { splitOptions[sel.dataset.split] = sel.value; });
+        normalizeSplitOptions();
+        if(splitOptions.orientation==='top') [splitOptions.second,splitOptions.third]=[splitOptions.third,splitOptions.second];
+        else [splitOptions.first,splitOptions.second]=[splitOptions.second,splitOptions.first];
+        applySplitNow();
       });
       popup.querySelector('[data-split-exit]').addEventListener('click',()=>{
         closeColumnsMenus();
@@ -4727,8 +4808,11 @@
       });
     });
     applyWorkspaceView(saved);
-    // Start with the selected columns visible; split only when explicitly chosen.
-    setSplit(false);
+    // Start with the selected columns visible; split only when explicitly chosen —
+    // except a row + 2 columns layout, which comes back as you left it (Julius, 2026-10-27).
+    let keepRow=false;
+    try{ keepRow=localStorage.getItem(MOBILE_SPLIT_KEY)==='1' && isRowLayout(); }catch(e){}
+    setSplit(keepRow);
   }
   function initMobileEditing(){
     document.addEventListener('selectionchange',() => {

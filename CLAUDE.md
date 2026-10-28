@@ -107,3 +107,8 @@
 
 - Options → Save (saved looks) also calls server `saveLookSnapshot(slot, json, ua)` → Sheet tab **Looks** (Slot / Device / Saved / Settings JSON, one row per slot+device). When Julius asks "how is it now" or "make my latest changes the default", read that tab with the Google Sheets connector (newest Saved row, or the slot/device he names) and bake the values into the defaults in `Index.html` (e.g. `DDEF` day colors from `fw.dmDayColors3`, `fw.dmCell` default, `fw.dmTint` TDEF, `fw.dayColorAdj`, padding/typography). He must tap Save first.
 - One-time reset flag `fw.dmDayReset` cleared his custom dark day colors (2026-10-27).
+
+## Row + 2 columns split (2026-10-27, Julius)
+
+- `splitOptions.orientation` also takes `'top'` (first = full-width row, second | third below) and `'bottom'` (first | second, third = row below); `isRowLayout()`. `normalizeSplitOptions()` fills `third` when it's 'none'. Handled at the top of the split branch in `updateWorkspaceLayout()`: 3x3 grid, `#mobileSplitResizer` = row bar (height ratio `mobileSplitRatio`), `#mobileSplitResizerThird` = column bar (`splitColsRatio`, localStorage `fw.splitColsRatio`, drag listener added once via `extra._colDrag`).
+- Cols menu: `[data-split-preset]` (Reference top, Today left, Notes right), `[data-split-rotate]`, `[data-split-swap]`; `labelSplitFields()` renames the slots per layout. `initWorkspaceView()` restores split on load only for row layouts.

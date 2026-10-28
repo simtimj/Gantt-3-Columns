@@ -48,6 +48,7 @@ Last updated: 2026-10-27
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Row + 2 columns layout (2026-10-27):** Cols → Split → Layout now has **Row on top + 2 columns** (one full-width row, two side-by-side columns below) and **2 columns + row below**. One tap: **Ref top · Today | Notes** sets Reference across the top with Today / Tasks left and Notes right. **↻ Rotate panes** moves every pane one spot over (same layout); **⇄ Swap columns** swaps the two side-by-side panes. The slot names change with the layout (Top row / Bottom left / Bottom right). Drag the long bar for the row height, the short bar for the column widths (both remembered). Each pane scrolls on its own. This layout comes back after a reload; other splits still start off.
 - **Stacked due dates everywhere (2026-10-27):** the 📅 due label on task lines (Today, Reference) now stacks in a narrow column — "📅 Tue" over "Oct 29" — and the Notes due group's "from Tue 10/26" stacks the same way, so long task text keeps the width (same fix the Urgent panel already had).
 
 - **Compact narrow rows (2026-10-27):** in the Urgent panel the dates stack in a small column on the right (Mon 11/16 over 20d, then the day made), so task text keeps the width; slightly tighter box-to-text spacing. Title lines (e.g. Morning) keep their name on one line and the − / + "50 out of 50 done" label wraps onto extra lines instead.

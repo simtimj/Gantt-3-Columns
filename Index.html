@@ -1152,6 +1152,13 @@
     .ucm-item[data-urg="1"]{--urg:#e5484d;}.ucm-item[data-urg="2"]{--urg:#f0b000;}.ucm-item[data-urg="3"]{--urg:#3b82f6;}
     .ucm-item.first{font-weight:700;}
     .ucm-item:hover{background:#f3f4f6;}
+    #urgentPanel .urg-text[contenteditable="true"]{cursor:text;outline:none;border-radius:3px;}
+    #urgentPanel .urg-text[contenteditable="true"]:focus{white-space:normal;overflow:visible;box-shadow:0 1px 0 var(--urg);}
+    .urg-row{-webkit-user-select:text;user-select:text;}
+    .urg-arch-head{display:flex;align-items:center;gap:4px;background:none;border:0;padding:0;cursor:pointer;color:var(--muted);font:inherit;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+    .urg-arch .urg-arch-day{margin:6px 0 1px;font-size:11px;color:var(--muted);font-weight:600;}
+    .urg-arch .urg-row{opacity:.8;}
+    .editor .check-line[data-arch] > .check-text{opacity:.6;}
     .urg-adder{cursor:text;padding:2px 0;}
     .urg-addbox{flex:0 0 auto;width:13px;height:13px;border:2px dashed var(--urg);border-radius:3px;opacity:.7;}
     #urgentPanel.wrap .urg-adder{align-items:center;}
@@ -5075,7 +5082,7 @@
   function noteUrgentDay(date,html,render=true,pane='today'){
     if(!date) return;
     const key = urgKey(date,pane);
-    if(html && /data-(urg|due)=/.test(html)) urgentSource.set(key,String(html));
+    if(html && /data-(urg|due|arch)=/.test(html)) urgentSource.set(key,String(html));
     else urgentSource.delete(key);
     if(render) renderUrgent();
   }
@@ -5096,20 +5103,26 @@
         const hasDue = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '');
         const cb = line.querySelector('input[type=checkbox]');
         const done = !!(cb && cb.hasAttribute('checked')); // Stays listed until urgency is cleared.
+        // Archived (2026-10-27, Julius): out of the levels, into the Archive log under them.
+        const arch = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.arch || '') ? line.dataset.arch : '';
         // Due date but no urgency → the "Due" group at the bottom, while open (2026-10-26, Julius).
-        if(urg === '0' && (!hasDue || done)) return;
+        if(!arch && urg === '0' && (!hasDue || done)) return;
         const level = Number(line.dataset.level) || 0;
         const subs = [];
         for(let j = i + 1; j < lines.length; j++){
           const l2 = Number(lines[j].dataset.level) || 0;
           if(l2 <= level) break;
-          subs.push({text:lineText(lines[j]),level:l2 - level,index:j,urg:/^[123]$/.test(lines[j].dataset.urg || '') ? Number(lines[j].dataset.urg) : 0,done:!!(lines[j].classList.contains('done') || lines[j].querySelector('input[checked]'))});
+          subs.push({text:lineText(lines[j]),html:lineHtml(lines[j]),level:l2 - level,index:j,urg:/^[123]$/.test(lines[j].dataset.urg || '') ? Number(lines[j].dataset.urg) : 0,done:!!(lines[j].classList.contains('done') || lines[j].querySelector('input[checked]'))});
           nestedUntil = j;
         }
-        out.push({date,pane,urg:Number(urg),index:i,text:lineText(line),subs,done,due:/^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : ''});
+        out.push({date,pane,arch,urg:Number(urg),index:i,text:lineText(line),html:lineHtml(line),subs,done,due:/^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : ''});
       });
     });
     return out;
+  }
+  function lineHtml(line){
+    const t = line.querySelector('.check-text');
+    return t ? t.innerHTML : '';
   }
   function lineText(line){
     const t = line.querySelector('.check-text');
@@ -5141,7 +5154,13 @@
       panel.id = 'urgentPanel';
       tree.parentNode.insertBefore(panel,document.getElementById('calPanel') || document.getElementById('inboxPanel') || tree);
     }
-    const items = collectUrgent();
+    // Editing a task's text right in the panel: don't rebuild under the cursor;
+    // it redraws when you leave the line (2026-10-27, Julius).
+    const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#urgentPanel .urg-text[contenteditable="true"]');
+    if(editing){ urgRedrawLater = true; return; }
+    urgRedrawLater = false;
+    const all = collectUrgent();
+    const items = all.filter(x => !x.arch), archived = all.filter(x => x.arch);
     // Keep a half-typed task and the keyboard in an inline add line across re-renders.
     const act = document.activeElement;
     const actAdd = act && act.closest ? act.closest('#urgentPanel .urg-adder') : null;
@@ -5215,53 +5234,14 @@
       }
       wrap.appendChild(sub);
       group.forEach(item => {
-        const row = document.createElement('button');
-        row.type = 'button';
-        row.className = 'urg-row' + (item.done ? ' done' : '');
-        row.dataset.urg = u;
-        row.title = 'Go to ' + item.date;
-        const box = document.createElement('span'); box.className = 'urg-box'; box.dataset.date = item.date; box.dataset.pane = item.pane; box.dataset.index = item.index; box.title = 'Hold (or right-click) to change urgency or due date';
-        const text = document.createElement('span'); text.className = 'urg-text'; text.textContent = item.text;
-        // Text first (always at the left), then the day it's on, small;
-        // the due date hugs the right (2026-10-26, Julius).
-        row.append(box,text);
-        if(showMadeDate()){
-          const made = document.createElement('span'); made.className = 'urg-made';
-          made.textContent = md(item.date); made.title = 'Made ' + wd(item.date) + ' ' + md(item.date);
-          // Made date rides at the end of the text itself (Julius, 2026-10-27), so with
-          // long wrapped text it stays by the words instead of at the right edge.
-          if(urgWrap()){ made.classList.add('inline'); text.append(' ',made); }
-          else row.append(made);
-        }
-        if(item.due){
-          const today = localToday();
-          const date = document.createElement('span'); date.className = 'urg-date';
-          date.textContent = dueText(item.due,today);
-          date.title = 'Due ' + dueLabel(item.due);
-          if(!item.done && item.due < today) date.classList.add('overdue');
-          else if(!item.done && item.due === today) date.classList.add('due-today');
-          row.append(date);
-        }
-        row.addEventListener('click',() => goToTask(item.date,item.index,item.pane));
-        wrap.appendChild(row);
+        wrap.appendChild(urgItemRow(item,u,item.index,item.html,item.text,0,item.done,true));
         // Subtasks: real checkbox rows like their task, indented under it
-        // (2026-10-27, Julius). Same hold-for-urgency box and tap-to-go.
-        item.subs.forEach(st => {
-          const r = document.createElement('button');
-          r.type = 'button';
-          r.className = 'urg-row urg-subrow' + (st.done ? ' done' : '');
-          r.dataset.urg = u;
-          r.style.paddingLeft = (st.level * 21) + 'px';
-          r.title = 'Go to ' + item.date;
-          const sbox = document.createElement('span'); sbox.className = 'urg-box'; sbox.dataset.date = item.date; sbox.dataset.pane = item.pane; sbox.dataset.index = st.index; sbox.title = 'Hold (or right-click) to change urgency or due date';
-          const stext = document.createElement('span'); stext.className = 'urg-text'; stext.textContent = st.text;
-          r.append(sbox,stext);
-          r.addEventListener('click',() => goToTask(item.date,st.index,item.pane));
-          wrap.appendChild(r);
-        });
+        // (2026-10-27, Julius). Same hold-for-urgency box, editable text.
+        item.subs.forEach(st => wrap.appendChild(urgItemRow(item,u,st.index,st.html,st.text,st.level,st.done,false)));
       });
       if(u) wrap.appendChild(urgAdderRow(u));
     });
+    if(archived.length) panel.appendChild(urgArchiveGroup(archived));
     if(focusAdd){
       const inp = panel.querySelector(`.urg-adder[data-urg="${focusAdd}"] input`);
       if(inp){
@@ -5278,6 +5258,86 @@
      urgency already set; the line stays focused for the next one.
      "Title: details" makes the title bold. Esc clears.
      --------------------------------------------------------- */
+  let urgRedrawLater = false;
+  // One task / subtask row. Tap the box = done, tap the text = edit it (writes to
+  // the real task; its day must be loaded), tap elsewhere on the row = go to it.
+  // Hold the box = urgency / due / subject / Archive / Go to task (2026-10-27, Julius).
+  function urgItemRow(item,u,index,html,text,level,done,isHead){
+    const row = document.createElement('div');
+    row.className = 'urg-row' + (level ? ' urg-subrow' : '') + (done ? ' done' : '');
+    row.dataset.urg = u;
+    if(level) row.style.paddingLeft = (level * 21) + 'px';
+    row.title = 'Tap the text to edit · tap the box to tick · tap the date side to go to it';
+    const box = document.createElement('span'); box.className = 'urg-box';
+    box.dataset.date = item.date; box.dataset.pane = item.pane; box.dataset.index = index;
+    box.title = 'Tap = done · hold (or right-click) = urgency, due date, archive';
+    box.addEventListener('click',e => { e.stopPropagation(); toggleDueTask(item.date,index,item.pane); });
+    const tx = document.createElement('span'); tx.className = 'urg-text';
+    tx.dataset.date = item.date; tx.dataset.pane = item.pane; tx.dataset.index = index;
+    if(html) tx.innerHTML = html; else tx.textContent = text;
+    const loaded = !!urgEditor(item.date,item.pane);
+    tx.contentEditable = loaded ? 'true' : 'false';
+    tx.spellcheck = true;
+    row.append(box,tx);
+    if(isHead && !item.arch && showMadeDate()){
+      const made = document.createElement('span'); made.className = 'urg-made';
+      made.textContent = md(item.date); made.title = 'Made ' + wd(item.date) + ' ' + md(item.date);
+      row.append(made);
+    }
+    if(isHead && item.due && !item.arch){
+      const today = localToday();
+      const date = document.createElement('span'); date.className = 'urg-date';
+      date.textContent = dueText(item.due,today);
+      date.title = 'Due ' + dueLabel(item.due);
+      if(!item.done && item.due < today) date.classList.add('overdue');
+      else if(!item.done && item.due === today) date.classList.add('due-today');
+      row.append(date);
+    }
+    row.addEventListener('click',e => {
+      if(e.target.closest('.urg-box')) return;
+      if(e.target.closest('.urg-text') && tx.isContentEditable) return;
+      goToTask(item.date,index,item.pane);
+    });
+    return row;
+  }
+  // Archive log (2026-10-27, Julius): finished work kept as a dated log under
+  // the levels, newest first; collapsed by default.
+  let urgArchOpen = false;
+  try{ urgArchOpen = localStorage.getItem('fw.urgArchOpen') === '1'; }catch(e){}
+  function urgArchiveGroup(list){
+    const wrap = document.createElement('div');
+    wrap.className = 'urg-group urg-arch';
+    wrap.dataset.urg = '0';
+    const head = document.createElement('button');
+    head.type = 'button'; head.className = 'urg-sub urg-arch-head';
+    head.append(pmBox(urgArchOpen),document.createTextNode(' Archive · ' + list.length));
+    head.title = 'Finished work kept as a log, by the day it was archived';
+    head.addEventListener('click',() => {
+      urgArchOpen = !urgArchOpen;
+      try{ localStorage.setItem('fw.urgArchOpen',urgArchOpen ? '1' : '0'); }catch(e){}
+      renderUrgent();
+    });
+    wrap.appendChild(head);
+    if(!urgArchOpen) return wrap;
+    const byDay = new Map();
+    list.forEach(x => { if(!byDay.has(x.arch)) byDay.set(x.arch,[]); byDay.get(x.arch).push(x); });
+    [...byDay.keys()].sort().reverse().forEach(day => {
+      const d = document.createElement('div'); d.className = 'urg-arch-day';
+      d.textContent = '🗄 ' + wd(day) + ' ' + md(day);
+      wrap.appendChild(d);
+      byDay.get(day).forEach(item => {
+        wrap.appendChild(urgItemRow(item,item.urg || 0,item.index,item.html,item.text,0,item.done,true));
+        item.subs.forEach(st => wrap.appendChild(urgItemRow(item,item.urg || 0,st.index,st.html,st.text,st.level,st.done,false)));
+      });
+    });
+    return wrap;
+  }
+  function setArchived(line,owner,on){
+    const day = localToday();
+    urgSubtree(line).forEach(l => { if(on) l.dataset.arch = day; else delete l.dataset.arch; });
+    urgChanged(owner);
+    setStatus(on ? 'Archived ' + md(day) + ' — in Urgent → Archive' : 'Back in the Urgent panel');
+  }
   const urgDraft = {1:'',2:'',3:''};
   let urgAddWant = 0;
   function urgAdderRow(u){
@@ -5889,6 +5949,7 @@
       lines.forEach((line,i) => {
         if(i <= nestedUntil) return;
         const due = line.dataset.due || '';
+        if(line.dataset.arch) return; // archived tasks leave the Due group too
         if(!/^\d{4}-\d{2}-\d{2}$/.test(due) || due === date) return;
         // The whole task: its subtasks come along (Julius, 2026-10-27).
         const level = Number(line.dataset.level) || 0, subs = [];
@@ -6020,7 +6081,7 @@
     });
     // Typing inside the group must not count as editing the Notes cell itself.
     ['beforeinput','input','keydown','keyup','paste'].forEach(type => document.addEventListener(type,e => {
-      const tx = e.target && e.target.closest ? e.target.closest('.due-notes .di-text') : null;
+      const tx = e.target && e.target.closest ? e.target.closest('.due-notes .di-text, #urgentPanel .urg-text[contenteditable="true"]') : null;
       if(!tx) return;
       e.stopPropagation();
       if(type === 'keydown' && e.key === 'Enter'){ e.preventDefault(); tx.blur(); return; }
@@ -6033,6 +6094,12 @@
       dueEditTimer = setTimeout(() => urgChanged(src.ed),600);
     },true));
     document.addEventListener('focusout',e => {
+      if(e.target && e.target.closest && e.target.closest('#urgentPanel .urg-text')){
+        const src = dueSource(e.target);
+        if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; if(src) urgChanged(src.ed); }
+        setTimeout(() => { try{ renderUrgent(); }catch(err){} },0);
+        return;
+      }
       if(!(e.target && e.target.closest && e.target.closest('.due-notes .di-text'))) return;
       const src = dueSource(e.target);
       if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; if(src) urgChanged(src.ed); }
@@ -6143,6 +6210,15 @@
       tb.addEventListener('pointerdown',e => e.preventDefault());
       tb.addEventListener('click',() => { hideUrgencyPicker(); toggleTitleLine(line,owner); });
       p.appendChild(tb);
+    }
+    // Archive / unarchive the task + its subtasks (2026-10-27, Julius).
+    {
+      const ab = document.createElement('button');
+      ab.type = 'button'; ab.className = 'urg-goto';
+      ab.textContent = line.dataset.arch ? '↩ Unarchive (back to Urgent)' : '🗄 Archive (keep as a log, dated today)';
+      ab.addEventListener('pointerdown',e => e.preventDefault());
+      ab.addEventListener('click',() => { hideUrgencyPicker(); setArchived(line,owner,!line.dataset.arch); });
+      p.appendChild(ab);
     }
     // From a copy (Due group in Notes, Urgent panel): jump to where it lives (Julius, 2026-10-27).
     if(cb.classList && (cb.classList.contains('di-box') || cb.classList.contains('urg-box'))){

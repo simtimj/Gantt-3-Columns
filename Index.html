@@ -8483,7 +8483,12 @@
       if(Math.abs(e.clientX - press.x) > th || Math.abs(e.clientY - press.y) > th) begin(e);
     },{capture:true,passive:false});
     document.addEventListener('pointerup',e => { press = null; if(drag) finish(false); },true);
-    document.addEventListener('pointercancel',e => { press = null; if(drag) finish(true); },true);
+    // Tell why a grip drag stopped, so a failed drag on the phone can be traced (2026-10-28).
+    document.addEventListener('pointercancel',e => {
+      const wasGrip = press && press.grip, wasDrag = !!drag;
+      press = null; if(drag) finish(true);
+      if(wasGrip || wasDrag) setStatus('Drag stopped: the phone took over the touch (cancel)');
+    },true);
     document.addEventListener('keydown',e => { if(e.key === 'Escape' && drag) finish(true); },true);
     // A drag must not also tick the box.
     document.addEventListener('click',e => {

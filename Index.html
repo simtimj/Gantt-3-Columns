@@ -8327,7 +8327,9 @@
     function finishInbox(d,t){
       if(d.row) d.row.classList.remove('inbox-dragging');
       if(!t) return;
+      if(t.retag) return inboxToToday(d.inbox,Number(t.urg));
       const line = d.line;
+      if(t.urg) line.dataset.urg = t.urg;
       line.dataset.level = String(t.level);
       line.style.marginLeft = t.level ? (t.level * 24) + 'px' : '';
       captureBeforeEdit(t.ed);
@@ -8343,12 +8345,36 @@
       dismissInbox(d.inbox.id,'Moved to ' + (t.ed.dataset.date ? (typeof shortDayLabel === 'function' ? shortDayLabel(t.ed.dataset.date) : t.ed.dataset.date) : 'Reference'));
     }
     // Drop on an Urgent row (2026-10-28, Julius): lands next to that task in its own cell and takes its urgency.
-    function urgTargetAt(el,x,y){
-      const row = el && el.closest ? el.closest('#urgentPanel .urg-row:not(.inbox-row)') : null;
-      if(!row) return undefined;
-      const tx = row.querySelector('.urg-text');
+    // Any spot in the Urgent panel counts (2026-10-28, Julius: dragging into it did nothing unless
+    // the finger was exactly on a row): headers, gaps, add lines and empty levels pick the nearest
+    // row in that level; a level with no usable row just gives the task that urgency where it is.
+    function urgRowSrc(row){
+      const tx = row && row.querySelector('.urg-text');
       const src = tx && typeof dueSource === 'function' ? dueSource(tx) : null;
-      if(!src || !src.ed.isContentEditable || drag.nodes.includes(src.line)) return null;
+      return src && src.ed.isContentEditable && !drag.nodes.includes(src.line) ? src : null;
+    }
+    function urgTargetAt(el,x,y){
+      const panel = el && el.closest ? el.closest('#urgentPanel') : null;
+      if(!panel) return undefined;
+      let row = el.closest('.urg-row:not(.inbox-row)');
+      if(!(row && urgRowSrc(row))){
+        let group = el.closest('.urg-group');
+        if(!group){
+          const gs = [...panel.querySelectorAll(':scope > .urg-group')].filter(g => g.dataset.urg !== '0');
+          group = gs.find(g => y <= g.getBoundingClientRect().bottom) || gs[gs.length - 1] || null;
+        }
+        if(!group) return null;
+        const rows = [...group.querySelectorAll('.urg-row:not(.inbox-row)')].filter(urgRowSrc);
+        let best = null, bd = Infinity;
+        rows.forEach(r => { const b = r.getBoundingClientRect(), d = y < b.top ? b.top - y : (y > b.bottom ? y - b.bottom : 0); if(d < bd){ bd = d; best = r; } });
+        if(!best){
+          const u = group.dataset.urg;
+          if(!u || u === '0') return null;
+          return {retag:true,urg:u,group,level:drag.base,rowLvl:drag.base};
+        }
+        row = best;
+      }
+      const src = urgRowSrc(row);
       const r = row.getBoundingClientRect(), above = y < r.top + r.height / 2;
       let before;
       if(above) before = src.line;
@@ -8401,6 +8427,13 @@
       const t = drag.target = targetAt(drag.x,drag.y);
       const ind = drag.ind;
       if(!t){ ind.hidden = true; return; }
+      if(t.retag){
+        const hd = t.group.querySelector('.urg-sub') || t.group, gr = hd.getBoundingClientRect();
+        ind.hidden = false;
+        ind.style.left = gr.left + 'px'; ind.style.width = Math.max(30,gr.width) + 'px';
+        ind.style.top = (gr.bottom + 1) + 'px';
+        return;
+      }
       if(t.row){
         const rr = t.row.getBoundingClientRect();
         ind.hidden = false;
@@ -8453,6 +8486,14 @@
       const t = cancelled ? null : d.target;
       if(d.inbox) return finishInbox(d,t);
       if(!t) return;
+      if(t.retag){
+        if(d.nodes.every(n => n.dataset.urg === t.urg)) return;
+        captureBeforeEdit(d.src);
+        d.nodes.forEach(n => { n.dataset.urg = t.urg; });
+        refreshCards(d.src); finishEditorEdit(d.src); urgChanged(d.src);
+        setStatus('Marked ' + (URG_NAMES[t.urg] || 'urgent'));
+        return;
+      }
       const shift = t.level - d.base;
       const samePlace = t.ed === d.src && shift === 0 && (t.before === d.nodes[d.nodes.length - 1].nextElementSibling);
       const urgSame = !t.urg || d.nodes.every(n => n.dataset.urg === t.urg);

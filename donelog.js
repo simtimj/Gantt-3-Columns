@@ -122,4 +122,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-no-caret-v3', date: '2026-10-28', project: 'Gantt', title: 'No cursor on first tap + Reference drag', details: 'cell is non-editable during the first tap so no cursor/keyboard; grip drag works for nested Reference tasks' },
   { id: 'd-20261028-urg-pick-nest', date: '2026-10-28', project: 'Gantt', title: 'Urgent first tap fixed + nest by sliding', details: 'first tap on an Urgent row picks it (with grip) and leaves the text you were in; drag onto Urgent rows and slide right to make it a subtask' },
   { id: 'd-20261028-grip-stays', date: '2026-10-28', project: 'Gantt', title: 'Grip stays after a press', details: 'pressing the grip without dragging keeps the card picked; drag from Urgent works again (tested in phone emulation)' },
+  { id: 'd-20261028-urg-drop-anywhere', date: '2026-10-28', project: 'Gantt', title: 'Drop anywhere in Urgent', details: 'dragging into the Urgent panel now works on headers, gaps and empty levels, not just exactly on a row' },
 ];

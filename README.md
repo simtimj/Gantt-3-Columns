@@ -48,6 +48,8 @@ Last updated: 2026-10-28
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Drag grip (2026-10-28):** tap into a task or subtask and a small **⠿** grip appears at the right end of that line (only on the line you're in, so it takes no space otherwise). Hold it and drag to move the task — reorder, drag left to turn a subtask into a task, right to nest it, or drop it into another day / Reference cell. Its subtasks come along. The checkbox still works as before (tap = tick, hold = menu).
+
 - **Slimmer urgency box (2026-10-28):** urgent checkboxes are the same size as the rest; the urgency color is a 2px border drawn over the subject color (no gap, no outer ring), with only a faint glow.
 
 - **Side space (2026-10-28):** less empty room left/right so text gets more width — day cells, Morning/Afternoon/Evening boxes, task cards (text to card edge), Suggested-day boxes, Urgent and Inbox panels, Reference column. New **Options → Side space** slider near the top (default 70%, 20–150%); columns narrower than 420px automatically use 60% of that. Saved in Saved looks.

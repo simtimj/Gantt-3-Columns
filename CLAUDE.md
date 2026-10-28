@@ -137,3 +137,7 @@
 ## Side space (2026-10-28, Julius)
 
 - `--side-k` multiplies horizontal padding: `.day-row` (all 3 rules), `#referenceScroll`, `.sec-host > .editor.sec-painted` (15px base), card `.check-line[data-tc]` sides (8px base), note-table `td`, `#urgentPanel` / `#inboxPanel`. `:root{--side-k:var(--side,.7)}`; `#workspace > .pane.pane-narrow` uses `--side × .6`. Slider `#sideSpace` (Options, under Scale) sets `--side` on `:root`, localStorage `fw.sideSpace` (in look `KEYS`). `paintDaySecs()` insets section boxes by ⅓ of the editor's left padding. He wants the triple-column layout to fit — apply `--side-k` to any new horizontal padding.
+
+## Drag grip (2026-10-28, Julius)
+
+- `#tcGrip` (fixed overlay div in `<body>`, created in the card-drag IIFE; never inside an editor) shows on the line with `data-tcfocus` when it's a direct editor child and cards are on. `window.tcGripPlace(line)` positions it at the line's right edge (first text row); `initLineFocus()` calls it on selection/focus/scroll/resize/input. `startPoint()` treats a pointerdown on the grip as a press on `grip._line` (`press.grip`, 3px drag threshold, `preventDefault` keeps focus); everything else uses the existing card drag (`begin`/`move`/`finish`). Julius picked this over an always-visible handle (space) and over empty-card-space grabbing; checkbox drag left as it was.

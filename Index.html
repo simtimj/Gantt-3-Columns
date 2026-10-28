@@ -5467,14 +5467,14 @@
         for(let j = i + 1; j < lines.length; j++){
           const l2 = Number(lines[j].dataset.level) || 0;
           if(l2 <= level) break;
-          subs.push({text:lineText(lines[j]),html:lineHtml(lines[j]),level:l2 - level,index:j,due:/^\d{4}-\d{2}-\d{2}$/.test(lines[j].dataset.due || '') ? lines[j].dataset.due : '',urg:/^[123]$/.test(lines[j].dataset.urg || '') ? Number(lines[j].dataset.urg) : 0,done:!!(lines[j].classList.contains('done') || lines[j].querySelector('input[checked]'))});
+          subs.push({text:lineText(lines[j]),html:lineHtml(lines[j]),level:l2 - level,index:j,due:/^\d{4}-\d{2}-\d{2}$/.test(lines[j].dataset.due || '') ? lines[j].dataset.due : '',urg:/^[123]$/.test(lines[j].dataset.urg || '') ? Number(lines[j].dataset.urg) : 0,dur:durMin(lines[j].dataset.dur),done:!!(lines[j].classList.contains('done') || lines[j].querySelector('input[checked]'))});
           nestedUntil = j;
         }
         const due = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : '';
         // Sort by the soonest open date of the task or any of its subtasks (2026-10-28, Julius:
         // subtasks are sometimes due before the task).
         const soon = [due].concat(subs.filter(x => !x.done).map(x => x.due)).filter(Boolean).sort()[0] || '';
-        out.push({date,pane,arch,urg:Number(urg),index:i,text:lineText(line),html:lineHtml(line),subs,done,due,soon});
+        out.push({date,pane,arch,urg:Number(urg),index:i,text:lineText(line),html:lineHtml(line),subs,done,due,soon,dur:durMin(line.dataset.dur)});
       });
     });
     return out;
@@ -5525,6 +5525,25 @@
     const m = durMin(min);
     if(m) line.dataset.dur = String(m); else delete line.dataset.dur;
     syncMetaLabel(line);
+  }
+  // Task fields that must travel when a line is rebuilt somewhere else (Notes → day /
+  // Reference, 2026-10-28): urgency, subject, due, duration.
+  function lineMeta(n){
+    const d = (n && n.dataset) || {};
+    return {
+      urg: /^[123]$/.test(d.urg || '') ? d.urg : '',
+      cat: /^[a-z]{2,12}$/.test(d.cat || '') ? d.cat : '',
+      due: /^\d{4}-\d{2}-\d{2}$/.test(d.due || '') ? d.due : '',
+      dur: durMin(d.dur) || ''
+    };
+  }
+  function applyLineMeta(c,m){
+    if(!m) return;
+    if(m.urg) c.dataset.urg = m.urg;
+    if(m.cat) c.dataset.cat = m.cat;
+    if(m.due) c.dataset.due = m.due;
+    if(durMin(m.dur)) c.dataset.dur = String(durMin(m.dur));
+    syncMetaLabel(c);
   }
   function localToday(){
     const d = new Date();
@@ -6085,6 +6104,7 @@
       if(t.level) c.style.marginLeft = `${t.level * 24}px`;
       c.innerHTML = '<input type="checkbox"><span class="check-text"></span>';
       c.querySelector('.check-text').innerHTML = t.html;
+      applyLineMeta(c,t.meta);
       cell.appendChild(c);
       wireCheckbox(c.querySelector('input'));
     });
@@ -6103,7 +6123,7 @@
       if(!n.classList.contains('check-line') || lvl(n) <= base) break;
       out.push(n);
     }
-    return out.map(n => ({ node:n, level: lvl(n) - base, html: n.querySelector('.check-text')?.innerHTML || '' }));
+    return out.map(n => ({ node:n, level: lvl(n) - base, html: n.querySelector('.check-text')?.innerHTML || '', meta: lineMeta(n) }));
   }
   function addTasksToDay(date, items){
     const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
@@ -6118,6 +6138,7 @@
       if(it.level) c.style.marginLeft = `${it.level * 24}px`;
       c.innerHTML = '<input type="checkbox"><span class="check-text"></span>';
       c.querySelector('.check-text').innerHTML = it.html;
+      applyLineMeta(c,it.meta);
       ed.appendChild(c);
       wireCheckbox(c.querySelector('input'));
     });
@@ -6128,7 +6149,7 @@
   }
   function sendNoteTask(line, ed, date){
     const tree = noteTaskTree(line);
-    const items = tree.map(t => ({ level:t.level, html:t.html }));
+    const items = tree.map(t => ({ level:t.level, html:t.html, meta:t.meta }));
     const label = formatDate(date);
     const what = items.length > 1 ? `${items.length} tasks` : 'task';
     const removeLines = () => {

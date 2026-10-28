@@ -49,6 +49,7 @@ Last updated: 2026-10-28
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
 - **Task duration (2026-10-28, auto-reshuffle step 1)**: hold a task's checkbox → **⏱** row: 15m · 30m · 45m · 1h · 1h 30m · 2h, or **…** for any length (minutes). Optional; tap the picked one again to clear. Shows as ⏱ 45m in the line's corner label (under the 📅 due date if it has one), saved with the task in the Sheet (`data-dur`). Deadline = the existing 📅 due date, priority = the existing red/yellow/blue urgency, so every task card now carries all three. Claude can add `dur` to tasks in `tasks.js`.
+  - Duration now also survives **→ Day / → Reference** sends from Notes (urgency, subject and due date too — they used to be dropped), Urgent items carry `dur` for prioritization, and `getDayTasks(date)` in `Code.gs` returns a day's tasks with level / done / urgency / due / duration for the future scheduler (2026-10-28).
 
 - **Urgency mark off the box (2026-10-28)**: the checkbox keeps only its subject fill (plain gray-ish border); urgency shows as a thin red/yellow/blue **bar left of the box** (box height). Options → Task cards → **Urgency mark** to try *Line under box*, *Underline text* or the old *Box border*. Urgent panel / Notes Due boxes unchanged.
 - **Subtask due dates everywhere** (2026-10-28): a subtask's own due date shows on its line in Today and Reference cells, on its row in Urgent (with Today / overdue colors), and in Notes' Due-today list even when its task is due later. Urgent sorts each task by the soonest open date of the task or its subtasks.

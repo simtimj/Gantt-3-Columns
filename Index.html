@@ -467,6 +467,8 @@
     /* .pane-narrow is set by initNarrowPanes() when a pane is under 420px wide. */
     .pane-narrow .check-line:not([data-tlon]){display:flow-root;min-height:calc(18px * var(--workspace-scale,1));}
     .pane-narrow .check-line:not([data-tlon]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
+    /* Done text is faded (opacity → own layer), which painted it over the floated box and ate taps (Julius, 2026-10-28). Keep the box on top. */
+    .check-line > input[type=checkbox]{position:relative;z-index:1;}
     .pane-narrow .check-line:not([data-tlon]) > .check-text{display:block;}
     .pane-narrow .check-line:not([data-tlon])[data-due-label]::after{display:block;white-space:normal;text-align:right;margin:1px 0 0;}
     /* Notes send lines when narrow: the → button floats top-right (as ::before so it comes first), text wraps under both. */

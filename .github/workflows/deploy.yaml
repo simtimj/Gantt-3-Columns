@@ -26,6 +26,5 @@ jobs:
       - name: Push code to Apps Script
         run: clasp push --force
 
-      - name: Update web app deployment
-        if: ${{ vars.DEPLOYMENT_ID != '' }}
-        run: clasp update-deployment "${{ vars.DEPLOYMENT_ID }}" --description "CI ${{ github.sha }}"
+      # Julius uses the /dev test link (always the latest pushed code), so no
+      # versioned deployment update here (it hit the 200-version cap, 2026-10-27).

@@ -1147,9 +1147,16 @@
     /* Narrow panel (Julius, 2026-10-27): when text + dates don't fit on one line, the
        dates drop to their own short line under the task instead of squeezing the text
        into a tall column. Lines break by full (unwrapped) widths first. */
-    #urgentPanel.wrap .urg-row{flex-wrap:wrap;row-gap:0;}
-    #urgentPanel.wrap .urg-row > .urg-text{flex:0 1 auto;max-width:calc(100% - 25px);}
-    #urgentPanel .urg-date,#urgentPanel .urg-made{white-space:nowrap;}
+    #urgentPanel .urg-row{gap:6px;}
+    #urgentPanel.wrap .urg-row > .urg-text{flex:1 1 0;min-width:4em;}
+    #urgentPanel .urg-meta{flex:0 0 auto;margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:0;line-height:1.15;text-align:right;}
+    #urgentPanel .urg-meta .urg-date{display:flex;flex-direction:column;align-items:flex-end;margin:0;padding:0;}
+    #urgentPanel .urg-meta .urg-date > span,#urgentPanel .urg-meta .urg-made{white-space:nowrap;}
+    #urgentPanel .urg-meta .urg-made{margin:0;}
+    /* Title lines (sections like Morning): the name keeps its width, the − / + "50 out of
+       50 done" label wraps onto more lines instead of crushing the name (Julius, 2026-10-27). */
+    [data-tlon] > .check-text,[data-tlon] > b{flex:0 1 auto;min-width:min-content;overflow-wrap:normal;word-break:normal;}
+    [data-tlon]::before{flex:0 12 auto;min-width:2.2em;white-space:normal!important;line-height:1.2!important;}
     #urgentPanel.wrap .urg-row .urg-box{margin-top:2px;}
     #urgentPanel.wrap .urg-text,#urgentPanel.wrap .urg-subtask{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
     .urg-create-menu{position:fixed;z-index:3002;display:flex;flex-direction:column;min-width:170px;padding:4px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);}
@@ -5285,20 +5292,24 @@
     tx.contentEditable = loaded ? 'true' : 'false';
     tx.spellcheck = true;
     row.append(box,tx);
-    if(isHead && !item.arch && showMadeDate()){
-      const made = document.createElement('span'); made.className = 'urg-made';
-      made.textContent = md(item.date); made.title = 'Made ' + wd(item.date) + ' ' + md(item.date);
-      row.append(made);
-    }
+    // Dates stack in a narrow column on the right (Julius, 2026-10-27): due date,
+    // then days left, then the day made — so the task text keeps the width.
+    const meta = document.createElement('span'); meta.className = 'urg-meta';
     if(isHead && item.due && !item.arch){
       const today = localToday();
       const date = document.createElement('span'); date.className = 'urg-date';
-      date.textContent = dueText(item.due,today);
+      dueText(item.due,today).split(' · ').forEach(part => { const sp = document.createElement('span'); sp.textContent = part; date.append(sp); });
       date.title = 'Due ' + dueLabel(item.due);
       if(!item.done && item.due < today) date.classList.add('overdue');
       else if(!item.done && item.due === today) date.classList.add('due-today');
-      row.append(date);
+      meta.append(date);
     }
+    if(isHead && !item.arch && showMadeDate()){
+      const made = document.createElement('span'); made.className = 'urg-made';
+      made.textContent = md(item.date); made.title = 'Made ' + wd(item.date) + ' ' + md(item.date);
+      meta.append(made);
+    }
+    if(meta.childNodes.length) row.append(meta);
     row.addEventListener('click',e => {
       if(e.target.closest('.urg-box')) return;
       if(e.target.closest('.urg-text') && tx.isContentEditable) return;

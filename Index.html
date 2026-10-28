@@ -1152,6 +1152,12 @@
     .ucm-item[data-urg="1"]{--urg:#e5484d;}.ucm-item[data-urg="2"]{--urg:#f0b000;}.ucm-item[data-urg="3"]{--urg:#3b82f6;}
     .ucm-item.first{font-weight:700;}
     .ucm-item:hover{background:#f3f4f6;}
+    .urg-adder{cursor:text;padding:2px 0;}
+    .urg-addbox{flex:0 0 auto;width:13px;height:13px;border:2px dashed var(--urg);border-radius:3px;opacity:.7;}
+    #urgentPanel.wrap .urg-adder{align-items:center;}
+    .urg-adder input{flex:1;min-width:0;font:inherit;font-size:13px;color:inherit;background:transparent;border:0;border-bottom:1px solid transparent;padding:3px 0;outline:none;border-radius:0;}
+    .urg-adder input:focus{border-bottom-color:var(--urg);}
+    .urg-adder input::placeholder{color:var(--muted);opacity:.8;}
     .urg-create{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:4px;}
     .urg-create input,.inbox-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;}
     #calPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
@@ -5136,6 +5142,12 @@
       tree.parentNode.insertBefore(panel,document.getElementById('calPanel') || document.getElementById('inboxPanel') || tree);
     }
     const items = collectUrgent();
+    // Keep a half-typed task and the keyboard in an inline add line across re-renders.
+    const act = document.activeElement;
+    const actAdd = act && act.closest ? act.closest('#urgentPanel .urg-adder') : null;
+    let focusAdd = urgAddWant || (actAdd ? Number(actAdd.dataset.urg) : 0);
+    const caret = actAdd && !urgAddWant ? act.selectionStart : null;
+    urgAddWant = 0;
     panel.innerHTML = '';
     panel.hidden = false; // Always shown, so you can add a task even when it's empty.
     panel.classList.toggle('wrap', urgWrap());
@@ -5182,17 +5194,11 @@
     headRow.append(head,add);
     panel.appendChild(headRow);
     if(!urgentOpen) return;
-    if(urgCreating) panel.appendChild(createRow(urgCreating));
-    if(!items.length && !urgCreating){
-      const empty = document.createElement('div');
-      empty.className = 'urg-empty';
-      empty.textContent = 'Nothing urgent. Tap + Task to add one.';
-      panel.appendChild(empty);
-    }
     [1,2,3,0].forEach(u => {
       const group = items.filter(x => x.urg === u)
         .sort((a,b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || (a.due || '').localeCompare(b.due || ''));
-      if(!group.length) return;
+      // Urgent / Soon / Can be later always show (with their add line), even when empty (Julius, 2026-10-27).
+      if(!group.length && !u) return;
       const wrap = document.createElement('div');
       wrap.className = 'urg-group';
       wrap.dataset.urg = u;
@@ -5254,7 +5260,58 @@
           wrap.appendChild(r);
         });
       });
+      if(u) wrap.appendChild(urgAdderRow(u));
     });
+    if(focusAdd){
+      const inp = panel.querySelector(`.urg-adder[data-urg="${focusAdd}"] input`);
+      if(inp){
+        try{ inp.focus({preventScroll:true}); }catch(e){ inp.focus(); }
+        const n = caret == null ? inp.value.length : Math.min(caret,inp.value.length);
+        try{ inp.setSelectionRange(n,n); }catch(e){}
+      }
+    }
+  }
+  /* ---------------------------------------------------------
+     Type tasks straight into the Urgent panel (2026-10-27, Julius):
+     each level ends with an add line (dashed box in the level's color).
+     Type → Enter = a new task at the end of today's Today cell with that
+     urgency already set; the line stays focused for the next one.
+     "Title: details" makes the title bold. Esc clears.
+     --------------------------------------------------------- */
+  const urgDraft = {1:'',2:'',3:''};
+  let urgAddWant = 0;
+  function urgAdderRow(u){
+    const row = document.createElement('form');
+    row.className = 'urg-row urg-adder';
+    row.dataset.urg = u;
+    row.title = 'Type a ' + URG_NAMES[u] + ' task, Enter to add (goes in today)';
+    const box = document.createElement('span'); box.className = 'urg-addbox'; box.setAttribute('aria-hidden','true');
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = urgDraft[u] || '';
+    inp.placeholder = 'Add ' + URG_NAMES[u].toLowerCase() + ' task…';
+    inp.enterKeyHint = 'enter';
+    inp.autocomplete = 'off';
+    inp.setAttribute('aria-label','New ' + URG_NAMES[u] + ' task');
+    inp.addEventListener('input',() => { urgDraft[u] = inp.value; });
+    inp.addEventListener('keydown',e => {
+      e.stopPropagation(); // the page's shortcuts / undo shouldn't act on this box
+      if(e.key === 'Escape'){ urgDraft[u] = ''; inp.value = ''; inp.blur(); }
+    });
+    row.addEventListener('pointerdown',e => { if(e.target !== inp){ e.preventDefault(); inp.focus(); } });
+    row.addEventListener('submit',e => {
+      e.preventDefault();
+      const p = splitTitle(inp.value);
+      if(!p.title && !p.details) return;
+      const was = inp.value;
+      urgDraft[u] = '';
+      urgAddWant = u; // keep typing in this level after the panel re-renders
+      if(addTaskToToday(p.title,p.details,u)) setStatus(URG_NAMES[u] + ' task added to today');
+      else { urgDraft[u] = was; urgAddWant = 0; }
+      renderUrgent();
+    });
+    row.append(box,inp);
+    return row;
   }
   /* ---------------------------------------------------------
      Make tasks right in the Urgent panel (2026-10-26, Julius).
@@ -5301,11 +5358,11 @@
       b.textContent = 'Create ' + URG_NAMES[u] + ' task';
       b.addEventListener('click',() => {
         closeCreateMenu();
-        urgCreating = u;
+        // Jump into that level's inline add line (2026-10-27).
         urgentOpen = true;
+        try{ localStorage.setItem('fw.urgentOpen','1'); }catch(e){}
+        urgAddWant = u;
         renderUrgent();
-        const inp = document.querySelector('#urgentPanel .urg-create input');
-        if(inp) inp.focus();
       });
       m.appendChild(b);
     });

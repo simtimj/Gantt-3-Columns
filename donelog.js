@@ -110,4 +110,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-urg-text-hold', date: '2026-10-28', project: 'Gantt', title: 'Urgent text hold menu', details: '+ Task / + Subtask / ← Outdent / Indent → moved off the checkbox hold; hold inside the task text where you are, no highlight' },
   { id: 'd-20261028-quiet-cards', date: '2026-10-28', project: 'Gantt', title: 'Quiet cards + focus ring', details: 'card outlines hidden at rest; the task/subtask line you type in gets a thin urgency-colored ring (Urgent ring thinner too)' },
   { id: 'd-20261028-side-space', date: '2026-10-28', project: 'Gantt', title: 'Side space slider', details: 'less left/right room in cells, section boxes, cards, panels; Options → Side space (default 70%), narrow columns tighter automatically' },
+  { id: 'd-20261028-slim-urg-box', date: '2026-10-28', project: 'Gantt', title: 'Slimmer urgency checkbox', details: 'normal size, 2px urgency border over the subject color, no gap or outer ring' },
 ];

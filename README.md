@@ -48,6 +48,8 @@ Last updated: 2026-10-28
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Slimmer urgency box (2026-10-28):** urgent checkboxes are the same size as the rest; the urgency color is a 2px border drawn over the subject color (no gap, no outer ring), with only a faint glow.
+
 - **Side space (2026-10-28):** less empty room left/right so text gets more width — day cells, Morning/Afternoon/Evening boxes, task cards (text to card edge), Suggested-day boxes, Urgent and Inbox panels, Reference column. New **Options → Side space** slider near the top (default 70%, 20–150%); columns narrower than 420px automatically use 60% of that. Saved in Saved looks.
 
 - **Quiet cards + focus ring (2026-10-28):** task cards no longer show an outline all the time. The task or subtask line you're typing in gets a thin ring in its urgency color (gray if none) — same as editing a task in Urgent, whose ring is now thinner too (1px). Also on the Due-today lines in Notes. Card fill (Options → Card fill) is unchanged.

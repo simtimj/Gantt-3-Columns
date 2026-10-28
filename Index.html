@@ -7372,11 +7372,13 @@
     background:var(--tc-cat)!important;display:inline-grid;place-content:center;cursor:pointer;
   }
   /* Urgency stands out (Julius, 2026-10-27): thicker colored border + a dark gap before the subject fill, plus a soft glow. */
+  /* Slimmer (Julius, 2026-10-28): same size as any box, 2px urgency border drawn over the subject fill
+     (no gap, no extra outer ring), just a faint glow. */
   body.tc-boxfill .check-line[data-tccat]:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{
-    width:1.15em;height:1.15em;border-width:2.5px!important;padding:1.5px;background-clip:content-box!important;
-    box-shadow:0 0 0 1px var(--urg),0 0 5px color-mix(in srgb,var(--urg) 70%,transparent);
+    border-width:2px!important;padding:0;background-clip:border-box!important;
+    box-shadow:0 0 3px color-mix(in srgb,var(--urg) 45%,transparent);
   }
-  .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{border-width:2.5px;box-shadow:0 0 4px color-mix(in srgb,var(--urg) 60%,transparent);}
+  .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{border-width:2px;box-shadow:0 0 3px color-mix(in srgb,var(--urg) 45%,transparent);}
   body.tc-boxfill .check-line[data-tccat]:not([data-urg]) > input[type=checkbox]{border-color:color-mix(in srgb,var(--tc-cat) 55%,#555)!important;}
   body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]:checked::after{
     content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2.5px 2.5px 0;

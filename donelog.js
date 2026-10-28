@@ -103,4 +103,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-urg-narrow', date: '2026-10-27', project: 'Gantt', title: 'Urgent narrow layout', details: 'narrow only: due date stacks Fri / 10/30 / 3d and text wraps under the box; all space savers now off when columns are wide' },
   { id: 'd-20261027-inbox-tasks', date: '2026-10-27', project: 'Gantt', title: 'Inbox rows as tasks + Delete', details: 'inbox items are checkbox + editable text; hold box = 1/2/3, due, Today, Archive, Delete; drag box into any cell; Delete added to every checkbox menu' },
   { id: 'd-20261027-urg-noplus', date: '2026-10-27', project: 'Gantt', title: 'Urgent + Task button removed', details: 'header is just Urgent + counts; add via each level add line or hold the header' },
+  { id: 'd-20261028-urg-fold', date: '2026-10-28', project: 'Gantt', title: 'Fold tasks in Urgent', details: '− / + on any Urgent task with subtasks hides/shows them; folded shows done/total; saved per device' },
+  { id: 'd-20261028-it-lab-task', date: '2026-10-28', project: 'Gantt', title: 'IT lab task added', details: 'Soon (yellow), due Fri Nov 6, 8 subtasks from DC setup to inventory + README' },
 ];

@@ -1120,7 +1120,10 @@ function applyClaudeTasks_() {
         const line = (text, level, tid) => '<div class="check-line" data-level="' + level + '"' + u +
           (tid ? ' data-tid="' + doneEsc_(tid) + '"' : '') + (level ? ' style="margin-left: ' + (level * 24) + 'px;"' : '') + '>' +
           doneCheck_(false) + '<span class="check-text">' + doneEsc_(text) + '</span></div>';
-        html += line(x.title, 0, x.id);
+        let head = line(x.title, 0, x.id);
+        // Optional due date on the head line (2026-10-28): due: 'YYYY-MM-DD'.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(x.due || '')) head = head.replace('<div class="check-line"', '<div class="check-line" data-due="' + x.due + '"');
+        html += head;
         (Array.isArray(x.subtasks) ? x.subtasks : []).forEach(t => { html += line(t, 1, ''); });
         cell.setValue(html);
       }

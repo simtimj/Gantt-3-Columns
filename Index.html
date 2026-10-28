@@ -1212,11 +1212,19 @@
     .cal-row.now .cal-title{font-weight:700;}
     .cal-now{flex:0 0 auto;font-size:10px;font-weight:700;text-transform:uppercase;color:#fff;background:#3b82f6;border-radius:4px;padding:0 5px;}
     #inboxPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
-    .inbox-row{display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-top:1px solid var(--border);font-size:13px;}
-    .inbox-row:first-of-type{border-top:0;}
-    .inbox-text{flex:1;min-width:0;overflow-wrap:anywhere;}
-    .inbox-from{margin-left:6px;font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;}
-    .inbox-row .btn.tiny{flex:0 0 auto;font-size:11px;padding:1px 6px;}
+    /* Inbox rows = task rows (2026-10-27, Julius): box + always-editable text, same as Urgent. */
+    #inboxPanel .inbox-row{display:flex;align-items:flex-start;gap:6px;padding:4px 0;cursor:default;}
+    #inboxPanel .inbox-row > .urg-box{margin-top:2px;touch-action:none;}
+    #inboxPanel .inbox-text{flex:1 1 0;min-width:4em;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;cursor:text;outline:none;border-radius:3px;}
+    #inboxPanel .inbox-text:focus{box-shadow:0 0 0 1.5px var(--urg);border-radius:4px;padding:1px 4px;margin:-1px -4px;}
+    #inboxPanel .inbox-row.inbox-dragging{opacity:.3;}
+    .inbox-from{order:2;flex:0 0 auto;margin-left:auto;font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+    /* Narrow Reference: text runs under the box, the Claude tag floats right (same as Urgent). */
+    .pane-narrow #inboxPanel .inbox-row{display:flow-root;}
+    .pane-narrow #inboxPanel .inbox-row > .urg-box{float:left;margin:2px 6px -10px 0;}
+    .pane-narrow #inboxPanel .inbox-row > .inbox-from{float:right;margin:1px 0 0 6px;}
+    .pane-narrow #inboxPanel .inbox-row > .inbox-text{display:block;}
+    .urg-picker .urg-del{color:#c0392b;}
     .inbox-add{display:flex;gap:6px;margin-top:6px;}
     /* Reference cell toggles: boxed − / + instead of ▾ / ▸. Done in CSS so every
        code path that sets the arrow text still works. */
@@ -5184,7 +5192,7 @@
   let urgentOpen = true;
   try{ urgentOpen = localStorage.getItem('fw.urgentOpen') !== '0'; }catch(e){}
   function urgencyCheckbox(t){
-    const box = t && t.closest ? t.closest('#urgentPanel .urg-box, .due-notes .di-box') : null;
+    const box = t && t.closest ? t.closest('#urgentPanel .urg-box, .due-notes .di-box, #inboxPanel .inbox-box') : null;
     if(box) return box;
     const cb = t && t.closest ? t.closest('input[type=checkbox]') : null;
     if(!cb) return null;
@@ -5460,6 +5468,38 @@
     });
     return wrap;
   }
+  // Delete a task and its subtasks. Undo: tap the status message within 30 s
+  // (or Ctrl+Z in that cell). Asks first when it has subtasks.
+  let lastTaskDelete = null;
+  function deleteTaskLine(line,owner){
+    if(!line || !owner) return;
+    const nodes = urgSubtree(line);
+    if(nodes.length > 1 && !confirm('Delete this task and its ' + (nodes.length - 1) + ' subtask' + (nodes.length > 2 ? 's' : '') + '?')) return;
+    captureBeforeEdit(owner);
+    const html = owner.innerHTML;
+    nodes.forEach(n => n.remove());
+    if(!owner.children.length) owner.innerHTML = '<p><br></p>';
+    if(typeof refreshCards === 'function') try{ refreshCards(owner); }catch(e){}
+    finishEditorEdit(owner);
+    urgChanged(owner);
+    if(typeof renderDueBlocks === 'function') try{ renderDueBlocks(); }catch(e){}
+    lastTaskDelete = {owner,html,at:Date.now()};
+    setStatus('Deleted' + (nodes.length > 1 ? ' (' + nodes.length + ' lines)' : '') + ' — tap here to undo');
+  }
+  document.addEventListener('click',e => {
+    const st = e.target && e.target.closest ? e.target.closest('#status,#focusStatus') : null;
+    if(!st || !lastTaskDelete || Date.now() - lastTaskDelete.at > 30000) return;
+    const d = lastTaskDelete; lastTaskDelete = null;
+    if(!document.contains(d.owner)){ setStatus('Can’t undo — that cell was reloaded'); return; }
+    captureBeforeEdit(d.owner);
+    d.owner.innerHTML = d.html;
+    if(typeof normalizeEditorTasks === 'function') try{ normalizeEditorTasks(d.owner); }catch(err){}
+    if(typeof refreshCards === 'function') try{ refreshCards(d.owner); }catch(err){}
+    finishEditorEdit(d.owner);
+    urgChanged(d.owner);
+    if(typeof renderDueBlocks === 'function') try{ renderDueBlocks(); }catch(err){}
+    setStatus('Delete undone');
+  });
   function setArchived(line,owner,on){
     const day = localToday();
     urgSubtree(line).forEach(l => { if(on) l.dataset.arch = day; else delete l.dataset.arch; });
@@ -5623,7 +5663,7 @@
     finishEditorEdit(ed);
     saveEditorOwner(ed);
     noteUrgentDay(date,ed.innerHTML);
-    return true;
+    return c; // the new line (truthy)
   }
 
   /* ---------------------------------------------------------
@@ -5908,20 +5948,134 @@
   let inboxAdding = false;
   try{ inboxOpen = localStorage.getItem('fw.inboxOpen') === '1'; }catch(e){}
   function setInbox(list){ inboxItems = Array.isArray(list) ? list : []; renderInbox(); }
+  // Inbox rows work like every other task (2026-10-27, Julius): checkbox + always-editable
+  // text. Tap the box = done (goes to the Inbox Archive). Hold the box = menu
+  // (1/2/3 → today with that urgency, due date, → Today, Archive, Delete);
+  // hold and drag the box = drop it into any day / Notes / Reference cell.
+  let inboxArchOpen = false;
+  try{ inboxArchOpen = localStorage.getItem('fw.inboxArchOpen') === '1'; }catch(e){}
+  const inboxById = id => inboxItems.find(x => x.id === id) || null;
+  function inboxRow(it){
+    const row = document.createElement('div');
+    row.className = 'urg-row inbox-row' + (it.done ? ' done' : '');
+    row.dataset.urg = '0';
+    const box = document.createElement('span');
+    box.className = 'urg-box inbox-box';
+    box.dataset.iid = it.id;
+    box.title = 'Tap = done · hold = urgency, due date, archive, delete · hold and drag = move it';
+    box.addEventListener('click',e => {
+      e.stopPropagation();
+      if(it.arch) setInboxFields(it.id,{arch:'',done:false},'Back in the inbox');
+      else setInboxFields(it.id,{arch:localToday(),done:true},'Done — in Inbox → Archive');
+    });
+    const tx = document.createElement('span');
+    tx.className = 'urg-text inbox-text';
+    tx.dataset.iid = it.id;
+    if(it.title){ const bb = document.createElement('b'); bb.textContent = it.title; tx.append(bb); }
+    if(it.details) tx.append(document.createTextNode((it.title ? ': ' : '') + it.details));
+    tx.contentEditable = 'true';
+    tx.spellcheck = true;
+    tx.dataset.was = tx.textContent;
+    row.append(box,tx);
+    if(it.from === 'claude'){ const tag = document.createElement('span'); tag.className = 'inbox-from'; tag.textContent = 'Claude'; row.insertBefore(tag,tx); } // before the text so it can float top-right when narrow
+    return row;
+  }
+  function saveInboxText(tx){
+    const now = tx.textContent.replace(/\s+/g,' ').trim();
+    if(now === (tx.dataset.was || '').replace(/\s+/g,' ').trim()) return;
+    tx.dataset.was = now;
+    const it = inboxById(tx.dataset.iid); if(!it) return;
+    if(!now){ deleteInboxItem(it.id); return; }
+    const p = splitTitle(now);
+    setInboxFields(it.id,{title:p.title,details:p.details},'Inbox item saved',true);
+  }
+  function setInboxFields(id,fields,msg,quiet){
+    const before = inboxItems;
+    inboxItems = inboxItems.map(x => x.id === id ? Object.assign({},x,fields) : x);
+    if(!quiet) renderInbox();
+    google.script.run
+      .withSuccessHandler(list => { inboxItems = Array.isArray(list) ? list : inboxItems; if(!quiet || !inboxEditing()) renderInbox(); if(msg) setStatus(msg); })
+      .withFailureHandler(err => { inboxItems = before; renderInbox(); setStatus('Inbox error: ' + err.message); })
+      .updateInboxItem(id,fields);
+  }
+  function inboxEditing(){ const a = document.activeElement; return !!(a && a.closest && a.closest('#inboxPanel .inbox-text')); }
+  function deleteInboxItem(id){ dismissInbox(id,'Deleted from inbox'); }
+  // Make an inbox item a real task line (for → Today, urgency, due date, drag).
+  function inboxTaskLine(it,urg){
+    const c = document.createElement('div');
+    c.className = 'check-line';
+    c.dataset.level = '0';
+    if(urg) c.dataset.urg = String(urg);
+    c.innerHTML = '<input type="checkbox"><span class="check-text"></span>';
+    const t = c.querySelector('.check-text');
+    if(it.title){ const bb = document.createElement('b'); bb.textContent = it.title; t.append(bb); }
+    if(it.details) t.append(document.createTextNode((it.title ? ': ' : '') + it.details));
+    return c;
+  }
+  function inboxToToday(it,urg,due){
+    const line = addTaskToToday(it.title,it.details,urg);
+    if(!line) return;
+    if(due && line.nodeType === 1){
+      const ed = line.closest('.editor');
+      setDue(line,due);
+      if(ed) urgChanged(ed);
+    }
+    dismissInbox(it.id,urg ? 'Sent to today as ' + URG_NAMES[urg] : (due ? 'Sent to today, due ' + dueLabel(due) : 'Sent to today'));
+  }
+  function showInboxPicker(box,x,y){
+    const it = inboxById(box.dataset.iid);
+    if(!it) return;
+    const p = document.createElement('div');
+    p.className = 'urg-picker';
+    const btn = (label,cls,title,fn,u) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = cls; b.textContent = label; if(title) b.title = title;
+      if(u) b.dataset.urg = u;
+      b.addEventListener('pointerdown',e => e.preventDefault());
+      b.addEventListener('click',() => { hideUrgencyPicker(); fn(); });
+      p.appendChild(b);
+      return b;
+    };
+    if(!it.arch){
+      [1,2,3].forEach(u => btn(String(u),'urg-pick',u + ' · ' + URG_NAMES[u] + ' — goes in today',() => inboxToToday(it,u),u));
+      const dueRow = document.createElement('div'); dueRow.className = 'urg-due-row';
+      const chip = document.createElement('button');
+      chip.type = 'button'; chip.className = 'urg-due-chip'; chip.textContent = '📅 Due date';
+      chip.addEventListener('pointerdown',e => e.preventDefault());
+      chip.addEventListener('click',() => {
+        if(urgCal){ hideUrgCal(); return; }
+        showUrgCal(chip,'',iso => { hideUrgencyPicker(); inboxToToday(it,0,iso); });
+      });
+      dueRow.appendChild(chip); p.appendChild(dueRow);
+      btn('→ Today (no urgency)','urg-goto','',() => inboxToToday(it,0));
+    }
+    btn(it.arch ? '↩ Unarchive (back to the inbox)' : '🗄 Archive','urg-goto','',
+      () => it.arch ? setInboxFields(it.id,{arch:'',done:false},'Back in the inbox') : setInboxFields(it.id,{arch:localToday()},'Archived — in Inbox → Archive'));
+    btn('🗑 Delete','urg-goto urg-del','Gone for good',() => deleteInboxItem(it.id));
+    document.body.appendChild(p);
+    const r = p.getBoundingClientRect();
+    p.style.left = Math.max(6,Math.min(window.innerWidth - r.width - 6,x - 12)) + 'px';
+    p.style.top = Math.max(6,Math.min(window.innerHeight - r.height - 6,y + 14)) + 'px';
+    urgPicker = p;
+  }
   function renderInbox(){
     const tree = document.getElementById('referenceTree');
     if(!tree) return;
+    if(inboxEditing()) return; // don't redraw under the cursor; blur redraws
     let panel = document.getElementById('inboxPanel');
     if(!panel){
       panel = document.createElement('div');
       panel.id = 'inboxPanel';
+      panel.className = 'wrap';
       tree.parentNode.insertBefore(panel,tree);
+      initInboxPanel(panel);
     }
     panel.innerHTML = '';
+    const open = inboxItems.filter(x => !x.arch), arch = inboxItems.filter(x => x.arch);
     const head = document.createElement('button');
     head.type = 'button';
     head.className = 'urg-head';
-    head.append(pmBox(inboxOpen),document.createTextNode('Inbox · ' + inboxItems.length));
+    head.append(pmBox(inboxOpen),document.createTextNode('Inbox · ' + open.length));
     head.addEventListener('click',() => {
       inboxOpen = !inboxOpen;
       if(!inboxOpen) inboxAdding = false;
@@ -5944,48 +6098,77 @@
     headRow.append(head,add);
     panel.appendChild(headRow);
     if(!inboxOpen) return;
-    if(!inboxItems.length && !inboxAdding){
+    if(!open.length && !inboxAdding){
       const empty = document.createElement('div'); empty.className = 'urg-empty'; empty.textContent = 'Empty. Tap + Add.';
       panel.appendChild(empty);
     }
-    inboxItems.forEach(it => {
-      const row = document.createElement('div');
-      row.className = 'inbox-row';
-      const text = document.createElement('div');
-      text.className = 'inbox-text';
-      if(it.title){ const b = document.createElement('b'); b.textContent = it.title; text.append(b); }
-      if(it.details) text.append(document.createTextNode((it.title ? ': ' : '') + it.details));
-      if(it.from === 'claude'){ const tag = document.createElement('span'); tag.className = 'inbox-from'; tag.textContent = 'Claude'; text.append(tag); }
-      const go = document.createElement('button'); go.type = 'button'; go.className = 'btn tiny'; go.textContent = '→ Today';
-      go.title = 'Make it a task in today';
-      go.addEventListener('click',() => { if(addTaskToToday(it.title,it.details,0)) dismissInbox(it.id,'Sent to today'); });
-      const x = document.createElement('button'); x.type = 'button'; x.className = 'btn tiny'; x.textContent = '✕';
-      x.title = 'Dismiss';
-      x.addEventListener('click',() => dismissInbox(it.id,'Dismissed'));
-      row.append(text,go,x);
-      panel.appendChild(row);
+    open.forEach(it => panel.appendChild(inboxRow(it)));
+    if(inboxAdding){
+      const form = document.createElement('form');
+      form.className = 'inbox-add';
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.placeholder = 'Add to inbox — Title: details'; inp.enterKeyHint = 'done';
+      const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'btn tiny'; ok.textContent = 'Add';
+      form.append(inp,ok);
+      inp.addEventListener('keydown',e => { if(e.key === 'Escape'){ inboxAdding = false; renderInbox(); } });
+      form.addEventListener('submit',e => {
+        e.preventDefault();
+        const p = splitTitle(inp.value);
+        if(!p.title && !p.details){ inboxAdding = false; renderInbox(); return; }
+        const temp = {id:'tmp' + Date.now(),title:p.title,details:p.details,from:'app'};
+        inboxItems = inboxItems.concat(temp); renderInbox();
+        google.script.run
+          .withSuccessHandler(list => { setInbox(list); setStatus('Added to inbox'); })
+          .withFailureHandler(err => { inboxItems = inboxItems.filter(x => x !== temp); renderInbox(); setStatus('Inbox error: ' + err.message); })
+          .addInboxItem(p.title,p.details);
+        const again = document.querySelector('#inboxPanel .inbox-add input'); if(again) again.focus();
+      });
+      panel.appendChild(form);
+    }
+    if(!arch.length) return;
+    const ag = document.createElement('div'); ag.className = 'urg-group urg-arch'; ag.dataset.urg = '0';
+    const ah = document.createElement('button');
+    ah.type = 'button'; ah.className = 'urg-sub urg-arch-head';
+    ah.append(pmBox(inboxArchOpen),document.createTextNode(' Archive · ' + arch.length));
+    ah.addEventListener('click',() => {
+      inboxArchOpen = !inboxArchOpen;
+      try{ localStorage.setItem('fw.inboxArchOpen',inboxArchOpen ? '1' : '0'); }catch(e){}
+      renderInbox();
     });
-    if(!inboxAdding) return;
-    const form = document.createElement('form');
-    form.className = 'inbox-add';
-    const inp = document.createElement('input');
-    inp.type = 'text'; inp.placeholder = 'Add to inbox — Title: details'; inp.enterKeyHint = 'done';
-    const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'btn tiny'; ok.textContent = 'Add';
-    form.append(inp,ok);
-    inp.addEventListener('keydown',e => { if(e.key === 'Escape'){ inboxAdding = false; renderInbox(); } });
-    form.addEventListener('submit',e => {
-      e.preventDefault();
-      const p = splitTitle(inp.value);
-      if(!p.title && !p.details){ inboxAdding = false; renderInbox(); return; }
-      const temp = {id:'tmp' + Date.now(),title:p.title,details:p.details,from:'app'};
-      inboxItems = inboxItems.concat(temp); renderInbox();
-      google.script.run
-        .withSuccessHandler(list => { setInbox(list); setStatus('Added to inbox'); })
-        .withFailureHandler(err => { inboxItems = inboxItems.filter(x => x !== temp); renderInbox(); setStatus('Inbox error: ' + err.message); })
-        .addInboxItem(p.title,p.details);
-      const again = document.querySelector('#inboxPanel .inbox-add input'); if(again) again.focus();
+    ag.appendChild(ah);
+    if(inboxArchOpen){
+      const byDay = new Map();
+      arch.forEach(x => { if(!byDay.has(x.arch)) byDay.set(x.arch,[]); byDay.get(x.arch).push(x); });
+      [...byDay.keys()].sort().reverse().forEach(day => {
+        const d = document.createElement('div'); d.className = 'urg-arch-day';
+        d.textContent = '🗄 ' + wd(day) + ' ' + md(day);
+        ag.appendChild(d);
+        byDay.get(day).forEach(it => ag.appendChild(inboxRow(it)));
+      });
+    }
+    panel.appendChild(ag);
+  }
+  // Typing in an inbox row edits only that item (not the Reference cells around it).
+  function initInboxPanel(panel){
+    ['beforeinput','input','keydown','keyup'].forEach(type => panel.addEventListener(type,e => {
+      const tx = e.target && e.target.closest ? e.target.closest('.inbox-text') : null;
+      if(!tx) return;
+      e.stopPropagation();
+      if(type === 'keydown' && e.key === 'Enter'){ e.preventDefault(); tx.blur(); }
+      if(type === 'keydown' && e.key === 'Escape'){ e.preventDefault(); tx.textContent = tx.dataset.was || ''; tx.blur(); }
+    }));
+    panel.addEventListener('paste',e => {
+      const tx = e.target && e.target.closest ? e.target.closest('.inbox-text') : null;
+      if(!tx) return;
+      e.preventDefault(); e.stopPropagation();
+      document.execCommand('insertText',false,(e.clipboardData || window.clipboardData).getData('text/plain'));
     });
-    panel.appendChild(form);
+    panel.addEventListener('focusout',e => {
+      const tx = e.target && e.target.closest ? e.target.closest('.inbox-text') : null;
+      if(!tx) return;
+      saveInboxText(tx);
+      setTimeout(() => { try{ renderInbox(); }catch(err){} },0);
+    });
   }
   function dismissInbox(id,msg){
     const before = inboxItems;
@@ -6283,6 +6466,7 @@
   function showUrgencyPicker(cb,x,y){
     hideUrgencyPicker();
     if(typeof hideContextMenu === 'function') hideContextMenu();
+    if(cb.classList && cb.classList.contains('inbox-box')){ showInboxPicker(cb,x,y); return; }
     const t = urgTarget(cb);
     if(!t){ setStatus('Scroll Today to that day first, then change it'); return; }
     const {line,owner} = t;
@@ -6349,6 +6533,16 @@
       ab.addEventListener('pointerdown',e => e.preventDefault());
       ab.addEventListener('click',() => { hideUrgencyPicker(); setArchived(line,owner,!line.dataset.arch); });
       p.appendChild(ab);
+    }
+    // Delete the task + its subtasks (2026-10-27, Julius) — every checkbox, all columns.
+    {
+      const n = urgSubtree(line).length - 1;
+      const db = document.createElement('button');
+      db.type = 'button'; db.className = 'urg-goto urg-del';
+      db.textContent = '🗑 Delete' + (n ? ' (with ' + n + ' subtask' + (n > 1 ? 's' : '') + ')' : '');
+      db.addEventListener('pointerdown',e => e.preventDefault());
+      db.addEventListener('click',() => { hideUrgencyPicker(); deleteTaskLine(line,owner); });
+      p.appendChild(db);
     }
     // From a copy (Due group in Notes, Urgent panel): jump to where it lives (Julius, 2026-10-27).
     if(cb.classList && (cb.classList.contains('di-box') || cb.classList.contains('urg-box'))){
@@ -7520,6 +7714,13 @@
     const editorOf = el => el && el.closest ? el.closest('.day-editor,.journal-editor,.ref-cell') : null;
     function startPoint(e){
       if(e.button === 2) return;
+      // Inbox box: drag it out of the inbox into any cell (2026-10-27, Julius).
+      const ib = e.target && e.target.closest ? e.target.closest('#inboxPanel .inbox-box') : null;
+      if(ib){
+        const it = typeof inboxById === 'function' ? inboxById(ib.dataset.iid) : null;
+        if(it) press = {cb:ib,inbox:it,x:e.clientX,y:e.clientY,id:e.pointerId};
+        return;
+      }
       const cb = e.target && e.target.closest ? e.target.closest('input[type=checkbox]') : null;
       if(!cb) return;
       const line = cb.closest('.check-line'), ed = editorOf(line);
@@ -7532,6 +7733,7 @@
       return out;
     }
     function begin(e){
+      if(press.inbox) return beginInbox(e);
       const {line,ed} = press;
       const nodes = block(line);
       if(typeof hideUrgencyPicker === 'function') hideUrgencyPicker();
@@ -7558,6 +7760,48 @@
       press = null;
       move(e);
       drag.raf = requestAnimationFrame(autoScroll);
+    }
+    function beginInbox(e){
+      const it = press.inbox, row = press.cb.closest('.inbox-row');
+      if(typeof hideUrgencyPicker === 'function') hideUrgencyPicker();
+      try{ urgPress && clearTimeout(urgPress.timer); urgPress = null; }catch(err){}
+      try{ document.activeElement && document.activeElement.blur && document.activeElement.blur(); }catch(err){}
+      window.getSelection && window.getSelection().removeAllRanges();
+      const line = inboxTaskLine(it,0);
+      const r = (row || press.cb).getBoundingClientRect();
+      const ghost = document.createElement('div');
+      ghost.className = 'tc-ghost';
+      ghost.style.width = Math.min(Math.max(r.width,160),window.innerWidth - 12) + 'px';
+      const g = line.cloneNode(true); g.setAttribute('data-tc','fl'); g.setAttribute('data-tchead','0');
+      ghost.appendChild(g);
+      document.body.appendChild(ghost);
+      const ind = document.createElement('div'); ind.className = 'tc-drop'; ind.hidden = true; document.body.appendChild(ind);
+      if(row) row.classList.add('inbox-dragging');
+      document.body.classList.add('tc-dragging');
+      if(navigator.vibrate) try{ navigator.vibrate(10); }catch(err){}
+      drag = {nodes:[line],inbox:it,row,src:null,line,ghost,ind,offX:e.clientX - r.left,offY:e.clientY - r.top,x0:e.clientX,x:e.clientX,y:e.clientY,base:0,target:null};
+      try{ press.cb.setPointerCapture(press.id); }catch(err){}
+      press = null;
+      move(e);
+      drag.raf = requestAnimationFrame(autoScroll);
+    }
+    function finishInbox(d,t){
+      if(d.row) d.row.classList.remove('inbox-dragging');
+      if(!t) return;
+      const line = d.line;
+      line.dataset.level = String(t.level);
+      line.style.marginLeft = t.level ? (t.level * 24) + 'px' : '';
+      captureBeforeEdit(t.ed);
+      const blank = !t.ed.textContent.trim() && !t.ed.querySelector('input,img,hr');
+      if(blank && !t.ed.classList.contains('ref-cell')) t.ed.replaceChildren(line);
+      else if(t.before) t.ed.insertBefore(line,t.before); else t.ed.appendChild(line);
+      if(typeof wireCheckbox === 'function') try{ wireCheckbox(line.querySelector('input')); }catch(err){}
+      refreshCards(t.ed); finishEditorEdit(t.ed);
+      urgChanged(t.ed);
+      if(typeof renderDueBlocks === 'function') try{ renderDueBlocks(); }catch(err){}
+      line.classList.add('urg-flash');
+      setTimeout(() => line.classList.remove('urg-flash'),1400);
+      dismissInbox(d.inbox.id,'Moved to ' + (t.ed.dataset.date ? (typeof shortDayLabel === 'function' ? shortDayLabel(t.ed.dataset.date) : t.ed.dataset.date) : 'Reference'));
     }
     function targetAt(x,y){
       const el = document.elementFromPoint(x,y);
@@ -7637,6 +7881,7 @@
       d.nodes.forEach(n => n.removeAttribute('data-tcdrag'));
       suppressUntil = Date.now() + 450;
       const t = cancelled ? null : d.target;
+      if(d.inbox) return finishInbox(d,t);
       if(!t) return;
       const shift = t.level - d.base;
       const samePlace = t.ed === d.src && shift === 0 && (t.before === d.nodes[d.nodes.length - 1].nextElementSibling);

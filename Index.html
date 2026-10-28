@@ -3896,7 +3896,11 @@
         cur = line;
         if(cur) cur.setAttribute('data-tcfocus','1');
       }
-      if(typeof window.tcGripPlace === 'function') window.tcGripPlace(cur);
+      // Copies (Urgent panel rows, Due-today rows in Notes): the grip goes on the row you're typing in.
+      let copy = null;
+      const act = document.activeElement;
+      if(!line && act && act.matches && act.matches('#urgentPanel .urg-text[contenteditable="true"]:not(.inbox-text), .due-notes .di-text[contenteditable="true"]')) copy = act;
+      if(typeof window.tcGripPlace === 'function') window.tcGripPlace(cur,copy);
     };
     const later = () => { if(!raf) raf = requestAnimationFrame(update); };
     document.addEventListener('selectionchange',later);
@@ -7323,7 +7327,7 @@
   /* ===== Task cards (Julius, 2026-10-27) =====
      A card = one task (checkbox + text) with its subtasks underneath. Drawn with
      render-only data-tc* attributes (stripped on save by cardCleanHtml). */
-  :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fl,62) * 1%),transparent);--tc-bd:rgba(0,0,0,.14);--tc-mix:24%;}
+  :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fl,0) * 1%),transparent);--tc-bd:rgba(0,0,0,.14);--tc-mix:24%;}
   .check-line[data-tc]{
     position:relative;box-sizing:border-box;
     margin-left:calc(var(--tch,0) * 24px)!important;
@@ -7345,8 +7349,8 @@
   .check-line[data-tc]{border-color:transparent!important;}
   .check-line[data-tcfocus]{box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:5px;}
   /* Drag grip on the focused card line (Julius, 2026-10-28) — overlay, never part of the cell. */
-  #tcGrip{position:fixed;z-index:2900;width:20px;height:24px;display:grid;place-items:center;border-radius:6px;
-    font-size:14px;line-height:1;color:#555;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.18);
+  #tcGrip{position:fixed;z-index:2900;width:26px;height:14px;display:grid;place-items:center;border-radius:7px;
+    font-size:11px;line-height:1;letter-spacing:-1px;color:#555;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.18);
     box-shadow:0 1px 3px rgba(0,0,0,.15);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;}
   #tcGrip[hidden]{display:none;}
   @media (prefers-color-scheme: dark){#tcGrip{color:#ccc;background:rgba(30,30,30,.92);border-color:rgba(255,255,255,.2);}}
@@ -7410,7 +7414,7 @@
   .urg-cat i{width:9px;height:9px;border-radius:50%;background:var(--c,#bbb);display:inline-block;}
   .urg-cat.on{border-color:var(--c,#888);background:color-mix(in srgb,var(--c,#888) 22%,transparent);font-weight:700;}
   @media (prefers-color-scheme: dark){
-    :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fd,12) * 1%),transparent);--tc-bd:rgba(255,255,255,.14);--tc-mix:22%;}
+    :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fd,0) * 1%),transparent);--tc-bd:rgba(255,255,255,.14);--tc-mix:22%;}
     .urg-cat-row{border-top-color:#333;}
   }
 </style>
@@ -7995,15 +7999,23 @@
     grip.id = 'tcGrip'; grip.textContent = '⠿'; grip.hidden = true;
     grip.setAttribute('aria-label','Drag to move this task');
     document.body.appendChild(grip);
-    window.tcGripPlace = line => {
-      const ed = line && editorOf(line);
-      if(!line || !ed || line.parentElement !== ed || !cardsOn || drag){ grip.hidden = true; grip._line = null; return; }
-      const r = line.getBoundingClientRect(), er = ed.getBoundingClientRect();
+    // Top middle of the line (Julius, 2026-10-28), sitting on its top edge.
+    window.tcGripPlace = (line,copy) => {
+      grip._line = null; grip._copy = null;
+      let box = null;
+      if(drag){ grip.hidden = true; return; }
+      if(line){
+        const ed = editorOf(line);
+        if(ed && line.parentElement === ed){ grip._line = line; box = line; }
+      } else if(copy){
+        grip._copy = copy; box = copy.closest('.urg-row,.di-line') || copy;
+      }
+      if(!box){ grip.hidden = true; return; }
+      const r = box.getBoundingClientRect();
       if(r.bottom < 0 || r.top > window.innerHeight || !r.height){ grip.hidden = true; return; }
-      grip._line = line; grip.hidden = false;
-      const lh = Math.min(r.height,parseFloat(getComputedStyle(line).lineHeight) || 20);
-      grip.style.left = Math.round(Math.min(r.right,er.right) - 11) + 'px';
-      grip.style.top = Math.round(r.top + Math.max(0,(lh + 4 - 24) / 2)) + 'px';
+      grip.hidden = false;
+      grip.style.left = Math.round(r.left + r.width / 2 - 13) + 'px';
+      grip.style.top = Math.round(r.top - 7) + 'px';
     };
     function startPoint(e){
       if(e.button === 2) return;
@@ -8018,7 +8030,13 @@
       const gp = e.target && e.target.closest ? e.target.closest('#tcGrip') : null;
       if(gp){
         e.preventDefault(); // keep the editor focused until the drag starts
-        const gl = gp._line, ged = editorOf(gl);
+        let gl = gp._line;
+        if(!gl && gp._copy && typeof dueSource === 'function'){
+          const src = dueSource(gp._copy);
+          if(src && src.line) gl = src.line;
+          else { if(typeof setStatus === 'function') setStatus('Scroll to that day first, then drag it'); return; }
+        }
+        const ged = editorOf(gl);
         if(gl && gl.isConnected && ged && gl.parentElement === ged) press = {cb:gp,line:gl,ed:ged,x:e.clientX,y:e.clientY,id:e.pointerId,grip:true};
         return;
       }
@@ -8242,7 +8260,9 @@
   // saved separately for light (fw.cardFillL, default 62) and dark mode (fw.cardFillD, default 12).
   (function(){
     const el = document.getElementById('cardFill'), out = document.getElementById('cardFillValue'), rs = document.getElementById('resetCardFill');
-    const DEF = {light:62, dark:12}, KEY = {light:'fw.cardFillL', dark:'fw.cardFillD'}, VAR = {light:'--tc-fl', dark:'--tc-fd'};
+    const DEF = {light:0, dark:0}, KEY = {light:'fw.cardFillL', dark:'fw.cardFillD'}, VAR = {light:'--tc-fl', dark:'--tc-fd'};
+    // Cards match the cell background (Julius, 2026-10-28): default 0, old saved fills cleared once.
+    try{ if(localStorage.getItem('fw.cardFillReset') !== '1'){ localStorage.removeItem(KEY.light); localStorage.removeItem(KEY.dark); localStorage.setItem('fw.cardFillReset','1'); } }catch(e){}
     const mode = () => (window.fwTheme && fwTheme.current() === 'dark') ? 'dark' : 'light';
     function get(m){ let v = DEF[m]; try{ const x = localStorage.getItem(KEY[m]); if(x !== null && x !== '' && isFinite(+x)) v = +x; }catch(e){} return v; }
     function show(){ const v = get(mode()); if(el) el.value = v; if(out) out.textContent = v + '%'; }

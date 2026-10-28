@@ -48,6 +48,8 @@ Last updated: 2026-10-27
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Text wraps under the checkbox in narrow columns (2026-10-27):** when a column is under ~420px wide (e.g. 3 columns on the phone), a task's checkbox sits at the top-left and the 2nd line onward runs underneath it, using the full width. A due date shows right-aligned under the task text. Wide columns look the same as before.
+- **Day made removed from Urgent (2026-10-27):** the small 10/26 created date is gone (and its Reference Options switch); hold the box → ↗ Go to task jumps to the task instead.
 - **Row + 2 columns layout (2026-10-27):** Cols → Split → Layout now has **Row on top + 2 columns** (one full-width row, two side-by-side columns below) and **2 columns + row below**. One tap: **Ref top · Today | Notes** sets Reference across the top with Today / Tasks left and Notes right. **↻ Rotate panes** moves every pane one spot over (same layout); **⇄ Swap columns** swaps the two side-by-side panes. The slot names change with the layout (Top row / Bottom left / Bottom right). Drag the long bar for the row height, the short bar for the column widths (both remembered). Each pane scrolls on its own. This layout comes back after a reload; other splits still start off.
 - **Stacked due dates everywhere (2026-10-27):** the 📅 due label on task lines (Today, Reference) now stacks in a narrow column — "📅 Tue" over "Oct 29" — and the Notes due group's "from Tue 10/26" stacks the same way, so long task text keeps the width (same fix the Urgent panel already had).
 

@@ -461,6 +461,13 @@
       opacity:.82;
     }
     .check-line.task-struck > .check-text{text-decoration:line-through;}
+    /* Narrow columns (Julius, 2026-10-27): the checkbox floats at the top-left and the text's
+       second line onward runs underneath it, using the full width. Due date goes under the text. */
+    /* .pane-narrow is set by initNarrowPanes() when a pane is under 420px wide. */
+    .pane-narrow .check-line:not([data-tlon]):not([data-send]){display:flow-root;min-height:calc(18px * var(--workspace-scale,1));}
+    .pane-narrow .check-line:not([data-tlon]):not([data-send]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
+    .pane-narrow .check-line:not([data-tlon]):not([data-send]) > .check-text{display:block;}
+    .pane-narrow .check-line:not([data-tlon]):not([data-send])[data-due-label]::after{display:block;white-space:normal;text-align:right;margin:1px 0 0;}
     .check-line > .check-text{align-self:flex-start;}
     .editor pre.code-block,.ref-cell pre.code-block{
       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;
@@ -1515,7 +1522,6 @@
         <div id="refOptions" class="ref-options" hidden>
           <div class="ts-sub">Urgent panel</div>
           <label class="ts-check"><input type="checkbox" id="optUrgWrap"> Wrap long text</label>
-          <label class="ts-check"><input type="checkbox" id="optShowMade"> Show day made (10/26)</label>
           <label class="ts-check">Due date
             <select id="optDueStyle" class="top-select">
               <option value="date">Tues 10/27</option>
@@ -6007,7 +6013,8 @@
   // Options for the Urgent panel (2026-10-26, Julius: keep it concise).
   function urgOpt(key,def){ try{ const v = localStorage.getItem(key); return v == null ? def : v; }catch(e){ return def; } }
   function setUrgOpt(key,v){ try{ localStorage.setItem(key,v); }catch(e){} renderUrgent(); }
-  function showMadeDate(){ return urgOpt('fw.showMade','1') !== '0'; }
+  // Day made removed from Urgent (Julius, 2026-10-27): hold the box → Go to task replaces it.
+  function showMadeDate(){ return false; }
   function dueStyle(){
     const v = urgOpt('fw.dueStyle',urgOpt('fw.dueCountdown','1') === '0' ? 'date' : 'days');
     return ['date','days','left','month','long','wkmonth','wklong'].includes(v) ? v : 'days';
@@ -7693,6 +7700,17 @@
       KEYS.forEach(k => { try{ if(k in snap) localStorage.setItem(k,snap[k]); else localStorage.removeItem(k); }catch(e){} });
       const r = document.querySelector('.refresh-btn'); if(r) r.click(); else location.reload();
     });
+  })();
+
+  // Narrow panes (Julius, 2026-10-27): text wraps under the checkbox below 420px wide.
+  (function initNarrowPanes(){
+    try{
+      const ro = new ResizeObserver(entries => entries.forEach(e => {
+        const w = e.contentRect.width;
+        e.target.classList.toggle('pane-narrow', w > 0 && w < 420);
+      }));
+      document.querySelectorAll('#workspace > .pane').forEach(p => ro.observe(p));
+    }catch(e){}
   })();
 </script>
 </body>

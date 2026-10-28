@@ -133,3 +133,7 @@
 ## Quiet cards + focus ring (2026-10-28, Julius)
 
 - Card borders are forced transparent (`.check-line[data-tc]{border-color:transparent!important}`), so cards don't show an outline at rest. `initLineFocus()` (just above `CARD_ATTRS`) puts render-only `data-tcfocus` on the `.check-line` holding the caret in a focused editor / ref cell → 1px `box-shadow` ring in `var(--urg,#8a8f98)`. `data-tcfocus` is in `CARD_ATTRS` and stripped by `cardCleanHtml()` — never persist it. Urgent `.urg-text:focus` and Notes `.di-text:focus` use the same 1px ring.
+
+## Side space (2026-10-28, Julius)
+
+- `--side-k` multiplies horizontal padding: `.day-row` (all 3 rules), `#referenceScroll`, `.sec-host > .editor.sec-painted` (15px base), card `.check-line[data-tc]` sides (8px base), note-table `td`, `#urgentPanel` / `#inboxPanel`. `:root{--side-k:var(--side,.7)}`; `#workspace > .pane.pane-narrow` uses `--side × .6`. Slider `#sideSpace` (Options, under Scale) sets `--side` on `:root`, localStorage `fw.sideSpace` (in look `KEYS`). `paintDaySecs()` insets section boxes by ⅓ of the editor's left padding. He wants the triple-column layout to fit — apply `--side-k` to any new horizontal padding.

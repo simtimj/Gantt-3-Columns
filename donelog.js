@@ -101,4 +101,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-hold-noselect', date: '2026-10-27', project: 'Gantt', title: 'No highlight on checkbox hold', details: 'holding a checkbox to open its menu no longer highlights text on the phone' },
   { id: 'd-20261027-notes-arrow', date: '2026-10-27', project: 'Gantt', title: 'Notes arrow button + wrap', details: '→ Day button is now a small →; narrow Notes tasks wrap under the checkbox' },
   { id: 'd-20261027-urg-narrow', date: '2026-10-27', project: 'Gantt', title: 'Urgent narrow layout', details: 'narrow only: due date stacks Fri / 10/30 / 3d and text wraps under the box; all space savers now off when columns are wide' },
+  { id: 'd-20261027-urg-noplus', date: '2026-10-27', project: 'Gantt', title: 'Urgent + Task button removed', details: 'header is just Urgent + counts; add via each level add line or hold the header' },
 ];

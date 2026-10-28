@@ -105,4 +105,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-urg-noplus', date: '2026-10-27', project: 'Gantt', title: 'Urgent + Task button removed', details: 'header is just Urgent + counts; add via each level add line or hold the header' },
   { id: 'd-20261028-urg-fold', date: '2026-10-28', project: 'Gantt', title: 'Fold tasks in Urgent', details: '− / + on any Urgent task with subtasks hides/shows them; folded shows done/total; saved per device' },
   { id: 'd-20261028-it-lab-task', date: '2026-10-28', project: 'Gantt', title: 'IT lab task added', details: 'Soon (yellow), due Fri Nov 6, 8 subtasks from DC setup to inventory + README' },
+  { id: 'd-20261028-urg-add', date: '2026-10-28', project: 'Gantt', title: 'Add tasks + subtasks in Urgent', details: 'Enter on a task in Urgent = new same-level task below it; hold any checkbox → + Task, + Subtask, ← Outdent, Indent →' },
+  { id: 'd-20261028-cal-off', date: '2026-10-28', project: 'Gantt', title: 'Calendar panel removed', details: 'gone from Reference; code kept under Shelved' },
 ];

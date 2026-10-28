@@ -48,6 +48,7 @@ Last updated: 2026-10-28
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Add tasks + subtasks right in Urgent (2026-10-28):** while editing a task's text in Urgent, **Enter** makes a new task at the same level right below it (same parent card, same urgency), ready to type; Enter on an empty line just finishes. A new line left empty disappears. **Hold any checkbox** (Urgent or any cell) → new row **+ Task · + Subtask · ← Outdent · Indent →** (indent/outdent moves its subtasks too). From Urgent the new line opens for typing right there; a subtask added under a folded task unfolds it.
 - **Fold tasks in Urgent (2026-10-28):** any task with subtasks in Urgent / Soon / Can be later (and the Archive log) gets a small **− / +** right after its text (beside the dates when the column is narrow). Tap it to hide or show its subtasks; folded shows **done/total** (e.g. + 2/8). Saved per device; only folds the Urgent panel, not the Today cell.
 - **Claude tasks with a due date (2026-10-28):** `tasks.js` entries can carry `due: 'YYYY-MM-DD'`, which lands as the task's due date.
 - **Inbox rows = tasks (2026-10-27):** each inbox item is a checkbox + text, like the rest of the app. The text is always editable (tap it, type, Enter or tap away saves; "Title: details" keeps the bold title; empty it to delete). **Tap the box** = done → it goes to a collapsible **Archive** under the inbox (tap again there to bring it back). **Hold the box** = menu: **1 / 2 / 3** sends it to today with that urgency (so it shows in Urgent), **📅 Due date** sends it to today with a due date, **→ Today (no urgency)**, **🗄 Archive**, **🗑 Delete**. **Hold and drag the box** = drop it into any day, Notes or Reference cell. The → Today and ✕ buttons are gone. Narrow Reference: text runs under the box, Claude tag on the right.
@@ -111,7 +112,6 @@ Last updated: 2026-10-28
 
 - **Nightly suggested day + day wrap-up (2026-10-26):** every night at ~10 pm a scheduled Claude run writes two blocks into the **Notes** column: a **Day wrap-up** at the end of today's Notes cell (how many tasks got done vs. planned, what you focused on, what carries over) and a **Suggested day** at the top of tomorrow's Notes cell (most urgent first from the Urgent panel, due dates, the Daily Work Log priorities and tomorrow's calendar gaps; then what can wait, stretch, for fun). They land the next time the app loads; delete one and it stays deleted. Done at 10 pm (not 8–9) so late work counts before the plan is made. Already planned tomorrow with Claude earlier? The nightly run skips it. Wrote your own plan? You still get Claude's suggestions above it. Calendar already blocked out? The plan starts with a **Scheduled** list of those blocks as a reminder (it never touches the calendar). Wrap-up details still to be worked out together.
 
-- **Calendar panel in Reference (2026-10-26):** between Urgent and Inbox, collapsible. **Today** first (times, what's on now highlighted, past dimmed), then the next 3 days as upcoming. Reads your main calendar and Events straight from Google Calendar, so anything Claude adds (and the dog-walk block later) shows up. ↻ reloads; also refreshes when you come back to the app after 5+ min. Tap an event to open it in Google Calendar.
 
 - **Done log spacing (2026-10-26):** a blank line before and after each project group, so groups don't run together.
 
@@ -200,6 +200,7 @@ Last updated: 2026-10-28
 ---
 
 ## 💤 Shelved
+- **Calendar panel in Reference** (built 2026-10-26, removed 2026-10-28 at Julius's request; `CAL_PANEL_ON` in Index.html, server `getCalendarEvents()` kept): between Urgent and Inbox, collapsible. **Today** first (times, what's on now highlighted, past dimmed), then the next 3 days as upcoming. Reads your main calendar and Events straight from Google Calendar, so anything Claude adds (and the dog-walk block later) shows up. ↻ reloads; also refreshes when you come back to the app after 5+ min. Tap an event to open it in Google Calendar.
 - **Hidden third column by swipe** (built 2026-10-27, paused same day — broke 2-column mode; `PEEK_ENABLED` in Index.html): with only two columns showing, the third sits just off-screen — swipe (or trackpad-scroll) past the edge to reach it. Starts on the right; pull past the left edge instead and it moves to the left side (remembered). Works from anywhere on the screen
 
 - **Focus** button (hid the top toolbar; Show toolbar brought it back) — button hidden 2026-10-26, code kept. To restore, un-comment the Focus button in `Index.html` and put back `initFocusMode()`'s saved state.

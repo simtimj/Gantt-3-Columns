@@ -126,4 +126,6 @@
 ## Urgent task fold (2026-10-28, Julius)
 
 - `urgItemRow()` adds `.urg-fold` (pmBox − / +, `order:1`, floated right when narrow) to head rows with subtasks; `urgFolded(item)` / `urgToggleFold(item)` keyed `date|pane|text` in localStorage `fw.urgFold`. `renderUrgent()` and `urgArchiveGroup()` skip subtask rows of folded items. Panel-only: doesn't touch the cell's title-line fold.
+- Add from Urgent (2026-10-28): Enter in `#urgentPanel .urg-text` (keydown in `initDueNotes()` capture) with text → `urgAddLine(line,owner,'task',true)`; picker `.urg-struct-row` (+ Task / + Subtask / ← Outdent / Indent →) via `urgAddLine` / `urgIndent` (whole subtree). New line copies `data-urg`, goes after the line's subtree; `urgFocusWant` {date,pane,index} is focused at the end of `renderUrgent()`. Empty `.urg-text` shows `data-ph`; focusout removes an empty line with no subtasks.
+- Calendar panel off (2026-10-28): `CAL_PANEL_ON = false` makes `loadCalendar()` remove `#calPanel` and `renderCalendar()` no-op.
 - `tasks.js` entries take optional `due` (head line gets `data-due`).

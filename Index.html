@@ -1197,6 +1197,10 @@
     .editor .check-line[data-arch] > .check-text{opacity:.6;}
     .urg-adder{cursor:text;padding:2px 0;}
     /* Task fold − / + in Urgent (2026-10-28, Julius) */
+    #urgentPanel .urg-text:empty::before{content:attr(data-ph);opacity:.45;font-style:italic;}
+    #urgentPanel .urg-text:empty{min-width:4em;}
+    .urg-struct-row{flex:1 0 100%;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;}
+    .urg-struct{padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:center;}
     #urgentPanel .urg-fold{order:1;flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;background:none;border:0;padding:0 2px;margin:0;cursor:pointer;color:var(--muted);font:inherit;font-size:12px;line-height:1;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
     #urgentPanel .urg-fold .pm-box{margin-right:0;}
     #urgentPanel .urg-fold small{font-size:10.5px;font-weight:600;}
@@ -5375,6 +5379,17 @@
       if(u) wrap.appendChild(urgAdderRow(u));
     });
     if(archived.length) panel.appendChild(urgArchiveGroup(archived));
+    // Open a line just added from the panel for typing (2026-10-28, Julius).
+    if(urgFocusWant){
+      const w = urgFocusWant; urgFocusWant = null;
+      const el = panel.querySelector(`.urg-text[data-date="${CSS.escape(w.date)}"][data-pane="${w.pane}"][data-index="${w.index}"]`);
+      if(el && el.isContentEditable){
+        try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); }
+        try{ const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }catch(e){}
+        el.scrollIntoView({block:'nearest'});
+        focusAdd = 0;
+      }
+    }
     if(focusAdd){
       const inp = panel.querySelector(`.urg-adder[data-urg="${focusAdd}"] input`);
       if(inp){
@@ -5394,10 +5409,17 @@
   let urgRedrawLater = false;
   // Per-task fold in the Urgent panel (2026-10-28, Julius): key = day + pane + task text,
   // saved per device in localStorage fw.urgFold. Open by default.
+  let urgFocusWant = null; // {date,pane,index} of a line just added from the panel
   let urgFoldSet = new Set();
   try{ urgFoldSet = new Set(JSON.parse(localStorage.getItem('fw.urgFold') || '[]')); }catch(e){}
   function urgFoldKey(item){ return item.date + '|' + item.pane + '|' + item.text; }
-  function urgFolded(item){ return !!(item.subs && item.subs.length) && urgFoldSet.has(urgFoldKey(item)); }
+  function urgFolded(item){
+    if(!(item.subs && item.subs.length) || !urgFoldSet.has(urgFoldKey(item))) return false;
+    // A subtask just added under a folded task opens it (2026-10-28).
+    const w = urgFocusWant;
+    if(w && w.date === item.date && w.pane === item.pane && item.subs.some(s => s.index === w.index)){ urgFoldSet.delete(urgFoldKey(item)); try{ localStorage.setItem('fw.urgFold',JSON.stringify([...urgFoldSet])); }catch(e){} return false; }
+    return true;
+  }
   function urgToggleFold(item){
     const k = urgFoldKey(item);
     if(urgFoldSet.has(k)) urgFoldSet.delete(k); else urgFoldSet.add(k);
@@ -5419,7 +5441,8 @@
     box.addEventListener('click',e => { e.stopPropagation(); toggleDueTask(item.date,index,item.pane); });
     const tx = document.createElement('span'); tx.className = 'urg-text';
     tx.dataset.date = item.date; tx.dataset.pane = item.pane; tx.dataset.index = index;
-    if(html) tx.innerHTML = html; else tx.textContent = text;
+    if(html) tx.innerHTML = html; else if(text !== '(empty task)') tx.textContent = text;
+    tx.dataset.ph = level ? 'Subtask' : 'Task';
     const loaded = !!urgEditor(item.date,item.pane);
     tx.contentEditable = loaded ? 'true' : 'false';
     tx.spellcheck = true;
@@ -5877,7 +5900,10 @@
      --------------------------------------------------------- */
   let calData = null, calOpen = true, calLoading = false, calLoadedAt = 0, calError = '';
   try{ calOpen = localStorage.getItem('fw.calOpen') !== '0'; }catch(e){}
+  // Calendar panel removed from Reference (2026-10-28, Julius); code kept, see README Shelved.
+  const CAL_PANEL_ON = false;
   function loadCalendar(){
+    if(!CAL_PANEL_ON){ const p = document.getElementById('calPanel'); if(p) p.remove(); return; }
     if(calLoading) return;
     calLoading = true; renderCalendar();
     google.script.run
@@ -5902,6 +5928,7 @@
     return dateObj(date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
   }
   function renderCalendar(){
+    if(!CAL_PANEL_ON) return;
     const tree = document.getElementById('referenceTree');
     if(!tree) return;
     let panel = document.getElementById('calPanel');
@@ -6431,7 +6458,21 @@
       const tx = e.target && e.target.closest ? e.target.closest('.due-notes .di-text, #urgentPanel .urg-text[contenteditable="true"]') : null;
       if(!tx) return;
       e.stopPropagation();
-      if(type === 'keydown' && e.key === 'Enter'){ e.preventDefault(); tx.blur(); return; }
+      if(type === 'keydown' && e.key === 'Enter'){
+        e.preventDefault();
+        // Urgent panel (2026-10-28, Julius): Enter on a task with text = new task at the
+        // same level right below it (same parent), open for typing. Empty line → just finish.
+        if(tx.matches('#urgentPanel .urg-text') && !e.shiftKey){
+          const src = dueSource(tx);
+          if(src && src.text && src.text.textContent.trim()){
+            if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; }
+            tx.blur();
+            urgAddLine(src.line,src.ed,'task',true);
+            return;
+          }
+        }
+        tx.blur(); return;
+      }
       if(type === 'paste'){ e.preventDefault(); document.execCommand('insertText',false,(e.clipboardData || window.clipboardData).getData('text/plain')); return; }
       if(type !== 'input') return;
       const src = dueSource(tx);
@@ -6443,6 +6484,12 @@
     document.addEventListener('focusout',e => {
       if(e.target && e.target.closest && e.target.closest('#urgentPanel .urg-text')){
         const src = dueSource(e.target);
+        // A new line left empty is removed again (2026-10-28), unless it has subtasks.
+        if(src && src.text && !src.text.textContent.trim() && urgSubtree(src.line).length === 1 && src.line.isConnected){
+          if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; }
+          captureBeforeEdit(src.ed); src.line.remove(); finishEditorEdit(src.ed); urgChanged(src.ed);
+          return;
+        }
         if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; if(src) urgChanged(src.ed); }
         setTimeout(() => { try{ renderUrgent(); }catch(err){} },0);
         return;
@@ -6497,6 +6544,39 @@
     for(let n = line.nextElementSibling; n && n.classList.contains('check-line') && lvl(n) > base; n = n.nextElementSibling) out.push(n);
     return out;
   }
+  // Add a task line after `line`'s subtree (2026-10-28, Julius): 'task' = same level,
+  // 'subtask' = one deeper, at the end of its subtasks. Keeps the urgency so it stays
+  // under the same card in Urgent. fromPanel → the new row opens for typing in Urgent.
+  function urgAddLine(line,owner,mode,fromPanel){
+    if(!line || !owner) return null;
+    const lvl = Number(line.dataset.level) || 0;
+    captureBeforeEdit(owner);
+    const n = createCheckboxLine(mode === 'subtask' ? Math.min(6,lvl + 1) : lvl);
+    if(line.dataset.urg) n.dataset.urg = line.dataset.urg;
+    urgSubtree(line).slice(-1)[0].insertAdjacentElement('afterend',n);
+    finishEditorEdit(owner);
+    const pane = owner.classList.contains('journal-editor') ? 'journal' : 'today';
+    if(fromPanel && owner.dataset.date){
+      urgFocusWant = {date:owner.dataset.date,pane,index:[...owner.querySelectorAll('.check-line')].indexOf(n)};
+      urgChanged(owner);
+    } else {
+      urgChanged(owner);
+      owner.focus({preventScroll:true});
+      placeCaretInsideCheckbox(n.querySelector('.check-text'));
+      n.scrollIntoView({block:'nearest'});
+    }
+    return n;
+  }
+  // Indent / outdent a task with its subtasks (2026-10-28, Julius).
+  function urgIndent(line,owner,delta){
+    if(!line || !owner) return;
+    const tree = urgSubtree(line);
+    if(delta < 0 && !(Number(line.dataset.level) > 0)){ setStatus('Already at the left'); return; }
+    captureBeforeEdit(owner);
+    tree.forEach(l => changeIndent(l,delta));
+    finishEditorEdit(owner);
+    urgChanged(owner);
+  }
   function showUrgencyPicker(cb,x,y){
     hideUrgencyPicker();
     if(typeof hideContextMenu === 'function') hideContextMenu();
@@ -6549,6 +6629,23 @@
       dueRow.appendChild(clr);
     }
     p.appendChild(dueRow);
+    // Structure row (2026-10-28, Julius): + Task (same level), + Subtask, ← Outdent, Indent →.
+    // Works from any checkbox; from the Urgent panel the new line opens for typing right there.
+    {
+      const sr = document.createElement('div'); sr.className = 'urg-struct-row';
+      const fromPanel = !!(cb.classList && cb.classList.contains('urg-box'));
+      [['+ Task',() => urgAddLine(line,owner,'task',fromPanel)],
+       ['+ Subtask',() => urgAddLine(line,owner,'subtask',fromPanel)],
+       ['← Outdent',() => urgIndent(line,owner,-1)],
+       ['Indent →',() => urgIndent(line,owner,1)]].forEach(([label,fn]) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'urg-struct'; b.textContent = label;
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',() => { hideUrgencyPicker(); fn(); });
+        sr.appendChild(b);
+      });
+      p.appendChild(sr);
+    }
     if(typeof addCardSubjectRow === 'function') addCardSubjectRow(p,line,owner);
     // Title line toggle (2026-10-27) for tasks in an editor.
     if(owner && line.parentElement === owner && !(cb.classList && (cb.classList.contains('di-box') || cb.classList.contains('urg-box')))){

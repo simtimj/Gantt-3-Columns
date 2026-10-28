@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` deploys automatically (`.github/workflows/deploy.yaml` → `clasp push` + update deployment).
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Status key
 
@@ -48,6 +48,8 @@ Last updated: 2026-10-27
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Fold tasks in Urgent (2026-10-28):** any task with subtasks in Urgent / Soon / Can be later (and the Archive log) gets a small **− / +** right after its text (beside the dates when the column is narrow). Tap it to hide or show its subtasks; folded shows **done/total** (e.g. + 2/8). Saved per device; only folds the Urgent panel, not the Today cell.
+- **Claude tasks with a due date (2026-10-28):** `tasks.js` entries can carry `due: 'YYYY-MM-DD'`, which lands as the task's due date.
 - **Inbox rows = tasks (2026-10-27):** each inbox item is a checkbox + text, like the rest of the app. The text is always editable (tap it, type, Enter or tap away saves; "Title: details" keeps the bold title; empty it to delete). **Tap the box** = done → it goes to a collapsible **Archive** under the inbox (tap again there to bring it back). **Hold the box** = menu: **1 / 2 / 3** sends it to today with that urgency (so it shows in Urgent), **📅 Due date** sends it to today with a due date, **→ Today (no urgency)**, **🗄 Archive**, **🗑 Delete**. **Hold and drag the box** = drop it into any day, Notes or Reference cell. The → Today and ✕ buttons are gone. Narrow Reference: text runs under the box, Claude tag on the right.
 - **🗑 Delete in every checkbox menu (2026-10-27):** hold (or right-click) any task's checkbox — Today, Notes, Reference, Urgent panel, Due group — → **🗑 Delete** removes the task and its subtasks (asks first when there are subtasks). Undo: tap the status message within 30 s (or Ctrl+Z in that cell). **🗄 Archive** is in the same menu.
 - **+ Task button removed from Urgent (2026-10-27):** the header line is just "Urgent" + counts now; add tasks with each level's add line (or hold the header).

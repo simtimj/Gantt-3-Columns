@@ -1196,6 +1196,11 @@
     .urg-arch .urg-row{opacity:.8;}
     .editor .check-line[data-arch] > .check-text{opacity:.6;}
     .urg-adder{cursor:text;padding:2px 0;}
+    /* Task fold − / + in Urgent (2026-10-28, Julius) */
+    #urgentPanel .urg-fold{order:1;flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;background:none;border:0;padding:0 2px;margin:0;cursor:pointer;color:var(--muted);font:inherit;font-size:12px;line-height:1;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+    #urgentPanel .urg-fold .pm-box{margin-right:0;}
+    #urgentPanel .urg-fold small{font-size:10.5px;font-weight:600;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-fold{float:right;margin:1px 0 0 6px;}
     .urg-addbox{flex:0 0 auto;width:13px;height:13px;border:2px dashed var(--urg);border-radius:3px;opacity:.7;}
     #urgentPanel.wrap .urg-adder{align-items:center;}
     .urg-adder input{flex:1;min-width:0;font:inherit;font-size:13px;color:inherit;background:transparent;border:1.5px solid transparent;padding:2px 5px;margin-left:-5px;outline:none;border-radius:4px;}
@@ -5364,7 +5369,8 @@
         wrap.appendChild(urgItemRow(item,u,item.index,item.html,item.text,0,item.done,true));
         // Subtasks: real checkbox rows like their task, indented under it
         // (2026-10-27, Julius). Same hold-for-urgency box, editable text.
-        item.subs.forEach(st => wrap.appendChild(urgItemRow(item,u,st.index,st.html,st.text,st.level,st.done,false)));
+        // Folded tasks (− / +, 2026-10-28, Julius) hide their subtasks here only.
+        if(!urgFolded(item)) item.subs.forEach(st => wrap.appendChild(urgItemRow(item,u,st.index,st.html,st.text,st.level,st.done,false)));
       });
       if(u) wrap.appendChild(urgAdderRow(u));
     });
@@ -5386,6 +5392,18 @@
      "Title: details" makes the title bold. Esc clears.
      --------------------------------------------------------- */
   let urgRedrawLater = false;
+  // Per-task fold in the Urgent panel (2026-10-28, Julius): key = day + pane + task text,
+  // saved per device in localStorage fw.urgFold. Open by default.
+  let urgFoldSet = new Set();
+  try{ urgFoldSet = new Set(JSON.parse(localStorage.getItem('fw.urgFold') || '[]')); }catch(e){}
+  function urgFoldKey(item){ return item.date + '|' + item.pane + '|' + item.text; }
+  function urgFolded(item){ return !!(item.subs && item.subs.length) && urgFoldSet.has(urgFoldKey(item)); }
+  function urgToggleFold(item){
+    const k = urgFoldKey(item);
+    if(urgFoldSet.has(k)) urgFoldSet.delete(k); else urgFoldSet.add(k);
+    try{ localStorage.setItem('fw.urgFold',JSON.stringify([...urgFoldSet].slice(-300))); }catch(e){}
+    renderUrgent();
+  }
   // One task / subtask row. Tap the box = done, tap the text = edit it (writes to
   // the real task; its day must be loaded), tap elsewhere on the row = go to it.
   // Hold the box = urgency / due / subject / Archive / Go to task (2026-10-27, Julius).
@@ -5429,6 +5447,22 @@
       meta.append(made);
     }
     if(meta.childNodes.length) row.insertBefore(meta,tx); // before the text so it can float top-right when narrow (order:2 keeps it last when wide)
+    // − / + fold for a task with subtasks (2026-10-28, Julius): right after the text when
+    // wide (order:1), floated right beside the dates when narrow. Folded shows done/total.
+    if(isHead && item.subs && item.subs.length){
+      const folded = urgFolded(item);
+      const fb = document.createElement('button');
+      fb.type = 'button'; fb.className = 'urg-fold' + (folded ? ' folded' : '');
+      fb.append(pmBox(!folded));
+      if(folded){
+        const d = item.subs.filter(s => s.done).length;
+        const n = document.createElement('small'); n.textContent = d + '/' + item.subs.length; fb.append(n);
+      }
+      fb.title = folded ? 'Show subtasks' : 'Hide subtasks';
+      fb.addEventListener('pointerdown',e => e.stopPropagation());
+      fb.addEventListener('click',e => { e.preventDefault(); e.stopPropagation(); urgToggleFold(item); });
+      row.insertBefore(fb,tx);
+    }
     row.addEventListener('click',e => {
       if(e.target.closest('.urg-box')) return;
       if(e.target.closest('.urg-text') && tx.isContentEditable) return;
@@ -5463,7 +5497,7 @@
       wrap.appendChild(d);
       byDay.get(day).forEach(item => {
         wrap.appendChild(urgItemRow(item,item.urg || 0,item.index,item.html,item.text,0,item.done,true));
-        item.subs.forEach(st => wrap.appendChild(urgItemRow(item,item.urg || 0,st.index,st.html,st.text,st.level,st.done,false)));
+        if(!urgFolded(item)) item.subs.forEach(st => wrap.appendChild(urgItemRow(item,item.urg || 0,st.index,st.html,st.text,st.level,st.done,false)));
       });
     });
     return wrap;

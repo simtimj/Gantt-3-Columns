@@ -122,3 +122,8 @@
 - Checkbox hold (2026-10-27): `initUrgency()` adds `body.urg-pressing` (user-select:none everywhere) from pointerdown on a checkbox until ~350ms after release, blocks `selectstart` during the press, and `clearPressSelection()` removes any non-collapsed selection when the picker opens and on release.
 
 - Narrow-only rule (Julius, 2026-10-27): every space-saving layout is gated on `.pane-narrow` (420px, `initNarrowPanes()`); wide panes keep one-line dates. Urgent rows: `.urg-meta` is inserted before `.urg-text` (`order:2` when wide); due parts are spans `.ud-wd` / `.ud-md` / `.ud-rel` (row with "· " before rel when wide, column when narrow); narrow + wrap → row `flow-root`, box floats left, meta floats right.
+
+## Urgent task fold (2026-10-28, Julius)
+
+- `urgItemRow()` adds `.urg-fold` (pmBox − / +, `order:1`, floated right when narrow) to head rows with subtasks; `urgFolded(item)` / `urgToggleFold(item)` keyed `date|pane|text` in localStorage `fw.urgFold`. `renderUrgent()` and `urgArchiveGroup()` skip subtask rows of folded items. Panel-only: doesn't touch the cell's title-line fold.
+- `tasks.js` entries take optional `due` (head line gets `data-due`).

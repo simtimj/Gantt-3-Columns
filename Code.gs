@@ -792,17 +792,42 @@ function saveCardCats(list) {
   inboxWrite_('cardCats', clean);
   return true;
 }
+// Claude's items can't be edited in inbox.js from the app, so edits / archive
+// state for them live in "inboxOver" {id: {title, details, arch, done}} (2026-10-27).
+// App items keep those fields on the item itself. arch = 'YYYY-MM-DD' archived day.
 function getInbox() {
   const done = inboxRead_('inboxDone', []);
   const mine = inboxRead_('inboxItems', []);
+  const over = inboxRead_('inboxOver', {});
   const claude = (typeof CLAUDE_INBOX !== 'undefined' && Array.isArray(CLAUDE_INBOX)) ? CLAUDE_INBOX : [];
-  return claude.map(x => Object.assign({ from: 'claude' }, x))
+  return claude.map(x => Object.assign({ from: 'claude' }, x, over[String(x && x.id)] || {}))
     .concat(mine.map(x => Object.assign({ from: 'app' }, x)))
     .filter(x => x && x.id && done.indexOf(String(x.id)) < 0)
     .map(x => ({
       id: String(x.id), title: String(x.title || ''), details: String(x.details || ''),
-      added: String(x.added || ''), from: x.from
+      added: String(x.added || ''), from: x.from, arch: String(x.arch || ''), done: !!x.done
     }));
+}
+// Change an inbox item: fields = any of {title, details, arch, done}.
+function updateInboxItem(id, fields) {
+  id = String(id || '');
+  fields = fields || {};
+  const pick = {};
+  ['title', 'details', 'arch'].forEach(k => { if (k in fields) pick[k] = String(fields[k] || '').slice(0, 4000); });
+  if ('done' in fields) pick.done = !!fields.done;
+  const lock = LockService.getUserLock();
+  lock.waitLock(10000);
+  try {
+    const mine = inboxRead_('inboxItems', []);
+    const it = mine.find(x => String(x.id) === id);
+    if (it) { Object.assign(it, pick); inboxWrite_('inboxItems', mine); }
+    else {
+      const over = inboxRead_('inboxOver', {});
+      over[id] = Object.assign(over[id] || {}, pick);
+      inboxWrite_('inboxOver', over);
+    }
+  } finally { lock.releaseLock(); }
+  return getInbox();
 }
 function addInboxItem(title, details) {
   title = String(title || '').trim();
@@ -829,6 +854,8 @@ function dismissInboxItem(id) {
       const done = inboxRead_('inboxDone', []);
       if (done.indexOf(id) < 0) done.push(id);
       inboxWrite_('inboxDone', done.slice(-300));
+      const over = inboxRead_('inboxOver', {});
+      if (over[id]) { delete over[id]; inboxWrite_('inboxOver', over); }
     }
   } finally { lock.releaseLock(); }
   return getInbox();

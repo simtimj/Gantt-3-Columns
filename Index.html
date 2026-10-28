@@ -3881,7 +3881,9 @@
     let cur = null, raf = 0, picked = null, pickMark = null;
     /* Copies = task rows outside the cells: Urgent / Inbox rows in Reference, Due-today rows in Notes. */
     const COPY_SEL = '#urgentPanel .urg-text[contenteditable="true"], #inboxPanel .urg-text[contenteditable="true"], .due-notes .di-text[contenteditable="true"]';
-    const isCopy = el => !!(el && el.matches && el.matches(COPY_SEL));
+    // Structural test (not the contenteditable state: a copy is briefly non-editable during a first tap).
+    const COPY_ANY = '#urgentPanel .urg-text, #inboxPanel .urg-text, .due-notes .di-text';
+    const isCopy = el => !!(el && el.matches && el.matches(COPY_ANY));
     const update = () => {
       raf = 0;
       let line = null;
@@ -3960,7 +3962,7 @@
     let tp = null, lastTouch = 0, lockedRoot = null;
     const unlock = (root,ms) => {
       if(!root || root.dataset.tcLock !== '1') return;
-      const go = () => { if(root.dataset.tcLock === '1'){ delete root.dataset.tcLock; root.contentEditable = 'true'; } };
+      const go = () => { if(root.dataset.tcLock === '1'){ delete root.dataset.tcLock; root.contentEditable = 'true'; later(); } };
       if(ms) setTimeout(go,ms); else go();
     };
     document.addEventListener('touchstart',e => {
@@ -3986,8 +3988,8 @@
       }
       if(hit.editing) return;
       tp.hit = hit;
-      const a = document.activeElement;
-      if(a && (a === root || root.contains(a))) try{ a.blur(); }catch(err){}
+      const a = document.activeElement; // leave whatever you were typing in (any cell or row)
+      if(a && a !== document.body && a.blur) try{ a.blur(); }catch(err){}
       root.setAttribute('inputmode','none');
       root.dataset.tcLock = '1';
       root.contentEditable = 'false';
@@ -8339,7 +8341,7 @@
       dismissInbox(d.inbox.id,'Moved to ' + (t.ed.dataset.date ? (typeof shortDayLabel === 'function' ? shortDayLabel(t.ed.dataset.date) : t.ed.dataset.date) : 'Reference'));
     }
     // Drop on an Urgent row (2026-10-28, Julius): lands next to that task in its own cell and takes its urgency.
-    function urgTargetAt(el,y){
+    function urgTargetAt(el,x,y){
       const row = el && el.closest ? el.closest('#urgentPanel .urg-row:not(.inbox-row)') : null;
       if(!row) return undefined;
       const tx = row.querySelector('.urg-text');
@@ -8352,11 +8354,15 @@
       while(before && drag.nodes.includes(before)) before = before.nextElementSibling;
       let prev = before ? before.previousElementSibling : src.ed.lastElementChild;
       while(prev && drag.nodes.includes(prev)) prev = prev.previousElementSibling;
-      return {ed:src.ed,before,prev,level:tcLvl(src.line),urg:row.dataset.urg || '',row,above};
+      // Slide right while dragging = nest it as a subtask (like in the cells), left = out a level.
+      const rowLvl = tcLvl(src.line);
+      const maxLvl = prev && prev.classList.contains('check-line') ? Math.min(6,tcLvl(prev) + 1) : 0;
+      const level = Math.max(0,Math.min(maxLvl,rowLvl + Math.round((x - drag.x0) / 28)));
+      return {ed:src.ed,before,prev,level,rowLvl,urg:row.dataset.urg || '',row,above};
     }
     function targetAt(x,y){
       const el = document.elementFromPoint(x,y);
-      const ut = urgTargetAt(el,y);
+      const ut = urgTargetAt(el,x,y);
       if(ut !== undefined) return ut;
       let ed = editorOf(el);
       if(ed && ed.closest('table[data-cnote]')) ed = null;
@@ -8396,8 +8402,9 @@
       if(t.row){
         const rr = t.row.getBoundingClientRect();
         ind.hidden = false;
-        ind.style.left = rr.left + 'px';
-        ind.style.width = Math.max(30,rr.width) + 'px';
+        const dx = (t.level - t.rowLvl) * 21;
+        ind.style.left = (rr.left + dx) + 'px';
+        ind.style.width = Math.max(30,rr.width - dx) + 'px';
         ind.style.top = (t.above ? rr.top - 2 : rr.bottom + 1) + 'px';
         return;
       }

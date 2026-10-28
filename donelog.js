@@ -119,4 +119,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-short-counts', date: '2026-10-28', project: 'Gantt', title: 'Short counts', details: '12/22 done instead of 12 out of 22 done, on title-line folds and the Today chip' },
   { id: 'd-20261028-backlog', date: '2026-10-28', project: 'Gantt', title: 'Backlog for urgent tasks', details: 'tasks typed in Urgent go to a Backlog cell in Reference, not today; hold menu: Not today → Backlog / Move to Today' },
   { id: 'd-20261028-no-kb-v2', date: '2026-10-28', project: 'Gantt', title: 'No keyboard on first tap (take 2)', details: 'card text is put in no-keyboard mode before the tap; second tap turns typing on' },
+  { id: 'd-20261028-no-caret-v3', date: '2026-10-28', project: 'Gantt', title: 'No cursor on first tap + Reference drag', details: 'cell is non-editable during the first tap so no cursor/keyboard; grip drag works for nested Reference tasks' },
 ];

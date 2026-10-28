@@ -112,3 +112,8 @@
 
 - `splitOptions.orientation` also takes `'top'` (first = full-width row, second | third below) and `'bottom'` (first | second, third = row below); `isRowLayout()`. `normalizeSplitOptions()` fills `third` when it's 'none'. Handled at the top of the split branch in `updateWorkspaceLayout()`: 3x3 grid, `#mobileSplitResizer` = row bar (height ratio `mobileSplitRatio`), `#mobileSplitResizerThird` = column bar (`splitColsRatio`, localStorage `fw.splitColsRatio`, drag listener added once via `extra._colDrag`).
 - Cols menu: `[data-split-preset]` (Reference top, Today left, Notes right), `[data-split-rotate]`, `[data-split-swap]`; `labelSplitFields()` renames the slots per layout. `initWorkspaceView()` restores split on load only for row layouts.
+
+## Narrow panes + Urgent made date (2026-10-27, Julius)
+
+- `initNarrowPanes()` (end of last `<script>`) uses a ResizeObserver to put `.pane-narrow` on any `#workspace > .pane` under 420px. Then check-lines (not title lines `[data-tlon]`, not note send lines `[data-send]`) are `display:flow-root` with the checkbox floated left (negative bottom margin so line 2 runs under it) and the due label `::after` as a right-aligned block under the text. Don't use CSS container queries here: they'd trap fixed-position pickers inside the pane.
+- Urgent panel day-made date removed: `showMadeDate()` returns false; the option checkbox is gone from Reference Options.

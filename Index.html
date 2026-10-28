@@ -5328,13 +5328,8 @@
       renderUrgent();
     });
     holdForCreate(head,null);
-    const add = document.createElement('button');
-    add.type = 'button';
-    add.className = 'btn tiny urg-add';
-    add.textContent = '+ Task';
-    add.title = 'Make an Urgent / Soon / Can be later task (goes in today)';
-    add.addEventListener('click',e => openCreateMenu(add,null));
-    headRow.append(head,add);
+    // "+ Task" button removed (Julius, 2026-10-27): add lines per level + hold header still create tasks.
+    headRow.append(head);
     panel.appendChild(headRow);
     if(!urgentOpen) return;
     [1,2,3,0].forEach(u => {

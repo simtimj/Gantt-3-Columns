@@ -119,3 +119,5 @@
 - Urgent panel day-made date removed: `showMadeDate()` returns false; the option checkbox is gone from Reference Options.
 
 - Checkbox hold (2026-10-27): `initUrgency()` adds `body.urg-pressing` (user-select:none everywhere) from pointerdown on a checkbox until ~350ms after release, blocks `selectstart` during the press, and `clearPressSelection()` removes any non-collapsed selection when the picker opens and on release.
+
+- Narrow-only rule (Julius, 2026-10-27): every space-saving layout is gated on `.pane-narrow` (420px, `initNarrowPanes()`); wide panes keep one-line dates. Urgent rows: `.urg-meta` is inserted before `.urg-text` (`order:2` when wide); due parts are spans `.ud-wd` / `.ud-md` / `.ud-rel` (row with "· " before rel when wide, column when narrow); narrow + wrap → row `flow-root`, box floats left, meta floats right.

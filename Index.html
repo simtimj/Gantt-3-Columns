@@ -1014,7 +1014,7 @@
     .uc-today{margin-top:4px;width:100%;font-size:11px;padding:3px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;}
     .urg-box{cursor:pointer;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
     /* Due label stacks in a narrow column (Julius, 2026-10-27): "📅 Wed" over "Oct 29", so the task text keeps the width. */
-    .check-line[data-due-label]::after{content:attr(data-due-label);flex:0 0 auto;margin-left:6px;font-size:10.5px;line-height:1.15;text-align:right;color:var(--muted);white-space:pre;pointer-events:none;-webkit-user-select:none;user-select:none;}
+    .check-line[data-due-label]::after{content:attr(data-due-label);flex:0 0 auto;margin-left:6px;font-size:10.5px;line-height:1.15;text-align:right;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
     .urg-subtask{font-size:12px;color:var(--muted);padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .urg-row.done .urg-box{background:var(--urg);}
     .urg-row.done .urg-text{text-decoration:line-through;opacity:.6;}
@@ -1127,7 +1127,8 @@
     .due-notes .di-line{cursor:default;}
     .due-notes .di-text{outline:none;cursor:text;border-radius:3px;}
     .due-notes .di-text[contenteditable="true"]:focus{background:rgba(127,127,127,.12);}
-    .due-notes .di-from{flex:0 0 auto;align-self:flex-start;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;white-space:nowrap;}
+    .due-notes .di-from{flex:0 0 auto;align-self:flex-start;display:flex;gap:.25em;align-items:flex-end;line-height:1.15;white-space:nowrap;}
+    .pane-narrow .due-notes .di-from{flex-direction:column;gap:0;}
     .urg-goto{flex:1 0 100%;margin-top:4px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:left;}
     /* Reference options, Urgent create, Inbox, −/+ toggles (2026-10-26, Julius). */
     /* Sort-row buttons match the Sort dropdown's size, and the row wraps instead
@@ -1161,8 +1162,18 @@
        into a tall column. Lines break by full (unwrapped) widths first. */
     #urgentPanel .urg-row{gap:6px;}
     #urgentPanel.wrap .urg-row > .urg-text{flex:1 1 0;min-width:4em;}
-    #urgentPanel .urg-meta{flex:0 0 auto;margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:0;line-height:1.15;text-align:right;}
-    #urgentPanel .urg-meta .urg-date{display:flex;flex-direction:column;align-items:flex-end;margin:0;padding:0;}
+    #urgentPanel .urg-meta{order:2;flex:0 0 auto;margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:0;line-height:1.15;text-align:right;}
+    #urgentPanel .urg-meta .urg-date{display:flex;flex-direction:row;gap:.3em;align-items:baseline;margin:0;padding:0;}
+    #urgentPanel .urg-meta .urg-date > .ud-rel::before{content:"· ";}
+    /* Space savers only when the Reference column is narrow (.pane-narrow, < 420px; Julius 2026-10-27):
+       weekday / date / days left stack as three short lines on the right, and the task text
+       runs under its box after the first line. */
+    .pane-narrow #urgentPanel .urg-meta .urg-date{flex-direction:column;align-items:flex-end;gap:0;}
+    .pane-narrow #urgentPanel .urg-meta .urg-date > .ud-rel::before{content:none;}
+    .pane-narrow #urgentPanel.wrap .urg-row{display:flow-root;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-box{float:left;margin:2px 6px -10px 0;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-meta{float:right;margin:0 0 0 6px;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-text{display:block;}
     #urgentPanel .urg-meta .urg-date > span,#urgentPanel .urg-meta .urg-made{white-space:nowrap;}
     #urgentPanel .urg-meta .urg-made{margin:0;}
     /* Title lines (sections like Morning): the name keeps its width, the − / + "50 out of
@@ -5398,7 +5409,12 @@
     if(isHead && item.due && !item.arch){
       const today = localToday();
       const date = document.createElement('span'); date.className = 'urg-date';
-      dueText(item.due,today).split(' · ').forEach(part => { const sp = document.createElement('span'); sp.textContent = part; date.append(sp); });
+      // Parts: weekday / date / days left (e.g. Fri · 10/30 · 3d); stacked only when narrow.
+      const dparts = dueText(item.due,today).split(' · ');
+      const first = dparts[0], cut = first.indexOf(' ');
+      const pieces = (cut > 0 ? [[first.slice(0,cut).replace(/,$/,''),'ud-wd'],[first.slice(cut + 1),'ud-md']] : [[first,'ud-md']])
+        .concat(dparts.slice(1).map(t => [t,'ud-rel']));
+      pieces.forEach(([t,c]) => { const sp = document.createElement('span'); sp.className = c; sp.textContent = t; date.append(sp); });
       date.title = 'Due ' + dueLabel(item.due);
       if(!item.done && item.due < today) date.classList.add('overdue');
       else if(!item.done && item.due === today) date.classList.add('due-today');
@@ -5409,7 +5425,7 @@
       made.textContent = md(item.date); made.title = 'Made ' + wd(item.date) + ' ' + md(item.date);
       meta.append(made);
     }
-    if(meta.childNodes.length) row.append(meta);
+    if(meta.childNodes.length) row.insertBefore(meta,tx); // before the text so it can float top-right when narrow (order:2 keeps it last when wide)
     row.addEventListener('click',e => {
       if(e.target.closest('.urg-box')) return;
       if(e.target.closest('.urg-text') && tx.isContentEditable) return;

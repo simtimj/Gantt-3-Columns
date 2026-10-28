@@ -93,4 +93,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261027-card-fill', date: '2026-10-27', project: 'Gantt', title: 'Card fill slider + day match off fix', details: 'Options → Card fill (separate for light/dark; dark default lighter); match-off now forces plain dark cells' },
   { id: 'd-20261027-daymatch-light', date: '2026-10-27', project: 'Gantt', title: 'Day color toggle in light mode', details: 'Day cells match the day color now works in light mode too (off = plain white cells)' },
   { id: 'd-20261027-fold-protect', date: '2026-10-27', project: 'Gantt', title: 'Folded lines protected', details: 'folded sections hide their blank lines too; hidden lines can no longer be deleted or changed (unfold first)' },
+  { id: 'd-20261027-urg-inline-add', date: '2026-10-27', project: 'Gantt', title: 'Type tasks in the Urgent panel', details: 'each level has an add line; Enter adds the task to today with that urgency already set' },
 ];

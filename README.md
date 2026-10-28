@@ -47,6 +47,7 @@ Last updated: 2026-10-28
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Urgent + Reference drag tracks like Today** (2026-10-28): in the Urgent panel the blue line follows your finger between rows like in a Today cell; slide right to make it a subtask, left to come out. When the card comes from another column, the level counts from where your finger rests for a moment (~0.3 s), so crossing from Today no longer forces a deep indent (this also fixes drops into Reference cells).
 - **Drop anywhere in Urgent** (2026-10-28): dragging a card into the Urgent panel works on headers, gaps, add lines and empty levels too — it lands next to the nearest task in that level; an empty level (or one whose days aren't loaded) just gives the task that urgency where it is. Inbox drags onto Urgent take the urgency too.
 
 - **Tap to pick, tap again to type (2026-10-28, fixed same day):** on *every* card — tasks and subtasks in Today, Notes and Reference cells (nested ones too), Urgent rows, Inbox rows and the Due-today rows in Notes — the first tap just *picks* it (thin ring + ⠿ grip, no keyboard). Tap the same card again to type. Tapping another card picks that one; tapping outside clears it. Checkboxes and the title-line − / + never open the keyboard. Now handled on the touch itself, so the phone keyboard stays closed.

@@ -8348,45 +8348,54 @@
     // Any spot in the Urgent panel counts (2026-10-28, Julius: dragging into it did nothing unless
     // the finger was exactly on a row): headers, gaps, add lines and empty levels pick the nearest
     // row in that level; a level with no usable row just gives the task that urgency where it is.
+    // Level while dragging (2026-10-28, Julius): in the card's own cell, slide left/right from where
+    // you grabbed it (as before). In another cell or the Urgent panel the slide counts from where the
+    // finger settled on the current drop spot (~0.3 s), so crossing columns doesn't force a deep indent.
+    function wantLevel(zone,slot,x){
+      if(zone === drag.src) return drag.base + Math.round((x - drag.x0) / 28);
+      const now = Date.now();
+      if(drag.slot !== slot || drag.slotZone !== zone){ drag.slot = slot; drag.slotZone = zone; drag.slotT = now; }
+      // Settle for a moment at a new spot: the finger is usually still gliding in from the side.
+      if(now - drag.slotT < 300) drag.zx = x;
+      return drag.base + Math.round((x - drag.zx) / 28);
+    }
     function urgRowSrc(row){
       const tx = row && row.querySelector('.urg-text');
       const src = tx && typeof dueSource === 'function' ? dueSource(tx) : null;
       return src && src.ed.isContentEditable && !drag.nodes.includes(src.line) ? src : null;
     }
+    // Urgent panel tracks like a Today cell (2026-10-28, Julius): the line follows the finger
+    // between rows (row middles), and sliding left/right sets the level from the dragged card's
+    // own level, capped at the line above + 1. Takes that level's urgency.
     function urgTargetAt(el,x,y){
       const panel = el && el.closest ? el.closest('#urgentPanel') : null;
       if(!panel) return undefined;
-      let row = el.closest('.urg-row:not(.inbox-row)');
-      if(!(row && urgRowSrc(row))){
-        let group = el.closest('.urg-group');
-        if(!group){
-          const gs = [...panel.querySelectorAll(':scope > .urg-group')].filter(g => g.dataset.urg !== '0');
-          group = gs.find(g => y <= g.getBoundingClientRect().bottom) || gs[gs.length - 1] || null;
-        }
-        if(!group) return null;
-        const rows = [...group.querySelectorAll('.urg-row:not(.inbox-row)')].filter(urgRowSrc);
-        let best = null, bd = Infinity;
-        rows.forEach(r => { const b = r.getBoundingClientRect(), d = y < b.top ? b.top - y : (y > b.bottom ? y - b.bottom : 0); if(d < bd){ bd = d; best = r; } });
-        if(!best){
-          const u = group.dataset.urg;
-          if(!u || u === '0') return null;
-          return {retag:true,urg:u,group,level:drag.base,rowLvl:drag.base};
-        }
-        row = best;
+      let group = el.closest('.urg-group');
+      if(!group){
+        const gs = [...panel.querySelectorAll(':scope > .urg-group')].filter(g => g.dataset.urg !== '0');
+        group = gs.find(g => y <= g.getBoundingClientRect().bottom) || gs[gs.length - 1] || null;
       }
-      const src = urgRowSrc(row);
-      const r = row.getBoundingClientRect(), above = y < r.top + r.height / 2;
-      let before;
-      if(above) before = src.line;
-      else { const b = block(src.line); before = b[b.length - 1].nextElementSibling; }
+      if(!group) return null;
+      const u = group.dataset.urg;
+      const rows = [...group.querySelectorAll('.urg-row:not(.inbox-row)')]
+        .map(r => ({r,src:urgRowSrc(r)})).filter(o => o.src && o.r.getBoundingClientRect().height);
+      if(!rows.length){
+        if(!u || u === '0') return null;
+        return {retag:true,urg:u,group,level:drag.base,rowLvl:drag.base};
+      }
+      const at = rows.find(o => { const b = o.r.getBoundingClientRect(); return y < b.top + b.height / 2; });
+      let ed, before, row, above;
+      if(at){ ed = at.src.ed; before = at.src.line; row = at.r; above = true; }
+      else {
+        const o = rows[rows.length - 1], bl = block(o.src.line);
+        ed = o.src.ed; before = bl[bl.length - 1].nextElementSibling; row = o.r; above = false;
+      }
       while(before && drag.nodes.includes(before)) before = before.nextElementSibling;
-      let prev = before ? before.previousElementSibling : src.ed.lastElementChild;
+      let prev = before ? before.previousElementSibling : ed.lastElementChild;
       while(prev && drag.nodes.includes(prev)) prev = prev.previousElementSibling;
-      // Slide right while dragging = nest it as a subtask (like in the cells), left = out a level.
-      const rowLvl = tcLvl(src.line);
       const maxLvl = prev && prev.classList.contains('check-line') ? Math.min(6,tcLvl(prev) + 1) : 0;
-      const level = Math.max(0,Math.min(maxLvl,rowLvl + Math.round((x - drag.x0) / 28)));
-      return {ed:src.ed,before,prev,level,rowLvl,urg:row.dataset.urg || '',row,above};
+      const level = Math.max(0,Math.min(maxLvl,wantLevel(panel,before || ed,x)));
+      return {ed,before,prev,level,urg:u === '0' ? '' : u,row,above};
     }
     function targetAt(x,y){
       const el = document.elementFromPoint(x,y);
@@ -8412,7 +8421,7 @@
       let prev = before ? before.previousElementSibling : ed.lastElementChild;
       while(prev && drag.nodes.includes(prev)) prev = prev.previousElementSibling;
       const maxLvl = prev && prev.classList.contains('check-line') ? Math.min(6,tcLvl(prev) + 1) : 0;
-      const want = drag.base + Math.round((x - drag.x0) / 28);
+      const want = wantLevel(ed,before || ed,x);
       const level = Math.max(0,Math.min(maxLvl,want));
       return {ed,before,prev,level};
     }
@@ -8437,7 +8446,7 @@
       if(t.row){
         const rr = t.row.getBoundingClientRect();
         ind.hidden = false;
-        const dx = (t.level - t.rowLvl) * 21;
+        const dx = t.level * 21;
         ind.style.left = (rr.left + dx) + 'px';
         ind.style.width = Math.max(30,rr.width - dx) + 'px';
         ind.style.top = (t.above ? rr.top - 2 : rr.bottom + 1) + 'px';

@@ -7704,7 +7704,7 @@
       const lines = [...ed.querySelectorAll('.check-line')];
       const done = lines.filter(l => l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
       const pct = lines.length ? Math.round(done / lines.length * 100) : 0;
-      chip.innerHTML = 'Today: <b>' + done + '</b> out of <b>' + lines.length + '</b> tasks done<span class="dash-bar"><i style="width:' + pct + '%"></i></span>';
+      chip.innerHTML = 'Today: <b>' + done + '/' + lines.length + '</b> done<span class="dash-bar"><i style="width:' + pct + '%"></i></span>';
     },120);
   }
   document.addEventListener('change',e => { if(e.target && e.target.matches && e.target.matches('#todayScroll input[type=checkbox]')) updateDash(); },true);
@@ -7834,7 +7834,7 @@
       const fold = n.dataset.fold === '1' && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? done + ' out of ' + tasks.length + ' done' : cov.length + ' hidden'});
+      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? done + '/' + tasks.length + ' done' : cov.length + ' hidden'});
       if(fold){
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);

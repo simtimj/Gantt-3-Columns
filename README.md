@@ -50,6 +50,7 @@ Last updated: 2026-10-28
 
 - **Tap to pick, tap again to type (2026-10-28, fixed same day):** on *every* card — tasks and subtasks in Today, Notes and Reference cells (nested ones too), Urgent rows, Inbox rows and the Due-today rows in Notes — the first tap just *picks* it (thin ring + ⠿ grip, no keyboard). Tap the same card again to type. Tapping another card picks that one; tapping outside clears it. Checkboxes and the title-line − / + never open the keyboard. Now handled on the touch itself, so the phone keyboard stays closed.
 - **Drag in Urgent (2026-10-28):** pick an Urgent row, drag its ⠿ grip like any card — into any cell, or onto another Urgent row: it lands right above/below that task in its own cell and takes that row's urgency.
+- **Short counts (2026-10-28):** counts read `12/22 done` instead of "12 out of 22 done" — title-line − / + (e.g. the Gantt group) and the Today chip at the top (`Today: 12/24 done`).
 
 - **Cards match the cell (2026-10-28):** task cards have no fill of their own now — same background as the day cell (Card fill default 0%; old saved fill cleared once). Options → Card fill still adds one back if wanted.
 

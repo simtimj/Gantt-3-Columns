@@ -4022,12 +4022,14 @@
         return;
       }
       const t = s.target instanceof Element ? s.target : (s.target && s.target.parentElement);
+      if(t && t.closest && t.closest('#tcGrip')){ later(); return; } // pressed the grip without dragging: keep the pick + grip
       if(tap(t) && e.cancelable) e.preventDefault();
     },{capture:true,passive:false});
     // Mouse (desktop): same rule on mousedown. Skipped right after a touch (that was handled above).
     document.addEventListener('mousedown',e => {
       if(e.button !== 0 || Date.now() - lastTouch < 1000) return;
       const t = e.target instanceof Element ? e.target : null;
+      if(t && t.closest('#tcGrip')) return;
       if(tap(t)) e.preventDefault();
     },true);
     document.addEventListener('selectionchange',later);

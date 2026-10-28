@@ -16,4 +16,5 @@ const CLAUDE_TASKS = [
     'Asset inventory sheet + README write-up',
   ] },
   { id: 't-20261027-crabbing-prep', date: '2026-10-27', title: 'Crabbing trip preparation', urg: 3, subtasks: ['Buy new grippy rubber gloves', 'Buy or figure out bait'] },
+  { id: 't-20261028-cert-a-plus-core1', date: '2026-10-28', title: 'Cert studies: CompTIA A+ Core 1 review', urg: 2, subtasks: [] },
 ];

@@ -121,4 +121,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-no-kb-v2', date: '2026-10-28', project: 'Gantt', title: 'No keyboard on first tap (take 2)', details: 'card text is put in no-keyboard mode before the tap; second tap turns typing on' },
   { id: 'd-20261028-no-caret-v3', date: '2026-10-28', project: 'Gantt', title: 'No cursor on first tap + Reference drag', details: 'cell is non-editable during the first tap so no cursor/keyboard; grip drag works for nested Reference tasks' },
   { id: 'd-20261028-urg-pick-nest', date: '2026-10-28', project: 'Gantt', title: 'Urgent first tap fixed + nest by sliding', details: 'first tap on an Urgent row picks it (with grip) and leaves the text you were in; drag onto Urgent rows and slide right to make it a subtask' },
+  { id: 'd-20261028-grip-stays', date: '2026-10-28', project: 'Gantt', title: 'Grip stays after a press', details: 'pressing the grip without dragging keeps the card picked; drag from Urgent works again (tested in phone emulation)' },
 ];

@@ -461,6 +461,7 @@
       opacity:.82;
     }
     .check-line.task-struck > .check-text{text-decoration:line-through;}
+    body.urg-pressing,body.urg-pressing *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
     /* Narrow columns (Julius, 2026-10-27): the checkbox floats at the top-left and the text's
        second line onward runs underneath it, using the full width. Due date goes under the text. */
     /* .pane-narrow is set by initNarrowPanes() when a pane is under 420px wide. */
@@ -6397,6 +6398,13 @@
     cal.style.left = left + 'px'; cal.style.top = top + 'px';
     urgCal = cal;
   }
+  // Clears a highlight left by a long press (only a real range; a plain caret stays).
+  function clearPressSelection(){
+    try{
+      const sel = window.getSelection();
+      if(sel && sel.rangeCount && !sel.isCollapsed) sel.removeAllRanges();
+    }catch(e){}
+  }
   function hideUrgencyPicker(){
     hideUrgCal();
     if(urgPicker){ urgPicker.remove(); urgPicker = null; }
@@ -6410,15 +6418,26 @@
       if(!cb) return;
       if(e.button === 2){ return; }
       const press = {cb,x:e.clientX,y:e.clientY};
+      // Holding a checkbox must not highlight text (Julius, 2026-10-27): no text selection
+      // anywhere while the press lasts, and anything the phone selected anyway is cleared.
+      document.body.classList.add('urg-pressing');
       press.timer = setTimeout(() => {
         if(urgPress !== press) return;
         urgPress = null;
         urgSuppressClick = true;
         if(navigator.vibrate) try{ navigator.vibrate(15); }catch(err){}
+        clearPressSelection();
         showUrgencyPicker(cb,press.x,press.y);
       },450);
       urgPress = press;
     },true);
+    const endPress = () => {
+      if(!document.body.classList.contains('urg-pressing')) return;
+      clearPressSelection();
+      setTimeout(() => { document.body.classList.remove('urg-pressing'); clearPressSelection(); },350);
+    };
+    ['pointerup','pointercancel','touchend','touchcancel'].forEach(t => document.addEventListener(t,endPress,true));
+    document.addEventListener('selectstart',e => { if(document.body.classList.contains('urg-pressing') || urgPress) e.preventDefault(); },true);
     const cancel = e => {
       if(!urgPress) return;
       if(e.type === 'pointermove' && Math.abs(e.clientX - urgPress.x) < 10 && Math.abs(e.clientY - urgPress.y) < 10) return;

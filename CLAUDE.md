@@ -117,3 +117,5 @@
 
 - `initNarrowPanes()` (end of last `<script>`) uses a ResizeObserver to put `.pane-narrow` on any `#workspace > .pane` under 420px. Then check-lines (not title lines `[data-tlon]`, not note send lines `[data-send]`) are `display:flow-root` with the checkbox floated left (negative bottom margin so line 2 runs under it) and the due label `::after` as a right-aligned block under the text. Don't use CSS container queries here: they'd trap fixed-position pickers inside the pane.
 - Urgent panel day-made date removed: `showMadeDate()` returns false; the option checkbox is gone from Reference Options.
+
+- Checkbox hold (2026-10-27): `initUrgency()` adds `body.urg-pressing` (user-select:none everywhere) from pointerdown on a checkbox until ~350ms after release, blocks `selectstart` during the press, and `clearPressSelection()` removes any non-collapsed selection when the picker opens and on release.

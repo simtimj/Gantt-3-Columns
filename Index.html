@@ -1126,7 +1126,7 @@
     .due-notes .due-item{margin:2px 0 0;padding:2px 0;}
     .due-notes .di-line{cursor:default;}
     .due-notes .di-text{outline:none;cursor:text;border-radius:3px;}
-    .due-notes .di-text[contenteditable="true"]:focus{background:rgba(127,127,127,.12);}
+    .due-notes .di-text[contenteditable="true"]:focus{outline:none;box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:4px;}
     .due-notes .di-from{flex:0 0 auto;align-self:flex-start;display:flex;gap:.25em;align-items:flex-end;line-height:1.15;white-space:nowrap;}
     .pane-narrow .due-notes .di-from{flex-direction:column;gap:0;}
     .urg-goto{flex:1 0 100%;margin-top:4px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:left;}
@@ -1189,7 +1189,7 @@
     .ucm-item.first{font-weight:700;}
     .ucm-item:hover{background:#f3f4f6;}
     #urgentPanel .urg-text[contenteditable="true"]{cursor:text;outline:none;border-radius:3px;}
-    #urgentPanel .urg-text[contenteditable="true"]:focus{white-space:normal;overflow:visible;box-shadow:0 0 0 1.5px var(--urg);border-radius:4px;padding:1px 4px;margin:-1px -4px;}
+    #urgentPanel .urg-text[contenteditable="true"]:focus{white-space:normal;overflow:visible;box-shadow:0 0 0 1px var(--urg);border-radius:4px;padding:1px 4px;margin:-1px -4px;}
     .urg-row{-webkit-user-select:text;user-select:text;}
     .urg-arch-head{display:flex;align-items:center;gap:4px;background:none;border:0;padding:0;cursor:pointer;color:var(--muted);font:inherit;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
     .urg-arch .urg-arch-day{margin:6px 0 1px;font-size:11px;color:var(--muted);font-weight:600;}
@@ -3869,14 +3869,40 @@
     setStatus('Unsaved…');
     saveTimers[date]=setTimeout(()=>saveDay(date),700);
   }
+  /* Focus ring on the task/subtask line holding the caret (Julius, 2026-10-28). */
+  (function initLineFocus(){
+    let cur = null, raf = 0;
+    const update = () => {
+      raf = 0;
+      let line = null;
+      try{
+        const sel = window.getSelection();
+        if(sel && sel.rangeCount && document.hasFocus()){
+          const n = sel.focusNode, el = n && (n.nodeType === 1 ? n : n.parentElement);
+          const l = el && el.closest ? el.closest('.check-line') : null;
+          const ed = l && l.closest('.editor,.ref-cell');
+          const act = document.activeElement;
+          if(l && ed && ed.isContentEditable && act && (act === ed || ed.contains(act)) && !l.closest('#urgentPanel,.due-notes')) line = l;
+        }
+      }catch(e){}
+      if(line === cur) return;
+      if(cur) cur.removeAttribute('data-tcfocus');
+      cur = line;
+      if(cur) cur.setAttribute('data-tcfocus','1');
+    };
+    const later = () => { if(!raf) raf = requestAnimationFrame(update); };
+    document.addEventListener('selectionchange',later);
+    document.addEventListener('focusout',() => setTimeout(later,0),true);
+    document.addEventListener('focusin',later,true);
+  })();
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
-  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag'];
+  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus'];
   function cardCleanHtml(el){
-    if(!el.querySelector('[data-tc],[data-tcdrag],[data-render-due],[data-tlon],[data-tlhid]')) return el.innerHTML;
+    if(!el.querySelector('[data-tc],[data-tcdrag],[data-tcfocus],[data-render-due],[data-tlon],[data-tlhid]')) return el.innerHTML;
     const c = el.cloneNode(true);
     c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid'].forEach(a => n.removeAttribute(a)));
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
-    c.querySelectorAll('[data-tc],[data-tcdrag]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tc],[data-tcdrag],[data-tcfocus]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
   }
   function saveDay(date){
@@ -7281,6 +7307,12 @@
   .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
   .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
   .check-line[data-tcdrag]{opacity:.3;}
+  /* Quiet cards (Julius, 2026-10-28): no card outline at rest — the borders stay transparent so
+     nothing shifts. The line you're typing in gets a thin ring in its urgency color (gray if none),
+     like editing a task in Urgent. data-tcfocus is render-only (stripped on save). */
+  .check-line[data-tc]{border-color:transparent!important;}
+  .check-line[data-tcfocus]{box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:5px;}
+  .check-line[data-tc][data-tcfocus]{border-radius:5px!important;}
   /* Day sections (Julius, 2026-10-27): Morning / Afternoon / Evening separators in the Today cell. */
   .editor > [data-sec]{margin:10px 0 4px;padding:0 0 2px;border-bottom:2px solid var(--note-line-adj,var(--border));font-size:.82em;letter-spacing:.06em;text-transform:uppercase;color:var(--note-line-adj,var(--muted));}
   .editor > [data-sec]:first-child{margin-top:0;}

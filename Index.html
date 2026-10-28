@@ -1127,6 +1127,7 @@
     .due-notes .di-line{cursor:default;}
     .due-notes .di-text{outline:none;cursor:text;border-radius:3px;}
     .due-notes .di-text[contenteditable="true"]:focus{outline:none;box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:4px;}
+    #urgentPanel .urg-text[data-tcpick],#inboxPanel .urg-text[data-tcpick],.due-notes .di-text[data-tcpick]{outline:none;box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:4px;}
     .due-notes .di-from{flex:0 0 auto;align-self:flex-start;display:flex;gap:.25em;align-items:flex-end;line-height:1.15;white-space:nowrap;}
     .pane-narrow .due-notes .di-from{flex-direction:column;gap:0;}
     .urg-goto{flex:1 0 100%;margin-top:4px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:left;}
@@ -3877,7 +3878,10 @@
   }
   /* Focus ring on the task/subtask line holding the caret (Julius, 2026-10-28). */
   (function initLineFocus(){
-    let cur = null, raf = 0, picked = null;
+    let cur = null, raf = 0, picked = null, pickMark = null;
+    /* Copies = task rows outside the cells: Urgent / Inbox rows in Reference, Due-today rows in Notes. */
+    const COPY_SEL = '#urgentPanel .urg-text[contenteditable="true"], #inboxPanel .urg-text[contenteditable="true"], .due-notes .di-text[contenteditable="true"]';
+    const isCopy = el => !!(el && el.matches && el.matches(COPY_SEL));
     const update = () => {
       raf = 0;
       let line = null;
@@ -3888,44 +3892,88 @@
           const l = el && el.closest ? el.closest('.check-line') : null;
           const ed = l && l.closest('.editor,.ref-cell');
           const act = document.activeElement;
-          if(l && ed && ed.isContentEditable && act && (act === ed || ed.contains(act)) && !l.closest('#urgentPanel,.due-notes')) line = l;
+          if(l && ed && ed.isContentEditable && act && (act === ed || ed.contains(act)) && !l.closest('#urgentPanel,#inboxPanel,.due-notes')) line = l;
         }
       }catch(e){}
+      const act = document.activeElement;
+      const typingCopy = isCopy(act) ? act : null;
       // Picked card (first tap) shows the ring + grip until you type somewhere or tap elsewhere.
-      if(line) picked = null;
-      else if(picked && picked.isConnected) line = picked;
-      else picked = null;
+      if(line || typingCopy) picked = null;
+      else if(picked && !picked.isConnected) picked = null;
+      if(!line && picked && !isCopy(picked)) line = picked;
       if(line !== cur){
         if(cur) cur.removeAttribute('data-tcfocus');
         cur = line;
         if(cur) cur.setAttribute('data-tcfocus','1');
       }
-      // Copies (Urgent panel rows, Due-today rows in Notes): the grip goes on the row you're typing in.
-      let copy = null;
-      const act = document.activeElement;
-      if(!line && act && act.matches && act.matches('#urgentPanel .urg-text[contenteditable="true"]:not(.inbox-text), .due-notes .di-text[contenteditable="true"]')) copy = act;
+      // Ring on a picked copy row (render-only rows, never saved).
+      const pc = picked && isCopy(picked) ? picked : null;
+      if(pc !== pickMark){
+        if(pickMark) pickMark.removeAttribute('data-tcpick');
+        pickMark = pc;
+        if(pickMark) pickMark.setAttribute('data-tcpick','1');
+      }
+      // Copies: the grip goes on the row you're typing in or have picked (not Inbox rows: drag those by the box).
+      let copy = line ? null : (typingCopy || pc);
+      if(copy && copy.classList.contains('inbox-text')) copy = null;
       if(typeof window.tcGripPlace === 'function') window.tcGripPlace(cur,copy);
     };
     const later = () => { if(!raf) raf = requestAnimationFrame(update); };
     /* Tap once = pick the card (ring + grip, no keyboard); tap it again = type in it (Julius, 2026-10-28).
-       Uses mousedown: on a phone it only fires for a real tap (not a scroll), and preventing it stops
-       the caret / keyboard. The line you're already typing in edits normally. */
-    document.addEventListener('mousedown',e => {
-      if(e.button !== 0) return;
-      const t = e.target instanceof Element ? e.target : null;
-      if(!t || t.closest('#tcGrip')) return;
+       Same for every card: tasks and subtasks in Today, Notes and Reference cells (nested too),
+       Urgent and Inbox rows, and the Due-today rows in Notes. */
+    function hitAt(t){
+      if(!t || t.closest('#tcGrip,input,button,a,select,textarea,[data-tlhid],.urg-box,.di-box,.inbox-box,.urg-fold,.urg-meta,.inbox-from,.di-from')) return null;
+      const act = document.activeElement;
+      const tx = t.closest(COPY_SEL);
+      if(tx) return {el:tx,editing:act === tx};
       const line = t.closest('.check-line');
-      const ed = line && line.parentElement;
-      const isCard = line && ed && ed.matches && ed.matches('.day-editor,.journal-editor,.ref-cell') && ed.isContentEditable;
-      if(!isCard || t.closest('input,button,a,[data-tlhid]')){ if(picked){ picked = null; later(); } return; }
-      if(line === picked || line === cur && document.activeElement && (document.activeElement === ed || ed.contains(document.activeElement)) && !picked){
-        picked = null; return; // second tap (or the line you're in): edit as usual
-      }
-      e.preventDefault();
+      const root = line && line.closest('.day-editor,.journal-editor,.ref-cell');
+      if(!line || !root || !root.isContentEditable || line.closest('[data-render-due],table[data-cnote]')) return null;
+      return {el:line,editing:!picked && line === cur && act && (act === root || root.contains(act))};
+    }
+    // Returns true when the tap only picked (caller stops the caret / keyboard).
+    function tap(t){
+      const hit = hitAt(t);
+      if(!hit){ if(picked){ picked = null; later(); } return false; }
+      if(hit.el === picked || hit.editing){ picked = null; later(); return false; } // second tap: type as usual
       try{ const a = document.activeElement; if(a && a !== document.body && a.blur) a.blur(); }catch(err){}
       try{ const sel = window.getSelection(); if(sel) sel.removeAllRanges(); }catch(err){}
-      picked = line;
+      picked = hit.el;
       later();
+      return true;
+    }
+    /* Touch: decide on touchend and preventDefault it. That is what reliably stops the phone
+       from focusing the text and opening the keyboard (mousedown alone didn't on his phone). */
+    let tp = null, lastTouch = 0;
+    document.addEventListener('touchstart',e => {
+      lastTouch = Date.now();
+      if(e.touches.length !== 1){ tp = null; return; }
+      const p = e.touches[0];
+      tp = {x:p.clientX,y:p.clientY,t:Date.now(),target:e.target,fold:window.__tlFoldAt || 0};
+    },{capture:true,passive:true});
+    document.addEventListener('touchmove',e => {
+      if(!tp) return;
+      const p = e.touches[0];
+      if(!p || Math.abs(p.clientX - tp.x) > 10 || Math.abs(p.clientY - tp.y) > 10) tp = null;
+    },{capture:true,passive:true});
+    document.addEventListener('touchcancel',() => { tp = null; },{capture:true,passive:true});
+    document.addEventListener('touchend',e => {
+      lastTouch = Date.now();
+      const s = tp; tp = null;
+      if(!s || e.touches.length) return;
+      // The − / + of a title line was tapped: don't open the keyboard, don't pick.
+      if((window.__tlFoldAt || 0) !== s.fold){ if(e.cancelable) e.preventDefault(); return; }
+      if(Date.now() - s.t > 400) return;               // holds: menus / text selection / drag
+      if(document.body.classList.contains('tc-dragging')) return;
+      const t = s.target instanceof Element ? s.target : (s.target && s.target.parentElement);
+      if(tap(t) && e.cancelable) e.preventDefault();
+    },{capture:true,passive:false});
+    // Mouse (desktop): same rule on mousedown. Skipped right after a touch (that was handled above).
+    document.addEventListener('mousedown',e => {
+      if(e.button !== 0 || Date.now() - lastTouch < 1000) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if(tap(t)) e.preventDefault();
     },true);
     document.addEventListener('selectionchange',later);
     document.addEventListener('focusout',() => setTimeout(later,0),true);
@@ -7879,6 +7927,7 @@
       const t = hit(e); if(!t) return;
       e.preventDefault(); e.stopPropagation();
       suppress = t;
+      window.__tlFoldAt = Date.now();
       toggleTitleFold(t,t.parentElement);
     },true);
     document.addEventListener('click',e => { if(suppress){ const s = suppress; suppress = null; if(s.contains(e.target)){ e.preventDefault(); e.stopPropagation(); } } },true);
@@ -8148,8 +8197,26 @@
       setTimeout(() => line.classList.remove('urg-flash'),1400);
       dismissInbox(d.inbox.id,'Moved to ' + (t.ed.dataset.date ? (typeof shortDayLabel === 'function' ? shortDayLabel(t.ed.dataset.date) : t.ed.dataset.date) : 'Reference'));
     }
+    // Drop on an Urgent row (2026-10-28, Julius): lands next to that task in its own cell and takes its urgency.
+    function urgTargetAt(el,y){
+      const row = el && el.closest ? el.closest('#urgentPanel .urg-row:not(.inbox-row)') : null;
+      if(!row) return undefined;
+      const tx = row.querySelector('.urg-text');
+      const src = tx && typeof dueSource === 'function' ? dueSource(tx) : null;
+      if(!src || !src.ed.isContentEditable || drag.nodes.includes(src.line)) return null;
+      const r = row.getBoundingClientRect(), above = y < r.top + r.height / 2;
+      let before;
+      if(above) before = src.line;
+      else { const b = block(src.line); before = b[b.length - 1].nextElementSibling; }
+      while(before && drag.nodes.includes(before)) before = before.nextElementSibling;
+      let prev = before ? before.previousElementSibling : src.ed.lastElementChild;
+      while(prev && drag.nodes.includes(prev)) prev = prev.previousElementSibling;
+      return {ed:src.ed,before,prev,level:tcLvl(src.line),urg:row.dataset.urg || '',row,above};
+    }
     function targetAt(x,y){
       const el = document.elementFromPoint(x,y);
+      const ut = urgTargetAt(el,y);
+      if(ut !== undefined) return ut;
       let ed = editorOf(el);
       if(ed && ed.closest('table[data-cnote]')) ed = null;
       if(!ed){
@@ -8185,6 +8252,14 @@
       const t = drag.target = targetAt(drag.x,drag.y);
       const ind = drag.ind;
       if(!t){ ind.hidden = true; return; }
+      if(t.row){
+        const rr = t.row.getBoundingClientRect();
+        ind.hidden = false;
+        ind.style.left = rr.left + 'px';
+        ind.style.width = Math.max(30,rr.width) + 'px';
+        ind.style.top = (t.above ? rr.top - 2 : rr.bottom + 1) + 'px';
+        return;
+      }
       const er = t.ed.getBoundingClientRect();
       let y;
       if(t.before){ const r = t.before.getBoundingClientRect(); y = r.top - 2; }
@@ -8230,7 +8305,9 @@
       if(!t) return;
       const shift = t.level - d.base;
       const samePlace = t.ed === d.src && shift === 0 && (t.before === d.nodes[d.nodes.length - 1].nextElementSibling);
-      if(samePlace) return;
+      const urgSame = !t.urg || d.nodes.every(n => n.dataset.urg === t.urg);
+      if(samePlace && urgSame) return;
+      if(t.urg) d.nodes.forEach(n => { n.dataset.urg = t.urg; });
       captureBeforeEdit(d.src);
       if(t.ed !== d.src) captureBeforeEdit(t.ed);
       d.nodes.forEach(n => {

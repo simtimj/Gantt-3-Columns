@@ -48,7 +48,8 @@ Last updated: 2026-10-28
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
-- **Tap to pick, tap again to type (2026-10-28):** in Today, Notes and Reference cells, the first tap on a task or subtask just *picks* it — thin ring + ⠿ grip, no keyboard — so you can drag it. Tap the same line again to type in it as usual. Tapping another line picks that one; tapping outside clears it. The checkbox works as before.
+- **Tap to pick, tap again to type (2026-10-28, fixed same day):** on *every* card — tasks and subtasks in Today, Notes and Reference cells (nested ones too), Urgent rows, Inbox rows and the Due-today rows in Notes — the first tap just *picks* it (thin ring + ⠿ grip, no keyboard). Tap the same card again to type. Tapping another card picks that one; tapping outside clears it. Checkboxes and the title-line − / + never open the keyboard. Now handled on the touch itself, so the phone keyboard stays closed.
+- **Drag in Urgent (2026-10-28):** pick an Urgent row, drag its ⠿ grip like any card — into any cell, or onto another Urgent row: it lands right above/below that task in its own cell and takes that row's urgency.
 
 - **Cards match the cell (2026-10-28):** task cards have no fill of their own now — same background as the day cell (Card fill default 0%; old saved fill cleared once). Options → Card fill still adds one back if wanted.
 

@@ -115,4 +115,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-grip-everywhere', date: '2026-10-28', project: 'Gantt', title: 'Grip on bottom middle, everywhere', details: '⠿ pill now sits on the bottom middle of the line; works in Today, Notes, Reference, Urgent and Due today' },
   { id: 'd-20261028-card-fill-off', date: '2026-10-28', project: 'Gantt', title: 'Cards match the cell color', details: 'card fill removed so cards use the day cell background' },
   { id: 'd-20261028-tap-pick', date: '2026-10-28', project: 'Gantt', title: 'Tap to pick, tap again to type', details: 'first tap on a task shows the ring + drag grip without the keyboard; second tap edits' },
+  { id: 'd-20261028-pick-all-cards', date: '2026-10-28', project: 'Gantt', title: 'Tap-to-pick on every card + Urgent drag', details: 'first tap no longer opens the keyboard on any card (cells, nested subtasks, Urgent, Inbox, Due today); Urgent rows can be dragged and dropped onto, taking that row urgency' },
 ];

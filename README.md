@@ -47,6 +47,8 @@ Last updated: 2026-10-28
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+
+- **Urgency mark off the box (2026-10-28)**: the checkbox keeps only its subject fill (plain gray-ish border); urgency shows as a thin red/yellow/blue **bar left of the box** (box height). Options → Task cards → **Urgency mark** to try *Line under box*, *Underline text* or the old *Box border*. Urgent panel / Notes Due boxes unchanged.
 - **Subtask due dates everywhere** (2026-10-28): a subtask's own due date shows on its line in Today and Reference cells, on its row in Urgent (with Today / overdue colors), and in Notes' Due-today list even when its task is due later. Urgent sorts each task by the soonest open date of the task or its subtasks.
 - **Urgent + Reference drag tracks like Today** (2026-10-28): in the Urgent panel the blue line follows your finger between rows like in a Today cell; slide right to make it a subtask, left to come out. When the card comes from another column, the level counts from where your finger rests for a moment (~0.3 s), so crossing from Today no longer forces a deep indent (this also fixes drops into Reference cells).
 - **Drop anywhere in Urgent** (2026-10-28): dragging a card into the Urgent panel works on headers, gaps, add lines and empty levels too — it lands next to the nearest task in that level; an empty level (or one whose days aren't loaded) just gives the task that urgency where it is. Inbox drags onto Urgent take the urgency too.

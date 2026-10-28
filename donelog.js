@@ -125,4 +125,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-urg-drop-anywhere', date: '2026-10-28', project: 'Gantt', title: 'Drop anywhere in Urgent', details: 'dragging into the Urgent panel now works on headers, gaps and empty levels, not just exactly on a row' },
   { id: 'd-20261028-urg-track-like-today', date: '2026-10-28', project: 'Gantt', title: 'Urgent + Reference drag tracks like Today', details: 'drop line follows the finger between Urgent rows; slide right/left sets the subtask level; crossing columns no longer forces a deep indent' },
   { id: 'd-20261028-subtask-due', date: '2026-10-28', project: 'Gantt', title: 'Subtask due dates everywhere', details: 'subtask due dates show in Urgent rows and the Due-today list, not just in cells; Urgent sorts by the soonest task or subtask date' },
+  { id: 'd-20261028-urgency-bar', date: '2026-10-28', project: 'Gantt', title: 'Urgency bar', details: 'urgency moved off the checkbox border to a thin colored bar left of the box; Options → Urgency mark has under-box / underline-text / old border to compare' },
 ];

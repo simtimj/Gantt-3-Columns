@@ -1489,6 +1489,10 @@
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
     <label class="ts-check"><input type="checkbox" id="daySecsOn" checked> Morning / Afternoon / Evening sections in Today</label>
     <label class="ts-check"><input type="checkbox" id="cardsBoxFill" checked> Subject color in the checkbox (off = whole card)</label>
+    <div class="ts-row">
+      <span class="ts-label" title="How red / yellow / blue urgency shows on a task">Urgency mark</span>
+      <select id="urgMarkSelect" aria-label="Urgency mark"><option value="bar">Bar left of box</option><option value="under">Line under box</option><option value="text">Underline text</option><option value="box">Box border (old)</option></select>
+    </div>
       <div class="ts-group ts-cats">
       <button type="button" class="ts-sub ts-cats-toggle" id="cardCatToggle" aria-expanded="false"><span class="ts-cats-arrow">▸</span> Card subjects</button>
       <div id="cardCatChips" class="ts-cat-chips" title="Tap to edit"></div>
@@ -7619,6 +7623,16 @@
   }
   .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{border-width:2px;box-shadow:0 0 3px color-mix(in srgb,var(--urg) 45%,transparent);}
   body.tc-boxfill .check-line[data-tccat]:not([data-urg]) > input[type=checkbox]{border-color:color-mix(in srgb,var(--tc-cat) 55%,#555)!important;}
+  /* Urgency mark (Julius, 2026-10-28: the urgency border around the subject fill looked gaudy).
+     body.urg-mark-bar (default) = thin bar left of the box, box height; urg-mark-under = line under the box;
+     urg-mark-text = colored underline under the task text; urg-mark-box = the old colored border.
+     The box itself keeps a plain border (subject-tinted gray, or gray). Option "Urgency mark", localStorage fw.urgMark. */
+  body:not(.urg-mark-box) .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{position:relative;overflow:visible;box-shadow:none!important;border-color:#8a8f98!important;}
+  body.tc-boxfill:not(.urg-mark-box) .check-line[data-tccat]:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{border-color:color-mix(in srgb,var(--tc-cat) 55%,#555)!important;}
+  body:is(.urg-mark-bar,.urg-mark-under) .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]::before{content:"";position:absolute;background:var(--urg);border-radius:2px;pointer-events:none;}
+  body.urg-mark-bar .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]::before{left:-7px;top:-2px;bottom:-2px;width:3px;}
+  body.urg-mark-under .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]::before{left:-2px;right:-2px;bottom:-6px;height:2.5px;}
+  body.urg-mark-text .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]):not(.task-struck) > .check-text{text-decoration:underline;text-decoration-color:var(--urg);text-decoration-thickness:2px;text-underline-offset:3px;}
   body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]:checked::after{
     content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2.5px 2.5px 0;
     transform:rotate(45deg) translate(-8%,-12%);filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
@@ -8121,6 +8135,11 @@
     const bf = document.getElementById('cardsBoxFill');
     let boxFill = true; try{ boxFill = localStorage.getItem('fw.cardsBoxFill') !== '0'; }catch(e){}
     document.body.classList.toggle('tc-boxfill',boxFill);
+    const um = document.getElementById('urgMarkSelect'), UM = ['bar','under','text','box'];
+    let urgMark = 'bar'; try{ const v = localStorage.getItem('fw.urgMark'); if(UM.includes(v)) urgMark = v; }catch(e){}
+    const setUrgMark = v => { UM.forEach(k => document.body.classList.toggle('urg-mark-' + k, k === v)); };
+    setUrgMark(urgMark);
+    if(um){ um.value = urgMark; um.addEventListener('change',() => { setUrgMark(um.value); try{ localStorage.setItem('fw.urgMark',um.value); }catch(e){} }); }
     if(bf){ bf.checked = boxFill; bf.addEventListener('change',() => { document.body.classList.toggle('tc-boxfill',bf.checked); try{ localStorage.setItem('fw.cardsBoxFill',bf.checked ? '1' : '0'); }catch(e){} }); }
     if(auto){ auto.checked = cardsAuto; auto.addEventListener('change',() => { cardsAuto = auto.checked; try{ localStorage.setItem('fw.cardsAuto',cardsAuto ? '1' : '0'); }catch(e){} refreshAllCards(); }); }
   })();
@@ -8594,7 +8613,7 @@
 <script>
   // Saved looks (Julius, 2026-10-27): Light / Dark / Custom slots that save every look setting on this device.
   (function(){
-    const KEYS = ['fw.sideSpace','fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.cardFillL','fw.cardFillD','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
+    const KEYS = ['fw.sideSpace','fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.urgMark','fw.cardFillL','fw.cardFillD','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
     const sel = document.getElementById('lookSlot'), sv = document.getElementById('lookSave'), ld = document.getElementById('lookLoad');
     if(!sel || !sv || !ld) return;
     const all = () => { try{ return JSON.parse(localStorage.getItem('fw.looks') || '{}') || {}; }catch(e){ return {}; } };

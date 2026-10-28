@@ -48,6 +48,8 @@ Last updated: 2026-10-27
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Stacked due dates everywhere (2026-10-27):** the 📅 due label on task lines (Today, Reference) now stacks in a narrow column — "📅 Tue" over "Oct 29" — and the Notes due group's "from Tue 10/26" stacks the same way, so long task text keeps the width (same fix the Urgent panel already had).
+
 - **Compact narrow rows (2026-10-27):** in the Urgent panel the dates stack in a small column on the right (Mon 11/16 over 20d, then the day made), so task text keeps the width; slightly tighter box-to-text spacing. Title lines (e.g. Morning) keep their name on one line and the − / + "50 out of 50 done" label wraps onto extra lines instead.
 - **Full outline while typing (2026-10-27):** the add line and a task being edited in Urgent get a full rounded outline in the level's color (was only a bottom line).
 - **Edit tasks in the Urgent panel (2026-10-27):** tap a task's (or subtask's) text to edit it right there — it changes the real task; Enter finishes. Tap the box = done; tap the right side of a row (day made / due date) = jump to the task. Hold the box = urgency, due date, subject, Archive, Go to task. The task's day has to be loaded to edit it.

@@ -1002,7 +1002,8 @@
     .uc-day.sel{background:#1a73e8;color:#fff;}
     .uc-today{margin-top:4px;width:100%;font-size:11px;padding:3px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;}
     .urg-box{cursor:pointer;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
-    .check-line[data-due-label]::after{content:"📅 " attr(data-due-label);flex:0 0 auto;margin-left:8px;font-size:11px;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
+    /* Due label stacks in a narrow column (Julius, 2026-10-27): "📅 Wed" over "Oct 29", so the task text keeps the width. */
+    .check-line[data-due-label]::after{content:attr(data-due-label);flex:0 0 auto;margin-left:6px;font-size:10.5px;line-height:1.15;text-align:right;color:var(--muted);white-space:pre;pointer-events:none;-webkit-user-select:none;user-select:none;}
     .urg-subtask{font-size:12px;color:var(--muted);padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .urg-row.done .urg-box{background:var(--urg);}
     .urg-row.done .urg-text{text-decoration:line-through;opacity:.6;}
@@ -1115,7 +1116,7 @@
     .due-notes .di-line{cursor:default;}
     .due-notes .di-text{outline:none;cursor:text;border-radius:3px;}
     .due-notes .di-text[contenteditable="true"]:focus{background:rgba(127,127,127,.12);}
-    .due-notes .di-from{flex:0 0 auto;align-self:center;}
+    .due-notes .di-from{flex:0 0 auto;align-self:flex-start;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;white-space:nowrap;}
     .urg-goto{flex:1 0 100%;margin-top:4px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:left;}
     /* Reference options, Urgent create, Inbox, −/+ toggles (2026-10-26, Julius). */
     /* Sort-row buttons match the Sort dropdown's size, and the row wraps instead
@@ -2443,7 +2444,7 @@
         if(/^[a-z]{2,12}$/.test(node.dataset.cat || '')) keep['data-cat'] = node.dataset.cat;
         if(/^\d{4}-\d{2}-\d{2}$/.test(node.dataset.due || '')){
           keep['data-due'] = node.dataset.due;
-          keep['data-due-label'] = dueLabel(node.dataset.due);
+          keep['data-due-label'] = dueLabelStack(node.dataset.due);
         }
         cleanStyle.marginLeft = level ? `${level * 24}px` : '';
         keep.style = cleanStyle.cssText;
@@ -5145,8 +5146,13 @@
   function dueLabel(s){
     return dateObj(s).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
   }
+  // Stacked label for task lines (2026-10-27): two short lines, shown by CSS white-space:pre.
+  function dueLabelStack(s){
+    const d = dateObj(s);
+    return '📅 ' + d.toLocaleDateString(undefined,{weekday:'short'}) + '\n' + d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  }
   function setDue(line,iso){
-    if(iso){ line.dataset.due = iso; line.dataset.dueLabel = dueLabel(iso); }
+    if(iso){ line.dataset.due = iso; line.dataset.dueLabel = dueLabelStack(iso); }
     else { delete line.dataset.due; delete line.dataset.dueLabel; }
   }
   function localToday(){
@@ -6062,7 +6068,7 @@
             tx.spellcheck = false;
             if(!live) tx.title = 'Scroll to ' + shortDate(it.date) + ' in its column to edit here';
             r.append(box,tx);
-            if(isMain){ const f = document.createElement('span'); f.className = 'di-from'; f.setAttribute('contenteditable','false'); f.textContent = from; r.append(f); }
+            if(isMain){ const f = document.createElement('span'); f.className = 'di-from'; f.setAttribute('contenteditable','false'); f.title = from; const sp = from.indexOf(' ',5); [from.slice(0,sp),from.slice(sp + 1)].forEach(t => { const x = document.createElement('span'); x.textContent = t; f.append(x); }); r.append(f); }
             return r;
           };
           card.appendChild(mk(it,0,true));
@@ -6959,6 +6965,8 @@
     if(!ed || !ed.isConnected) return false;
     let changed = ensureDaySections(ed);
     requestAnimationFrame(() => paintDaySecs(ed));
+    // Older lines carry the one-line due label; switch them to the stacked one (display only).
+    try{ ed.querySelectorAll('.check-line[data-due]').forEach(l => { if(!/^\d{4}-\d{2}-\d{2}$/.test(l.dataset.due)) return; const v = dueLabelStack(l.dataset.due); if(l.dataset.dueLabel !== v) l.dataset.dueLabel = v; }); }catch(e){}
     const plan = new Map(); // node -> {tc,head,rel,cat}
     let members = [], headLvl = 0, ctx = '', ctxGrp = false;
     const flush = () => {

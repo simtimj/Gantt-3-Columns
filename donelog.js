@@ -112,4 +112,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-side-space', date: '2026-10-28', project: 'Gantt', title: 'Side space slider', details: 'less left/right room in cells, section boxes, cards, panels; Options → Side space (default 70%), narrow columns tighter automatically' },
   { id: 'd-20261028-slim-urg-box', date: '2026-10-28', project: 'Gantt', title: 'Slimmer urgency checkbox', details: 'normal size, 2px urgency border over the subject color, no gap or outer ring' },
   { id: 'd-20261028-drag-grip', date: '2026-10-28', project: 'Gantt', title: 'Drag grip on the line you are in', details: '⠿ shows at the right end of the focused task/subtask; hold and drag to reorder, change level or move to another cell' },
+  { id: 'd-20261028-grip-everywhere', date: '2026-10-28', project: 'Gantt', title: 'Grip on top middle, everywhere', details: '⠿ pill now sits on the top middle of the line; works in Today, Notes, Reference, Urgent and Due today' },
+  { id: 'd-20261028-card-fill-off', date: '2026-10-28', project: 'Gantt', title: 'Cards match the cell color', details: 'card fill removed so cards use the day cell background' },
 ];

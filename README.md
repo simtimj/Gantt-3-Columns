@@ -47,6 +47,7 @@ Last updated: 2026-10-28
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
+- **Subtask due dates everywhere** (2026-10-28): a subtask's own due date shows on its line in Today and Reference cells, on its row in Urgent (with Today / overdue colors), and in Notes' Due-today list even when its task is due later. Urgent sorts each task by the soonest open date of the task or its subtasks.
 - **Urgent + Reference drag tracks like Today** (2026-10-28): in the Urgent panel the blue line follows your finger between rows like in a Today cell; slide right to make it a subtask, left to come out. When the card comes from another column, the level counts from where your finger rests for a moment (~0.3 s), so crossing from Today no longer forces a deep indent (this also fixes drops into Reference cells).
 - **Drop anywhere in Urgent** (2026-10-28): dragging a card into the Urgent panel works on headers, gaps, add lines and empty levels too — it lands next to the nearest task in that level; an empty level (or one whose days aren't loaded) just gives the task that urgency where it is. Inbox drags onto Urgent take the urgency too.
 
@@ -211,6 +212,7 @@ Last updated: 2026-10-28
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+- **Calendar column, like Google Calendar** (Julius, 2026-10-28): a full calendar view as its own column (or swipe in from the right / a button that swaps it in for Reference), so while scheduling with Claude he can see the day at a glance on phone, tablet and computer. Details to settle: day vs 3-day vs week view, read-only first or drag tasks onto it.
 - **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)
 - **Hold anywhere on a card to move it (2026-10-27)**: hold and grab a card (not just its checkbox) to drag it; a plain tap on the card still goes into the text for editing, selecting, highlighting
 - **Idea: built-in time tracking → plan vs actual (2026-10-27)**: own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)

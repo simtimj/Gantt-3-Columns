@@ -5456,10 +5456,14 @@
         for(let j = i + 1; j < lines.length; j++){
           const l2 = Number(lines[j].dataset.level) || 0;
           if(l2 <= level) break;
-          subs.push({text:lineText(lines[j]),html:lineHtml(lines[j]),level:l2 - level,index:j,urg:/^[123]$/.test(lines[j].dataset.urg || '') ? Number(lines[j].dataset.urg) : 0,done:!!(lines[j].classList.contains('done') || lines[j].querySelector('input[checked]'))});
+          subs.push({text:lineText(lines[j]),html:lineHtml(lines[j]),level:l2 - level,index:j,due:/^\d{4}-\d{2}-\d{2}$/.test(lines[j].dataset.due || '') ? lines[j].dataset.due : '',urg:/^[123]$/.test(lines[j].dataset.urg || '') ? Number(lines[j].dataset.urg) : 0,done:!!(lines[j].classList.contains('done') || lines[j].querySelector('input[checked]'))});
           nestedUntil = j;
         }
-        out.push({date,pane,arch,urg:Number(urg),index:i,text:lineText(line),html:lineHtml(line),subs,done,due:/^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : ''});
+        const due = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : '';
+        // Sort by the soonest open date of the task or any of its subtasks (2026-10-28, Julius:
+        // subtasks are sometimes due before the task).
+        const soon = [due].concat(subs.filter(x => !x.done).map(x => x.due)).filter(Boolean).sort()[0] || '';
+        out.push({date,pane,arch,urg:Number(urg),index:i,text:lineText(line),html:lineHtml(line),subs,done,due,soon});
       });
     });
     return out;
@@ -5559,7 +5563,7 @@
     if(!urgentOpen) return;
     [1,2,3,0].forEach(u => {
       const group = items.filter(x => x.urg === u)
-        .sort((a,b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || (a.due || '').localeCompare(b.due || ''));
+        .sort((a,b) => (a.soon ? 0 : 1) - (b.soon ? 0 : 1) || (a.soon || '').localeCompare(b.soon || ''));
       // Urgent / Soon / Can be later always show (with their add line), even when empty (Julius, 2026-10-27).
       if(!group.length && !u) return;
       const wrap = document.createElement('div');
@@ -5658,18 +5662,20 @@
     // Dates stack in a narrow column on the right (Julius, 2026-10-27): due date,
     // then days left, then the day made — so the task text keeps the width.
     const meta = document.createElement('span'); meta.className = 'urg-meta';
-    if(isHead && item.due && !item.arch){
+    const rowDue = isHead ? item.due : ((item.subs || []).find(x => x.index === index) || {}).due;
+    const rowDone = isHead ? item.done : done;
+    if(rowDue && !item.arch){
       const today = localToday();
       const date = document.createElement('span'); date.className = 'urg-date';
       // Parts: weekday / date / days left (e.g. Fri · 10/30 · 3d); stacked only when narrow.
-      const dparts = dueText(item.due,today).split(' · ');
+      const dparts = dueText(rowDue,today).split(' · ');
       const first = dparts[0], cut = first.indexOf(' ');
       const pieces = (cut > 0 ? [[first.slice(0,cut).replace(/,$/,''),'ud-wd'],[first.slice(cut + 1),'ud-md']] : [[first,'ud-md']])
         .concat(dparts.slice(1).map(t => [t,'ud-rel']));
       pieces.forEach(([t,c]) => { const sp = document.createElement('span'); sp.className = c; sp.textContent = t; date.append(sp); });
-      date.title = 'Due ' + dueLabel(item.due);
-      if(!item.done && item.due < today) date.classList.add('overdue');
-      else if(!item.done && item.due === today) date.classList.add('due-today');
+      date.title = 'Due ' + dueLabel(rowDue);
+      if(!rowDone && rowDue < today) date.classList.add('overdue');
+      else if(!rowDone && rowDue === today) date.classList.add('due-today');
       meta.append(date);
     }
     if(isHead && !item.arch && showMadeDate() && item.date !== 'backlog'){
@@ -6535,11 +6541,12 @@
       const tpl = document.createElement('template');
       tpl.innerHTML = urgentSource.get(key);
       const lines = [...tpl.content.querySelectorAll('.check-line')];
-      let nestedUntil = -1;
+      let nestedUntil = -1, nestedDue = '';
       const isDone = l => !!(l.classList.contains('done') || l.querySelector('input[type=checkbox][checked]'));
       const html = l => { const t = l.querySelector('.check-text'); return t ? t.innerHTML : lineText(l); };
       lines.forEach((line,i) => {
-        if(i <= nestedUntil) return;
+        // A subtask with its own, different due date is listed on that day too (2026-10-28, Julius).
+        if(i <= nestedUntil && !(line.dataset.due && line.dataset.due !== nestedDue)) return;
         const due = line.dataset.due || '';
         if(line.dataset.arch) return; // archived tasks leave the Due group too
         if(!/^\d{4}-\d{2}-\d{2}$/.test(due) || due === date) return;
@@ -6549,7 +6556,7 @@
           const l2 = Number(lines[j].dataset.level) || 0;
           if(l2 <= level) break;
           subs.push({index:j,level:l2 - level,urg:lines[j].dataset.urg || '',html:html(lines[j]),done:isDone(lines[j])});
-          nestedUntil = j;
+          if(j > nestedUntil){ nestedUntil = j; nestedDue = due; }
         }
         out.push({date,pane,index:i,due,urg:line.dataset.urg || '',text:lineText(line),html:html(line),subs,done:isDone(line)});
       });

@@ -986,6 +986,63 @@ function groupClaudeDone_(html, list) {
   return parts.map(p => p.group ? p.html : p.block).join('');
 }
 
+/* Day blocks for the done log (Julius, 2026-10-29): Claude's lines land in the
+   Morning / Afternoon / Evening block they happened in, never a block that
+   hasn't started yet. A time before a block's start rounds back to the
+   previous one (the nap gap 2–3:45 pm counts as Morning). Past days: Evening. */
+const DONE_SEC_ORDER_ = ['morning', 'afternoon', 'evening'];
+function doneSecNow_(date) {
+  if (date < todayString_()) return 'evening';
+  const hm = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm');
+  if (hm >= '18:30') return 'evening';
+  if (hm >= '15:45') return 'afternoon';
+  return 'morning';
+}
+// Moves Claude groups that sit in a later block (or below the last block) into
+// `sec`, just above that block's own empty last line. Cells without blocks are untouched.
+function placeDoneInSection_(html, sec) {
+  const blocks = doneBlocks_(html);
+  const secOf = b => { const m = /^<div\b[^>]*\sdata-sec="(\w+)"/i.exec(b); return m ? m[1].toLowerCase() : null; };
+  const isEnd = b => /^<div\b[^>]*\sdata-secend=/i.test(b);
+  const isBlank = b => /^<(p|div)\b[^>]*>(\s|&nbsp;|<br\b[^>]*>)*<\/(p|div)>$/i.test(b);
+  const target = DONE_SEC_ORDER_.indexOf(sec);
+  if (target < 0 || !blocks.some(b => secOf(b) === sec)) return html;
+  // Region of each block: index of the block section it sits in (-1 above Morning, 99 below the end marker).
+  const region = [];
+  let cur = -1;
+  blocks.forEach(b => {
+    const k = secOf(b);
+    if (k) cur = DONE_SEC_ORDER_.indexOf(k);
+    else if (isEnd(b)) cur = 99;
+    region.push(cur);
+  });
+  const moved = [], keep = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (doneAttr_(b, 'data-cgrp') != null && region[i] > target) {
+      moved.push(b);
+      let j = i + 1;
+      while (j < blocks.length && /^<div\b[^>]*class="[^"]*check-line/i.test(blocks[j])) moved.push(blocks[j++]);
+      // Drop the blank spacer we left behind if it now doubles up.
+      if (j < blocks.length && isBlank(blocks[j]) && keep.length && isBlank(keep[keep.length - 1])) j++;
+      i = j - 1;
+      continue;
+    }
+    keep.push(b);
+  }
+  if (!moved.length) return html;
+  // Insert point: before the target block's last empty line (its typing line), else before the next block / end marker.
+  const start = keep.findIndex(b => secOf(b) === sec);
+  let stop = keep.length;
+  for (let k = start + 1; k < keep.length; k++) if (secOf(keep[k]) || isEnd(keep[k])) { stop = k; break; }
+  let at = stop;
+  while (at - 1 > start && isBlank(keep[at - 1])) at--;
+  const BLANK = '<p><br></p>';
+  const ins = (at - 1 > start ? [BLANK] : []).concat(moved);
+  keep.splice(at, 0, ...ins);
+  return keep.join('');
+}
+
 function applyClaudeDone_() {
   const list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
   if (!list.length) return;
@@ -997,7 +1054,9 @@ function applyClaudeDone_() {
   // One-time pass: regroup days already written in the old flat style.
   // '2' (2026-10-26): re-render past days once so old lines get the "*" prefix.
   const migrate = props.getProperty('claudeDoneGrouped') !== '2';
-  if (!fresh.length && !migrate) return;
+  // One-time (2026-10-29): pull today's lines out of blocks that hadn't started yet.
+  const secFix = props.getProperty('claudeDoneSec') !== '1';
+  if (!fresh.length && !migrate && !secFix) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -1005,6 +1064,7 @@ function applyClaudeDone_() {
     const byDate = {};
     fresh.forEach(x => { (byDate[x.date] = byDate[x.date] || []).push(x); });
     if (migrate) valid.forEach(x => { byDate[x.date] = byDate[x.date] || []; });
+    if (secFix) byDate[todayString_()] = byDate[todayString_()] || [];
     Object.keys(byDate).forEach(date => {
       let row = findDayRow_(sheet, date);
       if (!row) {
@@ -1019,10 +1079,12 @@ function applyClaudeDone_() {
         applied.push(String(x.id));
       });
       html = groupClaudeDone_(html, valid);
+      if (date >= todayString_()) html = placeDoneInSection_(html, doneSecNow_(date));
       if (html !== before) cell.setValue(html);
     });
     props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));
     props.setProperty('claudeDoneGrouped', '2');
+    props.setProperty('claudeDoneSec', '1');
   } finally { lock.releaseLock(); }
 }
 

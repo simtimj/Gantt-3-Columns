@@ -7033,9 +7033,15 @@
       const k = ownerKey(owner);
       if(k && (k.pane === 'today' || k.pane === 'journal' || k.pane === 'backlog')){
         const toToday = k.pane === 'backlog';
+        // Urgent tasks don't need a home day (Julius, 2026-10-28): for a task (or subtask) with
+        // urgency or a due date, this reads as "remove from the day, keep in Urgent". Under the
+        // hood it's the same move to Backlog, so urgency, due date, duration and subtasks all stay.
+        const inUrgent = urgSubtree(line).some(l => l.dataset.urg || l.dataset.due);
+        const where = k.pane === 'journal' ? 'Notes' : 'Today';
         const mb = document.createElement('button');
         mb.type = 'button'; mb.className = 'urg-goto';
-        mb.textContent = toToday ? '📅 Move to Today' : '📥 Not today → Backlog';
+        mb.textContent = toToday ? '📅 Move to Today'
+          : inUrgent ? '✂ Remove from ' + where + ' (stays in Urgent)' : '📥 Not today → Backlog';
         mb.addEventListener('pointerdown',e => e.preventDefault());
         mb.addEventListener('click',() => {
           hideUrgencyPicker();
@@ -7043,7 +7049,7 @@
             const ed = urgEditor(localToday(),'today');
             if(!ed){ setStatus('Today isn’t loaded — tap Today, then try again'); return; }
             moveTaskTree(line,owner,ed,'Moved to Today');
-          } else withBacklog(c => moveTaskTree(line,owner,c,'Moved to Backlog'));
+          } else withBacklog(c => moveTaskTree(line,owner,c,inUrgent ? 'Removed from ' + where + ' · still in Urgent' : 'Moved to Backlog'));
         });
         p.appendChild(mb);
       }

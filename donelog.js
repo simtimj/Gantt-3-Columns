@@ -138,4 +138,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-no-mustdo', date: '2026-10-29', project: 'Gantt', title: 'Must Do section removed', details: 'Suggested Day drops Must Do / Urgent + Important (must-dos are on the calendar); today\'s plan re-rendered without it' },
   { id: 'd-20261029-blocks-every-day', date: '2026-10-29', project: 'Gantt', title: 'Blocks in every Today cell', details: '+ Blocks button removed; Morning / Afternoon / Evening in every cell from today on, with room above, between and below' },
   { id: 'd-20261029-note-banners', date: '2026-10-29', project: 'Gantt', title: 'Bright Suggested Day / Wrap-Up headers', details: 'yellow and purple title banners, matching bars on section headers; wrap-up split into Done / Still Urgent / Priority Check / Carries Over' },
+  { id: 'd-20261029-backlog-tasks', date: '2026-10-29', project: 'Gantt', title: 'Claude tasks into Backlog', details: 'tasks.js date: \'backlog\' puts a task in the Reference Backlog (in Urgent, not Today); first one: free pane layout (blue)' },
 ];

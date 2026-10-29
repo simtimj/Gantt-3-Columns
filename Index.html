@@ -4055,8 +4055,9 @@
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
   const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus'];
   function cardCleanHtml(el){
-    if(!el.querySelector('[data-tc],[data-tcdrag],[data-tcfocus],[data-render-due],[data-tlon],[data-tlhid]')) return el.innerHTML;
+    if(!el.querySelector('[data-tc],[data-tcdrag],[data-tcfocus],[data-render-due],[data-tlon],[data-tlhid],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
+    c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
     c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid'].forEach(a => n.removeAttribute(a)));
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
     c.querySelectorAll('[data-tc],[data-tcdrag],[data-tcfocus]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
@@ -7765,6 +7766,8 @@
   }
   /* Drag the checkbox to move the card; the page doesn't scroll from a checkbox. */
   .editor .check-line > input[type=checkbox],.ref-cell .check-line > input[type=checkbox]{touch-action:none;}
+  /* Hold-to-drag ready (2026-10-28): the held card gets a ring; move to drag. */
+  .check-line.tc-holdready,.urg-row.tc-holdready,.di-line.tc-holdready{box-shadow:0 0 0 2px var(--urg,#8a8f98)!important;border-radius:6px;}
   body.tc-dragging,body.tc-dragging *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important;}
   .tc-ghost{position:fixed;z-index:4000;pointer-events:none;opacity:.92;box-shadow:0 10px 28px rgba(0,0,0,.28);border-radius:8px;transform:rotate(1deg);}
   .tc-ghost .check-line{margin-top:0!important;margin-bottom:0!important;}
@@ -8411,11 +8414,78 @@
         return;
       }
       const cb = e.target && e.target.closest ? e.target.closest('input[type=checkbox]') : null;
-      if(!cb) return;
+      if(!cb){ holdStart(e); return; }
       const line = cb.closest('.check-line'), ed = editorOf(line);
       if(!line || !ed || line.parentElement !== ed) return; // not inside note boxes etc.
       press = {cb,line,ed,x:e.clientX,y:e.clientY,id:e.pointerId};
     }
+    /* Hold anywhere on a card to drag it (Julius, 2026-10-28): press and hold the card's text
+       (not the checkbox) ~350ms, then move. Works in Today / Notes / Reference cells (nested too)
+       and on Urgent / Due-today rows. Moving before the hold = normal scroll / text selection.
+       The line you're typing in keeps the phone's own hold (select words); use the grip there.
+       Holding still keeps the existing menus (they open as before; a drag closes them). */
+    const HOLD_MS = 350;
+    let hold = null;
+    function holdCancel(){
+      if(!hold) return;
+      clearTimeout(hold.timer);
+      if(hold.mark) hold.mark.classList.remove('tc-holdready');
+      if(hold.ready) setTimeout(() => { if(!hold && !drag) document.body.classList.remove('urg-pressing'); },300);
+      hold = null;
+    }
+    function holdTarget(t){
+      if(!t || !t.closest) return null;
+      if(t.closest('#tcGrip,input,button,a,select,textarea,label,[data-tlhid],.urg-box,.di-box,.inbox-box,.urg-fold,.urg-meta,.di-from,#inboxPanel')) return null;
+      const act = document.activeElement;
+      const typing = root => !!(root && act && (act === root || root.contains(act)) && root.getAttribute('inputmode') !== 'none');
+      const copy = t.closest('#urgentPanel .urg-text, .due-notes .di-text');
+      if(copy){
+        if(typing(copy)) return null;
+        return {copy,mark:copy.closest('.urg-row,.di-line') || copy};
+      }
+      const line = t.closest('.check-line'), ed = editorOf(line);
+      if(!line || !ed || !ed.contains(line) || line.closest('table[data-cnote],[data-render-due]')) return null;
+      if(typing(ed)){
+        // Caret in this very line = you're typing in it: leave the hold to the phone.
+        try{
+          const sel = window.getSelection(), n = sel && sel.rangeCount ? sel.focusNode : null;
+          const el = n && (n.nodeType === 1 ? n : n.parentElement);
+          if(el && el.closest && el.closest('.check-line') === line) return null;
+        }catch(err){}
+      }
+      return {line,ed,mark:line};
+    }
+    function holdStart(e){
+      holdCancel();
+      if(drag || e.isPrimary === false) return;
+      if(typeof cardsOn !== 'undefined' && !cardsOn) return;
+      const h = holdTarget(e.target);
+      if(!h) return;
+      hold = {...h,x:e.clientX,y:e.clientY,id:e.pointerId,el:e.target,touch:e.pointerType !== 'mouse'};
+      hold.timer = setTimeout(holdReady,HOLD_MS);
+    }
+    function holdReady(){
+      const h = hold;
+      if(!h) return;
+      let line = h.line, ed = h.ed;
+      if(h.copy){
+        const src = typeof dueSource === 'function' ? dueSource(h.copy) : null;
+        if(!src || !src.line){ holdCancel(); if(typeof setStatus === 'function') setStatus('Scroll to that day first, then drag it'); return; }
+        line = src.line; ed = editorOf(line);
+      }
+      if(!line || !line.isConnected || !ed){ holdCancel(); return; }
+      h.ready = true;
+      document.body.classList.add('urg-pressing'); // no word highlight / callout while held
+      try{ const sel = window.getSelection(); if(sel) sel.removeAllRanges(); }catch(err){}
+      if(h.mark) h.mark.classList.add('tc-holdready');
+      if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
+      press = {cb:h.el,line,ed,x:h.x,y:h.y,id:h.id,grip:true,hold:true};
+    }
+    // After the hold, the finger moving must drag, not scroll the page.
+    document.addEventListener('touchmove',e => {
+      if(e.cancelable && ((hold && hold.ready) || (drag && document.body.classList.contains('tc-dragging')))) e.preventDefault();
+    },{capture:true,passive:false});
+    document.addEventListener('contextmenu',e => { if(hold && hold.ready) e.preventDefault(); },true); // our own menu still opens
     function block(line){
       const base = tcLvl(line), out = [line];
       for(let n = line.nextElementSibling; n && n.classList.contains('check-line') && tcLvl(n) > base; n = n.nextElementSibling) out.push(n);
@@ -8424,6 +8494,7 @@
     function begin(e){
       if(press.inbox) return beginInbox(e);
       const {line,ed} = press;
+      if(hold){ clearTimeout(hold.timer); if(hold.mark) hold.mark.classList.remove('tc-holdready'); hold.ready = false; hold = null; }
       const nodes = block(line);
       if(typeof hideUrgencyPicker === 'function') hideUrgencyPicker();
       if(typeof hideContextMenu === 'function') hideContextMenu();
@@ -8642,6 +8713,7 @@
       cancelAnimationFrame(d.raf);
       d.ghost.remove(); d.ind.remove();
       document.body.classList.remove('tc-dragging');
+      setTimeout(() => { if(!hold && !drag) document.body.classList.remove('urg-pressing'); },300); // from a hold-drag
       d.nodes.forEach(n => n.removeAttribute('data-tcdrag'));
       suppressUntil = Date.now() + 450;
       const t = cancelled ? null : d.target;
@@ -8680,15 +8752,16 @@
     document.addEventListener('pointerdown',startPoint,true);
     document.addEventListener('pointermove',e => {
       if(drag){ e.preventDefault(); move(e); return; }
+      if(hold && !hold.ready && e.pointerId === hold.id && (Math.abs(e.clientX - hold.x) > 10 || Math.abs(e.clientY - hold.y) > 10)) holdCancel(); // moved first = scroll / select
       if(!press || e.pointerId !== press.id) return;
       const th = press.grip ? 3 : 8;
       if(Math.abs(e.clientX - press.x) > th || Math.abs(e.clientY - press.y) > th) begin(e);
     },{capture:true,passive:false});
-    document.addEventListener('pointerup',e => { press = null; if(drag) finish(false); },true);
+    document.addEventListener('pointerup',e => { press = null; holdCancel(); if(drag) finish(false); },true);
     // Tell why a grip drag stopped, so a failed drag on the phone can be traced (2026-10-28).
     document.addEventListener('pointercancel',e => {
       const wasGrip = press && press.grip, wasDrag = !!drag;
-      press = null; if(drag) finish(true);
+      press = null; holdCancel(); if(drag) finish(true);
       if(wasGrip || wasDrag) setStatus('Drag stopped: the phone took over the touch (cancel)');
     },true);
     document.addEventListener('keydown',e => { if(e.key === 'Escape' && drag) finish(true); },true);

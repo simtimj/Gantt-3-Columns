@@ -1,5 +1,6 @@
 # Gantt 3 Columns — notes for Claude
 
+- **Commit as Julius** (so it counts on his GitHub graph): `git -c user.name="Julius Simtim" -c user.email="juliussimtim@gmail.com" commit ...`. Never commit as "Claude <noreply@anthropic.com>"; Claude goes only in a Co-Authored-By trailer.
 - Google Apps Script web app (Today / Notes / Reference columns over a Google Sheet). Pushing to `main` runs `clasp push` via `.github/workflows/deploy.yaml`, so keep commits small and working. Julius opens the **/dev test link** (latest pushed code, ~30 s after a push, then tap ↻); the workflow no longer updates a versioned /exec deployment (200-version cap, 2026-10-27). Julius mostly works from his phone.
 - Files: `Code.gs` (server), `Index.html` (all UI), `appsscript.json`.
 

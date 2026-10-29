@@ -6653,7 +6653,7 @@
     const bar = document.createElement('div'); bar.className = 'cal-archive-bar';
     const run = document.createElement('button'); run.type = 'button'; run.className = 'btn tiny';
     run.textContent = '🗃 Archive done' + (a.ready ? ' (' + a.ready + ' ready)' : '');
-    run.title = 'Fold Graphite events ending in " X" into one "✅ Completed Tasks" all-day event per day (3+ per day, or any once that day has one)';
+    run.title = 'Fold Graphite events marked "[x] " into one "✅ Completed Tasks" all-day event per day (3+ per day, or any once that day has one)';
     run.addEventListener('click',() => {
       setStatus('Checking what can be archived…');
       google.script.run.withSuccessHandler(rep => {

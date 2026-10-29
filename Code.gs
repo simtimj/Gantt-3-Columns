@@ -1104,9 +1104,14 @@ function doneCheck_(checked) { return '<input type="checkbox"' + (checked ? ' ch
 function doneHeaderHtml_(project) {
   return '<div data-cgrp="' + doneEsc_(project) + '"><b><u>' + doneEsc_(project) + '</u></b></div>';
 }
-function doneItemHtml_(name, details, checked, cid) {
+function doneItemHtml_(name, details, checked, cid, mine) {
   // Claude's lines start with "*" (no space) so Julius can tell them from his own (2026-10-26).
-  if (cid) {
+  // `mine` = his own Graphite calendar task transferred by Claude: no "*", ends " X" (2026-10-29).
+  if (cid && mine) {
+    if (name) name = String(name).replace(/^\*+/, '');
+    if (details || !name) details = String(details || '').replace(/\s+X$/, '') + ' X';
+    else name = name.replace(/\s+X$/, '') + ' X';
+  } else if (cid) {
     if (name) name = '*' + String(name).replace(/^\*+/, '');
     else details = '*' + String(details || '').replace(/^\*+/, '');
   }
@@ -1179,7 +1184,7 @@ function groupClaudeDone_(html, list) {
         proj = doneUnesc_(proj);
         const name = item ? doneItemName_(item) : '';
         const details = item ? String(item.details || '') : doneStrip_(text);
-        groupOf(proj).push(doneItemHtml_(name, details, checked, item ? item.id : cid));
+        groupOf(proj).push(doneItemHtml_(name, details, checked, item ? item.id : cid, !!(item && item.mine)));
         return;
       }
     }
@@ -1581,11 +1586,12 @@ function setCalendarEventDone(calId, eventId, start, done) {
 
 /* =========================================================
    DAILY COMPLETED-TASK ARCHIVE (Julius's spec, 2026-10-29)
-   Keeps the main calendar uncluttered: finished task events (Graphite AND title ending " X") are folded
+   Keeps the main calendar uncluttered: finished task events (Graphite AND title starting "[x] ", or the old
+   trailing " X" — Julius 2026-10-29 switched the logged marker to a "[x] " prefix) are folded
    into one all-day "✅ Completed Tasks — YYYY-MM-DD" event per date on the same calendar, then deleted.
    - Only main calendar; never recurring events, events with guests (meetings) or the archive itself.
    - A date is archived once 3+ eligible events wait on it, or any number once its archive exists.
-   - Each task becomes "[x] Title" (trailing X dropped) + an indented line with the time, the original
+   - Each task becomes "[x] Title" (marker dropped) + an indented line with the time, the original
      event id marker (dedupe/traceability) and its original description.
    - Originals are deleted only after the archive is re-read and every marker is found in it; anything
      already in the archive (an earlier run that failed to delete) is deleted on the next run.
@@ -1605,12 +1611,15 @@ function setArchiveAuto(on) {
   return archiveAuto_();
 }
 
+const ARCHIVE_DONE_RE_ = /^\[x\]\s|\sX$/i;
+const archiveName_ = t => String(t || '').trim().replace(/^\[x\]\s*/i, '').replace(/\s+X$/, '');
+
 function archiveMarker_(ev, startMs) { return '⟦id ' + ev.getId() + '@' + startMs + '⟧'; }
 
 function archiveIsEligible_(ev) {
   const title = String(ev.getTitle() || '').trim();
   if (title.indexOf(ARCHIVE_PREFIX) === 0) return false;
-  if (!/\sX$/.test(title)) return false;                       // explicit " X"
+  if (!ARCHIVE_DONE_RE_.test(title)) return false;            // logged: "[x] " prefix (or old " X")
   if (String(ev.getColor() || '') !== '8') return false;      // Graphite
   try { if (ev.isRecurringEvent()) return false; } catch (e) { return false; }
   try { if (ev.getGuestList().length) return false; } catch (e) {} // meetings / appointments with people
@@ -1654,7 +1663,7 @@ function archiveCompletedTasks(opts) {
       const before = archive ? String(archive.getDescription() || '') : '';
       const fresh = list.filter(x => before.indexOf(archiveMarker_(x.ev, x.start)) < 0);
       const text = fresh.map(x => {
-        const name = String(x.ev.getTitle() || '').trim().replace(/\s+X$/, '');
+        const name = archiveName_(x.ev.getTitle());
         const when = x.allDay ? 'all day' :
           Utilities.formatDate(new Date(x.start), tz, 'h:mm') + '–' + Utilities.formatDate(new Date(x.end), tz, 'h:mm a');
         const desc = String(x.ev.getDescription() || '').trim();

@@ -149,4 +149,9 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-day-lines', date: '2026-10-29', project: 'Gantt', title: 'Clearer day lines + dates', details: 'thicker darker separator between days; dates underlined, no comma after the weekday' },
   { id: 'd-20261029-below-evening', date: '2026-10-29', project: 'Gantt', title: 'Free line under Evening', details: 'empty line kept below the Evening box so things can be added there' },
   { id: 'd-20261029-quiet-note-headers', date: '2026-10-29', project: 'Gantt', title: 'Quieter Suggested Day / Wrap-Up headers', details: 'big yellow and purple banners and section bars removed; titles are colored text with a thin underline; Schedule keeps its blue banner' },
+  { id: 'd-20261029-cal-walk-blocks', date: '2026-10-29', project: 'Walk Blocks', mine: true, title: 'Walk Blocks deployed', details: 'apps-scripts monorepo pushed; GitHub Actions created and linked the Walk Blocks script; still to do: run installTrigger at script.google.com' },
+  { id: 'd-20261029-cal-boox-tappy', date: '2026-10-29', project: 'Research', mine: true, title: 'BOOX Tappy page turner', details: 'looked into buttons, Bluetooth, battery and fit for handheld navigation' },
+  { id: 'd-20261029-cal-chopping-blocks', date: '2026-10-29', project: 'Research', mine: true, title: 'Waterproof chopping blocks', details: 'looked into options' },
+  { id: 'd-20261029-commits-as-julius', date: '2026-10-29', project: 'GitHub', title: 'Commits credited to Julius', details: 'Gantt history rewritten so all 206 commits are authored by simtimj (backup branch kept); both repos\' CLAUDE.md now say commit as Julius' },
+  { id: 'd-20261029-x-prefix', date: '2026-10-29', project: 'Gantt', title: '[x] calendar marker', details: 'logged Graphite events now start with "[x] " instead of ending " X"; archive reads both; own calendar lines in the log end " X" with no *' },
 ];

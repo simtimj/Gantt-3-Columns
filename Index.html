@@ -221,7 +221,8 @@
        DAY ROWS
        ========================================================= */
     .day-row{
-      border-bottom:1px solid var(--border);
+      /* Day separator (Julius, 2026-10-29): thicker + darker so the line between days is easy to see. */
+      border-bottom:3px solid var(--day-sep,#8a8a8a);
       padding:calc(5px * var(--pad-y,1)) calc(8px * var(--pad-x,1) * var(--side-k,1)) calc(6px * var(--pad-y,1));
       position:relative;
       display:flex;
@@ -312,6 +313,7 @@
       margin-bottom:3px;
       user-select:none;
     }
+    .day-date{text-decoration:underline;text-underline-offset:3px;}
     .today-pill{
       color:var(--accent);
       margin-left:6px;
@@ -1317,7 +1319,7 @@
       /* Day cells (Julius, 2026-10-27): back to dark day colors like the phone's
          original dark mode (light ones were too bright), light text; the lines
          (note boxes, today outline) use the day's LIGHT color. */
-      .day-row{color:var(--dm-text);}
+      .day-row{color:var(--dm-text);--day-sep:#6a6a6a;}
       .day-row .day-label{color:#969696;}
       .day-row.dow-1{background:var(--dm-cell);--note-line:#ababab;}
       .day-row.dow-2{background:var(--dm-cell);--note-line:#c29f7b;}
@@ -1805,16 +1807,11 @@
       }[c])
     );
   function formatDate(s){
+    // "Sunday November 1, 2026" — no comma after the weekday (Julius, 2026-10-29).
     const d = new Date(s + 'T00:00:00');
-    return d.toLocaleDateString(
-      undefined,
-      {
-        weekday:'long',
-        month:'long',
-        day:'numeric',
-        year:'numeric'
-      }
-    );
+    const wk = d.toLocaleDateString('en-US',{weekday:'long'});
+    const mon = d.toLocaleDateString('en-US',{month:'long'});
+    return wk + ' ' + mon + ' ' + d.getDate() + ', ' + d.getFullYear();
   }
   function setStatus(s){
     const status=document.getElementById('status');
@@ -1970,7 +1967,7 @@
       day.date;
     const label =
       `<div class="day-label">
-        ${esc(formatDate(day.date))}
+        <span class="day-date">${esc(formatDate(day.date))}</span>
         ${
           today
             ? '<span class="today-pill">• TODAY</span>'
@@ -8566,6 +8563,9 @@
         else{ m.removeAttribute('data-secend'); added = true; }
       });
       if(!end){ end = blank(); end.dataset.secend = '1'; ed.appendChild(end); added = true; }
+      // (Julius, 2026-10-29) always one free line under the Evening box too, outside it, to add things there.
+      const below = [...ed.children].filter(x => (end.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING) && !x.matches('[data-render-due],.due-notes'));
+      if(!below.length){ end.after(blank()); added = true; }
     }
     if(added && !noSave && typeof saveEditorOwner === 'function') saveEditorOwner(ed);
     return added;

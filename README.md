@@ -48,6 +48,7 @@ Last updated: 2026-10-28
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **Backspace deletes in Urgent (2026-10-28)**: clear a task's or subtask's text in the Urgent panel, then Backspace once more at the start → that line is deleted (in its real cell too) and the cursor jumps to the end of the row above, like in the cells. A task with subtasks asks first. Undo: tap the status message within 30 s.
 - **Checkbox tap fixed (2026-10-28)**: a plain tap on a checkbox ticks / unticks it again (holding still opens the menu). Done tasks' faded text was layered over the box in narrow columns and swallowed the tap.
 - **Task duration (2026-10-28, auto-reshuffle step 1)**: hold a task's checkbox → **⏱** row: 15m · 30m · 45m · 1h · 1h 30m · 2h, or **…** for any length — type `90`, `1h 30m` or `15h` (up to 100h for big projects). Optional; tap the picked one again to clear. Shows as ⏱ 45m in the line's corner label (under the 📅 due date if it has one), saved with the task in the Sheet (`data-dur`). Deadline = the existing 📅 due date, priority = the existing red/yellow/blue urgency, so every task card now carries all three. Claude can add `dur` to tasks in `tasks.js`.
   - Duration now also survives **→ Day / → Reference** sends from Notes (urgency, subject and due date too — they used to be dropped), Urgent items carry `dur` for prioritization, and `getDayTasks(date)` in `Code.gs` returns a day's tasks with level / done / urgency / due / duration for the future scheduler (2026-10-28).

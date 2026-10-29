@@ -48,6 +48,7 @@ Last updated: 2026-10-29
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-29)
+- **Done log in the right block** (2026-10-29): Claude's done lines land in the Morning / Afternoon / Evening block that has already started (2–3:45 pm counts as Morning), never a later one; today's misplaced lines were moved back once.
 - **Blocks in every Today cell**: + Blocks button removed; Morning / Afternoon / Evening are added to every Today cell from today on. There's always an empty line above Morning, gaps between blocks, and an empty line under Evening (outside the box), so nothing's locked in.
 - **Bright block headers**: Suggested Day title is a yellow banner, Day Wrap-Up a purple one; each section header gets a matching left bar.
 - **Wrap-up split into sections**: Done (per area, one item per line) · Still Urgent (one line per task) · Priority Check · Carries Over. Wed 10/28's wrap-up re-rendered in the new layout.

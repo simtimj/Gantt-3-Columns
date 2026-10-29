@@ -1504,6 +1504,8 @@ const EVENT_CALENDARS = [
 const EVENT_DAYS_AHEAD = 3;
 
 function getCalendarEvents() {
+  // Auto archive first (when on), so the list below is already tidy.
+  if (archiveAuto_()) { try { archiveCompletedTasks({}); } catch (e) { console.error(e); } }
   const tz = Session.getScriptTimeZone();
   const today = todayString_();
   const start = parseDate_(today);
@@ -1530,6 +1532,8 @@ function getCalendarEvents() {
         calId: id,
         color: color,
         done: color === '8', // Graphite = done (Julius's rule)
+        items: (ev.getTitle() || '').indexOf(ARCHIVE_PREFIX) === 0
+          ? String(ev.getDescription() || '').split('\n').filter(l => /^\[x\] /.test(l)).map(l => l.slice(4)) : null,
         title: ev.getTitle() || '(no title)',
         cal: calName,
         allDay: allDay,
@@ -1543,7 +1547,9 @@ function getCalendarEvents() {
     });
   });
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (b.allDay - a.allDay) || a.start - b.start);
-  return { today: today, events: out };
+  let archive = { ready: 0, auto: archiveAuto_() };
+  try { archive.ready = archiveCompletedTasks({ dryRun: true }).ready; } catch (e) { console.error(e); }
+  return { today: today, events: out, archive: archive };
 }
 
 /* Calendar checkbox (2026-10-29, Julius): ticking an event in the Reference Calendar panel marks it done the
@@ -1569,7 +1575,131 @@ function setCalendarEventDone(calId, eventId, start, done) {
     ev.setColor(prev && prev !== '8' ? prev : '5');
     props.deleteProperty(key);
   }
+  if (done && archiveAuto_()) { try { archiveCompletedTasks({}); } catch (e) { console.error(e); } }
   return { done: !!done, color: String(ev.getColor() || '') };
+}
+
+/* =========================================================
+   DAILY COMPLETED-TASK ARCHIVE (Julius's spec, 2026-10-29)
+   Keeps the main calendar uncluttered: finished task events (Graphite AND title ending " X") are folded
+   into one all-day "✅ Completed Tasks — YYYY-MM-DD" event per date on the same calendar, then deleted.
+   - Only main calendar; never recurring events, events with guests (meetings) or the archive itself.
+   - A date is archived once 3+ eligible events wait on it, or any number once its archive exists.
+   - Each task becomes "[x] Title" (trailing X dropped) + an indented line with the time, the original
+     event id marker (dedupe/traceability) and its original description.
+   - Originals are deleted only after the archive is re-read and every marker is found in it; anything
+     already in the archive (an earlier run that failed to delete) is deleted on the next run.
+   - Failures keep the original event and are reported; reruns are safe (script lock + markers).
+   - The Gantt cells are never touched (task history stays there).
+   - Auto mode is OFF until Julius turns it on in the Calendar panel (test with 3 events first). When on,
+     it runs on Calendar panel load and when an event is ticked done.
+   ========================================================= */
+const ARCHIVE_CAL = 'juliussimtim@gmail.com';
+const ARCHIVE_PREFIX = '✅ Completed Tasks — ';
+const ARCHIVE_DAYS_BACK = 14;
+const ARCHIVE_MIN = 3;
+
+function archiveAuto_() { return PropertiesService.getScriptProperties().getProperty('archiveAuto') === '1'; }
+function setArchiveAuto(on) {
+  PropertiesService.getScriptProperties().setProperty('archiveAuto', on ? '1' : '0');
+  return archiveAuto_();
+}
+
+function archiveMarker_(ev, startMs) { return '⟦id ' + ev.getId() + '@' + startMs + '⟧'; }
+
+function archiveIsEligible_(ev) {
+  const title = String(ev.getTitle() || '').trim();
+  if (title.indexOf(ARCHIVE_PREFIX) === 0) return false;
+  if (!/\sX$/.test(title)) return false;                       // explicit " X"
+  if (String(ev.getColor() || '') !== '8') return false;      // Graphite
+  try { if (ev.isRecurringEvent()) return false; } catch (e) { return false; }
+  try { if (ev.getGuestList().length) return false; } catch (e) {} // meetings / appointments with people
+  return true;
+}
+
+// opts: { dryRun } → { ready, dates: [{ date, eligible, archived, deleted, waiting, errors }], errors }
+function archiveCompletedTasks(opts) {
+  opts = opts || {};
+  const tz = Session.getScriptTimeZone();
+  const cal = CalendarApp.getCalendarById(ARCHIVE_CAL);
+  if (!cal) throw new Error('Main calendar not found');
+  const today = todayString_();
+  const start = parseDate_(addDaysToDateString_(today, -ARCHIVE_DAYS_BACK));
+  const end = parseDate_(addDaysToDateString_(today, 1));
+  const lock = LockService.getScriptLock();
+  if (!opts.dryRun) lock.waitLock(20000);
+  const report = { ready: 0, dates: [], errors: [] };
+  try {
+    const all = cal.getEvents(start, end);
+    const byDate = {}, archives = {};
+    all.forEach(ev => {
+      const allDay = ev.isAllDayEvent();
+      const s = allDay ? ev.getAllDayStartDate() : ev.getStartTime();
+      const date = Utilities.formatDate(s, tz, 'yyyy-MM-dd');
+      const title = String(ev.getTitle() || '');
+      if (title === ARCHIVE_PREFIX + date && allDay) { archives[date] = ev; return; }
+      if (!archiveIsEligible_(ev)) return;
+      (byDate[date] = byDate[date] || []).push({ ev: ev, start: s.getTime(), allDay: allDay, end: (allDay ? ev.getAllDayEndDate() : ev.getEndTime()).getTime() });
+    });
+    Object.keys(byDate).sort().forEach(date => {
+      const list = byDate[date];
+      let archive = archives[date] || null;
+      const r = { date: date, eligible: list.length, archived: 0, deleted: 0, waiting: 0, errors: [] };
+      report.dates.push(r);
+      if (!archive && list.length < ARCHIVE_MIN) { r.waiting = list.length; return; }
+      report.ready += list.length;
+      if (opts.dryRun) { r.titles = list.map(x => x.ev.getTitle()); return; }
+
+      // 1. Write every new entry into the archive (create it if needed).
+      const before = archive ? String(archive.getDescription() || '') : '';
+      const fresh = list.filter(x => before.indexOf(archiveMarker_(x.ev, x.start)) < 0);
+      const text = fresh.map(x => {
+        const name = String(x.ev.getTitle() || '').trim().replace(/\s+X$/, '');
+        const when = x.allDay ? 'all day' :
+          Utilities.formatDate(new Date(x.start), tz, 'h:mm') + '–' + Utilities.formatDate(new Date(x.end), tz, 'h:mm a');
+        const desc = String(x.ev.getDescription() || '').trim();
+        const loc = String(x.ev.getLocation() || '').trim();
+        return '[x] ' + name + '\n    ' + when + (loc ? ' · ' + loc : '') + ' · ' + archiveMarker_(x.ev, x.start) +
+          (desc ? '\n' + desc.split('\n').map(l => '    ' + l).join('\n') : '');
+      }).join('\n');
+      try {
+        if (!archive) {
+          archive = cal.createAllDayEvent(ARCHIVE_PREFIX + date, parseDate_(date), { description: text });
+          try { archive.setColor('8'); } catch (e) {}
+        } else if (text) {
+          archive.setDescription(before ? before.replace(/\s+$/, '') + '\n' + text : text);
+        }
+      } catch (e) {
+        r.errors.push('Could not write the archive: ' + e.message + ' (nothing deleted)');
+        return;
+      }
+      r.archived = fresh.length;
+
+      // 2. Verify: re-read the archive and check each marker before deleting anything.
+      let saved = '';
+      try {
+        const again = cal.getEventById(archive.getId());
+        saved = String((again || archive).getDescription() || '');
+      } catch (e) {
+        r.errors.push('Could not re-read the archive: ' + e.message + ' (nothing deleted)');
+        return;
+      }
+      // 3. Delete only verified originals.
+      list.forEach(x => {
+        if (saved.indexOf(archiveMarker_(x.ev, x.start)) < 0) {
+          r.errors.push('Not found in archive, kept: ' + x.ev.getTitle());
+          return;
+        }
+        try { x.ev.deleteEvent(); r.deleted++; }
+        catch (e) { r.errors.push('Could not delete "' + x.ev.getTitle() + '": ' + e.message + ' (kept; it is already in the archive)'); }
+      });
+    });
+  } catch (e) {
+    report.errors.push(e.message);
+  } finally {
+    if (!opts.dryRun) lock.releaseLock();
+  }
+  return report;
 }
 
 // Run once from the script editor if the app ever asks for calendar access.

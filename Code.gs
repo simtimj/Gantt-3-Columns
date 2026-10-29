@@ -46,6 +46,7 @@ function doGet() {
 
   // Refresh button target: the app's own URL, opened in the top window.
   try { template.appUrl = ScriptApp.getService().getUrl(); } catch (err) { template.appUrl = ''; }
+  template.build = appBuild_(true);
 
   return template.evaluate()
     .setTitle('Focus Workspace')
@@ -118,6 +119,7 @@ function getWorkspaceData() {
   try { applyClaudeDone_(); } catch (e) { console.error(e); }
   try { applyClaudeNotes_(); } catch (e) { console.error(e); }
   try { applyClaudeTasks_(); } catch (e) { console.error(e); }
+  try { moveScheduleToNotes_(); } catch (e) { console.error(e); }
 
   const today = todayString_();
 
@@ -226,7 +228,9 @@ function getDaysRange_(startDate, endDate) {
       out.push({
         date: match.date,
         tasks: String(row[0] || ''),
-        journal: String(row[1] || '')
+        journal: String(row[1] || ''),
+        th: cellHash_(row[0]),
+        jh: cellHash_(row[1])
       });
     });
   });
@@ -241,28 +245,182 @@ function getDaysRange_(startDate, endDate) {
    DAY SAVING
    ========================================================= */
 
-function saveDay(dateString, tasks, journal) {
-  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const row = findDayRow_(sheet, dateString);
+/* Safe saves (Julius, 2026-10-29: "bulletproof, never lose anything").
+   The app sends what it changed plus the version (hash) of the cell it started from.
+   - Cell unchanged on the server since then → write.
+   - Cell changed elsewhere (another tab/device, Claude's done log, a server move) → do NOT
+     overwrite; send the current cell back so the app merges both sides and saves again.
+   - A column the app didn't change is never written (saving Today can't clobber Notes).
+   Read-compare-write runs under the script lock. Old app tabs (no opts) still save, but the
+   cell they overwrite is copied to the Backup tab first. */
+function saveDay(dateString, tasks, journal, opts) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    const row = findDayRow_(sheet, dateString);
+    let curT = '', curJ = '';
+    if (row) {
+      const v = sheet.getRange(row, 2, 1, 2).getValues()[0];
+      curT = String(v[0] || ''); curJ = String(v[1] || '');
+    }
+    tasks = String(tasks || ''); journal = String(journal || '');
 
-  if (row) {
-    sheet.getRange(row, 2, 1, 2).setValues([
-      [
-        tasks || '',
-        journal || ''
-      ]
-    ]);
+    if (!opts) {
+      if (curT && curT !== tasks) backupCell_(dateString, 'Today', 'old app tab', curT, true);
+      if (curJ && curJ !== journal) backupCell_(dateString, 'Notes', 'old app tab', curJ, true);
+      if (row) sheet.getRange(row, 2, 1, 2).setValues([[tasks, journal]]);
+      else sheet.appendRow([parseDate_(dateString), tasks, journal]);
+      return true;
+    }
 
-    return true;
+    const t = syncCol_(curT, tasks, opts.th, opts.ct, dateString, 'Today');
+    const j = syncCol_(curJ, journal, opts.jh, opts.cj, dateString, 'Notes');
+    if (t.write || j.write) {
+      if (row) sheet.getRange(row, 2, 1, 2).setValues([[t.value, j.value]]);
+      else sheet.appendRow([parseDate_(dateString), t.value, j.value]);
+    }
+    const res = { th: cellHash_(t.value), jh: cellHash_(j.value), conflictT: !!t.conflict, conflictJ: !!j.conflict, build: appBuild_() };
+    if (t.sendBack) res.tasks = t.value;
+    if (j.sendBack) res.journal = j.value;
+    return res;
+  } finally {
+    lock.releaseLock();
   }
+}
 
-  sheet.appendRow([
-    parseDate_(dateString),
-    tasks || '',
-    journal || ''
-  ]);
+// One column of a safe save. baseHash = version the app started from (null = it had no row).
+function syncCol_(cur, mine, baseHash, changed, where, label) {
+  const same = baseHash ? cellHash_(cur) === baseHash : cur === '';
+  if (!changed) return { value: cur, write: false, sendBack: !same };
+  if (!same) return { value: cur, write: false, conflict: true, sendBack: true };
+  // Big drop in size (e.g. many lines deleted at once): keep a copy, just in case.
+  if (cur.length > 400 && mine.length < cur.length * 0.6) backupCell_(where, label, 'big shrink', cur);
+  return { value: mine, write: true };
+}
 
+// Short version id of a cell's text.
+function cellHash_(s) {
+  const b = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(s || ''), Utilities.Charset.UTF_8);
+  return b.slice(0, 8).map(x => ((x + 256) % 256).toString(16).padStart(2, '0')).join('');
+}
+
+// Version of the app's page code, so an open tab can tell a newer version was pushed.
+function appBuild_(fresh) {
+  const cache = CacheService.getScriptCache();
+  let b = fresh ? null : cache.get('appBuild');
+  if (b) return b;
+  try { b = cellHash_(HtmlService.createHtmlOutputFromFile('Index').getContent()); } catch (e) { b = ''; }
+  cache.put('appBuild', b, 120);
+  return b;
+}
+
+// Safety copies of cell text before risky overwrites → "Backup" tab (newest at the bottom, ~1000 kept).
+function backupCell_(where, col, reason, content, throttle) {
+  try {
+    if (throttle) {
+      const cache = CacheService.getScriptCache();
+      const key = 'bk:' + where + ':' + col;
+      if (cache.get(key)) return;
+      cache.put(key, '1', 60);
+    }
+    const sh = getOrCreateSheet_('Backup', ['Saved', 'Where', 'Column', 'Reason', 'Content']);
+    sh.appendRow([new Date(), String(where), col, reason, String(content).slice(0, 49000)]);
+    if (sh.getLastRow() > 1200) sh.deleteRows(2, 200);
+  } catch (e) { console.error(e); }
+}
+
+// Called when the app comes back into view (and every few minutes): returns anything that changed
+// elsewhere since the app loaded it. req = { days: { date: {th, jh} }, ref: { id: ch } }
+function getSyncState(req) {
+  req = req || {};
+  try { moveScheduleToNotes_(); } catch (e) { console.error(e); }
+  const out = { build: appBuild_(), days: {}, ref: {} };
+  const dates = Object.keys(req.days || {}).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  if (dates.length) {
+    getDaysRange_(dates[0], dates[dates.length - 1]).forEach(d => {
+      const want = req.days[d.date];
+      if (!want) return;
+      const e = { th: d.th, jh: d.jh };
+      if (want.th !== d.th) e.tasks = d.tasks;
+      if (want.jh !== d.jh) e.journal = d.journal;
+      if (e.tasks !== undefined || e.journal !== undefined) out.days[d.date] = e;
+    });
+  }
+  const refWant = req.ref || {};
+  if (Object.keys(refWant).length) {
+    getReference_().forEach(r => {
+      if (Object.prototype.hasOwnProperty.call(refWant, r.id) && refWant[r.id] !== r.ch) out.ref[r.id] = { content: r.content, ch: r.ch };
+    });
+  }
+  return out;
+}
+
+
+/* Schedule cell (Julius, 2026-10-29): time-block tasks ("10:00–10:30 · Walk Blocks setup …") don't belong in
+   the Morning block of Today. For today and the next 7 days they move, as they are (checkboxes, done state,
+   subtasks), into their own boxed cell in Notes, right under the Suggested Day:
+   <table data-cnote="s-YYYYMMDD" data-ckind="sched"><tr><td>title</td></tr><tr><td>lines</td></tr></table>.
+   New time-block lines added later join the same cell. */
+const SCHED_RE_ = /^\s*\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?\s*[–—-]\s*\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?\s*·/i;
+
+function moveScheduleToNotes_() {
+  const today = todayString_();
+  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+  const days = getDaysRange_(today, addDaysToDateString_(today, 7));
+  const todo = days.filter(d => d.tasks.indexOf('·') >= 0 && splitSchedule_(d.tasks).lines.length);
+  if (!todo.length) return false;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    todo.forEach(d => {
+      const row = findDayRow_(sheet, d.date);
+      if (!row) return;
+      const v = sheet.getRange(row, 2, 1, 2).getValues()[0];
+      const split = splitSchedule_(String(v[0] || ''));
+      if (!split.lines.length) return;
+      const notes = addToScheduleCell_(String(v[1] || ''), d.date, split.lines.join(''));
+      sheet.getRange(row, 2, 1, 2).setValues([[split.rest, notes]]);
+    });
+  } finally { lock.releaseLock(); }
   return true;
+}
+
+// Pull time-block check-lines (and the subtasks right under them) out of a Today cell.
+function splitSchedule_(html) {
+  const blocks = doneBlocks_(html);
+  const lines = [], rest = [];
+  let takingLevel = -1;
+  blocks.forEach(b => {
+    const isLine = /^<div\b[^>]*class="[^"]*check-line/i.test(b);
+    const level = Number(doneAttr_(b, 'data-level') || 0);
+    if (isLine && takingLevel >= 0 && level > takingLevel) { lines.push(b); return; }
+    takingLevel = -1;
+    const text = isLine ? doneStrip_(doneText_(b) || '') : '';
+    if (isLine && SCHED_RE_.test(text)) { lines.push(b); takingLevel = level; return; }
+    rest.push(b);
+  });
+  return { lines, rest: rest.join('') };
+}
+
+function addToScheduleCell_(notes, date, linesHtml) {
+  const id = 's-' + date.replace(/-/g, '');
+  const start = notes.indexOf('<table data-cnote="' + id + '"');
+  if (start >= 0) {
+    const end = notes.indexOf('</table>', start);
+    const close = notes.lastIndexOf('</td></tr></tbody></table>', end + 8);
+    if (end >= 0 && close > start) return notes.slice(0, close) + linesHtml + notes.slice(close);
+  }
+  const label = Utilities.formatDate(parseDate_(date), Session.getScriptTimeZone(), 'EEE M/d');
+  const table = '<table data-cnote="' + id + '" data-ckind="sched"><tbody><tr><td><div><b><u>Schedule · ' + label +
+    '</u></b></div></td></tr><tr><td>' + linesHtml + '</td></tr></tbody></table>';
+  // Right under the Suggested Day if there is one, else at the top.
+  const plan = notes.search(/<table data-cnote="[^"]*" data-ckind="plan"/);
+  if (plan >= 0) {
+    const pEnd = notes.indexOf('</table>', plan);
+    if (pEnd >= 0) return notes.slice(0, pEnd + 8) + table + notes.slice(pEnd + 8);
+  }
+  return table + notes;
 }
 
 
@@ -316,7 +474,8 @@ function getReference_() {
       title: String(row[3] || ''),
       content: String(row[4] || ''),
       expanded: row[5] !== false,
-      sort: Number(row[6]) || index
+      sort: Number(row[6]) || index,
+      ch: cellHash_(row[4])
     }))
     .sort((a, b) => a.sort - b.sort);
 }
@@ -340,38 +499,56 @@ function referenceRowMap_(sheet) {
 }
 
 
+// Safe save (2026-10-29), same rules as saveDay: item.fwSync + baseHash (version the app started from)
+// + contentChanged. Toggling a cell open/closed in a stale tab no longer writes old text over new text.
 function saveReferenceItem(item) {
-  const sheet = getOrCreateSheet_('Reference', REF_HEADERS);
-  const id = String(item.id || Utilities.getUuid());
-  const row = referenceRowMap_(sheet).get(id);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = getOrCreateSheet_('Reference', REF_HEADERS);
+    const id = String(item.id || Utilities.getUuid());
+    const row = referenceRowMap_(sheet).get(id);
+    const sync = !!item.fwSync;
+    let content = String(item.content || '');
+    let res = sync ? { id: id, build: appBuild_() } : null;
 
-  if (row) {
-    sheet.getRange(row, 1, 1, 7).setValues([
-      [
+    if (row) {
+      const cur = String(sheet.getRange(row, 5).getValue() || '');
+      if (sync) {
+        const c = syncCol_(cur, content, item.baseHash || null, !!item.contentChanged, 'Reference ' + id, 'Content');
+        content = c.value;
+        if (c.conflict) res.conflict = true;
+        if (c.sendBack) res.content = cur;
+      } else if (cur && cur !== content) {
+        backupCell_('Reference ' + id, 'Content', 'old app tab', cur, true);
+      }
+      sheet.getRange(row, 1, 1, 7).setValues([
+        [
+          id,
+          item.parentId || '',
+          item.type || 'item',
+          item.title || '',
+          content,
+          item.expanded !== false,
+          Number(item.sort) || row
+        ]
+      ]);
+    } else {
+      sheet.appendRow([
         id,
         item.parentId || '',
         item.type || 'item',
         item.title || '',
-        item.content || '',
+        content,
         item.expanded !== false,
-        Number(item.sort) || row
-      ]
-    ]);
-
+        Number(item.sort) || sheet.getLastRow()
+      ]);
+    }
+    if (res) { res.ch = cellHash_(content); return res; }
     return id;
+  } finally {
+    lock.releaseLock();
   }
-
-  sheet.appendRow([
-    id,
-    item.parentId || '',
-    item.type || 'item',
-    item.title || '',
-    item.content || '',
-    item.expanded !== false,
-    Number(item.sort) || sheet.getLastRow()
-  ]);
-
-  return id;
 }
 
 
@@ -1303,7 +1480,13 @@ function getCalendarEvents() {
         link = 'https://www.google.com/calendar/event?eid=' +
           Utilities.base64EncodeWebSafe(ev.getId().split('@')[0] + ' ' + id).replace(/=+$/, '');
       } catch (err) { link = ''; }
+      let color = '';
+      try { color = String(ev.getColor() || ''); } catch (err) { color = ''; }
       out.push({
+        id: ev.getId(),
+        calId: id,
+        color: color,
+        done: color === '8', // Graphite = done (Julius's rule)
         title: ev.getTitle() || '(no title)',
         cal: calName,
         allDay: allDay,
@@ -1318,6 +1501,32 @@ function getCalendarEvents() {
   });
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (b.allDay - a.allDay) || a.start - b.start);
   return { today: today, events: out };
+}
+
+/* Calendar checkbox (2026-10-29, Julius): ticking an event in the Reference Calendar panel marks it done the
+   same way he does by hand — Graphite color. Unticking puts back the color it had (yellow = open if unknown).
+   start = the event's start time (ms), so the right day of a repeating event is changed. */
+function setCalendarEventDone(calId, eventId, start, done) {
+  if (EVENT_CALENDARS.indexOf(calId) < 0) throw new Error('Not one of the app calendars');
+  const cal = CalendarApp.getCalendarById(calId);
+  if (!cal) throw new Error('Calendar not found');
+  const t = new Date(Number(start));
+  const ev = cal.getEvents(new Date(t.getTime() - 60000), new Date(t.getTime() + 60000))
+    .filter(e => e.getId() === eventId && Math.abs((e.isAllDayEvent() ? e.getAllDayStartDate() : e.getStartTime()).getTime() - t.getTime()) < 60000)[0]
+    || cal.getEvents(new Date(t.getTime() - DAY_MS), new Date(t.getTime() + DAY_MS)).filter(e => e.getId() === eventId)[0];
+  if (!ev) throw new Error('Event not found (moved or deleted?) — tap ↻ on the Calendar');
+  const props = PropertiesService.getScriptProperties();
+  const key = 'calPrev:' + eventId.slice(0, 60) + ':' + Number(start);
+  if (done) {
+    const cur = String(ev.getColor() || '');
+    if (cur !== '8') props.setProperty(key, cur || '5');
+    ev.setColor('8');
+  } else {
+    const prev = props.getProperty(key);
+    ev.setColor(prev && prev !== '8' ? prev : '5');
+    props.deleteProperty(key);
+  }
+  return { done: !!done, color: String(ev.getColor() || '') };
 }
 
 // Run once from the script editor if the app ever asks for calendar access.

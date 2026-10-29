@@ -139,5 +139,9 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-blocks-every-day', date: '2026-10-29', project: 'Gantt', title: 'Blocks in every Today cell', details: '+ Blocks button removed; Morning / Afternoon / Evening in every cell from today on, with room above, between and below' },
   { id: 'd-20261029-note-banners', date: '2026-10-29', project: 'Gantt', title: 'Bright Suggested Day / Wrap-Up headers', details: 'yellow and purple title banners, matching bars on section headers; wrap-up split into Done / Still Urgent / Priority Check / Carries Over' },
   { id: 'd-20261029-backlog-tasks', date: '2026-10-29', project: 'Gantt', title: 'Claude tasks into Backlog', details: 'tasks.js date: \'backlog\' puts a task in the Reference Backlog (in Urgent, not Today); first one: free pane layout (blue)' },
+  { id: 'd-20261029-safe-sync', date: '2026-10-29', project: 'Gantt', title: 'Safe saves, no lost edits', details: 'stale tabs merge line by line instead of overwriting; pulls changes when you come back; new-version bar; ↻ waits for saves; Backup tab' },
+  { id: 'd-20261029-empty-space', date: '2026-10-29', project: 'Gantt', title: 'Write in empty space', details: 'Today and Notes fill the row; tap below the last line to type there' },
+  { id: 'd-20261029-schedule-cell', date: '2026-10-29', project: 'Gantt', title: 'Schedule cell in Notes', details: 'time-block tasks move from Today into a blue box under the Suggested Day, still checkboxes' },
+  { id: 'd-20261029-cal-checkboxes', date: '2026-10-29', project: 'Gantt', title: 'Calendar panel with checkboxes', details: 'Reference Calendar back: To do by block, Done, next days; tick = Graphite on Google Calendar' },
   { id: 'd-20261029-done-in-block', date: '2026-10-29', project: 'Gantt', title: 'Done log in the right block', details: 'Claude done lines land in the Morning / Afternoon / Evening block that has already started, never a later one' },
 ];

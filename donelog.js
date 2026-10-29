@@ -131,4 +131,7 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-checkbox-tap', date: '2026-10-28', project: 'Gantt', title: 'Checkbox tap fixed', details: 'tapping a done task\'s checkbox unticks it again; faded done text was covering the box in narrow columns (hold still opens the menu)' },
   { id: 'd-20261028-urg-backspace', date: '2026-10-28', project: 'Gantt', title: 'Backspace deletes in Urgent', details: 'Backspace on an empty Urgent task/subtask deletes it and jumps to the row above; tasks with subtasks ask first' },
   { id: 'd-20261028-hold-drag', date: '2026-10-28', project: 'Gantt', title: 'Hold anywhere to drag', details: 'hold a card\'s text (not the checkbox) ~⅓ s, then move to drag it; quick moves still scroll, quick taps still pick' },
-  { id: 'd-20261028-remove-from-today', date: '2026-10-28', project: 'Gantt', title: 'Remove from Today, keep in Urgent', details: 'hold an urgent task\'s checkbox → ✂ Remove from Today (stays in Urgent); it moves to Backlog with urgency, due date, duration and subtasks' },];
+  { id: 'd-20261028-remove-from-today', date: '2026-10-28', project: 'Gantt', title: 'Remove from Today, keep in Urgent', details: 'hold an urgent task\'s checkbox → ✂ Remove from Today (stays in Urgent); it moves to Backlog with urgency, due date, duration and subtasks' },
+  { id: 'd-20261029-day-blocks-button', date: '2026-10-29', project: 'Gantt', title: '+ Blocks button', details: 'tap inside any Today day and press + Blocks to add Morning / Afternoon / Evening to it' },
+  { id: 'd-20261029-evening-spill', date: '2026-10-29', project: 'Gantt', title: 'Evening box spill fixed', details: 'day row re-syncs its height after the section boxes are drawn; boxes clipped to the cell' },
+];

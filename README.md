@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` deploys automatically (`.github/workflows/deploy.yaml` → `clasp push` + update deployment).
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## Status key
 
@@ -48,6 +48,8 @@ Last updated: 2026-10-28
 
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
+- **+ Blocks button (2026-10-29)**: tap inside any Today day (e.g. tomorrow's empty cell), then press **+ Blocks** in the Today header → that day gets Morning / Afternoon / Evening like today does, with the cursor ready under Morning. Future days keep their gaps and typing lines after that.
+- **Evening box no longer spills into the next day (2026-10-29)**: the day row re-measures its height after the section boxes / Today chip are drawn, and the boxes can never draw past the cell's bottom edge.
 - **Backspace deletes in Urgent (2026-10-28)**: clear a task's or subtask's text in the Urgent panel, then Backspace once more at the start → that line is deleted (in its real cell too) and the cursor jumps to the end of the row above, like in the cells. A task with subtasks asks first. Undo: tap the status message within 30 s.
 - **Checkbox tap fixed (2026-10-28)**: a plain tap on a checkbox ticks / unticks it again (holding still opens the menu). Done tasks' faded text was layered over the box in narrow columns and swallowed the tap.
 - **Task duration (2026-10-28, auto-reshuffle step 1)**: hold a task's checkbox → **⏱** row: 15m · 30m · 45m · 1h · 1h 30m · 2h, or **…** for any length — type `90`, `1h 30m` or `15h` (up to 100h for big projects). Optional; tap the picked one again to clear. Shows as ⏱ 45m in the line's corner label (under the 📅 due date if it has one), saved with the task in the Sheet (`data-dur`). Deadline = the existing 📅 due date, priority = the existing red/yellow/blue urgency, so every task card now carries all three. Claude can add `dur` to tasks in `tasks.js`.

@@ -134,4 +134,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261028-remove-from-today', date: '2026-10-28', project: 'Gantt', title: 'Remove from Today, keep in Urgent', details: 'hold an urgent task\'s checkbox → ✂ Remove from Today (stays in Urgent); it moves to Backlog with urgency, due date, duration and subtasks' },
   { id: 'd-20261029-day-blocks-button', date: '2026-10-29', project: 'Gantt', title: '+ Blocks button', details: 'tap inside any Today day and press + Blocks to add Morning / Afternoon / Evening to it' },
   { id: 'd-20261029-evening-spill', date: '2026-10-29', project: 'Gantt', title: 'Evening box spill fixed', details: 'day row re-syncs its height after the section boxes are drawn; boxes clipped to the cell' },
+  { id: 'd-20261029-header-today-jump', date: '2026-10-29', project: 'Gantt', title: 'Today button → header tap', details: 'removed the top-bar Today button; tap the TODAY / TASKS header text to jump to today' },
+  { id: 'd-20261029-no-mustdo', date: '2026-10-29', project: 'Gantt', title: 'Must Do section removed', details: 'Suggested Day drops Must Do / Urgent + Important (must-dos are on the calendar); today\'s plan re-rendered without it' },
 ];

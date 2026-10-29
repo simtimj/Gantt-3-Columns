@@ -22,11 +22,11 @@
 //   each part as a '  [] ' subtask, also **Name**: details.
 // Plan (Julius, 2026-10-26): cells:true (each section its own row, no blank lines needed). Each entry is a
 //   '- **Name**: one-line summary' with its time blocks / steps underneath as '  ' detail lines ('9:00–12:00 · …').
-//   Section order: '## Calendar' → '## Must Do / Urgent + Important' → '## Important / Not The Most Urgent' → '## Stretch' → '## Later'. No For fun section.
+//   Section order: '## Calendar' → '## Important / Not The Most Urgent' → '## Stretch' → '## Later'. No For fun section.
 //   Calendar: only real events (e.g. '- **CalCareers block**: 4:00–6:30'); never wake, routine, nap, chill or
 //   other fixed daily blocks. Always a dog-walk line from the Time To Pet calendar with client first names:
 //   '- **Dog walks**: 11:15 Brittany · 12:00 Catherine · 12:30 David', or '- **Dog walks**: none today'.
-//   Must Do names are bold + underlined and Title Cased (every word capitalized): '- **__CDCR Application__**: …' (Julius, 2026-10-27). Important = matters but not the most
+//   No Must Do / Urgent + Important section (removed Julius, 2026-10-29: must-dos live on his calendar). Important = matters but not the most
 //   urgent (yellow). Stretch = bonus if there's time. Later = blue, can wait.
 // Look (Julius, 2026-10-27): box outline and dividers are the same thin 1px day-colored line; fill is a slightly darker
 //   day tint; every underlined line (Focus areas, Priority check entries) shows bold too.
@@ -192,22 +192,13 @@ const CLAUDE_NOTES = [
     '  [] **Finish Lab DC001**: rename LAB-DC01, static IP, promote to domain controller',
     '[] **White Elephant Present**: yellow, open since Tue',
   ] },
-  { id: 'n-20261029-plan', cells: true, date: '2026-10-29', kind: 'plan', title: 'Suggested Day · Thu 10/29', lines: [
+  { id: 'n-20261029-plan', rev: 2, cells: true, date: '2026-10-29', kind: 'plan', title: 'Suggested Day · Thu 10/29', lines: [
     '## Calendar',
     '- **Walk Blocks Setup**: **9:15–9:35**',
     '- **Rock Show Run-Through**: **4:30–5:00**',
     '- **Last Band Practice**: **5:00–9:30 pm**',
     '- **Dog Walks**: none today',
     '  **Open**: **9:35–2:00** · **3:30–4:30** (nap 2:10–3, workout 3–3:30)',
-    '## Must Do / Urgent + Important',
-    '- **__Walk Blocks Setup__**: ~20 min at the PC',
-    '  **9:15–9:35** · **Repo + Secret**: create simtimj/apps-scripts, add CLASPRC_JSON, new chat so Claude pushes, run installTrigger once',
-    '- **__Claude Pipeline + Tasks Tab__**: due Tue 11/3',
-    '  **9:45–11:45** · **Tasks Tab**: name, due, duration, importance; Claude writes via the Sheets connector',
-    '- **__AI Instructions Card__**: was due Wed, Reference Backlog',
-    '  **12:00–12:45** · **Write + Verify**: the 6 subtasks',
-    '- **__Rock Show Prep__**: gig Fri 10/30',
-    '  **4:30–5:00** · **Run-Through**: full set, then Last Band Practice',
     '## Important / Not The Most Urgent',
     '- **IT Lab (AD / M365)**: due Fri 11/6, ~1 hr behind',
     '  **1:00–2:00** · **Finish Lab DC001**: rename LAB-DC01, static IP, promote to domain controller',

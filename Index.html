@@ -449,6 +449,10 @@
     .editor table[data-cnote][data-ccells] tr + tr > td > div:first-child{border-left:4px solid var(--cn-acc);padding-left:7px;margin-left:-2px;}
     .editor table[data-cnote][data-ckind="plan"]{--cn-acc:#f5b800;}
     .editor table[data-cnote][data-ckind="wrap"]{--cn-acc:#a855f7;}
+    /* Schedule cell (2026-10-29): time-block tasks moved out of Today's Morning block; blue banner. */
+    .editor table[data-cnote][data-ckind="sched"] tr:first-child > td > div:first-child{background:#3b82f6;color:#fff;}
+    .editor table[data-cnote][data-ckind="sched"]{--cn-acc:#3b82f6;}
+    .editor table[data-cnote][data-ckind="sched"] .check-line{padding:2px 0;}
     .check-line{
       display:flex;
       align-items:flex-start;
@@ -683,7 +687,7 @@
     #todayPane,#journalPane{border-right:0;}
     .day-row.today .day-label{color:#444;}
     .day-row.today .today-pill{color:var(--today-border-adj);font-weight:700;}
-    .editor.day-editor,.editor.journal-editor{min-height:5.9em;flex-shrink:0;}
+    .editor.day-editor,.editor.journal-editor{min-height:5.9em;flex-shrink:0;flex-grow:1;}
     .pane,.scroll{overscroll-behavior:contain;}
     @media(max-width:900px){
       html,body{height:100%;height:100dvh;}
@@ -1236,7 +1240,12 @@
     .urg-create input,.inbox-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;}
     #calPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     .cal-sub.cal-today{color:var(--text,#222);}
-    .cal-row{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;background:none;border:0;padding:3px 0;cursor:pointer;color:inherit;font-size:13px;}
+    .cal-row{display:flex;align-items:flex-start;gap:6px;width:100%;text-align:left;background:none;border:0;padding:3px 0;color:inherit;font-size:13px;}
+    .cal-row .cal-box{margin-top:2px;flex:0 0 auto;}
+    .cal-row .cal-time,.cal-row .cal-title{cursor:pointer;}
+    .cal-row.done .cal-title,.cal-row.done .cal-time{text-decoration:line-through;opacity:.55;}
+    .cal-sub.cal-block{padding-left:4px;font-size:11px;opacity:.8;}
+    .cal-sub.cal-donehead{cursor:pointer;display:flex;align-items:center;gap:4px;}
     .cal-time{flex:0 0 auto;min-width:6.4em;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
     .cal-title{flex:1;min-width:0;}
     .cal-row.past{opacity:.5;}
@@ -1646,6 +1655,7 @@
   /* Filled in by Apps Script (Code.gs doGet), so the first screen needs no
      extra server request. If it is missing, the page loads the data itself. */
   window.__FW_INITIAL__ = <?!= initialData ?>;
+  window.__FW_BUILD__ = '<?= build ?>';
 </script>
 <script>
   /* =========================================================
@@ -1833,7 +1843,7 @@
       state.days.map(d => [d.date,d])
     );
     newDays.forEach(
-      d => { map.set(d.date,d); noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); }
+      d => { map.set(d.date,d); fwSetDayBase(d, false); noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); }
     );
     renderUrgent();
     state.days = [
@@ -1860,6 +1870,9 @@
      ========================================================= */
   function applyWorkspaceData(data){
     state = data;
+    (state.days || []).forEach(d => fwSetDayBase(d, true));
+    (state.reference || []).forEach(refBase);
+    fwLastSync = Date.now();
     if(state.today && Array.isArray(state.days)){
       const from=addDays(state.today,-7),to=addDays(state.today,3);
       state.days=state.days.filter(d=>d.date>=from && d.date<=to);
@@ -4095,22 +4108,350 @@
     info.pending=false;
     daySaveState.set(date,info);
     setStatus('Saving…');
+    /* Safe save (2026-10-29): send the version each column started from; the server only writes a
+       column that hasn't changed elsewhere, and sends back anything that did so it can be merged. */
+    const b=fwDayBase(date);
+    const opts={th:b.tasks.h,jh:b.journal.h,ct:!!t&&tasks!==b.tasks.t,cj:!!j&&journal!==b.journal.t};
     google.script.run
-      .withSuccessHandler(()=>{
+      .withSuccessHandler(res=>{
         info.inFlight=false;
+        let note='';
+        if(res && typeof res==='object'){
+          fwCheckBuild(res.build);
+          if(opts.ct && !res.conflictT) b.tasks={t:tasks,h:res.th};
+          if(opts.cj && !res.conflictJ) b.journal={t:journal,h:res.jh};
+          if(res.tasks!==undefined) note=fwReconcileDay(date,'tasks',res.tasks,res.th)||note;
+          if(res.journal!==undefined) note=fwReconcileDay(date,'journal',res.journal,res.jh)||note;
+        }
         if(info.pending){
           saveDay(date);
         }else{
-          setStatus('Saved');
+          setStatus(note||'Saved');
         }
       })
       .withFailureHandler(e=>{
         info.inFlight=false;
-        setStatus('Save error: '+e.message);
-        if(info.pending) saveDay(date);
+        setStatus('Save error: '+e.message+' — retrying');
+        // Never drop an edit: keep it pending and try again (offline, timeouts, lock waits).
+        info.pending=true;
+        daySaveState.set(date,info);
+        clearTimeout(saveTimers[date]);
+        saveTimers[date]=setTimeout(()=>saveDay(date),5000);
       })
-      .saveDay(date,tasks,journal);
+      .saveDay(date,tasks,journal,opts);
   }
+  /* =========================================================
+     SAFE SYNC (Julius, 2026-10-29: "bulletproof — never lose anything")
+     Every cell remembers the version it was loaded/saved at (base). Saves send that version; if the
+     cell changed elsewhere the server refuses to overwrite and sends its copy back, and the app does a
+     three-way, line-by-line merge: lines either side added are kept, lines either side deleted go,
+     and when both sides changed the same line BOTH versions are kept (nothing is ever dropped).
+     The merged cell is re-drawn (Ctrl+Z undoes it) and saved again on top of the new version.
+     When the tab comes back into view (and every 3 min) fwSync() pulls changes made elsewhere.
+     ========================================================= */
+  const dayBase = new Map();
+  let fwLastSync = 0;
+  let fwSyncBusy = false;
+  let refInFlight = 0;
+  function fwSetDayBase(d, force){
+    if(!d || !d.date || d.th === undefined) return;
+    if(!force && dayBase.has(d.date)) return;
+    dayBase.set(d.date,{tasks:{t:d.tasks||'',h:d.th},journal:{t:d.journal||'',h:d.jh}});
+  }
+  function fwDayBase(date){
+    if(!dayBase.has(date)) dayBase.set(date,{tasks:{t:'',h:null},journal:{t:'',h:null}});
+    return dayBase.get(date);
+  }
+  function refBase(item){
+    if(!item._b) item._b = {c:item.content || '',h:item.ch || null};
+    return item._b;
+  }
+  /* Cell HTML → list of top-level lines in one normal form, so the server's copy, the loaded copy and
+     what's on screen compare the same way. */
+  function fwBlocks(html){
+    const div = document.createElement('div');
+    div.innerHTML = storedToHtml(stripReferenceMetadata(html || ''));
+    div.querySelectorAll('[data-render-due]').forEach(n => n.remove());
+    normalizeEditorTasks(div,false);
+    div.querySelectorAll('input[data-wired]').forEach(cb => cb.removeAttribute('data-wired'));
+    const clean = document.createElement('div');
+    clean.innerHTML = cardCleanHtml(div);
+    const out = [];
+    clean.childNodes.forEach(n => {
+      if(n.nodeType === 1) out.push(n.outerHTML);
+      else if(n.nodeType === 3 && n.textContent.trim()) out.push(esc(n.textContent));
+    });
+    return out;
+  }
+  function fwSame(a,b){
+    if(a.length !== b.length) return false;
+    for(let i = 0; i < a.length; i++) if(a[i] !== b[i]) return false;
+    return true;
+  }
+  // Which base lines survive in `other`, and what `other` inserted in each gap (gap g = before base[g]).
+  function fwAlign(base,other){
+    const n = base.length, m = other.length;
+    let pre = 0;
+    while(pre < n && pre < m && base[pre] === other[pre]) pre++;
+    let suf = 0;
+    while(suf < n - pre && suf < m - pre && base[n - 1 - suf] === other[m - 1 - suf]) suf++;
+    const a = base.slice(pre,n - suf), b = other.slice(pre,m - suf);
+    const kept = new Array(n).fill(false);
+    const ins = Array.from({length:n + 1},() => []);
+    for(let i = 0; i < pre; i++) kept[i] = true;
+    for(let i = 0; i < suf; i++) kept[n - 1 - i] = true;
+    // LCS on the middle part.
+    const A = a.length, B = b.length;
+    const dp = Array.from({length:A + 1},() => new Uint16Array(B + 1));
+    for(let i = A - 1; i >= 0; i--) for(let j = B - 1; j >= 0; j--)
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j],dp[i][j + 1]);
+    let i = 0, j = 0, gap = pre;
+    while(i < A || j < B){
+      if(i < A && j < B && a[i] === b[j]){ kept[pre + i] = true; i++; j++; gap = pre + i; }
+      else if(j < B && (i >= A || dp[i][j + 1] >= dp[i + 1][j])){ ins[gap].push(b[j]); j++; }
+      else { i++; }
+    }
+    return {kept,ins};
+  }
+  function fwMerge3(base,mine,theirs){
+    const M = fwAlign(base,mine), T = fwAlign(base,theirs);
+    const out = [];
+    let conflict = false;
+    for(let g = 0; g <= base.length; g++){
+      const tIns = T.ins[g], left = tIns.slice();
+      tIns.forEach(x => out.push(x));
+      M.ins[g].forEach(x => {
+        const k = left.indexOf(x);
+        if(k >= 0){ left.splice(k,1); return; } // both made the same change
+        if(tIns.length) conflict = true;
+        out.push(x);
+      });
+      if(g < base.length && M.kept[g] && T.kept[g]) out.push(base[g]);
+    }
+    // Structural lines (sections, Claude's lines and boxes) must never be doubled.
+    const seen = new Set();
+    const merged = out.filter(x => {
+      if(!/data-(sec|secend|cid|tid|cgrp|cnote)=/.test(x.slice(0,300))) return true;
+      if(seen.has(x)) return false;
+      seen.add(x); return true;
+    });
+    return {blocks:merged,conflict};
+  }
+  // Caret as a text offset, so a re-drawn cell keeps the cursor about where it was.
+  function fwCaretOffset(ed){
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount || !ed.contains(sel.anchorNode)) return -1;
+    const r = document.createRange();
+    r.selectNodeContents(ed);
+    try{ r.setEnd(sel.anchorNode,sel.anchorOffset); }catch(e){ return -1; }
+    return r.toString().length;
+  }
+  function fwSetCaret(ed,off){
+    const walk = document.createTreeWalker(ed,NodeFilter.SHOW_TEXT);
+    let n, left = off;
+    while((n = walk.nextNode())){
+      if(left <= n.textContent.length){
+        const r = document.createRange(); r.setStart(n,left); r.collapse(true);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); return;
+      }
+      left -= n.textContent.length;
+    }
+  }
+  function replaceEditorHtml(ed,html){
+    const focused = document.activeElement === ed;
+    const off = focused ? fwCaretOffset(ed) : -1;
+    const sc = [...document.querySelectorAll('#todayScroll,#journalScroll,#referenceScroll')].map(x => [x,x.scrollTop]);
+    captureBeforeEdit(ed); // Ctrl+Z / undo brings back what was on screen before the merge
+    const h = ensureEditorHistory(ed);
+    h.restoring = true;
+    ed.innerHTML = html;
+    normalizeEditorTasks(ed);
+    h.last = ed.innerHTML;
+    h.restoring = false;
+    if(off >= 0) fwSetCaret(ed,off);
+    sc.forEach(([x,t]) => { if(x.scrollTop !== t) x.scrollTop = t; });
+  }
+  function dayEditorFor(date,col){
+    return col === 'tasks'
+      ? document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`)
+      : document.querySelector(`#journalScroll .journal-editor[data-date="${CSS.escape(date)}"]`);
+  }
+  /* The server has `theirs` (version h) for this day column: merge it with what's on screen. */
+  function fwReconcileDay(date,col,theirs,h){
+    const b = fwDayBase(date);
+    const baseText = b[col].t;
+    b[col] = {t:theirs,h};
+    const d = state.days.find(x => x.date === date);
+    const ed = dayEditorFor(date,col);
+    if(!ed){ if(d) d[col] = theirs; return ''; }
+    const mineBlocks = fwBlocks(cardCleanHtml(ed));
+    const theirBlocks = fwBlocks(theirs);
+    const m = fwMerge3(fwBlocks(baseText),mineBlocks,theirBlocks);
+    if(!fwSame(m.blocks,mineBlocks)){
+      replaceEditorHtml(ed,m.blocks.join(''));
+      if(d) d[col] = cardCleanHtml(ed);
+      if(col === 'journal') noteUrgentDay(date,cardCleanHtml(ed),true,'journal'); else noteUrgentDay(date,cardCleanHtml(ed));
+      requestAnimationFrame(() => syncDayHeightStable(date));
+      try{ renderDueBlocks(); }catch(e){}
+    }
+    if(!fwSame(m.blocks,theirBlocks)) scheduleDaySave(date); // our side still has something to add
+    return m.conflict ? 'Merged with changes from elsewhere — check for doubled lines' : 'Synced changes from elsewhere';
+  }
+  function fwReconcileRef(item,theirs,h){
+    const baseText = refBase(item).c;
+    item._b = {c:theirs,h};
+    const wrap = document.querySelector(`#referenceTree .ref-cell-wrapper[data-id="${CSS.escape(String(item.id))}"]`);
+    const cell = wrap && wrap.querySelector(':scope > .ref-cell');
+    if(!cell){ item.content = theirs; return ''; }
+    const mineBlocks = fwBlocks(cardCleanHtml(cell));
+    const theirBlocks = fwBlocks(theirs);
+    const m = fwMerge3(fwBlocks(baseText),mineBlocks,theirBlocks);
+    if(!fwSame(m.blocks,mineBlocks)){
+      replaceEditorHtml(cell,m.blocks.join(''));
+      if(isBacklogItem(item)) noteUrgentDay('backlog',cell.innerHTML,true,'backlog');
+    }
+    if(!fwSame(m.blocks,theirBlocks)) saveRefFromDom(item.id);
+    else item.content = theirs;
+    const msg = m.conflict ? 'Merged with changes from elsewhere — check for doubled lines' : 'Synced changes from elsewhere';
+    setStatus(msg);
+    return msg;
+  }
+  /* Every Reference save goes through here (text, open/close, moves). */
+  function sendRefItem(item,onOk,onErr){
+    const b = refBase(item);
+    const payload = {
+      id:item.id, parentId:item.parentId, type:item.type, title:item.title, content:item.content,
+      expanded:item.expanded, sort:item.sort,
+      fwSync:1, baseHash:b.h, contentChanged:(item.content || '') !== b.c
+    };
+    refInFlight++;
+    google.script.run
+      .withSuccessHandler(res => {
+        refInFlight--;
+        if(res && typeof res === 'object'){
+          fwCheckBuild(res.build);
+          if(payload.contentChanged && !res.conflict) item._b = {c:payload.content || '',h:res.ch};
+          else if(!payload.contentChanged && res.content === undefined) item._b.h = res.ch;
+          if(res.content !== undefined){ fwReconcileRef(item,res.content,res.ch); return; }
+        }
+        if(onOk) onOk(res && res.id || res);
+      })
+      .withFailureHandler(err => {
+        refInFlight--;
+        if(onErr) onErr(err); else setStatus('Save error: ' + err.message);
+      })
+      .saveReferenceItem(payload);
+  }
+  /* Newer app version pushed while this tab was open → banner to reload. */
+  function fwCheckBuild(build){
+    if(!build || !window.__FW_BUILD__ || build === window.__FW_BUILD__) return;
+    if(document.getElementById('fwUpdateBar')) return;
+    const bar = document.createElement('a');
+    bar.id = 'fwUpdateBar';
+    bar.textContent = '↻ New version — tap to reload (your edits are saved first)';
+    const r = document.querySelector('.refresh-btn');
+    bar.href = r ? r.href : '#';
+    bar.target = '_top';
+    bar.addEventListener('click',e => fwGuardReload(e,bar));
+    document.body.appendChild(bar);
+  }
+  function fwUnsaved(){
+    for(const [date,info] of daySaveState) if(info.inFlight || info.pending) return true;
+    if(refInFlight > 0) return true;
+    return (state.reference || []).some(it => it._timer);
+  }
+  function fwFlushAll(){
+    for(const [date,info] of daySaveState) if(info.pending && !info.inFlight) saveDay(date);
+    (state.reference || []).forEach(it => { if(it._timer){ clearTimeout(it._timer); it._timer = 0; sendRefItem(it); } });
+  }
+  /* ↻ (and the update banner) wait for pending saves before reloading, so a refresh never eats an edit. */
+  function fwGuardReload(e,link){
+    if(link.dataset.fwGo === '1' || !fwUnsaved()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    setStatus('Saving before refresh…');
+    fwFlushAll();
+    const started = Date.now();
+    const wait = () => {
+      if(fwUnsaved() && Date.now() - started < 10000){ setTimeout(wait,250); return; }
+      if(fwUnsaved()){ setStatus('Still saving — tap ↻ again in a moment'); link.classList.remove('spin'); return; }
+      link.dataset.fwGo = '1';
+      link.click();
+    };
+    wait();
+  }
+  document.addEventListener('click',e => {
+    const a = e.target && e.target.closest && e.target.closest('.refresh-btn');
+    if(a) fwGuardReload(e,a);
+  },true);
+  /* Pull what changed elsewhere. Cells with a save waiting or in flight are skipped (that save merges). */
+  function fwSync(){
+    if(fwSyncBusy || !state.days || !state.days.length) return;
+    const req = {days:{},ref:{}};
+    state.days.forEach(d => {
+      const b = dayBase.get(d.date);
+      if(b && b.tasks.h) req.days[d.date] = {th:b.tasks.h,jh:b.journal.h};
+    });
+    (state.reference || []).forEach(it => { const b = refBase(it); if(b.h) req.ref[it.id] = b.h; });
+    fwSyncBusy = true;
+    google.script.run
+      .withSuccessHandler(out => {
+        fwSyncBusy = false;
+        fwLastSync = Date.now();
+        if(!out) return;
+        fwCheckBuild(out.build);
+        let note = '';
+        Object.keys(out.days || {}).forEach(date => {
+          const info = daySaveState.get(date);
+          if(info && (info.inFlight || info.pending)) return;
+          const e = out.days[date];
+          if(e.tasks !== undefined) note = fwReconcileDay(date,'tasks',e.tasks,e.th) || note;
+          if(e.journal !== undefined) note = fwReconcileDay(date,'journal',e.journal,e.jh) || note;
+        });
+        Object.keys(out.ref || {}).forEach(id => {
+          const it = (state.reference || []).find(x => String(x.id) === String(id));
+          if(!it || it._timer || refInFlight) return;
+          note = fwReconcileRef(it,out.ref[id].content,out.ref[id].ch) || note;
+        });
+        if(note) setStatus(note);
+      })
+      .withFailureHandler(() => { fwSyncBusy = false; })
+      .getSyncState(req);
+  }
+  document.addEventListener('visibilitychange',() => {
+    if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 15000) fwSync();
+  });
+  window.addEventListener('focus',() => { if(Date.now() - fwLastSync > 15000) fwSync(); });
+  setInterval(() => { if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 170000) fwSync(); },30000);
+  window.addEventListener('pagehide',() => { try{ fwFlushAll(); }catch(e){} });
+  /* Write in the empty space (2026-10-29, Julius): Today and Notes cells fill their whole row, and a tap
+     below the last line puts the cursor on an empty line at the bottom (reusing one if it's there, else
+     adding one — above the end marker), so a short cell next to a long one is writable all the way down. */
+  document.addEventListener('click',e => {
+    const ed = e.target;
+    if(!ed || !ed.matches || !ed.matches('#todayScroll .day-editor, #journalScroll .journal-editor')) return;
+    const kids = [...ed.children].filter(n => !n.matches('[data-render-due],.due-notes'));
+    if(!kids.length) return;
+    const end = kids[kids.length - 1].matches('[data-secend]') ? kids[kids.length - 1] : null;
+    let target = end ? end.previousElementSibling : kids[kids.length - 1];
+    const ref = target || end;
+    if(ref && e.clientY <= ref.getBoundingClientRect().bottom + 2) return; // tapped next to text, not below it
+    const blank = n => n && !n.matches('[data-sec],[data-secend],[data-tlhid],[data-tl],table,.check-line') &&
+      !n.querySelector('input,img,table') && !(n.textContent || '').replace(/[\s​ ]/g,'');
+    if(!blank(target)){
+      captureBeforeEdit(ed);
+      target = document.createElement('div');
+      target.innerHTML = '<br>';
+      if(end) end.before(target); else ed.appendChild(target);
+      finishEditorEdit(ed);
+      saveEditorOwner(ed);
+    }
+    ed.focus({preventScroll:true});
+    const r = document.createRange();
+    r.setStart(target,0); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    rememberSelection(ed);
+  });
   /* =========================================================
      REFERENCE
      ========================================================= */
@@ -4427,7 +4768,7 @@
       item.expanded = item.expanded === false;
       wrap.classList.toggle('ref-collapsed', !item.expanded);
       e.currentTarget.textContent = item.expanded ? '▾' : '▸';
-      google.script.run.saveReferenceItem(item);
+      sendRefItem(item);
     };
     wrap.querySelector(
       ':scope > .ref-actions [data-del]'
@@ -4464,18 +4805,11 @@
     item._timer =
       setTimeout(
         () => {
-          google.script.run
-            .withSuccessHandler(
-              () =>
-                setStatus('Saved')
-            )
-            .withFailureHandler(
-              err =>
-                setStatus('Save error: ' + err.message)
-            )
-            .saveReferenceItem(
-              item
-            );
+          item._timer = 0;
+          sendRefItem(item,() => setStatus('Saved'),err => {
+            setStatus('Save error: ' + err.message + ' — retrying');
+            item._timer = setTimeout(() => saveRefFromDom(item.id),5000); // never drop an edit
+          });
         },
         700
       );
@@ -5203,7 +5537,7 @@
     item.expanded=true;
     wrap.classList.remove('ref-collapsed');
     const arrow=wrap.querySelector(':scope > [data-toggle]');if(arrow)arrow.textContent='▾';
-    google.script.run.saveReferenceItem(item);
+    sendRefItem(item);
   }
   function initReferenceDragHandle(wrap){
     const handle=wrap.querySelector(':scope > .ref-drag');
@@ -5281,10 +5615,7 @@
         .withFailureHandler(err=>setStatus('Order save error: '+err.message))
         .saveReferenceOrder(order);
       if(parentChanged){
-        google.script.run
-          .withSuccessHandler(saveOrder)
-          .withFailureHandler(err=>setStatus('Move save error: '+err.message))
-          .saveReferenceItem(item);
+        sendRefItem(item,saveOrder,err=>setStatus('Move save error: '+err.message));
       }else saveOrder();
     };
     handle?.addEventListener('pointerup',end);
@@ -6207,8 +6538,8 @@
      --------------------------------------------------------- */
   let calData = null, calOpen = true, calLoading = false, calLoadedAt = 0, calError = '';
   try{ calOpen = localStorage.getItem('fw.calOpen') !== '0'; }catch(e){}
-  // Calendar panel removed from Reference (2026-10-28, Julius); code kept, see README Shelved.
-  const CAL_PANEL_ON = false;
+  // Calendar panel back (2026-10-29, Julius): every calendar event lives here as a checkbox (tick = Graphite = done).
+  const CAL_PANEL_ON = true;
   function loadCalendar(){
     if(!CAL_PANEL_ON){ const p = document.getElementById('calPanel'); if(p) p.remove(); return; }
     if(calLoading) return;
@@ -6234,6 +6565,47 @@
     if(date === tom) return 'Tomorrow';
     return dateObj(date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
   }
+  /* Calendar panel (2026-10-29, Julius): events as checkboxes like Today's tasks, grouped.
+     Today: To do (split by Morning / Afternoon / Evening, all-day first), then Done (Graphite events).
+     Later days: one group each. Ticking marks the event Graphite on Google Calendar (his done color);
+     unticking puts its color back. Tapping the text opens the event. */
+  function calBlock(ev){
+    if(ev.allDay) return 'allday';
+    const d = new Date(ev.start), m = d.getHours() * 60 + d.getMinutes();
+    return m < 14 * 60 ? 'morning' : m < 18 * 60 + 30 ? 'afternoon' : 'evening';
+  }
+  const CAL_BLOCKS = [['allday','All day'],['morning','Morning'],['afternoon','Afternoon'],['evening','Evening']];
+  let calDoneOpen = true;
+  try{ calDoneOpen = localStorage.getItem('fw.calDoneOpen') !== '0'; }catch(e){}
+  function calToggleDone(ev,box){
+    const want = box.checked;
+    ev.done = want; ev.color = want ? '8' : ev.color;
+    renderCalendar();
+    setStatus(want ? 'Marking done…' : 'Marking open…');
+    google.script.run
+      .withSuccessHandler(r => { ev.done = r.done; ev.color = r.color; setStatus(want ? 'Event done (Graphite)' : 'Event open again'); renderCalendar(); })
+      .withFailureHandler(e => { ev.done = !want; setStatus('Calendar error: ' + (e.message || e)); renderCalendar(); })
+      .setCalendarEventDone(ev.calId,ev.id,ev.start,want);
+  }
+  function calRow(ev,now){
+    const row = document.createElement('div');
+    const past = !ev.allDay && ev.end <= now;
+    const live = !ev.allDay && ev.start <= now && ev.end > now;
+    row.className = 'cal-row' + (ev.done ? ' done' : '') + (past && !ev.done ? ' past' : '') + (live ? ' now' : '');
+    const box = document.createElement('input');
+    box.type = 'checkbox'; box.checked = !!ev.done; box.className = 'cal-box';
+    box.title = ev.done ? 'Done (Graphite) — untick to reopen' : 'Tick = done (turns the event Graphite)';
+    box.addEventListener('click',e => e.stopPropagation());
+    box.addEventListener('change',() => calToggleDone(ev,box));
+    const t = document.createElement('span'); t.className = 'cal-time';
+    t.textContent = ev.allDay ? 'All day' : calTime(ev.start) + '–' + calTime(ev.end);
+    const tx = document.createElement('span'); tx.className = 'cal-title'; tx.textContent = ev.title;
+    row.append(box,t,tx);
+    if(live){ const n = document.createElement('span'); n.className = 'cal-now'; n.textContent = 'now'; row.append(n); }
+    row.title = ev.title + (ev.location ? ' · ' + ev.location : '') + ' · ' + ev.cal;
+    if(ev.link){ [t,tx].forEach(el => el.addEventListener('click',() => window.open(ev.link,'_blank'))); }
+    return row;
+  }
   function renderCalendar(){
     if(!CAL_PANEL_ON) return;
     const tree = document.getElementById('referenceTree');
@@ -6248,13 +6620,14 @@
     const events = (calData && calData.events) || [];
     const today = (calData && calData.today) || localToday();
     const todays = events.filter(ev => ev.date <= today && ev.endDate >= today);
+    const doneN = todays.filter(ev => ev.done).length;
     const headRow = document.createElement('div');
     headRow.className = 'urg-head-row';
     const head = document.createElement('button');
     head.type = 'button';
     head.className = 'urg-head';
-    head.append(pmBox(calOpen),document.createTextNode('Calendar · Today ' + (calData ? todays.length : '…')));
-    head.title = 'Today’s events, then the next few days';
+    head.append(pmBox(calOpen),document.createTextNode('Calendar · Today ' + (calData ? doneN + '/' + todays.length + ' done' : '…')));
+    head.title = 'Today’s events (to do by block, then done), then the next few days';
     head.addEventListener('click',() => {
       calOpen = !calOpen;
       try{ localStorage.setItem('fw.calOpen',calOpen ? '1' : '0'); }catch(e){}
@@ -6275,40 +6648,34 @@
     }
     if(!calData){ const w = document.createElement('div'); w.className = 'urg-empty'; w.textContent = 'Loading events…'; panel.appendChild(w); return; }
     const now = Date.now();
-    const days = [];
-    events.forEach(ev => {
-      const d = ev.date < today ? today : ev.date;
-      let g = days.find(x => x.date === d);
-      if(!g){ g = {date:d, list:[]}; days.push(g); }
+    const sub = (text,cls) => { const d = document.createElement('div'); d.className = 'urg-sub cal-sub' + (cls ? ' ' + cls : ''); d.textContent = text; panel.appendChild(d); return d; };
+    // Today: To do by block.
+    const open = todays.filter(ev => !ev.done), done = todays.filter(ev => ev.done);
+    sub('Today · To do ' + open.length,'cal-today');
+    if(!open.length){ const e = document.createElement('div'); e.className = 'urg-empty'; e.textContent = todays.length ? 'All done.' : 'Nothing on the calendar.'; panel.appendChild(e); }
+    CAL_BLOCKS.forEach(([key,name]) => {
+      const list = open.filter(ev => calBlock(ev) === key);
+      if(!list.length) return;
+      sub(name,'cal-block');
+      list.forEach(ev => panel.appendChild(calRow(ev,now)));
+    });
+    // Today: Done (foldable).
+    if(done.length){
+      const h = sub('','cal-today cal-donehead');
+      h.append(pmBox(calDoneOpen),document.createTextNode(' Today · Done ' + done.length));
+      h.addEventListener('click',() => { calDoneOpen = !calDoneOpen; try{ localStorage.setItem('fw.calDoneOpen',calDoneOpen ? '1' : '0'); }catch(e){} renderCalendar(); });
+      if(calDoneOpen) done.forEach(ev => panel.appendChild(calRow(ev,now)));
+    }
+    // Next days.
+    const later = [];
+    events.filter(ev => ev.date > today).forEach(ev => {
+      let g = later.find(x => x.date === ev.date);
+      if(!g){ g = {date:ev.date,list:[]}; later.push(g); }
       g.list.push(ev);
     });
-    if(!days.some(g => g.date === today)) days.unshift({date:today, list:[]});
-    days.sort((a,b) => a.date.localeCompare(b.date));
-    days.forEach(g => {
-      const isToday = g.date === today;
-      const sub = document.createElement('div');
-      sub.className = 'urg-sub cal-sub' + (isToday ? ' cal-today' : '');
-      sub.textContent = calDayLabel(g.date, today) + (isToday ? '' : ' · upcoming');
-      panel.appendChild(sub);
-      if(!g.list.length){
-        const e = document.createElement('div'); e.className = 'urg-empty'; e.textContent = 'Nothing on the calendar.';
-        panel.appendChild(e);
-      }
-      g.list.forEach(ev => {
-        const row = document.createElement('button');
-        row.type = 'button';
-        const past = !ev.allDay && ev.end <= now;
-        const live = !ev.allDay && ev.start <= now && ev.end > now;
-        row.className = 'cal-row' + (past ? ' past' : '') + (live ? ' now' : '');
-        const t = document.createElement('span'); t.className = 'cal-time';
-        t.textContent = ev.allDay ? 'All day' : calTime(ev.start) + '–' + calTime(ev.end);
-        const tx = document.createElement('span'); tx.className = 'cal-title'; tx.textContent = ev.title;
-        row.append(t,tx);
-        if(live){ const n = document.createElement('span'); n.className = 'cal-now'; n.textContent = 'now'; row.append(n); }
-        row.title = ev.title + (ev.location ? ' · ' + ev.location : '') + ' · ' + ev.cal;
-        if(ev.link) row.addEventListener('click',() => window.open(ev.link,'_blank'));
-        panel.appendChild(row);
-      });
+    later.sort((a,b) => a.date.localeCompare(b.date)).forEach(g => {
+      sub(calDayLabel(g.date,today) + ' · ' + g.list.filter(e => !e.done).length + ' to do');
+      g.list.forEach(ev => panel.appendChild(calRow(ev,now)));
     });
   }
   let inboxItems = [];
@@ -6741,7 +7108,7 @@
   }
   // Right under Claude's Suggested day box if there is one, else at the top.
   function placeDueNotes(ed,block){
-    const plan = ed.querySelector(':scope > table[data-cnote][data-ckind="plan"]');
+    const plan = ed.querySelector(':scope > table[data-cnote][data-ckind="sched"]') || ed.querySelector(':scope > table[data-cnote][data-ckind="plan"]');
     if(plan){ if(plan.nextSibling !== block) plan.after(block); }
     else if(ed.firstChild !== block) ed.prepend(block);
   }

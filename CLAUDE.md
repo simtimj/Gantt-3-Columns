@@ -4,6 +4,12 @@
 - Google Apps Script web app (Today / Notes / Reference columns over a Google Sheet). Pushing to `main` runs `clasp push` via `.github/workflows/deploy.yaml`, so keep commits small and working. Julius opens the **/dev test link** (latest pushed code, ~30 s after a push, then tap ↻); the workflow no longer updates a versioned /exec deployment (200-version cap, 2026-10-27). Julius mostly works from his phone.
 - Files: `Code.gs` (server), `Index.html` (all UI), `appsscript.json`.
 
+## Central Data Hub card (2026-10-29, Julius: permanent rule)
+
+- Reference card titled **Central Data Hub** (Sheet "New Gantt Sheet" → `Reference`; title in column D, HTML in column E — find it by title, never by row number) is the home for cross-AI integration: shared master instructions, source-of-truth architecture, sync between ChatGPT / Claude / Gemini / Gantt / Calendar / GitHub / Docs / Sheets.
+- Anything hub-related ("add this to the Central Data Hub", or a related idea) is appended to that card under the right section as a check-line `<b>Title</b>: details` — no new card, no `tasks.js` / Backlog entry. Reread the card first, check for duplicates, keep existing lines, done states and formatting. Stays Can be later (`data-urg="3"`) unless Julius sets urgency or a deadline; if a hub task becomes urgent, mirror only the actionable line into the urgency system and keep the details in the card.
+- Architecture: Gantt Sheet = tasks / urgency / day logs; Calendar = time; Google Docs = long-form plans + canonical shared AI instructions; Sheets = structured data; GitHub = code, deploy config, repo CLAUDE.md. Claude = coding; ChatGPT = planning and coordination.
+
 ## README is the feature list — always keep it current
 
 - `README.md` lists every feature under: ✅ Working · 🧪 To be confirmed · 🔧 To be improved · 📋 To do · 💤 Shelved.

@@ -4,7 +4,13 @@
 // applyClaudeTasks_() in Code.gs appends each entry once, as open check-lines at the end of that day's
 // Today cell (ids remembered in script property claudeTasksApplied, so a deleted task stays deleted).
 // Ids must be unique and never reused; prune entries older than ~30 days.
+// date: 'backlog' = into the Reference Backlog cell (shows in Urgent, not in Today).
 const CLAUDE_TASKS = [
+  { id: 't-20261029-pane-tiling', date: 'backlog', title: 'Gantt: free pane layout (tile like desktop windows)', urg: 3, subtasks: [
+    'Arrange Today / Tasks, Notes and Reference as blocks, not just columns',
+    'e.g. Today top-left, Notes bottom-left, Reference as a bigger area on the right',
+    'Drag panes around like desktop windows so they fill the screen',
+  ] },
   { id: 't-20261028-it-lab', date: '2026-10-28', title: 'IT lab: Active Directory + Microsoft 365', urg: 2, due: '2026-11-06', subtasks: [
     'Finish Lab DC001: rename LAB-DC01, static IP, promote to domain controller',
     'AD users, groups, password + lockout policy',

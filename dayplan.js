@@ -37,6 +37,11 @@
 //   written **Name**: short details. Time-block detail lines too: '  9:00–10:45 · **SOQ**: 2 pages …'. Wrap-up
 //   stat lines likewise ('**Done**: 28 / 36 tasks', '**Urgent**: …'); Priority Check entries '__Time Went To Apps__'.
 // Times (Julius, 2026-10-27): in the Suggested Day every time or time range is bold: '  **9:00–10:45** · **SOQ**: …'.
+// Wrap-up layout (Julius, 2026-10-29: the old Done / Urgent lines were one big mass): sections in this order,
+//   each its own cell: '## Done · **D/T**' → one '- **Area**: N items' entry per area (most time first) with
+//   each item on its own '  ' detail line (max ~7, merge the rest); '## Still Urgent · **N Open**' → one
+//   '- **Name**: due' line per open red/yellow task; '## Priority Check · **N/10**' → '- **Label**: detail'
+//   lines; '## Carries Over'. Block titles render as banners: Suggested Day yellow, Day Wrap-Up purple.
 // rev: bump (2, 3, …) to re-render an already-inserted block in place; a block he deleted stays deleted.
 // Each entry is applied once (ids in script property "claudeNotesApplied"); deleting it in the app keeps it deleted.
 // Ids must be unique and never reused. Prune entries older than ~30 days.
@@ -161,29 +166,35 @@ const CLAUDE_NOTES = [
     '- **Pin References To Top** · **Raindrop Saved Indicator** · **Cleanup IT Associate Ref**',
     '- **Move Out Ex Thing** · **Frictionless Capture**',
   ] },
-  { id: 'n-20261028-wrap', cells: true, date: '2026-10-28', kind: 'wrap', title: 'Day Wrap-Up · Wed 10/28', lines: [
-    '**Done**: 30 / 40 tasks in today\'s cell (3 more Claude items land on next load)',
-    '**Urgent**: 4 yellow open (IT Lab, due Fri 11/6 · A+ Core 1 Review · Halloween Gig, Fri 10/30 · White Elephant Present)',
-    '## Focus (Most Time First)',
-    '__Gantt__ · 29 Claude items',
-    'Tap to pick, tap again to type (no keyboard / cursor on first tap) · drag grip everywhere · hold anywhere to drag · drop anywhere in Urgent, nest by sliding · Urgent fold, add, text hold menu, Backspace delete · Backlog + Remove From Today · subtask due dates · task duration + getDayTasks() (auto-reshuffle step 1) · urgency bar · quiet cards, side space, slimmer boxes · Calendar panel removed · IT lab + A+ tasks added',
-    '__Walk Blocks Script__ · built + tested',
-    'Reads Time To Pet every 15 min · writes Walking Block events · 12 clients\' drive times · apps-scripts monorepo bundle saved in Drive for the push',
-    '__Julius AI Hub__ · docs moved to Google',
-    'Hub doc (Priorities, Daily Work Log, Log Archive, Ideas, Career) · 16 Claude Docs + 3 pages copied · Doc Index · A+ Study Sheet, Reference + Interview Prep',
-    '__Calendar + Planning__',
-    'Wed reworked around 10–2 walks · Nap added to Chill · Walk Blocks setup moved to Thu 9:15 · Eisenhower ranking decided · grey = done rule',
-    '__Other__',
-    'Knit up pillow · fixed dog belt hook',
+  { id: 'n-20261028-wrap', rev: 1, cells: true, date: '2026-10-28', kind: 'wrap', title: 'Day Wrap-Up · Wed 10/28', lines: [
+    '## Done · **30/40**',
+    '- **Gantt**: 29 Claude items, ~3 hrs',
+    '  Tap to pick, tap again to type',
+    '  Drag grip + hold anywhere to drag',
+    '  Drop anywhere in Urgent, nest by sliding',
+    '  Urgent fold, add, text hold menu',
+    '  Backlog + Remove From Today',
+    '  Subtask due dates + task durations',
+    '  Quiet cards, side space, slimmer boxes',
+    '- **Walk Blocks Script**: built + tested',
+    '  Reads Time To Pet every 15 min, writes Walking Blocks',
+    '  Drive times for 12 clients',
+    '- **Julius AI Hub**: docs moved to Google',
+    '  16 Claude Docs + 3 pages copied, Doc Index',
+    '  A+ Study Sheet, Reference + Interview Prep',
+    '- **Calendar + Planning**: Wed reworked around 10–2 walks',
+    '  Eisenhower ranking decided · grey = done rule',
+    '- **Other**: knit up pillow · fixed dog belt hook',
+    '## Still Urgent · **4 Open**',
+    '- **IT Lab**: due Fri 11/6',
+    '- **Halloween Gig**: Fri 10/30',
+    '- **A+ Core 1 Review**',
+    '- **White Elephant Present**',
     '## Priority Check · **5/10**',
-    '__Time Went To Gantt UI__',
-    '29 items, ~3 of ~4 hrs: tap, drag and grip fixes',
-    '__Went Right__',
-    'Walk Blocks script built + tested · AI Hub set up · durations = auto-reshuffle step 1',
-    '__Still Open__',
-    'Walk Blocks setup (was due today, now Thu 9:15) · IT lab ~1 hr behind · Tasks tab for the Nov 3 pipeline not started',
-    '__Fix For Tomorrow__',
-    'Setup + Tasks tab before any Gantt UI work',
+    '- **Time Went To Gantt UI**: ~3 of ~4 hrs on tap, drag and grip fixes',
+    '- **Went Right**: Walk Blocks built · AI Hub set up · durations added',
+    '- **Still Open**: Walk Blocks setup (now Thu 9:15) · IT lab ~1 hr behind · Tasks tab not started',
+    '- **Fix For Tomorrow**: setup + Tasks tab before any Gantt UI work',
     '## Carries Over',
     '[] **Walk Blocks Setup**: create repo simtimj/apps-scripts + CLASPRC_JSON secret, Claude pushes, run installTrigger once (Thu 9:15)',
     '[] **Claude Pipeline + Tasks Tab**: due Tue 11/3; Gantt Sheet Tasks tab (name, due, duration, importance)',

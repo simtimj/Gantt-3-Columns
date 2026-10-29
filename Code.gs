@@ -1104,16 +1104,26 @@ function applyClaudeTasks_() {
   const props = PropertiesService.getScriptProperties();
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeTasksApplied') || '[]'); } catch (e) { applied = []; }
-  const fresh = list.filter(x => x && x.id && x.title && /^\d{4}-\d{2}-\d{2}$/.test(x.date || '') && applied.indexOf(String(x.id)) < 0);
+  // date: 'backlog' (Julius, 2026-10-29) puts the task in the Reference "Backlog" cell instead of a day,
+  // so it shows in Urgent without landing in Today. Skipped (retried later) until that cell exists.
+  const fresh = list.filter(x => x && x.id && x.title && (/^\d{4}-\d{2}-\d{2}$/.test(x.date || '') || x.date === 'backlog') && applied.indexOf(String(x.id)) < 0);
   if (!fresh.length) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    const refSheet = getOrCreateSheet_('Reference', REF_HEADERS);
     fresh.forEach(x => {
-      let row = findDayRow_(sheet, x.date);
-      if (!row) { sheet.appendRow([parseDate_(x.date), '', '']); row = sheet.getLastRow(); }
-      const cell = sheet.getRange(row, 2);
+      let cell;
+      if (x.date === 'backlog') {
+        const b = getReference_().find(r => r.title.replace(/<[^>]*>/g, '').trim().toLowerCase() === 'backlog');
+        if (!b) return;
+        cell = refSheet.getRange(b.row, 5);
+      } else {
+        let row = findDayRow_(sheet, x.date);
+        if (!row) { sheet.appendRow([parseDate_(x.date), '', '']); row = sheet.getLastRow(); }
+        cell = sheet.getRange(row, 2);
+      }
       let html = String(cell.getValue() || '');
       if (html.indexOf('data-tid="' + doneEsc_(x.id) + '"') < 0) {
         const u = [1, 2, 3].indexOf(Number(x.urg)) >= 0 ? ' data-urg="' + Number(x.urg) + '"' : '';

@@ -21,6 +21,7 @@ Last updated: 2026-10-29
 - **Cols** menu: show/hide columns, single-pane focus view, and **Split** (two panes stacked, on desktop or Mobile mode; a repeated pane is a read-only mirror).
 - Mobile mode with phone-friendly sizes; toolbars stay clear of the phone camera/notch.
 - Save status ("Ready") sits on the same line as the buttons without changing toolbar height.
+- **Jump to today**: tap the TODAY / TASKS header text (top-bar Today button removed 2026-10-29).
 - **↻ Refresh** reloads the whole app at its /exec URL (picks up new deploys and data).
 - No double-tap zoom on buttons, menus or the toolbar. Menus/panels close on outside tap or Escape.
 
@@ -131,8 +132,8 @@ Last updated: 2026-10-29
 - **→ Reference**: the send menu has a Reference picker; the task (with its subtasks) goes to the end of that Reference cell and leaves the note. Preselects the cell whose title matches the task's words, else the last one used
 - **Wrap-up Priority check**: a 0–10 score on whether the day's time went to the right things, with what's still open on the priority and the fix for tomorrow
 - **Carry-over subtasks**: carry-overs with parts show them as subtasks; → Day on the parent sends it with all its subtasks, → Day on a subtask sends just that one. Every carry-over is **Name**: details
-- **Divided Suggested day**: each section (Must do, Next, …) sits in its own cell; each entry is a bold name with its time blocks on lines underneath, small gaps between entries (testing)
-- **Suggested day sections**: Calendar (real events only, plus a dog-walk line with client first names or "none today") → Must Do / Urgent + Important (names bold + underlined, Title Cased; every section header and block title capitalized too) → Important / Not The Most Urgent → Stretch (bonus) → Later; no For fun
+- **Divided Suggested day**: each section (Calendar, Important, …) sits in its own cell; each entry is a bold name with its time blocks on lines underneath, small gaps between entries (testing)
+- **Suggested day sections**: Calendar (real events only, plus a dog-walk line with client first names or "none today") → Important / Not The Most Urgent (every section header and block title capitalized; Must Do section removed 2026-10-29, must-dos live on the calendar) → Stretch (bonus) → Later; no For fun
 - **Divided Day wrap-up**: counts, Focus, Priority check and Carries over each in their own cell; Focus and Priority check entries are an underlined name with the details on the line below
 - **Note box dividers in the day's color**: the box outline and the lines between sections use a deeper shade of that day's color (Wed → deeper blue; deepened again 2026-10-27 so Monday shows in dark mode), thicker, with more space around each section
 - **Note blocks restyled** (2026-10-26): no colored left edge; list lines use dashes (Must do too); wrap-up skips empty stats; Focus ordered by most time, area underlined with a one-line item list under it.

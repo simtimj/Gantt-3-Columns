@@ -207,6 +207,7 @@
       border-bottom:1px solid var(--border);
     }
     #todayPane .pane-header{gap:8px;}
+    .today-jump{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
     .scroll{
       flex:1 1 0;
       height:0;
@@ -1405,7 +1406,6 @@
 <div id="app">
   <div id="focusControls">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
-    <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
     <button class="btn theme-toggle" type="button" aria-label="Light / dark">☾</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
@@ -1510,7 +1510,6 @@
   </div>
   <div id="toolbar">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
-    <button class="btn" type="button" data-layout="today" title="Jump to today">Today</button>
     <button class="btn theme-toggle" type="button" id="themeToggle" aria-label="Light / dark">☾</button>
     <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <div class="view-menu" data-view-menu>
@@ -1532,7 +1531,7 @@
   <div id="workspace">
     <section class="pane" id="todayPane">
       <div class="pane-header">
-        TODAY / TASKS
+        <span class="today-jump" data-jump-today role="button" tabindex="0" title="Jump to today">TODAY / TASKS</span>
         <span id="focusStatus" class="focus-status">Loading…</span>
         <button class="btn tiny" id="dayBlocksButton" type="button" title="Add Morning / Afternoon / Evening blocks to the Today day you're in">+ Blocks</button>
       </div>
@@ -5323,6 +5322,9 @@
   /* =========================================================
      TOP-BAR BUTTONS (none of these need the keyboard)
      ========================================================= */
+  /* Today/Tasks header text jumps to today (replaced the top-bar Today button, 2026-10-29). */
+  document.querySelector('[data-jump-today]')?.addEventListener('click',()=>jumpToday());
+  document.querySelector('[data-jump-today]')?.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); jumpToday(); } });
   function runLayoutAction(action){
     if(action === 'today') jumpToday();
     else if(action === 'scale') toggleTypeSettings();
@@ -7337,7 +7339,7 @@
     let drag=null;
     workspace.addEventListener('pointerdown',e=>{
       if(e.pointerType==='touch' || e.button!==0 || !e.target.closest('.pane-header') ||
-         e.target.closest('button,input,select,a') || workspace.scrollWidth<=workspace.clientWidth+2 ||
+         e.target.closest('button,input,select,a,[data-jump-today]') || workspace.scrollWidth<=workspace.clientWidth+2 ||
          isSplitActive())return;
       drag={x:e.clientX,left:workspace.scrollLeft};
       workspace.setPointerCapture(e.pointerId);

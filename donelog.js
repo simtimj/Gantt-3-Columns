@@ -143,5 +143,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-empty-space', date: '2026-10-29', project: 'Gantt', title: 'Write in empty space', details: 'Today and Notes fill the row; tap below the last line to type there' },
   { id: 'd-20261029-schedule-cell', date: '2026-10-29', project: 'Gantt', title: 'Schedule cell in Notes', details: 'time-block tasks move from Today into a blue box under the Suggested Day, still checkboxes' },
   { id: 'd-20261029-cal-checkboxes', date: '2026-10-29', project: 'Gantt', title: 'Calendar panel with checkboxes', details: 'Reference Calendar back: To do by block, Done, next days; tick = Graphite on Google Calendar' },
+  { id: 'd-20261029-urg-bold', date: '2026-10-29', project: 'Gantt', title: 'No stray bold in Urgent', details: 'new tasks stop inheriting bold from the line above; fully-bold urgent tasks un-bolded once' },
   { id: 'd-20261029-done-in-block', date: '2026-10-29', project: 'Gantt', title: 'Done log in the right block', details: 'Claude done lines land in the Morning / Afternoon / Evening block that has already started, never a later one' },
 ];

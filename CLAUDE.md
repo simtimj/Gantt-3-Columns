@@ -40,6 +40,7 @@
 
 - `moveScheduleToNotes_()` (in `getWorkspaceData` and `getSyncState`): for today..+7, check-lines whose text starts `H:MM–H:MM ·` (`SCHED_RE_`) plus their deeper subtasks move from Today into `<table data-cnote="s-YYYYMMDD" data-ckind="sched">` in Notes, right after the plan table (else top); later ones append inside it. Blue banner CSS; the Due group goes after it (`placeDueNotes`).
 - Calendar panel: `CAL_PANEL_ON = true`. Events carry `id`, `calId`, `color`, `done` (color '8' = Graphite). `calRow()` checkbox → `setCalendarEventDone(calId, id, start, done)` (Graphite; old color saved in script property `calPrev:…`, yellow '5' if unknown). Today = To do by `calBlock()` (all day / <14:00 / <18:30 / evening) + foldable Done (`fw.calDoneOpen`), then later days.
+- No stray bold: document `beforeinput` capture unwraps a `<b>/<strong>` that is the only content of an empty line/task before the first character lands. One-time server `fixUrgentBold_()` (flag `urgBoldFix`) unwrapped fully-bold `data-urg` lines without `data-cid` in Days + Reference.
 - Empty space: day/journal editors `flex-grow:1` fill the synced row; a click on the editor itself below the last line focuses an empty line there (reuses a blank one, or adds `<div><br></div>` before `data-secend`).
 
 ## Urgent panel + view stability (2026-10-26)

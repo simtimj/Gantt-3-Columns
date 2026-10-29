@@ -4424,6 +4424,30 @@
   window.addEventListener('focus',() => { if(Date.now() - fwLastSync > 15000) fwSync(); });
   setInterval(() => { if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 170000) fwSync(); },30000);
   window.addEventListener('pagehide',() => { try{ fwFlushAll(); }catch(e){} });
+  /* No stray bold (2026-10-29, Julius: Urgent rows were bold when they shouldn't be). Typing into an empty
+     line/task whose only content is a leftover <b>/<strong> (the browser carries bold over from the line
+     above on Enter) unwraps it first, so new tasks start plain. Ctrl+B on purpose still works: the bold is
+     only dropped while the line is still empty. */
+  document.addEventListener('beforeinput',e => {
+    if(!/^insert(Text|CompositionText|ReplacementText)$/.test(e.inputType)) return;
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    const b = node && node.closest && node.closest('b,strong');
+    if(!b || !b.closest('[contenteditable="true"]')) return;
+    const holder = b.closest('.check-text,.urg-text,.di-text,.inbox-text') || b.parentElement;
+    if(!holder || (holder.textContent || '').replace(/[\s\u200b\u00a0]/g,'')) return; // line has text: leave it
+    if(b.dataset.fwKeep) return;
+    if(holder.closest('.editor,.ref-cell')) captureBeforeEdit(holder.closest('.editor,.ref-cell'));
+    const parent = b.parentNode;
+    while(b.firstChild) parent.insertBefore(b.firstChild,b);
+    const mark = document.createTextNode('');
+    parent.insertBefore(mark,b);
+    b.remove();
+    const r = document.createRange(); r.setStart(mark,0); r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    try{ if(document.queryCommandState('bold')) document.execCommand('bold'); }catch(err){}
+  },true);
   /* Write in the empty space (2026-10-29, Julius): Today and Notes cells fill their whole row, and a tap
      below the last line puts the cursor on an empty line at the bottom (reusing one if it's there, else
      adding one — above the end marker), so a short cell next to a long one is writable all the way down. */

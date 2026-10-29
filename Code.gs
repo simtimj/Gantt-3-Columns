@@ -120,6 +120,7 @@ function getWorkspaceData() {
   try { applyClaudeNotes_(); } catch (e) { console.error(e); }
   try { applyClaudeTasks_(); } catch (e) { console.error(e); }
   try { moveScheduleToNotes_(); } catch (e) { console.error(e); }
+  try { fixUrgentBold_(); } catch (e) { console.error(e); }
 
   const today = todayString_();
 
@@ -384,6 +385,48 @@ function moveScheduleToNotes_() {
     });
   } finally { lock.releaseLock(); }
   return true;
+}
+
+/* One-time fix (2026-10-29, Julius: Urgent rows bold when they shouldn't be). The Urgent panel shows each
+   task's own formatting; typing on a new line right after bold text made the browser carry the bold into
+   the new task. Unwrap urgency tasks that are bold from end to end (not Claude's lines, which have a bold
+   title + plain details). The client now stops the carry-over (see "No stray bold" in Index.html). */
+function fixUrgentBold_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('urgBoldFix') === '1') return;
+  const fix = html => doneBlocks_(String(html || '')).map(b => {
+    if (!/^<div\b[^>]*class="[^"]*check-line/i.test(b) || !/\sdata-urg="/.test(b) || /\sdata-cid="/.test(b)) return b;
+    return b.replace(/(<span class="check-text">)\s*<(b|strong)>((?:(?!<\/?(?:b|strong)>)[\s\S])*)<\/\2>\s*(<\/span>)/i, '$1$3$4');
+  }).join('');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const days = getOrCreateSheet_('Days', DAYS_HEADERS);
+    const last = days.getLastRow();
+    if (last >= 2) {
+      const range = days.getRange(2, 2, last - 1, 2);
+      const vals = range.getValues();
+      let n = 0;
+      vals.forEach((row, i) => [0, 1].forEach(c => {
+        const v = String(row[c] || '');
+        if (v.indexOf('data-urg') < 0) return;
+        const f = fix(v);
+        if (f !== v) { days.getRange(i + 2, 2 + c).setValue(f); n++; }
+      }));
+    }
+    const ref = getOrCreateSheet_('Reference', REF_HEADERS);
+    const rl = ref.getLastRow();
+    if (rl >= 2) {
+      const vals = ref.getRange(2, 5, rl - 1, 1).getValues();
+      vals.forEach((row, i) => {
+        const v = String(row[0] || '');
+        if (v.indexOf('data-urg') < 0) return;
+        const f = fix(v);
+        if (f !== v) ref.getRange(i + 2, 5).setValue(f);
+      });
+    }
+    props.setProperty('urgBoldFix', '1');
+  } finally { lock.releaseLock(); }
 }
 
 // Pull time-block check-lines (and the subtasks right under them) out of a Today cell.

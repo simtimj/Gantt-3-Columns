@@ -59,7 +59,7 @@ Last updated: 2026-10-29
 - **Calendar panel back in Reference, as checkboxes**: every event from the main + Events calendars; Today grouped **To do** (All day / Morning / Afternoon / Evening) then **Done** (foldable), then the next 3 days. Ticking an event turns it Graphite on Google Calendar (done); unticking puts its old color back. Tap the time or title to open the event. Header shows "Today 3/7 done".
 - **Done log in the right block** (2026-10-29): Claude's done lines land in the Morning / Afternoon / Evening block that has already started (2–3:45 pm counts as Morning), never a later one; today's misplaced lines were moved back once.
 - **Blocks in every Today cell**: + Blocks button removed; Morning / Afternoon / Evening are added to every Today cell from today on. There's always an empty line above Morning, gaps between blocks, and an empty line under Evening (outside the box), so nothing's locked in.
-- **Bright block headers**: Suggested Day title is a yellow banner, Day Wrap-Up a purple one; each section header gets a matching left bar.
+- **Quiet block headers** (2026-10-29, toned down): Suggested Day and Day Wrap-Up titles are colored text with a thin underline (yellow / purple), no filled banner and no section bars. Only the Schedule cell keeps its bold blue banner.
 - **Wrap-up split into sections**: Done (per area, one item per line) · Still Urgent (one line per task) · Priority Check · Carries Over. Wed 10/28's wrap-up re-rendered in the new layout.
 - **Claude tasks into Backlog**: tasks.js entries with `date: 'backlog'` go to the Reference Backlog cell (in Urgent, not Today).
 

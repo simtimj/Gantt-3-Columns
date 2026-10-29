@@ -148,4 +148,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-done-in-block', date: '2026-10-29', project: 'Gantt', title: 'Done log in the right block', details: 'Claude done lines land in the Morning / Afternoon / Evening block that has already started, never a later one' },
   { id: 'd-20261029-day-lines', date: '2026-10-29', project: 'Gantt', title: 'Clearer day lines + dates', details: 'thicker darker separator between days; dates underlined, no comma after the weekday' },
   { id: 'd-20261029-below-evening', date: '2026-10-29', project: 'Gantt', title: 'Free line under Evening', details: 'empty line kept below the Evening box so things can be added there' },
+  { id: 'd-20261029-quiet-note-headers', date: '2026-10-29', project: 'Gantt', title: 'Quieter Suggested Day / Wrap-Up headers', details: 'big yellow and purple banners and section bars removed; titles are colored text with a thin underline; Schedule keeps its blue banner' },
 ];

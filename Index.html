@@ -441,18 +441,23 @@
     .editor table[data-cnote]{border-width:1.5px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
     /* Underlined names (Focus areas, Priority check entries) read bold, like the Suggested day */
     .editor table[data-cnote] u{font-weight:700;}
-    /* Block titles as bright banners (Julius, 2026-10-29): Suggested Day = yellow, Day Wrap-Up = purple; section
-       headers get a matching left bar so each part is easy to spot. */
-    .editor table[data-cnote] tr:first-child > td > div:first-child{display:block;margin:-2px 0 6px;padding:4px 8px;border-radius:7px;font-size:1.05em;}
+    /* Block titles (Julius, 2026-10-29: the full yellow / purple banners were too much): Suggested Day and
+       Day Wrap-Up get a quiet title — colored text + thin underline, no fill, no section bars.
+       Only the Schedule cell keeps the bold filled banner (he likes how obvious it is). */
+    .editor table[data-cnote] tr:first-child > td > div:first-child{display:block;margin:-2px 0 6px;padding:2px 0 3px;font-size:1.05em;}
     .editor table[data-cnote] tr:first-child > td > div:first-child u{text-decoration:none;}
-    .editor table[data-cnote][data-ckind="plan"] tr:first-child > td > div:first-child{background:#ffd60a;color:#1a1400;}
-    .editor table[data-cnote][data-ckind="wrap"] tr:first-child > td > div:first-child{background:#a855f7;color:#fff;}
+    .editor table[data-cnote][data-ckind="plan"] tr:first-child > td > div:first-child{color:var(--cn-acc);border-bottom:2px solid var(--cn-acc);}
+    .editor table[data-cnote][data-ckind="wrap"] tr:first-child > td > div:first-child{color:var(--cn-acc);border-bottom:2px solid var(--cn-acc);}
     .editor table[data-cnote] tr:first-child > td > div:first-child i{color:inherit;opacity:.75;}
-    .editor table[data-cnote][data-ccells] tr + tr > td > div:first-child{border-left:4px solid var(--cn-acc);padding-left:7px;margin-left:-2px;}
-    .editor table[data-cnote][data-ckind="plan"]{--cn-acc:#f5b800;}
-    .editor table[data-cnote][data-ckind="wrap"]{--cn-acc:#a855f7;}
+    .editor table[data-cnote][data-ckind="plan"]{--cn-acc:#a87c00;}
+    .editor table[data-cnote][data-ckind="wrap"]{--cn-acc:#8a3fd1;}
+    @media (prefers-color-scheme: dark){
+      .editor table[data-cnote][data-ckind="plan"]{--cn-acc:#f0c94a;}
+      .editor table[data-cnote][data-ckind="wrap"]{--cn-acc:#c29af0;}
+    }
     /* Schedule cell (2026-10-29): time-block tasks moved out of Today's Morning block; blue banner. */
-    .editor table[data-cnote][data-ckind="sched"] tr:first-child > td > div:first-child{background:#3b82f6;color:#fff;}
+    .editor table[data-cnote][data-ckind="sched"] tr:first-child > td > div:first-child{background:#3b82f6;color:#fff;padding:4px 8px;border-radius:7px;}
+    .editor table[data-cnote][data-ckind="sched"][data-ccells] tr + tr > td > div:first-child{border-left:4px solid var(--cn-acc);padding-left:7px;margin-left:-2px;}
     .editor table[data-cnote][data-ckind="sched"]{--cn-acc:#3b82f6;}
     .editor table[data-cnote][data-ckind="sched"] .check-line{padding:2px 0;}
     .check-line{

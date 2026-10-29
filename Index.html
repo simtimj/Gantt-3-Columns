@@ -838,7 +838,7 @@
 
     /* 2026-10-15 */
     /* Notes header: Template button sits at the far right of the header. */
-    #journalTemplateButton{margin-left:auto;min-height:calc(26px * var(--workspace-scale));padding:2px calc(9px * var(--workspace-scale));font-size:calc(12px * var(--workspace-scale));}
+    #dayBlocksButton,#journalTemplateButton{margin-left:auto;min-height:calc(26px * var(--workspace-scale));padding:2px calc(9px * var(--workspace-scale));font-size:calc(12px * var(--workspace-scale));}
     /* The save-status text must never change the toolbar's height (that shifted the
        whole workspace, and its scroll position, every time "Saving…" changed). */
     #status.status{flex:1 1 64px;min-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
@@ -1534,6 +1534,7 @@
       <div class="pane-header">
         TODAY / TASKS
         <span id="focusStatus" class="focus-status">Loading…</span>
+        <button class="btn tiny" id="dayBlocksButton" type="button" title="Add Morning / Afternoon / Evening blocks to the Today day you're in">+ Blocks</button>
       </div>
       <div
         class="scroll"
@@ -7726,7 +7727,7 @@
   @media (prefers-color-scheme: dark){:root{--sec-m-bd:#ffe14d;--sec-m:transparent;--sec-a-bd:#ff9a33;--sec-a:transparent;--sec-e-bd:#b98ee6;--sec-e:transparent;}}
   .sec-host{position:relative;}
   .sec-host > .editor.sec-painted{position:relative;z-index:1;padding-left:calc(15px * var(--side-k,1))!important;padding-right:calc(15px * var(--side-k,1))!important;padding-bottom:8px!important;}
-  .sec-boxes{position:absolute;inset:0;pointer-events:none;z-index:0;}
+  .sec-boxes{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
   .editor > [data-sec]{margin-top:16px;}
   .editor > [data-sec="morning"]{border-bottom-color:var(--sec-m-bd);color:var(--sec-m-bd);}
   .editor > [data-sec="afternoon"]{border-bottom-color:var(--sec-a-bd);color:var(--sec-a-bd);}
@@ -8001,6 +8002,8 @@
       if(!chip || !chip.classList.contains('dash-chip')){
         chip = document.createElement('div'); chip.className = 'dash-chip'; chip.id = 'dashChip';
         chip.title = "Today's tasks done"; ed.parentNode.insertBefore(chip,ed);
+        // The chip pushes the editor down: redraw the section boxes (and re-sync the row) so Evening doesn't spill (2026-10-29).
+        requestAnimationFrame(() => { try{ paintDaySecs(ed); }catch(e){} });
       }
       const lines = [...ed.querySelectorAll('.check-line')];
       const done = lines.filter(l => l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
@@ -8045,7 +8048,16 @@
   function ensureDaySections(ed){
     if(!daySecsOn || !ed || !ed.classList.contains('day-editor') || !ed.closest('#todayScroll')) return false;
     const today = (typeof state !== 'undefined' && state && state.today) || localToday();
-    if(ed.dataset.date !== today) return false;
+    if(ed.dataset.date !== today){
+      // Future days that got their blocks from the + Blocks button keep their gaps / typing lines too (2026-10-29).
+      if(ed.dataset.date > today && DAY_SECS.every(([k]) => ed.querySelector(':scope > [data-sec="' + k + '"]'))) return ensureSecGaps(ed);
+      return false;
+    }
+    return addDaySections(ed);
+  }
+  /* Adds whichever of Morning / Afternoon / Evening are missing to any Today day cell (also used by
+     the + Blocks button, Julius 2026-10-29). Returns true when something changed. */
+  function addDaySections(ed){
     const have = new Set([...ed.children].filter(n => n.dataset && n.dataset.sec).map(n => n.dataset.sec));
     if(have.size === DAY_SECS.length) return ensureSecGaps(ed);
     const mk = (k,label) => { const d = document.createElement('div'); d.dataset.tl = '1'; d.dataset.sec = k; d.innerHTML = '<b>' + label + '</b>'; return d; };
@@ -8092,7 +8104,34 @@
      The boxes live in a render-only .sec-boxes layer beside the editor (not saved); re-drawn when the editor resizes. */
   const SEC_TINT = {morning:['var(--sec-m-bd)','var(--sec-m)'], afternoon:['var(--sec-a-bd)','var(--sec-a)'], evening:['var(--sec-e-bd)','var(--sec-e)']};
   const secRO = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => paintDaySecs(e.target))) : null;
-  function paintDaySecs(ed){
+  /* + Blocks button (Julius, 2026-10-29): tap inside any Today day (e.g. tomorrow's empty cell), press
+     + Blocks, and that day gets the Morning / Afternoon / Evening blocks like today does. */
+  function insertDayBlocks(){
+    const ed = document.querySelector('#todayScroll .day-editor:focus') ||
+      (typeof activeEditor !== 'undefined' && activeEditor && activeEditor.isConnected && activeEditor.matches('#todayScroll .day-editor') ? activeEditor : null);
+    if(!ed){ setStatus('Tap inside a Today day first, then press + Blocks'); return; }
+    if(!daySecsOn){ setStatus('Turn on Morning / Afternoon / Evening sections in Options first'); return; }
+    const had = DAY_SECS.every(([k]) => ed.querySelector(':scope > [data-sec="' + k + '"]'));
+    captureBeforeEdit(ed);
+    addDaySections(ed);
+    finishEditorEdit(ed);
+    if(typeof refreshCards === 'function') refreshCards(ed);
+    syncDayHeightStable(ed.dataset.date);
+    saveEditorOwner(ed);
+    // Caret on Morning's first empty line, ready to type.
+    const m = ed.querySelector(':scope > [data-sec="' + DAY_SECS[0][0] + '"]'), line = m && m.nextElementSibling;
+    if(line && isEmptyLine(line) && !(line.dataset && line.dataset.sec)){
+      try{ const r = document.createRange(); r.setStart(line,0); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }catch(e){}
+    }
+    setStatus(had ? 'This day already has its blocks' : 'Blocks added to ' + (typeof shortDayLabel === 'function' ? shortDayLabel(ed.dataset.date) : ed.dataset.date));
+  }
+  (function(){
+    const b = document.getElementById('dayBlocksButton'); if(!b) return;
+    b.addEventListener('pointerdown',e => e.preventDefault()); // keep the caret in the day cell
+    b.addEventListener('mousedown',e => e.preventDefault());
+    b.addEventListener('click',insertDayBlocks);
+  })();
+  function paintDaySecs(ed,again){
     if(!ed || !ed.isConnected) return;
     const host = ed.parentElement; if(!host) return;
     let layer = host.querySelector(':scope > .sec-boxes');
@@ -8102,8 +8141,15 @@
       ed.classList.remove('sec-painted'); host.classList.remove('sec-host');
       return;
     }
-    if(!ed.classList.contains('sec-painted')){ ed.classList.add('sec-painted'); host.classList.add('sec-host'); if(secRO) secRO.observe(ed); }
+    if(!ed.classList.contains('sec-painted')){ ed.classList.add('sec-painted'); host.classList.add('sec-host'); if(secRO) secRO.observe(ed,{box:'border-box'}); }
     if(!layer){ layer = document.createElement('div'); layer.className = 'sec-boxes'; layer.setAttribute('aria-hidden','true'); host.appendChild(layer); }
+    // Evening spilling into the next day (Julius, 2026-10-29): the row's pixel height was measured before the
+    // section padding / dash chip / gap lines were added, so the editor ran past the row. Re-sync the row first.
+    const row = ed.closest('.day-row');
+    if(!again && row && row.style.height && ed.dataset.date && typeof syncDayHeightStable === 'function'){
+      const rr = row.getBoundingClientRect(), pb = parseFloat(getComputedStyle(row).paddingBottom) || 0;
+      if(ed.getBoundingClientRect().bottom > rr.bottom - pb + 1){ syncDayHeightStable(ed.dataset.date); return paintDaySecs(ed,true); }
+    }
     const hr = host.getBoundingClientRect(), er = ed.getBoundingClientRect();
     // Boxes sit INSIDE the editor with a small side margin (Julius, 2026-10-27: they melted into the cell edges);
     // the editor gets extra side padding (.editor.sec-painted) so the text stays inside the box.
@@ -8116,7 +8162,8 @@
       const gap = nx.previousElementSibling;
       return gap && gap !== n && isEmptyLine(gap) ? Math.round(gap.getBoundingClientRect().top - hr.top) - 1 : ys[i + 1] - 8;
     });
-    const bottom = Math.round(er.bottom - hr.top) - 3;
+    // Never past the cell's own bottom edge.
+    const bottom = Math.min(Math.round(er.bottom - hr.top) - 3, Math.round(hr.height) - 3);
     while(layer.children.length < secs.length) layer.appendChild(document.createElement('i'));
     while(layer.children.length > secs.length) layer.lastChild.remove();
     secs.forEach((n,i) => {

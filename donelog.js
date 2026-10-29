@@ -136,4 +136,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-evening-spill', date: '2026-10-29', project: 'Gantt', title: 'Evening box spill fixed', details: 'day row re-syncs its height after the section boxes are drawn; boxes clipped to the cell' },
   { id: 'd-20261029-header-today-jump', date: '2026-10-29', project: 'Gantt', title: 'Today button → header tap', details: 'removed the top-bar Today button; tap the TODAY / TASKS header text to jump to today' },
   { id: 'd-20261029-no-mustdo', date: '2026-10-29', project: 'Gantt', title: 'Must Do section removed', details: 'Suggested Day drops Must Do / Urgent + Important (must-dos are on the calendar); today\'s plan re-rendered without it' },
+  { id: 'd-20261029-blocks-every-day', date: '2026-10-29', project: 'Gantt', title: 'Blocks in every Today cell', details: '+ Blocks button removed; Morning / Afternoon / Evening in every cell from today on, with room above, between and below' },
+  { id: 'd-20261029-note-banners', date: '2026-10-29', project: 'Gantt', title: 'Bright Suggested Day / Wrap-Up headers', details: 'yellow and purple title banners, matching bars on section headers; wrap-up split into Done / Still Urgent / Priority Check / Carries Over' },
 ];

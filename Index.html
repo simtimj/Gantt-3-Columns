@@ -439,6 +439,16 @@
     .editor table[data-cnote]{border-width:1.5px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
     /* Underlined names (Focus areas, Priority check entries) read bold, like the Suggested day */
     .editor table[data-cnote] u{font-weight:700;}
+    /* Block titles as bright banners (Julius, 2026-10-29): Suggested Day = yellow, Day Wrap-Up = purple; section
+       headers get a matching left bar so each part is easy to spot. */
+    .editor table[data-cnote] tr:first-child > td > div:first-child{display:block;margin:-2px 0 6px;padding:4px 8px;border-radius:7px;font-size:1.05em;}
+    .editor table[data-cnote] tr:first-child > td > div:first-child u{text-decoration:none;}
+    .editor table[data-cnote][data-ckind="plan"] tr:first-child > td > div:first-child{background:#ffd60a;color:#1a1400;}
+    .editor table[data-cnote][data-ckind="wrap"] tr:first-child > td > div:first-child{background:#a855f7;color:#fff;}
+    .editor table[data-cnote] tr:first-child > td > div:first-child i{color:inherit;opacity:.75;}
+    .editor table[data-cnote][data-ccells] tr + tr > td > div:first-child{border-left:4px solid var(--cn-acc);padding-left:7px;margin-left:-2px;}
+    .editor table[data-cnote][data-ckind="plan"]{--cn-acc:#f5b800;}
+    .editor table[data-cnote][data-ckind="wrap"]{--cn-acc:#a855f7;}
     .check-line{
       display:flex;
       align-items:flex-start;
@@ -839,7 +849,7 @@
 
     /* 2026-10-15 */
     /* Notes header: Template button sits at the far right of the header. */
-    #dayBlocksButton,#journalTemplateButton{margin-left:auto;min-height:calc(26px * var(--workspace-scale));padding:2px calc(9px * var(--workspace-scale));font-size:calc(12px * var(--workspace-scale));}
+    #journalTemplateButton{margin-left:auto;min-height:calc(26px * var(--workspace-scale));padding:2px calc(9px * var(--workspace-scale));font-size:calc(12px * var(--workspace-scale));}
     /* The save-status text must never change the toolbar's height (that shifted the
        whole workspace, and its scroll position, every time "Saving…" changed). */
     #status.status{flex:1 1 64px;min-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
@@ -1533,7 +1543,6 @@
       <div class="pane-header">
         <span class="today-jump" data-jump-today role="button" tabindex="0" title="Jump to today">TODAY / TASKS</span>
         <span id="focusStatus" class="focus-status">Loading…</span>
-        <button class="btn tiny" id="dayBlocksButton" type="button" title="Add Morning / Afternoon / Evening blocks to the Today day you're in">+ Blocks</button>
       </div>
       <div
         class="scroll"
@@ -8028,12 +8037,15 @@
     if(n.querySelector && n.querySelector('input,img,table,video,iframe')) return false;
     return !(n.textContent || '').replace(/[\s​ ]/g,'');
   }
+  /* A day section ends at the next section or at the saved end marker <div data-secend="1"> below Evening
+     (Julius, 2026-10-29: lines under the last box stay outside it). */
+  function isSecStop(n){ return !!(n && n.nodeType === 1 && n.dataset && (n.dataset.sec || n.dataset.secend)); }
   function titleCovered(t){
     const out = [];
     // Day sections (Morning / Afternoon / Evening) cover everything up to the next section, blank lines and other titles included.
     if(t.dataset && t.dataset.sec){
       for(let n = t.nextElementSibling; n; n = n.nextElementSibling){
-        if(n.nodeType === 1 && n.dataset.sec) break;
+        if(isSecStop(n)) break;
         if(!isEmptyLine(n)) out.push(n);
       }
       return out;
@@ -8050,12 +8062,11 @@
   function ensureDaySections(ed){
     if(!daySecsOn || !ed || !ed.classList.contains('day-editor') || !ed.closest('#todayScroll')) return false;
     const today = (typeof state !== 'undefined' && state && state.today) || localToday();
-    if(ed.dataset.date !== today){
-      // Future days that got their blocks from the + Blocks button keep their gaps / typing lines too (2026-10-29).
-      if(ed.dataset.date > today && DAY_SECS.every(([k]) => ed.querySelector(':scope > [data-sec="' + k + '"]'))) return ensureSecGaps(ed);
-      return false;
-    }
-    return addDaySections(ed);
+    // Every Today cell from today on gets the blocks (Julius, 2026-10-29: + Blocks button removed). Past days
+    // only keep their spacing fixed if they already had blocks.
+    if(ed.dataset.date >= today) return addDaySections(ed);
+    if(DAY_SECS.every(([k]) => ed.querySelector(':scope > [data-sec="' + k + '"]'))) return ensureSecGaps(ed);
+    return false;
   }
   /* Adds whichever of Morning / Afternoon / Evening are missing to any Today day cell (also used by
      the + Blocks button, Julius 2026-10-29). Returns true when something changed. */
@@ -8067,13 +8078,13 @@
       if(have.has(k)) return;
       const el = mk(k,label);
       // Morning goes on top (existing tasks land under it); the others go after the previous section's block, else at the end.
-      if(i === 0) ed.insertBefore(el,ed.firstChild);
+      if(i === 0) ed.insertBefore(el,ed.firstChild); // ensureSecGaps puts an empty line above it
       else{
         const next = DAY_SECS.slice(i + 1).map(([nk]) => ed.querySelector(':scope > [data-sec="' + nk + '"]')).find(Boolean);
         if(next) ed.insertBefore(el,next); else ed.appendChild(el);
       }
     });
-    ensureSecGaps(ed,true);
+    ensureSecGaps(ed,true); ensureSecGaps(ed,true); // 2nd pass splits the shared typing / gap line
     if(typeof saveEditorOwner === 'function') saveEditorOwner(ed);
     return true;
   }
@@ -8085,9 +8096,9 @@
     const blank = () => { const d = document.createElement('div'); d.appendChild(document.createElement('br')); return d; };
     [...ed.children].filter(n => n.dataset && n.dataset.sec).forEach(n => {
       const inside = [];
-      for(let x = n.nextElementSibling; x && !(x.dataset && x.dataset.sec); x = x.nextElementSibling) inside.push(x);
+      for(let x = n.nextElementSibling; x && !isSecStop(x); x = x.nextElementSibling) inside.push(x);
       const nextSec = inside.length ? inside[inside.length - 1].nextElementSibling : n.nextElementSibling;
-      if(nextSec && inside.length && isEmptyLine(inside[inside.length - 1])) inside.pop(); // the gap line belongs between boxes
+      if(nextSec && nextSec.dataset && nextSec.dataset.sec && inside.length && isEmptyLine(inside[inside.length - 1])) inside.pop(); // the gap line belongs between boxes
       // ...and that empty line is always the section's LAST line, so there's room at the bottom (Julius, 2026-10-27).
       const last = inside[inside.length - 1];
       if(!last || !isEmptyLine(last)){ ed.insertBefore(blank(),(last || n).nextSibling); added = true; }
@@ -8099,6 +8110,21 @@
       const gap = document.createElement('div'); gap.appendChild(document.createElement('br'));
       ed.insertBefore(gap,n); added = true;
     });
+    // Edges (Julius, 2026-10-29): the blocks are never the very top or bottom of the cell, so there's always
+    // room above Morning and below Evening. An empty line sits above the first block, and a saved end marker
+    // (<div data-secend="1">, an ordinary line he can type in) closes the last block; lines after it are outside.
+    const secs = [...ed.children].filter(n => n.dataset && n.dataset.sec);
+    if(secs.length){
+      if(!secs[0].previousElementSibling){ ed.insertBefore(blank(),secs[0]); added = true; }
+      const last = secs[secs.length - 1];
+      let end = null;
+      [...ed.querySelectorAll(':scope > [data-secend]')].forEach(m => {
+        // Only the first marker after the last block counts; Enter can copy it onto the next line.
+        if(!end && (last.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING)) end = m;
+        else{ m.removeAttribute('data-secend'); added = true; }
+      });
+      if(!end){ end = blank(); end.dataset.secend = '1'; ed.appendChild(end); added = true; }
+    }
     if(added && !noSave && typeof saveEditorOwner === 'function') saveEditorOwner(ed);
     return added;
   }
@@ -8106,33 +8132,6 @@
      The boxes live in a render-only .sec-boxes layer beside the editor (not saved); re-drawn when the editor resizes. */
   const SEC_TINT = {morning:['var(--sec-m-bd)','var(--sec-m)'], afternoon:['var(--sec-a-bd)','var(--sec-a)'], evening:['var(--sec-e-bd)','var(--sec-e)']};
   const secRO = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => paintDaySecs(e.target))) : null;
-  /* + Blocks button (Julius, 2026-10-29): tap inside any Today day (e.g. tomorrow's empty cell), press
-     + Blocks, and that day gets the Morning / Afternoon / Evening blocks like today does. */
-  function insertDayBlocks(){
-    const ed = document.querySelector('#todayScroll .day-editor:focus') ||
-      (typeof activeEditor !== 'undefined' && activeEditor && activeEditor.isConnected && activeEditor.matches('#todayScroll .day-editor') ? activeEditor : null);
-    if(!ed){ setStatus('Tap inside a Today day first, then press + Blocks'); return; }
-    if(!daySecsOn){ setStatus('Turn on Morning / Afternoon / Evening sections in Options first'); return; }
-    const had = DAY_SECS.every(([k]) => ed.querySelector(':scope > [data-sec="' + k + '"]'));
-    captureBeforeEdit(ed);
-    addDaySections(ed);
-    finishEditorEdit(ed);
-    if(typeof refreshCards === 'function') refreshCards(ed);
-    syncDayHeightStable(ed.dataset.date);
-    saveEditorOwner(ed);
-    // Caret on Morning's first empty line, ready to type.
-    const m = ed.querySelector(':scope > [data-sec="' + DAY_SECS[0][0] + '"]'), line = m && m.nextElementSibling;
-    if(line && isEmptyLine(line) && !(line.dataset && line.dataset.sec)){
-      try{ const r = document.createRange(); r.setStart(line,0); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }catch(e){}
-    }
-    setStatus(had ? 'This day already has its blocks' : 'Blocks added to ' + (typeof shortDayLabel === 'function' ? shortDayLabel(ed.dataset.date) : ed.dataset.date));
-  }
-  (function(){
-    const b = document.getElementById('dayBlocksButton'); if(!b) return;
-    b.addEventListener('pointerdown',e => e.preventDefault()); // keep the caret in the day cell
-    b.addEventListener('mousedown',e => e.preventDefault());
-    b.addEventListener('click',insertDayBlocks);
-  })();
   function paintDaySecs(ed,again){
     if(!ed || !ed.isConnected) return;
     const host = ed.parentElement; if(!host) return;
@@ -8160,7 +8159,8 @@
     const ys = secs.map(n => Math.round(n.getBoundingClientRect().top - hr.top) - 5);
     // A box ends just above the empty gap line before the next section.
     const ends = secs.map((n,i) => {
-      const nx = secs[i + 1]; if(!nx) return null;
+      const nx = secs[i + 1];
+      if(!nx){ const m = ed.querySelector(':scope > [data-secend]'); return m && m.offsetParent !== null ? Math.round(m.getBoundingClientRect().top - hr.top) - 3 : null; }
       const gap = nx.previousElementSibling;
       return gap && gap !== n && isEmptyLine(gap) ? Math.round(gap.getBoundingClientRect().top - hr.top) - 1 : ys[i + 1] - 8;
     });
@@ -8189,7 +8189,7 @@
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);
         // only the gap line right before the next section stays, so the boxes keep their gap.
-        if(n.dataset.sec) for(let x = n.nextElementSibling; x && !(x.dataset && x.dataset.sec); x = x.nextElementSibling){
+        if(n.dataset.sec) for(let x = n.nextElementSibling; x && !isSecStop(x); x = x.nextElementSibling){
           const nx = x.nextElementSibling;
           if(isEmptyLine(x) && !(nx && nx.dataset && nx.dataset.sec)) hide.add(x);
         }

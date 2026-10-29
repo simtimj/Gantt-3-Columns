@@ -47,6 +47,12 @@ Last updated: 2026-10-29
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
+## 🧪 To be confirmed (2026-10-29)
+- **Blocks in every Today cell**: + Blocks button removed; Morning / Afternoon / Evening are added to every Today cell from today on. There's always an empty line above Morning, gaps between blocks, and an empty line under Evening (outside the box), so nothing's locked in.
+- **Bright block headers**: Suggested Day title is a yellow banner, Day Wrap-Up a purple one; each section header gets a matching left bar.
+- **Wrap-up split into sections**: Done (per area, one item per line) · Still Urgent (one line per task) · Priority Check · Carries Over. Wed 10/28's wrap-up re-rendered in the new layout.
+- **Claude tasks into Backlog**: tasks.js entries with `date: 'backlog'` go to the Reference Backlog cell (in Urgent, not Today).
+
 ## 🧪 To be confirmed (shipped 2026-10-26)
 
 - **+ Blocks button (2026-10-29)**: tap inside any Today day (e.g. tomorrow's empty cell), then press **+ Blocks** in the Today header → that day gets Morning / Afternoon / Evening like today does, with the cursor ready under Morning. Future days keep their gaps and typing lines after that.

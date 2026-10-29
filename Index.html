@@ -6768,6 +6768,30 @@
         }
         tx.blur(); return;
       }
+      // Backspace at the start of an empty Urgent row deletes that task / subtask (Julius, 2026-10-28),
+      // like the cells; the caret moves to the end of the row above.
+      if(type === 'keydown' && e.key === 'Backspace' && tx.matches('#urgentPanel .urg-text') && !tx.textContent.replace(/[\s\u200b\u00a0]/g,'')){
+        const sel = window.getSelection();
+        if(sel && sel.rangeCount && !sel.getRangeAt(0).collapsed) return;
+        e.preventDefault();
+        const src = dueSource(tx);
+        if(!src || !src.line || !src.line.isConnected) return;
+        const tree = urgSubtree(src.line), at = [...src.ed.querySelectorAll('.check-line')].indexOf(src.line);
+        const rows = [...document.querySelectorAll('#urgentPanel .urg-text[data-index]')];
+        const prev = rows[rows.indexOf(tx) - 1];
+        urgFocusWant = null;
+        if(prev){
+          let pi = Number(prev.dataset.index);
+          const same = prev.dataset.date === tx.dataset.date && prev.dataset.pane === tx.dataset.pane;
+          if(same && pi > at) pi -= tree.length;
+          if(!(same && pi >= at && pi < at + tree.length)) urgFocusWant = {date:prev.dataset.date,pane:prev.dataset.pane,index:pi};
+        }
+        if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; }
+        if(tree.length === 1){ urgTextKeepEmpty = false; tx.blur(); return; } // focusout removes the empty line
+        urgTextKeepEmpty = true; tx.blur();
+        deleteTaskLine(src.line,src.ed); // asks first: it has subtasks
+        return;
+      }
       if(type === 'paste'){ e.preventDefault(); document.execCommand('insertText',false,(e.clipboardData || window.clipboardData).getData('text/plain')); return; }
       if(type !== 'input') return;
       const src = dueSource(tx);

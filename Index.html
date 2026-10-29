@@ -1245,6 +1245,9 @@
     .cal-row .cal-time,.cal-row .cal-title{cursor:pointer;}
     .cal-row.done .cal-title,.cal-row.done .cal-time{text-decoration:line-through;opacity:.55;}
     .cal-sub.cal-block{padding-left:4px;font-size:11px;opacity:.8;}
+    .cal-arch-item{padding-left:18px;font-size:12px;}
+    .cal-archive-bar{display:flex;align-items:center;gap:8px;margin:4px 0 2px;flex-wrap:wrap;}
+    .cal-auto{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--muted);}
     .cal-sub.cal-donehead{cursor:pointer;display:flex;align-items:center;gap:4px;}
     .cal-time{flex:0 0 auto;min-width:6.4em;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
     .cal-title{flex:1;min-width:0;}
@@ -6628,7 +6631,54 @@
     if(live){ const n = document.createElement('span'); n.className = 'cal-now'; n.textContent = 'now'; row.append(n); }
     row.title = ev.title + (ev.location ? ' · ' + ev.location : '') + ' · ' + ev.cal;
     if(ev.link){ [t,tx].forEach(el => el.addEventListener('click',() => window.open(ev.link,'_blank'))); }
+    // Daily archive event: show the archived tasks under it as done rows (read-only).
+    if(Array.isArray(ev.items) && ev.items.length){
+      const wrap = document.createElement('div'); wrap.className = 'cal-arch';
+      wrap.append(row);
+      ev.items.forEach(name => {
+        const r = document.createElement('div'); r.className = 'cal-row cal-arch-item done';
+        const b = document.createElement('input'); b.type = 'checkbox'; b.checked = true; b.disabled = true; b.className = 'cal-box';
+        const s = document.createElement('span'); s.className = 'cal-title'; s.textContent = name;
+        r.append(b,s); wrap.append(r);
+      });
+      return wrap;
+    }
     return row;
+  }
+  // Archive controls (2026-10-29): manual run with a preview, and the Auto switch (off until tested).
+  function calArchiveBar(){
+    const a = (calData && calData.archive) || {ready:0,auto:false};
+    const bar = document.createElement('div'); bar.className = 'cal-archive-bar';
+    const run = document.createElement('button'); run.type = 'button'; run.className = 'btn tiny';
+    run.textContent = '🗃 Archive done' + (a.ready ? ' (' + a.ready + ' ready)' : '');
+    run.title = 'Fold Graphite events ending in " X" into one "✅ Completed Tasks" all-day event per day (3+ per day, or any once that day has one)';
+    run.addEventListener('click',() => {
+      setStatus('Checking what can be archived…');
+      google.script.run.withSuccessHandler(rep => {
+        const ready = (rep.dates || []).filter(d => d.titles && d.titles.length);
+        const waiting = (rep.dates || []).filter(d => d.waiting).map(d => d.date + ': ' + d.waiting + ' waiting (needs 3)');
+        if(!ready.length){ setStatus('Nothing to archive yet' + (waiting.length ? ' · ' + waiting.join(' · ') : '')); return; }
+        const list = ready.map(d => d.date + '\n  ' + d.titles.join('\n  ')).join('\n');
+        if(!confirm('Archive these into one event per day, then delete the originals?\n\n' + list)){ setStatus('Archive cancelled'); return; }
+        setStatus('Archiving…');
+        google.script.run.withSuccessHandler(res => {
+          const done = (res.dates || []).reduce((n,d) => n + d.deleted,0);
+          const errs = [].concat(res.errors || [],...(res.dates || []).map(d => d.errors || []));
+          setStatus(errs.length ? 'Archived ' + done + ' · problems: ' + errs.join(' · ') : 'Archived ' + done + ' events');
+          loadCalendar();
+        }).withFailureHandler(e => setStatus('Archive error (nothing lost): ' + e.message)).archiveCompletedTasks({});
+      }).withFailureHandler(e => setStatus('Archive check error: ' + e.message)).archiveCompletedTasks({dryRun:true});
+    });
+    const auto = document.createElement('label'); auto.className = 'cal-auto';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!a.auto;
+    cb.addEventListener('change',() => {
+      if(cb.checked && !confirm('Turn on auto archive? It runs when the Calendar loads and when you tick an event. Test it by hand with 3 events first.')){ cb.checked = false; return; }
+      google.script.run.withSuccessHandler(on => { a.auto = on; setStatus('Auto archive ' + (on ? 'on' : 'off')); })
+        .withFailureHandler(e => { cb.checked = !cb.checked; setStatus('Error: ' + e.message); }).setArchiveAuto(cb.checked);
+    });
+    auto.append(cb,document.createTextNode(' Auto'));
+    bar.append(run,auto);
+    return bar;
   }
   function renderCalendar(){
     if(!CAL_PANEL_ON) return;
@@ -6690,6 +6740,7 @@
       h.addEventListener('click',() => { calDoneOpen = !calDoneOpen; try{ localStorage.setItem('fw.calDoneOpen',calDoneOpen ? '1' : '0'); }catch(e){} renderCalendar(); });
       if(calDoneOpen) done.forEach(ev => panel.appendChild(calRow(ev,now)));
     }
+    panel.appendChild(calArchiveBar());
     // Next days.
     const later = [];
     events.filter(ev => ev.date > today).forEach(ev => {

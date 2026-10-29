@@ -49,6 +49,7 @@ Last updated: 2026-10-29
 
 ## 🧪 To be confirmed (2026-10-29)
 
+- **Folded summary on every title line** (2026-10-29): fold any title line (Claude's Gantt group, Morning / Afternoon / Evening, your own titles) and a condensed block under it lists the bold beginning of each hidden line, e.g. "In Today marker · Safe sync · …". Lines with no bold start use the text before ":". Subtasks are skipped; capped at 30 with "+N more". Not shown on a title line that has its own due/duration label.
 - **[x] calendar marker + your own done lines (2026-10-29):** once a Graphite event is in the log, its title starts with **[x] ** (was a trailing " X"). Your own calendar tasks in the done log have no `*` and end with " X"; Claude's still start with `*`.
 - **Clearer day lines + dates** (2026-10-29): the line between days (Today and Notes) is thicker and darker; dates are underlined and read "Sunday November 1, 2026" (no comma after the weekday).
 - **Free line under Evening** (2026-10-29): every Today cell keeps an empty line below the Evening box, outside it, so you can add things there; tapping below the last line lands on it.

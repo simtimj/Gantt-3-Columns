@@ -154,4 +154,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-cal-chopping-blocks', date: '2026-10-29', project: 'Research', mine: true, title: 'Waterproof chopping blocks', details: 'looked into options' },
   { id: 'd-20261029-commits-as-julius', date: '2026-10-29', project: 'GitHub', title: 'Commits credited to Julius', details: 'Gantt history rewritten so all 206 commits are authored by simtimj (backup branch kept); both repos\' CLAUDE.md now say commit as Julius' },
   { id: 'd-20261029-x-prefix', date: '2026-10-29', project: 'Gantt', title: '[x] calendar marker', details: 'logged Graphite events now start with "[x] " instead of ending " X"; archive reads both; own calendar lines in the log end " X" with no *' },
+  { id: 'd-20261029-fold-summary', date: '2026-10-29', project: 'Gantt', title: 'Folded summary on title lines', details: 'folding any title line (Gantt group, day blocks, your own) shows one condensed block of the bold starts of the hidden lines' },
 ];

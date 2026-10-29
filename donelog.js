@@ -146,4 +146,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-urg-bold', date: '2026-10-29', project: 'Gantt', title: 'No stray bold in Urgent', details: 'new tasks stop inheriting bold from the line above; fully-bold urgent tasks un-bolded once' },
   { id: 'd-20261029-cal-archive', date: '2026-10-29', project: 'Gantt', title: 'Daily completed-task archive', details: 'Graphite + " X" events fold into one ✅ Completed Tasks all-day event per day, verified before deleting; Archive button with preview, Auto off until tested' },
   { id: 'd-20261029-done-in-block', date: '2026-10-29', project: 'Gantt', title: 'Done log in the right block', details: 'Claude done lines land in the Morning / Afternoon / Evening block that has already started, never a later one' },
+  { id: 'd-20261029-day-lines', date: '2026-10-29', project: 'Gantt', title: 'Clearer day lines + dates', details: 'thicker darker separator between days; dates underlined, no comma after the weekday' },
+  { id: 'd-20261029-below-evening', date: '2026-10-29', project: 'Gantt', title: 'Free line under Evening', details: 'empty line kept below the Evening box so things can be added there' },
 ];

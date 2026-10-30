@@ -1011,6 +1011,9 @@
     .urg-group{margin-top:6px;padding-left:8px;border-left:3px solid var(--urg);}
     .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}.urg-group[data-urg="0"],.urg-row[data-urg="0"]{--urg:#8a8f98;}
     .urg-group .urg-sub{margin-top:0;color:var(--urg);}
+    .urg-batch{display:flex;align-items:center;gap:6px;width:100%;margin:5px 0 0;padding:2px 0;background:none;border:0;text-align:left;cursor:pointer;color:var(--muted);font:inherit;font-size:11px;font-weight:700;-webkit-user-select:none;user-select:none;}
+    .urg-batch i{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--bc,#9ca3af);}
+    .urg-batch small{font-weight:600;opacity:.8;}
     .urg-head{display:block;width:100%;text-align:left;background:none;border:0;padding:2px 0;font-weight:700;font-size:13px;cursor:pointer;color:inherit;}
     .urg-sub{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     .urg-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;padding:4px 0;cursor:pointer;color:inherit;font-size:13px;}
@@ -1647,6 +1650,7 @@
         <div id="refOptions" class="ref-options" hidden>
           <div class="ts-sub">Urgent panel</div>
           <label class="ts-check"><input type="checkbox" id="optUrgWrap"> Wrap long text</label>
+          <label class="ts-check"><input type="checkbox" id="optUrgBatch"> Group by subject</label>
           <label class="ts-check">Due date
             <select id="optDueStyle" class="top-select">
               <option value="date">Tues 10/27</option>
@@ -5923,10 +5927,21 @@
         // Sort by the soonest open date of the task or any of its subtasks (2026-10-28, Julius:
         // subtasks are sometimes due before the task).
         const soon = [due].concat(subs.filter(x => !x.done).map(x => x.due)).filter(Boolean).sort()[0] || '';
-        out.push({date,pane,arch,urg:Number(urg),index:i,text:lineText(line),html:lineHtml(line),subs,done,due,soon,dur:durMin(line.dataset.dur)});
+        out.push({date,pane,arch,urg:Number(urg),index:i,text:lineText(line),html:lineHtml(line),subs,done,due,soon,dur:durMin(line.dataset.dur),cat:urgItemCat(line,subs)});
       });
     });
     return out;
+  }
+  // Subject of an Urgent task (2026-10-30, Julius: batches): the one set from the hold
+  // menu, else the same guess the cards use (" · Music" tag at the end wins). '' = Other.
+  function urgItemCat(line,subs){
+    try{
+      const d = line.dataset.cat || '';
+      if(d === 'none') return '';
+      if(CARD_CAT_BY_KEY[d]) return d;
+      if(!cardsAuto) return '';
+      return guessCardCat(lineText(line),'',false,(subs || []).map(x => x.text).join(' ')) || '';
+    }catch(e){ return ''; }
   }
   function lineHtml(line){
     const t = line.querySelector('.check-text');
@@ -6096,12 +6111,22 @@
         sub.title = 'Tasks with a due date but no urgency, soonest first';
       }
       wrap.appendChild(sub);
-      group.forEach(item => {
+      const addItem = item => {
         wrap.appendChild(urgItemRow(item,u,item.index,item.html,item.text,0,item.done,true));
         // Subtasks: real checkbox rows like their task, indented under it
         // (2026-10-27, Julius). Same hold-for-urgency box, editable text.
         // Folded tasks (− / +, 2026-10-28, Julius) hide their subtasks here only.
         if(!urgFolded(item)) item.subs.forEach(st => wrap.appendChild(urgItemRow(item,u,st.index,st.html,st.text,st.level,st.done,false)));
+      };
+      // Batches (2026-10-30, Julius): inside each level, tasks are grouped by subject
+      // (Music, Productivity, Career / IT, …) so he can work one batch at a time.
+      // Batch order = its soonest task; Other (no subject) last. Fold per batch.
+      const batches = urgBatches(group);
+      if(!urgBatchOn() || (batches.length === 1 && !batches[0].cat)) group.forEach(addItem);
+      else batches.forEach(b => {
+        const folded = urgBatchFolded(u,b.cat);
+        wrap.appendChild(urgBatchHead(u,b,folded));
+        if(!folded) b.items.forEach(addItem);
       });
       if(u) wrap.appendChild(urgAdderRow(u));
     });
@@ -6125,6 +6150,45 @@
         try{ inp.setSelectionRange(n,n); }catch(e){}
       }
     }
+  }
+  // Urgent batches by subject (2026-10-30, Julius). Option "Group by subject"
+  // (localStorage fw.urgBatch, default on); folded batches in fw.urgBatchFold ("u|cat").
+  function urgBatchOn(){ return urgOpt('fw.urgBatch','1') !== '0'; }
+  // Subjects load in a later script; before that there are no batches yet.
+  function urgCatInfo(k){ try{ return k && CARD_CAT_BY_KEY[k] || null; }catch(e){ return null; } }
+  let urgBatchFoldSet = new Set();
+  try{ urgBatchFoldSet = new Set(JSON.parse(localStorage.getItem('fw.urgBatchFold') || '[]')); }catch(e){}
+  function urgBatchFolded(u,cat){ return urgBatchFoldSet.has(u + '|' + (cat || 'other')); }
+  function urgBatches(group){
+    const map = new Map();
+    group.forEach(item => {
+      const c = urgCatInfo(item.cat) ? item.cat : '';
+      if(!map.has(c)) map.set(c,{cat:c,items:[]});
+      map.get(c).items.push(item);
+    });
+    const list = [...map.values()];
+    const pos = b => group.indexOf(b.items[0]);
+    return list.sort((a,b) => (a.cat ? 0 : 1) - (b.cat ? 0 : 1) || pos(a) - pos(b));
+  }
+  function urgBatchHead(u,b,folded){
+    const c = urgCatInfo(b.cat);
+    const h = document.createElement('button');
+    h.type = 'button'; h.className = 'urg-batch'; h.dataset.cat = b.cat || 'other';
+    if(c) h.style.setProperty('--bc',c.color);
+    const dot = document.createElement('i');
+    const name = document.createElement('span'); name.textContent = c ? c.name : 'Other';
+    const n = document.createElement('small'); n.textContent = b.items.length;
+    h.append(pmBox(!folded),dot,name,n);
+    h.title = (folded ? 'Show ' : 'Hide ') + (c ? c.name : 'Other') + ' tasks · change a task\'s subject from its checkbox hold menu';
+    h.addEventListener('pointerdown',e => e.stopPropagation());
+    h.addEventListener('click',e => {
+      e.preventDefault(); e.stopPropagation();
+      const k = u + '|' + (b.cat || 'other');
+      if(urgBatchFoldSet.has(k)) urgBatchFoldSet.delete(k); else urgBatchFoldSet.add(k);
+      try{ localStorage.setItem('fw.urgBatchFold',JSON.stringify([...urgBatchFoldSet])); }catch(e){}
+      renderUrgent();
+    });
+    return h;
   }
   /* ---------------------------------------------------------
      Type tasks straight into the Urgent panel (2026-10-27, Julius):
@@ -7092,6 +7156,8 @@
     window.addEventListener('resize',() => { if(!box.hidden) place(); });
     const wrapCb = document.getElementById('optUrgWrap');
     if(wrapCb){ wrapCb.checked = urgWrap(); wrapCb.addEventListener('change',() => setUrgOpt('fw.urgWrap',wrapCb.checked ? '1' : '0')); }
+    const batchCb = document.getElementById('optUrgBatch');
+    if(batchCb){ batchCb.checked = urgBatchOn(); batchCb.addEventListener('change',() => setUrgOpt('fw.urgBatch',batchCb.checked ? '1' : '0')); }
   }
   function urgWrap(){ return urgOpt('fw.urgWrap','1') !== '0'; }
 
@@ -8335,12 +8401,15 @@
   // Saved to the account (user properties, all devices) with a local copy for a fast start.
   const CARD_CATS_DEFAULT = [
     {key:'code',   name:'Code',   color:'#22c55e', words:'gantt, exercise tracker, userscript, userscripts, script, scripts, apps script, clasp, github, repo, code, coding, bug, bugs, feature, features, readme, deploy, tampermonkey, violentmonkey, react, typescript, next.js, nextjs, tailwind, javascript, api, css, html, app, apps, ui, playnite, endpoint, dashboard, planner hub'},
-    {key:'career', name:'Career', color:'#86efac', words:'resume, resumes, résumé, job, jobs, job search, application, applications, apply, interview, interviews, linkedin, career, cover letter, recruiter, recruiters, ats, cdcr, calcareers, it associate, hiring, portfolio, networking, soq'},
+    {key:'career', name:'Career / IT', color:'#86efac', words:'resume, resumes, résumé, job, jobs, job search, application, applications, apply, interview, interviews, linkedin, career, cover letter, recruiter, recruiters, ats, cdcr, calcareers, it associate, hiring, portfolio, networking, soq, help desk, helpdesk, it support, tech support, it job, it jobs, it role, certification, cert, security, cloud security, devsecops'},
+    // Music + Productivity added for Urgent batches (2026-10-30, Julius); server upgrades saved lists once (getCardCats_).
+    {key:'music',  name:'Music',  color:'#d946ef', words:'music, guitar, sing, singing, song, songs, setlist, set list, the show, show prep, music show, gig, gigs, rehearsal, rehearse, band, vocals, pedal, pedals, amp, open mic, soundcheck'},
+    {key:'productivity', name:'Productivity', color:'#0891b2', words:'productivity, efficiency, efficient, workflow, workflows, automation, automate, organize, organizing, clean up, cleanup, consolidate, chatgpt, gemini, handoff, master instructions, docs cleanup, migrate, migration'},
     {key:'study',  name:'Study',  color:'#a78bfa', words:'a+, comptia, study, studying, course, class, quiz, exam, practice test, flashcard, flashcards, learn, lesson, lessons'},
     {key:'work',   name:'Work',   color:'#94a3b8', words:'dog walk, dog walks, dog walking, walk, walks, client, clients, rover, invoice, invoices'},
     {key:'health', name:'Health', color:'#ec4899', words:'exercise, exercises, workout, gym, stretch, stretching, pt, physical therapy, sleep, doctor, dentist, skincare, running, lift, lifting, rehab'},
     {key:'life',   name:'Life',   color:'#14b8a6', words:'errand, errands, clean, cleaning, laundry, groceries, grocery, car, oil change, home, garden, bill, bills, bank, appointment, appointments, dmv, shopping, cook, cooking, dishes'},
-    {key:'fun',    name:'Fun',    color:'#f97316', words:'guitar, music, sing, singing, game, games, gaming, movie, movies, youtube, fun, spanish, japanese, language'},
+    {key:'fun',    name:'Fun',    color:'#f97316', words:'game, games, gaming, movie, movies, youtube, fun, spanish, japanese, language'},
   ];
   let CARD_CATS = [], CARD_CAT_BY_KEY = {};
   // Declared before the first setCardCats() call: it refreshes cards, which reads these.
@@ -8382,7 +8451,7 @@
       clearTimeout(setCardCats.t);
       setCardCats.t = setTimeout(() => { try{ google.script.run.withFailureHandler(e => setStatus('Subjects not saved: ' + e.message)).saveCardCats(plain); }catch(e){} },600);
     }
-    if(!noRefresh) refreshAllCards();
+    if(!noRefresh){ refreshAllCards(); try{ renderUrgent(); }catch(e){} } // Urgent batches use the subject names
   }
   (function(){
     let local = null;
@@ -8957,7 +9026,8 @@
         if(owner && typeof captureBeforeEdit === 'function') captureBeforeEdit(owner);
         if(key) head.dataset.cat = key; else delete head.dataset.cat;
         row.querySelectorAll('.urg-cat').forEach(x => x.classList.toggle('on',x === b));
-        if(owner){ refreshCards(owner); if(typeof finishEditorEdit === 'function') finishEditorEdit(owner); saveEditorOwner(owner); }
+        // urgChanged also re-sorts the Urgent batches (2026-10-30).
+        if(owner){ refreshCards(owner); if(typeof finishEditorEdit === 'function') finishEditorEdit(owner); if(typeof urgChanged === 'function') urgChanged(owner); else saveEditorOwner(owner); }
       });
       row.appendChild(b);
     });

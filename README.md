@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` deploys automatically (`.github/workflows/deploy.yaml` → `clasp push` + update deployment).
 
-Last updated: 2026-10-29
+Last updated: 2026-10-30
 
 ## Status key
 
@@ -46,6 +46,11 @@ Last updated: 2026-10-29
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-10-30)
+
+- **Urgent batches by subject**: inside each level (Urgent / Soon / Can be later / Due), tasks are grouped under small subject headers (e.g. Music, Productivity, Career / IT) with a count, so he can work one batch at a time. Batch order = its soonest task; "Other" (no subject) last. Tap a header to fold that batch. Reference Options → "Group by subject" turns it off.
+- **New subjects Music + Productivity, Career renamed "Career / IT"** (more IT words). Added once to his saved subject list on all devices; guitar/music/singing words moved from Fun to Music. Set a task's subject from its checkbox hold menu, or end the task with " · Music" / " · Productivity" / " · Career". More batches = add a subject in Options → Card subjects (or ask Claude).
 
 ## 🧪 To be confirmed (2026-10-29)
 

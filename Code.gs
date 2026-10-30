@@ -133,7 +133,7 @@ function getWorkspaceData() {
     reference: getReference_(),
     urgent: getUrgentDays_(),
     inbox: (function () { try { return getInbox(); } catch (e) { return []; } })(),
-    cardCats: inboxRead_('cardCats', null),
+    cardCats: getCardCats_(),
     today: today
   };
 }
@@ -1036,6 +1036,43 @@ function inboxRead_(key, def) {
 }
 function inboxWrite_(key, value) {
   PropertiesService.getUserProperties().setProperty(key, JSON.stringify(value));
+}
+// Urgent batches (2026-10-30, Julius): Music + Productivity subjects, Career shown as
+// "Career / IT". One-time upgrade of his saved list (flag cardCatsBatch1) so every
+// device gets them; after that his edits in Options win (deleting one keeps it gone).
+const CARD_CATS_BATCH1_ = [
+  { key: 'music', name: 'Music', color: '#d946ef', words: 'music, guitar, sing, singing, song, songs, setlist, set list, the show, show prep, music show, gig, gigs, rehearsal, rehearse, band, vocals, pedal, pedals, amp, open mic, soundcheck' },
+  { key: 'productivity', name: 'Productivity', color: '#0891b2', words: 'productivity, efficiency, efficient, workflow, workflows, automation, automate, organize, organizing, clean up, cleanup, consolidate, chatgpt, gemini, handoff, master instructions, docs cleanup, migrate, migration' }
+];
+const CARD_CATS_CAREER_WORDS_ = 'help desk, helpdesk, it support, tech support, it job, it jobs, it role, certification, cert, security, cloud security, devsecops';
+function getCardCats_() {
+  const list = inboxRead_('cardCats', null);
+  if (!Array.isArray(list) || !list.length) return list;
+  const props = PropertiesService.getUserProperties();
+  if (props.getProperty('cardCatsBatch1')) return list;
+  const out = cardCatsBatch1_(list);
+  inboxWrite_('cardCats', out);
+  props.setProperty('cardCatsBatch1', '1');
+  return out;
+}
+function cardCatsBatch1_(list) {
+  const moved = ['guitar', 'music', 'sing', 'singing'];
+  const out = list.map(c => {
+    const n = Object.assign({}, c);
+    if (n.key === 'fun') n.words = String(n.words || '').split(',').map(w => w.trim()).filter(w => w && moved.indexOf(w.toLowerCase()) < 0).join(', ');
+    if (n.key === 'career') {
+      if (n.name === 'Career') n.name = 'Career / IT';
+      const have = String(n.words || '').split(',').map(w => w.trim().toLowerCase());
+      const extra = CARD_CATS_CAREER_WORDS_.split(', ').filter(w => have.indexOf(w) < 0);
+      if (extra.length) n.words = (n.words ? n.words + ', ' : '') + extra.join(', ');
+    }
+    return n;
+  });
+  const at = Math.max(0, out.findIndex(c => c.key === 'career') + 1) || out.length;
+  CARD_CATS_BATCH1_.slice().reverse().forEach(c => {
+    if (!out.some(x => x.key === c.key)) out.splice(at, 0, Object.assign({}, c));
+  });
+  return out.slice(0, 30);
 }
 // Card subjects (name, color, keywords) edited in Options — one list for all devices (2026-10-27).
 function saveCardCats(list) {

@@ -159,4 +159,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-day-sections-removed', date: '2026-10-29', project: 'Gantt', title: 'Day sections removed', details: 'Morning / Afternoon / Evening lines, boxes and Options toggle gone; saved section lines stripped from every Today cell once (backed up); done log no longer placed into blocks' },
   { id: 'd-20261029-same-font-size', date: '2026-10-29', project: 'Gantt', title: 'Same text size everywhere', details: 'Urgent, Inbox and Calendar rows and the Plan pad now match the cell font and size (Text size × Scale); small labels scale with it' },
   { id: 'd-20261029-plan-pad-full-editor', date: '2026-10-29', project: 'Gantt', title: 'Plan pad = full cell', details: 'checkboxes, hold/right-click menu, cards, urgency, due, title lines, drag and undo now work in the Plan pad; its urgent tasks show in Urgent' },
+  { id: 'd-20261030-urgent-batches', date: '2026-10-30', project: 'Gantt', title: 'Urgent batches', details: 'Urgent levels grouped by subject (Music, Productivity, Career / IT, Other) with fold per batch; new Music + Productivity subjects; Options toggle Group by subject' },
 ];

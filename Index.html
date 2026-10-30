@@ -8501,7 +8501,39 @@
   }
   function cardCatTag(text){
     const m = String(text || '').match(/\s[·•]\s*([^·•]{1,40}?)\s*$/);
-    return m ? cardCatFromName(m[1]) : '';
+    if(!m) return '';
+    const raw = m[1].trim();
+    // " · #Name" (2026-10-30, Julius): makes the subject/batch if it doesn't exist yet,
+    // so ChatGPT's paste-ready tasks can create new Urgent batches with no Options step.
+    if(raw[0] === '#'){ const k = cardCatEnsure(raw.slice(1).trim()); return k || cardCatFromName(raw.slice(1)); }
+    return cardCatFromName(raw);
+  }
+  const CARD_CAT_AUTO_COLORS = ['#eab308','#6366f1','#10b981','#f472b6','#0ea5e9','#a3e635','#fb7185','#c084fc','#2dd4bf','#fbbf24','#78716c','#be123c'];
+  let cardCatPending = new Map(), cardCatPendingT = 0;
+  function cardCatEnsure(name){
+    name = String(name || '').replace(/\s+/g,' ').trim();
+    if(!/^[\p{L}\p{N}][\p{L}\p{N} &\/+'-]{0,23}$/u.test(name)) return '';
+    const low = name.toLowerCase();
+    const have = CARD_CATS.find(c => c.key === low || c.name.toLowerCase() === low);
+    if(have) return have.key;
+    const key = low.replace(/[^a-z]/g,'').slice(0,12);
+    if(key.length < 2 || key === 'none') return '';
+    if(CARD_CAT_BY_KEY[key]) return key;
+    if(!cardCatPending.has(key)){
+      const used = new Set(CARD_CATS.map(c => c.color.toLowerCase()).concat([...cardCatPending.values()].map(c => c.color)));
+      const color = CARD_CAT_AUTO_COLORS.find(c => !used.has(c)) || CARD_CAT_AUTO_COLORS[key.length % CARD_CAT_AUTO_COLORS.length];
+      cardCatPending.set(key,{key,name,color,words:''});
+      clearTimeout(cardCatPendingT);
+      cardCatPendingT = setTimeout(() => {
+        const list = CARD_CATS.map(({re,reG,...c}) => c);
+        cardCatPending.forEach(c => { if(!list.some(x => x.key === c.key)) list.push(c); });
+        cardCatPending = new Map();
+        setCardCats(list,true);
+        try{ renderCardCatEditor(); }catch(e){}
+        try{ setStatus('New batch: ' + list.slice(-1)[0].name); }catch(e){}
+      },50);
+    }
+    return key;
   }
   function cardCatScore(parts){
     const score = {}, first = {};

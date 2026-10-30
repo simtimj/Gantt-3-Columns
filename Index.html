@@ -1391,6 +1391,26 @@
     body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
     .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
     body.one-day .sec-boxes{display:none;}
+
+    /* One text size everywhere (Julius, 2026-10-29): Reference panels (Urgent, Inbox, Calendar) and the Plan
+       pad use the same font, size and line height as the Today / Notes / Reference cells
+       (Text size × Scale). Small labels (dates, counts, sub-headers) are sized relative to it. */
+    :root{--fw-text:calc(var(--paragraph-size) * var(--workspace-scale,1));}
+    #urgentPanel,#inboxPanel,#calPanel{font-family:var(--paragraph-font);font-size:var(--fw-text);}
+    #urgentPanel :is(.urg-row,.urg-text,.urg-subtask,.urg-head),
+    #inboxPanel :is(.urg-row,.urg-text,.inbox-text,.urg-head),
+    #calPanel :is(.cal-row,.urg-head),
+    .urg-create input,.inbox-add input{font-family:var(--paragraph-font)!important;font-size:var(--fw-text)!important;line-height:1.3;}
+    #urgentPanel .urg-row,#inboxPanel .urg-row{padding-top:2px;padding-bottom:2px;}
+    #urgentPanel .urg-subtask{color:inherit;}
+    .urg-date,.cal-time,.cal-arch-item,.cal-auto,.urg-empty,.urg-due-chip{font-size:.85em;}
+    .urg-sub,.urg-arch-head,.urg-arch .urg-arch-day,.cal-sub.cal-block{font-size:.8em;}
+    .urg-made,.inbox-from,.cal-now{font-size:.72em;}
+    #urgentPanel .urg-fold{font-size:.9em;}
+    #urgentPanel .urg-fold small{font-size:.8em;}
+    .urg-head .urg-sub{font-size:.8em;}
+    .dash-chip{font-size:.85em;}
+    body.one-day #todayScroll .od-on > .plan-pad{font-size:var(--fw-text);line-height:1.3;}
 </style>
 <script>
   /* ===== Light / dark toggle, saved per device (Julius, 2026-10-27) =====

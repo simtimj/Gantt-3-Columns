@@ -158,4 +158,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261029-one-day-view', date: '2026-10-29', project: 'Gantt', title: 'One-day view', details: 'Today / Notes locked to one day with ▲ ▼ day buttons; Today split into Completed (scrolls on its own) and a Plan / think pad saved per day; folded groups show just a done count' },
   { id: 'd-20261029-day-sections-removed', date: '2026-10-29', project: 'Gantt', title: 'Day sections removed', details: 'Morning / Afternoon / Evening lines, boxes and Options toggle gone; saved section lines stripped from every Today cell once (backed up); done log no longer placed into blocks' },
   { id: 'd-20261029-same-font-size', date: '2026-10-29', project: 'Gantt', title: 'Same text size everywhere', details: 'Urgent, Inbox and Calendar rows and the Plan pad now match the cell font and size (Text size × Scale); small labels scale with it' },
+  { id: 'd-20261029-plan-pad-full-editor', date: '2026-10-29', project: 'Gantt', title: 'Plan pad = full cell', details: 'checkboxes, hold/right-click menu, cards, urgency, due, title lines, drag and undo now work in the Plan pad; its urgent tasks show in Urgent' },
 ];

@@ -1790,7 +1790,7 @@
     root.style.setProperty('--subtitle-size', typographySettings.paragraphSize + 'px');
     root.style.setProperty('--title-font', typographySettings.titleFont);
     root.style.setProperty('--title-size', typographySettings.paragraphSize + 'px');
-    document.querySelectorAll('.day-editor,.journal-editor,.ref-cell').forEach(el => {
+    document.querySelectorAll('.day-editor,.journal-editor,.plan-editor,.ref-cell').forEach(el => {
       if(!el.style.fontFamily || el.style.fontFamily.includes('var(')) el.style.fontFamily = 'var(--paragraph-font)';
       if(!el.style.fontSize || el.style.fontSize.includes('var(')) el.style.fontSize = 'var(--paragraph-size)';
       el.style.lineHeight = '1.18';
@@ -2046,9 +2046,9 @@
     if(type === 'day'){
       // One-day view (2026-10-29, Julius): top = Completed (this editor), bottom = Plan pad (Days column D).
       row.querySelector('.editor').insertAdjacentHTML('beforebegin','<div class="od-head">Completed</div>');
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Plan / think</div><div class="plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Priorities, plans, thoughts…"></div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Plan / think</div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Priorities, plans, thoughts…"></div>');
       const pad = row.querySelector('.plan-pad');
-      pad.innerHTML = day.plan || '';
+      pad.innerHTML = storedToHtml(day.plan || '');
     }
     container.appendChild(row);
     const ed =
@@ -2059,7 +2059,10 @@
     wireEditor(
       ed,
       type
-    );    // New days (incl. lazily loaded weeks) pick up tasks due on them.
+    );
+    // Plan pad = a full editor too (checkboxes, cards, menus, urgency, drag) — Julius 2026-10-29.
+    const padEd = row.querySelector('.plan-editor');
+    if(padEd){ padEd.style.fontSize = 'var(--paragraph-size)'; padEd.style.fontFamily = 'var(--paragraph-font)'; wireEditor(padEd,'plan'); }    // New days (incl. lazily loaded weeks) pick up tasks due on them.
     if(type === 'day'){
       clearTimeout(appendDayRow._due);
       appendDayRow._due = setTimeout(() => { try{ renderDueBlocks(); }catch(e){} },0);
@@ -2165,6 +2168,7 @@
       'input',
       () => {
         autoFormat(el);
+        if(type === 'plan'){ if(window.odPadSave) odPadSave(el.dataset.date); return; }
         if(el.dataset.date){
           requestAnimationFrame(() => syncDayHeightStable(el.dataset.date));
         }
@@ -2950,6 +2954,7 @@
     if(!el){
       return;
     }
+    if(el.classList && el.classList.contains('plan-editor')){ if(window.odPadSave) odPadSave(el.dataset.date); return; }
     if(
       el.closest('.day-row')
     ){
@@ -4005,7 +4010,7 @@
       let typingCopy = isCopy(act) ? act : null;
       // Focus that landed in pick mode (inputmode=none, no keyboard) is a pick, not typing.
       const pickMode = el => !!(el && el.getAttribute && el.getAttribute('inputmode') === 'none');
-      if(line && pickMode(line.closest('.day-editor,.journal-editor,.ref-cell'))){ picked = line; line = null; }
+      if(line && pickMode(line.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell'))){ picked = line; line = null; }
       if(typingCopy && pickMode(typingCopy)){ picked = typingCopy; typingCopy = null; }
       // Picked card (first tap) shows the ring + grip until you type somewhere or tap elsewhere.
       if(line || typingCopy) picked = null;
@@ -4038,7 +4043,7 @@
       const tx = t.closest(COPY_SEL);
       if(tx) return {el:tx,editing:act === tx};
       const line = t.closest('.check-line');
-      const root = line && line.closest('.day-editor,.journal-editor,.ref-cell');
+      const root = line && line.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell');
       if(!line || !root || !root.isContentEditable || line.closest('[data-render-due],table[data-cnote]')) return null;
       return {el:line,editing:!picked && line === cur && act && (act === root || root.contains(act))};
     }
@@ -4059,7 +4064,7 @@
     /* Belt and braces (2026-10-28, Julius: keyboard still opened): a card's editable gets
        inputmode="none" before a first tap, so even if the phone focuses it, no keyboard shows.
        The second tap on the picked card clears it (and re-focuses), so the keyboard comes up. */
-    const rootOf = el => isCopy(el) ? el : el.closest('.day-editor,.journal-editor,.ref-cell');
+    const rootOf = el => isCopy(el) ? el : el.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell');
     /* First tap must not put the cursor in the card at all (Julius, 2026-10-28): during that
        touch the card's cell is made non-editable, so the phone has nothing to focus; it is
        editable again right after. The second tap on the picked card is left alone → cursor + keyboard. */
@@ -4526,7 +4531,7 @@
      adding one — above the end marker), so a short cell next to a long one is writable all the way down. */
   document.addEventListener('click',e => {
     const ed = e.target;
-    if(!ed || !ed.matches || !ed.matches('#todayScroll .day-editor, #journalScroll .journal-editor')) return;
+    if(!ed || !ed.matches || !ed.matches('#todayScroll .day-editor, #journalScroll .journal-editor, #todayScroll .plan-editor')) return;
     const kids = [...ed.children].filter(n => !n.matches('[data-render-due],.due-notes'));
     if(!kids.length) return;
     const end = kids[kids.length - 1].matches('[data-secend]') ? kids[kids.length - 1] : null;
@@ -5819,8 +5824,8 @@
   const URG_NAMES = {1:'Urgent',2:'Soon',3:'Can be later'};
   const urgentSource = new Map();   // date (Today) or date+'|j' (Notes) -> html that has urgency
   // Urgency set on a task in Notes counts too (Julius, 2026-10-27: it showed, then vanished on save).
-  function urgKey(date,pane){ return pane === 'journal' ? date + '|j' : pane === 'backlog' ? 'backlog|b' : date; }
-  function urgKeyParts(key){ const i = key.indexOf('|'); return i < 0 ? {date:key,pane:'today'} : {date:key.slice(0,i),pane:key.slice(i + 1) === 'b' ? 'backlog' : 'journal'}; }
+  function urgKey(date,pane){ return pane === 'journal' ? date + '|j' : pane === 'plan' ? date + '|p' : pane === 'backlog' ? 'backlog|b' : date; }
+  function urgKeyParts(key){ const i = key.indexOf('|'); if(i < 0) return {date:key,pane:'today'}; const t = key.slice(i + 1); return {date:key.slice(0,i),pane:t === 'b' ? 'backlog' : t === 'p' ? 'plan' : 'journal'}; }
   /* Backlog (2026-10-28, Julius): a Reference cell titled "Backlog" holds urgent tasks that
      aren't for any day yet. They show in Urgent like the rest (pane 'backlog', date 'backlog'). */
   function isBacklogItem(item){ return !!item && /^backlog$/i.test(referenceTitle(item)); }
@@ -5834,7 +5839,7 @@
   // Where a cell's tasks live, for the Urgent list: {date,pane} or null.
   function ownerKey(owner){
     if(!owner) return null;
-    if(owner.dataset && owner.dataset.date) return {date:owner.dataset.date,pane:owner.classList.contains('journal-editor') ? 'journal' : 'today'};
+    if(owner.dataset && owner.dataset.date) return {date:owner.dataset.date,pane:owner.classList.contains('journal-editor') ? 'journal' : owner.classList.contains('plan-editor') ? 'plan' : 'today'};
     if(isBacklogCell(owner)) return {date:'backlog',pane:'backlog'};
     return null;
   }
@@ -5854,6 +5859,7 @@
   }
   function urgEditor(date,pane){
     if(pane === 'backlog') return backlogCell();
+    if(pane === 'plan') return document.querySelector(`#todayScroll .plan-editor[data-date="${CSS.escape(date)}"]`);
     return pane === 'journal'
       ? document.querySelector(`#journalScroll .journal-editor[data-date="${CSS.escape(date)}"]`)
       : document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
@@ -5871,8 +5877,8 @@
   }
   function initUrgentSource(list){
     urgentSource.clear();
-    (Array.isArray(list) ? list : []).forEach(d => { noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); });
-    (state.days || []).forEach(d => { noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); });
+    (Array.isArray(list) ? list : []).forEach(d => { noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); if(d.plan) noteUrgentDay(d.date,d.plan,false,'plan'); });
+    (state.days || []).forEach(d => { noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); noteUrgentDay(d.date,d.plan || '',false,'plan'); });
     const bl = backlogItem();
     if(bl) noteUrgentDay('backlog',storedToHtml(stripReferenceMetadata(bl.content || '')),false,'backlog');
     renderUrgent();
@@ -7555,13 +7561,13 @@
     // keeps urgency and due date, so it stays in Urgent.
     {
       const k = ownerKey(owner);
-      if(k && (k.pane === 'today' || k.pane === 'journal' || k.pane === 'backlog')){
+      if(k && (k.pane === 'today' || k.pane === 'journal' || k.pane === 'plan' || k.pane === 'backlog')){
         const toToday = k.pane === 'backlog';
         // Urgent tasks don't need a home day (Julius, 2026-10-28): for a task (or subtask) with
         // urgency or a due date, this reads as "remove from the day, keep in Urgent". Under the
         // hood it's the same move to Backlog, so urgency, due date, duration and subtasks all stay.
         const inUrgent = urgSubtree(line).some(l => l.dataset.urg || l.dataset.due);
-        const where = k.pane === 'journal' ? 'Notes' : 'Today';
+        const where = k.pane === 'journal' ? 'Notes' : k.pane === 'plan' ? 'Plan' : 'Today';
         const mb = document.createElement('button');
         mb.type = 'button'; mb.className = 'urg-goto';
         mb.textContent = toToday ? '📅 Move to Today'
@@ -7687,7 +7693,7 @@
       fn(src.line,src.ed);
     };
     const keepFocus = (line,ed) => {
-      if(ed && ed.dataset.date) urgFocusWant = {date:ed.dataset.date,pane:ed.classList.contains('journal-editor') ? 'journal' : 'today',index:[...ed.querySelectorAll('.check-line')].indexOf(line)};
+      if(ed && ed.dataset.date) urgFocusWant = {date:ed.dataset.date,pane:ed.classList.contains('journal-editor') ? 'journal' : ed.classList.contains('plan-editor') ? 'plan' : 'today',index:[...ed.querySelectorAll('.check-line')].indexOf(line)};
     };
     [['+ Task',(l,ed) => urgAddLine(l,ed,'task',true)],
      ['+ Subtask',(l,ed) => urgAddLine(l,ed,'subtask',true)],
@@ -8454,7 +8460,7 @@
     const b = n.querySelector('b,strong,u');
     return !!b && tcText(b) === t;
   }
-  function cardEditors(){ return document.querySelectorAll('#todayScroll .day-editor,#journalScroll .journal-editor,#referenceTree .ref-cell'); }
+  function cardEditors(){ return document.querySelectorAll('#todayScroll .day-editor,#journalScroll .journal-editor,#todayScroll .plan-editor,#referenceTree .ref-cell'); }
   function setAttr(n,name,val){
     if(val === null || val === undefined || val === ''){ if(n.hasAttribute(name)){ n.removeAttribute(name); return true; } return false; }
     if(n.getAttribute(name) !== String(val)){ n.setAttribute(name,String(val)); return true; }
@@ -8798,7 +8804,7 @@
     let suppress = null;
     function hit(e){
       const t = e.target && e.target.closest ? e.target.closest('[data-tlon]') : null;
-      if(!t || !t.parentElement || !t.parentElement.matches('.day-editor,.journal-editor,.ref-cell')) return null;
+      if(!t || !t.parentElement || !t.parentElement.matches('.day-editor,.journal-editor,.plan-editor,.ref-cell')) return null;
       // The button sits right after the text: find where the text ends.
       let right = -Infinity;
       t.childNodes.forEach(n => {
@@ -8827,14 +8833,14 @@
   (function(){
     const root = document.getElementById('workspace') || document.body;
     const dirty = new Set(); let timer = 0;
-    const editorOf = n => { const el = n && (n.nodeType === 1 ? n : n.parentElement); return el ? el.closest('.day-editor,.journal-editor,.ref-cell') : null; };
+    const editorOf = n => { const el = n && (n.nodeType === 1 ? n : n.parentElement); return el ? el.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell') : null; };
     const obs = new MutationObserver(muts => {
       for(const m of muts){
         const ed = editorOf(m.target); if(ed) dirty.add(ed);
         m.addedNodes.forEach(n => {
           if(n.nodeType !== 1) return;
-          if(n.matches('.day-editor,.journal-editor,.ref-cell')) dirty.add(n);
-          n.querySelectorAll && n.querySelectorAll('.day-editor,.journal-editor,.ref-cell').forEach(e => dirty.add(e));
+          if(n.matches('.day-editor,.journal-editor,.plan-editor,.ref-cell')) dirty.add(n);
+          n.querySelectorAll && n.querySelectorAll('.day-editor,.journal-editor,.plan-editor,.ref-cell').forEach(e => dirty.add(e));
         });
       }
       if(dirty.size && !timer) timer = setTimeout(run,180);
@@ -8961,7 +8967,7 @@
   /* ---- Drag a card by its checkbox ---- */
   (function(){
     let press = null, drag = null, suppressUntil = 0;
-    const editorOf = el => el && el.closest ? el.closest('.day-editor,.journal-editor,.ref-cell') : null;
+    const editorOf = el => el && el.closest ? el.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell') : null;
     const grip = document.createElement('div');
     grip.id = 'tcGrip'; grip.textContent = '⠿'; grip.hidden = true;
     grip.setAttribute('aria-label','Drag to move this task');
@@ -9554,7 +9560,9 @@
       const x = st(d); clearTimeout(x.timer); x.timer = 0;
       if(x.inFlight){ x.pending = true; return; }
       const pad = padEl(d); if(!pad){ x.pending = false; return; }
-      const html = clean(pad.innerHTML);
+      pad.querySelectorAll('input[data-wired]').forEach(cb => cb.removeAttribute('data-wired'));
+      const html = clean(cardCleanHtml(pad));
+      noteUrgentDay(d,html,true,'plan');
       const b = base(d);
       if(html === b.t){ x.pending = false; return; }
       x.inFlight = true; x.pending = false;
@@ -9583,19 +9591,17 @@
       const b = base(d);
       padBase.set(d,{t:theirs || '', h});
       const pad = padEl(d); if(!pad) return;
-      const mine = fwBlocks(clean(pad.innerHTML)), their = fwBlocks(theirs || '');
+      const mine = fwBlocks(clean(cardCleanHtml(pad))), their = fwBlocks(theirs || '');
       const m = fwMerge3(fwBlocks(b.t), mine, their);
       if(!fwSame(m.blocks, mine)){
-        const focused = document.activeElement === pad;
-        const off = focused && typeof fwCaretOffset === 'function' ? fwCaretOffset(pad) : -1;
-        pad.innerHTML = m.blocks.join('');
-        if(off >= 0 && typeof fwSetCaret === 'function') fwSetCaret(pad, off);
+        replaceEditorHtml(pad, m.blocks.join(''));
+        noteUrgentDay(d, cardCleanHtml(pad), true, 'plan');
       }
       if(!fwSame(m.blocks, their)) schedule(d);
       setStatus(m.conflict ? 'Plan merged with changes from elsewhere' : 'Synced changes from elsewhere');
     }
     // Delegated (the first screen is drawn before this script runs).
-    document.addEventListener('input', e => { const p = e.target.closest && e.target.closest('.plan-pad'); if(p) schedule(p.dataset.date); });
+    window.odPadSave = d => { if(d) schedule(d); };
     document.addEventListener('focusout', e => { const p = e.target.closest && e.target.closest('.plan-pad'); if(p && st(p.dataset.date).pending) save(p.dataset.date); });
     window.odPadHash = d => { const b = base(d); return b && b.h ? b.h : undefined; };
     window.odPadTheirs = (d, plan, h) => { const x = st(d); if(x.inFlight || x.pending) return; merge(d, plan, h); };

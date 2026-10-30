@@ -146,14 +146,16 @@ function getUrgentDays_() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
   // Today and Journal (Notes) columns: urgency set on a task in Notes counts too (Julius, 2026-10-27).
-  const values = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  // Plus the Plan pad (column D, 2026-10-29) when the sheet has it.
+  const width = sheet.getMaxColumns() >= 4 ? 4 : 3;
+  const values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
   const out = [];
   const has = h => h.indexOf('data-urg=') >= 0 || h.indexOf('data-due=') >= 0; // urgent or has a due date
   values.forEach(row => {
-    const html = String(row[1] || ''), journal = String(row[2] || '');
-    if (!has(html) && !has(journal)) return;
+    const html = String(row[1] || ''), journal = String(row[2] || ''), plan = width > 3 ? String(row[3] || '') : '';
+    if (!has(html) && !has(journal) && !has(plan)) return;
     const key = formatDate_(row[0]);
-    if (key) out.push({ date: key, tasks: has(html) ? html : '', journal: has(journal) ? journal : '' });
+    if (key) out.push({ date: key, tasks: has(html) ? html : '', journal: has(journal) ? journal : '', plan: has(plan) ? plan : '' });
   });
   return out;
 }

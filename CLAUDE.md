@@ -59,6 +59,7 @@
 - Today row in one-day: `.od-head` "Completed" + `.day-editor` (scrolls on its own) + `.od-pad-head` + `.plan-pad` (contenteditable, NOT `.editor`). Section boxes hidden in one-day.
 - Plan pad = Days column D ("Plan"): `getDaysRange_` returns `plan` / `ph`; `savePlanPad(date, html, baseHash)` safe-saves (conflict → returns server copy, client 3-way merges with `fwMerge3`); `getSyncState` takes `ph` per day and returns `plan`. Client saving via delegated `input` / `focusout`; `odPadUnsaved` / `odPadFlush` are part of `fwUnsaved` / `fwFlushAll`.
 - Title-line fold label: all done → "N done" (no "/total").
+- Plan pad is a full editor (2026-10-29): `.editor.plan-editor.plan-pad`, `wireEditor(pad,'plan')`; in every generic selector next to `.journal-editor` (`cardEditors`, pick/hold/drag `editorOf`, observer). Saves route through `saveEditorOwner` → `odPadSave(date)` (wireEditor's input handler too), saved HTML = `cardCleanHtml(pad)`. Urgent pane `'plan'` (key `date|p`, `urgKey`/`urgKeyParts`/`ownerKey`/`urgEditor`); server `getUrgentDays_` returns `plan`. Any new selector that lists the day/notes editors must include `.plan-editor`.
 
 ## Urgent panel + view stability (2026-10-26)
 

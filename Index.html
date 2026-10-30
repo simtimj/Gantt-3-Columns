@@ -1011,11 +1011,15 @@
     .urg-group{margin-top:6px;padding-left:8px;border-left:3px solid var(--urg);}
     .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}.urg-group[data-urg="0"],.urg-row[data-urg="0"]{--urg:#8a8f98;}
     .urg-group .urg-sub{margin-top:0;color:var(--urg);}
+    /* Boxed levels (2026-10-30, Julius): Urgent / Soon / Can be later each sit in a rounded border in their color. */
+    #urgentPanel > .urg-group:not(.urg-arch){margin-top:8px;padding:5px calc(8px * var(--side-k,1)) 4px;border:2px solid var(--urg);border-radius:10px;background:color-mix(in srgb,var(--urg) 5%,transparent);}
     .urg-batch{display:flex;align-items:center;gap:6px;width:100%;margin:5px 0 0;padding:2px 0;background:none;border:0;text-align:left;cursor:pointer;color:var(--muted);font:inherit;font-size:11px;font-weight:700;-webkit-user-select:none;user-select:none;}
     /* Batch title (2026-10-30, Julius): bold + underlined, in the subject's color (darkened in light mode so pale ones read). */
     .urg-batch-name{font-weight:700;text-decoration:underline;text-underline-offset:2px;color:color-mix(in srgb,var(--bc,#8a8f98) 70%,#000);}
     @media (prefers-color-scheme: dark){ .urg-batch-name{color:var(--bc,#9ca3af);} }
     .urg-batch small{font-weight:600;opacity:.8;}
+    /* Batch − / + on the right (2026-10-30, Julius), like the task fold. */
+    .urg-batch .pm-box{margin:0 0 0 auto;}
     .urg-head{display:block;width:100%;text-align:left;background:none;border:0;padding:2px 0;font-weight:700;font-size:13px;cursor:pointer;color:inherit;}
     .urg-sub{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     .urg-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;padding:4px 0;cursor:pointer;color:inherit;font-size:13px;}
@@ -6181,7 +6185,7 @@
     if(c) h.style.setProperty('--bc',c.color);
     const name = document.createElement('span'); name.className = 'urg-batch-name'; name.textContent = c ? c.name : 'Other';
     const n = document.createElement('small'); n.textContent = b.items.length;
-    h.append(pmBox(!folded),name,n);
+    h.append(name,n,pmBox(!folded));
     h.title = (folded ? 'Show ' : 'Hide ') + (c ? c.name : 'Other') + ' tasks · change a task\'s subject from its checkbox hold menu';
     h.addEventListener('pointerdown',e => e.stopPropagation());
     h.addEventListener('click',e => {

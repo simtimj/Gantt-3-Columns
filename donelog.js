@@ -162,4 +162,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261030-urgent-batches', date: '2026-10-30', project: 'Gantt', title: 'Urgent batches', details: 'Urgent levels grouped by subject (Music, Productivity, Career / IT, Other) with fold per batch; new Music + Productivity subjects; Options toggle Group by subject' },
   { id: 'd-20261030-tag-new-batch', date: '2026-10-30', project: 'Gantt', title: 'New batches from #tags', details: 'a task ending " · #Name" creates that subject/batch if missing (auto color, synced), so ChatGPT can make new groups with no Options step' },
   { id: 'd-20261030-batch-titles', date: '2026-10-30', project: 'Gantt', title: 'Batch titles restyled', details: 'Urgent batch headers bold + underlined in subject color (Code green, Music purple), dot removed; cert studies and IT lab grouped under Career / IT' },
+  { id: 'd-20261030-boxed-levels', date: '2026-10-30', project: 'Gantt', title: 'Boxed urgency levels', details: 'Urgent / Soon / Can be later each in a rounded red / yellow / blue border; batch − / + moved to the right end of its header' },
 ];

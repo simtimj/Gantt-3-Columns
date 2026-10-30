@@ -220,18 +220,23 @@ function getDaysRange_(startDate, endDate) {
   const out = [];
 
   runs.forEach(group => {
+    // Column D = Plan pad (one-day view, 2026-10-29) when the sheet has it.
+    const width = sheet.getMaxColumns() >= 4 ? 3 : 2;
     const block = sheet
-      .getRange(group.start, 2, group.end - group.start + 1, 2)
+      .getRange(group.start, 2, group.end - group.start + 1, width)
       .getValues();
 
     group.items.forEach(match => {
       const row = block[match.row - group.start];
+      const plan = width > 2 ? String(row[2] || '') : '';
       out.push({
         date: match.date,
         tasks: String(row[0] || ''),
         journal: String(row[1] || ''),
+        plan: plan,
         th: cellHash_(row[0]),
-        jh: cellHash_(row[1])
+        jh: cellHash_(row[1]),
+        ph: cellHash_(plan)
       });
     });
   });
@@ -290,6 +295,33 @@ function saveDay(dateString, tasks, journal, opts) {
   }
 }
 
+/* Plan pad (Julius, 2026-10-29): free planning / thinking space under the Today cell in the
+   one-day view. Stored in Days column D ("Plan"). Same safe-save rule as saveDay: write only if
+   the cell still matches the version the app started from, else send the server copy back. */
+function savePlanPad(dateString, html, baseHash) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    if (sheet.getMaxColumns() < 4) sheet.insertColumnsAfter(sheet.getMaxColumns(), 4 - sheet.getMaxColumns());
+    if (!sheet.getRange(1, 4).getValue()) sheet.getRange(1, 4).setValue('Plan');
+    let row = findDayRow_(sheet, dateString);
+    const cur = row ? String(sheet.getRange(row, 4).getValue() || '') : '';
+    html = String(html || '');
+    const same = baseHash ? cellHash_(cur) === baseHash : cur === '';
+    if (!same) return { ph: cellHash_(cur), conflict: true, plan: cur, build: appBuild_() };
+    if (cur.length > 400 && html.length < cur.length * 0.6) backupCell_(dateString, 'Plan', 'big shrink', cur);
+    if (!row) {
+      sheet.appendRow([parseDate_(dateString), '', '']);
+      row = sheet.getLastRow();
+    }
+    sheet.getRange(row, 4).setValue(html);
+    return { ph: cellHash_(html), build: appBuild_() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // One column of a safe save. baseHash = version the app started from (null = it had no row).
 function syncCol_(cur, mine, baseHash, changed, where, label) {
   const same = baseHash ? cellHash_(cur) === baseHash : cur === '';
@@ -342,10 +374,11 @@ function getSyncState(req) {
     getDaysRange_(dates[0], dates[dates.length - 1]).forEach(d => {
       const want = req.days[d.date];
       if (!want) return;
-      const e = { th: d.th, jh: d.jh };
+      const e = { th: d.th, jh: d.jh, ph: d.ph };
       if (want.th !== d.th) e.tasks = d.tasks;
       if (want.jh !== d.jh) e.journal = d.journal;
-      if (e.tasks !== undefined || e.journal !== undefined) out.days[d.date] = e;
+      if (want.ph !== undefined && want.ph !== d.ph) e.plan = d.plan;
+      if (e.tasks !== undefined || e.journal !== undefined || e.plan !== undefined) out.days[d.date] = e;
     });
   }
   const refWant = req.ref || {};

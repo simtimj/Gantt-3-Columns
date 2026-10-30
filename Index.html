@@ -1371,6 +1371,26 @@
       .reference-sort-bar #refOptionsBtn.on{background:#1d2738;border-color:#3f74a6;}
       .urg-picker,.urg-due-chip,.uc-today,#calPanel,#inboxPanel{background:#161616;}
     }
+
+    /* One-day view (2026-10-29, Julius): only one day shows; ▲ ▼ in the Today header change day.
+       Today row = Completed (top, the day's Today cell) + Plan pad (bottom, Days column D),
+       each half scrolling on its own. */
+    .od-nav{display:none;gap:4px;margin-left:2px;flex:0 0 auto;}
+    .od-nav .btn{min-width:28px;padding:0 6px;line-height:1.4;}
+    body.one-day .od-nav{display:inline-flex;}
+    .od-head,.plan-pad{display:none;}
+    body.one-day #todayScroll .day-row:not(.od-on),
+    body.one-day #journalScroll .day-row:not(.od-on){display:none;}
+    body.one-day #todayScroll{overflow:hidden;}
+    body.one-day #todayScroll .day-row.od-on{height:var(--od-h,100%);min-height:0;border-bottom:0;}
+    body.one-day #journalScroll .day-row.od-on{min-height:var(--od-hj,100%);border-bottom:0;}
+    body.one-day #todayScroll .day-row.od-on > *{flex:0 0 auto;}
+    body.one-day #todayScroll .od-on > .od-head{display:block;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;}
+    body.one-day #todayScroll .od-on > .od-pad-head{border-top:2px solid var(--day-sep,#8a8a8a);padding-top:5px;margin-top:6px;}
+    body.one-day #todayScroll .od-on > .day-editor{flex:1 1 0 !important;min-height:0 !important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}
+    body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
+    .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
+    body.one-day .sec-boxes{display:none;}
 </style>
 <script>
   /* ===== Light / dark toggle, saved per device (Julius, 2026-10-27) =====
@@ -1527,6 +1547,7 @@
     <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
     <label class="ts-check"><input type="checkbox" id="daySecsOn" checked> Morning / Afternoon / Evening sections in Today</label>
+    <label class="ts-check"><input type="checkbox" id="oneDayOn" checked> One day at a time (▲ ▼ to change day; Completed on top, Plan pad below)</label>
     <label class="ts-check"><input type="checkbox" id="cardsBoxFill" checked> Subject color in the checkbox (off = whole card)</label>
     <div class="ts-row">
       <span class="ts-label" title="How red / yellow / blue urgency shows on a task">Urgency mark</span>
@@ -1564,6 +1585,7 @@
     <section class="pane" id="todayPane">
       <div class="pane-header">
         <span class="today-jump" data-jump-today role="button" tabindex="0" title="Jump to today">TODAY / TASKS</span>
+        <span class="od-nav"><button class="btn tiny" type="button" id="odUp" title="Previous day" aria-label="Previous day">▲</button><button class="btn tiny" type="button" id="odDown" title="Next day" aria-label="Next day">▼</button></span>
         <span id="focusStatus" class="focus-status">Loading…</span>
       </div>
       <div
@@ -1949,6 +1971,7 @@
       syncDayHeights();
       syncDailyScroll();
       updateVisibleDate();
+      if(window.odApply) odApply();
     });
   }
   function appendDayRow(
@@ -2001,6 +2024,13 @@
             ? 'Tasks for this day…'
             : 'Write whatever you want…'
         }">${storedToHtml(content)}</div>`;
+    if(type === 'day'){
+      // One-day view (2026-10-29, Julius): top = Completed (this editor), bottom = Plan pad (Days column D).
+      row.querySelector('.editor').insertAdjacentHTML('beforebegin','<div class="od-head">Completed</div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Plan / think</div><div class="plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Priorities, plans, thoughts…"></div>');
+      const pad = row.querySelector('.plan-pad');
+      pad.innerHTML = day.plan || '';
+    }
     container.appendChild(row);
     const ed =
       row.querySelector('.editor');
@@ -3571,6 +3601,10 @@
   }
   function syncDayHeight(date){
     if(!date) return;
+    if(document.body.classList.contains('one-day')){
+      document.querySelectorAll(`.day-row[data-date="${CSS.escape(date)}"]`).forEach(r => { r.style.height = ''; });
+      return;
+    }
     const rows = ['todayScroll','journalScroll'].map(id =>
       document.querySelector(`#${id} .day-row[data-date="${CSS.escape(date)}"]`)
     ).filter(Boolean);
@@ -3623,6 +3657,7 @@
     /* Today intentionally has no visible scrollbar. Wheel/trackpad input over
        Today is forwarded to Journal, which owns the shared scrollbar. */
     a.onwheel = e => {
+      if(document.body.classList.contains('one-day')) return; // each section scrolls on its own
       if(Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       const before = b.scrollTop;
       b.scrollTop += e.deltaY;
@@ -3641,6 +3676,9 @@
     };
   }
   function updateVisibleDate(){
+    if(document.body.classList.contains('one-day') && window.odDate){
+      const l = document.getElementById('dateLabel'); if(l) l.textContent = formatDate(window.odDate); return;
+    }
     const a =
       document.getElementById(
         'todayScroll'
@@ -3680,6 +3718,7 @@
     return Date.now() - lastUserScrollAt < 1500;
   }
   function maybeLoadMore(scroll){
+    if(document.body.classList.contains('one-day')) return; // ▲ ▼ load days instead
     if(!state.days.length){
       return;
     }
@@ -3841,6 +3880,7 @@
     });
     left.prepend(fragL);
     right.prepend(fragR);
+    if(window.odApply) odApply();
   }
   function appendDays(days){
     const sorted =
@@ -3874,10 +3914,12 @@
         );
       }
     });
+    if(window.odApply) odApply();
   }
   function jumpToday(
     announce = true
   ){
+    if(document.body.classList.contains('one-day') && window.odGo){ odGo(state.today); if(announce) setStatus('Today'); return; }
     const row =
       document.querySelector(
         `#todayScroll .day-row[data-date="${CSS.escape(state.today)}"]`
@@ -4364,11 +4406,13 @@
     document.body.appendChild(bar);
   }
   function fwUnsaved(){
+    if(window.odPadUnsaved && odPadUnsaved()) return true;
     for(const [date,info] of daySaveState) if(info.inFlight || info.pending) return true;
     if(refInFlight > 0) return true;
     return (state.reference || []).some(it => it._timer);
   }
   function fwFlushAll(){
+    if(window.odPadFlush) odPadFlush();
     for(const [date,info] of daySaveState) if(info.pending && !info.inFlight) saveDay(date);
     (state.reference || []).forEach(it => { if(it._timer){ clearTimeout(it._timer); it._timer = 0; sendRefItem(it); } });
   }
@@ -4399,6 +4443,7 @@
     state.days.forEach(d => {
       const b = dayBase.get(d.date);
       if(b && b.tasks.h) req.days[d.date] = {th:b.tasks.h,jh:b.journal.h};
+      if(window.odPadHash){ const ph = odPadHash(d.date); if(ph !== undefined && req.days[d.date]) req.days[d.date].ph = ph; }
     });
     (state.reference || []).forEach(it => { const b = refBase(it); if(b.h) req.ref[it.id] = b.h; });
     fwSyncBusy = true;
@@ -4410,9 +4455,10 @@
         fwCheckBuild(out.build);
         let note = '';
         Object.keys(out.days || {}).forEach(date => {
+          const e = out.days[date];
+          if(e.plan !== undefined && window.odPadTheirs) odPadTheirs(date,e.plan,e.ph);
           const info = daySaveState.get(date);
           if(info && (info.inFlight || info.pending)) return;
-          const e = out.days[date];
           if(e.tasks !== undefined) note = fwReconcileDay(date,'tasks',e.tasks,e.th) || note;
           if(e.journal !== undefined) note = fwReconcileDay(date,'journal',e.journal,e.jh) || note;
         });
@@ -8657,7 +8703,7 @@
       const fold = n.dataset.fold === '1' && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? done + '/' + tasks.length + ' done' : cov.length + ' hidden', sum:fold ? titleSummary(cov) : ''});
+      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : cov.length + ' hidden', sum:fold ? titleSummary(cov) : ''});
       if(fold){
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);
@@ -9373,6 +9419,168 @@
       }));
       document.querySelectorAll('#workspace > .pane').forEach(p => ro.observe(p));
     }catch(e){}
+  })();
+
+  /* One-day view (Julius, 2026-10-29). Rows for every loaded day stay in the page (sync, Urgent, Due
+     and the done log keep working); CSS hides all but window.odDate. ▲ = previous day, ▼ = next day,
+     loading more weeks when needed. Plan pad = free writing under the Completed area, saved to the
+     Days tab column D via savePlanPad (safe save: hash check + 3-way merge like the cells). */
+  (function initOneDay(){
+    let on = true; try{ on = localStorage.getItem('fw.oneDay') !== '0'; }catch(e){}
+    document.body.classList.toggle('one-day', on);
+    window.odDate = null;
+    const T = () => document.getElementById('todayScroll'), J = () => document.getElementById('journalScroll');
+    const root = document.documentElement;
+    function setH(){
+      const a = T(), b = J();
+      const ha = a && a.clientHeight, hb = b && b.clientHeight;
+      if(ha) root.style.setProperty('--od-h', ha + 'px');
+      if(hb) root.style.setProperty('--od-hj', hb + 'px');
+    }
+    try{ const ro = new ResizeObserver(setH); [T(),J()].forEach(x => x && ro.observe(x)); }catch(e){}
+    function rowFor(date){ return document.querySelector(`#todayScroll .day-row[data-date="${CSS.escape(date)}"]`); }
+    function insertBlank(date){
+      if(rowFor(date)) return;
+      const day = {date, tasks:'', journal:'', plan:''};
+      state.days.push(day);
+      state.days.sort((a,b) => a.date.localeCompare(b.date));
+      [['todayScroll','day'],['journalScroll','journal']].forEach(([id,type]) => {
+        const box = document.getElementById(id);
+        const frag = document.createDocumentFragment();
+        appendDayRow(day, frag, type);
+        const next = [...box.querySelectorAll(':scope > .day-row')].find(r => r.dataset.date > date);
+        box.insertBefore(frag, next || null);
+      });
+    }
+    let waitTimer = 0;
+    function loadToward(date){
+      const first = state.days[0].date, last = state.days[state.days.length - 1].date;
+      const now = Date.now();
+      if(date < first){
+        if(typeof loadingPrev !== 'undefined' && loadingPrev) return;
+        if(typeof prevBlockedUntil !== 'undefined' && now < prevBlockedUntil){ insertBlank(date); return; }
+        setStatus('Loading…'); loadPreviousWeek();
+      }else if(date > last){
+        if(typeof loadingNext !== 'undefined' && loadingNext) return;
+        if(typeof nextBlockedUntil !== 'undefined' && now < nextBlockedUntil){ insertBlank(date); return; }
+        setStatus('Loading…'); loadNextWeek();
+      }else{ insertBlank(date); return; }
+      // If the week came back without this day, make an empty one.
+      clearTimeout(waitTimer);
+      waitTimer = setTimeout(() => { if(on && window.odDate === date && !rowFor(date)){ insertBlank(date); odApply(); } }, 8000);
+    }
+    function odApply(){
+      if(!on || typeof state === 'undefined' || !state || !state.days || !state.days.length) return;
+      if(!window.odDate) window.odDate = state.today;
+      const date = window.odDate;
+      if(!rowFor(date)){
+        loadToward(date);
+        if(!rowFor(date)) return; // waiting for the week to load; odApply runs again after
+      }
+      document.querySelectorAll('#todayScroll > .day-row, #journalScroll > .day-row')
+        .forEach(r => { r.classList.toggle('od-on', r.dataset.date === date); r.style.height = ''; });
+      setH();
+      [T(),J()].forEach(x => { if(x) x.scrollTop = 0; });
+      const lbl = document.getElementById('dateLabel'); if(lbl) lbl.textContent = formatDate(date);
+      const up = document.getElementById('odUp'), dn = document.getElementById('odDown');
+      if(up) up.title = 'Previous day (' + formatDate(addDays(date,-1)) + ')';
+      if(dn) dn.title = 'Next day (' + formatDate(addDays(date,1)) + ')';
+    }
+    function odGo(date){
+      if(!date) return;
+      if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      window.odDate = date;
+      odApply();
+    }
+    window.odApply = odApply;
+    window.odGo = odGo;
+    const step = n => () => odGo(addDays(window.odDate || state.today, n));
+    document.getElementById('odUp')?.addEventListener('click', step(-1));
+    document.getElementById('odDown')?.addEventListener('click', step(1));
+
+    function setOn(v){
+      on = v;
+      try{ localStorage.setItem('fw.oneDay', v ? '1' : '0'); }catch(e){}
+      document.body.classList.toggle('one-day', v);
+      if(v) odGo(window.odDate || state.today);
+      else {
+        document.querySelectorAll('.day-row.od-on').forEach(r => r.classList.remove('od-on'));
+        requestAnimationFrame(() => { syncDayHeights(); jumpToday(false); });
+      }
+    }
+    const box = document.getElementById('oneDayOn');
+    if(box){ box.checked = on; box.addEventListener('change', () => setOn(box.checked)); }
+
+    /* ---- Plan pad saving ---- */
+    const padBase = new Map();   // date -> {t, h}
+    const padSt = new Map();     // date -> {timer, inFlight, pending}
+    // Version the pad started from: from the loaded day until the first save/merge.
+    function base(d){
+      if(!padBase.has(d)){
+        const day = (state.days || []).find(y => y.date === d);
+        if(day && day.ph !== undefined) padBase.set(d,{t:day.plan || '', h:day.ph});
+      }
+      return padBase.get(d) || {t:'', h:null};
+    }
+    const st = d => { if(!padSt.has(d)) padSt.set(d,{timer:0,inFlight:false,pending:false}); return padSt.get(d); };
+    const padEl = d => document.querySelector(`#todayScroll .plan-pad[data-date="${CSS.escape(d)}"]`);
+    const clean = html => /^(\s|<br\s*\/?>|<div><br\s*\/?><\/div>)*$/i.test(html || '') ? '' : String(html);
+    function schedule(d){
+      const x = st(d); x.pending = true; clearTimeout(x.timer);
+      setStatus('Unsaved…');
+      x.timer = setTimeout(() => save(d), 900);
+    }
+    function save(d){
+      const x = st(d); clearTimeout(x.timer); x.timer = 0;
+      if(x.inFlight){ x.pending = true; return; }
+      const pad = padEl(d); if(!pad){ x.pending = false; return; }
+      const html = clean(pad.innerHTML);
+      const b = base(d);
+      if(html === b.t){ x.pending = false; return; }
+      x.inFlight = true; x.pending = false;
+      setStatus('Saving…');
+      google.script.run
+        .withSuccessHandler(res => {
+          x.inFlight = false;
+          if(res && res.build && typeof fwCheckBuild === 'function') fwCheckBuild(res.build);
+          if(res && res.conflict){ merge(d, res.plan, res.ph); }
+          else if(res){
+            padBase.set(d,{t:html, h:res.ph});
+            const day = state.days.find(y => y.date === d); if(day){ day.plan = html; day.ph = res.ph; }
+            if(!x.pending) setStatus('Saved');
+          }
+          if(x.pending) save(d);
+        })
+        .withFailureHandler(e => {
+          x.inFlight = false; x.pending = true;
+          setStatus('Plan save failed — retrying');
+          x.timer = setTimeout(() => save(d), 5000);
+        })
+        .savePlanPad(d, html, b.h);
+    }
+    // Server copy changed elsewhere: merge it with what's on screen (same 3-way merge as the cells).
+    function merge(d, theirs, h){
+      const b = base(d);
+      padBase.set(d,{t:theirs || '', h});
+      const pad = padEl(d); if(!pad) return;
+      const mine = fwBlocks(clean(pad.innerHTML)), their = fwBlocks(theirs || '');
+      const m = fwMerge3(fwBlocks(b.t), mine, their);
+      if(!fwSame(m.blocks, mine)){
+        const focused = document.activeElement === pad;
+        const off = focused && typeof fwCaretOffset === 'function' ? fwCaretOffset(pad) : -1;
+        pad.innerHTML = m.blocks.join('');
+        if(off >= 0 && typeof fwSetCaret === 'function') fwSetCaret(pad, off);
+      }
+      if(!fwSame(m.blocks, their)) schedule(d);
+      setStatus(m.conflict ? 'Plan merged with changes from elsewhere' : 'Synced changes from elsewhere');
+    }
+    // Delegated (the first screen is drawn before this script runs).
+    document.addEventListener('input', e => { const p = e.target.closest && e.target.closest('.plan-pad'); if(p) schedule(p.dataset.date); });
+    document.addEventListener('focusout', e => { const p = e.target.closest && e.target.closest('.plan-pad'); if(p && st(p.dataset.date).pending) save(p.dataset.date); });
+    window.odPadHash = d => { const b = base(d); return b && b.h ? b.h : undefined; };
+    window.odPadTheirs = (d, plan, h) => { const x = st(d); if(x.inFlight || x.pending) return; merge(d, plan, h); };
+    window.odPadUnsaved = () => [...padSt.values()].some(x => x.inFlight || x.pending);
+    window.odPadFlush = () => { for(const [d,x] of padSt) if(x.pending && !x.inFlight) save(d); };
   })();
 </script>
 </body>

@@ -53,6 +53,13 @@
 - Empty space: day/journal editors `flex-grow:1` fill the synced row; a click on the editor itself below the last line focuses an empty line there (reuses a blank one, or adds `<div><br></div>` before `data-secend`). `ensureSecGaps` also keeps one blank line AFTER the end marker (outside Evening), so a tap below lands there (2026-10-29).
 - Day look (2026-10-29): `.day-row` bottom border 3px `--day-sep` (#8a8a8a light, #6a6a6a dark); `formatDate()` = "Sunday November 1, 2026" (no weekday comma), wrapped in underlined `.day-date`.
 
+## One-day view + Plan pad (2026-10-29, Julius)
+
+- `initOneDay()` (last `<script>`): `body.one-day` (localStorage `fw.oneDay`, default on, `#oneDayOn` in Options). All loaded day rows stay in the DOM; CSS shows only `.day-row.od-on` (`window.odDate`). `odApply()` / `odGo(date)`; `#odUp` / `#odDown` in the Today header; missing day → `loadPreviousWeek` / `loadNextWeek`, else `insertBlank()`. Hooks: `jumpToday`, `maybeLoadMore` (off), `syncDayHeight` (no fixed heights), Today `onwheel` (no forwarding), `updateVisibleDate`, `renderDays` / `prependDays` / `appendDays` call `odApply`. Row height = `--od-h` (Today) / `--od-hj` (Notes) from a ResizeObserver.
+- Today row in one-day: `.od-head` "Completed" + `.day-editor` (scrolls on its own) + `.od-pad-head` + `.plan-pad` (contenteditable, NOT `.editor`). Section boxes hidden in one-day.
+- Plan pad = Days column D ("Plan"): `getDaysRange_` returns `plan` / `ph`; `savePlanPad(date, html, baseHash)` safe-saves (conflict → returns server copy, client 3-way merges with `fwMerge3`); `getSyncState` takes `ph` per day and returns `plan`. Client saving via delegated `input` / `focusout`; `odPadUnsaved` / `odPadFlush` are part of `fwUnsaved` / `fwFlushAll`.
+- Title-line fold label: all done → "N done" (no "/total").
+
 ## Urgent panel + view stability (2026-10-26)
 
 - `collectUrgent()` also returns open lines with `data-due` but no `data-urg` as `urg: 0`; `renderUrgent()` draws them last as a grey **Due** group (no hold-to-create). Every group sorts dated first, soonest due first.

@@ -49,6 +49,8 @@ Last updated: 2026-10-29
 
 ## 🧪 To be confirmed (2026-10-29)
 
+- **One-day view** (2026-10-29): Today + Notes show one day at a time; ▲ / ▼ next to TODAY / TASKS go to the previous / next day (loads more weeks as needed); tapping TODAY / TASKS goes back to today. Today's cell is split: **Completed** on top (the day's Today cell — Claude's done log lands here grouped by project, as before) and **Plan / think** below (free writing space, saved per day in the Days tab column D "Plan"). Each half scrolls on its own. Toggle in Options → "One day at a time". Folded title lines now show just a count ("12 done") when everything under them is done. Moving finished tasks into Completed stays manual.
+
 - **Folded summary on every title line** (2026-10-29): fold any title line (Claude's Gantt group, Morning / Afternoon / Evening, your own titles) and a condensed block under it lists the bold beginning of each hidden line, e.g. "In Today marker · Safe sync · …". Lines with no bold start use the text before ":". Subtasks are skipped; capped at 30 with "+N more". Not shown on a title line that has its own due/duration label.
 - **[x] calendar marker + your own done lines (2026-10-29):** once a Graphite event is in the log, its title starts with **[x] ** (was a trailing " X"). Your own calendar tasks in the done log have no `*` and end with " X"; Claude's still start with `*`.
 - **Clearer day lines + dates** (2026-10-29): the line between days (Today and Notes) is thicker and darker; dates are underlined and read "Sunday November 1, 2026" (no comma after the weekday).

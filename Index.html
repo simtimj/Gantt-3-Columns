@@ -1012,7 +1012,9 @@
     .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}.urg-group[data-urg="0"],.urg-row[data-urg="0"]{--urg:#8a8f98;}
     .urg-group .urg-sub{margin-top:0;color:var(--urg);}
     .urg-batch{display:flex;align-items:center;gap:6px;width:100%;margin:5px 0 0;padding:2px 0;background:none;border:0;text-align:left;cursor:pointer;color:var(--muted);font:inherit;font-size:11px;font-weight:700;-webkit-user-select:none;user-select:none;}
-    .urg-batch i{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--bc,#9ca3af);}
+    /* Batch title (2026-10-30, Julius): bold + underlined, in the subject's color (darkened in light mode so pale ones read). */
+    .urg-batch-name{font-weight:700;text-decoration:underline;text-underline-offset:2px;color:color-mix(in srgb,var(--bc,#8a8f98) 70%,#000);}
+    @media (prefers-color-scheme: dark){ .urg-batch-name{color:var(--bc,#9ca3af);} }
     .urg-batch small{font-weight:600;opacity:.8;}
     .urg-head{display:block;width:100%;text-align:left;background:none;border:0;padding:2px 0;font-weight:700;font-size:13px;cursor:pointer;color:inherit;}
     .urg-sub{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
@@ -6162,7 +6164,9 @@
   function urgBatches(group){
     const map = new Map();
     group.forEach(item => {
-      const c = urgCatInfo(item.cat) ? item.cat : '';
+      // Cert studies sit in the Career / IT batch (2026-10-30, Julius).
+      const k = item.cat === 'study' && urgCatInfo('career') ? 'career' : item.cat;
+      const c = urgCatInfo(k) ? k : '';
       if(!map.has(c)) map.set(c,{cat:c,items:[]});
       map.get(c).items.push(item);
     });
@@ -6175,10 +6179,9 @@
     const h = document.createElement('button');
     h.type = 'button'; h.className = 'urg-batch'; h.dataset.cat = b.cat || 'other';
     if(c) h.style.setProperty('--bc',c.color);
-    const dot = document.createElement('i');
-    const name = document.createElement('span'); name.textContent = c ? c.name : 'Other';
+    const name = document.createElement('span'); name.className = 'urg-batch-name'; name.textContent = c ? c.name : 'Other';
     const n = document.createElement('small'); n.textContent = b.items.length;
-    h.append(pmBox(!folded),dot,name,n);
+    h.append(pmBox(!folded),name,n);
     h.title = (folded ? 'Show ' : 'Hide ') + (c ? c.name : 'Other') + ' tasks · change a task\'s subject from its checkbox hold menu';
     h.addEventListener('pointerdown',e => e.stopPropagation());
     h.addEventListener('click',e => {
@@ -8401,9 +8404,9 @@
   // Saved to the account (user properties, all devices) with a local copy for a fast start.
   const CARD_CATS_DEFAULT = [
     {key:'code',   name:'Code',   color:'#22c55e', words:'gantt, exercise tracker, userscript, userscripts, script, scripts, apps script, clasp, github, repo, code, coding, bug, bugs, feature, features, readme, deploy, tampermonkey, violentmonkey, react, typescript, next.js, nextjs, tailwind, javascript, api, css, html, app, apps, ui, playnite, endpoint, dashboard, planner hub'},
-    {key:'career', name:'Career / IT', color:'#86efac', words:'resume, resumes, résumé, job, jobs, job search, application, applications, apply, interview, interviews, linkedin, career, cover letter, recruiter, recruiters, ats, cdcr, calcareers, it associate, hiring, portfolio, networking, soq, help desk, helpdesk, it support, tech support, it job, it jobs, it role, certification, cert, security, cloud security, devsecops'},
+    {key:'career', name:'Career / IT', color:'#86efac', words:'resume, resumes, résumé, job, jobs, job search, application, applications, apply, interview, interviews, linkedin, career, cover letter, recruiter, recruiters, ats, cdcr, calcareers, it associate, hiring, portfolio, networking, soq, help desk, helpdesk, it support, tech support, it job, it jobs, it role, certification, cert, security, cloud security, devsecops, it lab, home lab, homelab, lab, labs'},
     // Music + Productivity added for Urgent batches (2026-10-30, Julius); server upgrades saved lists once (getCardCats_).
-    {key:'music',  name:'Music',  color:'#d946ef', words:'music, guitar, sing, singing, song, songs, setlist, set list, the show, show prep, music show, gig, gigs, rehearsal, rehearse, band, vocals, pedal, pedals, amp, open mic, soundcheck'},
+    {key:'music',  name:'Music',  color:'#a855f7', words:'music, guitar, sing, singing, song, songs, setlist, set list, the show, show prep, music show, gig, gigs, rehearsal, rehearse, band, vocals, pedal, pedals, amp, open mic, soundcheck'},
     {key:'productivity', name:'Productivity', color:'#0891b2', words:'productivity, efficiency, efficient, workflow, workflows, automation, automate, organize, organizing, clean up, cleanup, consolidate, chatgpt, gemini, handoff, master instructions, docs cleanup, migrate, migration'},
     {key:'study',  name:'Study',  color:'#a78bfa', words:'a+, comptia, study, studying, course, class, quiz, exam, practice test, flashcard, flashcards, learn, lesson, lessons'},
     {key:'work',   name:'Work',   color:'#94a3b8', words:'dog walk, dog walks, dog walking, walk, walks, client, clients, rover, invoice, invoices'},

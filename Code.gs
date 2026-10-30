@@ -1041,7 +1041,7 @@ function inboxWrite_(key, value) {
 // "Career / IT". One-time upgrade of his saved list (flag cardCatsBatch1) so every
 // device gets them; after that his edits in Options win (deleting one keeps it gone).
 const CARD_CATS_BATCH1_ = [
-  { key: 'music', name: 'Music', color: '#d946ef', words: 'music, guitar, sing, singing, song, songs, setlist, set list, the show, show prep, music show, gig, gigs, rehearsal, rehearse, band, vocals, pedal, pedals, amp, open mic, soundcheck' },
+  { key: 'music', name: 'Music', color: '#a855f7', words: 'music, guitar, sing, singing, song, songs, setlist, set list, the show, show prep, music show, gig, gigs, rehearsal, rehearse, band, vocals, pedal, pedals, amp, open mic, soundcheck' },
   { key: 'productivity', name: 'Productivity', color: '#0891b2', words: 'productivity, efficiency, efficient, workflow, workflows, automation, automate, organize, organizing, clean up, cleanup, consolidate, chatgpt, gemini, handoff, master instructions, docs cleanup, migrate, migration' }
 ];
 const CARD_CATS_CAREER_WORDS_ = 'help desk, helpdesk, it support, tech support, it job, it jobs, it role, certification, cert, security, cloud security, devsecops';
@@ -1049,11 +1049,24 @@ function getCardCats_() {
   const list = inboxRead_('cardCats', null);
   if (!Array.isArray(list) || !list.length) return list;
   const props = PropertiesService.getUserProperties();
-  if (props.getProperty('cardCatsBatch1')) return list;
-  const out = cardCatsBatch1_(list);
-  inboxWrite_('cardCats', out);
-  props.setProperty('cardCatsBatch1', '1');
+  let out = list;
+  if (!props.getProperty('cardCatsBatch1')) { out = cardCatsBatch1_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch1', '1'); }
+  // 2026-10-30 (Julius): Music purple; IT lab words in Career / IT (cert studies fold in on the client).
+  if (!props.getProperty('cardCatsBatch2')) { out = cardCatsBatch2_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch2', '1'); }
   return out;
+}
+function cardCatsBatch2_(list) {
+  const lab = ['it lab', 'home lab', 'homelab', 'lab', 'labs'];
+  return list.map(c => {
+    const n = Object.assign({}, c);
+    if (n.key === 'music' && String(n.color).toLowerCase() === '#d946ef') n.color = '#a855f7';
+    if (n.key === 'career') {
+      const have = String(n.words || '').split(',').map(w => w.trim().toLowerCase());
+      const extra = lab.filter(w => have.indexOf(w) < 0);
+      if (extra.length) n.words = (n.words ? n.words + ', ' : '') + extra.join(', ');
+    }
+    return n;
+  });
 }
 function cardCatsBatch1_(list) {
   const moved = ['guitar', 'music', 'sing', 'singing'];

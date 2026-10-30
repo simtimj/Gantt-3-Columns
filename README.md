@@ -50,6 +50,7 @@ Last updated: 2026-10-30
 ## 🧪 To be confirmed (2026-10-30)
 
 - **Urgent batches by subject**: inside each level (Urgent / Soon / Can be later / Due), tasks are grouped under small subject headers (e.g. Music, Productivity, Career / IT) with a count, so he can work one batch at a time. Batch order = its soonest task; "Other" (no subject) last. Tap a header to fold that batch. Reference Options → "Group by subject" turns it off.
+- **Batch titles + Career / IT** (2026-10-30): batch headers are bold + underlined in the subject's color (Code green, Music purple), no dot. Study (cert) tasks and IT lab work show in the Career / IT batch.
 - **New batches from a task tag**: ending a task with " · #Name" (e.g. "Show prep · #Gigs") creates that subject/batch if it doesn't exist (auto color, saved to all devices) and files the task there. Plain " · Name" only matches existing subjects, so lines like "Walk · LaDonna" never create one. Rename, recolor, add keywords or delete in Options → Card subjects (a task still tagged #Name brings it back).
 - **New subjects Music + Productivity, Career renamed "Career / IT"** (more IT words). Added once to his saved subject list on all devices; guitar/music/singing words moved from Fun to Music. Set a task's subject from its checkbox hold menu, or end the task with " · Music" / " · Productivity" / " · Career". More batches = add a subject in Options → Card subjects (or ask Claude).
 

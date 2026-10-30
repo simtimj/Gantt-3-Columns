@@ -121,6 +121,7 @@ function getWorkspaceData() {
   try { applyClaudeTasks_(); } catch (e) { console.error(e); }
   try { moveScheduleToNotes_(); } catch (e) { console.error(e); }
   try { fixUrgentBold_(); } catch (e) { console.error(e); }
+  try { removeDaySections_(); } catch (e) { console.error(e); }
 
   const today = todayString_();
 
@@ -1301,6 +1302,39 @@ function placeDoneInSection_(html, sec) {
   return keep.join('');
 }
 
+/* Day sections removed (Julius, 2026-10-29). One-time: drop the saved Morning / Afternoon / Evening
+   header lines from every Today cell and turn the end marker back into a plain line. The old cell is
+   copied to the Backup tab first. Flag: script property daySecsRemoved. */
+const DAY_SEC_LINE_RE_ = /<div\b[^>]*\sdata-sec="\w+"[^>]*>(?:(?!<div\b)[\s\S])*?<\/div>/gi;
+function stripDaySections_(html) {
+  return String(html || '')
+    .replace(DAY_SEC_LINE_RE_, '')
+    .replace(/\sdata-secend="[^"]*"/gi, '');
+}
+function removeDaySections_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('daySecsRemoved') === '1') return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    const last = sheet.getLastRow();
+    if (last >= 2) {
+      const range = sheet.getRange(2, 1, last - 1, 2);
+      const vals = range.getValues();
+      vals.forEach((r, i) => {
+        const before = String(r[1] || '');
+        if (!/data-sec(end)?=/i.test(before)) return;
+        const after = stripDaySections_(before);
+        if (after === before) return;
+        backupCell_(formatDate_(r[0]), 'Today', 'day sections removed', before);
+        sheet.getRange(i + 2, 2).setValue(after);
+      });
+    }
+    props.setProperty('daySecsRemoved', '1');
+  } finally { lock.releaseLock(); }
+}
+
 function applyClaudeDone_() {
   const list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
   if (!list.length) return;
@@ -1337,7 +1371,7 @@ function applyClaudeDone_() {
         applied.push(String(x.id));
       });
       html = groupClaudeDone_(html, valid);
-      if (date >= todayString_()) html = placeDoneInSection_(html, doneSecNow_(date));
+      // Day blocks removed (Julius, 2026-10-29): no placing into Morning / Afternoon / Evening.
       if (html !== before) cell.setValue(html);
     });
     props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));

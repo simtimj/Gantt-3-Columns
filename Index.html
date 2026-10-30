@@ -1546,7 +1546,6 @@
     <div class="ts-sub">Task cards</div>
     <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
-    <label class="ts-check"><input type="checkbox" id="daySecsOn" checked> Morning / Afternoon / Evening sections in Today</label>
     <label class="ts-check"><input type="checkbox" id="oneDayOn" checked> One day at a time (▲ ▼ to change day; Completed on top, Plan pad below)</label>
     <label class="ts-check"><input type="checkbox" id="cardsBoxFill" checked> Subject color in the checkbox (off = whole card)</label>
     <div class="ts-row">
@@ -8321,7 +8320,8 @@
   // Declared before the first setCardCats() call: it refreshes cards, which reads these.
   let cardsOn = true, cardsAuto = true;
   const DAY_SECS = [['morning','Morning'],['afternoon','Afternoon'],['evening','Evening']];
-  let daySecsOn = true; try{ daySecsOn = localStorage.getItem('fw.daySecs') !== '0'; }catch(e){}
+  // Day sections removed (Julius, 2026-10-29); kept off so the old code paths stay inert.
+  let daySecsOn = false;
   try{ cardsOn = localStorage.getItem('fw.cards') !== '0'; cardsAuto = localStorage.getItem('fw.cardsAuto') !== '0'; }catch(e){}
   const cardHeadOf = new WeakMap(); // line -> its card's head line
   function cardCatRegex(words){

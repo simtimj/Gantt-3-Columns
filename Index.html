@@ -145,6 +145,8 @@
       right:-4px;
       cursor:col-resize;
     }
+    /* Square grip in the middle of each column line, same as the half-split grips (2026-10-31, Julius). */
+    .column-resizer::after{content:"";position:absolute;top:50%;left:-1px;width:4px;height:28px;margin-top:-14px;border-radius:0;background:var(--divider-on,var(--divider));pointer-events:none;}
     .column-resizer:hover,.column-resizer.dragging{background:#9dbcf0;}
     #workspace.view-single .column-resizer{display:none;}
     #focusControls{
@@ -532,7 +534,7 @@
     /* Drag bar between the halves: 2px line in --divider, taller invisible grab area, grip pill. */
     #refSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
     #refSplitBar::before{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px;}
-    #refSplitBar::after{content:"";position:absolute;left:50%;top:-2px;width:34px;height:6px;margin-left:-17px;border-radius:3px;background:var(--divider);}
+    #refSplitBar::after{content:"";position:absolute;left:50%;top:-1px;width:28px;height:4px;margin-left:-14px;border-radius:0;background:var(--divider);}
     /* Phone (2026-10-26, Julius): Delete sits at the right end of the title
        line instead of on its own row below, so tapping a cell doesn't make
        it taller. The title makes room for it while the cell is active. */
@@ -752,9 +754,11 @@
     body.mobile-mode #workspace{scroll-snap-type:none!important;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;}
     body.mobile-mode #workspace .pane{scroll-snap-align:start;}
     body.mobile-mode .column-resizer{display:none!important;}
+    /* Phone: column lines are the pane edges; draw them in the divider color, 2px, without changing widths (2026-10-31). */
+    body.mobile-mode #workspace #todayPane,body.mobile-mode #workspace #journalPane{border-right:0;box-shadow:inset -2px 0 0 var(--divider);}
     /* Split works in regular and Mobile mode (body class name kept from before). */
     body:not(.mobile-split) #mobileSplitResizer{display:none!important;}
-    #mobileSplitResizer{display:none;background:var(--divider-on,var(--divider));height:7px;cursor:row-resize;touch-action:none;position:relative;z-index:40;}
+    #mobileSplitResizer{display:none;background:var(--divider-on,var(--divider));height:3px;cursor:row-resize;touch-action:none;position:relative;z-index:40;}
     #mobileSplitResizer::before{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px;}
     body.mobile-split #mobileSplitResizer{display:block;}
     body.mobile-split #workspace{overflow:hidden;scroll-snap-type:none;}
@@ -1408,7 +1412,7 @@
     body.one-day #todayScroll .od-on > .od-head{display:block;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;}
     body.one-day #todayScroll .od-on > .od-pad-head{border-top:2px solid var(--divider);padding-top:5px;margin-top:6px;position:relative;cursor:row-resize;touch-action:none;user-select:none;-webkit-user-select:none;}
     body.one-day #todayScroll .od-on > .od-pad-head::before{content:"";position:absolute;left:0;right:0;top:-12px;bottom:0;}
-    body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-4px;width:34px;height:6px;margin-left:-17px;border-radius:3px;background:var(--divider);}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-3px;width:28px;height:4px;margin-left:-14px;border-radius:0;background:var(--divider);}
     .split-dragging,.split-dragging *{cursor:row-resize!important;}
     body.one-day #todayScroll .od-on > .day-editor{flex:var(--od-a,1) 1 0 !important;min-height:0 !important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}
     body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}

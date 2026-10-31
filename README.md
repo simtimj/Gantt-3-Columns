@@ -48,6 +48,9 @@ Last updated: 2026-10-31
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
+- Today marker is a small ● next to the date (was "• TODAY")
+- Three panes side by side: both column lines drag (square grips); double-tap a line to reset to equal widths
+- Smaller − / + fold buttons and smaller toolbar / menu buttons
 - Today done count: plain "Today: 6/6 done" (no bar, not bold), sits above Morning inside the cell and scrolls away
 - Short day dates in narrow panes (Today + Notes): "Sat Oct 31, 2026" on one line; full form when wide
 
@@ -259,6 +262,7 @@ Last updated: 2026-10-31
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+- Split the Notes column into top / bottom (ideas in the "Gantt Cols" reference card)
 - **Auto-reshuffle, Motion/Reclaim-style (Julius, 2026-10-28)**: ✅ step 1 task fields (duration above) · step 2 `Code.gs` reads today's calendar and finds free gaps, skipping the Chill and Repeat Tasks calendars · step 3 scheduler sorts by deadline + priority and puts each task in the first gap it fits · step 4 **Reshuffle** button that reruns it (auto-run later). Keep a manual mode too: set the parameters together with Claude in conversation. Target: Fri Nov 6.
 - **Calendar column, like Google Calendar** (Julius, 2026-10-28): a full calendar view as its own column (or swipe in from the right / a button that swaps it in for Reference), so while scheduling with Claude he can see the day at a glance on phone, tablet and computer. Details to settle: day vs 3-day vs week view, read-only first or drag tasks onto it.
 - **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)

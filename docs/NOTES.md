@@ -197,3 +197,5 @@ Read only the section you need.
 
 - `updateDash()` no longer makes a `.dash-chip`: it sets `data-dash` on today's `.day-editor` and CSS `.editor[data-dash]:not(:empty)::before` shows it (attribute on the editor, never in saved innerHTML) so it scrolls with the cell. No bar, not bold.
 - Day labels render `.dd-long` (formatDate) + `.dd-short` (formatDateShort, "Sat Oct 31, 2026"); `.pane-narrow` (<420px) shows the short one, nowrap.
+- Today marker: `.today-pill` is now "●" (title "Today").
+- Three-pane split (mobile-split, not row layout): `split3` fractions in localStorage `fw.split3`; `triDrag(handle,idx)` on `#mobileSplitResizer` (idx 0) and `#mobileSplitResizerThird` (idx 1); `data-dir` col/row draws the square grip.

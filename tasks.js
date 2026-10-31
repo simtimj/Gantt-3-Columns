@@ -34,4 +34,5 @@ const CLAUDE_TASKS = [
   ] },
   { id: 't-20261027-crabbing-prep', date: '2026-10-27', title: 'Crabbing trip preparation', urg: 3, subtasks: ['Buy new grippy rubber gloves', 'Buy or figure out bait'] },
   { id: 't-20261028-cert-a-plus-core1', date: '2026-10-28', title: 'Cert studies: CompTIA A+ Core 1 review', urg: 2, subtasks: [] },
+  { id: 't-20261031-split-notes-col', date: '2026-10-31', title: 'Gantt: split the Notes column (top / bottom)', urg: 3, subtasks: ['Pick a layout from the Gantt Cols reference card (A = Plan on top, Review on bottom)'] },
 ];

@@ -322,7 +322,7 @@
     .pane-narrow .day-label{white-space:nowrap;}
     .pane-narrow .day-date .dd-long{display:none;}
     .pane-narrow .day-date .dd-short{display:inline;}
-    .today-pill{
+    .today-pill{font-size:.75em;vertical-align:.1em;
       color:var(--accent);
       margin-left:6px;
     }
@@ -718,7 +718,7 @@
       #app{height:100%;}
       #toolbar{flex-wrap:wrap;gap:calc(6px * var(--mobile-scale,1));padding:calc(6px * var(--mobile-scale,1)) calc(8px * var(--mobile-scale,1));font-size:calc(14px * var(--mobile-scale,1));}
       #title{font-size:calc(14px * var(--mobile-scale,1));}
-      #toolbar .btn,#toolbar .top-select{min-height:calc(40px * var(--mobile-scale,1));}
+      #toolbar .btn,#toolbar .top-select{min-height:calc(30px * var(--mobile-scale,1));}
       #dateLabel{display:none;}
       .status{font-size:calc(12px * var(--mobile-scale,1));}
       .pane-header{flex:0 0 calc(42px * var(--mobile-scale,1));padding:0 calc(12px * var(--mobile-scale,1));font-size:calc(15px * var(--mobile-scale,1));}
@@ -732,10 +732,10 @@
       #workspace .pane{scroll-snap-align:start;}
       .column-resizer{display:none!important;}
       #focusControls{position:static;flex:0 0 auto;padding:calc(6px * var(--mobile-scale,1)) calc(8px * var(--mobile-scale,1));flex-wrap:wrap;background:#fff;}
-      #focusControls .btn{min-height:calc(40px * var(--mobile-scale,1));font-size:calc(13px * var(--mobile-scale,1));}
+      #focusControls .btn{min-height:calc(30px * var(--mobile-scale,1));font-size:calc(13px * var(--mobile-scale,1));}
       #focusStatus{margin-right:auto;}
       .view-menu-popup{position:fixed;top:calc(54px * var(--mobile-scale,1));left:calc(8px * var(--mobile-scale,1))!important;right:calc(8px * var(--mobile-scale,1))!important;width:auto;z-index:2500;}
-      .view-menu-row .btn{min-height:calc(40px * var(--mobile-scale,1));font-size:calc(14px * var(--mobile-scale,1));}
+      .view-menu-row .btn{min-height:calc(32px * var(--mobile-scale,1));font-size:calc(14px * var(--mobile-scale,1));}
       .type-settings{position:fixed;top:calc(54px * var(--mobile-scale,1));left:calc(8px * var(--mobile-scale,1));right:calc(8px * var(--mobile-scale,1));width:auto;z-index:2600;}
       .type-settings label{grid-template-columns:calc(70px * var(--mobile-scale,1)) 1fr calc(54px * var(--mobile-scale,1)) calc(18px * var(--mobile-scale,1));font-size:calc(13px * var(--mobile-scale,1));}
       .type-settings input,.type-settings select{min-height:calc(40px * var(--mobile-scale,1));font-size:calc(16px * var(--mobile-scale,1));}
@@ -764,6 +764,12 @@
     body:not(.mobile-split) #mobileSplitResizer{display:none!important;}
     #mobileSplitResizer{display:none;background:var(--divider-on,var(--divider));height:3px;cursor:row-resize;touch-action:none;position:relative;z-index:40;}
     #mobileSplitResizer::before{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px;}
+    /* Square grips on the split column lines, same as the half-split bars (2026-10-31, Julius). */
+    #mobileSplitResizerThird{background:var(--divider-on,var(--divider));touch-action:none;position:relative;z-index:40;}
+    #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{content:"";position:absolute;top:0;bottom:0;left:-6px;right:-6px;}
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{content:"";position:absolute;background:var(--divider-on,var(--divider));pointer-events:none;}
+    #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{top:50%;left:50%;width:4px;height:28px;margin:-14px 0 0 -2px;filter:brightness(.6);}
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{left:50%;top:50%;width:28px;height:4px;margin:-2px 0 0 -14px;filter:brightness(.6);}
     body.mobile-split #mobileSplitResizer{display:block;}
     body.mobile-split #workspace{overflow:hidden;scroll-snap-type:none;}
     /* Non-split mode must always permit horizontal overflow on both desktop and mobile. */
@@ -854,7 +860,7 @@
     /* 2026-10-14: shared scale and typography, regardless of editing device. */
     :root{--workspace-scale:1;}
     #toolbar{min-height:calc(42px * var(--workspace-scale));gap:calc(7px * var(--workspace-scale));padding:calc(4px * var(--workspace-scale)) calc(8px * var(--workspace-scale));}
-    .btn,.top-select{min-height:calc(34px * var(--workspace-scale));padding:calc(6px * var(--workspace-scale)) calc(10px * var(--workspace-scale));font-size:calc(13px * var(--workspace-scale));}
+    .btn,.top-select{min-height:calc(28px * var(--workspace-scale));padding:calc(4px * var(--workspace-scale)) calc(8px * var(--workspace-scale));font-size:calc(13px * var(--workspace-scale));}
     #focusControls .btn{min-height:calc(34px * var(--workspace-scale));font-size:calc(13px * var(--workspace-scale));}
     .pane-header{font-size:calc(14px * var(--workspace-scale));}
     .day-label,body.mobile-mode .day-label{font-size:calc(17px * var(--workspace-scale))!important;line-height:1.3!important;}
@@ -906,7 +912,7 @@
 
     /* Columns menu: bigger checkboxes, taller rows, Split section. */
     .view-menu-popup{min-width:270px;max-height:calc(100dvh - 70px);overflow-y:auto;padding:8px;}
-    .view-menu-row{min-height:40px;padding:5px 6px;font-size:14px;}
+    .view-menu-row{min-height:34px;padding:5px 6px;font-size:14px;}
     .view-menu-row label{gap:10px;}
     .view-menu-row input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;margin:0;}
     .view-menu-section{border-top:1px solid var(--border);margin-top:6px;padding:8px 6px 4px;display:grid;gap:7px;}
@@ -929,7 +935,7 @@
     .ctx-menu[hidden]{display:none!important;}
     .ctx-menu .btn{text-align:left;white-space:nowrap;min-height:34px;padding:5px 10px;font-size:13px;}
     .ctx-menu .ctx-wide{grid-column:1 / -1;}
-    .ctx-menu.ctx-touch .btn{min-height:44px;font-size:15px;}
+    .ctx-menu.ctx-touch .btn{min-height:36px;font-size:14px;}
 
     /* Reference follows Scale: title line height, collapsed rows, arrow and drag handle. */
     :root{--ref-line:calc(var(--paragraph-size) * var(--workspace-scale,1) * 1.3);}
@@ -1172,7 +1178,7 @@
     [data-tlon]{display:flex!important;align-items:center;}
     [data-tlon] > .check-text{flex:0 1 auto;}
     [data-tlon]::after{order:2;}
-    [data-tlon]::before{content:"−";order:1;flex:0 0 auto;margin-left:6px;padding:0 5px;min-width:1.1em;font-size:12px;font-weight:700;line-height:1.45;text-align:center;border:1px solid var(--border);border-radius:5px;color:var(--muted);background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
+    [data-tlon]::before{content:"−";order:1;flex:0 0 auto;margin-left:5px;padding:0 3px;min-width:.9em;font-size:10px;font-weight:700;line-height:1.25;text-align:center;border:1px solid var(--border);border-radius:5px;color:var(--muted);background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
     [data-tlon="c"]::before{content:"+  " attr(data-tlinfo);font-weight:600;}
     [data-tlhid]{display:none!important;}
     /* Folded summary (2026-10-29): bold starts of the hidden lines, as one condensed block under the title. */
@@ -1210,7 +1216,7 @@
     .ref-options .ts-check select{min-height:28px;padding:2px 6px;font-size:13px;}
     .ref-options .ts-sub{margin-top:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     .ref-opt-tip{margin-top:4px;font-size:12px;color:var(--muted);}
-    .pm-box{display:inline-grid;place-content:center;box-sizing:border-box;width:1.15em;height:1.15em;margin-right:6px;border:1.5px solid currentColor;border-radius:4px;font-size:.95em;line-height:1;font-weight:700;opacity:.75;vertical-align:-.15em;}
+    .pm-box{display:inline-grid;place-content:center;box-sizing:border-box;width:.95em;height:.95em;margin-right:4px;border:1px solid currentColor;border-radius:3px;font-size:.8em;line-height:1;font-weight:700;opacity:.75;vertical-align:-.15em;}
     .urg-head{display:flex;align-items:center;}
     .urg-head-row{display:flex;align-items:center;gap:6px;}
     .urg-head-row .urg-head{flex:1;min-width:0;}
@@ -2070,7 +2076,7 @@
         <span class="day-date"><span class="dd-long">${esc(formatDate(day.date))}</span><span class="dd-short">${esc(formatDateShort(day.date))}</span></span>
         ${
           today
-            ? '<span class="today-pill">• TODAY</span>'
+            ? '<span class="today-pill" title="Today">●</span>'
             : ''
         }
       </div>`;
@@ -4737,6 +4743,32 @@
   try{ splitColsRatio = Math.max(.2,Math.min(.8,Number(localStorage.getItem(SPLIT_COLS_KEY)) || .5)); }catch(e){}
   function saveSplitOptions(){ try{ localStorage.setItem(MOBILE_SPLIT_OPTIONS_KEY,JSON.stringify(splitOptions)); }catch(e){} }
   let mobileSplitRatio = Math.max(.2,Math.min(.8,Number(localStorage.getItem(MOBILE_SPLIT_SIZE_KEY)) || .5));
+  /* Three panes side by side (Julius, 2026-10-31): both column lines drag, like the half-split bars.
+     split3 = the three widths as fractions (sum 1); double-tap a line to reset to equal. */
+  const SPLIT3_KEY = 'fw.split3';
+  let split3 = [1/3,1/3,1/3];
+  try{ const v = JSON.parse(localStorage.getItem(SPLIT3_KEY)); if(Array.isArray(v) && v.length === 3 && v.every(x => x > .05)) split3 = v; }catch(e){}
+  function isTriSplit(){ try{ return isSplitActive() && !isRowLayout() && splitOptions.third !== 'none'; }catch(e){ return false; } }
+  function triDrag(handle,idx,event){
+    event.preventDefault(); try{ handle.setPointerCapture(event.pointerId); }catch(e){}
+    const now = Date.now();
+    if(now - (handle._lastTap || 0) < 350){ handle._lastTap = 0; split3 = [1/3,1/3,1/3]; try{ localStorage.setItem(SPLIT3_KEY,JSON.stringify(split3)); }catch(e){} updateWorkspaceLayout(); return; }
+    handle._lastTap = now;
+    const workspace = document.getElementById('workspace');
+    const rect = workspace.getBoundingClientRect();
+    const horizontal = splitOptions.orientation === 'horizontal';
+    const MIN = .12;
+    const move = e => {
+      const p = horizontal ? (e.clientX - rect.left) / Math.max(1,rect.width) : (e.clientY - rect.top) / Math.max(1,rect.height);
+      const b0 = split3[0], b1 = split3[0] + split3[1];
+      if(idx === 0){ const n = Math.max(MIN,Math.min(b1 - MIN,p)); split3 = [n,b1 - n,1 - b1]; }
+      else { const n = Math.max(b0 + MIN,Math.min(1 - MIN,p)); split3 = [b0,n - b0,1 - n]; }
+      handle._lastTap = 0;
+      updateWorkspaceLayout();
+    };
+    const up = () => { try{ localStorage.setItem(SPLIT3_KEY,JSON.stringify(split3)); }catch(e){} handle.removeEventListener('pointermove',move); handle.removeEventListener('pointerup',up); handle.removeEventListener('pointercancel',up); };
+    handle.addEventListener('pointermove',move); handle.addEventListener('pointerup',up); handle.addEventListener('pointercancel',up);
+  }
   function isActualMobileDevice(){
     // Prefer the browser's explicit mobile hint. Fall back to mobile OS signals.
     if(navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') return navigator.userAgentData.mobile;
@@ -4778,6 +4810,7 @@
     normalizeSplitOptions();
     const handle=document.getElementById('mobileSplitResizer');
     handle?.addEventListener('pointerdown',event=>{
+      if(isTriSplit()){ triDrag(handle,0,event); return; }
       event.preventDefault(); handle.setPointerCapture(event.pointerId);
       const workspace=document.getElementById('workspace');
       const rect=workspace.getBoundingClientRect();
@@ -5250,7 +5283,7 @@
       const ratio=slots.length===2 ? mobileSplitRatio : 1/3;
       const tracks=slots.length===2
         ? [`minmax(0,${ratio}fr)`,'7px',`minmax(0,${1-ratio}fr)`]
-        : ['minmax(0,1fr)','7px','minmax(0,1fr)','7px','minmax(0,1fr)'];
+        : [`minmax(0,${split3[0]}fr)`,'7px',`minmax(0,${split3[1]}fr)`,'7px',`minmax(0,${split3[2]}fr)`];
       workspace.style.gridTemplateColumns=horizontal?tracks.join(' '):'minmax(0,1fr)';
       workspace.style.gridTemplateRows=horizontal?'minmax(0,1fr)':tracks.join(' ');
       panes.forEach((pane,i)=>{
@@ -5275,8 +5308,15 @@
         extra.style.gridRow=horizontal?'1':'4';
         extra.style.width=horizontal?'7px':'auto';
         extra.style.height=horizontal?'auto':'7px';
-        extra.style.background='var(--border)';
+        extra.style.background='';
+        extra.style.cursor=horizontal?'col-resize':'row-resize';
+        if(!extra._triDrag){
+          extra._triDrag=true;
+          extra.addEventListener('pointerdown',ev=>{ if(isTriSplit()) triDrag(extra,1,ev); });
+        }
       }else extra?.remove();
+      split.dataset.dir=horizontal?'col':'row';
+      if(extra) extra.dataset.dir=horizontal?'col':'row';
       workspace.style.overflowX='hidden';workspace.style.overflowY='hidden';
       workspace.scrollLeft=0;
       workspace.classList.remove('view-single');

@@ -522,6 +522,9 @@
     #referenceScroll{
       padding:6px 5px 40px;
     }
+    #refTopScroll{padding:6px 5px 10px;}
+    #refTopScroll:empty{display:none;}
+    #refTopScroll:not(:empty) + #referenceScroll{border-top:2px solid var(--day-sep,#8a8a8a);}
     /* Phone (2026-10-26, Julius): Delete sits at the right end of the title
        line instead of on its own row below, so tapping a cell doesn't make
        it taller. The title makes room for it while the cell is active. */
@@ -855,7 +858,7 @@
     .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale));height:calc(17px * var(--workspace-scale));}
     body.mobile-mode .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale))!important;height:calc(17px * var(--workspace-scale))!important;min-width:calc(17px * var(--workspace-scale))!important;}
     /* 2026-10-26: Reference follows the left/right padding slider like Today. */
-    #referenceScroll{padding-left:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1) * var(--side-k,1));padding-right:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1) * var(--side-k,1));}
+    #referenceScroll,#refTopScroll{padding-left:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1) * var(--side-k,1));padding-right:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1) * var(--side-k,1));}
     .type-settings{z-index:3100;}
 
     /* 2026-10-15 */
@@ -1647,9 +1650,12 @@
               <option value="modified">Last modified · newest first</option>
             </select>
             <button class="btn tiny ref-collapse-all" type="button" data-layout="reference" title="Collapse or expand all Reference cells" aria-label="Collapse or expand all Reference cells">−</button>
-            <button class="btn tiny" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: Urgent panel, Inbox">Options</button>
+            <button class="btn tiny" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: Urgent panel">Options</button>
         </div>
       </div>
+      <!-- Reference split (2026-10-31, Julius): top = Urgent, Calendar and the other panels,
+           bottom = the Reference cells. Each half scrolls on its own, like Today. -->
+      <div class="scroll ref-top" id="refTopScroll"></div>
       <div
         class="scroll"
         id="referenceScroll">
@@ -1679,7 +1685,7 @@
           </label>
           <button class="btn tiny" id="resetRefPad" type="button">Reset padding</button>
           <div class="ts-sub">Tips</div>
-          <div class="ref-opt-tip">Hold a level heading in Urgent (or tap + Task) to make a task there. Inbox items go to Today with → Today.</div>
+          <div class="ref-opt-tip">Hold a level heading in Urgent (or tap + Task) to make a task there.</div>
         </div>
         <div class="ref-toolbar">
           <input
@@ -6033,6 +6039,10 @@
     const d = dateObj(s);
     return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
   }
+  // Top half of Reference (2026-10-31): panels live here, cells stay in #referenceScroll.
+  function refTopHost(tree){
+    return document.getElementById('refTopScroll') || tree.parentNode;
+  }
   function renderUrgent(){
     try{ renderDueBlocks(); }catch(e){}
     const tree = document.getElementById('referenceTree');
@@ -6041,7 +6051,7 @@
     if(!panel){
       panel = document.createElement('div');
       panel.id = 'urgentPanel';
-      tree.parentNode.insertBefore(panel,document.getElementById('calPanel') || document.getElementById('inboxPanel') || tree);
+      refTopHost(tree).insertBefore(panel,document.getElementById('calPanel'));
     }
     // Editing a task's text right in the panel: don't rebuild under the cursor;
     // it redraws when you leave the line (2026-10-27, Julius).
@@ -6835,7 +6845,7 @@
     if(!panel){
       panel = document.createElement('div');
       panel.id = 'calPanel';
-      tree.parentNode.insertBefore(panel,document.getElementById('inboxPanel') || tree);
+      refTopHost(tree).appendChild(panel);
     }
     panel.innerHTML = '';
     const events = (calData && calData.events) || [];
@@ -6904,6 +6914,26 @@
   let inboxOpen = false;
   let inboxAdding = false;
   try{ inboxOpen = localStorage.getItem('fw.inboxOpen') === '1'; }catch(e){}
+  // Inbox removed (2026-10-31, Julius): ideas go to the Backlog cell as Can be later.
+  // Any open items left in the in-app inbox move there once (only when the Backlog
+  // cell is loaded, so no duplicate Backlog cells), then leave the inbox.
+  const INBOX_PANEL_ON = false;
+  let inboxMigrating = false;
+  function migrateInboxToBacklog(){
+    if(inboxMigrating || !backlogCell()) return;
+    const open = inboxItems.filter(x => x && !x.arch && !x.done && (x.title || x.details));
+    if(!open.length) return;
+    inboxMigrating = true;
+    open.forEach(it => {
+      if(addTaskToBacklog(it.title || it.details, it.title ? it.details : '', 3)){
+        google.script.run.withFailureHandler(() => {}).dismissInboxItem(it.id);
+      }
+    });
+    inboxItems = inboxItems.filter(x => open.indexOf(x) < 0);
+    renderUrgent();
+    setStatus(open.length + ' inbox item' + (open.length > 1 ? 's' : '') + ' moved to Backlog');
+    setTimeout(() => { inboxMigrating = false; }, 2000);
+  }
   function setInbox(list){ inboxItems = Array.isArray(list) ? list : []; renderInbox(); }
   // Inbox rows work like every other task (2026-10-27, Julius): checkbox + always-editable
   // text. Tap the box = done (goes to the Inbox Archive). Hold the box = menu
@@ -7016,6 +7046,7 @@
     urgPicker = p;
   }
   function renderInbox(){
+    if(!INBOX_PANEL_ON){ const p = document.getElementById('inboxPanel'); if(p) p.remove(); migrateInboxToBacklog(); return; }
     const tree = document.getElementById('referenceTree');
     if(!tree) return;
     if(inboxEditing()) return; // don't redraw under the cursor; blur redraws
@@ -7159,7 +7190,7 @@
     document.addEventListener('pointerdown',e => {
       if(!box.hidden && !box.contains(e.target) && !btn.contains(e.target)) close();
     },true);
-    document.getElementById('referenceScroll')?.addEventListener('scroll',close,{passive:true});
+    ['referenceScroll','refTopScroll'].forEach(id => document.getElementById(id)?.addEventListener('scroll',close,{passive:true}));
     window.addEventListener('resize',() => { if(!box.hidden) place(); });
     const wrapCb = document.getElementById('optUrgWrap');
     if(wrapCb){ wrapCb.checked = urgWrap(); wrapCb.addEventListener('change',() => setUrgOpt('fw.urgWrap',wrapCb.checked ? '1' : '0')); }

@@ -4,7 +4,5 @@
 // The app shows them as **Title**: details in the Inbox under Urgent (Reference).
 // Dismissed / sent-to-Today ids are remembered in the app, so old items here
 // are hidden once handled; Claude can prune entries older than ~30 days.
-const CLAUDE_INBOX = [
-  { id: 'c-20261026-personal-faq', title: 'Personal FAQ → Claude', details: 'Later: find the FAQ Google Doc, save its location in Claude\'s memory so you can just ask Claude instead of searching it; optionally clean it up or move it into a Claude Doc', added: '2026-10-26' },
-  { id: 'c-20261027-time-tracking-review', title: 'Idea: built-in time tracking → plan vs actual', details: 'If the Gantt app gets its own timekeeping (Toggl-style), send that data to Claude so it can compare the day\'s plan against what actually happened and spot habits and pitfalls in more detail', added: '2026-10-27' },
-];
+// Inbox removed 2026-10-31 (Julius): new ideas go to tasks.js with date 'backlog', urg 3.
+const CLAUDE_INBOX = [];

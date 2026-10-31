@@ -6,6 +6,11 @@
 // Ids must be unique and never reused; prune entries older than ~30 days.
 // date: 'backlog' = into the Reference Backlog cell (shows in Urgent, not in Today).
 const CLAUDE_TASKS = [
+  { id: 't-20261031-time-tracking', date: 'backlog', title: 'Gantt: built-in time tracking → plan vs actual · Code', urg: 3, subtasks: [
+    'Toggl-style timer in the app for each task',
+    'Send the time data to Claude to compare the day\'s plan against what actually happened',
+    'Spot habits and pitfalls in more detail',
+  ] },
   { id: 't-20261031-ai-overlay', date: 'backlog', title: 'AI overlay: floating Claude + ChatGPT like Gemini\'s · Code', urg: 3, subtasks: [
     'Minimal floating bar over any app, opened by side key / back tap',
     'Loads claude.ai / chatgpt.com on his subscriptions (no paid API)',

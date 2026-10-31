@@ -16,7 +16,11 @@
 - **Every change that adds, changes or removes a feature must update `README.md` in the same commit.** New work goes under 🧪 To be confirmed (with the date); move it to ✅ Working once Julius says it works; anything he wants tweaked goes under 🔧; ideas he mentions but hasn't asked to build go under 📋. Update the "Last updated" date.
 - Keep useful info that's removed from the screen (e.g. the shortcuts list) in the README.
 
-## Inbox — how Claude adds items (2026-10-26)
+## Inbox — REMOVED 2026-10-31 (Julius)
+
+- The Inbox panel is gone (`INBOX_PANEL_ON = false`). Ideas Julius captures go to `CLAUDE_TASKS` in `tasks.js` with `date: 'backlog'`, `urg: 3` (Backlog cell, Can be later). Open in-app inbox items move to Backlog once via `migrateInboxToBacklog()` (only when the Backlog cell is loaded). `CLAUDE_INBOX` stays as an empty array. Old notes below are history.
+
+### Old inbox notes (2026-10-26)
 
 - When Julius says "add to my Gantt inbox: …" (or captures an idea for the planner), clean it up into a concise title + details and append to `CLAUDE_INBOX` in `inbox.js`: `{ id: 'c-YYYYMMDD-short-slug', title: 'Concise title', details: 'what else is needed', added: 'YYYY-MM-DD' }`. Ids must be unique and never reused. Push to `main`; it shows in the app in ~1 min, rendered **Title**: details.
 - Claude can't reach Google from its workspace, so this file is the pipeline. Dismissed / sent-to-Today ids are stored in the app's user properties (`inboxDone`), so handled items stay hidden; prune entries older than ~30 days when editing the file.
@@ -197,3 +201,7 @@
 - Inside each Urgent level, `renderUrgent()` groups items by subject via `urgBatches(group)` → `urgBatchHead(u,b,folded)` (`.urg-batch`, colored dot `--bc`, count; tap folds, localStorage `fw.urgBatchFold` keys `u|cat`). Order = soonest task, Other last; `study` items batch under `career` (Julius: cert studies + IT lab belong to Career / IT); header text `.urg-batch-name` bold + underlined in `--bc` (darkened 70% in light mode), no dot; a level with only Other shows no header. Toggle `fw.urgBatch` (`#optUrgBatch` in Reference Options, default on). Batch − / + is last in the header (right end, `.urg-batch .pm-box` margin-left auto). Levels are boxed: `#urgentPanel > .urg-group:not(.urg-arch)` = 2px rounded border in `--urg` + 5% tint (2026-10-30). Item subject = `urgItemCat(line,subs)` (`data-cat`, else `guessCardCat`); `urgCatInfo(k)` guards the subject list (it loads in a later script).
 - Subjects Music + Productivity added; Career shown as "Career / IT". Server `getCardCats_()` upgrades his saved list once (user property flag `cardCatsBatch1`, `cardCatsBatch1_()`), so later deletes in Options stick; `cardCatsBatch2` / `cardCatsBatch2_()` = Music purple #a855f7 + lab words in career. New batch = new subject (Options → Card subjects); for another one-time upgrade use a new flag. Subject hold-menu picks call `urgChanged(owner)` so batches re-sort.
 - ChatGPT may tag tasks it writes with a trailing " · Music" / " · Productivity" / " · Career" (`cardCatTag`). " · #Name" creates the subject if missing: `cardCatEnsure(name)` (key = letters of the name, 2–12; color = first unused `CARD_CAT_AUTO_COLORS`), queued in `cardCatPending` and saved via `setCardCats(list,true)` 50 ms later. Plain tags never create.
+
+## Reference split (2026-10-31, Julius)
+
+- Reference is two stacked halves like Today: `#refTopScroll` (top, own scroll) holds the panels (Urgent, Calendar — anything that isn't a Reference cell); `#referenceScroll` (bottom) keeps the search toolbar + `#referenceTree` cells. New panels go in via `refTopHost(tree)`, never `tree.parentNode`. 2px `--day-sep` line between them; top hides when empty.

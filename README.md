@@ -47,6 +47,11 @@ Last updated: 2026-10-30
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
+## 🧪 To be confirmed (2026-10-31)
+
+- **Reference split in two (2026-10-31):** like Today, Reference is now two stacked halves that scroll on their own — top = Urgent, Calendar and the other panels; bottom = search, + Cell and all the Reference cells.
+- **Inbox removed (2026-10-31):** the Inbox panel is gone. The time-tracking idea moved to Backlog (Can be later); any open items you typed into the inbox move to Backlog automatically.
+
 ## 🧪 To be confirmed (2026-10-30)
 
 - **Urgent batches by subject**: inside each level (Urgent / Soon / Can be later / Due), tasks are grouped under small subject headers (e.g. Music, Productivity, Career / IT) with a count, so he can work one batch at a time. Batch order = its soonest task; "Other" (no subject) last. Tap a header to fold that batch. Reference Options → "Group by subject" turns it off.
@@ -208,7 +213,7 @@ Last updated: 2026-10-30
 - **More due date styles** (Reference Options → Due date): added **Oct 27 · 3d**, **October 27th · 3d**, **Tue, Oct 27 · 3d** and **Tuesday, October 27th · 3d**, alongside Tue 10/27, Tue 10/27 · 3d and 3d.
 - **− / + collapse buttons**: a boxed − / + next to Sort collapses or expands every Reference cell; the toolbar button reads Ref − / Ref +; each cell's ▾ / ▸ arrow is now a boxed − / +; the Urgent and Inbox headers use the same − / +.
 - **Make tasks in the Urgent panel**: hold (or right-click) a level heading like "2 · Soon", hold the Urgent header, or tap **+ Task** → *Create Urgent / Soon / Can be later task* → type → Enter. It's added at the end of today's Today cell with that urgency, so it shows in the panel right away. Typing `Title: details` makes the title bold. The panel now always shows (even with nothing urgent) so + Task is always there.
-- **Inbox** under Urgent (collapsed by default): quick captures shown as **Title**: details. Tap the small **+ Add** on the Inbox header line to type one in (the add box stays hidden otherwise; empty Add or Esc closes it), or tell Claude ("add to my Gantt inbox: …") and it shows up about a minute later, tagged Claude. Rows work like tasks now (see 🧪 Inbox rows = tasks, 2026-10-27).
+- ~~**Inbox**~~ (removed 2026-10-31 — ideas go to Backlog as Can be later; leftover inbox items move there automatically) under Urgent (collapsed by default): quick captures shown as **Title**: details. Tap the small **+ Add** on the Inbox header line to type one in (the add box stays hidden otherwise; empty Add or Esc closes it), or tell Claude ("add to my Gantt inbox: …") and it shows up about a minute later, tagged Claude. Rows work like tasks now (see 🧪 Inbox rows = tasks, 2026-10-27).
 
 - **Text brightness fix (2026-10-27)**: all dark mode text now follows the Text brightness slider — dimmer labels, done tasks, quotes, code blocks, the calendar's today line and dark pasted/inline-colored text (that last stayed near-black before)
 - **Day colors slider (2026-10-27)**: Options → **Day colors · darker / lighter** (−60…+60, default 0, saved per device) lightens or darkens everything in a day's color (Tue orange, Wed blue…): day names, note box lines, today outline, and the light-mode day backgrounds

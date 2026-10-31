@@ -165,4 +165,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261030-boxed-levels', date: '2026-10-30', project: 'Gantt', title: 'Boxed urgency levels', details: 'Urgent / Soon / Can be later each in a rounded red / yellow / blue border; batch − / + moved to the right end of its header' },
   { id: 'd-20261031-ref-split', date: '2026-10-31', project: 'Gantt', title: 'Reference split in two', details: 'top half = Urgent, Calendar and other panels; bottom half = Reference cells; each scrolls on its own like Today' },
   { id: 'd-20261031-inbox-removed', date: '2026-10-31', project: 'Gantt', title: 'Inbox removed', details: 'time-tracking idea moved to Backlog (Can be later); leftover in-app inbox items move to Backlog automatically' },
+  { id: 'd-20261031-dividers', date: '2026-10-31', project: 'Gantt', title: 'Bold divider lines', details: 'column + half-split lines high contrast (dark / bright), color picker in Options' },
+  { id: 'd-20261031-split-drag', date: '2026-10-31', project: 'Gantt', title: 'Draggable half splits', details: 'drag the Today (Completed / Plan pad) and Reference (panels / cells) split lines; size remembered, double-tap resets' },
 ];

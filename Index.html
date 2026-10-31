@@ -11,6 +11,7 @@
   <style>
     :root{
       --border:#d9d9d9;
+      --divider:#1f2937; /* big section lines (2026-10-31, Julius): high contrast, set in Options */
       --muted:#777;
       --bg:#f6f7f8;
       --panel:#fff;
@@ -129,7 +130,8 @@
       min-width:1px;
       position:relative;
       cursor:col-resize;
-      background:var(--border);
+      background:var(--divider-on,var(--divider));
+      box-shadow:1px 0 0 var(--divider-on,var(--divider)); /* 2px look, grid track stays 1px */
       touch-action:none;
       z-index:20;
     }
@@ -524,7 +526,13 @@
     }
     #refTopScroll{padding:6px 5px 10px;}
     #refTopScroll:empty{display:none;}
-    #refTopScroll:not(:empty) + #referenceScroll{border-top:2px solid var(--day-sep,#8a8a8a);}
+    #refTopScroll{flex:var(--rs-a,1) 1 0;}
+    #referenceScroll{flex:var(--rs-b,1) 1 0;}
+    #refTopScroll:empty + #refSplitBar{display:none;}
+    /* Drag bar between the halves: 2px line in --divider, taller invisible grab area, grip pill. */
+    #refSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
+    #refSplitBar::before{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px;}
+    #refSplitBar::after{content:"";position:absolute;left:50%;top:-2px;width:34px;height:6px;margin-left:-17px;border-radius:3px;background:var(--divider);}
     /* Phone (2026-10-26, Julius): Delete sits at the right end of the title
        line instead of on its own row below, so tapping a cell doesn't make
        it taller. The title makes room for it while the cell is active. */
@@ -746,7 +754,7 @@
     body.mobile-mode .column-resizer{display:none!important;}
     /* Split works in regular and Mobile mode (body class name kept from before). */
     body:not(.mobile-split) #mobileSplitResizer{display:none!important;}
-    #mobileSplitResizer{display:none;background:var(--border);height:7px;cursor:row-resize;touch-action:none;position:relative;z-index:40;}
+    #mobileSplitResizer{display:none;background:var(--divider-on,var(--divider));height:7px;cursor:row-resize;touch-action:none;position:relative;z-index:40;}
     #mobileSplitResizer::before{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px;}
     body.mobile-split #mobileSplitResizer{display:block;}
     body.mobile-split #workspace{overflow:hidden;scroll-snap-type:none;}
@@ -1323,7 +1331,7 @@
        (Wednesday stays blue) with dark text on them. Adjust from here.
        ========================================================= */
     @media (prefers-color-scheme: dark){
-      :root{--dm-cell-l:11;--dm-tint:#ffffff;--dm-cell:color-mix(in srgb,var(--dm-tint) calc(var(--dm-cell-l) * 1%),#000);--dm-l:52;--dm-text:hsl(0 0% calc(var(--dm-l) * 1%));--dm-muted:hsl(0 0% calc(var(--dm-l) * .82%));--muted:var(--dm-muted);--done:hsl(0 0% calc(var(--dm-l) * .75%));--text:var(--dm-text);--bg:#000;--panel:#000;--border:#3a3a3a;color-scheme:dark;}
+      :root{--dm-cell-l:11;--dm-tint:#ffffff;--dm-cell:color-mix(in srgb,var(--dm-tint) calc(var(--dm-cell-l) * 1%),#000);--dm-l:52;--dm-text:hsl(0 0% calc(var(--dm-l) * 1%));--dm-muted:hsl(0 0% calc(var(--dm-l) * .82%));--muted:var(--dm-muted);--done:hsl(0 0% calc(var(--dm-l) * .75%));--text:var(--dm-text);--bg:#000;--panel:#000;--border:#3a3a3a;--divider:#e5e7eb;color-scheme:dark;}
       html,body{background:#121212;color:var(--dm-text);}
       #toolbar,#focusControls,.pane-header,.pane{background:#121212;color:var(--dm-text);}
       .btn,.top-select,.send-menu button,.urg-due-clear,.uc-today{background:#1c1c1c;color:var(--dm-text);border-color:#444;}
@@ -1398,9 +1406,12 @@
     body.one-day #journalScroll .day-row.od-on{min-height:var(--od-hj,100%);border-bottom:0;}
     body.one-day #todayScroll .day-row.od-on > *{flex:0 0 auto;}
     body.one-day #todayScroll .od-on > .od-head{display:block;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;}
-    body.one-day #todayScroll .od-on > .od-pad-head{border-top:2px solid var(--day-sep,#8a8a8a);padding-top:5px;margin-top:6px;}
-    body.one-day #todayScroll .od-on > .day-editor{flex:1 1 0 !important;min-height:0 !important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}
-    body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
+    body.one-day #todayScroll .od-on > .od-pad-head{border-top:2px solid var(--divider);padding-top:5px;margin-top:6px;position:relative;cursor:row-resize;touch-action:none;user-select:none;-webkit-user-select:none;}
+    body.one-day #todayScroll .od-on > .od-pad-head::before{content:"";position:absolute;left:0;right:0;top:-12px;bottom:0;}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-4px;width:34px;height:6px;margin-left:-17px;border-radius:3px;background:var(--divider);}
+    .split-dragging,.split-dragging *{cursor:row-resize!important;}
+    body.one-day #todayScroll .od-on > .day-editor{flex:var(--od-a,1) 1 0 !important;min-height:0 !important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}
+    body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
     .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
     body.one-day .sec-boxes{display:none;}
 
@@ -1578,6 +1589,7 @@
     <div class="ts-sub">Task cards</div>
     <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
+    <label class="ts-check">Divider lines <input type="color" id="dividerColor" value="#1f2937" aria-label="Divider line color"> <button class="btn tiny" type="button" id="dividerReset">Reset</button></label>
     <label class="ts-check"><input type="checkbox" id="oneDayOn" checked> One day at a time (▲ ▼ to change day; Completed on top, Plan pad below)</label>
     <label class="ts-check"><input type="checkbox" id="cardsBoxFill" checked> Subject color in the checkbox (off = whole card)</label>
     <div class="ts-row">
@@ -1656,6 +1668,7 @@
       <!-- Reference split (2026-10-31, Julius): top = Urgent, Calendar and the other panels,
            bottom = the Reference cells. Each half scrolls on its own, like Today. -->
       <div class="scroll ref-top" id="refTopScroll"></div>
+      <div id="refSplitBar" title="Drag to resize · double-tap to reset"></div>
       <div
         class="scroll"
         id="referenceScroll">
@@ -9591,6 +9604,70 @@
      and the done log keep working); CSS hides all but window.odDate. ▲ = previous day, ▼ = next day,
      loading more weeks when needed. Plan pad = free writing under the Completed area, saved to the
      Days tab column D via savePlanPad (safe save: hash check + 3-way merge like the cells). */
+  // Split bars (2026-10-31, Julius): drag the line between the two halves of Today
+  // (Completed / Plan pad) and Reference (panels / cells). Ratio saved per bar;
+  // double-tap resets to half and half. Divider color is set in Options.
+  (function initSplitBars(){
+    const clamp = r => Math.max(.12,Math.min(.88,r));
+    const apply = (host,a,b,r) => { host.style.setProperty(a,String(r)); host.style.setProperty(b,String(1 - r)); };
+    const load = k => { try{ const v = parseFloat(localStorage.getItem(k)); return isFinite(v) ? clamp(v) : .5; }catch(e){ return .5; } };
+    const save = (k,r) => { try{ localStorage.setItem(k,String(r)); }catch(e){} };
+    function wire(opt){
+      apply(opt.host(),opt.a,opt.b,load(opt.key));
+      let drag = null, lastTap = 0;
+      document.addEventListener('pointerdown',e => {
+        const bar = e.target.closest && e.target.closest(opt.sel);
+        if(!bar || e.button > 0) return;
+        const now = Date.now();
+        if(now - lastTap < 350){ lastTap = 0; apply(opt.host(),opt.a,opt.b,.5); save(opt.key,.5); e.preventDefault(); return; }
+        lastTap = now;
+        const box = opt.box(bar);
+        if(!box) return;
+        drag = {box,id:e.pointerId,bar,moved:false,y:e.clientY};
+        try{ bar.setPointerCapture(e.pointerId); }catch(err){}
+        document.body.classList.add('split-dragging');
+        e.preventDefault(); e.stopPropagation();
+      },true);
+      document.addEventListener('pointermove',e => {
+        if(!drag || e.pointerId !== drag.id) return;
+        if(Math.abs(e.clientY - drag.y) > 3) drag.moved = true;
+        const r = clamp((e.clientY - drag.box.top) / Math.max(1,drag.box.height));
+        apply(opt.host(),opt.a,opt.b,r); drag.r = r;
+        e.preventDefault();
+      },true);
+      const end = e => {
+        if(!drag || (e && e.pointerId !== drag.id)) return;
+        if(drag.moved && drag.r != null){ save(opt.key,drag.r); lastTap = 0; }
+        document.body.classList.remove('split-dragging');
+        drag = null;
+      };
+      document.addEventListener('pointerup',end,true);
+      document.addEventListener('pointercancel',end,true);
+      document.addEventListener('touchmove',e => { if(drag) e.preventDefault(); },{capture:true,passive:false});
+    }
+    wire({sel:'#refSplitBar',key:'fw.refSplit',a:'--rs-a',b:'--rs-b',
+      host:() => document.getElementById('referencePane') || document.documentElement,
+      box:() => {
+        const t = document.getElementById('refTopScroll'), b = document.getElementById('referenceScroll');
+        if(!t || !b) return null;
+        const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
+        return {top:r1.top,height:r2.bottom - r1.top};
+      }});
+    wire({sel:'body.one-day #todayScroll .od-on > .od-pad-head',key:'fw.odSplit',a:'--od-a',b:'--od-b',
+      host:() => document.getElementById('todayScroll') || document.documentElement,
+      box:bar => {
+        const row = bar.parentNode, ed = row && row.querySelector('.day-editor'), pad = row && row.querySelector('.plan-pad');
+        if(!ed || !pad) return null;
+        const r1 = ed.getBoundingClientRect(), r2 = pad.getBoundingClientRect();
+        return {top:r1.top,height:r2.bottom - r1.top};
+      }});
+    // Divider color (Options).
+    const inp = document.getElementById('dividerColor'), rst = document.getElementById('dividerReset');
+    const setDiv = c => { if(c) document.documentElement.style.setProperty('--divider',c); else document.documentElement.style.removeProperty('--divider'); };
+    try{ const c = localStorage.getItem('fw.divider'); if(c){ setDiv(c); if(inp) inp.value = c; } }catch(e){}
+    if(inp) inp.addEventListener('input',() => { setDiv(inp.value); try{ localStorage.setItem('fw.divider',inp.value); }catch(e){} });
+    if(rst) rst.addEventListener('click',() => { setDiv(''); try{ localStorage.removeItem('fw.divider'); }catch(e){} if(inp) inp.value = '#1f2937'; });
+  })();
   (function initOneDay(){
     let on = true; try{ on = localStorage.getItem('fw.oneDay') !== '0'; }catch(e){}
     document.body.classList.toggle('one-day', on);

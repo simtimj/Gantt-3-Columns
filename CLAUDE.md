@@ -205,3 +205,4 @@
 ## Reference split (2026-10-31, Julius)
 
 - Reference is two stacked halves like Today: `#refTopScroll` (top, own scroll) holds the panels (Urgent, Calendar — anything that isn't a Reference cell); `#referenceScroll` (bottom) keeps the search toolbar + `#referenceTree` cells. New panels go in via `refTopHost(tree)`, never `tree.parentNode`. 2px `--day-sep` line between them; top hides when empty.
+- Split bars (2026-10-31): `initSplitBars()` (before `initOneDay`). Today = `.od-pad-head` is the handle (flex grow `--od-a`/`--od-b` on `#todayScroll`, localStorage `fw.odSplit`); Reference = `#refSplitBar` between `#refTopScroll` and `#referenceScroll` (`--rs-a`/`--rs-b` on `#referencePane`, `fw.refSplit`). Double-tap = 0.5. Big section lines use `--divider` (light #1f2937, dark #e5e7eb; Options `#dividerColor` → `fw.divider`). `.column-resizer` grid track stays 1px; the 2px look is a box-shadow.

@@ -49,6 +49,8 @@ Last updated: 2026-10-30
 
 ## 🧪 To be confirmed (2026-10-31)
 
+- **Bold divider lines (2026-10-31):** the column lines and the lines splitting Today and Reference in half are now dark (light theme) / bright (dark theme), 2px. Change the color in **Options → Divider lines** (Reset puts it back).
+- **Drag the half-split lines (2026-10-31):** drag the line above "Plan / think" in Today, or the line between Urgent/Calendar and the cells in Reference, to resize the halves. Each remembers its size; double-tap a line to go back to half and half.
 - **Reference split in two (2026-10-31):** like Today, Reference is now two stacked halves that scroll on their own — top = Urgent, Calendar and the other panels; bottom = search, + Cell and all the Reference cells.
 - **Inbox removed (2026-10-31):** the Inbox panel is gone. The time-tracking idea moved to Backlog (Can be later); any open items you typed into the inbox move to Backlog automatically.
 

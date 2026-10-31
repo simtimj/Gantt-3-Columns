@@ -173,4 +173,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-col-drag-small-btns', date: '2026-10-31', project: 'Gantt', title: 'Draggable column lines + smaller buttons', details: 'both column lines drag in 3-pane view; ● today marker; smaller fold and toolbar buttons; Notes-split ideas in Gantt Cols card' },
   { id: 'd-20261031-lines-not-boxes', date: '2026-10-31', project: 'Gantt', title: 'Lines instead of cell boxes', details: 'Today + Notes cells keep only top/bottom lines; column lines now drag on the phone' },
   { id: 'd-20261031-line-strength', date: '2026-10-31', project: 'Gantt', title: 'Line strength slider + slimmer resize bars', details: 'Options slider fades all dividing lines (default 70%); split bars 3px, smaller grips' },
+  { id: 'd-20261031-ref-urgent-only', date: '2026-10-31', project: 'Gantt', title: 'Reference: Urgent on top, one Options button', details: 'Calendar panel off; sort + collapse into Options; toolbar search · + · Arc · Options' },
 ];

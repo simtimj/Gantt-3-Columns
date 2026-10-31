@@ -1212,7 +1212,9 @@
     .ref-options{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;}
     .ref-options .ts-check{flex-wrap:wrap;}
     .ref-options .ts-check select{max-width:100%;}
-    .reference-sort-bar #refOptionsBtn.on{background:#eef2ff;border-color:#1a73e8;}
+    .reference-sort-bar #refOptionsBtn.on,#refOptionsBtn.on{background:#eef2ff;border-color:#1a73e8;}
+    .ref-toolbar .btn.ref-tb-sm{padding:2px 6px!important;font-size:12px;flex:0 0 auto;}
+    .ref-options .ref-collapse-all{min-width:1.6em;padding:0 6px;font-weight:700;}
     .ref-options{margin:0 0 10px;padding:6px 10px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;}
     /* Pop-up over the content instead of pushing it down (Julius, 2026-10-26); closes on tap outside */
     .ref-options{position:fixed;z-index:3000;margin:0;width:min(300px,calc(100vw - 32px));max-height:70vh;overflow:auto;box-shadow:0 6px 20px rgba(0,0,0,.18);border-radius:10px;}
@@ -1687,16 +1689,6 @@
       id="referencePane">
       <div class="pane-header ref-pane-header">
         <span class="ref-pane-title">REFERENCE</span>
-          <div class="reference-sort-bar">
-            <label for="referenceSort" class="ref-sort-label">Sort</label>
-            <select id="referenceSort" class="top-select">
-              <option value="original">Original order</option>
-              <option value="title">Title A–Z</option>
-              <option value="modified">Last modified · newest first</option>
-            </select>
-            <button class="btn tiny ref-collapse-all" type="button" data-layout="reference" title="Collapse or expand all Reference cells" aria-label="Collapse or expand all Reference cells">−</button>
-            <button class="btn tiny" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: Urgent panel">Options</button>
-        </div>
       </div>
       <!-- Reference split (2026-10-31, Julius): top = Urgent, Calendar and the other panels,
            bottom = the Reference cells. Each half scrolls on its own, like Today. -->
@@ -1706,6 +1698,16 @@
         class="scroll"
         id="referenceScroll">
         <div id="refOptions" class="ref-options" hidden>
+          <!-- One Options button (2026-10-31, Julius): sort + collapse moved here from the header. -->
+          <div class="ts-sub">Reference cells</div>
+          <label class="ts-check">Sort
+            <select id="referenceSort" class="top-select">
+              <option value="original">Original order</option>
+              <option value="title">Title A–Z</option>
+              <option value="modified">Last modified · newest first</option>
+            </select>
+          </label>
+          <label class="ts-check">Collapse / expand all <button class="btn tiny ref-collapse-all" type="button" data-layout="reference" title="Collapse or expand all Reference cells" aria-label="Collapse or expand all Reference cells">−</button></label>
           <div class="ts-sub">Urgent panel</div>
           <label class="ts-check"><input type="checkbox" id="optUrgWrap"> Wrap long text</label>
           <label class="ts-check"><input type="checkbox" id="optUrgBatch"> Group by subject</label>
@@ -1738,17 +1740,9 @@
             id="refSearch"
             class="ref-search"
             placeholder="Search reference…">
-          <button
-            class="btn"
-            onclick="addReferenceCell()">
-            + Cell
-          </button>
-          <button
-            class="btn"
-            title="Deleted cells — restore them"
-            onclick="openArchive()">
-            Archive
-          </button>
+          <button class="btn ref-tb-sm" title="New Reference cell" onclick="addReferenceCell()">+</button>
+          <button class="btn ref-tb-sm" title="Archive: deleted cells — restore them" onclick="openArchive()">Arc</button>
+          <button class="btn ref-tb-sm" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: sort, collapse, Urgent panel, padding">Options</button>
         </div>
         <div id="referenceTree"></div>
       </div>
@@ -6810,7 +6804,7 @@
   let calData = null, calOpen = true, calLoading = false, calLoadedAt = 0, calError = '';
   try{ calOpen = localStorage.getItem('fw.calOpen') !== '0'; }catch(e){}
   // Calendar panel back (2026-10-29, Julius): every calendar event lives here as a checkbox (tick = Graphite = done).
-  const CAL_PANEL_ON = true;
+  const CAL_PANEL_ON = false; // Calendar panel off (2026-10-31, Julius): Reference top half is Urgent only.
   function loadCalendar(){
     if(!CAL_PANEL_ON){ const p = document.getElementById('calPanel'); if(p) p.remove(); return; }
     if(calLoading) return;

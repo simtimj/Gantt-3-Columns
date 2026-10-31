@@ -176,4 +176,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-ref-urgent-only', date: '2026-10-31', project: 'Gantt', title: 'Reference: Urgent on top, one Options button', details: 'Calendar panel off; sort + collapse into Options; toolbar search · + · Arc · Options' },
   { id: 'd-20261031-weekday-icons', date: '2026-10-31', project: 'Gantt', title: 'Weekday icons in Today headers', details: 'Sun–Sat element icons (sun, moon, fire, water, wood, gold, earth) right of each Today date, text-sized, in the day\'s own color' },
   { id: 'd-20261031-notes-split', date: '2026-10-31', project: 'Gantt', title: 'Notes split: Plan on top, live Review below', details: 'Drag bar in Notes; Review shows done count, focus by time section, at-risk tasks, tomorrow\'s top 3; to-do: confirm on /dev, tweak what Review shows' },
+  { id: 'd-20261031-grips-note-cells', date: '2026-10-31', project: 'Gantt', title: 'Bolder drag notches + edge-to-edge plan/wrap cells', details: 'Resize grips thicker, full strength; Suggested Day and Day wrap-up boxed again, column lines as their sides' },
 ];

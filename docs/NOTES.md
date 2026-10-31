@@ -210,3 +210,8 @@ Read only the section you need.
 - `#journalPane` = `#journalScroll` (Plan, flex `--ns-a`) + `#notesSplitBar` + `#reviewScroll` (flex `--ns-b`); wired in `initSplitBars` (`fw.notesSplit`). One-day `--od-hj` follows the smaller `#journalScroll` via the existing ResizeObserver.
 - `renderReview()` (after `updateDash`, debounced 150 ms) reads top-level `.check-line`s of the Today `.day-editor` for `reviewDate()` (one-day `odDate`, else today): Done n/m; Got focus = done grouped by `tsecOf(data-dt)`; At risk = open `data-urg` 1–2 (past day: Slipped = all open); Tomorrow's top 3 = open sorted urg 1→2→3→none. Called from `updateDash`, `odApply`, and every 60 s. Click `.rv-line` → `reviewSrc[i].scrollIntoView`. Render-only, never saved; adds nothing to the Today DOM.
 
+## Grips + edge-to-edge note cells (2026-10-31, Julius)
+
+- Grips: override block after the "Lines, not boxes" rules; all `::after` grips use `--grip` (set in `setDiv` = divider base color, unfaded), 5px × 30px.
+- Plan / wrap `table[data-cnote]` bleed to the column edges: `--rowpx` on `.day-row` mirrors its side padding (desktop 8px, ≤900px / mobile-mode 12px × `--mobile-scale`, × `--pad-x` × `--side-k`); table `width:calc(100% + 2*--rowpx)` + negative margins, td padding = `--rowpx`. Sched table untouched. If `.day-row` side padding changes, update `--rowpx` too.
+

@@ -1461,6 +1461,21 @@
     .editor table[data-cnote]{border-left:0!important;border-right:0!important;border-radius:0!important;}
     .editor table[data-cnote] td{padding-left:2px!important;padding-right:2px!important;}
     .day-row.today.day-pane-row,.day-row.today.journal-pane-row{box-shadow:inset 0 2px 0 var(--today-border-adj),inset 0 -2px 0 var(--today-border-adj)!important;}
+    /* Grips stick out (Julius, 2026-10-31): drag notches on every resize line are thicker, longer and
+       full strength (--grip = divider color, not faded by Line strength). */
+    .column-resizer::after{left:-1.5px!important;width:5px!important;height:30px!important;margin-top:-15px!important;border-radius:2px!important;background:var(--grip,var(--divider))!important;}
+    #refSplitBar::after,#notesSplitBar::after{top:-1.5px!important;height:5px!important;width:30px!important;margin-left:-15px!important;border-radius:2px!important;background:var(--grip,var(--divider))!important;}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{top:-3.5px!important;height:5px!important;width:30px!important;margin-left:-15px!important;border-radius:2px!important;background:var(--grip,var(--divider))!important;}
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{background:var(--grip,var(--divider))!important;filter:none!important;border-radius:2px;}
+    #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
+    /* Suggested Day + Day wrap-up are cells again (Julius, 2026-10-31), stretched edge to edge so the
+       column lines are their left / right sides: negative margins = the day row's side padding (--rowpx). */
+    .day-row{--rowpx:calc(8px * var(--pad-x,1) * var(--side-k,1));}
+    @media(max-width:900px){ .day-row{--rowpx:calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1));} }
+    body.mobile-mode .day-row{--rowpx:calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1));}
+    .day-row .editor table[data-cnote][data-ckind="plan"],.day-row .editor table[data-cnote][data-ckind="wrap"]{width:calc(100% + 2 * var(--rowpx))!important;max-width:none!important;margin-left:calc(-1 * var(--rowpx))!important;margin-right:calc(-1 * var(--rowpx))!important;border-top-width:2px!important;border-bottom-width:2px!important;}
+    .day-row .editor table[data-cnote][data-ckind="plan"] td,.day-row .editor table[data-cnote][data-ckind="wrap"] td{padding-left:var(--rowpx)!important;padding-right:var(--rowpx)!important;}
     body.one-day #todayScroll .od-on > .day-editor{flex:var(--od-a,1) 1 0 !important;min-height:0 !important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}
     body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
     .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
@@ -9917,6 +9932,7 @@
       const base = divColor || getComputedStyle(root).getPropertyValue('--divider').trim() || '#1f2937';
       root.style.setProperty('--divider', lineK >= 100 ? base : `color-mix(in srgb, ${base} ${lineK}%, transparent)`);
       root.style.setProperty('--line-k', lineK + '%');
+      root.style.setProperty('--grip', base);
       if(rv) rv.textContent = lineK + '%';
     };
     if(inp && divColor) inp.value = divColor;

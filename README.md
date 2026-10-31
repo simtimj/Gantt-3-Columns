@@ -48,6 +48,8 @@ Last updated: 2026-10-31
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
+- **Bolder drag notches (2026-10-31):** the grips on every resize line (columns, Today / Notes / Reference halves, phone split) are thicker and longer and stay full strength even when Line strength fades the lines.
+- **Suggested Day + Day wrap-up are cells again (2026-10-31):** stretched edge to edge across the column, so the column lines are their left and right sides; top and bottom lines in the day's color.
 - **Notes split (2026-10-31, option A):** Notes column has two halves with a drag bar (double-tap = half and half), like Today and Reference. Top = Plan (the Notes cell: Suggested Day + Schedule). Bottom = live **Review** of the day shown in Today: Done n/m, what got focus (done tasks by Morning / Nap gap / Afternoon / Evening), what's at risk (open red/yellow tasks; on a past day everything still open = Slipped) and tomorrow's top 3 (open tasks, red → yellow → blue). Updates as you tick or edit; tap a line to jump to the task. Not saved anywhere.
 - **Weekday icons (2026-10-31):** each Today date header shows its weekday symbol a little right of the date (Sun sun, Mon moon, Tue fire, Wed water, Thu tree, Fri 3D gold bar with open seams between its faces, Sat earth), text height, filled with that day's color (Saturday = dirt brown). Images live in `WeekdayIcons.html`.
 - Reference top half = Urgent only (Calendar panel turned off: `CAL_PANEL_ON = false`)

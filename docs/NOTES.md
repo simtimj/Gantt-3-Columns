@@ -200,3 +200,8 @@ Read only the section you need.
 - Day labels render `.dd-long` (formatDate) + `.dd-short` (formatDateShort, "Sat Oct 31, 2026"); `.pane-narrow` (<420px) shows the short one, nowrap.
 - Today marker: `.today-pill` is now "●" (title "Today").
 - Three-pane split (mobile-split, not row layout): `split3` fractions in localStorage `fw.split3`; `triDrag(handle,idx)` on `#mobileSplitResizer` (idx 0) and `#mobileSplitResizerThird` (idx 1); `data-dir` col/row draws the square grip.
+
+## Weekday icons (2026-10-31, Julius)
+
+- `WeekdayIcons.html` = his 7 PNGs unchanged as base64 (`WD_ICON_B64`, index = `getDay()`, 0 = Sun), turned into blob URLs once (`WD_ICON_URL`). Included at the top of the main `<script>` area via `<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>` (doGet uses a template). `wdIconHtml(date)` adds `<img class="wd-icon">` in `.day-label` for Today rows only (`type === 'day'`), before `.day-date`. CSS `.day-label .wd-icon`: 15px tall, auto width, 4px gap.
+

@@ -48,6 +48,7 @@ Last updated: 2026-10-31
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
+- **Weekday icons (2026-10-31):** each Today date header shows its weekday picture before the date (Sun sun, Mon moon, Tue fire, Wed water, Thu wood, Fri gold, Sat earth), 15px tall, transparent. Images live in `WeekdayIcons.html`.
 - Reference top half = Urgent only (Calendar panel turned off: `CAL_PANEL_ON = false`)
 - Reference toolbar: search · + · Arc · Options. Sort and collapse/expand-all moved from the header into Options (with Urgent panel + padding settings)
 - Options → Line strength slider (20–100%, default 70%): fades all dividing lines (column/split lines, day separators, note block lines); Reset restores color + strength

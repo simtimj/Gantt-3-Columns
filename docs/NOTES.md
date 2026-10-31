@@ -198,12 +198,12 @@ Read only the section you need.
 
 - `updateDash()` no longer makes a `.dash-chip`: it sets `data-dash` on today's `.day-editor` and CSS `.editor[data-dash]:not(:empty)::before` shows it (attribute on the editor, never in saved innerHTML) so it scrolls with the cell. No bar, not bold.
 - Day labels render `.dd-long` (formatDate) + `.dd-short` (formatDateShort, "Sat Oct 31, 2026"); `.pane-narrow` (<420px) shows the short one, nowrap.
-- Today marker: `.today-pill` is now "●" (title "Today").
+- Today marker `.today-pill` (●) REMOVED 2026-10-31 (Julius): not rendered anymore; CSS left harmless.
 - Three-pane split (mobile-split, not row layout): `split3` fractions in localStorage `fw.split3`; `triDrag(handle,idx)` on `#mobileSplitResizer` (idx 0) and `#mobileSplitResizerThird` (idx 1); `data-dir` col/row draws the square grip.
 
 ## Weekday icons (2026-10-31, Julius)
 
-- `WeekdayIcons.html` = his 7 PNGs unchanged as base64 (`WD_ICON_B64`, index = `getDay()`, 0 = Sun), turned into blob URLs once (`WD_ICON_URL`). Included at the top of the main `<script>` area via `<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>` (doGet uses a template). `wdIconHtml(date)` adds `<span class="wd-icon">` in `.day-label` for Today rows only (`type === 'day'`), AFTER `.day-date` (2026-10-31: moved right). The PNG is a CSS mask (`mask-image`, inline style) filled with `var(--note-line-adj)` = the day's own color, so it follows the day colors, dark mode and the brightness slider. Height .9em (text size), width = .9em × `WD_RATIO[d]` (PNG width/height).
+- `WeekdayIcons.html` = his 7 PNGs unchanged as base64 (`WD_ICON_B64`, index = `getDay()`, 0 = Sun), turned into blob URLs once (`WD_ICON_URL`). Included at the top of the main `<script>` area via `<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>` (doGet uses a template). `wdIconHtml(date)` adds `<span class="wd-icon">` in `.day-label` for Today rows only (`type === 'day'`), AFTER `.day-date`, 9px gap (2026-10-31: moved right). The PNG is a CSS mask (`mask-image`, inline style) filled with `var(--note-line-adj)` = the day's own color, so it follows the day colors, dark mode and the brightness slider. Height .9em (text size), width = .9em × `WD_RATIO[d]` (PNG width/height).
 
 ## Notes split + Review (2026-10-31, Julius: option A)
 

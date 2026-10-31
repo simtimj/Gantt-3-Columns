@@ -49,7 +49,7 @@ Last updated: 2026-10-31
 
 ## 🧪 To be confirmed (2026-10-31)
 - **Notes split (2026-10-31, option A):** Notes column has two halves with a drag bar (double-tap = half and half), like Today and Reference. Top = Plan (the Notes cell: Suggested Day + Schedule). Bottom = live **Review** of the day shown in Today: Done n/m, what got focus (done tasks by Morning / Nap gap / Afternoon / Evening), what's at risk (open red/yellow tasks; on a past day everything still open = Slipped) and tomorrow's top 3 (open tasks, red → yellow → blue). Updates as you tick or edit; tap a line to jump to the task. Not saved anywhere.
-- **Weekday icons (2026-10-31):** each Today date header shows its weekday symbol right after the date (Sun sun, Mon moon, Tue fire, Wed water, Thu wood, Fri gold, Sat earth), text height, filled with that day's color (Saturday = dirt brown). Images live in `WeekdayIcons.html`.
+- **Weekday icons (2026-10-31):** each Today date header shows its weekday symbol a little right of the date (Sun sun, Mon moon, Tue fire, Wed water, Thu wood, Fri gold, Sat earth), text height, filled with that day's color (Saturday = dirt brown). Images live in `WeekdayIcons.html`.
 - Reference top half = Urgent only (Calendar panel turned off: `CAL_PANEL_ON = false`)
 - Reference toolbar: search · + · Arc · Options. Sort and collapse/expand-all moved from the header into Options (with Urgent panel + padding settings)
 - Options → Line strength slider (20–100%, default 70%): fades all dividing lines (column/split lines, day separators, note block lines); Reset restores color + strength
@@ -57,7 +57,7 @@ Last updated: 2026-10-31
 - Line strength slider fixed (was squeezed to 16px and stuck at 20%)
 - Lines, not boxes: note blocks and today's cell keep only top / bottom lines (no side borders) in Today + Notes
 - Column lines (Today | Notes | Reference) drag on phone-size screens too, wider finger grab
-- Today marker is a small ● next to the date (was "• TODAY")
+- Today ● dot next to the date removed (2026-10-31): one-day view, no list to mark it in
 - Three panes side by side: both column lines drag (square grips); double-tap a line to reset to equal widths
 - Smaller − / + fold buttons and smaller toolbar / menu buttons
 - Today done count: plain "Today: 6/6 done" (no bar, not bold), sits above Morning inside the cell and scrolls away

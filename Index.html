@@ -318,7 +318,7 @@
       user-select:none;
     }
     .day-date{text-decoration:underline;text-underline-offset:3px;}
-    .day-label .wd-icon{display:inline-block;height:.9em;vertical-align:-.1em;margin-left:4px;background:var(--note-line-adj,currentColor);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;pointer-events:none;user-select:none;-webkit-user-select:none;}
+    .day-label .wd-icon{display:inline-block;height:.9em;vertical-align:-.1em;margin-left:9px;background:var(--note-line-adj,currentColor);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;pointer-events:none;user-select:none;-webkit-user-select:none;}
     .day-date .dd-short{display:none;}
     .pane-narrow .day-label{white-space:nowrap;}
     .pane-narrow .day-date .dd-long{display:none;}
@@ -2111,12 +2111,7 @@
     const label =
       `<div class="day-label">
         <span class="day-date"><span class="dd-long">${esc(formatDate(day.date))}</span><span class="dd-short">${esc(formatDateShort(day.date))}</span></span>${type === 'day' ? wdIconHtml(day.date) : ''}
-        ${
-          today
-            ? '<span class="today-pill" title="Today">●</span>'
-            : ''
-        }
-      </div>`;
+      </div>`; // today ● dot removed (Julius, 2026-10-31: one-day view, no list)
     const content =
       type === 'day'
         ? day.tasks

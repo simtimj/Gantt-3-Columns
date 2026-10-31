@@ -48,6 +48,8 @@ Last updated: 2026-10-31
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
+- Lines, not boxes: note blocks and today's cell keep only top / bottom lines (no side borders) in Today + Notes
+- Column lines (Today | Notes | Reference) drag on phone-size screens too, wider finger grab
 - Today marker is a small ● next to the date (was "• TODAY")
 - Three panes side by side: both column lines drag (square grips); double-tap a line to reset to equal widths
 - Smaller − / + fold buttons and smaller toolbar / menu buttons

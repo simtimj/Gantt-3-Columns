@@ -171,4 +171,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-time-sections', date: '2026-10-31', project: 'Gantt', title: 'Time sections in Today', details: 'tasks sort under Morning / Afternoon / Evening by check or add time; nap-gap tasks under a short half line' },
   { id: 'd-20261031-dash-dates', date: '2026-10-31', project: 'Gantt', title: 'Compact done count + short dates', details: 'Today count plain, no bar, scrolls away above Morning; narrow Today/Notes dates as "Sat Oct 31, 2026"' },
   { id: 'd-20261031-col-drag-small-btns', date: '2026-10-31', project: 'Gantt', title: 'Draggable column lines + smaller buttons', details: 'both column lines drag in 3-pane view; ● today marker; smaller fold and toolbar buttons; Notes-split ideas in Gantt Cols card' },
+  { id: 'd-20261031-lines-not-boxes', date: '2026-10-31', project: 'Gantt', title: 'Lines instead of cell boxes', details: 'Today + Notes cells keep only top/bottom lines; column lines now drag on the phone' },
 ];

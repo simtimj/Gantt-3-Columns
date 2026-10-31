@@ -57,3 +57,4 @@
 - Urgent batches (2026-10-30, Julius)
 - Reference split (2026-10-31, Julius)
 - Time sections in Today (2026-10-31, Julius)
+- Done count + short dates (2026-10-31, Julius)

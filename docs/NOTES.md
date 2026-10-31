@@ -192,3 +192,8 @@ Read only the section you need.
 ## Time sections in Today (2026-10-31, Julius)
 
 - Index.html, before `initSplitBars`: `TSEC`, `tsecStampNew(ed)` (top-level check-lines get `data-at="HH:MM"` when new; first run marks old lines `data-at="-"`), `tsecToggled()` (called from `wireCheckbox` change: sets/removes `data-dt`), `tsecArrange(ed)` rebuilds today's `.day-editor` children: untimed blocks on top, then `<div data-tsec="morning|gap|afternoon|evening" contenteditable="false">` headers + blocks sorted by time (checked → dt, open → at). Boundaries: <14:00 morning, <15:45 gap (dashed half line), <18:30 afternoon, else evening. Runs on toggle (deferred to focusout while typing elsewhere in the cell), on focusout, and in `addTaskToEditor`. Today only. Old Day sections (`data-sec`) are a different, removed system.
+
+## Done count + short dates (2026-10-31, Julius)
+
+- `updateDash()` no longer makes a `.dash-chip`: it sets `data-dash` on today's `.day-editor` and CSS `.editor[data-dash]:not(:empty)::before` shows it (attribute on the editor, never in saved innerHTML) so it scrolls with the cell. No bar, not bold.
+- Day labels render `.dd-long` (formatDate) + `.dd-short` (formatDateShort, "Sat Oct 31, 2026"); `.pane-narrow` (<420px) shows the short one, nowrap.

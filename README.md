@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` deploys automatically (`.github/workflows/deploy.yaml` → `clasp push` + update deployment).
 
-Last updated: 2026-10-30
+Last updated: 2026-10-31
 
 ## Status key
 
@@ -48,6 +48,8 @@ Last updated: 2026-10-30
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
+- Today done count: plain "Today: 6/6 done" (no bar, not bold), sits above Morning inside the cell and scrolls away
+- Short day dates in narrow panes (Today + Notes): "Sat Oct 31, 2026" on one line; full form when wide
 
 - **Time sections in Today (2026-10-31):** today's tasks sort themselves under Morning (8:30 am – 2 pm), Afternoon (3:45 – 6:30 pm) and Evening (6:30 – 9:30 pm). Checked tasks go by when you checked them, open ones by when you added them; anything done in the 2–3:45 nap gap sits under a short dashed half line after Morning. Headers only show when something is in them. Older lines, notes and Claude's done log stay on top. Sorting happens when you tick a box or leave the cell, never while you type.
 - **Bold divider lines (2026-10-31):** the column lines and the lines splitting Today and Reference in half are now dark (light theme) / bright (dark theme), 2px. Change the color in **Options → Divider lines** (Reset puts it back).

@@ -318,6 +318,10 @@
       user-select:none;
     }
     .day-date{text-decoration:underline;text-underline-offset:3px;}
+    .day-date .dd-short{display:none;}
+    .pane-narrow .day-label{white-space:nowrap;}
+    .pane-narrow .day-date .dd-long{display:none;}
+    .pane-narrow .day-date .dd-short{display:inline;}
     .today-pill{
       color:var(--accent);
       margin-left:6px;
@@ -1160,6 +1164,7 @@
     /* Mini dashboard (2026-10-27): today's tasks done, in the toolbar. */
     .dash-chip{display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:0 0 6px;padding:1px 8px;font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:999px;color:var(--muted);white-space:nowrap;}
     .dash-chip:empty{display:none;}
+    .editor[data-dash]:not(:empty)::before{content:attr(data-dash);display:block;margin:0 0 4px;font-size:12px;font-weight:400;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
     .dash-chip b{color:inherit;}
     .dash-chip .dash-bar{display:inline-block;vertical-align:middle;width:46px;height:5px;margin-left:6px;border-radius:3px;background:rgba(127,127,127,.25);overflow:hidden;}
     .dash-chip .dash-bar i{display:block;height:100%;background:#22a06b;}
@@ -1902,6 +1907,11 @@
     const mon = d.toLocaleDateString('en-US',{month:'long'});
     return wk + ' ' + mon + ' ' + d.getDate() + ', ' + d.getFullYear();
   }
+  // Narrow panes use "Sat Oct 31, 2026" so the date stays on one line (Julius, 2026-10-31).
+  function formatDateShort(s){
+    const d = new Date(s + 'T00:00:00');
+    return d.toLocaleDateString('en-US',{weekday:'short'}) + ' ' + d.toLocaleDateString('en-US',{month:'short'}) + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
   function setStatus(s){
     const status=document.getElementById('status');
     const focusStatus=document.getElementById('focusStatus');
@@ -2057,7 +2067,7 @@
       day.date;
     const label =
       `<div class="day-label">
-        <span class="day-date">${esc(formatDate(day.date))}</span>
+        <span class="day-date"><span class="dd-long">${esc(formatDate(day.date))}</span><span class="dd-short">${esc(formatDateShort(day.date))}</span></span>
         ${
           today
             ? '<span class="today-pill">• TODAY</span>'
@@ -8691,19 +8701,18 @@
       // (Julius, 2026-10-27) lives inside today's Today cell, right under the date line.
       const today = (typeof state !== 'undefined' && state && state.today) || localToday();
       const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(today)}"]`);
-      document.querySelectorAll('.dash-chip').forEach(c => { if(!ed || c.nextElementSibling !== ed) c.remove(); });
+      // (2026-10-31, Julius) No bar, not bold, not pinned: shown as the editor's ::before (data-dash on the
+      // editor element, never in its saved innerHTML) so it sits above Morning and scrolls away.
+      document.querySelectorAll('.dash-chip').forEach(c => c.remove());
+      document.querySelectorAll('.editor[data-dash]').forEach(e => { if(e !== ed) delete e.dataset.dash; });
       if(!ed) return;
-      let chip = ed.previousElementSibling;
-      if(!chip || !chip.classList.contains('dash-chip')){
-        chip = document.createElement('div'); chip.className = 'dash-chip'; chip.id = 'dashChip';
-        chip.title = "Today's tasks done"; ed.parentNode.insertBefore(chip,ed);
-        // The chip pushes the editor down: redraw the section boxes (and re-sync the row) so Evening doesn't spill (2026-10-29).
-        requestAnimationFrame(() => { try{ paintDaySecs(ed); }catch(e){} });
-      }
       const lines = [...ed.querySelectorAll('.check-line')];
       const done = lines.filter(l => l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      const pct = lines.length ? Math.round(done / lines.length * 100) : 0;
-      chip.innerHTML = 'Today: <b>' + done + '/' + lines.length + '</b> done<span class="dash-bar"><i style="width:' + pct + '%"></i></span>';
+      const txt = 'Today: ' + done + '/' + lines.length + ' done';
+      if(ed.dataset.dash !== txt){
+        ed.dataset.dash = txt;
+        requestAnimationFrame(() => { try{ paintDaySecs(ed); }catch(e){} });
+      }
     },120);
   }
   document.addEventListener('change',e => { if(e.target && e.target.matches && e.target.matches('#todayScroll input[type=checkbox]')) updateDash(); },true);

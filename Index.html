@@ -537,7 +537,7 @@
     #refTopScroll:empty + #refSplitBar{display:none;}
     /* Drag bar between the halves: 2px line in --divider, taller invisible grab area, grip pill. */
     #refSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
-    #refSplitBar::before{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px;}
+    #refSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
     #refSplitBar::after{content:"";position:absolute;left:50%;top:-.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
     /* Phone (2026-10-26, Julius): Delete sits at the right end of the title
        line instead of on its own row below, so tapping a cell doesn't make
@@ -731,7 +731,7 @@
       #workspace{scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
       #workspace .pane{scroll-snap-align:start;}
       /* Column lines drag on phones too (Julius, 2026-10-31); wider invisible grab area for fingers. */
-      .column-resizer::before{left:-10px;right:-10px;}
+      .column-resizer::before{left:-13px;right:-13px;}
       #focusControls{position:static;flex:0 0 auto;padding:calc(6px * var(--mobile-scale,1)) calc(8px * var(--mobile-scale,1));flex-wrap:wrap;background:#fff;}
       #focusControls .btn{min-height:calc(30px * var(--mobile-scale,1));font-size:calc(13px * var(--mobile-scale,1));}
       #focusStatus{margin-right:auto;}
@@ -764,10 +764,11 @@
     /* Split works in regular and Mobile mode (body class name kept from before). */
     body:not(.mobile-split) #mobileSplitResizer{display:none!important;}
     #mobileSplitResizer{display:none;background:var(--divider-on,var(--divider));height:3px;cursor:row-resize;touch-action:none;position:relative;z-index:40;}
-    #mobileSplitResizer::before{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px;}
+    #mobileSplitResizer::before{content:"";position:absolute;left:0;right:0;top:-9px;bottom:-9px;}
+    #mobileSplitResizerThird[data-dir="row"]::before{content:"";position:absolute;left:0;right:0;top:-9px;bottom:-9px;}
     /* Square grips on the split column lines, same as the half-split bars (2026-10-31, Julius). */
     #mobileSplitResizerThird{background:var(--divider-on,var(--divider));touch-action:none;position:relative;z-index:40;}
-    #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{content:"";position:absolute;top:0;bottom:0;left:-6px;right:-6px;}
+    #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{content:"";position:absolute;top:0;bottom:0;left:-10px;right:-10px;}
     #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{content:"";position:absolute;background:var(--divider-on,var(--divider));pointer-events:none;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{top:50%;left:50%;width:3px;height:22px;margin:-11px 0 0 -1.5px;filter:brightness(.6);}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{left:50%;top:50%;width:22px;height:3px;margin:-1.5px 0 0 -11px;filter:brightness(.6);}
@@ -1121,6 +1122,9 @@
     #typeSettings .ts-cat .ts-cat-del{width:26px!important;height:26px!important;}
     body #typeSettings .ts-check input,body #typeSettings .ts-cat input{min-height:0!important;}
     body #typeSettings .ts-check input{height:16px!important;}
+    /* Range sliders in Options get real width (the checkbox sizing above made them 16px and stuck, 2026-10-31). */
+    body #typeSettings .ts-check input[type=range]{width:auto!important;flex:1 1 140px;min-width:120px;height:22px!important;margin:0!important;touch-action:pan-y;}
+    #lineStrengthVal{min-width:3em;text-align:right;font-variant-numeric:tabular-nums;}
     #typeSettings .ts-hint{font-size:11px;color:var(--muted);margin:2px 0 6px;}
     #typeSettings .ts-cat{display:grid;grid-template-columns:34px minmax(0,1fr) 28px;gap:4px 6px;align-items:center;margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
     #typeSettings .ts-cat input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;}
@@ -1423,7 +1427,7 @@
     body.one-day #todayScroll .day-row.od-on > *{flex:0 0 auto;}
     body.one-day #todayScroll .od-on > .od-head{display:block;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;}
     body.one-day #todayScroll .od-on > .od-pad-head{border-top:2px solid var(--divider);padding-top:5px;margin-top:6px;position:relative;cursor:row-resize;touch-action:none;user-select:none;-webkit-user-select:none;}
-    body.one-day #todayScroll .od-on > .od-pad-head::before{content:"";position:absolute;left:0;right:0;top:-12px;bottom:0;}
+    body.one-day #todayScroll .od-on > .od-pad-head::before{content:"";position:absolute;left:0;right:0;top:-15px;bottom:0;}
     body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-2.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
     .split-dragging,.split-dragging *{cursor:row-resize!important;}
     /* Time sections in Today (2026-10-31): small labeled lines; the in-between one is a short half line. */

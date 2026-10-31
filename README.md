@@ -49,7 +49,8 @@ Last updated: 2026-10-31
 
 ## 🧪 To be confirmed (2026-10-31)
 - Options → Line strength slider (20–100%, default 70%): fades all dividing lines (column/split lines, day separators, note block lines); Reset restores color + strength
-- Slimmer resize bars: split lines 3px (were 7px), smaller square grips
+- Slimmer resize bars: split lines 3px (were 7px), smaller square grips; bigger invisible grab area (2026-10-31)
+- Line strength slider fixed (was squeezed to 16px and stuck at 20%)
 - Lines, not boxes: note blocks and today's cell keep only top / bottom lines (no side borders) in Today + Notes
 - Column lines (Today | Notes | Reference) drag on phone-size screens too, wider finger grab
 - Today marker is a small ● next to the date (was "• TODAY")

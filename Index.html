@@ -1948,7 +1948,7 @@
   // Weekday icon right of the date in Today headers (Julius, 2026-10-31): Sun=sun, Mon=moon,
   // Tue=fire, Wed=water, Thu=wood, Fri=gold, Sat=earth. The PNG (WeekdayIcons.html) is used as a
   // mask filled with the day's own color (--note-line-adj: Saturday = dirt brown), text height.
-  const WD_RATIO = [187/187,186/195,169/202,157/207,212/167,236/98,245/152]; // width / height per PNG
+  const WD_RATIO = [187/187,186/195,169/202,157/207,174/234,225/126,245/152]; // width / height per PNG
   function wdIconHtml(s){
     const d = new Date(s + 'T00:00:00').getDay(), src = (window.WD_ICON_URL || [])[d];
     if(!src) return '';

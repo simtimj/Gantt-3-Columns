@@ -49,7 +49,7 @@ Last updated: 2026-10-31
 
 ## 🧪 To be confirmed (2026-10-31)
 - **Notes split (2026-10-31, option A):** Notes column has two halves with a drag bar (double-tap = half and half), like Today and Reference. Top = Plan (the Notes cell: Suggested Day + Schedule). Bottom = live **Review** of the day shown in Today: Done n/m, what got focus (done tasks by Morning / Nap gap / Afternoon / Evening), what's at risk (open red/yellow tasks; on a past day everything still open = Slipped) and tomorrow's top 3 (open tasks, red → yellow → blue). Updates as you tick or edit; tap a line to jump to the task. Not saved anywhere.
-- **Weekday icons (2026-10-31):** each Today date header shows its weekday symbol a little right of the date (Sun sun, Mon moon, Tue fire, Wed water, Thu wood, Fri gold, Sat earth), text height, filled with that day's color (Saturday = dirt brown). Images live in `WeekdayIcons.html`.
+- **Weekday icons (2026-10-31):** each Today date header shows its weekday symbol a little right of the date (Sun sun, Mon moon, Tue fire, Wed water, Thu tree, Fri 3D gold bar with open seams between its faces, Sat earth), text height, filled with that day's color (Saturday = dirt brown). Images live in `WeekdayIcons.html`.
 - Reference top half = Urgent only (Calendar panel turned off: `CAL_PANEL_ON = false`)
 - Reference toolbar: search · + · Arc · Options. Sort and collapse/expand-all moved from the header into Options (with Urgent panel + padding settings)
 - Options → Line strength slider (20–100%, default 70%): fades all dividing lines (column/split lines, day separators, note block lines); Reset restores color + strength

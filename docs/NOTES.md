@@ -205,3 +205,8 @@ Read only the section you need.
 
 - `WeekdayIcons.html` = his 7 PNGs unchanged as base64 (`WD_ICON_B64`, index = `getDay()`, 0 = Sun), turned into blob URLs once (`WD_ICON_URL`). Included at the top of the main `<script>` area via `<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>` (doGet uses a template). `wdIconHtml(date)` adds `<img class="wd-icon">` in `.day-label` for Today rows only (`type === 'day'`), before `.day-date`. CSS `.day-label .wd-icon`: 15px tall, auto width, 4px gap.
 
+## Notes split + Review (2026-10-31, Julius: option A)
+
+- `#journalPane` = `#journalScroll` (Plan, flex `--ns-a`) + `#notesSplitBar` + `#reviewScroll` (flex `--ns-b`); wired in `initSplitBars` (`fw.notesSplit`). One-day `--od-hj` follows the smaller `#journalScroll` via the existing ResizeObserver.
+- `renderReview()` (after `updateDash`, debounced 150 ms) reads top-level `.check-line`s of the Today `.day-editor` for `reviewDate()` (one-day `odDate`, else today): Done n/m; Got focus = done grouped by `tsecOf(data-dt)`; At risk = open `data-urg` 1–2 (past day: Slipped = all open); Tomorrow's top 3 = open sorted urg 1→2→3→none. Called from `updateDash`, `odApply`, and every 60 s. Click `.rv-line` → `reviewSrc[i].scrollIntoView`. Render-only, never saved; adds nothing to the Today DOM.
+

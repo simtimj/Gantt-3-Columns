@@ -540,6 +540,22 @@
     #refSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
     #refSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
     #refSplitBar::after{content:"";position:absolute;left:50%;top:-.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
+    /* Notes split (2026-10-31, Julius): Plan on top, Review on the bottom, same bar as Reference. */
+    #journalScroll{flex:var(--ns-a,1) 1 0;}
+    #reviewScroll{flex:var(--ns-b,1) 1 0;padding:6px 10px 24px;font-size:13px;line-height:1.4;}
+    #notesSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
+    #notesSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
+    #notesSplitBar::after{content:"";position:absolute;left:50%;top:-.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
+    .rv-head{font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:0 0 4px;user-select:none;-webkit-user-select:none;}
+    .rv-sec{margin:8px 0 2px;font-weight:700;font-size:12px;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
+    .rv-count{font-weight:700;}
+    .rv-line{padding:1px 0 1px 10px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .rv-line[data-urg="1"]{color:#c0392b;}
+    .rv-line[data-urg="2"]{color:#b8860b;}
+    .rv-line[data-urg="3"]{color:#2f6fb5;}
+    .rv-done{opacity:.7;}
+    .rv-empty{padding-left:10px;opacity:.6;font-style:italic;}
+    .rv-more{padding-left:10px;opacity:.6;}
     /* Phone (2026-10-26, Julius): Delete sits at the right end of the title
        line instead of on its own row below, so tapping a cell doesn't make
        it taller. The title makes room for it while the cell is active. */
@@ -1683,6 +1699,10 @@
         class="scroll"
         id="journalScroll">
       </div>
+      <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
+           bottom = live Review of the day shown in Today. Render-only, never saved. -->
+      <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
+      <div class="scroll notes-review" id="reviewScroll"></div>
     </section>
     <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
     <section
@@ -8757,6 +8777,7 @@
       // (2026-10-31, Julius) No bar, not bold, not pinned: shown as the editor's ::before (data-dash on the
       // editor element, never in its saved innerHTML) so it sits above Morning and scrolls away.
       document.querySelectorAll('.dash-chip').forEach(c => c.remove());
+      if(typeof renderReview === 'function') renderReview();
       document.querySelectorAll('.editor[data-dash]').forEach(e => { if(e !== ed) delete e.dataset.dash; });
       if(!ed) return;
       const lines = [...ed.querySelectorAll('.check-line')];
@@ -8769,6 +8790,67 @@
     },120);
   }
   document.addEventListener('change',e => { if(e.target && e.target.matches && e.target.matches('#todayScroll input[type=checkbox]')) updateDash(); },true);
+  /* ===== Review (Notes bottom half, 2026-10-31, Julius: option A) =====
+     Live wrap-up of the day shown in Today (one-day date, else today), rebuilt
+     whenever updateDash runs (edits, ticks) and on day change. Reads top-level
+     check-lines of that day's .day-editor: Done n/m, what got focus (done by
+     time section), what's still open / slipped, and tomorrow's top 3 (open,
+     urgency 1 → 2 → 3 → none). Tap a line to jump to the task. Not saved. */
+  let reviewTimer = null, reviewSrc = [];
+  function reviewDate(){
+    const t = (typeof state !== 'undefined' && state && state.today) || localToday();
+    return (document.body.classList.contains('one-day') && window.odDate) || t;
+  }
+  function renderReview(){
+    clearTimeout(reviewTimer);
+    reviewTimer = setTimeout(() => {
+      const box = document.getElementById('reviewScroll');
+      if(!box) return;
+      const date = reviewDate(), today = (typeof state !== 'undefined' && state && state.today) || localToday();
+      const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+      const lvl = el => Math.floor(Number(el.dataset && el.dataset.level) || 0);
+      const lines = ed ? [...ed.querySelectorAll(':scope > .check-line')].filter(l => !lvl(l)) : [];
+      const isDone = l => l.classList.contains('done') || !!(l.querySelector(':scope > input[type=checkbox]') || {}).checked;
+      const txt = l => ((l.querySelector(':scope > .check-text') || l).textContent || '').replace(/\s+/g,' ').trim();
+      const items = lines.map(l => ({l, t:txt(l), done:isDone(l), urg:+(l.dataset.urg || 0)})).filter(x => x.t);
+      const done = items.filter(x => x.done), open = items.filter(x => !x.done);
+      reviewSrc = [];
+      const line = (x,cls) => { reviewSrc.push(x.l); return `<div class="rv-line ${cls || ''}" data-ri="${reviewSrc.length - 1}"${x.urg ? ` data-urg="${x.urg}"` : ''}>${esc(x.t)}</div>`; };
+      const list = (arr,cls,max) => !arr.length ? '<div class="rv-empty">none</div>'
+        : arr.slice(0,max).map(x => line(x,cls)).join('') + (arr.length > max ? `<div class="rv-more">+${arr.length - max} more</div>` : '');
+      const label = date === today ? 'Today' : (typeof formatDateShort === 'function' ? formatDateShort(date) : date);
+      let h = `<div class="rv-head">Review · ${esc(label)}</div>`;
+      h += `<div><span class="rv-count">Done ${done.length}/${items.length}</span></div>`;
+      // Focus: done tasks grouped by the time section they were checked in.
+      const secName = {morning:'Morning',gap:'Nap gap',afternoon:'Afternoon',evening:'Evening'};
+      const bySec = {};
+      done.forEach(x => { const dt = x.l.dataset.dt; const k = /^\d\d:\d\d$/.test(dt || '') && typeof tsecOf === 'function' ? tsecOf(dt) : 'other'; (bySec[k] = bySec[k] || []).push(x); });
+      const secs = ['morning','gap','afternoon','evening','other'].filter(k => bySec[k]);
+      h += '<div class="rv-sec">Got focus</div>';
+      if(!secs.length) h += '<div class="rv-empty">nothing done yet</div>';
+      secs.forEach(k => { h += `<div class="rv-more">${k === 'other' ? 'Done' : secName[k]} · ${bySec[k].length}</div>` + list(bySec[k],'rv-done',6); });
+      // Slipped: open urgent (1–2) tasks, or any open task on a past day.
+      const past = date < today;
+      const byUrg = arr => arr.slice().sort((a,b) => (a.urg || 9) - (b.urg || 9));
+      const slipped = byUrg(open.filter(x => past || x.urg === 1 || x.urg === 2));
+      h += `<div class="rv-sec">${past ? 'Slipped' : 'At risk / still open'} · ${past ? open.length : slipped.length}</div>` + list(slipped,'',8);
+      // Tomorrow's top 3.
+      h += '<div class="rv-sec">Tomorrow\'s top 3</div>' + list(byUrg(open),'',3);
+      if(box.innerHTML !== h) box.innerHTML = h;
+    },150);
+  }
+  (function initReview(){
+    const box = document.getElementById('reviewScroll');
+    if(!box) return;
+    box.addEventListener('click',e => {
+      const r = e.target.closest && e.target.closest('.rv-line');
+      const src = r && reviewSrc[+r.dataset.ri];
+      if(!src || !src.isConnected) return;
+      src.scrollIntoView({block:'center',behavior:'smooth'});
+    });
+    setInterval(renderReview,60000);
+    renderReview();
+  })();
   /* ===== Title lines (Julius, 2026-10-27: save room) =====
      A title line = a line marked data-tl="1" (hold a task's checkbox → Make
      title line, or right-click / long-press any line → ▤ Title), and every
@@ -9808,6 +9890,14 @@
         const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};
       }});
+    wire({sel:'#notesSplitBar',key:'fw.notesSplit',a:'--ns-a',b:'--ns-b',
+      host:() => document.getElementById('journalPane') || document.documentElement,
+      box:() => {
+        const t = document.getElementById('journalScroll'), b = document.getElementById('reviewScroll');
+        if(!t || !b) return null;
+        const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
+        return {top:r1.top,height:r2.bottom - r1.top};
+      }});
     wire({sel:'body.one-day #todayScroll .od-on > .od-pad-head',key:'fw.odSplit',a:'--od-a',b:'--od-b',
       host:() => document.getElementById('todayScroll') || document.documentElement,
       box:bar => {
@@ -9898,6 +9988,7 @@
       const up = document.getElementById('odUp'), dn = document.getElementById('odDown');
       if(up) up.title = 'Previous day (' + formatDate(addDays(date,-1)) + ')';
       if(dn) dn.title = 'Next day (' + formatDate(addDays(date,1)) + ')';
+      if(typeof renderReview === 'function') renderReview();
     }
     function odGo(date){
       if(!date) return;

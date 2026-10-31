@@ -59,3 +59,4 @@
 - Time sections in Today (2026-10-31, Julius)
 - Done count + short dates (2026-10-31, Julius)
 - Weekday icons (2026-10-31, Julius)
+- Notes split + Review (2026-10-31, Julius: option A)

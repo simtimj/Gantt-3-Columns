@@ -175,4 +175,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-line-strength', date: '2026-10-31', project: 'Gantt', title: 'Line strength slider + slimmer resize bars', details: 'Options slider fades all dividing lines (default 70%); split bars 3px, smaller grips' },
   { id: 'd-20261031-ref-urgent-only', date: '2026-10-31', project: 'Gantt', title: 'Reference: Urgent on top, one Options button', details: 'Calendar panel off; sort + collapse into Options; toolbar search · + · Arc · Options' },
   { id: 'd-20261031-weekday-icons', date: '2026-10-31', project: 'Gantt', title: 'Weekday icons in Today headers', details: 'Sun–Sat element icons (sun, moon, fire, water, wood, gold, earth) beside each Today date, 15px, transparent' },
+  { id: 'd-20261031-notes-split', date: '2026-10-31', project: 'Gantt', title: 'Notes split: Plan on top, live Review below', details: 'Drag bar in Notes; Review shows done count, focus by time section, at-risk tasks, tomorrow\'s top 3; to-do: confirm on /dev, tweak what Review shows' },
 ];

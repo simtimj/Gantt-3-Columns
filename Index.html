@@ -318,7 +318,7 @@
       user-select:none;
     }
     .day-date{text-decoration:underline;text-underline-offset:3px;}
-    .day-label .wd-icon{height:15px;width:auto;vertical-align:middle;margin:-2px 4px 0 0;background:none;border:0;display:inline-block;flex:none;pointer-events:none;user-select:none;-webkit-user-select:none;}
+    .day-label .wd-icon{display:inline-block;height:.9em;vertical-align:-.1em;margin-left:4px;background:var(--note-line-adj,currentColor);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;pointer-events:none;user-select:none;-webkit-user-select:none;}
     .day-date .dd-short{display:none;}
     .pane-narrow .day-label{white-space:nowrap;}
     .pane-narrow .day-date .dd-long{display:none;}
@@ -1945,11 +1945,15 @@
     const d = new Date(s + 'T00:00:00');
     return d.toLocaleDateString('en-US',{weekday:'short'}) + ' ' + d.toLocaleDateString('en-US',{month:'short'}) + ' ' + d.getDate() + ', ' + d.getFullYear();
   }
-  // Weekday icon beside the day name in Today date headers (Julius, 2026-10-31): Sun=sun, Mon=moon,
-  // Tue=fire, Wed=water, Thu=wood, Fri=gold, Sat=earth. Images come from WeekdayIcons.html.
+  // Weekday icon right of the date in Today headers (Julius, 2026-10-31): Sun=sun, Mon=moon,
+  // Tue=fire, Wed=water, Thu=wood, Fri=gold, Sat=earth. The PNG (WeekdayIcons.html) is used as a
+  // mask filled with the day's own color (--note-line-adj: Saturday = dirt brown), text height.
+  const WD_RATIO = [187/187,186/195,169/202,157/207,212/167,236/98,245/152]; // width / height per PNG
   function wdIconHtml(s){
     const d = new Date(s + 'T00:00:00').getDay(), src = (window.WD_ICON_URL || [])[d];
-    return src ? '<img class="wd-icon" src="' + src + '" alt="" aria-hidden="true" draggable="false">' : '';
+    if(!src) return '';
+    const m = 'url(' + src + ')';
+    return '<span class="wd-icon" aria-hidden="true" style="width:' + (0.9 * WD_RATIO[d]).toFixed(3) + 'em;-webkit-mask-image:' + m + ';mask-image:' + m + '"></span>';
   }
   function setStatus(s){
     const status=document.getElementById('status');
@@ -2106,7 +2110,7 @@
       day.date;
     const label =
       `<div class="day-label">
-        ${type === 'day' ? wdIconHtml(day.date) : ''}<span class="day-date"><span class="dd-long">${esc(formatDate(day.date))}</span><span class="dd-short">${esc(formatDateShort(day.date))}</span></span>
+        <span class="day-date"><span class="dd-long">${esc(formatDate(day.date))}</span><span class="dd-short">${esc(formatDateShort(day.date))}</span></span>${type === 'day' ? wdIconHtml(day.date) : ''}
         ${
           today
             ? '<span class="today-pill" title="Today">●</span>'

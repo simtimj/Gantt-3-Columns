@@ -146,7 +146,7 @@
       cursor:col-resize;
     }
     /* Square grip in the middle of each column line, same as the half-split grips (2026-10-31, Julius). */
-    .column-resizer::after{content:"";position:absolute;top:50%;left:-1px;width:4px;height:28px;margin-top:-14px;border-radius:0;background:var(--divider-on,var(--divider));pointer-events:none;}
+    .column-resizer::after{content:"";position:absolute;top:50%;left:-1px;width:3px;height:22px;margin-top:-11px;border-radius:0;background:var(--divider-on,var(--divider));pointer-events:none;}
     .column-resizer:hover,.column-resizer.dragging{background:#9dbcf0;}
     #workspace.view-single .column-resizer{display:none;}
     #focusControls{
@@ -226,7 +226,7 @@
        ========================================================= */
     .day-row{
       /* Day separator (Julius, 2026-10-29): thicker + darker so the line between days is easy to see. */
-      border-bottom:3px solid var(--day-sep,#8a8a8a);
+      border-bottom:3px solid color-mix(in srgb, var(--day-sep,#8a8a8a) var(--line-k,100%), transparent);
       padding:calc(5px * var(--pad-y,1)) calc(8px * var(--pad-x,1) * var(--side-k,1)) calc(6px * var(--pad-y,1));
       position:relative;
       display:flex;
@@ -443,7 +443,7 @@
     .day-row.dow-1{--note-line:#4d4d4d;} .day-row.dow-2{--note-line:#b06a2c;} .day-row.dow-3{--note-line:#3f74a6;}
     .day-row.dow-4{--note-line:#7d5630;} .day-row.dow-5{--note-line:#9a7a12;} .day-row.dow-6{--note-line:#6e4a24;}
     .day-row.dow-0{--note-line:#a3870a;}
-    .editor table[data-cnote]{border-color:var(--note-line-adj);}
+    .editor table[data-cnote]{border-color:color-mix(in srgb, var(--note-line-adj) var(--line-k,100%), transparent);}
     .editor table[data-cnote] tr + tr > td{border-top:1.5px solid var(--note-line-adj);padding-top:10px;padding-bottom:10px;}
     /* Uniform 1.5px lines (between the old 2px and 1px, Julius 2026-10-27); inside shows the day's own color (Julius, 2026-10-27) */
     .editor table[data-cnote]{border-width:1.5px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
@@ -538,7 +538,7 @@
     /* Drag bar between the halves: 2px line in --divider, taller invisible grab area, grip pill. */
     #refSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
     #refSplitBar::before{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px;}
-    #refSplitBar::after{content:"";position:absolute;left:50%;top:-1px;width:28px;height:4px;margin-left:-14px;border-radius:0;background:var(--divider);}
+    #refSplitBar::after{content:"";position:absolute;left:50%;top:-.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
     /* Phone (2026-10-26, Julius): Delete sits at the right end of the title
        line instead of on its own row below, so tapping a cell doesn't make
        it taller. The title makes room for it while the cell is active. */
@@ -769,8 +769,8 @@
     #mobileSplitResizerThird{background:var(--divider-on,var(--divider));touch-action:none;position:relative;z-index:40;}
     #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{content:"";position:absolute;top:0;bottom:0;left:-6px;right:-6px;}
     #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{content:"";position:absolute;background:var(--divider-on,var(--divider));pointer-events:none;}
-    #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{top:50%;left:50%;width:4px;height:28px;margin:-14px 0 0 -2px;filter:brightness(.6);}
-    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{left:50%;top:50%;width:28px;height:4px;margin:-2px 0 0 -14px;filter:brightness(.6);}
+    #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{top:50%;left:50%;width:3px;height:22px;margin:-11px 0 0 -1.5px;filter:brightness(.6);}
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{left:50%;top:50%;width:22px;height:3px;margin:-1.5px 0 0 -11px;filter:brightness(.6);}
     body.mobile-split #mobileSplitResizer{display:block;}
     body.mobile-split #workspace{overflow:hidden;scroll-snap-type:none;}
     /* Non-split mode must always permit horizontal overflow on both desktop and mobile. */
@@ -796,7 +796,7 @@
 
     body.mobile-split #workspace{display:grid!important;min-width:0!important;max-width:100%;overflow:hidden!important;scroll-snap-type:none!important;}
     body.mobile-split #workspace .pane{box-sizing:border-box;min-width:0!important;width:100%!important;max-width:100%;height:100%;min-height:0;}
-    body.mobile-split #mobileSplitResizer{min-width:7px;min-height:7px;align-self:stretch;justify-self:stretch;}
+    body.mobile-split #mobileSplitResizer{min-width:3px;min-height:3px;align-self:stretch;justify-self:stretch;}
     /* Desktop horizontal scroll is available when fixed-size panes exceed viewport. */
     body:not(.mobile-split) #workspace:not(.view-single){overflow-x:auto!important;min-width:0;}
     body:not(.mobile-split) #workspace:not(.view-single) .pane{min-width:0;}
@@ -1424,7 +1424,7 @@
     body.one-day #todayScroll .od-on > .od-head{display:block;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;}
     body.one-day #todayScroll .od-on > .od-pad-head{border-top:2px solid var(--divider);padding-top:5px;margin-top:6px;position:relative;cursor:row-resize;touch-action:none;user-select:none;-webkit-user-select:none;}
     body.one-day #todayScroll .od-on > .od-pad-head::before{content:"";position:absolute;left:0;right:0;top:-12px;bottom:0;}
-    body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-3px;width:28px;height:4px;margin-left:-14px;border-radius:0;background:var(--divider);}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-2.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
     .split-dragging,.split-dragging *{cursor:row-resize!important;}
     /* Time sections in Today (2026-10-31): small labeled lines; the in-between one is a short half line. */
     .editor > [data-tsec]{margin:8px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
@@ -1618,6 +1618,7 @@
     <label class="ts-check"><input type="checkbox" id="cardsOn" checked> Show tasks as cards</label>
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
     <label class="ts-check">Divider lines <input type="color" id="dividerColor" value="#1f2937" aria-label="Divider line color"> <button class="btn tiny" type="button" id="dividerReset">Reset</button></label>
+    <label class="ts-check">Line strength <input type="range" id="lineStrength" min="20" max="100" step="5" value="70" aria-label="Dividing line strength"> <span id="lineStrengthVal">70%</span></label>
     <label class="ts-check"><input type="checkbox" id="oneDayOn" checked> One day at a time (▲ ▼ to change day; Completed on top, Plan pad below)</label>
     <label class="ts-check"><input type="checkbox" id="cardsBoxFill" checked> Subject color in the checkbox (off = whole card)</label>
     <div class="ts-row">
@@ -5253,8 +5254,8 @@
         // One full-width row + two columns. Drag the long bar = row height, the short bar = column widths.
         const top=splitOptions.orientation==='top';
         const r=mobileSplitRatio, c=splitColsRatio;
-        workspace.style.gridTemplateColumns=`minmax(0,${c}fr) 7px minmax(0,${1-c}fr)`;
-        workspace.style.gridTemplateRows=`minmax(0,${r}fr) 7px minmax(0,${1-r}fr)`;
+        workspace.style.gridTemplateColumns=`minmax(0,${c}fr) 3px minmax(0,${1-c}fr)`;
+        workspace.style.gridTemplateRows=`minmax(0,${r}fr) 3px minmax(0,${1-r}fr)`;
         const rowPane=top?panes[0]:panes[2], colA=top?panes[1]:panes[0], colB=top?panes[2]:panes[1];
         const rowLine=top?'1':'3', colLine=top?'3':'1';
         rowPane.style.gridColumn='1 / 4';rowPane.style.gridRow=rowLine;
@@ -5263,12 +5264,12 @@
         panes.forEach(p=>{p.style.width='100%';p.style.minWidth='0';p.style.minHeight='0';});
         split.style.display='block';
         split.style.gridColumn='1 / 4';split.style.gridRow='2';
-        split.style.width='auto';split.style.height='7px';split.style.cursor='row-resize';
+        split.style.width='auto';split.style.height='3px';split.style.cursor='row-resize';
         let extra=document.getElementById('mobileSplitResizerThird');
         if(!extra){ extra=split.cloneNode(false);extra.id='mobileSplitResizerThird';workspace.appendChild(extra); }
         extra.style.display='block';extra.style.background='var(--border)';
         extra.style.gridColumn='2';extra.style.gridRow=colLine;
-        extra.style.width='7px';extra.style.height='auto';extra.style.cursor='col-resize';
+        extra.style.width='3px';extra.style.height='auto';extra.style.cursor='col-resize';
         if(!extra._colDrag){
           extra._colDrag=true;
           extra.addEventListener('pointerdown',ev=>{
@@ -5288,8 +5289,8 @@
       }
       const ratio=slots.length===2 ? mobileSplitRatio : 1/3;
       const tracks=slots.length===2
-        ? [`minmax(0,${ratio}fr)`,'7px',`minmax(0,${1-ratio}fr)`]
-        : [`minmax(0,${split3[0]}fr)`,'7px',`minmax(0,${split3[1]}fr)`,'7px',`minmax(0,${split3[2]}fr)`];
+        ? [`minmax(0,${ratio}fr)`,'3px',`minmax(0,${1-ratio}fr)`]
+        : [`minmax(0,${split3[0]}fr)`,'3px',`minmax(0,${split3[1]}fr)`,'3px',`minmax(0,${split3[2]}fr)`];
       workspace.style.gridTemplateColumns=horizontal?tracks.join(' '):'minmax(0,1fr)';
       workspace.style.gridTemplateRows=horizontal?'minmax(0,1fr)':tracks.join(' ');
       panes.forEach((pane,i)=>{
@@ -5300,8 +5301,8 @@
       split.style.display='block';
       split.style.gridColumn=horizontal?'2':'1';
       split.style.gridRow=horizontal?'1':'2';
-      split.style.width=horizontal?'7px':'auto';
-      split.style.height=horizontal?'auto':'7px';
+      split.style.width=horizontal?'3px':'auto';
+      split.style.height=horizontal?'auto':'3px';
       split.style.cursor=horizontal?'col-resize':'row-resize';
       let extra=document.getElementById('mobileSplitResizerThird');
       if(slots.length===3){
@@ -5312,8 +5313,8 @@
         extra.style.display='block';
         extra.style.gridColumn=horizontal?'4':'1';
         extra.style.gridRow=horizontal?'1':'4';
-        extra.style.width=horizontal?'7px':'auto';
-        extra.style.height=horizontal?'auto':'7px';
+        extra.style.width=horizontal?'3px':'auto';
+        extra.style.height=horizontal?'auto':'3px';
         extra.style.background='';
         extra.style.cursor=horizontal?'col-resize':'row-resize';
         if(!extra._triDrag){
@@ -9811,10 +9812,25 @@
       }});
     // Divider color (Options).
     const inp = document.getElementById('dividerColor'), rst = document.getElementById('dividerReset');
-    const setDiv = c => { if(c) document.documentElement.style.setProperty('--divider',c); else document.documentElement.style.removeProperty('--divider'); };
-    try{ const c = localStorage.getItem('fw.divider'); if(c){ setDiv(c); if(inp) inp.value = c; } }catch(e){}
-    if(inp) inp.addEventListener('input',() => { setDiv(inp.value); try{ localStorage.setItem('fw.divider',inp.value); }catch(e){} });
-    if(rst) rst.addEventListener('click',() => { setDiv(''); try{ localStorage.removeItem('fw.divider'); }catch(e){} if(inp) inp.value = '#1f2937'; });
+    // Line strength slider (Julius, 2026-10-31): fades every dividing line (column/split lines, day separators,
+    // note block lines, time-section lines) toward transparent. --line-k = 20–100%.
+    const root = document.documentElement, rng = document.getElementById('lineStrength'), rv = document.getElementById('lineStrengthVal');
+    let divColor = '', lineK = 70;
+    try{ divColor = localStorage.getItem('fw.divider') || ''; const k = parseInt(localStorage.getItem('fw.lineK'),10); if(k >= 20 && k <= 100) lineK = k; }catch(e){}
+    const setDiv = () => {
+      root.style.removeProperty('--divider');
+      const base = divColor || getComputedStyle(root).getPropertyValue('--divider').trim() || '#1f2937';
+      root.style.setProperty('--divider', lineK >= 100 ? base : `color-mix(in srgb, ${base} ${lineK}%, transparent)`);
+      root.style.setProperty('--line-k', lineK + '%');
+      if(rv) rv.textContent = lineK + '%';
+    };
+    if(inp && divColor) inp.value = divColor;
+    if(rng) rng.value = String(lineK);
+    setDiv();
+    try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',setDiv); }catch(e){}
+    if(inp) inp.addEventListener('input',() => { divColor = inp.value; setDiv(); try{ localStorage.setItem('fw.divider',inp.value); }catch(e){} });
+    if(rng) rng.addEventListener('input',() => { lineK = parseInt(rng.value,10) || 70; setDiv(); try{ localStorage.setItem('fw.lineK',String(lineK)); }catch(e){} });
+    if(rst) rst.addEventListener('click',() => { divColor = ''; lineK = 70; if(rng) rng.value = '70'; setDiv(); try{ localStorage.removeItem('fw.divider'); localStorage.removeItem('fw.lineK'); }catch(e){} if(inp) inp.value = '#1f2937'; });
   })();
   (function initOneDay(){
     let on = true; try{ on = localStorage.getItem('fw.oneDay') !== '0'; }catch(e){}

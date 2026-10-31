@@ -48,6 +48,8 @@ Last updated: 2026-10-31
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
+- Options → Line strength slider (20–100%, default 70%): fades all dividing lines (column/split lines, day separators, note block lines); Reset restores color + strength
+- Slimmer resize bars: split lines 3px (were 7px), smaller square grips
 - Lines, not boxes: note blocks and today's cell keep only top / bottom lines (no side borders) in Today + Notes
 - Column lines (Today | Notes | Reference) drag on phone-size screens too, wider finger grab
 - Today marker is a small ● next to the date (was "• TODAY")

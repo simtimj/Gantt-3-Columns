@@ -1414,6 +1414,13 @@
     body.one-day #todayScroll .od-on > .od-pad-head::before{content:"";position:absolute;left:0;right:0;top:-12px;bottom:0;}
     body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-3px;width:28px;height:4px;margin-left:-14px;border-radius:0;background:var(--divider);}
     .split-dragging,.split-dragging *{cursor:row-resize!important;}
+    /* Time sections in Today (2026-10-31): small labeled lines; the in-between one is a short half line. */
+    .editor > [data-tsec]{margin:8px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
+    .editor > [data-tsec]:first-child{margin-top:2px;}
+    .editor > [data-tsec="morning"]::after{content:" · 8:30 am – 2 pm";font-weight:500;}
+    .editor > [data-tsec="afternoon"]::after{content:" · 3:45 – 6:30 pm";font-weight:500;}
+    .editor > [data-tsec="evening"]::after{content:" · 6:30 – 9:30 pm";font-weight:500;}
+    .editor > [data-tsec="gap"]{width:50%;height:0;overflow:hidden;margin:6px 0 4px;padding:0;border-bottom:1px dashed var(--divider);font-size:0;}
     body.one-day #todayScroll .od-on > .day-editor{flex:var(--od-a,1) 1 0 !important;min-height:0 !important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}
     body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
     .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
@@ -3338,6 +3345,7 @@
           cb.closest(
             '.editor,.ref-cell'
           );
+        if(typeof tsecToggled === 'function') try{ tsecToggled(line,cb.checked,root); }catch(err){}
         saveEditorOwner(root);
       }
     );
@@ -6556,6 +6564,7 @@
     wireCheckbox(c.querySelector('input'));
     if(typeof refreshCards === 'function') try{ refreshCards(ed); }catch(err){}
     finishEditorEdit(ed);
+    if(typeof tsecStampNew === 'function') try{ if(tsecIsToday(ed)){ tsecStampNew(ed); tsecArrange(ed); } }catch(err){}
     urgChanged(ed);
     return c; // the new line (truthy)
   }
@@ -9608,6 +9617,86 @@
      and the done log keep working); CSS hides all but window.odDate. ▲ = previous day, ▼ = next day,
      loading more weeks when needed. Plan pad = free writing under the Completed area, saved to the
      Days tab column D via savePlanPad (safe save: hash check + 3-way merge like the cells). */
+  /* Time sections in today's Today cell (2026-10-31, Julius): tasks sort under Morning / Afternoon /
+     Evening by time — checked tasks by when they were checked (data-dt), open ones by when they were
+     added (data-at). Times = his day: Morning 8:30–2, in-between (nap) 2–3:45 → a short half line
+     after Morning, Afternoon 3:45–6:30, Evening 6:30 on. Lines with no time (older lines, Claude's done
+     log, notes) stay on top in their order. Headers are saved lines [data-tsec], rebuilt each time. */
+  const TSEC = [['morning','Morning','8:30 am – 2 pm'],['gap','',''],['afternoon','Afternoon','3:45 – 6:30 pm'],['evening','Evening','6:30 – 9:30 pm']];
+  const tsecNow = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
+  function tsecIsToday(ed){ return !!ed && ed.classList && ed.classList.contains('day-editor') && ed.dataset.date === localToday(); }
+  function tsecOf(hm){
+    const m = +hm.slice(0,2) * 60 + +hm.slice(3,5);
+    return m < 14 * 60 ? 'morning' : m < 15 * 60 + 45 ? 'gap' : m < 18 * 60 + 30 ? 'afternoon' : 'evening';
+  }
+  const tsecLevel = el => Math.floor(Number(el.dataset && el.dataset.level) || 0);
+  const tsecIsTask = el => el.classList && el.classList.contains('check-line');
+  // Old lines get data-at="-" once (no time); any task line without data-at after that is new.
+  function tsecStampNew(ed){
+    const lines = [...ed.children].filter(el => tsecIsTask(el) && !tsecLevel(el));
+    if(!ed.dataset.tsecInit && !lines.some(el => el.dataset.at)){ lines.forEach(el => { el.dataset.at = '-'; }); }
+    ed.dataset.tsecInit = '1';
+    const now = tsecNow();
+    lines.forEach(el => { if(!el.dataset.at) el.dataset.at = now; });
+  }
+  function tsecArrange(ed){
+    const kids = [...ed.children].filter(el => !el.hasAttribute('data-tsec'));
+    const blocks = [];
+    for(let i = 0; i < kids.length; i++){
+      const el = kids[i];
+      if(tsecIsTask(el) && !tsecLevel(el)){
+        const b = [el];
+        while(i + 1 < kids.length && tsecLevel(kids[i + 1]) > 0) b.push(kids[++i]);
+        const cb = el.querySelector('input[type="checkbox"]');
+        const t = cb && cb.checked ? el.dataset.dt : el.dataset.at;
+        blocks.push({nodes:b,t:/^\d\d:\d\d$/.test(t || '') ? t : ''});
+      } else blocks.push({nodes:[el],t:'',blank:!el.textContent.trim() && !el.querySelector('input,img,hr')});
+    }
+    if(!blocks.some(b => b.t)){ ed.querySelectorAll(':scope > [data-tsec]').forEach(n => n.remove()); return false; }
+    const top = [], tail = [], by = {morning:[],gap:[],afternoon:[],evening:[]};
+    let seenTimed = false;
+    blocks.forEach(b => {
+      if(b.t){ seenTimed = true; by[tsecOf(b.t)].push(b); }
+      else if(b.blank && seenTimed){ if(!tail.length) tail.push(b); }
+      else top.push(b);
+    });
+    const out = [];
+    top.forEach(b => out.push(...b.nodes));
+    TSEC.forEach(([k,name]) => {
+      const list = by[k].sort((a,b) => a.t < b.t ? -1 : a.t > b.t ? 1 : 0);
+      if(!list.length) return;
+      const h = document.createElement('div');
+      h.dataset.tsec = k; h.setAttribute('contenteditable','false');
+      if(name) h.textContent = name; else h.innerHTML = '<br>';
+      out.push(h);
+      list.forEach(b => out.push(...b.nodes));
+    });
+    tail.forEach(b => out.push(...b.nodes));
+    if(!tail.length){ const blank = document.createElement('div'); blank.innerHTML = '<br>'; out.push(blank); }
+    const before = ed.innerHTML;
+    ed.replaceChildren(...out);
+    return ed.innerHTML !== before;
+  }
+  let tsecPending = new Set();
+  function tsecToggled(line,checked,ed){
+    if(!tsecIsToday(ed) || !line || tsecLevel(line)) return;
+    if(checked) line.dataset.dt = tsecNow(); else delete line.dataset.dt;
+    tsecStampNew(ed);
+    const sel = window.getSelection && window.getSelection();
+    const typing = document.activeElement === ed && sel && sel.rangeCount && ed.contains(sel.anchorNode) && !line.contains(sel.anchorNode);
+    if(typing){ tsecPending.add(ed); return; }
+    tsecArrange(ed); // caller saves
+  }
+  document.addEventListener('focusout',e => {
+    const ed = e.target && e.target.closest && e.target.closest('#todayScroll .day-editor');
+    if(!ed || !tsecIsToday(ed)) return;
+    setTimeout(() => {
+      if(ed.contains(document.activeElement)) return;
+      tsecStampNew(ed);
+      const had = tsecPending.delete(ed);
+      if(tsecArrange(ed) || had) saveEditorOwner(ed);
+    },0);
+  });
   // Split bars (2026-10-31, Julius): drag the line between the two halves of Today
   // (Completed / Plan pad) and Reference (panels / cells). Ratio saved per bar;
   // double-tap resets to half and half. Divider color is set in Options.

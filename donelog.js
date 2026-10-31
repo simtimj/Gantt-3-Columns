@@ -168,4 +168,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-dividers', date: '2026-10-31', project: 'Gantt', title: 'Bold divider lines', details: 'column + half-split lines high contrast (dark / bright), color picker in Options' },
   { id: 'd-20261031-split-drag', date: '2026-10-31', project: 'Gantt', title: 'Draggable half splits', details: 'drag the Today (Completed / Plan pad) and Reference (panels / cells) split lines; size remembered, double-tap resets' },
   { id: 'd-20261031-square-grips', date: '2026-10-31', project: 'Gantt', title: 'Square divider grips', details: 'thinner square grips on split lines, same grip on column lines; phone column lines in divider color' },
+  { id: 'd-20261031-time-sections', date: '2026-10-31', project: 'Gantt', title: 'Time sections in Today', details: 'tasks sort under Morning / Afternoon / Evening by check or add time; nap-gap tasks under a short half line' },
 ];

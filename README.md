@@ -49,6 +49,7 @@ Last updated: 2026-10-30
 
 ## 🧪 To be confirmed (2026-10-31)
 
+- **Time sections in Today (2026-10-31):** today's tasks sort themselves under Morning (8:30 am – 2 pm), Afternoon (3:45 – 6:30 pm) and Evening (6:30 – 9:30 pm). Checked tasks go by when you checked them, open ones by when you added them; anything done in the 2–3:45 nap gap sits under a short dashed half line after Morning. Headers only show when something is in them. Older lines, notes and Claude's done log stay on top. Sorting happens when you tick a box or leave the cell, never while you type.
 - **Bold divider lines (2026-10-31):** the column lines and the lines splitting Today and Reference in half are now dark (light theme) / bright (dark theme), 2px. Change the color in **Options → Divider lines** (Reset puts it back).
 - **Square grips (2026-10-31):** the grips on the split lines are thinner and square; column lines got the same square grip, and on the phone the column lines use the divider color too.
 - **Drag the half-split lines (2026-10-31):** drag the line above "Plan / think" in Today, or the line between Urgent/Calendar and the cells in Reference, to resize the halves. Each remembers its size; double-tap a line to go back to half and half.

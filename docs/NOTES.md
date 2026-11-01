@@ -238,12 +238,12 @@ Read only the section you need.
 
 ## Center Up / Down + planning pause (2026-11-01, Julius: spec, PENDING — not built)
 
-Requirements collected only; implement in phases later. Confirm the open questions with Julius before coding.
+Requirements settled with Julius 2026-11-01; implement in phases, smallest safe phase first.
 
-1. **Center column split**: the Notes column (`#journalPane`) splits vertically into **Center Up** (upper Notes) and **Center Down** (purpose TBD). Adjustable split (esp. mobile); keep column resizing / scaling. Likely base: the hidden Notes split (`#notesSplitBar`, `--ns-a/--ns-b`, `fw.notesSplit` in `initSplitBars`) — reuse it, don't build a second split. Review stays hidden unless Julius picks it for Center Down.
-2. **Notes simplification**: drop the redundant day-of-week label in Notes; Notes area belongs to Today. Keep note contents + persistence untouched.
-3. **Pause daily planning**: Suggested Day + Day Wrap-Up on hold (see "Nightly plan + wrap-up"). No new UI/automation work; keep data, `dayplan.js`, `applyClaudeNotes_()` so they can come back.
-4. **Urgent ↔ Reference**: carry the recent Urgent-area changes into the Reference notes/card; keep grouping, subjects, priorities, linked task identity (`data-tid`) and completion sync. Build on "Task mirrors" (phase 1) — no second task system.
-5. **Approach**: smallest safe phase first; read sections selectively; preserve mobile layouts, notes, calendar, task logs, saved data, resize controls; never delete/overwrite content for the layout change.
-
-Open questions (ask first): what goes in Center Down? · which label exactly is the "day-of-week" one (Notes day label / weekday icon)? · pause = hide the Suggested Day / Wrap-Up blocks, or just stop the nightly task? · which "recent Urgent-area changes" are meant (Urgent batches 10-30? something newer from another chat)?
+1. **Center column split**: the Notes column (`#journalPane`) splits vertically into **Center Up** and **Center Down**. Adjustable split (esp. mobile); keep column resizing / scaling. Likely base: the hidden Notes split (`#notesSplitBar`, `--ns-a/--ns-b`, `fw.notesSplit` in `initSplitBars`) — reuse it, don't build a second split.
+   - **Center Up has tabs** (small symbols to tap through, switching what it shows): tab 1 = the current Notes (Plan); tab 2 = **Weather, hourly** (source and layout to work out later with Julius). More tabs may come.
+   - **Center Down = empty for now** (Julius still deciding). The hidden Review stays hidden.
+2. **Notes simplification**: in the Notes column only, remove the day label AND the weekday icon. Today / tasks column keeps its day label + weekday icon. Notes area belongs to Today. Keep note contents + persistence untouched.
+3. **Pause daily planning — both**: hide the Suggested Day + Day Wrap-Up blocks in Notes AND stop the nightly scheduled task ("Gantt: nightly wrap-up + plan"; pause/disable, don't delete). Keep data, `dayplan.js`, `applyClaudeNotes_()` so they can come back.
+4. ~~Urgent ↔ Reference integration~~ — dropped for now (Julius 2026-11-01).
+5. **Approach**: read sections selectively; preserve mobile layouts, notes, calendar, task logs, saved data, resize controls; never delete/overwrite content for the layout change.

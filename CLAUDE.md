@@ -4,6 +4,7 @@
 - Google Apps Script web app (Today / Notes / Reference columns over a Google Sheet). Pushing to `main` runs `clasp push` via `.github/workflows/deploy.yaml`, so keep commits small and working. Julius opens the **/dev test link** (latest pushed code, ~30 s after a push, then tap ↻); the workflow no longer updates a versioned /exec deployment (200-version cap, 2026-10-27). Julius mostly works from his phone.
 - Files: `Code.gs` (server), `Index.html` (all UI), `WeekdayIcons.html` (header icons, base64), `appsscript.json`.
 - **Keep this file short** (Julius 2026-10-31). Detailed feature notes live in `docs/NOTES.md`; open only the section you need (`grep -n "^## " docs/NOTES.md`, then read that range). New feature notes go there, not here.
+- Julius's words (2026-11-01): **task cell** = a task line / card; **urgency cell** = the Urgent area; **reference cell** = a Reference card.
 - Be token-lean: if a request is vague, ask Julius a short clarifying question before digging through `Index.html` (~9.8k lines); grep for the function/section instead of reading whole files.
 
 ## Central Data Hub card (2026-10-29, Julius: permanent rule)

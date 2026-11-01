@@ -190,4 +190,6 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-center-p1', date: '2026-11-01', project: 'Gantt', title: 'Center phase 1: Notes label off, planning paused', details: 'Notes column day label hidden (Today keeps date + icon); Suggested Day + Wrap-up boxes hidden, data kept; nightly 10 pm task off; to-do: confirm on /dev, next = Center Up/Down split with tabs' },
   { id: 'd-20261101-gantt-center-split', date: '2026-11-01', project: 'Gantt', title: 'Center Up / Down split', details: 'Notes column split into Center Up (tabs: 📝 Notes, ☁️ Weather placeholder) and an empty Center Down; resizable' },
   { id: 'd-20261101-gantt-center-header', date: '2026-11-01', project: 'Gantt', title: 'Center header cleanup', details: 'smaller tab symbols; NOTES text and + Template button removed' },
+  { id: 'd-20261101-gantt-quiet-grips', date: '2026-11-01', project: 'Gantt', title: 'Quiet grips', details: 'drag-line grips faint until pressed' },
+  { id: 'd-20261101-gantt-make-sure', date: '2026-11-01', project: 'Gantt', title: 'Make sure you do section', details: "header at the top of today's Notes cell; normal checkbox/drag lines under it" },
 ];

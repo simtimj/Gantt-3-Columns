@@ -1482,6 +1482,13 @@
     #refSplitBar::after,#notesSplitBar::after{top:-1.5px!important;height:5px!important;width:30px!important;margin-left:-15px!important;border-radius:2px!important;background:var(--grip,var(--divider))!important;}
     body.one-day #todayScroll .od-on > .od-pad-head::after{top:-3.5px!important;height:5px!important;width:30px!important;margin-left:-15px!important;border-radius:2px!important;background:var(--grip,var(--divider))!important;}
     #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{background:var(--grip,var(--divider))!important;filter:none!important;border-radius:2px;}
+    /* Quiet grips (Julius, 2026-11-01): faint until pressed, full strength while dragging. */
+    .column-resizer::after,#refSplitBar::after,#notesSplitBar::after,body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{opacity:.18;transition:opacity .15s;}
+    body.split-dragging #refSplitBar::after,body.split-dragging #notesSplitBar::after,body.split-dragging.one-day #todayScroll .od-on > .od-pad-head::after,
+    .column-resizer.dragging::after,.column-resizer:active::after,#mobileSplitResizer:active::after,#mobileSplitResizerThird:active::after{opacity:1;}
+    /* Make sure you do (Julius, 2026-11-01): section header at the top of today's Notes cell, same look as Today's time sections. */
+    .editor > [data-nsec]{margin:2px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
     /* Grips at the edges (Julius, 2026-11-01): same size, just moved out of the way. Today's line grip sits at
@@ -2190,6 +2197,13 @@
             ? 'Tasks for this day…'
             : 'Write whatever you want…'
         }">${storedToHtml(content)}</div>`;
+    // Make sure you do (2026-11-01, Julius): today's Notes cell starts with this section header (saved with the cell
+    // once he edits it). Lines under it are normal lines: checkboxes, drag, menus all work as elsewhere.
+    if(type === 'journal' && today){
+      const jed = row.querySelector('.editor');
+      if(!jed.querySelector(':scope > [data-nsec="must"]'))
+        jed.insertAdjacentHTML('afterbegin','<div data-nsec="must" contenteditable="false">Make sure you do</div>' + (jed.textContent.trim() || jed.querySelector('table,input') ? '<div><br></div>' : ''));
+    }
     if(type === 'day'){
       // One-day view (2026-10-29, Julius): top = Completed (this editor), bottom = Plan pad (Days column D).
       row.querySelector('.editor').insertAdjacentHTML('beforebegin','<div class="od-head">Completed</div>');

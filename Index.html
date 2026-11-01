@@ -7843,10 +7843,15 @@
       p.appendChild(go);
     }
     document.body.appendChild(p);
+    placeUrgPicker(p,x,y);
+    urgPicker = p;
+  }
+  function placeUrgPicker(p,x,y){
+    const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    p.style.maxHeight = Math.max(120,vh - 12) + 'px';
     const r = p.getBoundingClientRect();
     p.style.left = Math.max(6,Math.min(window.innerWidth - r.width - 6,x - 12)) + 'px';
-    p.style.top = Math.max(6,Math.min(window.innerHeight - r.height - 6,y + 14)) + 'px';
-    urgPicker = p;
+    p.style.top = Math.max(6,Math.min(vh - r.height - 6,y + 14)) + 'px';
   }
   // Mini calendar popover: placed right of the anchor if it fits, else left,
   // else below/above. Tap a day = done.
@@ -7947,6 +7952,12 @@
       sr.appendChild(b);
     });
     p.appendChild(sr);
+    // Same full menu as holding the checkbox, with these four on top (2026-10-31, Julius).
+    const box = tx.parentElement ? tx.parentElement.querySelector(':scope > .urg-box') : null;
+    if(box && urgTarget(box)){
+      showUrgencyPicker(box,x,y);
+      if(urgPicker){ urgPicker.insertBefore(sr,urgPicker.firstChild); placeUrgPicker(urgPicker,x,y); return; }
+    }
     document.body.appendChild(p);
     const r = p.getBoundingClientRect();
     p.style.left = Math.max(6,Math.min(window.innerWidth - r.width - 6,x - r.width / 2)) + 'px';
@@ -8551,6 +8562,8 @@
   .tc-drop::before{content:"";position:absolute;left:-4px;top:-3px;width:9px;height:9px;border-radius:50%;background:#3b82f6;}
   /* Subject row in the hold menu */
   .urg-picker{max-width:252px;}
+  /* Never cut off on a phone: scrolls inside instead (2026-10-31, Julius). */
+  .urg-picker{max-height:calc(100vh - 12px);max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain;}
   .urg-cat-row{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;padding-top:6px;border-top:1px solid var(--border);}
   .urg-cat-row .uc-head{flex:1 0 100%;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
   .urg-cat{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border:1px solid var(--border);border-radius:999px;background:transparent;color:inherit;font-size:11px;line-height:1.3;cursor:pointer;}

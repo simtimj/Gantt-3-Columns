@@ -332,7 +332,14 @@ function syncCol_(cur, mine, baseHash, changed, where, label) {
   if (!same) return { value: cur, write: false, conflict: true, sendBack: true };
   // Big drop in size (e.g. many lines deleted at once): keep a copy, just in case.
   if (cur.length > 400 && mine.length < cur.length * 0.6) backupCell_(where, label, 'big shrink', cur);
+  // An open task disappeared (deleted, moved, or wiped by mistake): keep a copy too (2026-10-31, Julius).
+  else if (openTasks_(mine) < openTasks_(cur)) backupCell_(where, label, 'open task removed', cur);
   return { value: mine, write: true };
+}
+
+// Number of unticked task lines in a cell.
+function openTasks_(html) {
+  return (String(html || '').match(/class="check-line(?![^"]*\bdone\b)[^"]*"/g) || []).length;
 }
 
 // Short version id of a cell's text.

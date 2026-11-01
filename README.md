@@ -48,6 +48,8 @@ Last updated: 2026-10-31
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
+- **One full hold menu in Urgent (2026-10-31):** holding a task's text (not just its checkbox) now opens the full menu (urgency, due, length, subject, Archive, Delete, Go to task) with + Task / + Subtask / Outdent / Indent on top. The menu scrolls if it's taller than the screen.
+- **Backup when a task disappears (2026-10-31):** whenever a save removes an open (unticked) task from any cell, the old cell text is copied to the Sheet's Backup tab first, so lost tasks can be recovered.
 - **Urgent add box wraps (2026-10-31):** typing a new task in the Urgent panel now wraps onto new lines and the box grows downward, instead of running past the cell. Enter still adds the task; pasted line breaks become spaces.
 - **Reference list shrinks further (2026-10-31):** drag the Reference half line down until only a ~30px strip of the list is left; it can't disappear, so the line and its notch are always there to pull it back up.
 - **Reset columns also resets the splits (2026-10-31):** besides column widths, it puts the Today, Notes and Reference half lines and the phone split back to half and half.

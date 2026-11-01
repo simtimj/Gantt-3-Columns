@@ -61,3 +61,4 @@
 - Weekday icons (2026-10-31, Julius)
 - Notes split + Review (2026-10-31, Julius: option A) — HIDDEN 2026-10-31
 - Grips + edge-to-edge note cells (2026-10-31, Julius)
+- Edge grips (2026-11-01, Julius)

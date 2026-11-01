@@ -1475,6 +1475,25 @@
     #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{background:var(--grip,var(--divider))!important;filter:none!important;border-radius:2px;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
+    /* Grips at the edges (Julius, 2026-11-01): same size, just moved out of the way. Today's line grip sits at
+       the left edge, Reference's at the right edge, column-line grips at the top. Only the grip area drags:
+       the wide invisible grab area (::before) now covers only the grip; the Today / Reference lines themselves
+       ignore touches (pointer-events:none; ::before hits still target the bar, so drag code is unchanged).
+       Column / split lines keep their own 1–3px line (their drag code relies on pointer capture). */
+    #refSplitBar,#notesSplitBar,body.one-day #todayScroll .od-on > .od-pad-head{pointer-events:none!important;cursor:default!important;}
+    #refSplitBar::before,#notesSplitBar::before,body.one-day #todayScroll .od-on > .od-pad-head::before{pointer-events:auto!important;}
+    .column-resizer::after{top:0!important;margin-top:0!important;}
+    .column-resizer::before{top:0!important;bottom:auto!important;height:46px!important;left:-13px!important;right:-13px!important;cursor:col-resize!important;}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{left:0!important;margin-left:0!important;}
+    body.one-day #todayScroll .od-on > .od-pad-head::before{left:0!important;right:auto!important;width:46px!important;top:-15px!important;bottom:auto!important;height:30px!important;cursor:row-resize!important;}
+    #refSplitBar::after{left:auto!important;right:0!important;margin-left:0!important;}
+    #refSplitBar::before{left:auto!important;right:0!important;width:46px!important;cursor:row-resize!important;}
+    #notesSplitBar::after{left:0!important;margin-left:0!important;}
+    #notesSplitBar::before{right:auto!important;width:46px!important;cursor:row-resize!important;}
+    #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{top:0!important;margin-top:0!important;}
+    #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{bottom:auto!important;height:46px!important;cursor:col-resize!important;}
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{left:0!important;margin-left:0!important;}
+    #mobileSplitResizer[data-dir="row"]::before,#mobileSplitResizerThird[data-dir="row"]::before{right:auto!important;width:46px!important;cursor:row-resize!important;}
     /* Suggested Day + Day wrap-up are cells again (Julius, 2026-10-31), stretched edge to edge so the
        column lines are their left / right sides: negative margins = the day row's side padding (--rowpx). */
     .day-row{--rowpx:calc(8px * var(--pad-x,1) * var(--side-k,1));}

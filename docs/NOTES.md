@@ -219,3 +219,7 @@ Read only the section you need.
 - Grips: override block after the "Lines, not boxes" rules; all `::after` grips use `--grip` (set in `setDiv` = divider base color, unfaded), 5px × 30px.
 - Plan / wrap `table[data-cnote]` bleed to the column edges: `--rowpx` on `.day-row` mirrors its side padding (desktop 8px, ≤900px / mobile-mode 12px × `--mobile-scale`, × `--pad-x` × `--side-k`); table `width:calc(100% + 2*--rowpx)` + negative margins, td padding = `--rowpx`. Sched table untouched. If `.day-row` side padding changes, update `--rowpx` too.
 
+
+## Edge grips (2026-11-01, Julius)
+
+- Override block "Grips at the edges" after the grip-size rules: grips keep size, positions only — `.od-pad-head` left, `#refSplitBar` right, `.column-resizer` + mobile col lines top, mobile row lines left. Each `::before` hit area shrunk to ~46px around the grip. `#refSplitBar` / `#notesSplitBar` / `.od-pad-head` get `pointer-events:none` (only `::before` takes touches; wire() uses document listeners). Column / mobile split lines keep pointer events on their own thin line because their drag code listens on the element after setPointerCapture.

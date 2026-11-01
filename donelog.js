@@ -184,4 +184,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-ref-new-cell-save', date: '2026-10-31', project: 'Gantt', title: 'Fix: new Reference cells reverted on first save', details: 'Backlog/new cells made in the tab lost their first edit (first save looked unchanged, server copy won); bases set at creation, server checks the made-with text; Urgent add keeps your text if making Backlog fails' },
   { id: 'd-20261031-urg-no-grip', date: '2026-10-31', project: 'Gantt', title: 'No stray dots in Urgent', details: 'removed the dashed red box before the Urgent add box (sat alone above the input on narrow panes) and the ⠿ grip in the panel' },
   { id: 'd-20261101-urg-tidy', date: '2026-11-01', project: 'Gantt', title: 'Urgent: no stray bold, − next to text', details: 'Urgent add box no longer saves plain tasks bold (2 old Backlog lines unbolded); no − on the Urgent header; task and batch − / + sit right after their text' },
+  { id: 'd-20261101-edge-grips', date: '2026-11-01', project: 'Gantt', title: 'Drag grips moved to the edges', details: 'Today split grip at left edge, Reference at right, column-line grips at top; only the grip area drags, not the whole line' },
 ];

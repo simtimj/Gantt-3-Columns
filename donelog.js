@@ -201,4 +201,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-gantt-day-lines', date: '2026-11-01', project: 'Gantt', title: 'Day-color lines toggle', details: 'Options toggle: all lines in the day color, 2px, wall to wall; Center Up scroll no longer drags the column' },
   { id: 'd-20261101-gantt-line-fixes', date: '2026-11-01', project: 'Gantt', title: 'Line cleanup', details: 'softer red, thin section lines, one line between split columns, header lines under Notes / Reference' },
   { id: 'd-20261101-focus-p2', date: '2026-11-01', project: 'Gantt', title: 'Focus Tracking, phase 2', details: 'tasks in project cards with data-tid; ticks sync both ways with mirrors; done → today\'s Completed; 📌 to Plan / think; renames follow; chunked server storage. To do: phases 3–5 (drag, priority/progress/dashboard, temp urgency/expand)' },
+  { id: 'd-20261101-gantt-scroll-tight', date: '2026-11-01', project: 'Gantt', title: 'Scrolling date + tight Notes lines', details: 'Today date and Completed scroll with the tasks; Make sure you do lines tighter; single line between Notes and Reference (Urgent box outline removed)' },
 ];

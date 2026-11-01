@@ -1459,7 +1459,7 @@
     body.one-day #todayScroll .day-row.od-on{height:var(--od-h,100%);min-height:0;border-bottom:0;}
     body.one-day #journalScroll .day-row.od-on{min-height:var(--od-hj,100%);border-bottom:0;}
     body.one-day #todayScroll .day-row.od-on > *{flex:0 0 auto;}
-    body.one-day #todayScroll .od-on > .od-head{display:block;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;}
+    body.one-day #todayScroll .od-on .od-head{display:block;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;}
     body.one-day #todayScroll .od-on > .od-pad-head{border-top:2px solid var(--divider);padding-top:5px;margin-top:6px;position:relative;cursor:row-resize;touch-action:none;user-select:none;-webkit-user-select:none;}
     body.one-day #todayScroll .od-on > .od-pad-head::before{content:"";position:absolute;left:0;right:0;top:-15px;bottom:0;}
     body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-2.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
@@ -1526,6 +1526,10 @@
     /* One line between Notes and Reference (Julius): the Urgent box's own outline sat a few px in from the
        column line (double line with a gap). No outline, like the Notes side; the 3 urgency boxes stay. */
     #urgentPanel{border:0!important;border-radius:0!important;}
+    /* Tight Notes lines (Julius, 2026-11-01): Make sure you do lines had the full card gap (5px margin + 4px
+       padding each side). Notes check-lines get 1px margin + 2px padding, like the rest of the cell. */
+    .journal-editor > .check-line[data-tc^="f"]{margin-top:1px!important;padding-top:2px!important;}
+    .journal-editor > .check-line[data-tc$="l"]{margin-bottom:1px!important;padding-bottom:2px!important;}
     /* Section lines a bit thicker (1px was too thin, 2px too thick). */
     .editor > [data-nsec="must"]{border-bottom:1.5px solid #b55a56!important;}
     .editor > [data-nsec="focus"]{border-bottom:1.5px solid #1565c0!important;}
@@ -1537,7 +1541,7 @@
     html[data-theme="dark"] .center-tabs button.on{background:rgba(255,255,255,.14)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
     /* Completed stays inside its area while scrolling: the editor spans the row edge to edge (so the
        section lines fit without overflowing) and never scrolls sideways. */
-    body.one-day #todayScroll .od-on > .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
+    body.one-day #todayScroll .od-on .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
     #journalScroll{overflow-x:hidden;}
     /* Repeating tasks (Make sure you do starters repeat daily): small ↻ after the text. */
     .check-line[data-rep] > .check-text::after{content:" \21BB";color:var(--muted,#888);font-size:.85em;font-weight:400;}
@@ -1608,7 +1612,10 @@
        Suggested Day + Day Wrap-Up paused = hidden, never deleted (remove these two lines to bring them back). */
     .journal-pane-row > .day-label{display:none!important;}
     .day-row .editor table[data-cnote][data-ckind="plan"],.day-row .editor table[data-cnote][data-ckind="wrap"]{display:none!important;}
-    body.one-day #todayScroll .od-on > .day-editor{flex:var(--od-a,1) 1 0 !important;min-height:0 !important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}
+    body.one-day #todayScroll .od-on > .od-top{display:flex;flex-direction:column;flex:var(--od-a,1) 1 0 !important;min-height:0 !important;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;}
+    body.one-day #todayScroll .od-on > .od-top > *{flex:0 0 auto;}
+    body.one-day #todayScroll .od-on > .od-top > .day-editor{flex:1 0 auto !important;overflow:visible !important;min-height:2em;}
+    .od-top{display:contents;}
     body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
     .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
     body.one-day .sec-boxes{display:none;}
@@ -2318,6 +2325,11 @@
     if(type === 'day'){
       // One-day view (2026-10-29, Julius): top = Completed (this editor), bottom = Plan pad (Days column D).
       row.querySelector('.editor').insertAdjacentHTML('beforebegin','<div class="od-head">Completed</div>');
+      // Date + Completed scroll with the tasks (2026-11-01, Julius): one scroller around all three.
+      // display:contents outside one-day, so the multi-day layout is unchanged.
+      { const top = document.createElement('div'); top.className = 'od-top';
+        row.insertBefore(top, row.firstElementChild);
+        [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
       row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Plan / think</div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Priorities, plans, thoughts…"></div>');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
@@ -10339,7 +10351,7 @@
     wire({sel:'body.one-day #todayScroll .od-on > .od-pad-head',key:'fw.odSplit',a:'--od-a',b:'--od-b',
       host:() => document.getElementById('todayScroll') || document.documentElement,
       box:bar => {
-        const row = bar.parentNode, ed = row && row.querySelector('.day-editor'), pad = row && row.querySelector('.plan-pad');
+        const row = bar.parentNode, ed = row && (row.querySelector(':scope > .od-top') || row.querySelector('.day-editor')), pad = row && row.querySelector('.plan-pad');
         if(!ed || !pad) return null;
         const r1 = ed.getBoundingClientRect(), r2 = pad.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};

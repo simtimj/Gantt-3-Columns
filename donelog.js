@@ -178,4 +178,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-notes-split', date: '2026-10-31', project: 'Gantt', title: 'Notes split: Plan on top, live Review below', details: 'Drag bar in Notes; Review shows done count, focus by time section, at-risk tasks, tomorrow\'s top 3; to-do: confirm on /dev, tweak what Review shows' },
   { id: 'd-20261031-grips-note-cells', date: '2026-10-31', project: 'Gantt', title: 'Bolder drag notches + edge-to-edge plan/wrap cells', details: 'Resize grips thicker, full strength; Suggested Day and Day wrap-up boxed again, column lines as their sides' },
   { id: 'd-20261031-reset-splits', date: '2026-10-31', project: 'Gantt', title: 'Reset columns resets the half splits too', details: 'Today / Notes / Reference half lines and phone split go back to 50/50' },
+  { id: 'd-20261031-ref-shrink-review-off', date: '2026-10-31', project: 'Gantt', title: 'Reference list shrinks to a strip; Review hidden', details: 'Reference bottom half can drag down to ~30px, never gone; Notes Review half hidden for now' },
 ];

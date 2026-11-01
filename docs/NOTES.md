@@ -205,13 +205,16 @@ Read only the section you need.
 
 - `WeekdayIcons.html` = his PNGs as base64 (Thu tree + Fri 3D gold bar redrawn by Claude 2026-10-31 at his ask) (`WD_ICON_B64`, index = `getDay()`, 0 = Sun), turned into blob URLs once (`WD_ICON_URL`). Included at the top of the main `<script>` area via `<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>` (doGet uses a template). `wdIconHtml(date)` adds `<span class="wd-icon">` in `.day-label` for Today rows only (`type === 'day'`), AFTER `.day-date`, 9px gap (2026-10-31: moved right). The PNG is a CSS mask (`mask-image`, inline style) filled with `var(--note-line-adj)` = the day's own color, so it follows the day colors, dark mode and the brightness slider. Height .9em (text size), width = .9em × `WD_RATIO[d]` (PNG width/height).
 
-## Notes split + Review (2026-10-31, Julius: option A)
+## Notes split + Review (2026-10-31, Julius: option A) — HIDDEN 2026-10-31
+
+- Hidden "for now" by two CSS lines (`#notesSplitBar,#reviewScroll{display:none!important}` + `#journalScroll{flex:1 1 0!important}`); `renderReview` returns early while hidden. Delete those lines to bring it back.
 
 - `#journalPane` = `#journalScroll` (Plan, flex `--ns-a`) + `#notesSplitBar` + `#reviewScroll` (flex `--ns-b`); wired in `initSplitBars` (`fw.notesSplit`). One-day `--od-hj` follows the smaller `#journalScroll` via the existing ResizeObserver.
 - `renderReview()` (after `updateDash`, debounced 150 ms) reads top-level `.check-line`s of the Today `.day-editor` for `reviewDate()` (one-day `odDate`, else today): Done n/m; Got focus = done grouped by `tsecOf(data-dt)`; At risk = open `data-urg` 1–2 (past day: Slipped = all open); Tomorrow's top 3 = open sorted urg 1→2→3→none. Called from `updateDash`, `odApply`, and every 60 s. Click `.rv-line` → `reviewSrc[i].scrollIntoView`. Render-only, never saved; adds nothing to the Today DOM.
 
 ## Grips + edge-to-edge note cells (2026-10-31, Julius)
 
+- Reference split: `wire` option `minB:30` lets the bottom (`#referenceScroll`, CSS `min-height:30px`) shrink to a 30px strip; load clamp .98 for that bar.
 - `resetColumnSizes()` also calls `window.resetSplitBars()` (every `initSplitBars` wire → .5) and resets `mobileSplitRatio`, `splitColsRatio`, `split3` + their localStorage keys (2026-10-31).
 - Grips: override block after the "Lines, not boxes" rules; all `::after` grips use `--grip` (set in `setDiv` = divider base color, unfaded), 5px × 30px.
 - Plan / wrap `table[data-cnote]` bleed to the column edges: `--rowpx` on `.day-row` mirrors its side padding (desktop 8px, ≤900px / mobile-mode 12px × `--mobile-scale`, × `--pad-x` × `--side-k`); table `width:calc(100% + 2*--rowpx)` + negative margins, td padding = `--rowpx`. Sched table untouched. If `.day-row` side padding changes, update `--rowpx` too.

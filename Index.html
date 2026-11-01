@@ -534,7 +534,7 @@
     #refTopScroll{padding:6px 5px 10px;}
     #refTopScroll:empty{display:none;}
     #refTopScroll{flex:var(--rs-a,1) 1 0;}
-    #referenceScroll{flex:var(--rs-b,1) 1 0;}
+    #referenceScroll{flex:var(--rs-b,1) 1 0;min-height:30px;} /* never fully hidden: the bar + a strip stay reachable (Julius, 2026-10-31) */
     #refTopScroll:empty + #refSplitBar{display:none;}
     /* Drag bar between the halves: 2px line in --divider, taller invisible grab area, grip pill. */
     #refSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
@@ -543,6 +543,9 @@
     /* Notes split (2026-10-31, Julius): Plan on top, Review on the bottom, same bar as Reference. */
     #journalScroll{flex:var(--ns-a,1) 1 0;}
     #reviewScroll{flex:var(--ns-b,1) 1 0;padding:6px 10px 24px;font-size:13px;line-height:1.4;}
+    /* Review hidden for now (Julius, 2026-10-31): Notes is one cell again. Remove these two lines to bring it back. */
+    #notesSplitBar,#reviewScroll{display:none!important;}
+    #journalScroll{flex:1 1 0!important;}
     #notesSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
     #notesSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
     #notesSplitBar::after{content:"";position:absolute;left:50%;top:-.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
@@ -8824,7 +8827,7 @@
     clearTimeout(reviewTimer);
     reviewTimer = setTimeout(() => {
       const box = document.getElementById('reviewScroll');
-      if(!box) return;
+      if(!box || !box.offsetParent) return; // hidden (Review off for now)
       const date = reviewDate(), today = (typeof state !== 'undefined' && state && state.today) || localToday();
       const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
       const lvl = el => Math.floor(Number(el.dataset && el.dataset.level) || 0);
@@ -9866,13 +9869,13 @@
   (function initSplitBars(){
     const clamp = r => Math.max(.12,Math.min(.88,r));
     const apply = (host,a,b,r) => { host.style.setProperty(a,String(r)); host.style.setProperty(b,String(1 - r)); };
-    const load = k => { try{ const v = parseFloat(localStorage.getItem(k)); return isFinite(v) ? clamp(v) : .5; }catch(e){ return .5; } };
+    const load = (k,mx) => { try{ const v = parseFloat(localStorage.getItem(k)); return isFinite(v) ? Math.max(.12,Math.min(mx || .88,v)) : .5; }catch(e){ return .5; } };
     const save = (k,r) => { try{ localStorage.setItem(k,String(r)); }catch(e){} };
     const wired = [];
     window.resetSplitBars = () => wired.forEach(o => { apply(o.host(),o.a,o.b,.5); save(o.key,.5); });
     function wire(opt){
       wired.push(opt);
-      apply(opt.host(),opt.a,opt.b,load(opt.key));
+      apply(opt.host(),opt.a,opt.b,load(opt.key,opt.minB ? .98 : 0));
       let drag = null, lastTap = 0;
       document.addEventListener('pointerdown',e => {
         const bar = e.target.closest && e.target.closest(opt.sel);
@@ -9890,7 +9893,9 @@
       document.addEventListener('pointermove',e => {
         if(!drag || e.pointerId !== drag.id) return;
         if(Math.abs(e.clientY - drag.y) > 3) drag.moved = true;
-        const r = clamp((e.clientY - drag.box.top) / Math.max(1,drag.box.height));
+        let r = (e.clientY - drag.box.top) / Math.max(1,drag.box.height);
+        // opt.minB (px): how short the bottom half may get (Reference list, Julius 2026-10-31).
+        r = opt.minB ? Math.max(.12,Math.min(1 - opt.minB / Math.max(1,drag.box.height),r)) : clamp(r);
         apply(opt.host(),opt.a,opt.b,r); drag.r = r;
         e.preventDefault();
       },true);
@@ -9904,7 +9909,7 @@
       document.addEventListener('pointercancel',end,true);
       document.addEventListener('touchmove',e => { if(drag) e.preventDefault(); },{capture:true,passive:false});
     }
-    wire({sel:'#refSplitBar',key:'fw.refSplit',a:'--rs-a',b:'--rs-b',
+    wire({sel:'#refSplitBar',key:'fw.refSplit',a:'--rs-a',b:'--rs-b',minB:30,
       host:() => document.getElementById('referencePane') || document.documentElement,
       box:() => {
         const t = document.getElementById('refTopScroll'), b = document.getElementById('referenceScroll');

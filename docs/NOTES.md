@@ -235,3 +235,15 @@ Read only the section you need.
 - Paste-split tail drops `data-tid` (a split-off line isn't a mirror).
 - Limits: only loaded cells sync live (unloaded days catch up on load, done-only); no title sync yet (phase 2).
 
+
+## Center Up / Down + planning pause (2026-11-01, Julius: spec, PENDING — not built)
+
+Requirements collected only; implement in phases later. Confirm the open questions with Julius before coding.
+
+1. **Center column split**: the Notes column (`#journalPane`) splits vertically into **Center Up** (upper Notes) and **Center Down** (purpose TBD). Adjustable split (esp. mobile); keep column resizing / scaling. Likely base: the hidden Notes split (`#notesSplitBar`, `--ns-a/--ns-b`, `fw.notesSplit` in `initSplitBars`) — reuse it, don't build a second split. Review stays hidden unless Julius picks it for Center Down.
+2. **Notes simplification**: drop the redundant day-of-week label in Notes; Notes area belongs to Today. Keep note contents + persistence untouched.
+3. **Pause daily planning**: Suggested Day + Day Wrap-Up on hold (see "Nightly plan + wrap-up"). No new UI/automation work; keep data, `dayplan.js`, `applyClaudeNotes_()` so they can come back.
+4. **Urgent ↔ Reference**: carry the recent Urgent-area changes into the Reference notes/card; keep grouping, subjects, priorities, linked task identity (`data-tid`) and completion sync. Build on "Task mirrors" (phase 1) — no second task system.
+5. **Approach**: smallest safe phase first; read sections selectively; preserve mobile layouts, notes, calendar, task logs, saved data, resize controls; never delete/overwrite content for the layout change.
+
+Open questions (ask first): what goes in Center Down? · which label exactly is the "day-of-week" one (Notes day label / weekday icon)? · pause = hide the Suggested Day / Wrap-Up blocks, or just stop the nightly task? · which "recent Urgent-area changes" are meant (Urgent batches 10-30? something newer from another chat)?

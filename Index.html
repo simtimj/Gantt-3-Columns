@@ -1501,6 +1501,10 @@
     body.mobile-mode .day-row{--rowpx:calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1));}
     .day-row .editor table[data-cnote][data-ckind="plan"],.day-row .editor table[data-cnote][data-ckind="wrap"]{width:calc(100% + 2 * var(--rowpx))!important;max-width:none!important;margin-left:calc(-1 * var(--rowpx))!important;margin-right:calc(-1 * var(--rowpx))!important;border-top-width:2px!important;border-bottom-width:2px!important;}
     .day-row .editor table[data-cnote][data-ckind="plan"] td,.day-row .editor table[data-cnote][data-ckind="wrap"] td{padding-left:var(--rowpx)!important;padding-right:var(--rowpx)!important;}
+    /* Center phase 1 (2026-11-01, Julius): Notes column has no day label (Today keeps its label + weekday icon);
+       Suggested Day + Day Wrap-Up paused = hidden, never deleted (remove these two lines to bring them back). */
+    .journal-pane-row > .day-label{display:none!important;}
+    .day-row .editor table[data-cnote][data-ckind="plan"],.day-row .editor table[data-cnote][data-ckind="wrap"]{display:none!important;}
     body.one-day #todayScroll .od-on > .day-editor{flex:var(--od-a,1) 1 0 !important;min-height:0 !important;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;}
     body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
     .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}

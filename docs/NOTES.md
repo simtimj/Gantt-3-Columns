@@ -246,4 +246,5 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 2. **Notes simplification**: in the Notes column only, remove the day label AND the weekday icon. Today / tasks column keeps its day label + weekday icon. Notes area belongs to Today. Keep note contents + persistence untouched.
 3. **Pause daily planning — both**: hide the Suggested Day + Day Wrap-Up blocks in Notes AND stop the nightly scheduled task ("Gantt: nightly wrap-up + plan"; pause/disable, don't delete). Keep data, `dayplan.js`, `applyClaudeNotes_()` so they can come back.
 4. ~~Urgent ↔ Reference integration~~ — dropped for now (Julius 2026-11-01).
+- **Phase 1 done 2026-11-01**: CSS block "Center phase 1" in Index.html hides `.journal-pane-row > .day-label` and `table[data-cnote][data-ckind="plan"|"wrap"]` (data kept; delete those lines to undo). Nightly task `trig_011mvzKaMfkgAP7tKLQ7b3pb` disabled (not deleted). Next phase: split + Center Up tabs, then Weather.
 5. **Approach**: read sections selectively; preserve mobile layouts, notes, calendar, task logs, saved data, resize controls; never delete/overwrite content for the layout change.

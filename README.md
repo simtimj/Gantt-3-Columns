@@ -48,6 +48,7 @@ Last updated: 2026-11-01
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-01)
+- **Center, phase 1** (2026-11-01) — Notes column no longer shows the day label (Today keeps its date + weekday icon). Suggested Day + Day wrap-up are paused: their boxes are hidden (not deleted) and the 10 pm nightly scheduled task is turned off. The Schedule box still shows.
 - **Task mirrors, phase 1** (2026-11-01) — hold a Reference task's checkbox (Backlog too) → **📌 Send to Today (Plan / think)** puts a linked copy in the selected day's Plan / think pad (the day shown with ▲▼, not always today). Sending again shows "Already in Plan / think". Ticking any copy (Reference, Plan / think, or the Urgent row) ticks the others; a ticked Plan / think copy moves into that day's Completed (Today) as a history line, once per day. Unticking reopens the task but keeps the history line. Two tasks with the same name stay separate. Phase 2 (title edits sync, Go to Reference) not built yet.
 - **Even reset** (2026-11-01) — Reset column sizes makes all columns the same width (filling the window) and lines up Today's split line with Reference's; Reference is a true 50/50. With nothing saved yet, the lines start lined up too.
 - **Drag grips at the edges** (2026-11-01) — same grips, moved out of the way: Today's split grip sits at the left edge, Reference's at the right edge, the column-line grips at the top (phone split lines too). Only the grip area drags now, not the whole line.
@@ -285,7 +286,7 @@ Last updated: 2026-11-01
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
-- **Center Up / Center Down (2026-11-01, Julius: spec saved, pending)**: split the Notes column; Center Up gets tabs (1 = Notes, 2 = hourly Weather), Center Down empty for now; remove the day label + weekday icon from the Notes column only (Today keeps them); pause Suggested Day + Day Wrap-Up (hide blocks + stop the nightly task, keep data). Spec: `docs/NOTES.md` → "Center Up / Down + planning pause".
+- **Center Up / Center Down (2026-11-01, Julius: spec saved; phase 1 done)**: next = split the Notes column; Center Up gets tabs (1 = Notes, 2 = hourly Weather), Center Down empty for now. Spec: `docs/NOTES.md` → "Center Up / Down + planning pause".
 - **Auto-reshuffle, Motion/Reclaim-style (Julius, 2026-10-28)**: ✅ step 1 task fields (duration above) · step 2 `Code.gs` reads today's calendar and finds free gaps, skipping the Chill and Repeat Tasks calendars · step 3 scheduler sorts by deadline + priority and puts each task in the first gap it fits · step 4 **Reshuffle** button that reruns it (auto-run later). Keep a manual mode too: set the parameters together with Claude in conversation. Target: Fri Nov 6.
 - **Calendar column, like Google Calendar** (Julius, 2026-10-28): a full calendar view as its own column (or swipe in from the right / a button that swaps it in for Reference), so while scheduling with Claude he can see the day at a glance on phone, tablet and computer. Details to settle: day vs 3-day vs week view, read-only first or drag tasks onto it.
 - **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)

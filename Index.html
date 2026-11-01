@@ -1473,8 +1473,8 @@
     /* Narrow Today (Julius, 2026-11-01): symbol + short times instead of the words. */
     .pane-narrow .editor > [data-tsec]:not([data-tsec="gap"]){font-size:0!important;letter-spacing:0;}
     .pane-narrow .editor > [data-tsec]:not([data-tsec="gap"])::before,.pane-narrow .editor > [data-tsec]:not([data-tsec="gap"])::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:500;letter-spacing:.02em;}
-    .pane-narrow .editor > [data-tsec="morning"]::before{content:"☀️";}
-    .pane-narrow .editor > [data-tsec="afternoon"]::before{content:"☀️";filter:hue-rotate(-28deg) saturate(1.6);display:inline-block;}
+    .pane-narrow .editor > [data-tsec="morning"]::before{content:"☀\FE0E";color:#f4b400;font-size:calc(var(--paragraph-size,14px) * 1.05);font-weight:400;}
+    .pane-narrow .editor > [data-tsec="afternoon"]::before{content:"☀\FE0E";color:#fb8c00;font-size:calc(var(--paragraph-size,14px) * 1.05);font-weight:400;}
     .pane-narrow .editor > [data-tsec="evening"]::before{content:"🌙";}
     .pane-narrow .editor > [data-tsec="morning"]::after{content:" 8:30–2";}
     .pane-narrow .editor > [data-tsec="afternoon"]::after{content:" 3:45–6:30";}
@@ -1504,8 +1504,8 @@
     /* Notes sections (Julius, 2026-11-01): no fill, colored text + colored line, line runs edge to edge (--rowpx bleed). */
     .editor > [data-nsec]{margin:2px calc(-1 * var(--rowpx,8px)) 3px;padding:0 var(--rowpx,8px) 1px;border-bottom:1px solid;font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;user-select:none;-webkit-user-select:none;}
     .editor > [data-nsec]:first-child{margin-top:0;}
-    .editor > [data-nsec="must"]{color:#e53935;border-bottom-color:#e53935;}
-    .editor > [data-nsec="focus"]{color:#1e88e5;border-bottom-color:#1e88e5;margin-top:10px;}
+    .editor > [data-nsec="must"]{color:#e53935!important;border-bottom:1px solid #e53935!important;}
+    .editor > [data-nsec="focus"]{color:#1e88e5!important;border-bottom:1px solid #1e88e5!important;margin-top:10px;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
     /* Grips at the edges (Julius, 2026-11-01): same size, just moved out of the way. Today's line grip sits at

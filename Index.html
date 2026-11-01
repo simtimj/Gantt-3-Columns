@@ -552,8 +552,8 @@
     #journalPane[data-ctab="weather"] #journalScroll,#journalPane[data-ctab="weather"] #journalTemplateButton,
     #journalPane:not([data-ctab="weather"]) #weatherScroll{display:none!important;}
     .center-tabs{display:inline-flex;gap:2px;margin-left:-6px;}
-    .center-tabs button{border:0;background:transparent;font-size:12px;line-height:1;padding:2px 4px;border-radius:6px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-    .center-tabs button.on{opacity:1;background:var(--divider);}
+    .center-tabs button{border:0;background:transparent;font-size:12px;line-height:1;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .center-tabs button.on{opacity:1;background:color-mix(in srgb,var(--divider) 45%,transparent);}
     .center-placeholder{padding:10px 12px;color:var(--muted,#888);font-size:13px;line-height:1.4;}
     #notesSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
     #notesSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}

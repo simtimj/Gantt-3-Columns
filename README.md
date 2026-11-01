@@ -48,6 +48,7 @@ Last updated: 2026-10-31
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
+- **Urgent add box wraps (2026-10-31):** typing a new task in the Urgent panel now wraps onto new lines and the box grows downward, instead of running past the cell. Enter still adds the task; pasted line breaks become spaces.
 - **Reference list shrinks further (2026-10-31):** drag the Reference half line down until only a ~30px strip of the list is left; it can't disappear, so the line and its notch are always there to pull it back up.
 - **Reset columns also resets the splits (2026-10-31):** besides column widths, it puts the Today, Notes and Reference half lines and the phone split back to half and half.
 - **Bolder drag notches (2026-10-31):** the grips on every resize line (columns, Today / Notes / Reference halves, phone split) are thicker and longer and stay full strength even when Line strength fades the lines.

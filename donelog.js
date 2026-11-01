@@ -179,4 +179,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-grips-note-cells', date: '2026-10-31', project: 'Gantt', title: 'Bolder drag notches + edge-to-edge plan/wrap cells', details: 'Resize grips thicker, full strength; Suggested Day and Day wrap-up boxed again, column lines as their sides' },
   { id: 'd-20261031-reset-splits', date: '2026-10-31', project: 'Gantt', title: 'Reset columns resets the half splits too', details: 'Today / Notes / Reference half lines and phone split go back to 50/50' },
   { id: 'd-20261031-ref-shrink-review-off', date: '2026-10-31', project: 'Gantt', title: 'Reference list shrinks to a strip; Review hidden', details: 'Reference bottom half can drag down to ~30px, never gone; Notes Review half hidden for now' },
+  { id: 'd-20261031-urg-add-wrap', date: '2026-10-31', project: 'Gantt', title: 'Urgent add box wraps', details: 'New-task box in Urgent wraps and grows downward instead of running past the cell; Enter still adds' },
 ];

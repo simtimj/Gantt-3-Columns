@@ -1305,9 +1305,9 @@
     .pane-narrow #urgentPanel.wrap .urg-row > .urg-fold{float:right;margin:1px 0 0 6px;}
     .urg-addbox{flex:0 0 auto;width:13px;height:13px;border:2px dashed var(--urg);border-radius:3px;opacity:.7;}
     #urgentPanel.wrap .urg-adder{align-items:center;}
-    .urg-adder input{flex:1;min-width:0;font:inherit;font-size:13px;color:inherit;background:transparent;border:1.5px solid transparent;padding:2px 5px;margin-left:-5px;outline:none;border-radius:4px;}
-    .urg-adder input:focus{border-color:var(--urg);}
-    .urg-adder input::placeholder{color:var(--muted);opacity:.8;}
+    .urg-adder textarea{flex:1;min-width:0;max-width:100%;box-sizing:border-box;display:block;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:inherit;font-size:13px;line-height:1.4;color:inherit;background:transparent;border:1.5px solid transparent;padding:2px 5px;margin-left:-5px;outline:none;border-radius:4px;}
+    .urg-adder textarea:focus{border-color:var(--urg);}
+    .urg-adder textarea::placeholder{color:var(--muted);opacity:.8;}
     .urg-create{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:4px;}
     .urg-create input,.inbox-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;}
     #calPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
@@ -6289,7 +6289,7 @@
       }
     }
     if(focusAdd){
-      const inp = panel.querySelector(`.urg-adder[data-urg="${focusAdd}"] input`);
+      const inp = panel.querySelector(`.urg-adder[data-urg="${focusAdd}"] textarea`);
       if(inp){
         try{ inp.focus({preventScroll:true}); }catch(e){ inp.focus(); }
         const n = caret == null ? inp.value.length : Math.min(caret,inp.value.length);
@@ -6511,17 +6511,22 @@
     row.dataset.urg = u;
     row.title = 'Type a ' + URG_NAMES[u] + ' task, Enter to add (goes in today)';
     const box = document.createElement('span'); box.className = 'urg-addbox'; box.setAttribute('aria-hidden','true');
-    const inp = document.createElement('input');
-    inp.type = 'text';
+    // Wraps onto new lines and grows downward instead of running past the cell (2026-10-31, Julius).
+    const inp = document.createElement('textarea');
+    inp.rows = 1;
+    const fit = () => { inp.style.height = 'auto'; inp.style.height = inp.scrollHeight + 'px'; };
     inp.value = urgDraft[u] || '';
     inp.placeholder = 'Add ' + URG_NAMES[u].toLowerCase() + ' task…';
     inp.enterKeyHint = 'enter';
     inp.autocomplete = 'off';
     inp.setAttribute('aria-label','New ' + URG_NAMES[u] + ' task');
-    inp.addEventListener('input',() => { urgDraft[u] = inp.value; });
+    inp.addEventListener('input',() => { if(/\n/.test(inp.value)) inp.value = inp.value.replace(/\s*\n\s*/g,' '); urgDraft[u] = inp.value; fit(); });
+    inp.addEventListener('focus',fit);
+    requestAnimationFrame(fit);
     inp.addEventListener('keydown',e => {
       e.stopPropagation(); // the page's shortcuts / undo shouldn't act on this box
-      if(e.key === 'Escape'){ urgDraft[u] = ''; inp.value = ''; inp.blur(); }
+      if(e.key === 'Escape'){ urgDraft[u] = ''; inp.value = ''; fit(); inp.blur(); }
+      else if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); row.requestSubmit ? row.requestSubmit() : row.dispatchEvent(new Event('submit',{cancelable:true})); }
     });
     row.addEventListener('pointerdown',e => { if(e.target !== inp){ e.preventDefault(); inp.focus(); } });
     row.addEventListener('submit',e => {

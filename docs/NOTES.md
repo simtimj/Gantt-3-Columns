@@ -224,3 +224,14 @@ Read only the section you need.
 
 - Override block "Grips at the edges" after the grip-size rules: grips keep size, positions only — `.od-pad-head` left, `#refSplitBar` right, `.column-resizer` + mobile col lines top, mobile row lines left. Each `::before` hit area shrunk to ~46px around the grip. `#refSplitBar` / `#notesSplitBar` / `.od-pad-head` get `pointer-events:none` (only `::before` takes touches; wire() uses document listeners). Column / mobile split lines keep pointer events on their own thin line because their drag code listens on the element after setPointerCapture.
 - Even reset (2026-11-01): `resetColumnSizes()` sets equal widths then `fitColumnsToWindow()`. `alignSplits(save)` in `initSplitBars` measures the Today `.od-pad-head` top at r=.3/.7 and solves for the `#refSplitBar` top (fallback: middle of `#todayScroll`); runs after `resetSplitBars()` and once on load when `fw.odSplit` is unset (not saved). Exposed as `window.alignSplitBars`.
+
+## Task mirrors (2026-11-01, Julius: spec phase 1)
+
+- One logical task = every check-line sharing a `data-tid` (assigned on first send as `m-<base36 time><rand>`, saved in the cell HTML; never regenerated; no registry). Script block at the end of `Index.html` (`tidToggled`, `tidMenuRow`, `sendToToday`, `toHistory`, `reconcile`).
+- Hold menu (`showUrgencyPicker` → `tidMenuRow`) shows **📌 Send to Today (Plan / think)** only when the owner is a `.ref-cell` (Backlog included). Target = `window.odDate` (selected day) → `urgEditor(date,'plan')`. Placement copies the check-text HTML and `data-cat`, NOT `data-urg/due/dur` (else Urgent would list it twice). One placement per tid per pad; a done task can't be sent; a tid duplicated within one cell gets a fresh id first.
+- Sync: `wireCheckbox`'s change handler calls `tidToggled(line,on,root)`; it sets the first line with that tid in every other editor (`cardEditors()`), without dispatching change (no loops), and saves each via `urgChanged`. Urgent rows are drawn from cells, so they follow. History lines use `data-htid` so they never re-sync.
+- Ticked Plan / think copy → after 350 ms `toHistory` appends a checked `data-htid` line to the end of that date's `.day-editor` (Completed) — once per tid per day — and removes the placement. Unticking keeps the history line.
+- Catch-up: a MutationObserver on `#todayScroll` / `#referenceTree` childList runs `reconcile()` (debounced 800 ms): an open Plan copy whose task is ticked in another loaded copy (done wins), or a leftover ticked copy, goes to history.
+- Paste-split tail drops `data-tid` (a split-off line isn't a mirror).
+- Limits: only loaded cells sync live (unloaded days catch up on load, done-only); no title sync yet (phase 2).
+

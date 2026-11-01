@@ -2808,6 +2808,7 @@
       tailRange.selectNodeContents(block);
       tailRange.setStart(range.startContainer,range.startOffset);
       const tail = block.cloneNode(false);
+      tail.removeAttribute('data-tid'); // a split-off line is a new task, not a mirror (2026-11-01)
       tail.appendChild(tailRange.extractContents());
       const task = block.classList.contains('check-line');
       const originalCheckbox = block.querySelector('input[type=checkbox]') || tail.querySelector('input[type=checkbox]');
@@ -3434,6 +3435,8 @@
             '.editor,.ref-cell'
           );
         if(typeof tsecToggled === 'function') try{ tsecToggled(line,cb.checked,root); }catch(err){}
+        // Task mirrors (2026-11-01): same data-tid elsewhere follows this tick.
+        if(window.tidToggled) try{ tidToggled(line,cb.checked,root); }catch(err){}
         saveEditorOwner(root);
       }
     );
@@ -7851,6 +7854,8 @@
         p.appendChild(mb);
       }
     }
+    // Reference task → Plan / think of the selected day, as a linked mirror (2026-11-01).
+    if(window.tidMenuRow) try{ tidMenuRow(p,line,owner); }catch(err){}
     // Delete the task + its subtasks (2026-10-27, Julius) — every checkbox, all columns.
     {
       const n = urgSubtree(line).length - 1;
@@ -10182,6 +10187,125 @@
     window.odPadTheirs = (d, plan, h) => { const x = st(d); if(x.inFlight || x.pending) return; merge(d, plan, h); };
     window.odPadUnsaved = () => [...padSt.values()].some(x => x.inFlight || x.pending);
     window.odPadFlush = () => { for(const [d,x] of padSt) if(x.pending && !x.inFlight) save(d); };
+  })();
+</script>
+<script>
+  /* Task mirrors (2026-11-01, Julius; spec phase 1). One task, several places: every live copy
+     carries the same data-tid. Ticking any copy ticks the others (Reference, Plan / think, Today,
+     Notes; Urgent is drawn from those cells, so it follows). A ticked Plan / think copy moves into
+     that day's Today ("Completed") as a history line with data-htid (not data-tid, so it never
+     re-syncs). Details: docs/NOTES.md → "Task mirrors". */
+  (function(){
+    let syncing = false;
+    const q = s => '"' + CSS.escape(String(s)) + '"';
+    const ED = '.day-editor,.journal-editor,.plan-editor,.ref-cell';
+    const ownerOf = l => l && l.closest ? l.closest(ED) : null;
+    const boxOf = l => l.querySelector(':scope > input[type=checkbox]') || l.querySelector('input[type=checkbox]');
+    const isOn = l => { const b = boxOf(l); return !!(b && b.checked); };
+    function setOn(l,on){
+      const b = boxOf(l); if(!b) return;
+      b.checked = on; b.toggleAttribute('checked',on); l.classList.toggle('done',on);
+    }
+    function newTid(){ return 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+    // The live copies of a task: the first line with this tid in each other editor.
+    function copies(tid,exceptEd){
+      const out = [];
+      cardEditors().forEach(ed => {
+        if(ed === exceptEd) return;
+        const l = ed.querySelector('.check-line[data-tid=' + q(tid) + ']');
+        if(l && ownerOf(l) === ed) out.push(l);
+      });
+      return out;
+    }
+    function edit(ed,fn){ captureBeforeEdit(ed); fn(); finishEditorEdit(ed); urgChanged(ed); }
+    // Completed Plan / think copy → history line at the end of that day's Today cell.
+    function toHistory(pl){
+      const pad = ownerOf(pl), date = pad && pad.dataset.date;
+      if(!date || !pl.isConnected || !isOn(pl)) return;
+      const day = document.querySelector('#todayScroll .day-editor[data-date=' + q(date) + ']');
+      if(!day) return;
+      const tid = pl.dataset.tid;
+      if(!day.querySelector('.check-line[data-htid=' + q(tid) + ']')){ // never twice for one day
+        const h = document.createElement('div');
+        h.className = 'check-line done'; h.dataset.level = '0'; h.dataset.htid = tid;
+        if(pl.dataset.cat) h.dataset.cat = pl.dataset.cat;
+        h.innerHTML = '<input type="checkbox" checked><span class="check-text"></span>';
+        const tx = pl.querySelector('.check-text');
+        h.querySelector('.check-text').innerHTML = tx ? tx.innerHTML : '';
+        edit(day,() => {
+          if(!day.textContent.trim() && !day.querySelector('input,img,hr')) day.replaceChildren();
+          day.appendChild(h);
+          wireCheckbox(h.querySelector('input'));
+        });
+      }
+      edit(pad,() => { pl.remove(); if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren(); });
+    }
+    function sweepPlans(tid){
+      document.querySelectorAll('#todayScroll .plan-editor .check-line[data-tid' + (tid ? '=' + q(tid) : '') + ']')
+        .forEach(pl => { if(isOn(pl)) toHistory(pl); });
+    }
+    // Called from wireCheckbox's change handler after a real tick.
+    window.tidToggled = function(line,on,root){
+      const tid = line && line.dataset && line.dataset.tid;
+      if(syncing || !tid) return;
+      syncing = true;
+      try{
+        copies(tid,root).forEach(l => { if(isOn(l) !== on) edit(ownerOf(l),() => setOn(l,on)); });
+      } finally { syncing = false; }
+      // Short pause so the tick is seen before the line moves to Completed.
+      if(on) setTimeout(() => sweepPlans(tid),350);
+    };
+    // Load-time catch-up: a Plan / think copy whose task was ticked elsewhere while that
+    // day wasn't loaded (or a ticked copy left behind) moves to history now. Done wins.
+    function reconcile(){
+      document.querySelectorAll('#todayScroll .plan-editor .check-line[data-tid]').forEach(pl => {
+        if(isOn(pl)){ toHistory(pl); return; }
+        if(copies(pl.dataset.tid,ownerOf(pl)).some(isOn)){ edit(ownerOf(pl),() => setOn(pl,true)); toHistory(pl); }
+      });
+    }
+    let rt = 0;
+    const later = () => { clearTimeout(rt); rt = setTimeout(() => { try{ reconcile(); }catch(e){} },800); };
+    function watch(){
+      ['todayScroll','referenceTree'].forEach(id => { const el = document.getElementById(id); if(el) new MutationObserver(later).observe(el,{childList:true}); });
+      later();
+    }
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded',watch); else watch();
+
+    function sendToToday(line,owner){
+      const date = window.odDate || (typeof state !== 'undefined' && state.today) || localToday();
+      const pad = urgEditor(date,'plan');
+      if(!pad){ setStatus('That day isn’t loaded — open it, then try again'); return; }
+      if(isOn(line)){ setStatus('That task is done — untick it first'); return; }
+      let tid = line.dataset.tid;
+      // No id yet, or a stray duplicate in the same cell → a fresh stable id, saved with the cell.
+      if(!tid || owner.querySelectorAll('.check-line[data-tid=' + q(tid) + ']').length > 1)
+        edit(owner,() => { line.dataset.tid = tid = newTid(); });
+      const have = pad.querySelector('.check-line[data-tid=' + q(tid) + ']');
+      if(have){
+        setStatus('Already in Plan / think for ' + shortDate(date));
+        have.classList.add('urg-flash'); setTimeout(() => have.classList.remove('urg-flash'),1300);
+        return;
+      }
+      const n = createCheckboxLine(0);
+      n.dataset.tid = tid;
+      if(line.dataset.cat) n.dataset.cat = line.dataset.cat;
+      const src = line.querySelector('.check-text');
+      n.querySelector('.check-text').innerHTML = src && src.textContent.trim() ? src.innerHTML : '<br>';
+      edit(pad,() => {
+        if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren();
+        pad.appendChild(n);
+      });
+      setStatus('Sent to Plan / think · ' + shortDate(date));
+    }
+    // Hold-menu button, Reference tasks only (Backlog is a Reference cell too).
+    window.tidMenuRow = function(p,line,owner){
+      if(!owner || !owner.classList || !owner.classList.contains('ref-cell')) return;
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'urg-goto'; b.textContent = '📌 Send to Today (Plan / think)';
+      b.addEventListener('pointerdown',e => e.preventDefault());
+      b.addEventListener('click',() => { hideUrgencyPicker(); sendToToday(line,owner); });
+      p.appendChild(b);
+    };
   })();
 </script>
 </body>

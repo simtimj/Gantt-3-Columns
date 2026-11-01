@@ -48,6 +48,8 @@ Last updated: 2026-11-01
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-01)
+- **Lines in the day color** (2026-11-01) — Options toggle (off by default): column / split lines and grips take today's day color; section lines and note-table lines inside a day take that day's color; all 2px. Today's time-section lines now reach the column walls too.
+- **Center Up stays put** (2026-11-01) — scrolling inside Notes / Weather / Center Down no longer drags the column or page.
 - **Notes section look + narrow time sections** (2026-11-01) — Make sure you do = red text + red line, Focus tracking = blue text + blue line, no fill, lines run wall to wall. When Today is narrow, Morning / Afternoon / Evening headers show ☀️ 8:30–2, orange ☀️ 3:45–6:30, 🌙 6:30–9:30.
 - **Backlog → Undated Tasks** (2026-11-01) — the Reference card that holds urgency tasks with no day is now titled **Undated Tasks**, with a one-line description at the top. Its tasks show in Urgent ("from Undated Tasks"); tasks typed into Urgent and "📥 Not today" land there. The old "Backlog" title still works.
 - **Tight Urgent** (2026-11-01) — the Urgent panel and its group boxes now reach the Reference column edges (1px side padding).

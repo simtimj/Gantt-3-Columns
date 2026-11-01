@@ -1505,6 +1505,16 @@
     .editor > [data-nsec]{margin:2px calc(-1 * var(--rowpx,8px)) 3px;padding:0 var(--rowpx,8px) 1px;border-bottom:1px solid;font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;user-select:none;-webkit-user-select:none;}
     .editor > [data-nsec]:first-child{margin-top:0;}
     .editor > [data-nsec="must"]{color:#c62828!important;border-bottom:1px solid #c62828!important;}
+    /* Center Up stays put (Julius, 2026-11-01): scrolling inside Notes / Weather / Center Down never drags the pane or page. */
+    #journalPane{overflow:hidden;}
+    #journalScroll,#weatherScroll,#centerDownScroll{overscroll-behavior:contain;}
+    /* Today time-section lines reach the column walls like the Notes section lines. */
+    .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
+    /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
+    body.day-lines .editor > [data-tsec]:not([data-tsec="gap"]),body.day-lines .editor > [data-nsec]{border-bottom:2px solid var(--note-line-adj)!important;}
+    body.day-lines .editor > [data-tsec="gap"]{border-bottom:2px dashed var(--note-line-adj)!important;}
+    body.day-lines .editor table[data-cnote]{border-top:2px solid var(--note-line-adj)!important;border-bottom:2px solid var(--note-line-adj)!important;}
+    body.day-lines .editor table[data-cnote] tr + tr > td{border-top:2px solid var(--note-line-adj)!important;}
     .editor > [data-nsec="focus"]{color:#1565c0!important;border-bottom:1px solid #1565c0!important;margin-top:10px;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
@@ -1691,6 +1701,7 @@
       <button class="btn tiny" id="resetDmCell" type="button">Reset</button>
     </div>
     <label class="ts-check"><input type="checkbox" id="dmDayMatch" checked> Day cells match the day color</label>
+    <label class="ts-check"><input type="checkbox" id="dayLinesToggle"> Lines in the day color</label>
     <div class="ts-daycols" id="dmDayCols">
       <label>M<input type="color" data-dow="1"></label><label>T<input type="color" data-dow="2"></label><label>W<input type="color" data-dow="3"></label><label>T<input type="color" data-dow="4"></label><label>F<input type="color" data-dow="5"></label><label>S<input type="color" data-dow="6"></label><label>S<input type="color" data-dow="0"></label>
       <button class="btn tiny" id="dmDayDefault" type="button">Default</button>
@@ -2167,6 +2178,7 @@
       syncDailyScroll();
       updateVisibleDate();
       if(window.odApply) odApply();
+      if(window.applyDayLines) applyDayLines();
     });
   }
   // Starter lines for a new day's Make sure you do (Julius, 2026-11-01). Edit here to change the defaults.
@@ -9872,7 +9884,7 @@
 <script>
   // Saved looks (Julius, 2026-10-27): Light / Dark / Custom slots that save every look setting on this device.
   (function(){
-    const KEYS = ['fw.sideSpace','fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.urgMark','fw.cardFillL','fw.cardFillD','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
+    const KEYS = ['fw.sideSpace','fw.theme','fw.dmTint','fw.dmText','fw.dmCell','fw.dmDayMatch','fw.dayLines','fw.dmDayColors3','fw.dayColorAdj','fw.cards','fw.cardsAuto','fw.cardsBoxFill','fw.urgMark','fw.cardFillL','fw.cardFillD','fw.refPadX','fw.refPadY','focusWorkspaceTypographyV1','focusWorkspaceMobileScaleV1','focusWorkspacePadXV1','focusWorkspacePadYV1'];
     const sel = document.getElementById('lookSlot'), sv = document.getElementById('lookSave'), ld = document.getElementById('lookLoad');
     if(!sel || !sv || !ld) return;
     const all = () => { try{ return JSON.parse(localStorage.getItem('fw.looks') || '{}') || {}; }catch(e){ return {}; } };
@@ -10107,6 +10119,25 @@
     if(inp) inp.addEventListener('input',() => { divColor = inp.value; setDiv(); try{ localStorage.setItem('fw.divider',inp.value); }catch(e){} });
     if(rng) rng.addEventListener('input',() => { lineK = parseInt(rng.value,10) || 70; setDiv(); try{ localStorage.setItem('fw.lineK',String(lineK)); }catch(e){} });
     if(rst) rst.addEventListener('click',() => { divColor = ''; lineK = 70; if(rng) rng.value = '70'; setDiv(); try{ localStorage.removeItem('fw.divider'); localStorage.removeItem('fw.lineK'); }catch(e){} if(inp) inp.value = '#1f2937'; });
+  })();
+  // Day-color lines (Julius, 2026-11-01): Options toggle; dividers + grips take today's day color, in-cell lines their row's.
+  (function initDayLines(){
+    const box = document.getElementById('dayLinesToggle');
+    function apply(){
+      let on = false; try{ on = localStorage.getItem('fw.dayLines') === '1'; }catch(e){}
+      document.body.classList.toggle('day-lines', on);
+      const b = document.body.style;
+      if(!on){ b.removeProperty('--divider'); b.removeProperty('--grip'); return; }
+      const row = document.querySelector('.day-row.today') || document.querySelector('.day-row.od-on') || document.querySelector('.day-row');
+      const c = row && getComputedStyle(row).getPropertyValue('--note-line-adj').trim();
+      if(c){ b.setProperty('--divider', c); b.setProperty('--grip', c); }
+    }
+    window.applyDayLines = apply;
+    if(box){
+      try{ box.checked = localStorage.getItem('fw.dayLines') === '1'; }catch(e){}
+      box.addEventListener('change',() => { try{ localStorage.setItem('fw.dayLines', box.checked ? '1' : '0'); }catch(e){} apply(); });
+    }
+    apply();
   })();
   (function initOneDay(){
     let on = true; try{ on = localStorage.getItem('fw.oneDay') !== '0'; }catch(e){}

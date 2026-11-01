@@ -196,4 +196,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-gantt-undated-tasks', date: '2026-11-01', project: 'Gantt', title: 'Backlog renamed Undated Tasks + tight Urgent', details: 'card renamed with a one-line description (old name still works); Urgent panel reaches the column edges' },
   { id: 'd-20261101-gantt-section-look', date: '2026-11-01', project: 'Gantt', title: 'Section colors + sun/moon time headers', details: 'Notes sections: colored text + full-width line, no fill; narrow Today shows ☀️ / orange ☀️ / 🌙 with short times' },
   { id: 'd-20261101-gantt-must-starters', date: '2026-11-01', project: 'Gantt', title: 'Make sure you do starters', details: 'water, 10K steps, stretch, hygiene, medicine, supplements; darker section colors' },
+  { id: 'd-20261101-gantt-day-lines', date: '2026-11-01', project: 'Gantt', title: 'Day-color lines toggle', details: 'Options toggle: all lines in the day color, 2px, wall to wall; Center Up scroll no longer drags the column' },
 ];

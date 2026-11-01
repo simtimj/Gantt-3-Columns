@@ -1555,6 +1555,15 @@
     .fx-add{border:0;background:transparent;color:var(--muted,#888);font:inherit;font-size:.82em;padding:2px 4px;cursor:pointer;}
     .fx-cat.fx-col > .fx-body{display:none;}
     .fx-sub{font-weight:400;color:var(--muted,#888);font-size:.85em;}
+    .fx-tasks{margin:2px 0 0 1.8em;}
+    .fx-proj.fx-col .fx-tasks{display:none;}
+    .fx-task{display:flex;align-items:flex-start;gap:5px;padding:1px 0;}
+    .fx-task input{margin:.2em 0 0;flex:0 0 auto;accent-color:#1565c0;}
+    .fx-tt{flex:1 1 auto;outline:none;min-width:2em;word-break:break-word;overflow-wrap:anywhere;}
+    .fx-done .fx-tt{text-decoration:line-through;color:var(--muted,#888);}
+    .fx-send{border:0;background:transparent;padding:0 2px;cursor:pointer;font-size:.8em;opacity:.35;flex:0 0 auto;}
+    .fx-task:focus-within .fx-send,.fx-send:hover{opacity:1;}
+    .fx-tasks > .fx-add{padding-left:0;}
     /* Hourly weather (☁️ tab). */
     .wx-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;font-size:12px;color:var(--muted,#888);}
     .wx-head button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 4px;}
@@ -6111,7 +6120,13 @@
         c.projects.forEach(p => {
           out += '<div class="fx-proj' + (p.col ? ' fx-col' : '') + '" data-fid="' + p.id + '"><div class="fx-ph"><button type="button" class="fx-tg" data-fx="tg">' + (p.col ? '▸' : '▾') + '</button>' +
             '<span class="fx-title" contenteditable="true" data-fx="title" data-fph="Project">' + h(p.title) + '</span></div>' +
-            '<div class="fx-why" contenteditable="true" data-fx="why" data-fph="Why focus…">' + h(p.why) + '</div></div>';
+            '<div class="fx-why" contenteditable="true" data-fx="why" data-fph="Why focus…">' + h(p.why) + '</div><div class="fx-tasks">';
+          (p.tasks || []).forEach(t => {
+            out += '<div class="fx-task' + (t.d ? ' fx-done' : '') + '" data-ftid="' + h(t.id) + '"><input type="checkbox" data-fx="tick"' + (t.d ? ' checked' : '') + '>' +
+              '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="Task">' + h(t.t) + '</span>' +
+              '<button type="button" class="fx-send" data-fx="send" title="Send to Today (Plan / think)">📌</button></div>';
+          });
+          out += '<button type="button" class="fx-add" data-fx="addt">+ Task</button></div></div>';
         });
         out += '<button type="button" class="fx-add" data-fx="addp">+ Project</button></div></div>';
       });
@@ -6145,9 +6160,34 @@
         const id = b.closest('[data-fid]')?.dataset.fid, f = id ? find(id) : {};
         if(b.dataset.fx === 'tg'){ const o = f.p || f.c; if(o){ o.col = !o.col; save(); render(); } }
         else if(b.dataset.fx === 'addc'){ const c = {id:uid('c'),name:'',col:false,projects:[]}; data.cats.push(c); save(); render(); focusNew(c.id,'name'); }
-        else if(b.dataset.fx === 'addp' && f.c){ const p = {id:uid('p'),title:'',why:'',col:false}; f.c.projects.push(p); f.c.col = false; save(); render(); focusNew(p.id,'title'); }
+        else if(b.dataset.fx === 'addp' && f.c){ const p = {id:uid('p'),title:'',why:'',col:false,tasks:[]}; f.c.projects.push(p); f.c.col = false; save(); render(); focusNew(p.id,'title'); }
+        else if(b.dataset.fx === 'addt' && f.p){ const t = {id:tid(),t:'',d:0}; (f.p.tasks = f.p.tasks || []).push(t); f.p.col = false; save(); render(); focusTask(t.id); }
+        else if(b.dataset.fx === 'send' && f.p){
+          const t = task(f.p, b.closest('[data-ftid]').dataset.ftid); if(!t) return;
+          if(!t.t){ setStatus && setStatus('Give the task a name first'); return; }
+          window.tidPlace && window.tidPlace(t.id, h(t.t), !!t.d);
+        }
+      });
+      // Tick a focus task → every mirror copy follows; done → a history line in today's Completed.
+      host.addEventListener('change', e => {
+        e.stopPropagation();
+        const cb = e.target.closest('[data-fx="tick"]'); if(!cb) return;
+        const f = find(cb.closest('[data-fid]').dataset.fid), t = f.p && task(f.p, cb.closest('[data-ftid]').dataset.ftid);
+        if(!t) return;
+        t.d = cb.checked ? 1 : 0; save();
+        cb.closest('.fx-task').classList.toggle('fx-done', !!t.d);
+        window.tidSet && window.tidSet(t.id, !!t.d, h(t.t));
       });
       host.addEventListener('focusout', e => {
+        const tt = e.target.closest && e.target.closest('[data-fx="tt"]');
+        if(tt){
+          const f = find(tt.closest('[data-fid]').dataset.fid), id = tt.closest('[data-ftid]').dataset.ftid, t = f.p && task(f.p, id);
+          if(!t) return;
+          const v = tt.textContent.replace(/\s+/g,' ').trim().slice(0,300);
+          if(!v){ f.p.tasks = f.p.tasks.filter(x => x !== t); save(); setTimeout(render); return; }
+          if(v !== t.t){ t.t = v; save(); window.tidRetitle && window.tidRetitle(t.id, h(v)); }
+          return;
+        }
         const el = e.target.closest && e.target.closest('[data-fx="name"],[data-fx="title"],[data-fx="why"]'); if(!el) return;
         const id = el.closest('[data-fid]').dataset.fid, f = find(id), v = el.textContent.replace(/\s+/g,' ').trim();
         const k = el.dataset.fx;
@@ -6156,7 +6196,7 @@
           if(!v && f.c.projects.length){ el.textContent = f.c.name; return; }
           if(v !== f.c.name){ f.c.name = v; save(); }
         } else if(k === 'title' && f.p){
-          if(!v && !f.p.why){ f.c.projects = f.c.projects.filter(x => x !== f.p); save(); setTimeout(render); return; }
+          if(!v && !f.p.why && !(f.p.tasks||[]).length){ f.c.projects = f.c.projects.filter(x => x !== f.p); save(); setTimeout(render); return; }
           if(v !== f.p.title){ f.p.title = v; save(); }
         } else if(k === 'why' && f.p && v !== f.p.why){ f.p.why = v.slice(0,240); save(); }
         if(!el.textContent && v === '') el.textContent = '';
@@ -6166,7 +6206,25 @@
       const el = document.querySelector('.fx [data-fid="' + id + '"] [data-fx="' + k + '"]');
       if(el){ el.focus(); }
     }
-    if(window.google && google.script) google.script.run.withSuccessHandler(d => { data = (d && Array.isArray(d.cats)) ? d : {v:1,cats:[]}; render(); })
+    // Phase 2 (2026-11-01): tasks. id = the task's data-tid (same 'm-' form as Task mirrors).
+    const tid = () => 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    const task = (p,id) => (p.tasks || []).find(t => t.id === id);
+    function findTask(id){ for(const c of data.cats) for(const p of c.projects){ const t = task(p,id); if(t) return t; } return null; }
+    function focusTask(id){ const el = document.querySelector('.fx [data-ftid="' + id + '"] [data-fx="tt"]'); if(el) el.focus(); }
+    // A copy ticked / unticked elsewhere (Today, Plan / think, Reference) → the focus task follows.
+    window.focusTidToggled = (id,on) => {
+      if(!data) return;
+      const t = findTask(id); if(!t || !!t.d === on) return;
+      t.d = on ? 1 : 0; save(); render();
+    };
+    // Load-time catch-up, done wins: an open focus task whose loaded copy is ticked becomes done.
+    window.focusReconcile = anyOn => {
+      if(!data || !anyOn) return;
+      let ch = false;
+      data.cats.forEach(c => c.projects.forEach(p => (p.tasks || []).forEach(t => { if(!t.d && anyOn(t.id)){ t.d = 1; ch = true; } })));
+      if(ch){ save(); render(); }
+    };
+    if(window.google && google.script) google.script.run.withSuccessHandler(d => { data = (d && Array.isArray(d.cats)) ? d : {v:1,cats:[]}; render(); window.tidAnyOn && window.focusReconcile(window.tidAnyOn); })
       .withFailureHandler(() => { data = {v:1,cats:[]}; render(); }).getFocus();
     else { data = {v:1,cats:[]}; }
     render();
@@ -10519,22 +10577,25 @@
       if(!date || !pl.isConnected || !isOn(pl)) return;
       const day = document.querySelector('#todayScroll .day-editor[data-date=' + q(date) + ']');
       if(!day) return;
-      const tid = pl.dataset.tid;
-      if(!day.querySelector('.check-line[data-htid=' + q(tid) + ']')){ // never twice for one day
-        const h = document.createElement('div');
-        h.className = 'check-line done'; h.dataset.level = '0'; h.dataset.htid = tid;
-        if(pl.dataset.cat) h.dataset.cat = pl.dataset.cat;
-        h.innerHTML = '<input type="checkbox" checked><span class="check-text"></span>';
-        const tx = pl.querySelector('.check-text');
-        h.querySelector('.check-text').innerHTML = tx ? tx.innerHTML : '';
-        edit(day,() => {
-          if(!day.textContent.trim() && !day.querySelector('input,img,hr')) day.replaceChildren();
-          day.appendChild(h);
-          wireCheckbox(h.querySelector('input'));
-        });
-      }
+      const tx = pl.querySelector('.check-text');
+      addHistory(day, pl.dataset.tid, tx ? tx.innerHTML : '', pl.dataset.cat);
       edit(pad,() => { pl.remove(); if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren(); });
     }
+    // Checked data-htid line at the end of a Today cell — never twice per tid per day.
+    function addHistory(day,tid,html,cat){
+      if(!day || day.querySelector('.check-line[data-htid=' + q(tid) + ']')) return;
+      const h = document.createElement('div');
+      h.className = 'check-line done'; h.dataset.level = '0'; h.dataset.htid = tid;
+      if(cat) h.dataset.cat = cat;
+      h.innerHTML = '<input type="checkbox" checked><span class="check-text"></span>';
+      h.querySelector('.check-text').innerHTML = html || '';
+      edit(day,() => {
+        if(!day.textContent.trim() && !day.querySelector('input,img,hr')) day.replaceChildren();
+        day.appendChild(h);
+        wireCheckbox(h.querySelector('input'));
+      });
+    }
+    const todayStr = () => (typeof state !== 'undefined' && state.today) || localToday();
     function sweepPlans(tid){
       document.querySelectorAll('#todayScroll .plan-editor .check-line[data-tid' + (tid ? '=' + q(tid) : '') + ']')
         .forEach(pl => { if(isOn(pl)) toHistory(pl); });
@@ -10546,6 +10607,7 @@
       syncing = true;
       try{
         copies(tid,root).forEach(l => { if(isOn(l) !== on) edit(ownerOf(l),() => setOn(l,on)); });
+        if(window.focusTidToggled) try{ focusTidToggled(tid,on); }catch(e){}
       } finally { syncing = false; }
       // Short pause so the tick is seen before the line moves to Completed.
       if(on) setTimeout(() => sweepPlans(tid),350);
@@ -10557,7 +10619,48 @@
         if(isOn(pl)){ toHistory(pl); return; }
         if(copies(pl.dataset.tid,ownerOf(pl)).some(isOn)){ edit(ownerOf(pl),() => setOn(pl,true)); toHistory(pl); }
       });
+      if(window.focusReconcile) focusReconcile(window.tidAnyOn);
     }
+    // Focus Tracking phase 2 (2026-11-01): focus tasks live in focusData, not in a cell, so they
+    // reach their copies through these. Focus is the source of the task's title.
+    window.tidAnyOn = tid => copies(tid,null).some(isOn);
+    window.tidSet = function(tid,on,html){
+      if(syncing || !tid) return;
+      syncing = true;
+      try{ copies(tid,null).forEach(l => { if(isOn(l) !== on) edit(ownerOf(l),() => setOn(l,on)); }); }
+      finally { syncing = false; }
+      if(!on) return; // unticking keeps the history line
+      const day = document.querySelector('#todayScroll .day-editor[data-date=' + q(todayStr()) + ']');
+      if(day) addHistory(day,tid,html); else setStatus('Today isn’t loaded — the Completed line comes when you tick it there');
+      setTimeout(() => sweepPlans(tid),350);
+    };
+    window.tidRetitle = function(tid,html){
+      copies(tid,null).forEach(l => {
+        const tx = l.querySelector(':scope > .check-text') || l.querySelector('.check-text');
+        if(tx && tx.innerHTML !== html) edit(ownerOf(l),() => { tx.innerHTML = html; });
+      });
+    };
+    // 📌 on a focus task → a copy in Plan / think of the selected day (same rules as Send to Today).
+    window.tidPlace = function(tid,html,done){
+      if(done){ setStatus('That task is done — untick it first'); return; }
+      const date = window.odDate || todayStr();
+      const pad = urgEditor(date,'plan');
+      if(!pad){ setStatus('That day isn’t loaded — open it, then try again'); return; }
+      const have = pad.querySelector('.check-line[data-tid=' + q(tid) + ']');
+      if(have){
+        setStatus('Already in Plan / think for ' + shortDate(date));
+        have.classList.add('urg-flash'); setTimeout(() => have.classList.remove('urg-flash'),1300);
+        return;
+      }
+      const n = createCheckboxLine(0);
+      n.dataset.tid = tid;
+      n.querySelector('.check-text').innerHTML = html || '<br>';
+      edit(pad,() => {
+        if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren();
+        pad.appendChild(n);
+      });
+      setStatus('Sent to Plan / think · ' + shortDate(date));
+    };
     let rt = 0;
     const later = () => { clearTimeout(rt); rt = setTimeout(() => { try{ reconcile(); }catch(e){} },800); };
     function watch(){

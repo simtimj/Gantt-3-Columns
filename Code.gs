@@ -1111,14 +1111,27 @@ function saveCardCats(list) {
 // App items keep those fields on the item itself. arch = 'YYYY-MM-DD' archived day.
 // Focus Tracking dashboard (2026-11-01, Julius: phase 1). One JSON blob in script properties:
 // {v:1, cats:[{id,name,col, projects:[{id,title,why,col}]}]}. Render-only in the Notes cell, never in cell HTML.
+// Phase 2 (2026-11-01): projects carry tasks [{id:'m-…' (= data-tid), t, d:0|1}], so the JSON is split
+// into 8k chunks focusData_0..n-1 with the count in focusDataN (one property maxes out at ~9 KB).
 function getFocus() {
-  const raw = PropertiesService.getScriptProperties().getProperty('focusData');
+  const sp = PropertiesService.getScriptProperties(), all = sp.getProperties();
+  let raw = '';
+  const n = Number(all.focusDataN || 0);
+  if (n > 0) { for (let i = 0; i < n; i++) raw += all['focusData_' + i] || ''; }
+  else raw = all.focusData || '';
   try { return raw ? JSON.parse(raw) : { v: 1, cats: [] }; } catch (e) { return { v: 1, cats: [] }; }
 }
 function saveFocus(data) {
   const json = JSON.stringify(data || { v: 1, cats: [] });
-  if (json.length > 8500) throw new Error('Focus data too big (' + json.length + ' chars)');
-  PropertiesService.getScriptProperties().setProperty('focusData', json);
+  if (json.length > 200000) throw new Error('Focus data too big (' + json.length + ' chars)');
+  const sp = PropertiesService.getScriptProperties();
+  const oldN = Number(sp.getProperty('focusDataN') || 0), props = {};
+  let n = 0;
+  for (let i = 0; i < json.length; i += 8000) props['focusData_' + (n++)] = json.slice(i, i + 8000);
+  props.focusDataN = String(n);
+  sp.setProperties(props);
+  for (let i = n; i < oldN; i++) sp.deleteProperty('focusData_' + i);
+  if (sp.getProperty('focusData') != null) sp.deleteProperty('focusData'); // phase-1 single property
   return true;
 }
 function getInbox() {

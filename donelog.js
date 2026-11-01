@@ -200,4 +200,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-gantt-must-starters', date: '2026-11-01', project: 'Gantt', title: 'Make sure you do starters', details: 'water, 10K steps, stretch, hygiene, medicine, supplements; darker section colors' },
   { id: 'd-20261101-gantt-day-lines', date: '2026-11-01', project: 'Gantt', title: 'Day-color lines toggle', details: 'Options toggle: all lines in the day color, 2px, wall to wall; Center Up scroll no longer drags the column' },
   { id: 'd-20261101-gantt-line-fixes', date: '2026-11-01', project: 'Gantt', title: 'Line cleanup', details: 'softer red, thin section lines, one line between split columns, header lines under Notes / Reference' },
+  { id: 'd-20261101-focus-p2', date: '2026-11-01', project: 'Gantt', title: 'Focus Tracking, phase 2', details: 'tasks in project cards with data-tid; ticks sync both ways with mirrors; done → today\'s Completed; 📌 to Plan / think; renames follow; chunked server storage. To do: phases 3–5 (drag, priority/progress/dashboard, temp urgency/expand)' },
 ];

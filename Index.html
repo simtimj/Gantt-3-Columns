@@ -9337,6 +9337,8 @@
         const ed = editorOf(line);
         if(ed && ed.contains(line) && !line.closest('table[data-cnote],[data-render-due]')){ grip._line = line; box = line; }
       } else if(copy){
+        // No grip in the Urgent panel: it showed as stray dots by the add box and isn't used there (2026-10-31, Julius).
+        if(copy.closest('#urgentPanel')){ grip.hidden = true; return; }
         grip._copy = copy; box = copy.closest('.urg-row,.di-line') || copy;
       }
       if(!box){ grip.hidden = true; return; }

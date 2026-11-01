@@ -182,5 +182,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-urg-add-wrap', date: '2026-10-31', project: 'Gantt', title: 'Urgent add box wraps', details: 'New-task box in Urgent wraps and grows downward instead of running past the cell; Enter still adds' },
   { id: 'd-20261031-urg-full-menu', date: '2026-10-31', project: 'Gantt', title: 'One full hold menu in Urgent + lost-task backup', details: 'Holding task text opens the full checkbox menu (Archive, Delete…) with task/subtask buttons on top; menu scrolls; Backup tab gets a copy whenever an open task disappears' },
   { id: 'd-20261031-ref-new-cell-save', date: '2026-10-31', project: 'Gantt', title: 'Fix: new Reference cells reverted on first save', details: 'Backlog/new cells made in the tab lost their first edit (first save looked unchanged, server copy won); bases set at creation, server checks the made-with text; Urgent add keeps your text if making Backlog fails' },
-  { id: 'd-20261031-urg-no-grip', date: '2026-10-31', project: 'Gantt', title: 'No drag dots in Urgent', details: 'removed the stray ⠿ grip that showed above the Urgent add box' },
+  { id: 'd-20261031-urg-no-grip', date: '2026-10-31', project: 'Gantt', title: 'No stray dots in Urgent', details: 'removed the dashed red box before the Urgent add box (sat alone above the input on narrow panes) and the ⠿ grip in the panel' },
 ];

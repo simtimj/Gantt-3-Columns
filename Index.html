@@ -1305,7 +1305,7 @@
     .pane-narrow #urgentPanel.wrap .urg-row > .urg-fold{float:right;margin:1px 0 0 6px;}
     .urg-addbox{flex:0 0 auto;width:13px;height:13px;border:2px dashed var(--urg);border-radius:3px;opacity:.7;}
     #urgentPanel.wrap .urg-adder{align-items:center;}
-    .urg-adder textarea{flex:1;min-width:0;max-width:100%;box-sizing:border-box;display:block;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:inherit;font-size:13px;line-height:1.4;color:inherit;background:transparent;border:1.5px solid transparent;padding:2px 5px;margin-left:-5px;outline:none;border-radius:4px;}
+    .urg-adder textarea{flex:1;min-width:0;width:100%;max-width:100%;box-sizing:border-box;display:block;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:inherit;font-size:13px;line-height:1.4;color:inherit;background:transparent;border:1.5px solid transparent;padding:2px 5px;margin-left:-5px;outline:none;border-radius:4px;}
     .urg-adder textarea:focus{border-color:var(--urg);}
     .urg-adder textarea::placeholder{color:var(--muted);opacity:.8;}
     .urg-create{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:4px;}
@@ -6515,7 +6515,6 @@
     row.className = 'urg-row urg-adder';
     row.dataset.urg = u;
     row.title = 'Type a ' + URG_NAMES[u] + ' task, Enter to add (goes in today)';
-    const box = document.createElement('span'); box.className = 'urg-addbox'; box.setAttribute('aria-hidden','true');
     // Wraps onto new lines and grows downward instead of running past the cell (2026-10-31, Julius).
     const inp = document.createElement('textarea');
     inp.rows = 1;
@@ -6545,7 +6544,7 @@
       else { urgDraft[u] = was; urgAddWant = 0; }
       renderUrgent();
     });
-    row.append(box,inp);
+    row.append(inp); // dashed box removed: on narrow panes it sat alone on a line above the input as stray red dots (2026-10-31, Julius)
     return row;
   }
   /* ---------------------------------------------------------

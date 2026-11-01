@@ -48,7 +48,7 @@ Last updated: 2026-10-31
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-10-31)
-- **No drag dots in Urgent** (2026-10-31) — the ⠿ drag grip no longer appears in the Urgent panel (it showed as stray dots above the add box). Still there for tasks in the Today / Notes / Reference cells.
+- **No stray dots in Urgent** (2026-10-31) — removed the dashed red box in front of the Urgent add box (on narrow panes it sat alone above the input as red dots); the ⠿ drag grip also no longer shows in the Urgent panel (still there in Today / Notes / Reference cells).
 - **Fix: new Reference cells keep their first edit** (2026-10-31) — a cell made in the open tab (e.g. a new Backlog from the Urgent add box, or Reference +) used to snap back to its empty title on the first save. Now saved properly; if making the Backlog fails, the Urgent add box keeps what you typed.
 - **One full hold menu in Urgent (2026-10-31):** holding a task's text (not just its checkbox) now opens the full menu (urgency, due, length, subject, Archive, Delete, Go to task) with + Task / + Subtask / Outdent / Indent on top. The menu scrolls if it's taller than the screen.
 - **Backup when a task disappears (2026-10-31):** whenever a save removes an open (unticked) task from any cell, the old cell text is copied to the Sheet's Backup tab first, so lost tasks can be recovered.

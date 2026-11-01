@@ -1504,8 +1504,8 @@
     /* Notes sections (Julius, 2026-11-01): no fill, colored text + colored line, line runs edge to edge (--rowpx bleed). */
     .editor > [data-nsec]{margin:2px calc(-1 * var(--rowpx,8px)) 3px;padding:0 var(--rowpx,8px) 1px;border-bottom:1px solid;font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;user-select:none;-webkit-user-select:none;}
     .editor > [data-nsec]:first-child{margin-top:0;}
-    .editor > [data-nsec="must"]{color:#e53935!important;border-bottom:1px solid #e53935!important;}
-    .editor > [data-nsec="focus"]{color:#1e88e5!important;border-bottom:1px solid #1e88e5!important;margin-top:10px;}
+    .editor > [data-nsec="must"]{color:#c62828!important;border-bottom:1px solid #c62828!important;}
+    .editor > [data-nsec="focus"]{color:#1565c0!important;border-bottom:1px solid #1565c0!important;margin-top:10px;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
     /* Grips at the edges (Julius, 2026-11-01): same size, just moved out of the way. Today's line grip sits at
@@ -2169,6 +2169,8 @@
       if(window.odApply) odApply();
     });
   }
+  // Starter lines for a new day's Make sure you do (Julius, 2026-11-01). Edit here to change the defaults.
+  const MUST_DEFAULTS = ['Drink 64 oz water','10K steps','Stretch','Hygiene','Medicine','Supplements'];
   function appendDayRow(
     day,
     container,
@@ -2219,7 +2221,7 @@
     if(type === 'journal' && today){
       const jed = row.querySelector('.editor');
       if(!jed.querySelector(':scope > [data-nsec="must"]'))
-        jed.insertAdjacentHTML('afterbegin','<div data-nsec="must" contenteditable="false">Make sure you do</div>' + (jed.textContent.trim() || jed.querySelector('table,input') ? '<div><br></div>' : ''));
+        jed.insertAdjacentHTML('afterbegin','<div data-nsec="must" contenteditable="false">Make sure you do</div>' + MUST_DEFAULTS.map(t => '<div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">' + t + '</span></div>').join(''));
       // Focus tracking (2026-11-01, Julius: Backlog idea) goes after the Make sure you do lines, before any note table.
       if(!jed.querySelector(':scope > [data-nsec="focus"]')){
         let at = jed.querySelector(':scope > [data-nsec="must"]').nextSibling;

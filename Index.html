@@ -5891,9 +5891,11 @@
     handle?.addEventListener('pointercancel',()=>{if(refDragState?.handle===handle){clearTimeout(refDragState.holdTimer);refDragState=null;wrap.classList.remove('ref-dragging');refClearDropMarks();}});
   }
   function resetColumnSizes(){
-    columnWidths={today:420,journal:420,reference:399};
+    // Even columns (Julius, 2026-11-01): equal widths, stretched to fill the window.
+    columnWidths={today:420,journal:420,reference:420};
     localStorage.removeItem(COLUMN_STORAGE_KEY);
     applyColumnWidths();
+    try{ fitColumnsToWindow(); }catch(e){}
     // Also put every horizontal / phone split back to half and half (Julius, 2026-10-31).
     try{ if(typeof window.resetSplitBars === 'function') window.resetSplitBars(); }catch(e){}
     mobileSplitRatio = .5; splitColsRatio = .5; split3 = [1/3,1/3,1/3];
@@ -9917,7 +9919,29 @@
     const load = (k,mx) => { try{ const v = parseFloat(localStorage.getItem(k)); return isFinite(v) ? Math.max(.12,Math.min(mx || .88,v)) : .5; }catch(e){ return .5; } };
     const save = (k,r) => { try{ localStorage.setItem(k,String(r)); }catch(e){} };
     const wired = [];
-    window.resetSplitBars = () => wired.forEach(o => { apply(o.host(),o.a,o.b,.5); save(o.key,.5); });
+    window.resetSplitBars = () => { wired.forEach(o => { apply(o.host(),o.a,o.b,.5); save(o.key,.5); }); requestAnimationFrame(() => alignSplits(true)); };
+    // Line up the Today and Reference split lines (Julius, 2026-11-01). Reference stays a true 50/50; Today's
+    // line moves to the same height (Today has its date header above, so a plain .5 sat lower). y(r) is linear,
+    // so measure at two ratios and solve. save=false on first load when nothing is saved yet.
+    function alignSplits(doSave){
+      const od = wired.find(o => o.key === 'fw.odSplit');
+      const bar = document.querySelector('body.one-day #todayScroll .od-on > .od-pad-head');
+      if(!od || !bar || !bar.offsetParent) return;
+      const rb = document.getElementById('refSplitBar');
+      let target;
+      if(rb && rb.offsetParent){ target = rb.getBoundingClientRect().top; }
+      else { const ts = document.getElementById('todayScroll').getBoundingClientRect(); target = ts.top + ts.height / 2; }
+      const host = od.host();
+      const yAt = r => { apply(host,od.a,od.b,r); return bar.getBoundingClientRect().top; };
+      const y1 = yAt(.3), y2 = yAt(.7);
+      let r = Math.abs(y2 - y1) > 1 ? .3 + (target - y1) * .4 / (y2 - y1) : .5;
+      r = Math.max(.12,Math.min(.88,r));
+      apply(host,od.a,od.b,r);
+      if(doSave) save(od.key,r);
+    }
+    window.alignSplitBars = alignSplits;
+    // Nothing saved yet → line them up once the day view is drawn.
+    try{ if(localStorage.getItem('fw.odSplit') == null) setTimeout(() => alignSplits(false),1500); }catch(e){}
     function wire(opt){
       wired.push(opt);
       apply(opt.host(),opt.a,opt.b,load(opt.key,opt.minB ? .98 : 0));

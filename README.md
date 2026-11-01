@@ -48,6 +48,7 @@ Last updated: 2026-11-01
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-01)
+- **Even reset** (2026-11-01) — Reset column sizes makes all columns the same width (filling the window) and lines up Today's split line with Reference's; Reference is a true 50/50. With nothing saved yet, the lines start lined up too.
 - **Drag grips at the edges** (2026-11-01) — same grips, moved out of the way: Today's split grip sits at the left edge, Reference's at the right edge, the column-line grips at the top (phone split lines too). Only the grip area drags now, not the whole line.
 - **Urgent tidy-up** (2026-11-01) — tasks typed into the Urgent add box without a "Title:" are no longer saved bold; the Urgent header has no − box (tap it to fold); the − / + on a task with subtasks and on subject batches sits right after the text instead of at the far edge.
 

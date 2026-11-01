@@ -185,4 +185,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-urg-no-grip', date: '2026-10-31', project: 'Gantt', title: 'No stray dots in Urgent', details: 'removed the dashed red box before the Urgent add box (sat alone above the input on narrow panes) and the ⠿ grip in the panel' },
   { id: 'd-20261101-urg-tidy', date: '2026-11-01', project: 'Gantt', title: 'Urgent: no stray bold, − next to text', details: 'Urgent add box no longer saves plain tasks bold (2 old Backlog lines unbolded); no − on the Urgent header; task and batch − / + sit right after their text' },
   { id: 'd-20261101-edge-grips', date: '2026-11-01', project: 'Gantt', title: 'Drag grips moved to the edges', details: 'Today split grip at left edge, Reference at right, column-line grips at top; only the grip area drags, not the whole line' },
+  { id: 'd-20261101-even-reset', date: '2026-11-01', project: 'Gantt', title: 'Even columns + lined-up splits on reset', details: 'Reset gives equal column widths filling the window; Today split line aligns with Reference 50/50 line (also on first load with nothing saved)' },
 ];

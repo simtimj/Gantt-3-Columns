@@ -1109,6 +1109,18 @@ function saveCardCats(list) {
 // Claude's items can't be edited in inbox.js from the app, so edits / archive
 // state for them live in "inboxOver" {id: {title, details, arch, done}} (2026-10-27).
 // App items keep those fields on the item itself. arch = 'YYYY-MM-DD' archived day.
+// Focus Tracking dashboard (2026-11-01, Julius: phase 1). One JSON blob in script properties:
+// {v:1, cats:[{id,name,col, projects:[{id,title,why,col}]}]}. Render-only in the Notes cell, never in cell HTML.
+function getFocus() {
+  const raw = PropertiesService.getScriptProperties().getProperty('focusData');
+  try { return raw ? JSON.parse(raw) : { v: 1, cats: [] }; } catch (e) { return { v: 1, cats: [] }; }
+}
+function saveFocus(data) {
+  const json = JSON.stringify(data || { v: 1, cats: [] });
+  if (json.length > 8500) throw new Error('Focus data too big (' + json.length + ' chars)');
+  PropertiesService.getScriptProperties().setProperty('focusData', json);
+  return true;
+}
 function getInbox() {
   const done = inboxRead_('inboxDone', []);
   const mine = inboxRead_('inboxItems', []);

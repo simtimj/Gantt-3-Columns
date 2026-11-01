@@ -1538,6 +1538,23 @@
     #journalScroll{overflow-x:hidden;}
     /* Repeating tasks (Make sure you do starters repeat daily): small ↻ after the text. */
     .check-line[data-rep] > .check-text::after{content:" \21BB";color:var(--muted,#888);font-size:.85em;font-weight:400;}
+    /* Focus Tracking dashboard (phase 1). Render-only, fits ~350px, no sideways scroll. */
+    .fx{margin:2px 0 6px;font-size:calc(var(--paragraph-size,14px) * .95);-webkit-user-select:text;user-select:text;max-width:100%;overflow:hidden;}
+    .fx-cat{margin:4px 0;}
+    .fx-ch{display:flex;align-items:center;gap:4px;font-weight:700;font-size:.85em;letter-spacing:.04em;text-transform:uppercase;color:#1565c0;padding:2px 0;}
+    .fx-tg{border:0;background:transparent;color:inherit;padding:0 2px;width:1.4em;cursor:pointer;font:inherit;flex:0 0 auto;}
+    .fx-name,.fx-title,.fx-why{outline:none;min-width:2em;word-break:break-word;overflow-wrap:anywhere;}
+    .fx-name{flex:1 1 auto;}
+    .fx-proj{margin:3px 0 3px 6px;padding:3px 6px 4px;border-left:2px solid color-mix(in srgb,#1565c0 45%,transparent);}
+    .fx-ph{display:flex;align-items:center;gap:4px;font-weight:600;}
+    .fx-title{flex:1 1 auto;}
+    .fx-why{font-size:.88em;color:var(--muted,#777);margin:1px 0 0 1.8em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .fx-why:focus{display:block;-webkit-line-clamp:unset;}
+    [data-fph]:empty::before{content:attr(data-fph);color:var(--muted,#999);font-weight:400;font-style:italic;}
+    .fx-proj.fx-col .fx-why{display:none;}
+    .fx-add{border:0;background:transparent;color:var(--muted,#888);font:inherit;font-size:.82em;padding:2px 4px;cursor:pointer;}
+    .fx-cat.fx-col > .fx-body{display:none;}
+    .fx-sub{font-weight:400;color:var(--muted,#888);font-size:.85em;}
     /* Hourly weather (☁️ tab). */
     .wx-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;font-size:12px;color:var(--muted,#888);}
     .wx-head button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 4px;}
@@ -2273,6 +2290,12 @@
         tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Focus tracking</div><div><br></div>';
         [...tmp.childNodes].forEach(n => jed.insertBefore(n, at));
       }
+      // Focus Tracking dashboard (phase 1): render-only host right under the Focus tracking header.
+      // data-render-due = existing render-only marker (stripped on save, skipped by drag / card code).
+      { const fh = jed.querySelector(':scope > [data-nsec="focus"]');
+        if(fh && !jed.querySelector(':scope > .fx')){
+          fh.insertAdjacentHTML('afterend','<div class="fx" data-render-due contenteditable="false"></div>');
+          window.renderFocus && window.renderFocus(); } }
       // Repeating marker (2026-11-01): Make sure you do starters repeat every day → ↻ after the text (re-marked on load).
       { const mustSet = new Set(MUST_DEFAULTS.map(t => t.toLowerCase()));
         jed.querySelectorAll(':scope > .check-line').forEach(l => {
@@ -4581,6 +4604,7 @@
     h.restoring = true;
     ed.innerHTML = html;
     normalizeEditorTasks(ed);
+    window.ensureFocusHost && window.ensureFocusHost(ed); // Focus dashboard is render-only
     h.last = ed.innerHTML;
     h.restoring = false;
     if(off >= 0) fwSetCaret(ed,off);
@@ -6060,6 +6084,92 @@
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
+  })();
+  /* Focus Tracking dashboard (2026-11-01, Julius: phase 1). Categories → project cards, each with an
+     editable title + "Why focus" (2 lines). Collapse state saved with the data. Data from getFocus /
+     saveFocus (script property focusData), not the Notes cell. Phases 2–5 (tasks with data-tid, drag,
+     priority/progress, temporary urgency, expand) come later. */
+  (function initFocus(){
+    let data = null, saveT = null;
+    const wired = new WeakSet();
+    const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    function save(){
+      clearTimeout(saveT);
+      saveT = setTimeout(() => { if(window.google && google.script) google.script.run.withFailureHandler(e => setStatus && setStatus('Focus not saved: ' + (e && e.message || e))).saveFocus(data); }, 700);
+    }
+    function find(id){
+      for(const c of data.cats){ if(c.id === id) return {c}; for(const p of c.projects) if(p.id === id) return {c,p}; }
+      return {};
+    }
+    function html(){
+      let out = '';
+      data.cats.forEach(c => {
+        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + '" data-fid="' + c.id + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
+          '<span class="fx-name" contenteditable="true" data-fx="name" data-fph="Category">' + h(c.name) + '</span>' +
+          (c.col ? '<span class="fx-sub">' + c.projects.length + '</span>' : '') + '</div><div class="fx-body">';
+        c.projects.forEach(p => {
+          out += '<div class="fx-proj' + (p.col ? ' fx-col' : '') + '" data-fid="' + p.id + '"><div class="fx-ph"><button type="button" class="fx-tg" data-fx="tg">' + (p.col ? '▸' : '▾') + '</button>' +
+            '<span class="fx-title" contenteditable="true" data-fx="title" data-fph="Project">' + h(p.title) + '</span></div>' +
+            '<div class="fx-why" contenteditable="true" data-fx="why" data-fph="Why focus…">' + h(p.why) + '</div></div>';
+        });
+        out += '<button type="button" class="fx-add" data-fx="addp">+ Project</button></div></div>';
+      });
+      return out + '<button type="button" class="fx-add" data-fx="addc">+ Category</button>';
+    }
+    function render(){
+      document.querySelectorAll('.journal-editor .fx[data-render-due]').forEach(host => {
+        if(!data){ host.innerHTML = '<span class="fx-sub">Loading focus…</span>'; return; }
+        if(host.contains(document.activeElement)) return; // don't redraw while typing
+        host.innerHTML = html();
+        if(!wired.has(host)){ wire(host); wired.add(host); }
+      });
+    }
+    window.renderFocus = render;
+    // Put the host back if a sync / undo rebuilt the Notes cell without it.
+    window.ensureFocusHost = ed => {
+      if(!ed || !ed.classList.contains('journal-editor')) return;
+      ed.querySelectorAll(':scope > .fx').forEach((x,i) => { if(i) x.remove(); });
+      const fh = ed.querySelector(':scope > [data-nsec="focus"]');
+      if(fh && !ed.querySelector(':scope > .fx')) fh.insertAdjacentHTML('afterend','<div class="fx" data-render-due contenteditable="false"></div>');
+      render();
+    };
+    function wire(host){
+      // Keep the Notes editor's own key / tap / drag handlers out of the dashboard.
+      ['keydown','keyup','keypress','beforeinput','input','paste','cut','pointerdown','mousedown','touchstart','dragstart','contextmenu'].forEach(t =>
+        host.addEventListener(t, e => { e.stopPropagation(); if(t === 'keydown' && e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); e.target.blur && e.target.blur(); } }));
+      host.addEventListener('paste', e => { e.preventDefault(); const t = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, t.replace(/\s+/g,' ')); });
+      host.addEventListener('click', e => {
+        e.stopPropagation();
+        const b = e.target.closest('[data-fx]'); if(!b) return;
+        const id = b.closest('[data-fid]')?.dataset.fid, f = id ? find(id) : {};
+        if(b.dataset.fx === 'tg'){ const o = f.p || f.c; if(o){ o.col = !o.col; save(); render(); } }
+        else if(b.dataset.fx === 'addc'){ const c = {id:uid('c'),name:'',col:false,projects:[]}; data.cats.push(c); save(); render(); focusNew(c.id,'name'); }
+        else if(b.dataset.fx === 'addp' && f.c){ const p = {id:uid('p'),title:'',why:'',col:false}; f.c.projects.push(p); f.c.col = false; save(); render(); focusNew(p.id,'title'); }
+      });
+      host.addEventListener('focusout', e => {
+        const el = e.target.closest && e.target.closest('[data-fx="name"],[data-fx="title"],[data-fx="why"]'); if(!el) return;
+        const id = el.closest('[data-fid]').dataset.fid, f = find(id), v = el.textContent.replace(/\s+/g,' ').trim();
+        const k = el.dataset.fx;
+        if(k === 'name' && f.c && !f.p){
+          if(!v && !f.c.projects.length){ data.cats = data.cats.filter(x => x !== f.c); save(); setTimeout(render); return; }
+          if(!v && f.c.projects.length){ el.textContent = f.c.name; return; }
+          if(v !== f.c.name){ f.c.name = v; save(); }
+        } else if(k === 'title' && f.p){
+          if(!v && !f.p.why){ f.c.projects = f.c.projects.filter(x => x !== f.p); save(); setTimeout(render); return; }
+          if(v !== f.p.title){ f.p.title = v; save(); }
+        } else if(k === 'why' && f.p && v !== f.p.why){ f.p.why = v.slice(0,240); save(); }
+        if(!el.textContent && v === '') el.textContent = '';
+      });
+    }
+    function focusNew(id,k){
+      const el = document.querySelector('.fx [data-fid="' + id + '"] [data-fx="' + k + '"]');
+      if(el){ el.focus(); }
+    }
+    if(window.google && google.script) google.script.run.withSuccessHandler(d => { data = (d && Array.isArray(d.cats)) ? d : {v:1,cats:[]}; render(); })
+      .withFailureHandler(() => { data = {v:1,cats:[]}; render(); }).getFocus();
+    else { data = {v:1,cats:[]}; }
+    render();
   })();
   /* Hourly weather (2026-11-01, Julius): ☁️ tab. Open-Meteo (free, no key), Vallejo/Benicia area,
      next 24 hours. Loads when the tab is shown; refreshes if older than 30 min. */

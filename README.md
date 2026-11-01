@@ -48,6 +48,7 @@ Last updated: 2026-11-01
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-01)
+- **Focus Tracking, phase 1** (2026-11-01) — under the Focus tracking header in today's Notes: **+ Category** → **+ Project** cards, each with an editable title and a 2-line "Why focus" reason. ▾/▸ collapses a category or project (remembered). Enter finishes editing; clearing an empty project's title (or an empty category's name) removes it. Saved on the server, so it's the same every day and on every device. Next phases: tasks (shared with mirrors), drag order, priority + progress + dashboard, temporary urgency + expand.
 - **Hourly weather** (2026-11-01) — ☁️ tab shows the next 24 hours for the Vallejo / Benicia area (Open-Meteo, free): time, sky symbol, °F, rain chance (10%+), wind. Loads when the tab opens, refreshes after 30 min or with ↻.
 - **Repeating marker** (2026-11-01) — Make sure you do starter tasks (they come back every day) show a small ↻ after the text.
 - **Line + scroll fixes** (2026-11-01) — Make sure you do / Focus tracking lines 1.5px; no double line under the Today / Notes headers (header keeps the line); active tab icon is see-through white instead of the day color; Completed scrolls only up/down inside its own area.

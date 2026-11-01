@@ -4505,6 +4505,8 @@
       expanded:item.expanded, sort:item.sort,
       fwSync:1, baseHash:b.h, contentChanged:(item.content || '') !== b.c
     };
+    // Cell made in this tab: no server hash yet, so let the server check against the text it was made with (2026-10-31).
+    if(!b.h) payload.baseText = b.c;
     refInFlight++;
     google.script.run
       .withSuccessHandler(res => {
@@ -5084,6 +5086,7 @@
           expanded:true,
           sort:Date.now()
         };
+        item._b = {c:item.content,h:null}; // base = what the server holds (2026-10-31)
         state.reference.push(
           item
         );
@@ -5152,6 +5155,7 @@
             google.script.run
               .withSuccessHandler(reference => {
                 state.reference = reference;
+                state.reference.forEach(refBase);
                 renderReference();
                 row.remove();
                 if(!list.children.length) list.innerHTML = '<p class="archive-empty">Archive is empty.</p>';
@@ -5990,18 +5994,19 @@
     return null;
   }
   // Finds or makes the Backlog cell, then calls back with it.
-  function withBacklog(cb){
+  function withBacklog(cb,fail){
     const cell = backlogCell();
     if(cell){ cb(cell); return; }
     setStatus('Making the Backlog cell…');
     google.script.run.withSuccessHandler(id => {
       const item = {id,parentId:'',type:'item',title:'Backlog',content:'<h2>Backlog</h2>',expanded:true,sort:Date.now()};
+      item._b = {c:item.content,h:null}; // base = what the server holds; without it the first save was dropped and the cell reverted (2026-10-31)
       state.reference.push(item);
       document.querySelector('#referenceTree > .empty')?.remove();
       createReferenceCell(item);
       const c = backlogCell();
-      if(c) cb(c); else setStatus('Couldn’t find the Backlog cell');
-    }).withFailureHandler(e => setStatus('Backlog error: ' + e.message)).addReferenceItem('','Backlog','<h2>Backlog</h2>');
+      if(c) cb(c); else { setStatus('Couldn’t find the Backlog cell'); if(fail) fail(); }
+    }).withFailureHandler(e => { setStatus('Backlog error: ' + e.message); if(fail) fail(); }).addReferenceItem('','Backlog','<h2>Backlog</h2>');
   }
   function urgEditor(date,pane){
     if(pane === 'backlog') return backlogCell();
@@ -6646,7 +6651,8 @@
   function addTaskToBacklog(title,details,urg){
     const cell = backlogCell();
     if(cell) return addTaskToEditor(cell,title,details,urg);
-    withBacklog(c => { addTaskToEditor(c,title,details,urg); renderUrgent(); });
+    withBacklog(c => { addTaskToEditor(c,title,details,urg); renderUrgent(); },
+      () => { if(!urgDraft[urg]) urgDraft[urg] = details ? (title ? title + ': ' + details : details) : title; renderUrgent(); });
     return true;
   }
   function addTaskToDay(date,title,details,urg,textHtml){

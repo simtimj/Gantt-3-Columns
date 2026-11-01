@@ -181,4 +181,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261031-ref-shrink-review-off', date: '2026-10-31', project: 'Gantt', title: 'Reference list shrinks to a strip; Review hidden', details: 'Reference bottom half can drag down to ~30px, never gone; Notes Review half hidden for now' },
   { id: 'd-20261031-urg-add-wrap', date: '2026-10-31', project: 'Gantt', title: 'Urgent add box wraps', details: 'New-task box in Urgent wraps and grows downward instead of running past the cell; Enter still adds' },
   { id: 'd-20261031-urg-full-menu', date: '2026-10-31', project: 'Gantt', title: 'One full hold menu in Urgent + lost-task backup', details: 'Holding task text opens the full checkbox menu (Archive, Delete…) with task/subtask buttons on top; menu scrolls; Backup tab gets a copy whenever an open task disappears' },
+  { id: 'd-20261031-ref-new-cell-save', date: '2026-10-31', project: 'Gantt', title: 'Fix: new Reference cells reverted on first save', details: 'Backlog/new cells made in the tab lost their first edit (first save looked unchanged, server copy won); bases set at creation, server checks the made-with text; Urgent add keeps your text if making Backlog fails' },
 ];

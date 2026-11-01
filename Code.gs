@@ -326,8 +326,9 @@ function savePlanPad(dateString, html, baseHash) {
 }
 
 // One column of a safe save. baseHash = version the app started from (null = it had no row).
-function syncCol_(cur, mine, baseHash, changed, where, label) {
-  const same = baseHash ? cellHash_(cur) === baseHash : cur === '';
+function syncCol_(cur, mine, baseHash, changed, where, label, baseText) {
+  // No hash yet (a cell made in that tab): compare against the text it was made with (2026-10-31).
+  const same = baseHash ? cellHash_(cur) === baseHash : baseText != null ? cur === String(baseText) : cur === '';
   if (!changed) return { value: cur, write: false, sendBack: !same };
   if (!same) return { value: cur, write: false, conflict: true, sendBack: true };
   // Big drop in size (e.g. many lines deleted at once): keep a copy, just in case.
@@ -601,7 +602,7 @@ function saveReferenceItem(item) {
     if (row) {
       const cur = String(sheet.getRange(row, 5).getValue() || '');
       if (sync) {
-        const c = syncCol_(cur, content, item.baseHash || null, !!item.contentChanged, 'Reference ' + id, 'Content');
+        const c = syncCol_(cur, content, item.baseHash || null, !!item.contentChanged, 'Reference ' + id, 'Content', item.baseText);
         content = c.value;
         if (c.conflict) res.conflict = true;
         if (c.sendBack) res.content = cur;

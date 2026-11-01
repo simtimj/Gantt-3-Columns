@@ -1470,6 +1470,15 @@
     .editor > [data-tsec="morning"]::after{content:" · 8:30 am – 2 pm";font-weight:500;}
     .editor > [data-tsec="afternoon"]::after{content:" · 3:45 – 6:30 pm";font-weight:500;}
     .editor > [data-tsec="evening"]::after{content:" · 6:30 – 9:30 pm";font-weight:500;}
+    /* Narrow Today (Julius, 2026-11-01): symbol + short times instead of the words. */
+    .pane-narrow .editor > [data-tsec]:not([data-tsec="gap"]){font-size:0!important;letter-spacing:0;}
+    .pane-narrow .editor > [data-tsec]:not([data-tsec="gap"])::before,.pane-narrow .editor > [data-tsec]:not([data-tsec="gap"])::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:500;letter-spacing:.02em;}
+    .pane-narrow .editor > [data-tsec="morning"]::before{content:"☀️";}
+    .pane-narrow .editor > [data-tsec="afternoon"]::before{content:"☀️";filter:hue-rotate(-28deg) saturate(1.6);display:inline-block;}
+    .pane-narrow .editor > [data-tsec="evening"]::before{content:"🌙";}
+    .pane-narrow .editor > [data-tsec="morning"]::after{content:" 8:30–2";}
+    .pane-narrow .editor > [data-tsec="afternoon"]::after{content:" 3:45–6:30";}
+    .pane-narrow .editor > [data-tsec="evening"]::after{content:" 6:30–9:30";}
     .editor > [data-tsec="gap"]{width:50%;height:0;overflow:hidden;margin:6px 0 4px;padding:0;border-bottom:1px dashed var(--divider);font-size:0;}
     /* Lines, not boxes (Julius, 2026-10-31): note blocks and today's cell drop their side borders; only the
        top / bottom lines stay, so the text gets the side room back. Today + Notes columns. */
@@ -1488,13 +1497,15 @@
     body.split-dragging #refSplitBar::after,body.split-dragging #notesSplitBar::after,body.split-dragging.one-day #todayScroll .od-on > .od-pad-head::after,
     .column-resizer.dragging::after,.column-resizer:active::after,#mobileSplitResizer:active::after,#mobileSplitResizerThird:active::after{opacity:1;}
     /* Make sure you do (Julius, 2026-11-01): section header at the top of today's Notes cell, same look as Today's time sections. */
-    .editor > [data-nsec="must"]{background:rgba(229,57,53,.13);border-bottom-color:rgba(229,57,53,.35)!important;padding:2px 6px 1px!important;border-radius:3px 3px 0 0;}
     /* Tight Urgent (Julius, 2026-11-01): Urgent panel + its group boxes reach the column edges. */
     #refTopScroll{padding-left:1px!important;padding-right:1px!important;}
     #urgentPanel{padding-left:1px!important;padding-right:1px!important;}
     #urgentPanel > .urg-group:not(.urg-arch){margin-left:0!important;margin-right:0!important;}
-    .editor > [data-nsec="focus"]{background:rgba(30,136,229,.11);border-bottom-color:rgba(30,136,229,.32)!important;padding:2px 6px 1px!important;margin-top:10px!important;border-radius:3px 3px 0 0;}
-    .editor > [data-nsec]{margin:2px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
+    /* Notes sections (Julius, 2026-11-01): no fill, colored text + colored line, line runs edge to edge (--rowpx bleed). */
+    .editor > [data-nsec]{margin:2px calc(-1 * var(--rowpx,8px)) 3px;padding:0 var(--rowpx,8px) 1px;border-bottom:1px solid;font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;user-select:none;-webkit-user-select:none;}
+    .editor > [data-nsec]:first-child{margin-top:0;}
+    .editor > [data-nsec="must"]{color:#e53935;border-bottom-color:#e53935;}
+    .editor > [data-nsec="focus"]{color:#1e88e5;border-bottom-color:#1e88e5;margin-top:10px;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
     /* Grips at the edges (Julius, 2026-11-01): same size, just moved out of the way. Today's line grip sits at

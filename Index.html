@@ -1489,6 +1489,7 @@
     .column-resizer.dragging::after,.column-resizer:active::after,#mobileSplitResizer:active::after,#mobileSplitResizerThird:active::after{opacity:1;}
     /* Make sure you do (Julius, 2026-11-01): section header at the top of today's Notes cell, same look as Today's time sections. */
     .editor > [data-nsec="must"]{background:rgba(229,57,53,.13);border-bottom-color:rgba(229,57,53,.35)!important;padding:2px 6px 1px!important;border-radius:3px 3px 0 0;}
+    .editor > [data-nsec="focus"]{background:rgba(30,136,229,.11);border-bottom-color:rgba(30,136,229,.32)!important;padding:2px 6px 1px!important;margin-top:10px!important;border-radius:3px 3px 0 0;}
     .editor > [data-nsec]{margin:2px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
@@ -2204,6 +2205,14 @@
       const jed = row.querySelector('.editor');
       if(!jed.querySelector(':scope > [data-nsec="must"]'))
         jed.insertAdjacentHTML('afterbegin','<div data-nsec="must" contenteditable="false">Make sure you do</div>' + (jed.textContent.trim() || jed.querySelector('table,input') ? '<div><br></div>' : ''));
+      // Focus tracking (2026-11-01, Julius: Backlog idea) goes after the Make sure you do lines, before any note table.
+      if(!jed.querySelector(':scope > [data-nsec="focus"]')){
+        let at = jed.querySelector(':scope > [data-nsec="must"]').nextSibling;
+        while(at && !(at.nodeType === 1 && (at.matches('table,[data-nsec]')))) at = at.nextSibling;
+        const tmp = document.createElement('div');
+        tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Focus tracking</div><div><br></div>';
+        [...tmp.childNodes].forEach(n => jed.insertBefore(n, at));
+      }
     }
     if(type === 'day'){
       // One-day view (2026-10-29, Julius): top = Completed (this editor), bottom = Plan pad (Days column D).

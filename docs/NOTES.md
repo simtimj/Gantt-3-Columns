@@ -212,6 +212,7 @@ Read only the section you need.
 
 ## Grips + edge-to-edge note cells (2026-10-31, Julius)
 
+- `resetColumnSizes()` also calls `window.resetSplitBars()` (every `initSplitBars` wire → .5) and resets `mobileSplitRatio`, `splitColsRatio`, `split3` + their localStorage keys (2026-10-31).
 - Grips: override block after the "Lines, not boxes" rules; all `::after` grips use `--grip` (set in `setDiv` = divider base color, unfaded), 5px × 30px.
 - Plan / wrap `table[data-cnote]` bleed to the column edges: `--rowpx` on `.day-row` mirrors its side padding (desktop 8px, ≤900px / mobile-mode 12px × `--mobile-scale`, × `--pad-x` × `--side-k`); table `width:calc(100% + 2*--rowpx)` + negative margins, td padding = `--rowpx`. Sched table untouched. If `.day-row` side padding changes, update `--rowpx` too.
 

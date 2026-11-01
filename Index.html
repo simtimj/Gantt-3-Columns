@@ -1511,7 +1511,13 @@
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
-    body.day-lines .editor > [data-tsec]:not([data-tsec="gap"]),body.day-lines .editor > [data-nsec]{border-bottom:2px solid var(--note-line-adj)!important;}
+    body.day-lines .editor > [data-tsec]:not([data-tsec="gap"]){border-bottom:2px solid var(--note-line-adj)!important;}
+    body.day-lines .editor > [data-nsec]{border-bottom:1px solid var(--note-line-adj)!important;}
+    /* One line between split columns (Julius, 2026-11-01): the split bar is the line; panes drop their own inset line. */
+    body.mobile-split #workspace #todayPane,body.mobile-split #workspace #journalPane{box-shadow:none!important;}
+    /* Header lines (Julius, 2026-11-01): a visible line under every column header (Notes, Reference, Today). */
+    .pane-header{border-bottom:1px solid var(--divider)!important;}
+    body.day-lines .pane-header{border-bottom-width:2px!important;}
     body.day-lines .editor > [data-tsec="gap"]{border-bottom:2px dashed var(--note-line-adj)!important;}
     body.day-lines .editor table[data-cnote]{border-top:2px solid var(--note-line-adj)!important;border-bottom:2px solid var(--note-line-adj)!important;}
     body.day-lines .editor table[data-cnote] tr + tr > td{border-top:2px solid var(--note-line-adj)!important;}

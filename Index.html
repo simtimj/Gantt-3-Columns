@@ -1522,6 +1522,31 @@
     body.day-lines .editor table[data-cnote]{border-top:2px solid var(--note-line-adj)!important;border-bottom:2px solid var(--note-line-adj)!important;}
     body.day-lines .editor table[data-cnote] tr + tr > td{border-top:2px solid var(--note-line-adj)!important;}
     .editor > [data-nsec="focus"]{color:#1565c0!important;border-bottom:1px solid #1565c0!important;margin-top:10px;}
+    /* Fixes (Julius, 2026-11-01 pm) ------------------------------------------------------------ */
+    /* Section lines a bit thicker (1px was too thin, 2px too thick). */
+    .editor > [data-nsec="must"]{border-bottom:1.5px solid #b55a56!important;}
+    .editor > [data-nsec="focus"]{border-bottom:1.5px solid #1565c0!important;}
+    body.day-lines .editor > [data-nsec]{border-bottom:1.5px solid var(--note-line-adj)!important;}
+    /* No double line under the header: the header keeps its line, today's row drops its top line. */
+    .day-row.today.day-pane-row,.day-row.today.journal-pane-row{box-shadow:inset 0 -2px 0 var(--today-border-adj)!important;}
+    /* Active tab icon: soft see-through white, not the day color. */
+    .center-tabs button.on{background:rgba(255,255,255,.6)!important;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);}
+    html[data-theme="dark"] .center-tabs button.on{background:rgba(255,255,255,.14)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+    /* Completed stays inside its area while scrolling: the editor spans the row edge to edge (so the
+       section lines fit without overflowing) and never scrolls sideways. */
+    body.one-day #todayScroll .od-on > .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
+    #journalScroll{overflow-x:hidden;}
+    /* Repeating tasks (Make sure you do starters repeat daily): small ↻ after the text. */
+    .check-line[data-rep] > .check-text::after{content:" \21BB";color:var(--muted,#888);font-size:.85em;font-weight:400;}
+    /* Hourly weather (☁️ tab). */
+    .wx-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;font-size:12px;color:var(--muted,#888);}
+    .wx-head button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 4px;}
+    .wx-row{display:grid;grid-template-columns:3.4em 1.6em 2.6em 1fr auto;align-items:center;gap:4px;padding:3px 8px;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--border,#ddd) 60%,transparent);}
+    .wx-row.wx-now{font-weight:700;}
+    .wx-row .wx-t{color:var(--muted,#888);font-size:12px;}
+    .wx-row .wx-p{color:#1e88e5;font-size:12px;}
+    .wx-row .wx-w{color:var(--muted,#888);font-size:11px;text-align:right;}
+    .wx-day{padding:6px 8px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#888);}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
     /* Grips at the edges (Julius, 2026-11-01): same size, just moved out of the way. Today's line grip sits at
@@ -1789,14 +1814,14 @@
         <!-- Center Up tabs (2026-11-01, Julius): small symbols switch what Center Up shows. -->
         <span class="center-tabs" role="tablist">
           <button type="button" data-ctab="notes" class="on" title="Notes">📝</button>
-          <button type="button" data-ctab="weather" title="Weather (hourly, coming later)">☁️</button>
+          <button type="button" data-ctab="weather" title="Weather (hourly)">☁️</button>
         </span>
       </div>
       <div
         class="scroll"
         id="journalScroll">
       </div>
-      <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Weather, hourly: coming later.</div></div>
+      <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Loading hourly weather…</div></div>
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
@@ -2239,7 +2264,7 @@
     if(type === 'journal' && today){
       const jed = row.querySelector('.editor');
       if(!jed.querySelector(':scope > [data-nsec="must"]'))
-        jed.insertAdjacentHTML('afterbegin','<div data-nsec="must" contenteditable="false">Make sure you do</div>' + MUST_DEFAULTS.map(t => '<div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">' + t + '</span></div>').join(''));
+        jed.insertAdjacentHTML('afterbegin','<div data-nsec="must" contenteditable="false">Make sure you do</div>' + MUST_DEFAULTS.map(t => '<div class="check-line" data-level="0" data-rep="daily"><input type="checkbox"><span class="check-text">' + t + '</span></div>').join(''));
       // Focus tracking (2026-11-01, Julius: Backlog idea) goes after the Make sure you do lines, before any note table.
       if(!jed.querySelector(':scope > [data-nsec="focus"]')){
         let at = jed.querySelector(':scope > [data-nsec="must"]').nextSibling;
@@ -2248,6 +2273,12 @@
         tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Focus tracking</div><div><br></div>';
         [...tmp.childNodes].forEach(n => jed.insertBefore(n, at));
       }
+      // Repeating marker (2026-11-01): Make sure you do starters repeat every day → ↻ after the text (re-marked on load).
+      { const mustSet = new Set(MUST_DEFAULTS.map(t => t.toLowerCase()));
+        jed.querySelectorAll(':scope > .check-line').forEach(l => {
+          const t = (l.querySelector('.check-text')?.textContent || '').trim().toLowerCase();
+          if(mustSet.has(t)) l.dataset.rep = 'daily';
+        }); }
     }
     if(type === 'day'){
       // One-day view (2026-10-29, Julius): top = Completed (this editor), bottom = Plan pad (Days column D).
@@ -6029,6 +6060,45 @@
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
+  })();
+  /* Hourly weather (2026-11-01, Julius): ☁️ tab. Open-Meteo (free, no key), Vallejo/Benicia area,
+     next 24 hours. Loads when the tab is shown; refreshes if older than 30 min. */
+  (function initWeather(){
+    const box = document.getElementById('weatherScroll'), pane = document.getElementById('journalPane');
+    if(!box || !pane) return;
+    const LAT = 38.08, LON = -122.19, PLACE = 'Vallejo / Benicia';
+    let at = 0, busy = false;
+    const icon = (c,day) => c === 0 ? (day ? '☀️' : '🌙') : c <= 2 ? (day ? '🌤️' : '☁️') : c === 3 ? '☁️' : c <= 48 ? '🌫️' :
+      c <= 57 ? '🌦️' : c <= 67 ? '🌧️' : c <= 77 ? '❄️' : c <= 82 ? '🌧️' : c <= 86 ? '🌨️' : '⛈️';
+    const hr = h => (h % 12 || 12) + (h < 12 ? ' am' : ' pm');
+    function load(force){
+      if(busy || (!force && Date.now() - at < 30 * 60 * 1000)) return;
+      busy = true;
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=' + LAT + '&longitude=' + LON +
+        '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,is_day' +
+        '&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FLos_Angeles&forecast_days=2')
+        .then(r => r.json()).then(d => { at = Date.now(); draw(d.hourly); })
+        .catch(() => { box.innerHTML = '<div class="center-placeholder">☁️ Weather didn\'t load. <button type="button" class="btn" data-wx-retry>Retry</button></div>'; })
+        .finally(() => { busy = false; });
+    }
+    function draw(h){
+      const now = new Date(), key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + 'T' + String(now.getHours()).padStart(2,'0');
+      let i = h.time.findIndex(t => t.slice(0,13) === key); if(i < 0) i = 0;
+      let html = '<div class="wx-head"><span>' + PLACE + '</span><button type="button" data-wx-retry title="Refresh">↻</button></div>', lastDay = h.time[i].slice(0,10);
+      for(let k = i; k < Math.min(i + 24, h.time.length); k++){
+        const d = h.time[k].slice(0,10), H = +h.time[k].slice(11,13);
+        if(d !== lastDay){ html += '<div class="wx-day">Tomorrow</div>'; lastDay = d; }
+        const p = h.precipitation_probability[k];
+        html += '<div class="wx-row' + (k === i ? ' wx-now' : '') + '"><span class="wx-t">' + (k === i ? 'Now' : hr(H)) + '</span><span>' + icon(h.weather_code[k], h.is_day[k]) +
+          '</span><span>' + Math.round(h.temperature_2m[k]) + '°</span><span class="wx-p">' + (p >= 10 ? '💧' + p + '%' : '') + '</span><span class="wx-w">' + Math.round(h.wind_speed_10m[k]) + ' mph</span></div>';
+      }
+      box.innerHTML = html;
+    }
+    box.addEventListener('click', e => { if(e.target.closest('[data-wx-retry]')) load(true); });
+    const check = () => { if(pane.dataset.ctab === 'weather') load(false); };
+    new MutationObserver(check).observe(pane, {attributes:true, attributeFilter:['data-ctab']});
+    document.addEventListener('visibilitychange', () => { if(!document.hidden) check(); });
+    check();
   })();
   /* =========================================================
      TOP-BAR BUTTONS (none of these need the keyboard)

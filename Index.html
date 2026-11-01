@@ -1066,7 +1066,7 @@
     @media (prefers-color-scheme: dark){ .urg-batch-name{color:var(--bc,#9ca3af);} }
     .urg-batch small{font-weight:600;opacity:.8;}
     /* Batch − / + on the right (2026-10-30, Julius), like the task fold. */
-    .urg-batch .pm-box{margin:0 0 0 auto;}
+    .urg-batch .pm-box{margin:0;} /* next to the name + count, not the far edge (Julius 2026-11-01) */
     .urg-head{display:block;width:100%;text-align:left;background:none;border:0;padding:2px 0;font-weight:700;font-size:13px;cursor:pointer;color:inherit;}
     .urg-sub{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
     .urg-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;padding:4px 0;cursor:pointer;color:inherit;font-size:13px;}
@@ -1302,7 +1302,10 @@
     #urgentPanel .urg-fold{order:1;flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;background:none;border:0;padding:0 2px;margin:0;cursor:pointer;color:var(--muted);font:inherit;font-size:12px;line-height:1;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
     #urgentPanel .urg-fold .pm-box{margin-right:0;}
     #urgentPanel .urg-fold small{font-size:10.5px;font-weight:600;}
-    .pane-narrow #urgentPanel.wrap .urg-row > .urg-fold{float:right;margin:1px 0 0 6px;}
+    /* − / + sits right after the task text (Julius 2026-11-01): text stops stretching. */
+    #urgentPanel.wrap .urg-row:has(> .urg-fold) > .urg-text{flex:0 1 auto;}
+    .pane-narrow #urgentPanel.wrap .urg-row:has(> .urg-fold) > .urg-text{display:inline;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-fold{float:none;display:inline-flex;vertical-align:middle;margin:0 0 0 6px;}
     .urg-addbox{flex:0 0 auto;width:13px;height:13px;border:2px dashed var(--urg);border-radius:3px;opacity:.7;}
     #urgentPanel.wrap .urg-adder{align-items:center;}
     .urg-adder textarea{flex:1;min-width:0;width:100%;max-width:100%;box-sizing:border-box;display:block;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:inherit;font-size:13px;line-height:1.4;color:inherit;background:transparent;border:1.5px solid transparent;padding:2px 5px;margin-left:-5px;outline:none;border-radius:4px;}
@@ -6229,7 +6232,7 @@
       n.title = name + ': ' + t.n + (t.t ? ' · subtasks ' + t.d + '/' + t.t + ' done' : '');
       counts.append(n);
     });
-    head.append(pmBox(urgentOpen), document.createTextNode('Urgent'), counts);
+    head.append(document.createTextNode('Urgent'), counts); // no − box (Julius 2026-11-01); tap still folds
     head.title = 'Tap to collapse/expand · hold to add a task';
     head.addEventListener('click',() => {
       if(urgCreateSuppress){ urgCreateSuppress = false; return; }
@@ -6429,7 +6432,7 @@
       fb.title = folded ? 'Show subtasks' : 'Hide subtasks';
       fb.addEventListener('pointerdown',e => e.stopPropagation());
       fb.addEventListener('click',e => { e.preventDefault(); e.stopPropagation(); urgToggleFold(item); });
-      row.insertBefore(fb,tx);
+      tx.after(fb); // right after the text, not pushed to the edge (Julius 2026-11-01)
     }
     row.addEventListener('click',e => {
       if(e.target.closest('.urg-box')) return;
@@ -6671,9 +6674,7 @@
     else if(title && details){
       const b = document.createElement('b'); b.textContent = title;
       t.append(b,document.createTextNode(': ' + details));
-    } else if(title){
-      const b = document.createElement('b'); b.textContent = title; t.append(b);
-    } else t.textContent = details;
+    } else t.textContent = title || details; // no "Title:" → plain text, not bold (Julius 2026-11-01)
     const blank = !ed.textContent.trim() && !ed.querySelector('input,img,hr');
     if(blank && !ed.classList.contains('ref-cell')) ed.replaceChildren(c); else ed.appendChild(c);
     wireCheckbox(c.querySelector('input'));

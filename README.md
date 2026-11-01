@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` deploys automatically (`.github/workflows/deploy.yaml` → `clasp push` + update deployment).
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
 ## Status key
 
@@ -46,6 +46,9 @@ Last updated: 2026-10-31
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-01)
+- **Urgent tidy-up** (2026-11-01) — tasks typed into the Urgent add box without a "Title:" are no longer saved bold; the Urgent header has no − box (tap it to fold); the − / + on a task with subtasks and on subject batches sits right after the text instead of at the far edge.
 
 ## 🧪 To be confirmed (2026-10-31)
 - **No stray dots in Urgent** (2026-10-31) — removed the dashed red box in front of the Urgent add box (on narrow panes it sat alone above the input as red dots); the ⠿ drag grip also no longer shows in the Urgent panel (still there in Today / Notes / Reference cells).

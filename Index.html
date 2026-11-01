@@ -544,8 +544,18 @@
     #journalScroll{flex:var(--ns-a,1) 1 0;}
     #reviewScroll{flex:var(--ns-b,1) 1 0;padding:6px 10px 24px;font-size:13px;line-height:1.4;}
     /* Review hidden for now (Julius, 2026-10-31): Notes is one cell again. Remove these two lines to bring it back. */
-    #notesSplitBar,#reviewScroll{display:none!important;}
-    #journalScroll{flex:1 1 0!important;}
+    #reviewScroll{display:none!important;}
+    /* Center Up / Down (phase 2, 2026-11-01, Julius): Center Up = tabbed (Notes | Weather) above the
+       Notes split bar, Center Down = empty cell below it (can shrink to a 30px strip). Review stays hidden. */
+    #journalScroll,#weatherScroll{flex:var(--ns-a,1) 1 0;}
+    #centerDownScroll{flex:var(--ns-b,1) 1 0;min-height:30px;}
+    #journalPane[data-ctab="weather"] #journalScroll,#journalPane[data-ctab="weather"] #journalTemplateButton,
+    #journalPane:not([data-ctab="weather"]) #weatherScroll{display:none!important;}
+    .center-tabs{display:inline-flex;gap:2px;margin-left:8px;}
+    .center-tabs button{border:0;background:transparent;font-size:15px;line-height:1;padding:3px 5px;border-radius:6px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .center-tabs button.on{opacity:1;background:var(--divider);}
+    #journalPane[data-ctab="weather"] .center-tabs{margin-right:auto;}
+    .center-placeholder{padding:10px 12px;color:var(--muted,#888);font-size:13px;line-height:1.4;}
     #notesSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
     #notesSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
     #notesSplitBar::after{content:"";position:absolute;left:50%;top:-.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
@@ -1734,19 +1744,27 @@
     </section>
     <div id="mobileSplitResizer" title="Drag to resize split"></div>
     <div class="column-resizer" data-left="today" data-right="journal" title="Drag to resize columns"></div>
-    <section class="pane" id="journalPane">
+    <section class="pane" id="journalPane" data-ctab="notes">
       <div class="pane-header">
         NOTES
+        <!-- Center Up tabs (2026-11-01, Julius): small symbols switch what Center Up shows. -->
+        <span class="center-tabs" role="tablist">
+          <button type="button" data-ctab="notes" class="on" title="Notes">📝</button>
+          <button type="button" data-ctab="weather" title="Weather (hourly, coming later)">☁️</button>
+        </span>
         <button class="btn tiny" id="journalTemplateButton" type="button" title="Insert the Reference cell titled Journal Template into the selected Notes day">+ Template</button>
       </div>
       <div
         class="scroll"
         id="journalScroll">
       </div>
+      <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Weather, hourly: coming later.</div></div>
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
       <div class="scroll notes-review" id="reviewScroll"></div>
+      <!-- Center Down (2026-11-01, Julius): empty for now. -->
+      <div class="scroll" id="centerDownScroll"></div>
     </section>
     <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
     <section
@@ -5942,6 +5960,20 @@
   }
   document.getElementById('journalTemplateButton')?.addEventListener('pointerdown',e=>e.preventDefault());
   document.getElementById('journalTemplateButton')?.addEventListener('click',insertJournalTemplate);
+  (function initCenterTabs(){ // Center Up tabs (2026-11-01, Julius); last tab remembered per device
+    const pane = document.getElementById('journalPane');
+    if(!pane) return;
+    const set = t => {
+      pane.dataset.ctab = t;
+      pane.querySelectorAll('.center-tabs button').forEach(b => b.classList.toggle('on', b.dataset.ctab === t));
+      try{ localStorage.setItem('fw.centerTab', t); }catch(e){}
+    };
+    let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
+    set(t === 'weather' ? 'weather' : 'notes');
+    pane.querySelector('.center-tabs')?.addEventListener('click', e => {
+      const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
+    });
+  })();
   /* =========================================================
      TOP-BAR BUTTONS (none of these need the keyboard)
      ========================================================= */
@@ -9996,9 +10028,11 @@
         return {top:r1.top,height:r2.bottom - r1.top};
       }});
     wire({sel:'#notesSplitBar',key:'fw.notesSplit',a:'--ns-a',b:'--ns-b',
-      host:() => document.getElementById('journalPane') || document.documentElement,
+      host:() => document.getElementById('journalPane') || document.documentElement, minB:30,
       box:() => {
-        const t = document.getElementById('journalScroll'), b = document.getElementById('reviewScroll');
+        // Center Up (whichever tab is showing) above, Center Down below (2026-11-01).
+        const p = document.getElementById('journalPane');
+        const t = document.getElementById(p && p.dataset.ctab === 'weather' ? 'weatherScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
         if(!t || !b) return null;
         const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};

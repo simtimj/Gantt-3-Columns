@@ -1489,6 +1489,10 @@
     .column-resizer.dragging::after,.column-resizer:active::after,#mobileSplitResizer:active::after,#mobileSplitResizerThird:active::after{opacity:1;}
     /* Make sure you do (Julius, 2026-11-01): section header at the top of today's Notes cell, same look as Today's time sections. */
     .editor > [data-nsec="must"]{background:rgba(229,57,53,.13);border-bottom-color:rgba(229,57,53,.35)!important;padding:2px 6px 1px!important;border-radius:3px 3px 0 0;}
+    /* Tight Urgent (Julius, 2026-11-01): Urgent panel + its group boxes reach the column edges. */
+    #refTopScroll{padding-left:1px!important;padding-right:1px!important;}
+    #urgentPanel{padding-left:1px!important;padding-right:1px!important;}
+    #urgentPanel > .urg-group:not(.urg-arch){margin-left:0!important;margin-right:0!important;}
     .editor > [data-nsec="focus"]{background:rgba(30,136,229,.11);border-bottom-color:rgba(30,136,229,.32)!important;padding:2px 6px 1px!important;margin-top:10px!important;border-radius:3px 3px 0 0;}
     .editor > [data-nsec]{margin:2px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
@@ -6062,14 +6066,16 @@
   function urgKeyParts(key){ const i = key.indexOf('|'); if(i < 0) return {date:key,pane:'today'}; const t = key.slice(i + 1); return {date:key.slice(0,i),pane:t === 'b' ? 'backlog' : t === 'p' ? 'plan' : 'journal'}; }
   /* Backlog (2026-10-28, Julius): a Reference cell titled "Backlog" holds urgent tasks that
      aren't for any day yet. They show in Urgent like the rest (pane 'backlog', date 'backlog'). */
-  function isBacklogItem(item){ return !!item && /^backlog$/i.test(referenceTitle(item)); }
+  // Renamed "Undated Tasks" (Julius, 2026-11-01); the old "Backlog" title still works.
+  const BACKLOG_NAME = 'Undated Tasks';
+  function isBacklogItem(item){ return !!item && /^(backlog|undated tasks)$/i.test(referenceTitle(item)); }
   function backlogItem(){ return (state.reference || []).find(isBacklogItem) || null; }
   function backlogCell(){
     const it = backlogItem();
     return it ? document.querySelector(`#referenceTree .ref-cell-wrapper[data-id="${CSS.escape(String(it.id))}"] > .ref-cell`) : null;
   }
   function isBacklogCell(el){ return !!el && el === backlogCell(); }
-  function urgWhere(date){ return date === 'backlog' ? 'Backlog' : shortDate(date); }
+  function urgWhere(date){ return date === 'backlog' ? BACKLOG_NAME : shortDate(date); }
   // Where a cell's tasks live, for the Urgent list: {date,pane} or null.
   function ownerKey(owner){
     if(!owner) return null;
@@ -6081,16 +6087,16 @@
   function withBacklog(cb,fail){
     const cell = backlogCell();
     if(cell){ cb(cell); return; }
-    setStatus('Making the Backlog cell…');
+    setStatus('Making the ' + BACKLOG_NAME + ' cell…');
     google.script.run.withSuccessHandler(id => {
-      const item = {id,parentId:'',type:'item',title:'Backlog',content:'<h2>Backlog</h2>',expanded:true,sort:Date.now()};
+      const item = {id,parentId:'',type:'item',title:BACKLOG_NAME,content:'<h2>' + BACKLOG_NAME + '</h2>',expanded:true,sort:Date.now()};
       item._b = {c:item.content,h:null}; // base = what the server holds; without it the first save was dropped and the cell reverted (2026-10-31)
       state.reference.push(item);
       document.querySelector('#referenceTree > .empty')?.remove();
       createReferenceCell(item);
       const c = backlogCell();
-      if(c) cb(c); else { setStatus('Couldn’t find the Backlog cell'); if(fail) fail(); }
-    }).withFailureHandler(e => { setStatus('Backlog error: ' + e.message); if(fail) fail(); }).addReferenceItem('','Backlog','<h2>Backlog</h2>');
+      if(c) cb(c); else { setStatus('Couldn’t find the ' + BACKLOG_NAME + ' cell'); if(fail) fail(); }
+    }).withFailureHandler(e => { setStatus(BACKLOG_NAME + ' error: ' + e.message); if(fail) fail(); }).addReferenceItem('',BACKLOG_NAME,'<h2>' + BACKLOG_NAME + '</h2>');
   }
   function urgEditor(date,pane){
     if(pane === 'backlog') return backlogCell();
@@ -6624,7 +6630,7 @@
       const was = inp.value;
       urgDraft[u] = '';
       urgAddWant = u; // keep typing in this level after the panel re-renders
-      if(addTaskToBacklog(p.title,p.details,u)) setStatus(URG_NAMES[u] + ' task added to Backlog');
+      if(addTaskToBacklog(p.title,p.details,u)) setStatus(URG_NAMES[u] + ' task added to ' + BACKLOG_NAME);
       else { urgDraft[u] = was; urgAddWant = 0; }
       renderUrgent();
     });
@@ -6715,7 +6721,7 @@
       if(addTaskToBacklog(p.title,p.details,u)){
         urgCreating = 0;
         renderUrgent();
-        setStatus(URG_NAMES[u] + ' task added to Backlog');
+        setStatus(URG_NAMES[u] + ' task added to ' + BACKLOG_NAME);
       }
     });
     row.append(inp,ok,no);
@@ -7154,7 +7160,7 @@
     });
     inboxItems = inboxItems.filter(x => open.indexOf(x) < 0);
     renderUrgent();
-    setStatus(open.length + ' inbox item' + (open.length > 1 ? 's' : '') + ' moved to Backlog');
+    setStatus(open.length + ' inbox item' + (open.length > 1 ? 's' : '') + ' moved to ' + BACKLOG_NAME);
     setTimeout(() => { inboxMigrating = false; }, 2000);
   }
   function setInbox(list){ inboxItems = Array.isArray(list) ? list : []; renderInbox(); }
@@ -7556,7 +7562,7 @@
           card.className = 'due-item' + (it.done ? ' done' : '');
           if(it.urg) card.dataset.urg = it.urg;
           const live = !!urgEditor(it.date,it.pane);
-          const from = it.date === 'backlog' ? 'from Backlog' : 'from ' + dateObj(it.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(it.date).getMonth() + 1) + '/' + dateObj(it.date).getDate();
+          const from = it.date === 'backlog' ? 'from ' + BACKLOG_NAME : 'from ' + dateObj(it.date).toLocaleDateString(undefined,{weekday:'short'}) + ' ' + (dateObj(it.date).getMonth() + 1) + '/' + dateObj(it.date).getDate();
           const mk = (t,level,isMain) => {
             const r = document.createElement('div');
             r.className = 'di-line' + (t.done ? ' done' : '');
@@ -7898,7 +7904,7 @@
         const mb = document.createElement('button');
         mb.type = 'button'; mb.className = 'urg-goto';
         mb.textContent = toToday ? '📅 Move to Today'
-          : inUrgent ? '✂ Remove from ' + where + ' (stays in Urgent)' : '📥 Not today → Backlog';
+          : inUrgent ? '✂ Remove from ' + where + ' (stays in Urgent)' : '📥 Not today → ' + BACKLOG_NAME;
         mb.addEventListener('pointerdown',e => e.preventDefault());
         mb.addEventListener('click',() => {
           hideUrgencyPicker();
@@ -7906,7 +7912,7 @@
             const ed = urgEditor(localToday(),'today');
             if(!ed){ setStatus('Today isn’t loaded — tap Today, then try again'); return; }
             moveTaskTree(line,owner,ed,'Moved to Today');
-          } else withBacklog(c => moveTaskTree(line,owner,c,inUrgent ? 'Removed from ' + where + ' · still in Urgent' : 'Moved to Backlog'));
+          } else withBacklog(c => moveTaskTree(line,owner,c,inUrgent ? 'Removed from ' + where + ' · still in Urgent' : 'Moved to ' + BACKLOG_NAME));
         });
         p.appendChild(mb);
       }

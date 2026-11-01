@@ -48,6 +48,8 @@ Last updated: 2026-11-01
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-01)
+- **Backlog → Undated Tasks** (2026-11-01) — the Reference card that holds urgency tasks with no day is now titled **Undated Tasks**, with a one-line description at the top. Its tasks show in Urgent ("from Undated Tasks"); tasks typed into Urgent and "📥 Not today" land there. The old "Backlog" title still works.
+- **Tight Urgent** (2026-11-01) — the Urgent panel and its group boxes now reach the Reference column edges (1px side padding).
 - **Quiet grips** (2026-11-01) — the drag-line grips are faint until you press them, then full strength while dragging.
 - **Make sure you do** (2026-11-01) — today's Notes cell (📝 tab) starts with a "MAKE SURE YOU DO" section header, styled like Today's time sections with a light red shade.
 - **Focus tracking** (2026-11-01) — second section in today's Notes cell, under Make sure you do (light blue shade). Normal lines for now; dashboard / what-to-keep / temporary time-based urgency to work out with Julius. Lines under it are normal cell lines (checkboxes, drag and drop, menus).

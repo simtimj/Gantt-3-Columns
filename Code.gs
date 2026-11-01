@@ -1530,7 +1530,7 @@ function applyClaudeTasks_() {
     fresh.forEach(x => {
       let cell;
       if (x.date === 'backlog') {
-        const b = getReference_().find(r => r.title.replace(/<[^>]*>/g, '').trim().toLowerCase() === 'backlog');
+        const b = getReference_().find(r => /^(backlog|undated tasks)$/.test(r.title.replace(/<[^>]*>/g, '').trim().toLowerCase()));
         if (!b) return;
         cell = refSheet.getRange(b.row, 5);
       } else {

@@ -54,6 +54,7 @@
 - Quiet cards + focus ring (2026-10-28, Julius)
 - Side space (2026-10-28, Julius)
 - Drag grip (2026-10-28, Julius)
+- Undated Tasks + tight Urgent (2026-11-01, Julius) — Backlog card renamed
 - Urgent batches (2026-10-30, Julius)
 - Reference split (2026-10-31, Julius)
 - Time sections in Today (2026-10-31, Julius)

@@ -193,4 +193,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-gantt-quiet-grips', date: '2026-11-01', project: 'Gantt', title: 'Quiet grips', details: 'drag-line grips faint until pressed' },
   { id: 'd-20261101-gantt-make-sure', date: '2026-11-01', project: 'Gantt', title: 'Make sure you do section', details: "header at the top of today's Notes cell; normal checkbox/drag lines under it" },
   { id: 'd-20261101-gantt-focus-section', date: '2026-11-01', project: 'Gantt', title: 'Make sure you do shade + Focus tracking section', details: "light red Make sure you do header; light blue Focus tracking header under it in today's Notes" },
+  { id: 'd-20261101-gantt-undated-tasks', date: '2026-11-01', project: 'Gantt', title: 'Backlog renamed Undated Tasks + tight Urgent', details: 'card renamed with a one-line description (old name still works); Urgent panel reaches the column edges' },
 ];

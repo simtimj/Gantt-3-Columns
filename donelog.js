@@ -189,4 +189,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-task-mirrors-p1', date: '2026-11-01', project: 'Gantt', title: 'Task mirrors, phase 1: Send to Today', details: 'Reference hold menu → linked copy in the selected day\'s Plan / think; one tick state across Reference, Plan / think and Urgent; done Plan copies move to Completed as history; to-do: confirm on /dev, then phase 2 (title sync, Go to Reference)' },
   { id: 'd-20261101-center-p1', date: '2026-11-01', project: 'Gantt', title: 'Center phase 1: Notes label off, planning paused', details: 'Notes column day label hidden (Today keeps date + icon); Suggested Day + Wrap-up boxes hidden, data kept; nightly 10 pm task off; to-do: confirm on /dev, next = Center Up/Down split with tabs' },
   { id: 'd-20261101-gantt-center-split', date: '2026-11-01', project: 'Gantt', title: 'Center Up / Down split', details: 'Notes column split into Center Up (tabs: 📝 Notes, ☁️ Weather placeholder) and an empty Center Down; resizable' },
+  { id: 'd-20261101-gantt-center-header', date: '2026-11-01', project: 'Gantt', title: 'Center header cleanup', details: 'smaller tab symbols; NOTES text and + Template button removed' },
 ];

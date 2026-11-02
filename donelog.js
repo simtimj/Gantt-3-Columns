@@ -203,4 +203,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-focus-p2', date: '2026-11-01', project: 'Gantt', title: 'Focus Tracking, phase 2', details: 'tasks in project cards with data-tid; ticks sync both ways with mirrors; done → today\'s Completed; 📌 to Plan / think; renames follow; chunked server storage. To do: phases 3–5 (drag, priority/progress/dashboard, temp urgency/expand)' },
   { id: 'd-20261101-gantt-scroll-tight', date: '2026-11-01', project: 'Gantt', title: 'Scrolling date + tight Notes lines', details: 'Today date and Completed scroll with the tasks; Make sure you do lines tighter; single line between Notes and Reference (Urgent box outline removed)' },
   { id: 'd-20261101-sun-icon', date: '2026-11-01', project: 'Gantt', title: 'Sun icon with rays', details: 'Sunday header icon redrawn as one piece: round center + 6 pointed rays, day color only' },
+  { id: 'd-20261101-plan-pad-look', date: '2026-11-01', project: 'Gantt', title: 'Plan / think spacing + outlines', details: 'Plan / think matches Today line spacing; task cards show a faint urgency-colored outline, stronger when tapped' },
 ];

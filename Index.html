@@ -1212,7 +1212,7 @@
     [data-tlon]{display:flex!important;align-items:center;}
     [data-tlon] > .check-text{flex:0 1 auto;}
     [data-tlon]::after{order:2;}
-    [data-tlon]::before{content:"−";order:1;flex:0 0 auto;margin-left:5px;padding:0 3px;min-width:.9em;font-size:10px;font-weight:700;line-height:1.25;text-align:center;border:1px solid var(--border);border-radius:5px;color:var(--muted);background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
+    [data-tlon]::before{content:"−";order:1;flex:0 0 auto;margin-left:4px;padding:0 1px;min-width:.75em;font-size:10px;font-weight:700;line-height:1.25;text-align:center;border:1px solid var(--border);border-radius:5px;color:var(--muted);background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
     [data-tlon="c"]::before{content:"+  " attr(data-tlinfo);font-weight:600;}
     [data-tlhid]{display:none!important;}
     /* Folded summary (2026-10-29): bold starts of the hidden lines, as one condensed block under the title. */
@@ -1467,18 +1467,16 @@
     /* Time sections in Today (2026-10-31): small labeled lines; the in-between one is a short half line. */
     .editor > [data-tsec]{margin:8px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
     .editor > [data-tsec]:first-child{margin-top:2px;}
-    .editor > [data-tsec="morning"]::after{content:" · 8:30 am – 2 pm";font-weight:500;}
-    .editor > [data-tsec="afternoon"]::after{content:" · 3:45 – 6:30 pm";font-weight:500;}
-    .editor > [data-tsec="evening"]::after{content:" · 6:30 – 9:30 pm";font-weight:500;}
-    /* Narrow Today (Julius, 2026-11-01): symbol + short times instead of the words. */
-    .pane-narrow .editor > [data-tsec]:not([data-tsec="gap"]){font-size:0!important;letter-spacing:0;}
-    .pane-narrow .editor > [data-tsec]:not([data-tsec="gap"])::before,.pane-narrow .editor > [data-tsec]:not([data-tsec="gap"])::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:500;letter-spacing:.02em;}
-    .pane-narrow .editor > [data-tsec="morning"]::before{content:"☀\FE0E";color:#f4b400;font-size:calc(var(--paragraph-size,14px) * 1.05);font-weight:400;}
-    .pane-narrow .editor > [data-tsec="afternoon"]::before{content:"☀\FE0E";color:#fb8c00;font-size:calc(var(--paragraph-size,14px) * 1.05);font-weight:400;}
-    .pane-narrow .editor > [data-tsec="evening"]::before{content:"🌙";}
-    .pane-narrow .editor > [data-tsec="morning"]::after{content:" 8:30–2";}
-    .pane-narrow .editor > [data-tsec="afternoon"]::after{content:" 3:45–6:30";}
-    .pane-narrow .editor > [data-tsec="evening"]::after{content:" 6:30–9:30";}
+    /* Short time headers always (Julius, 2026-11-01): colored symbol + short times, no am / pm — saves room. */
+    .editor > [data-tsec]:not([data-tsec="gap"]){font-size:0!important;letter-spacing:0;}
+    .editor > [data-tsec]:not([data-tsec="gap"])::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:500;letter-spacing:.02em;}
+    .editor > [data-tsec]:not([data-tsec="gap"])::before{font-size:calc(var(--paragraph-size,14px) * 1.05);font-weight:400;}
+    .editor > [data-tsec="morning"]::before{content:"\2600\FE0E";color:#f4b400;}
+    .editor > [data-tsec="afternoon"]::before{content:"\2600\FE0E";color:#fb8c00;}
+    .editor > [data-tsec="evening"]::before{content:"\263E\FE0E";color:#bf97e8;}
+    .editor > [data-tsec="morning"]::after{content:" 8:30–2";}
+    .editor > [data-tsec="afternoon"]::after{content:" 3:45–6:30";}
+    .editor > [data-tsec="evening"]::after{content:" 6:30–9:30";}
     .editor > [data-tsec="gap"]{width:50%;height:0;overflow:hidden;margin:6px 0 4px;padding:0;border-bottom:1px dashed var(--divider);font-size:0;}
     /* Lines, not boxes (Julius, 2026-10-31): note blocks and today's cell drop their side borders; only the
        top / bottom lines stay, so the text gets the side room back. Today + Notes columns. */

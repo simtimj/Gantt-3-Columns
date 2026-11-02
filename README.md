@@ -49,6 +49,9 @@ Last updated: 2026-11-01
 
 ## 🧪 To be confirmed (2026-11-01)
 
+- **Short time headers always** (2026-11-01) — Today's Morning / Afternoon / Evening headers always show a colored symbol + short times: yellow ☀ 8:30–2, orange ☀ 3:45–6:30, light purple ☾ 6:30–9:30 (no am / pm).
+- **Slimmer − / + boxes** (2026-11-01) — title-line fold boxes are narrower.
+
 - **Sunday icon: storybook sun** (2026-11-01) — simple round sun with 8 short rounded rays (replaces the spiky one), still in the day color.
 
 - **Plan / think spacing + card outlines** (2026-11-01) — the bottom-left Plan / think cell uses the same text size and line height as the Today cell, so checkboxes line up the same. Its task cards always show a faint outline in their urgency color (red / yellow / blue, gray if none; works in light and dark); the line you tap gets a stronger ring.

@@ -205,4 +205,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-sun-icon', date: '2026-11-01', project: 'Gantt', title: 'Sun icon with rays', details: 'Sunday header icon redrawn as one piece: round center + 6 pointed rays, day color only' },
   { id: 'd-20261101-plan-pad-look', date: '2026-11-01', project: 'Gantt', title: 'Plan / think spacing + outlines', details: 'Plan / think matches Today line spacing; task cards show a faint urgency-colored outline, stronger when tapped' },
   { id: 'd-20261101-storybook-sun', date: '2026-11-01', project: 'Gantt', title: 'Storybook Sunday sun', details: 'Sunday icon redrawn as a simple round sun with 8 short rounded rays' },
+  { id: 'd-20261101-short-time-heads', date: '2026-11-01', project: 'Gantt', title: 'Short time headers + slim folds', details: 'Morning / Afternoon / Evening always show yellow sun, orange sun, purple moon + short times (no am/pm); title-line − / + boxes narrower' },
 ];

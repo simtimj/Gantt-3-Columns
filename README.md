@@ -49,6 +49,7 @@ Last updated: 2026-11-02
 
 ## 🧪 To be confirmed (2026-11-02)
 
+- **Task tracking rename**: the Focus tracking section in the middle column is now called Task tracking, including on days already saved
 - **Even drag lines + stronger grips**: grips are more solid at rest (75%) and a little squarer; every drag line is 2px (the Notes line was doubling up to 4px, phone split lines were 3px); Today's line reaches the column edges; Reset sizes and double-tap put the Today, Notes and Reference lines at the exact same height, dead center of the area under the headers
 
 ## 🧪 To be confirmed (2026-11-01)

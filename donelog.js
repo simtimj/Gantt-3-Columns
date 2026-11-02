@@ -211,4 +211,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-grips-visible', date: '2026-11-01', project: 'Gantt', title: 'More visible drag grips', details: 'Resize grips on all split / column lines at half strength when idle (were nearly invisible)' },
   { id: 'd-20261101-bracket-caret', date: '2026-11-01', project: 'Gantt', title: 'Cursor after [] task', details: 'New empty task from [] or the toolbar now puts the cursor after the box; a background sync keeps it there. Awaiting his phone test.' },
   { id: 'd-20261102-even-lines', date: '2026-11-02', project: 'Gantt', title: 'Even drag lines + stronger grips', details: 'Grips more solid and slightly squarer; all drag lines 2px (Notes line was 4px); Reset sizes centers the Today, Notes and Reference lines at the same height' },
+  { id: 'd-20261102-task-tracking-name', date: '2026-11-02', project: 'Gantt', title: 'Task tracking rename', details: 'Focus tracking section in the middle column renamed Task tracking, saved days included' },
 ];

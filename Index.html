@@ -2308,6 +2308,8 @@
         }">${storedToHtml(content)}</div>`;
     // Make sure you do (2026-11-01, Julius): today's Notes cell starts with this section header (saved with the cell
     // once he edits it). Lines under it are normal lines: checkboxes, drag, menus all work as elsewhere.
+    // Renamed Task tracking (Julius, 2026-11-02): cells saved earlier still hold the old header text, on any day.
+    if(type === 'journal') row.querySelectorAll('.editor > [data-nsec="focus"]').forEach(h => { h.textContent = 'Task tracking'; });
     if(type === 'journal' && today){
       const jed = row.querySelector('.editor');
       if(!jed.querySelector(':scope > [data-nsec="must"]'))
@@ -2317,7 +2319,7 @@
         let at = jed.querySelector(':scope > [data-nsec="must"]').nextSibling;
         while(at && !(at.nodeType === 1 && (at.matches('table,[data-nsec]')))) at = at.nextSibling;
         const tmp = document.createElement('div');
-        tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Focus tracking</div><div><br></div>';
+        tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Task tracking</div><div><br></div>';
         [...tmp.childNodes].forEach(n => jed.insertBefore(n, at));
       }
       // Focus Tracking dashboard (phase 1): render-only host right under the Focus tracking header.

@@ -231,6 +231,11 @@ Read only the section you need.
 - Override block "Grips at the edges" after the grip-size rules: grips keep size, positions only — `.od-pad-head` left, `#refSplitBar` right, `.column-resizer` + mobile col lines top, mobile row lines left. Each `::before` hit area shrunk to ~46px around the grip. `#refSplitBar` / `#notesSplitBar` / `.od-pad-head` get `pointer-events:none` (only `::before` takes touches; wire() uses document listeners). Column / mobile split lines keep pointer events on their own thin line because their drag code listens on the element after setPointerCapture.
 - Even reset (2026-11-01): `resetColumnSizes()` sets equal widths then `fitColumnsToWindow()`. `alignSplits(save)` in `initSplitBars` measures the Today `.od-pad-head` top at r=.3/.7 and solves for the `#refSplitBar` top (fallback: middle of `#todayScroll`); runs after `resetSplitBars()` and once on load when `fw.odSplit` is unset (not saved). Exposed as `window.alignSplitBars`.
 
+## Even lines (2026-11-02, Julius)
+
+- All drag lines = 2px (phone split tracks too, `updateWorkspaceLayout`). Grips: opacity .75 at rest, radius 1px. One-day rows drop the `.day-row.today` inset shadow (it sat on `#notesSplitBar` and made a 4px line). `.od-pad-head` bleeds to the column edges via `--rowpx`.
+- `alignOne(o,save)` in `initSplitBars` solves each bar's ratio to the center of its pane under `.pane-header` (a plain .5 misses because of padding / the date header). Used by reset (`alignSplits`), double-tap, and on load for bars unset or at a plain .5. Saved ratios are therefore usually not .5.
+
 ## Task mirrors (2026-11-01, Julius: spec phase 1)
 
 - One logical task = every check-line sharing a `data-tid` (assigned on first send as `m-<base36 time><rand>`, saved in the cell HTML; never regenerated; no registry). Script block at the end of `Index.html` (`tidToggled`, `tidMenuRow`, `sendToToday`, `toHistory`, `reconcile`).

@@ -1491,7 +1491,7 @@
     #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{background:var(--grip,var(--divider))!important;filter:none!important;border-radius:2px;}
     /* Quiet grips (Julius, 2026-11-01): faint until pressed, full strength while dragging. */
     .column-resizer::after,#refSplitBar::after,#notesSplitBar::after,body.one-day #todayScroll .od-on > .od-pad-head::after,
-    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{opacity:.18;transition:opacity .15s;}
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{opacity:.5;transition:opacity .15s;} /* .18 → .5 (Julius 2026-11-01: easier to see at rest) */
     body.split-dragging #refSplitBar::after,body.split-dragging #notesSplitBar::after,body.split-dragging.one-day #todayScroll .od-on > .od-pad-head::after,
     .column-resizer.dragging::after,.column-resizer:active::after,#mobileSplitResizer:active::after,#mobileSplitResizerThird:active::after{opacity:1;}
     /* Make sure you do (Julius, 2026-11-01): section header at the top of today's Notes cell, same look as Today's time sections. */

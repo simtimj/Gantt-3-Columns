@@ -8901,6 +8901,17 @@
   .editor > [data-sec="afternoon"] > b:first-child::after{content:" · 3:45 – 6:30 pm";}
   .editor > [data-sec="evening"] > b:first-child::after{content:" · 6:30 – 9:30 pm";}
   .editor > [data-sec]:first-child{margin-top:6px;}
+  /* Short look for these older Morning / Afternoon / Evening title lines too (Julius, 2026-11-01):
+     colored symbol + short times, no am / pm. Display only — the saved word stays. */
+  .editor > [data-sec] > b:first-child{font-size:0;letter-spacing:0;}
+  .editor > [data-sec] > b:first-child::before{font-size:calc(var(--paragraph-size,14px) * 1.05);font-weight:400;}
+  .editor > [data-sec] > b:first-child::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:500;opacity:1;}
+  .editor > [data-sec="morning"] > b:first-child::before{content:"\2600\FE0E";color:#f4b400;}
+  .editor > [data-sec="afternoon"] > b:first-child::before{content:"\2600\FE0E";color:#fb8c00;}
+  .editor > [data-sec="evening"] > b:first-child::before{content:"\263E\FE0E";color:#bf97e8;}
+  .editor > [data-sec="morning"] > b:first-child::after{content:" 8:30–2";}
+  .editor > [data-sec="afternoon"] > b:first-child::after{content:" 3:45–6:30";}
+  .editor > [data-sec="evening"] > b:first-child::after{content:" 6:30–9:30";}
   .sec-boxes > i{position:absolute;box-sizing:border-box;border:1.5px solid var(--bd);border-radius:10px;background:var(--fill);}
   /* Subject color in the checkbox (Julius, 2026-10-27; default): card stays neutral, the subject
      fills the checkbox, urgency is its border (gray when none), done = the check mark.

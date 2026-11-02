@@ -3318,7 +3318,10 @@
       c.querySelector('.check-text').textContent = checkboxMatch[3] || '';
       if(line === el) el.replaceChildren(c); else line.replaceWith(c);
       wireCheckbox(c.querySelector('input'));
-      placeEnd(c.querySelector('.check-text'));
+      // Empty task: a <br> gives the phone's cursor a spot inside the text, not before the box (2026-11-01, Julius).
+      const taskText = c.querySelector('.check-text');
+      if(taskText.textContent){ placeEnd(taskText); }
+      else { taskText.innerHTML = '<br>'; placeCaretInsideCheckbox(taskText); }
       saveEditorOwner(el);
       return;
     }
@@ -3516,6 +3519,7 @@
     const editor=text.closest('.editor,.ref-cell');
     if(!editor) return;
     const setCaret=()=>{
+      if(!text.isConnected) return; // the line was replaced before the next frame
       editor.focus({preventScroll:true});
       const range=document.createRange();
       range.setStart(text,0);
@@ -3677,7 +3681,8 @@
         ed.appendChild(task);
       }
       wireCheckbox(task.querySelector('input'));
-      placeEnd(text);
+      if(text.textContent){ placeEnd(text); }
+      else { text.innerHTML = '<br>'; placeCaretInsideCheckbox(text); }
       finishEditorEdit(ed);
       rememberSelection(ed);
       saveEditorOwner(ed);
@@ -4626,6 +4631,11 @@
   function replaceEditorHtml(ed,html){
     const focused = document.activeElement === ed;
     const off = focused ? fwCaretOffset(ed) : -1;
+    // A caret in an empty task has no text to re-find, so remember which task it was.
+    const anchor = focused && window.getSelection().anchorNode;
+    const anchorEl = anchor ? (anchor.nodeType === 3 ? anchor.parentElement : anchor) : null;
+    const emptyTask = anchorEl && anchorEl.closest ? anchorEl.closest('.check-line') : null;
+    const emptyIdx = emptyTask && ed.contains(emptyTask) && !emptyTask.textContent.trim() ? [...ed.querySelectorAll('.check-line')].indexOf(emptyTask) : -1;
     const sc = [...document.querySelectorAll('#todayScroll,#journalScroll,#referenceScroll')].map(x => [x,x.scrollTop]);
     captureBeforeEdit(ed); // Ctrl+Z / undo brings back what was on screen before the merge
     const h = ensureEditorHistory(ed);
@@ -4635,7 +4645,10 @@
     window.ensureFocusHost && window.ensureFocusHost(ed); // Focus dashboard is render-only
     h.last = ed.innerHTML;
     h.restoring = false;
-    if(off >= 0) fwSetCaret(ed,off);
+    const backTo = emptyIdx >= 0 ? ed.querySelectorAll('.check-line')[emptyIdx] : null;
+    const backText = backTo && !backTo.textContent.trim() ? backTo.querySelector('.check-text') : null;
+    if(backText){ if(!backText.firstChild) backText.innerHTML = '<br>'; placeCaretInsideCheckbox(backText); }
+    else if(off >= 0) fwSetCaret(ed,off);
     sc.forEach(([x,t]) => { if(x.scrollTop !== t) x.scrollTop = t; });
   }
   function dayEditorFor(date,col){

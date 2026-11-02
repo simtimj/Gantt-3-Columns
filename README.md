@@ -49,6 +49,8 @@ Last updated: 2026-11-01
 
 ## 🧪 To be confirmed (2026-11-01)
 
+- **Cursor after typing [ ]**: a new empty task from `[]` (or the toolbar task button) now puts the cursor inside the task, after the box, and a background sync keeps it there.
+
 - **Easier-to-see drag grips** (2026-11-01) — the resize grips on every split / column line show at half strength while idle (were nearly invisible), full strength while dragging.
 
 - **Short time headers** (2026-11-01) — Today's time headers (both the auto time sections and the older Morning / Afternoon / Evening title lines) show one line: rounded icon + short name + times — yellow sunflower sun **Morn 8:30–2**, orange setting sunflower sun **After 3:45–6:30**, filled purple moon **Night 6:30–9:30**.

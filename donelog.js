@@ -207,4 +207,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261101-storybook-sun', date: '2026-11-01', project: 'Gantt', title: 'Storybook Sunday sun', details: 'Sunday icon redrawn as a simple round sun with 8 short rounded rays' },
   { id: 'd-20261101-short-time-heads', date: '2026-11-01', project: 'Gantt', title: 'Short time headers + slim folds', details: 'Morning / Afternoon / Evening always show yellow sun, orange sun, purple moon + short times (no am/pm); title-line − / + boxes narrower' },
   { id: 'd-20261101-time-head-icons', date: '2026-11-01', project: 'Gantt', title: 'Time header icons + short names', details: 'One-line headers: rounded sun Morn 8:30–2, setting sun After 3:45–6:30, filled moon Night 6:30–9:30; spacing between icon and text' },
+  { id: 'd-20261101-sunflower-suns', date: '2026-11-01', project: 'Gantt', title: 'Sunflower-style suns', details: 'Sunday icon, Morn and After headers: rays swapped for a soft zigzag mane (rounded points)' },
 ];

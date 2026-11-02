@@ -49,10 +49,10 @@ Last updated: 2026-11-01
 
 ## 🧪 To be confirmed (2026-11-01)
 
-- **Short time headers** (2026-11-01) — Today's time headers (both the auto time sections and the older Morning / Afternoon / Evening title lines) show one line: rounded icon + short name + times — yellow sun **Morn 8:30–2**, orange setting sun **After 3:45–6:30**, filled purple moon **Night 6:30–9:30**.
+- **Short time headers** (2026-11-01) — Today's time headers (both the auto time sections and the older Morning / Afternoon / Evening title lines) show one line: rounded icon + short name + times — yellow sunflower sun **Morn 8:30–2**, orange setting sunflower sun **After 3:45–6:30**, filled purple moon **Night 6:30–9:30**.
 - **Slimmer − / + boxes** (2026-11-01) — title-line fold boxes are narrower.
 
-- **Sunday icon: storybook sun** (2026-11-01) — simple round sun with 8 short rounded rays (replaces the spiky one), still in the day color.
+- **Sunday icon: sunflower sun** (2026-11-01) — round sun with a soft zigzag mane (like a sunflower / lion), still in the day color. Same sun on the Morn header; After uses the setting-sun half.
 
 - **Plan / think spacing + card outlines** (2026-11-01) — the bottom-left Plan / think cell uses the same text size and line height as the Today cell, so checkboxes line up the same. Its task cards always show a faint outline in their urgency color (red / yellow / blue, gray if none; works in light and dark); the line you tap gets a stronger ring.
 - **Date + Completed scroll with the tasks** (2026-11-01) — in the one-day Today view, the date and the Completed label now scroll up with the task list instead of staying fixed at the top. Plan / think below is unchanged.

@@ -49,6 +49,8 @@ Last updated: 2026-11-01
 
 ## 🧪 To be confirmed (2026-11-01)
 
+- **Sunday icon: storybook sun** (2026-11-01) — simple round sun with 8 short rounded rays (replaces the spiky one), still in the day color.
+
 - **Plan / think spacing + card outlines** (2026-11-01) — the bottom-left Plan / think cell uses the same text size and line height as the Today cell, so checkboxes line up the same. Its task cards always show a faint outline in their urgency color (red / yellow / blue, gray if none; works in light and dark); the line you tap gets a stronger ring.
 - **Date + Completed scroll with the tasks** (2026-11-01) — in the one-day Today view, the date and the Completed label now scroll up with the task list instead of staying fixed at the top. Plan / think below is unchanged.
 - **Tighter Make sure you do lines** (2026-11-01) — task lines in the Notes cell use a small gap instead of the full task-card spacing.

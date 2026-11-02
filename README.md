@@ -49,7 +49,7 @@ Last updated: 2026-11-01
 
 ## 🧪 To be confirmed (2026-11-01)
 
-- **Short time headers always** (2026-11-01) — Today's Morning / Afternoon / Evening headers always show a colored symbol + short times: yellow ☀ 8:30–2, orange ☀ 3:45–6:30, light purple ☾ 6:30–9:30 (no am / pm). Applies to both the auto time sections and the Morning / Afternoon / Evening title lines already in the cell.
+- **Short time headers** (2026-11-01) — Today's time headers (both the auto time sections and the older Morning / Afternoon / Evening title lines) show one line: rounded icon + short name + times — yellow sun **Morn 8:30–2**, orange setting sun **After 3:45–6:30**, filled purple moon **Night 6:30–9:30**.
 - **Slimmer − / + boxes** (2026-11-01) — title-line fold boxes are narrower.
 
 - **Sunday icon: storybook sun** (2026-11-01) — simple round sun with 8 short rounded rays (replaces the spiky one), still in the day color.

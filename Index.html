@@ -1467,16 +1467,16 @@
     /* Time sections in Today (2026-10-31): small labeled lines; the in-between one is a short half line. */
     .editor > [data-tsec]{margin:8px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
     .editor > [data-tsec]:first-child{margin-top:2px;}
-    /* Short time headers always (Julius, 2026-11-01): colored symbol + short times, no am / pm — saves room. */
-    .editor > [data-tsec]:not([data-tsec="gap"]){font-size:0!important;letter-spacing:0;}
-    .editor > [data-tsec]:not([data-tsec="gap"])::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:500;letter-spacing:.02em;}
-    .editor > [data-tsec]:not([data-tsec="gap"])::before{font-size:calc(var(--paragraph-size,14px) * 1.05);font-weight:400;}
-    .editor > [data-tsec="morning"]::before{content:"\2600\FE0E";color:#f4b400;}
-    .editor > [data-tsec="afternoon"]::before{content:"\2600\FE0E";color:#fb8c00;}
-    .editor > [data-tsec="evening"]::before{content:"\263E\FE0E";color:#bf97e8;}
-    .editor > [data-tsec="morning"]::after{content:" 8:30–2";}
-    .editor > [data-tsec="afternoon"]::after{content:" 3:45–6:30";}
-    .editor > [data-tsec="evening"]::after{content:" 6:30–9:30";}
+    /* Short time headers (Julius, 2026-11-01): rounded icon (sun / setting sun / filled moon) + short name + times, one line, no am / pm. */
+    .editor > [data-tsec="morning"],.editor > [data-tsec="afternoon"],.editor > [data-tsec="evening"]{white-space:nowrap;font-size:0!important;letter-spacing:0;}
+    .editor > [data-tsec="morning"]::before,.editor > [data-tsec="afternoon"]::before,.editor > [data-tsec="evening"]::before{content:"";display:inline-block;width:calc(var(--paragraph-size,14px) * 1.05);height:calc(var(--paragraph-size,14px) * 1.05);vertical-align:-.2em;margin-right:.35em;-webkit-mask:var(--ts-ic) center/contain no-repeat;mask:var(--ts-ic) center/contain no-repeat;background:var(--ts-c);font-size:calc(var(--paragraph-size,14px) * .75);}
+    .editor > [data-tsec="morning"]::after,.editor > [data-tsec="afternoon"]::after,.editor > [data-tsec="evening"]::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:600;letter-spacing:.02em;opacity:1;text-transform:none;}
+    .editor > [data-tsec="morning"]{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Ccircle cx="12" cy="12" r="5.2" fill="%23000"/%3E%3Cg stroke="%23000" stroke-width="2.4" stroke-linecap="round" fill="none"%3E%3Cline x1="20.30" y1="12.00" x2="22.60" y2="12.00"/%3E%3Cline x1="17.87" y1="6.13" x2="19.50" y2="4.50"/%3E%3Cline x1="12.00" y1="3.70" x2="12.00" y2="1.40"/%3E%3Cline x1="6.13" y1="6.13" x2="4.50" y2="4.50"/%3E%3Cline x1="3.70" y1="12.00" x2="1.40" y2="12.00"/%3E%3Cline x1="6.13" y1="17.87" x2="4.50" y2="19.50"/%3E%3Cline x1="12.00" y1="20.30" x2="12.00" y2="22.60"/%3E%3Cline x1="17.87" y1="17.87" x2="19.50" y2="19.50"/%3E%3C/g%3E%3C/svg%3E');--ts-c:#f4b400;}
+    .editor > [data-tsec="morning"]::after{content:"Morn 8:30–2";}
+    .editor > [data-tsec="afternoon"]{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M6.6 17a5.4 5.4 0 0 1 10.8 0z" fill="%23000"/%3E%3Cg stroke="%23000" stroke-width="2.4" stroke-linecap="round" fill="none"%3E%3Cline x1="3.60" y1="17.00" x2="1.40" y2="17.00"/%3E%3Cline x1="6.06" y1="11.06" x2="4.50" y2="9.50"/%3E%3Cline x1="12.00" y1="8.60" x2="12.00" y2="6.40"/%3E%3Cline x1="17.94" y1="11.06" x2="19.50" y2="9.50"/%3E%3Cline x1="20.40" y1="17.00" x2="22.60" y2="17.00"/%3E%3Cline x1="2" y1="20.6" x2="22" y2="20.6"/%3E%3C/g%3E%3C/svg%3E');--ts-c:#fb8c00;}
+    .editor > [data-tsec="afternoon"]::after{content:"After 3:45–6:30";}
+    .editor > [data-tsec="evening"]{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M15.5 2.5A9.5 9.5 0 1 0 21.5 17.5A8 8 0 0 1 15.5 2.5z" fill="%23000"/%3E%3C/svg%3E');--ts-c:#bf97e8;}
+    .editor > [data-tsec="evening"]::after{content:"Night 6:30–9:30";}
     .editor > [data-tsec="gap"]{width:50%;height:0;overflow:hidden;margin:6px 0 4px;padding:0;border-bottom:1px dashed var(--divider);font-size:0;}
     /* Lines, not boxes (Julius, 2026-10-31): note blocks and today's cell drop their side borders; only the
        top / bottom lines stay, so the text gets the side room back. Today + Notes columns. */
@@ -8901,17 +8901,16 @@
   .editor > [data-sec="afternoon"] > b:first-child::after{content:" · 3:45 – 6:30 pm";}
   .editor > [data-sec="evening"] > b:first-child::after{content:" · 6:30 – 9:30 pm";}
   .editor > [data-sec]:first-child{margin-top:6px;}
-  /* Short look for these older Morning / Afternoon / Evening title lines too (Julius, 2026-11-01):
-     colored symbol + short times, no am / pm. Display only — the saved word stays. */
-  .editor > [data-sec] > b:first-child{font-size:0;letter-spacing:0;}
-  .editor > [data-sec] > b:first-child::before{font-size:calc(var(--paragraph-size,14px) * 1.05);font-weight:400;}
-  .editor > [data-sec] > b:first-child::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:500;opacity:1;}
-  .editor > [data-sec="morning"] > b:first-child::before{content:"\2600\FE0E";color:#f4b400;}
-  .editor > [data-sec="afternoon"] > b:first-child::before{content:"\2600\FE0E";color:#fb8c00;}
-  .editor > [data-sec="evening"] > b:first-child::before{content:"\263E\FE0E";color:#bf97e8;}
-  .editor > [data-sec="morning"] > b:first-child::after{content:" 8:30–2";}
-  .editor > [data-sec="afternoon"] > b:first-child::after{content:" 3:45–6:30";}
-  .editor > [data-sec="evening"] > b:first-child::after{content:" 6:30–9:30";}
+  /* Same short look for the older Morning / Afternoon / Evening title lines (Julius, 2026-11-01). Display only — the saved word stays. */
+  .editor > [data-sec="morning"] > b:first-child,.editor > [data-sec="afternoon"] > b:first-child,.editor > [data-sec="evening"] > b:first-child{white-space:nowrap;font-size:0!important;letter-spacing:0;}
+  .editor > [data-sec="morning"] > b:first-child::before,.editor > [data-sec="afternoon"] > b:first-child::before,.editor > [data-sec="evening"] > b:first-child::before{content:"";display:inline-block;width:calc(var(--paragraph-size,14px) * 1.05);height:calc(var(--paragraph-size,14px) * 1.05);vertical-align:-.2em;margin-right:.35em;-webkit-mask:var(--ts-ic) center/contain no-repeat;mask:var(--ts-ic) center/contain no-repeat;background:var(--ts-c);font-size:calc(var(--paragraph-size,14px) * .75);}
+  .editor > [data-sec="morning"] > b:first-child::after,.editor > [data-sec="afternoon"] > b:first-child::after,.editor > [data-sec="evening"] > b:first-child::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:600;letter-spacing:.02em;opacity:1;text-transform:none;}
+  .editor > [data-sec="morning"] > b:first-child{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Ccircle cx="12" cy="12" r="5.2" fill="%23000"/%3E%3Cg stroke="%23000" stroke-width="2.4" stroke-linecap="round" fill="none"%3E%3Cline x1="20.30" y1="12.00" x2="22.60" y2="12.00"/%3E%3Cline x1="17.87" y1="6.13" x2="19.50" y2="4.50"/%3E%3Cline x1="12.00" y1="3.70" x2="12.00" y2="1.40"/%3E%3Cline x1="6.13" y1="6.13" x2="4.50" y2="4.50"/%3E%3Cline x1="3.70" y1="12.00" x2="1.40" y2="12.00"/%3E%3Cline x1="6.13" y1="17.87" x2="4.50" y2="19.50"/%3E%3Cline x1="12.00" y1="20.30" x2="12.00" y2="22.60"/%3E%3Cline x1="17.87" y1="17.87" x2="19.50" y2="19.50"/%3E%3C/g%3E%3C/svg%3E');--ts-c:#f4b400;}
+  .editor > [data-sec="morning"] > b:first-child::after{content:"Morn 8:30–2";}
+  .editor > [data-sec="afternoon"] > b:first-child{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M6.6 17a5.4 5.4 0 0 1 10.8 0z" fill="%23000"/%3E%3Cg stroke="%23000" stroke-width="2.4" stroke-linecap="round" fill="none"%3E%3Cline x1="3.60" y1="17.00" x2="1.40" y2="17.00"/%3E%3Cline x1="6.06" y1="11.06" x2="4.50" y2="9.50"/%3E%3Cline x1="12.00" y1="8.60" x2="12.00" y2="6.40"/%3E%3Cline x1="17.94" y1="11.06" x2="19.50" y2="9.50"/%3E%3Cline x1="20.40" y1="17.00" x2="22.60" y2="17.00"/%3E%3Cline x1="2" y1="20.6" x2="22" y2="20.6"/%3E%3C/g%3E%3C/svg%3E');--ts-c:#fb8c00;}
+  .editor > [data-sec="afternoon"] > b:first-child::after{content:"After 3:45–6:30";}
+  .editor > [data-sec="evening"] > b:first-child{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M15.5 2.5A9.5 9.5 0 1 0 21.5 17.5A8 8 0 0 1 15.5 2.5z" fill="%23000"/%3E%3C/svg%3E');--ts-c:#bf97e8;}
+  .editor > [data-sec="evening"] > b:first-child::after{content:"Night 6:30–9:30";}
   .sec-boxes > i{position:absolute;box-sizing:border-box;border:1.5px solid var(--bd);border-radius:10px;background:var(--fill);}
   /* Subject color in the checkbox (Julius, 2026-10-27; default): card stays neutral, the subject
      fills the checkbox, urgency is its border (gray when none), done = the check mark.

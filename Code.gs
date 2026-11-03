@@ -1420,8 +1420,49 @@ function removeDaySections_() {
   } finally { lock.releaseLock(); }
 }
 
+/* Sheet intake (2026-11-02, Julius): any AI appends a row to the "Done Log" or
+   "New Tasks" tab, with no deploy. Rows are never edited; the next app load
+   applies each new one once. The id comes from the row's text, so an exact
+   repeat is added once and a line he deletes stays deleted. */
+const DONE_LOG_HEADERS = ['Date', 'Project', 'Title', 'Details', 'Done by'];
+const NEW_TASKS_HEADERS = ['Date', 'Title', 'Urgency', 'Due', 'Minutes', 'Subtasks'];
+const DONE_LOG_DAYS = 30; // older rows are ignored, so the applied-id list can't age out
+
+function intakeDate_(value) {
+  return value instanceof Date ? formatDate_(value) : String(value || '').trim();
+}
+
+function sheetDoneRows_() {
+  const sheet = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
+  const oldest = addDaysToDateString_(todayString_(), -DONE_LOG_DAYS);
+  return sheet.getDataRange().getValues().slice(1).map(r => {
+    const date = intakeDate_(r[0]);
+    const project = String(r[1] || '').trim();
+    const title = String(r[2] || '').trim();
+    const details = String(r[3] || '').trim();
+    return {
+      id: 's-' + cellHash_([date, project, title, details].join('|')), date, project: project || 'Other', title, details,
+      mine: /^(julius|me)$/i.test(String(r[4] || '').trim()),
+    };
+  }).filter(x => x.title && x.date >= oldest);
+}
+
+function sheetTaskRows_() {
+  const sheet = getOrCreateSheet_('New Tasks', NEW_TASKS_HEADERS);
+  return sheet.getDataRange().getValues().slice(1).map(r => {
+    const raw = intakeDate_(r[0]);
+    const date = /^(backlog|undated)$/i.test(raw) ? 'backlog' : raw;
+    const title = String(r[1] || '').trim();
+    return {
+      id: 's-' + cellHash_([raw, title].join('|')), date, title, urg: Number(r[2]), due: intakeDate_(r[3]), dur: Number(r[4]),
+      subtasks: String(r[5] || '').split('|').map(t => t.trim()).filter(Boolean),
+    };
+  }).filter(x => x.title);
+}
+
 function applyClaudeDone_() {
-  const list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
+  let list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
+  try { list = list.concat(sheetDoneRows_()); } catch (e) { console.error(e); }
   if (!list.length) return;
   const props = PropertiesService.getScriptProperties();
   let applied = [];
@@ -1539,7 +1580,8 @@ function noteBlockFlatHtml_(item) {
 /* Open tasks from Claude (2026-10-27, Julius): CLAUDE_TASKS in tasks.js → open check-lines (with urgency
    and subtasks) appended once to that day's Today cell. data-tid marks the head line. */
 function applyClaudeTasks_() {
-  const list = (typeof CLAUDE_TASKS !== 'undefined' && Array.isArray(CLAUDE_TASKS)) ? CLAUDE_TASKS : [];
+  let list = (typeof CLAUDE_TASKS !== 'undefined' && Array.isArray(CLAUDE_TASKS)) ? CLAUDE_TASKS : [];
+  try { list = list.concat(sheetTaskRows_()); } catch (e) { console.error(e); }
   const props = PropertiesService.getScriptProperties();
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeTasksApplied') || '[]'); } catch (e) { applied = []; }

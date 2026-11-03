@@ -214,4 +214,5 @@ const CLAUDE_DONE = [
   { id: 'd-20261102-task-tracking-name', date: '2026-11-02', project: 'Gantt', title: 'Task tracking rename', details: 'Focus tracking section in the middle column renamed Task tracking, saved days included' },
   { id: 'd-20261102-ex-least-recent', date: '2026-11-02', project: 'Exercise Tracker', title: 'Suggested: least recent first', details: 'Suggested now runs from the exercise touched least lately, never-logged on top, replacing the fixed PT rotation; rows show that exercise\'s own days. To do: confirm in the app' },
   { id: 'd-20261102-ex-set-logging', date: '2026-11-02', project: 'Exercise Tracker', title: 'Set-by-set logging', details: 'Add Set replaces Log; editable sets, Undo, rep goals, manual Complete; first set counts for recovery; new Sets and Goals tabs in Ex. To do: test on the real sheet' },
+  { id: 'd-20261102-sheet-intake', date: '2026-11-02', project: 'Gantt', title: 'Log and add tasks through the Sheet', details: 'New Done Log and New Tasks tabs; Claude and ChatGPT add rows with no deploy, and the Gantt applies them on load. To do: confirm the first row lands' },
 ];

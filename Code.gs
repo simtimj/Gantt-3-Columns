@@ -1425,11 +1425,21 @@ function removeDaySections_() {
    applies each new one once. The id comes from the row's text, so an exact
    repeat is added once and a line he deletes stays deleted. */
 const DONE_LOG_HEADERS = ['Date', 'Project', 'Title', 'Details', 'Done by'];
-const NEW_TASKS_HEADERS = ['Date', 'Title', 'Urgency', 'Due', 'Minutes', 'Subtasks'];
+const NEW_TASKS_HEADERS = ['Date', 'Title', 'Urgency', 'Due', 'Minutes', 'Subtasks', 'Added'];
 const DONE_LOG_DAYS = 30; // older rows are ignored, so the applied-id list can't age out
 
 function intakeDate_(value) {
   return value instanceof Date ? formatDate_(value) : String(value || '').trim();
+}
+
+// Added column (2026-11-02, Julius): the time the AI added the row, as 'HH:MM' (24 h) or '2:30 PM'. '' if unreadable.
+function intakeTime_(value) {
+  const m = String(value || '').trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])?\.?(?:m\.?)?$/i);
+  if (!m) return '';
+  let h = Number(m[1]);
+  if (m[3]) h = (h % 12) + (/p/i.test(m[3]) ? 12 : 0);
+  if (h > 23 || Number(m[2]) > 59) return '';
+  return String(h).padStart(2, '0') + ':' + m[2];
 }
 
 function sheetDoneRows_() {
@@ -1449,13 +1459,17 @@ function sheetDoneRows_() {
 
 function sheetTaskRows_() {
   const sheet = getOrCreateSheet_('New Tasks', NEW_TASKS_HEADERS);
-  return sheet.getDataRange().getValues().slice(1).map(r => {
+  if (sheet.getRange(1, 7).getValue() !== 'Added') sheet.getRange(1, 7).setValue('Added'); // tab made before this column
+  const range = sheet.getDataRange();
+  const shown = range.getDisplayValues(); // as displayed: a time cell's raw value is an 1899 date
+  return range.getValues().slice(1).map((r, i) => {
     const raw = intakeDate_(r[0]);
     const date = /^(backlog|undated)$/i.test(raw) ? 'backlog' : raw;
     const title = String(r[1] || '').trim();
     return {
       id: 's-' + cellHash_([raw, title].join('|')), date, title, urg: Number(r[2]), due: intakeDate_(r[3]), dur: Number(r[4]),
       subtasks: String(r[5] || '').split('|').map(t => t.trim()).filter(Boolean),
+      added: intakeTime_(shown[i + 1][6]),
     };
   }).filter(x => x.title);
 }
@@ -1617,6 +1631,16 @@ function applyClaudeTasks_() {
         // Optional duration in minutes (2026-10-28, auto-reshuffle step 1): dur: 45.
         const dur = Math.round(Number(x.dur));
         if (dur >= 1 && dur <= 6000) head = head.replace('<div class="check-line"', '<div class="check-line" data-dur="' + dur + '"');
+        // Time section (2026-11-02, Julius): a task for today goes under the section for when the AI added it.
+        // data-at = that time (row's Added, else now); data-ai-new tells the app to sort it on load. Any other day
+        // gets "-" (no time), and a cell with no times yet has its lines marked "-" so they don't count as new.
+        if (x.date !== 'backlog') {
+          const today = x.date === todayString_();
+          const at = !today ? '-' : (x.added || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm'));
+          if (!/data-at=/.test(html)) html = html.replace(/<div\b[^>]*class="[^"]*check-line[^>]*>/g, tag =>
+            /data-level="[1-9]/.test(tag) ? tag : tag.replace('<div', '<div data-at="-"'));
+          head = head.replace('<div class="check-line"', '<div class="check-line" data-at="' + at + '"' + (today ? ' data-ai-new="1"' : ''));
+        }
         html += head;
         (Array.isArray(x.subtasks) ? x.subtasks : []).forEach(t => { html += line(t, 1, ''); });
         cell.setValue(html);

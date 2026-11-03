@@ -2192,6 +2192,7 @@
       state.days=state.days.filter(d=>d.date>=from && d.date<=to);
     }
     renderDays();
+    setTimeout(tsecPlaceAi,0);
     renderReference();
     applyReferenceCollapseState();
     initUrgentSource(data.urgent);
@@ -10277,6 +10278,15 @@
     const before = ed.innerHTML;
     ed.replaceChildren(...out);
     return ed.innerHTML !== before;
+  }
+  // AI tasks (2026-11-02, Julius): the server adds them at the end of the cell with their time; sort them in on load.
+  function tsecPlaceAi(){
+    const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(localToday())}"]`);
+    const fresh = ed ? ed.querySelectorAll(':scope > .check-line[data-ai-new]') : [];
+    if(!fresh.length) return;
+    fresh.forEach(l => { delete l.dataset.aiNew; });
+    tsecArrange(ed);
+    saveEditorOwner(ed);
   }
   let tsecPending = new Set();
   function tsecToggled(line,checked,ed){

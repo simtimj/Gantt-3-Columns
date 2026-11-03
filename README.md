@@ -49,6 +49,7 @@ Last updated: 2026-11-02
 
 ## 🧪 To be confirmed (2026-11-02)
 
+- **AI tasks land in the right time section (2026-11-02):** a task an AI adds for today now goes under Morn / After / Night by when it was added, not at the bottom. New `Added` column in `New Tasks` (time the AI added the row); if it's blank, the time the app picked the row up is used. Tasks for other days and Undated Tasks still go at the end.
 - **Logging through the Sheet, no deploy (2026-11-02):** Claude and ChatGPT add a row to the new `Done Log` or `New Tasks` tab in the Sheet, and the Gantt places it in the right day on its next load (↻). Exact repeats are added once, and lines you delete stay deleted.
 
 - **Task tracking rename**: the Focus tracking section in the middle column is now called Task tracking, including on days already saved

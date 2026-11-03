@@ -1531,6 +1531,7 @@
     /* Section lines a bit thicker (1px was too thin, 2px too thick). */
     .editor > [data-nsec="must"]{border-bottom:1.5px solid #b55a56!important;}
     .editor > [data-nsec="focus"]{border-bottom:1.5px solid #1565c0!important;}
+    .editor > [data-nsec="focus"]{border-top:1.5px solid #1565c0!important;padding-top:5px!important;}
     body.day-lines .editor > [data-nsec]{border-bottom:1.5px solid var(--note-line-adj)!important;}
     /* No double line under the header: the header keeps its line, today's row drops its top line. */
     .day-row.today.day-pane-row,.day-row.today.journal-pane-row{box-shadow:inset 0 -2px 0 var(--today-border-adj)!important;}
@@ -2311,7 +2312,7 @@
     // once he edits it). Lines under it are normal lines: checkboxes, drag, menus all work as elsewhere.
     // Renamed Task tracking (Julius, 2026-11-02): cells saved earlier still hold the old header text, on any day.
     if(type === 'journal') row.querySelectorAll('.editor > [data-nsec="must"]').forEach(h => { h.textContent = 'Dailies'; });
-    if(type === 'journal') row.querySelectorAll('.editor > [data-nsec="focus"]').forEach(h => { h.textContent = 'Task tracking'; });
+    if(type === 'journal') row.querySelectorAll('.editor > [data-nsec="focus"]').forEach(h => { h.textContent = 'Keep in mind'; });
     if(type === 'journal' && today){
       const jed = row.querySelector('.editor');
       if(!jed.querySelector(':scope > [data-nsec="must"]'))
@@ -2321,7 +2322,7 @@
         let at = jed.querySelector(':scope > [data-nsec="must"]').nextSibling;
         while(at && !(at.nodeType === 1 && (at.matches('table,[data-nsec]')))) at = at.nextSibling;
         const tmp = document.createElement('div');
-        tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Task tracking</div><div><br></div>';
+        tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Keep in mind</div><div><br></div>';
         [...tmp.childNodes].forEach(n => jed.insertBefore(n, at));
       }
       // Focus Tracking dashboard (phase 1): render-only host right under the Focus tracking header.

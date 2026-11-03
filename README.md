@@ -49,6 +49,9 @@ Last updated: 2026-11-03
 
 ## 🧪 To be confirmed (2026-11-03)
 
+- **Dailies:** right-side lock marks daily recurrence while items remain editable. Health routines use pink, including water, hygiene, medicine, supplements and strength training. Read 10+ pages (Study) and Meditate (Health) are added once to Nov 3 and carry forward; both are included in new starter lists.
+
+- **History folding:** project expand/collapse controls and condensed borders use the subject color (Gantt → Code green). Fold only on a short tap; drags, holds and canceled gestures do not toggle. Project folds stop at time-section headers so Afternoon and Evening remain visible. Done Log insertion recognizes current time-section headers and uses 2 pm / 7 pm boundaries.
 - **Weather:** location label is **Vallejo**; wind is removed from both the hourly display and forecast request.
 
 - **Dailies carry forward:** new days inherit the latest saved Dailies list, including custom additions such as strength training. Checkboxes start unchecked on a new day; saved historical days are preserved. The repeat-arrow symbol is removed.
@@ -380,4 +383,5 @@ Last updated: 2026-11-03
 - `donelog.js` — work done through Claude (`CLAUDE_DONE`), merged into each day's Today cell.
 - `Index.html` — the whole client UI (styles + script).
 - `appsscript.json` — Apps Script manifest.
+
 

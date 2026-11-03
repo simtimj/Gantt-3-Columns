@@ -1515,6 +1515,15 @@
     .ce-scheduled{margin:5px 0;}
     .ce-time{display:block;width:fit-content;max-width:100%;padding-bottom:1px;border-bottom:1px solid currentColor;font-size:.85em;color:var(--muted);}
     .ce-title{display:block;margin-top:2px;}
+    #centerCalendarList{min-width:0;max-width:100%;}
+    .ce-head{flex-wrap:wrap;}
+    .ce-head strong{min-width:0;overflow-wrap:anywhere;}
+    .ce-head button{min-width:32px;min-height:32px;flex:0 0 auto;}
+    @media (max-width:600px){
+      .ce-event{font-size:.95em;line-height:1.4;padding:4px 0;}
+      .ce-group{margin-top:12px;}
+      .ce-scheduled{margin:6px 0;}
+    }
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
@@ -1551,11 +1560,22 @@
        section lines fit without overflowing) and never scrolls sideways. */
     body.one-day #todayScroll .od-on .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
     #journalScroll{overflow-x:hidden;}
-    /* The lock marks recurrence; daily items remain editable. */
-    .journal-editor .check-line[data-rep="daily"] > .check-text::after{content:"🔒";float:right;margin-left:8px;font-size:.8em;opacity:.7;}
+    /* Small monochrome recurrence marker directly after the text (Julius, Nov 3).
+       CSS masks stay out of saved HTML and use the checkbox hold menu, not icon taps. */
+    .journal-editor .check-line:is([data-rep="daily"],[data-rep="off"]) > .check-text::after{
+      content:"";display:inline-block;width:.7em;height:.7em;margin-left:4px;vertical-align:-.03em;
+      background:#fff;pointer-events:none;
+      --daily-lock:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10V7a5 5 0 0 1 10 0v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zm2 0h6V7a3 3 0 0 0-6 0z'/%3E%3C/svg%3E");
+      -webkit-mask:var(--daily-lock) center/contain no-repeat;mask:var(--daily-lock) center/contain no-repeat;
+    }
+    .journal-editor .check-line[data-rep="off"] > .check-text::after{
+      background:#85858b;
+      --daily-lock:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10V7a5 5 0 0 1 9.6-2l-1.8.8A3 3 0 0 0 9 7v3h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z'/%3E%3C/svg%3E");
+    }
     /* Focus Tracking dashboard (phase 1). Render-only, fits ~350px, no sideways scroll. */
     .fx{margin:2px 0 6px;font-size:calc(var(--paragraph-size,14px) * .95);-webkit-user-select:text;user-select:text;max-width:100%;overflow:hidden;}
     .fx-cat{margin:4px 0;}
+    .fx-cat + .fx-cat{margin-top:14px;}
     .fx-ch{display:flex;align-items:center;gap:4px;font-weight:700;font-size:.85em;letter-spacing:.04em;text-transform:uppercase;color:#1565c0;padding:2px 0;}
     .fx-tg{border:0;background:transparent;color:inherit;padding:0 2px;width:1.4em;cursor:pointer;font:inherit;flex:0 0 auto;}
     .fx-name,.fx-title,.fx-why{outline:none;min-width:2em;word-break:break-word;overflow-wrap:anywhere;}
@@ -6289,16 +6309,16 @@
           (c.col ? '<span class="fx-sub">' + c.projects.length + '</span>' : '') + '</div><div class="fx-body">';
         c.projects.forEach(p => {
           out += '<div class="fx-proj' + (p.col ? ' fx-col' : '') + '" data-fid="' + p.id + '"><div class="fx-ph"><button type="button" class="fx-tg" data-fx="tg">' + (p.col ? '▸' : '▾') + '</button>' +
-            '<span class="fx-title" contenteditable="true" data-fx="title" data-fph="Project">' + h(p.title) + '</span></div>' +
+            '<span class="fx-title" contenteditable="true" data-fx="title" data-fph="Task">' + h(p.title) + '</span></div>' +
             '<div class="fx-why" contenteditable="true" data-fx="why" data-fph="Why focus…">' + h(p.why) + '</div><div class="fx-tasks">';
           (p.tasks || []).forEach(t => {
             out += '<div class="fx-task' + (t.d ? ' fx-done' : '') + '" data-ftid="' + h(t.id) + '"><input type="checkbox" data-fx="tick"' + (t.d ? ' checked' : '') + '>' +
-              '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="Task">' + h(t.t) + '</span>' +
+              '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="Subtask">' + h(t.t) + '</span>' +
               '<button type="button" class="fx-send" data-fx="send" title="Send to Today (Plan / think)">📌</button></div>';
           });
-          out += '<button type="button" class="fx-add" data-fx="addt">+ Task</button></div></div>';
+          out += '<button type="button" class="fx-add" data-fx="addt">+ Subtask</button></div></div>';
         });
-        out += '<button type="button" class="fx-add" data-fx="addp">+ Project</button></div></div>';
+        out += '<button type="button" class="fx-add" data-fx="addp">+ Task</button></div></div>';
       });
       return out + '<button type="button" class="fx-add" data-fx="addh">+ Heading</button>';
     }
@@ -8266,7 +8286,7 @@
     if(owner && owner.matches('.journal-editor') && dailySectionLines(owner).includes(line)){
       const repeat = document.createElement('button');
       repeat.type = 'button'; repeat.className = 'urg-goto';
-      repeat.textContent = line.dataset.rep === 'off' ? 'Keep recurring daily' : 'Remove daily recurrence';
+      repeat.textContent = line.dataset.rep === 'off' ? 'Lock — repeat daily' : 'Unlock — stop repeating';
       repeat.addEventListener('pointerdown', e => e.preventDefault());
       repeat.addEventListener('click', () => {
         captureBeforeEdit(owner);
@@ -9114,7 +9134,12 @@
      The mark is white with a dark outline so it reads on any fill. Option "Subject color: whole card" brings back the tinted cards. */
   body.tc-boxfill .check-line[data-tccat]{--tc-tint:transparent;}
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
-  body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid var(--tc-cat)!important;border-radius:7px;}
+  body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}
+  /* Keep subject colors readable without the bright outlines/fold controls. */
+  [data-tlon]::before{border-color:color-mix(in srgb,var(--tc-cat,var(--border)) 38%,transparent);color:color-mix(in srgb,var(--tc-cat,var(--muted)) 60%,var(--muted));}
+  [data-tlon="c"][data-tlsum]:not([data-due-label])::after{border-left-color:color-mix(in srgb,var(--tc-cat,var(--border)) 38%,transparent);}
+  .editor > [data-cgrp]{margin-top:12px!important;}
+  .urg-batch{margin-top:12px;}
   body.tc-borderonly .check-line[data-tccat] > input[type=checkbox]{background:transparent;}
 
   body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]{
@@ -10981,4 +11006,5 @@
 </script>
 </body>
 </html>
+
 

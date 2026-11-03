@@ -7,9 +7,12 @@ on:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -23,8 +26,12 @@ jobs:
         env:
           CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
 
+      - name: Prepare automatic code-change history
+        run: python3 .github/scripts/build_deploy_log.py
+
       - name: Push code to Apps Script
         run: clasp push --force
 
       # Julius uses the /dev test link (always the latest pushed code), so no
       # versioned deployment update here (it hit the 200-version cap, 2026-10-27).
+

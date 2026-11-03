@@ -116,6 +116,7 @@ function ensureSetup_() {
 
 function getWorkspaceData() {
   ensureSetup_();
+  try { applyDeployedCodeLog_(); } catch (e) { console.error(e); }
   try { applyClaudeDone_(); } catch (e) { console.error(e); }
   try { applyClaudeNotes_(); } catch (e) { console.error(e); }
   try { applyClaudeTasks_(); } catch (e) { console.error(e); }
@@ -502,7 +503,7 @@ function splitSchedule_(html) {
   blocks.forEach(b => {
     const sec = doneAttr_(b, 'data-tsec') || doneAttr_(b, 'data-sec');
     if (sec || doneAttr_(b, 'data-secend') != null) {
-      section = sec || 'end'; current = null; slots.push({block:b}); return;
+      takingLevel = -1; rest.push(b); return;
     }
     const isLine = /^<div\b[^>]*class="[^"]*check-line/i.test(b);
     const level = Number(doneAttr_(b, 'data-level') || 0);
@@ -1478,6 +1479,44 @@ const DONE_LOG_HEADERS = ['Date', 'Project', 'Title', 'Details', 'Done by'];
 const NEW_TASKS_HEADERS = ['Date', 'Title', 'Urgency', 'Due', 'Minutes', 'Subtasks', 'Added'];
 const DONE_LOG_DAYS = 30; // older rows are ignored, so the applied-id list can't age out
 
+// Deployment generates this manifest from main's code changes. Import once on app
+// load, before Done Log intake. Scan stable commit markers as a crash/retry guard;
+// never edit old rows. No extra scopes, external AI call or calendar event needed.
+function applyDeployedCodeLog_() {
+  const entries = typeof FW_DEPLOY_LOG !== 'undefined' && Array.isArray(FW_DEPLOY_LOG) ? FW_DEPLOY_LOG : [];
+  if (!entries.length) return;
+  const signature = cellHash_(JSON.stringify(entries));
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('deployedCodeLog') === signature) return;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;
+  try {
+    if (props.getProperty('deployedCodeLog') === signature) return;
+    const sheet = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
+    const rows = sheet.getDataRange().getValues();
+    const markers = new Set();
+    rows.slice(1).forEach(row => {
+      const matches = String(row[3] || '').match(/\[code-change:[a-f0-9]{40}\]/g) || [];
+      matches.forEach(marker => markers.add(marker));
+    });
+    const fresh = entries.filter(entry => /^[a-f0-9]{40}$/.test(entry.sha || '') &&
+      /^\d{4}-\d{2}-\d{2}$/.test(entry.date || '') && entry.title && !markers.has('[code-change:' + entry.sha + ']'));
+    const added = new Set();
+    fresh.forEach(entry => {
+      const marker = '[code-change:' + entry.sha + ']';
+      if (added.has(marker)) return;
+      // Prefix user-controlled strings so a commit title cannot become a Sheet formula.
+      const text = value => /^[=+@-]/.test(String(value || '')) ? "'" + value : String(value || '');
+      sheet.appendRow([entry.date, 'Gantt', text(entry.title),
+        text('Code included in deployed build. ' + marker + '\n' + String(entry.details || '') +
+          '\nFeature behavior still needs user/device confirmation.'),
+        /^(ChatGPT|Claude|Julius)$/.test(entry.by || '') ? entry.by : 'Julius']);
+      added.add(marker);
+    });
+    props.setProperty('deployedCodeLog', signature);
+  } finally { lock.releaseLock(); }
+}
+
 function intakeDate_(value) {
   return value instanceof Date ? formatDate_(value) : String(value || '').trim();
 }
@@ -2128,5 +2167,6 @@ function saveLookSnapshot(slot, json, ua) {
   sh.getRange(row, 1, 1, 4).setValues([[slot, dev, new Date(), String(json).slice(0, 45000)]]);
   return true;
 }
+
 
 

@@ -1325,6 +1325,14 @@
     #calPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     .cal-sub.cal-today{color:var(--text,#222);}
     .cal-row{display:flex;align-items:flex-start;gap:6px;width:100%;text-align:left;background:none;border:0;padding:3px 0;color:inherit;font-size:13px;}
+    /* Calendar event cards use the same Options typography as the rest of Gantt. */
+    #calPanel{font-size:var(--paragraph-size);font-family:var(--paragraph-font);}
+    #calPanel .cal-row{box-sizing:border-box;gap:8px;margin:4px 0;padding:7px 9px;border:1px solid color-mix(in srgb,var(--border) 75%,transparent);border-radius:7px;background:var(--panel);font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.3;}
+    #calPanel .cal-time{font-size:inherit;min-width:0;max-width:42%;overflow-wrap:anywhere;}
+    #calPanel .cal-title{font-size:inherit;overflow-wrap:anywhere;}
+    #calPanel .cal-sub.cal-block{font-size:inherit;margin-top:8px;}
+    #calPanel .cal-arch-item{font-size:inherit;}
+    #calPanel .cal-row.now{border-color:var(--accent);}
     .cal-row .cal-box{margin-top:2px;flex:0 0 auto;}
     .cal-row .cal-time,.cal-row .cal-title{cursor:pointer;}
     .cal-row.done .cal-title,.cal-row.done .cal-time{text-decoration:line-through;opacity:.55;}
@@ -1523,6 +1531,19 @@
       .ce-event{font-size:.95em;line-height:1.4;padding:4px 0;}
       .ce-group{margin-top:12px;}
       .ce-scheduled{margin:6px 0;}
+    }
+    /* Center calendar: compact cards, Options typography and comfortable phone insets. */
+    #centerDownScroll{padding-inline:clamp(8px,2.5vw,16px);box-sizing:border-box;}
+    #centerCalendarList{font-family:var(--paragraph-font);font-size:var(--paragraph-size);}
+    #centerCalendarList .ce-date,#centerCalendarList .ce-group,#centerCalendarList .ce-event,#centerCalendarList .ce-time{font-size:inherit;}
+    #centerCalendarList .ce-event{box-sizing:border-box;margin:5px 0;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--panel);line-height:1.35;overflow-wrap:anywhere;}
+    #centerCalendarList .ce-scheduled{margin:6px 0;}
+    #centerCalendarList .ce-time{color:var(--muted);}
+    .ce-head [data-ce-refresh]{box-sizing:border-box;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1;border-radius:6px;}
+    @media(max-width:600px){
+      #centerDownScroll{padding-inline:10px;}
+      #centerCalendarList .ce-event{padding:9px 10px;}
+      .ce-head [data-ce-refresh]{width:28px;height:28px;min-width:28px;min-height:28px;}
     }
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
@@ -10897,6 +10918,7 @@
     }
     function save(d){
       const x = st(d); clearTimeout(x.timer); x.timer = 0;
+      if(dictatingPads.has(d)){ x.pending = true; return; }
       if(x.inFlight){ x.pending = true; return; }
       const pad = padEl(d); if(!pad){ x.pending = false; return; }
       pad.querySelectorAll('input[data-wired]').forEach(cb => cb.removeAttribute('data-wired'));
@@ -10925,8 +10947,33 @@
         })
         .savePlanPad(d, html, b.h);
     }
+    // Android speech-to-text uses IME composition. Never replace the active
+    // contenteditable DOM during composition: doing so destroys the caret.
+    const dictatingPads = new Set();
+    const deferredPadMerges = new Map();
+    document.addEventListener('compositionstart', e => {
+      const pad = e.target.closest?.('.plan-pad');
+      if(pad) dictatingPads.add(pad.dataset.date);
+    }, true);
+    document.addEventListener('compositionend', e => {
+      const pad = e.target.closest?.('.plan-pad');
+      if(!pad) return;
+      const d = pad.dataset.date;
+      dictatingPads.delete(d);
+      schedule(d);
+      const deferred = deferredPadMerges.get(d);
+      if(deferred){
+        deferredPadMerges.delete(d);
+        // Wait for the IME's final input event before touching the editor.
+        setTimeout(() => merge(d, deferred.plan, deferred.h), 100);
+      }
+    }, true);
     // Server copy changed elsewhere: merge it with what's on screen (same 3-way merge as the cells).
     function merge(d, theirs, h){
+      if(dictatingPads.has(d)){
+        deferredPadMerges.set(d,{plan:theirs,h});
+        return;
+      }
       const b = base(d);
       padBase.set(d,{t:theirs || '', h});
       const pad = padEl(d); if(!pad) return;

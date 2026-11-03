@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` deploys automatically (`.github/workflows/deploy.yaml` → `clasp push` + update deployment).
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 ## Status key
 
@@ -46,6 +46,16 @@ Last updated: 2026-11-02
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-03)
+
+- **Dailies carry forward:** new days inherit the latest saved Dailies list, including custom additions such as strength training. Checkboxes start unchecked on a new day; saved historical days are preserved. The repeat-arrow symbol is removed.
+- **Daily controls:** hold a Dailies checkbox to keep or remove daily recurrence (the item stays on its existing day).
+- **Keep In Mind carries forward:** free notes carry into new days; the shared heading/task dashboard is shown across dates. Use **+ Heading**, then **+ Task**, without creating a category. Names/headings are underlined. Its top divider follows the day's color.
+- **Card border only:** subject-colored card outlines are thinner (1px instead of 2px).
+- **Resize handles:** compact centered square notches replace the large blocks on vertical and horizontal dividers; invisible phone drag targets retain their size.
+- **History Log:** every date displays Morning, Afternoon and Evening, even when empty. Existing section placement is preserved; timed tasks use the existing time boundaries. Dailies and Keep In Mind headers/dashboard are also available on every date.
+- **Calendar Events:** the bottom-middle section lists the selected day's main Google Calendar events, including all-day events. Read-only, with refresh, empty/error states, and a one-minute cache. The old Reference calendar remains off.
 
 ## 🧪 To be confirmed (2026-11-02)
 
@@ -368,3 +378,4 @@ Last updated: 2026-11-02
 - `donelog.js` — work done through Claude (`CLAUDE_DONE`), merged into each day's Today cell.
 - `Index.html` — the whole client UI (styles + script).
 - `appsscript.json` — Apps Script manifest.
+

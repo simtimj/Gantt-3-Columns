@@ -49,6 +49,8 @@ Last updated: 2026-11-03
 
 ## 🧪 To be confirmed (2026-11-03)
 
+- **Weather:** location label is **Vallejo**; wind is removed from both the hourly display and forecast request.
+
 - **Dailies carry forward:** new days inherit the latest saved Dailies list, including custom additions such as strength training. Checkboxes start unchecked on a new day; saved historical days are preserved. The repeat-arrow symbol is removed.
 - **Daily controls:** hold a Dailies checkbox to keep or remove daily recurrence (the item stays on its existing day).
 - **Keep In Mind carries forward:** free notes carry into new days; the shared heading/task dashboard is shown across dates. Use **+ Heading**, then **+ Task**, without creating a category. Names/headings are underlined. Its top divider follows the day's color.

@@ -1584,11 +1584,10 @@
     /* Hourly weather (☁️ tab). */
     .wx-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;font-size:12px;color:var(--muted,#888);}
     .wx-head button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 4px;}
-    .wx-row{display:grid;grid-template-columns:3.4em 1.6em 2.6em 1fr auto;align-items:center;gap:4px;padding:3px 8px;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--border,#ddd) 60%,transparent);}
+    .wx-row{display:grid;grid-template-columns:3.4em 1.6em 2.6em 1fr;align-items:center;gap:4px;padding:3px 8px;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--border,#ddd) 60%,transparent);}
     .wx-row.wx-now{font-weight:700;}
     .wx-row .wx-t{color:var(--muted,#888);font-size:12px;}
     .wx-row .wx-p{color:#1e88e5;font-size:12px;}
-    .wx-row .wx-w{color:var(--muted,#888);font-size:11px;text-align:right;}
     .wx-day{padding:6px 8px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#888);}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
@@ -6392,7 +6391,7 @@
   (function initWeather(){
     const box = document.getElementById('weatherScroll'), pane = document.getElementById('journalPane');
     if(!box || !pane) return;
-    const LAT = 38.08, LON = -122.19, PLACE = 'Vallejo / Benicia';
+    const LAT = 38.08, LON = -122.19, PLACE = 'Vallejo';
     let at = 0, busy = false;
     const icon = (c,day) => c === 0 ? (day ? '☀️' : '🌙') : c <= 2 ? (day ? '🌤️' : '☁️') : c === 3 ? '☁️' : c <= 48 ? '🌫️' :
       c <= 57 ? '🌦️' : c <= 67 ? '🌧️' : c <= 77 ? '❄️' : c <= 82 ? '🌧️' : c <= 86 ? '🌨️' : '⛈️';
@@ -6401,8 +6400,8 @@
       if(busy || (!force && Date.now() - at < 30 * 60 * 1000)) return;
       busy = true;
       fetch('https://api.open-meteo.com/v1/forecast?latitude=' + LAT + '&longitude=' + LON +
-        '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,is_day' +
-        '&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America%2FLos_Angeles&forecast_days=2')
+        '&hourly=temperature_2m,precipitation_probability,weather_code,is_day' +
+        '&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=2')
         .then(r => r.json()).then(d => { at = Date.now(); draw(d.hourly); })
         .catch(() => { box.innerHTML = '<div class="center-placeholder">☁️ Weather didn\'t load. <button type="button" class="btn" data-wx-retry>Retry</button></div>'; })
         .finally(() => { busy = false; });
@@ -6416,7 +6415,7 @@
         if(d !== lastDay){ html += '<div class="wx-day">Tomorrow</div>'; lastDay = d; }
         const p = h.precipitation_probability[k];
         html += '<div class="wx-row' + (k === i ? ' wx-now' : '') + '"><span class="wx-t">' + (k === i ? 'Now' : hr(H)) + '</span><span>' + icon(h.weather_code[k], h.is_day[k]) +
-          '</span><span>' + Math.round(h.temperature_2m[k]) + '°</span><span class="wx-p">' + (p >= 10 ? '💧' + p + '%' : '') + '</span><span class="wx-w">' + Math.round(h.wind_speed_10m[k]) + ' mph</span></div>';
+          '</span><span>' + Math.round(h.temperature_2m[k]) + '°</span><span class="wx-p">' + (p >= 10 ? '💧' + p + '%' : '') + '</span></div>';
       }
       box.innerHTML = html;
     }

@@ -55,7 +55,7 @@ Last updated: 2026-11-03
 - **Card border only:** subject-colored card outlines are thinner (1px instead of 2px).
 - **Resize handles:** compact centered square notches replace the large blocks on vertical and horizontal dividers; invisible phone drag targets retain their size.
 - **History Log:** every date displays Morning, Afternoon and Evening, even when empty. Existing section placement is preserved; timed tasks use the existing time boundaries. Dailies and Keep In Mind headers/dashboard are also available on every date.
-- **Calendar Events:** the bottom-middle section lists the selected day's main Google Calendar events, including all-day events. Read-only, with refresh, empty/error states, and a one-minute cache. The old Reference calendar remains off.
+- **Calendar Events:** the bottom-middle section lists the selected day's main Google Calendar events in compact **All-Day Tasks** and **Scheduled Tasks** groups. All-day entries show titles only; scheduled entries put the title below an underlined time. Read-only, with refresh, empty/error states, and a one-minute cache. The old Reference calendar remains off.
 
 ## 🧪 To be confirmed (2026-11-02)
 

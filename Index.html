@@ -1510,8 +1510,11 @@
     .ce-head strong{font-size:.85em;}
     .ce-head button{font-size:12px;padding:2px 6px;}
     .ce-date,.ce-empty{font-size:.8em;color:var(--muted);margin:4px 0;}
-    .ce-event{display:grid;grid-template-columns:minmax(5em,auto) minmax(0,1fr);gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.85em;overflow-wrap:anywhere;}
-    .ce-time{font-size:.85em;color:var(--muted);}
+    .ce-group{margin:7px 0 3px;font-size:.8em;font-weight:600;color:var(--muted);}
+    .ce-event{padding:2px 0;font-size:.85em;line-height:1.3;overflow-wrap:anywhere;}
+    .ce-scheduled{margin:5px 0;}
+    .ce-time{display:block;width:fit-content;max-width:100%;padding-bottom:1px;border-bottom:1px solid currentColor;font-size:.85em;color:var(--muted);}
+    .ce-title{display:block;margin-top:2px;}
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
@@ -7386,8 +7389,11 @@
     const seq = ++centerCalendarSeq;
     const draw = data => {
       if(seq !== centerCalendarSeq) return;
+      const allDay = data.events.filter(ev => ev.allDay), scheduled = data.events.filter(ev => !ev.allDay);
       box.innerHTML = '<div class="ce-date">' + esc(formatDate(date)) + '</div>' +
-        (data.events.length ? data.events.map(ev => '<div class="ce-event"><span class="ce-time">' + esc(ev.time) + '</span><span>' + esc(ev.title) + '</span></div>').join('') : '<div class="ce-empty">No events.</div>');
+        (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => '<div class="ce-event">' + esc(ev.title) + '</div>').join('') : '') +
+        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => '<div class="ce-event ce-scheduled"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></div>').join('') : '') +
+        (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');
     };
     const cached = centerCalendarCache.get(date);
     if(!force && cached && Date.now() - cached.at < 60000){ draw(cached.data); return; }

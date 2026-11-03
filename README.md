@@ -49,6 +49,8 @@ Last updated: 2026-11-03
 
 ## 🧪 To be confirmed (2026-11-03)
 
+- **Active lock visibility correction:** closed white and open gray locks now use explicit SVG images rather than CSS masks. Newly typed daily tasks receive their active recurrence marker during refresh, so the closed lock appears immediately. Kept the smaller inline position and existing hold-menu behavior.
+
 - **Dailies lock correction:** a smaller single-color lock sits immediately after the text. White closed lock = repeating daily; gray open lock = recurrence off. Hold/right-click the checkbox and choose **Lock — repeat daily / Unlock — stop repeating**; normal taps still check/uncheck. The icon is render-only CSS, so saved text stays clean.
 - **Softer styling:** subject borders remain 1px but are more transparent; project fold controls retain softer category colors. Category groups have more separation. Calendar Events gets slightly larger mobile text, wrapping headings and an easier refresh target, retaining the compact all-day/scheduled layout.
 - **Keep In Mind labels:** Category → Task → Subtask; **+ Task** replaces **+ Project**, **+ Subtask** replaces the nested **+ Task**. Why focus stays. Existing saved project/task keys and IDs are preserved.

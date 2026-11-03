@@ -1560,17 +1560,17 @@
        section lines fit without overflowing) and never scrolls sideways. */
     body.one-day #todayScroll .od-on .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
     #journalScroll{overflow-x:hidden;}
-    /* Small monochrome recurrence marker directly after the text (Julius, Nov 3).
-       CSS masks stay out of saved HTML and use the checkbox hold menu, not icon taps. */
+    /* Explicit SVG images keep both recurrence states visible on mobile.
+       Render-only; hold the checkbox to change recurrence. */
     .journal-editor .check-line:is([data-rep="daily"],[data-rep="off"]) > .check-text::after{
-      content:"";display:inline-block;width:.7em;height:.7em;margin-left:4px;vertical-align:-.03em;
-      background:#fff;pointer-events:none;
-      --daily-lock:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10V7a5 5 0 0 1 10 0v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zm2 0h6V7a3 3 0 0 0-6 0z'/%3E%3C/svg%3E");
-      -webkit-mask:var(--daily-lock) center/contain no-repeat;mask:var(--daily-lock) center/contain no-repeat;
+      content:"";display:inline-block;width:.7em;height:.7em;min-width:8px;min-height:8px;
+      margin-left:4px;vertical-align:-.03em;pointer-events:none;
+      background:transparent center/contain no-repeat;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='5' y='10' width='14' height='12' rx='2' fill='%23ffffff'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 8 0v3' fill='none' stroke='%23ffffff' stroke-width='2.5'/%3E%3C/svg%3E");
+      -webkit-mask:none;mask:none;filter:drop-shadow(0 0 .4px rgba(0,0,0,.65));
     }
     .journal-editor .check-line[data-rep="off"] > .check-text::after{
-      background:#85858b;
-      --daily-lock:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10V7a5 5 0 0 1 9.6-2l-1.8.8A3 3 0 0 0 9 7v3h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z'/%3E%3C/svg%3E");
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='5' y='10' width='14' height='12' rx='2' fill='%2385858b'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 7.5-2' fill='none' stroke='%2385858b' stroke-width='2.5'/%3E%3C/svg%3E");
     }
     /* Focus Tracking dashboard (phase 1). Render-only, fits ~350px, no sideways scroll. */
     .fx{margin:2px 0 6px;font-size:calc(var(--paragraph-size,14px) * .95);-webkit-user-select:text;user-select:text;max-width:100%;overflow:hidden;}
@@ -9377,6 +9377,8 @@
     if(!ed || !ed.isConnected) return false;
     // Care routines use an explicit Health tag instead of generic keyword guessing.
     if(ed.classList.contains('journal-editor')) dailySectionLines(ed).forEach(line => {
+      // Newly typed Dailies are recurring too; do not wait for a page reload to show their lock.
+      if(!line.hasAttribute('data-rep')) line.dataset.rep = 'daily';
       const text = tcText(line).toLowerCase();
       if(/water|drink|hygiene|medicine|supplement|strength|stretch|steps|pillow|case|meditat/.test(text)) line.dataset.cat = 'health';
       else if(/\bread(?:ing)?\b/.test(text) && !line.dataset.cat) line.dataset.cat = 'study';

@@ -49,6 +49,10 @@ Last updated: 2026-11-03
 
 ## 🧪 To be confirmed (2026-11-03)
 
+- **Dailies health groups and hydration:** underlined **P health** / **M health** groups; Read 10+ pages and Meditate go under M health, other routines under P health. Stretch becomes **Morning · Stretch**, with **Before bed · Stretch** and **On waking · Drink a glass of water** added once. Existing checkboxes/IDs remain intact; historical days are not rewritten.
+- **Hydration total:** `Hydration 64 oz: T: 24/64 | 8W · 8C · 8W`. All drinks count at their actual ounce volume, including coffee. Hold the hydration checkbox → enter `8W`, `8C`, `8Tea`, `8M` or `8O` → **Add drink**. Edit/remove drink tokens directly and leave the line to recalculate. New days inherit the routine with an empty drink list and zero total. Checking the waking-water habit does not silently add a second drink. Watch/Gemini forwarding still needs a separately authenticated connection; this change does not expose an unauthenticated endpoint.
+- **Life subject removed:** omitted from defaults, saved Options and subject guessing. Existing explicit Life assignments/tags appear as Other without deleting or renaming task text. Health is labeled P health, with an M health subject for mental routines.
+
 - **Active lock visibility correction:** closed white and open gray locks now use explicit SVG images rather than CSS masks. Newly typed daily tasks receive their active recurrence marker during refresh, so the closed lock appears immediately. Kept the smaller inline position and existing hold-menu behavior.
 
 - **Dailies lock correction:** a smaller single-color lock sits immediately after the text. White closed lock = repeating daily; gray open lock = recurrence off. Hold/right-click the checkbox and choose **Lock — repeat daily / Unlock — stop repeating**; normal taps still check/uncheck. The icon is render-only CSS, so saved text stays clean.
@@ -392,6 +396,7 @@ Last updated: 2026-11-03
 - `donelog.js` — work done through Claude (`CLAUDE_DONE`), merged into each day's Today cell.
 - `Index.html` — the whole client UI (styles + script).
 - `appsscript.json` — Apps Script manifest.
+
 
 
 

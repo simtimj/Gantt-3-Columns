@@ -1560,6 +1560,12 @@
        section lines fit without overflowing) and never scrolls sideways. */
     body.one-day #todayScroll .od-on .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
     #journalScroll{overflow-x:hidden;}
+    .journal-editor > [data-daily-group]{margin:12px 0 4px;font-size:.88em;font-weight:700;}
+    .journal-editor > [data-daily-group="physical"]{color:#ec4899;}
+    .journal-editor > [data-daily-group="mental"]{color:#a78bfa;}
+    .urg-hydration{display:flex;gap:5px;flex:1 0 100%;}
+    .urg-hydration input{min-width:0;width:100%;font:inherit;padding:5px;}
+    .urg-hydration button{white-space:nowrap;}
     /* Explicit SVG images keep both recurrence states visible on mobile.
        Render-only; hold the checkbox to change recurrence. */
     .journal-editor .check-line:is([data-rep="daily"],[data-rep="off"]) > .check-text::after{
@@ -2317,21 +2323,83 @@
     });
   }
   // Starter lines for a new day's Make sure you do (Julius, 2026-11-01). Edit here to change the defaults.
-  const MUST_DEFAULTS = ['Drink 64 oz water','10K steps','Stretch','Hygiene','Medicine','Supplements','Read 10+ pages','Meditate'];
+  const MUST_DEFAULTS = ['Hydration 64 oz: T: 0/64 |','On waking · Drink a glass of water','10K steps','Morning · Stretch','Hygiene','Medicine','Supplements','Before bed · Stretch','Read 10+ pages','Meditate'];
+  // Drink tokens are the editable source of truth; the displayed total is derived.
+  function hydrationDrink(value){
+    const m = String(value || '').trim().match(/^(\d+(?:\.\d+)?)\s*(?:oz\s*|ounces?\s*(?:of\s*)?)?(water|coffee|tea|milk|other|w|c|m|o)?$/i);
+    if(!m || !Number.isFinite(Number(m[1])) || Number(m[1]) <= 0 || Number(m[1]) > 256) return null;
+    const names = {water:'W',coffee:'C',tea:'Tea',milk:'M',other:'O',w:'W',c:'C',m:'M',o:'O'};
+    return {oz:Number(m[1]),kind:names[(m[2] || 'water').toLowerCase()] || 'Tea'};
+  }
+  function hydrationText(text,reset){
+    const value = String(text || '').trim();
+    const m = value.match(/^(?:Hydration\s+|Drink\s+)(\d+(?:\.\d+)?)\s*(?:oz|ounces)(?:\s+(?:of\s+)?water)?\s*:/i) || value.match(/^Drink\s+(\d+(?:\.\d+)?)\s*oz\s+water\s*$/i);
+    if(!m) return null;
+    const goal = Number(m[1]);
+    if(!Number.isFinite(goal) || goal <= 0) return null;
+    if(!reset && !value.includes('|') && value.slice(m[0].length).trim()) return null;
+    const tail = !reset && value.includes('|') ? value.slice(value.indexOf('|') + 1).trim() : '';
+    const tokens = tail ? tail.split(/[·,|]/).map(t => t.trim()).filter(Boolean) : [];
+    const drinks = tokens.map(hydrationDrink);
+    if(drinks.some(t => !t)) return null; // Never erase an unrecognized note.
+    const total = Math.round(drinks.reduce((n,d) => n + d.oz,0) * 100) / 100;
+    return 'Hydration ' + goal + ' oz: T: ' + total + '/' + goal + ' |' + (drinks.length ? ' ' + drinks.map(d => d.oz + d.kind).join(' · ') : '');
+  }
+  function hydrationLine(line){
+    return !!line && hydrationText((line.querySelector(':scope > .check-text') || line).textContent) !== null;
+  }
+  function dailyHealthCat(text){ return /\bread(?:ing)?\b|\bmeditat/i.test(String(text || '')) ? 'mhealth' : 'health'; }
+  function arrangeDailyGroups(ed){
+    const header = ed.querySelector(':scope > [data-nsec="must"]');
+    if(!header) return;
+    const nodes = [];
+    let end = header.nextSibling;
+    while(end && !(end.nodeType === 1 && end.matches('[data-nsec],table'))){ nodes.push(end); end = end.nextSibling; }
+    const physical = [], mental = [];
+    let group = physical;
+    nodes.forEach(n => {
+      if(n.nodeType === 1 && n.hasAttribute('data-daily-group')){ n.remove(); return; }
+      if(n.nodeType === 1 && n.matches('.check-line')){
+        const level = Number(n.dataset.level) || 0;
+        if(!level) group = dailyHealthCat((n.querySelector(':scope > .check-text') || n).textContent) === 'mhealth' ? mental : physical;
+        n.dataset.cat = group === mental ? 'mhealth' : 'health';
+      }
+      group.push(n);
+    });
+    [['physical','P health',physical],['mental','M health',mental]].forEach(([key,title,items]) => {
+      const heading = document.createElement('div'); heading.dataset.dailyGroup = key;
+      heading.setAttribute('contenteditable','false'); heading.innerHTML = '<u>' + title + '</u>';
+      ed.insertBefore(heading,end); items.forEach(n => ed.insertBefore(n,end));
+    });
+  }
   function upgradeDailies(ed,date){
     const header = ed.querySelector(':scope > [data-nsec="must"]');
-    if(!header || date !== '2026-11-03' || header.dataset.dailyUpgrade === '1') return false;
+    if(!header || date < state.today) return false;
+    if(header.dataset.dailyHealth === '1'){
+      const before = ed.innerHTML; arrangeDailyGroups(ed); return ed.innerHTML !== before;
+    }
+    dailySectionLines(ed).forEach(line => {
+      const text = line.querySelector(':scope > .check-text'); if(!text) return;
+      const value = text.textContent.trim();
+      const water = hydrationText(value);
+      if(water !== null) text.textContent = water;
+      if(/^stretch$/i.test(value)) text.textContent = 'Morning · Stretch';
+    });
     const names = dailySectionLines(ed).map(line => line.textContent.trim().toLowerCase());
     let at = header.nextElementSibling;
     while(at && !at.matches('[data-nsec],table')) at = at.nextElementSibling;
-    [['Read 10+ pages','study',/\bread(?:ing)?\b/],['Meditate','health',/\bmeditat/]].forEach(([title,cat,re]) => {
+    [['Read 10+ pages','mhealth',/\bread(?:ing)?\b/],['Meditate','mhealth',/\bmeditat/],
+     ['On waking · Drink a glass of water','health',/on waking.*water|water.*on waking/i],
+     ['Morning · Stretch','health',/morning.*stretch|stretch.*morning/i],
+     ['Before bed · Stretch','health',/(?:before bed|evening).*stretch|stretch.*(?:before bed|evening)/i]].forEach(([title,cat,re]) => {
       if(names.some(name => re.test(name))) return;
       const line = document.createElement('div');
       line.className = 'check-line'; line.dataset.level = '0'; line.dataset.rep = 'daily'; line.dataset.cat = cat;
       line.innerHTML = '<input type="checkbox"><span class="check-text">' + title + '</span>';
       ed.insertBefore(line,at);
     });
-    header.dataset.dailyUpgrade = '1';
+    header.dataset.dailyHealth = '1';
+    arrangeDailyGroups(ed);
     return true;
   }
   function persistentNotesHtml(kind, targetDate){
@@ -2365,6 +2433,8 @@
             line.classList.remove('done','urg-flash');
             line.dataset.rep = 'daily';
             ['data-tid','data-cid','data-htid','data-at','data-dt'].forEach(a => line.removeAttribute(a));
+            const text = line.querySelector(':scope > .check-text');
+            if(text && hydrationLine(line)) text.textContent = hydrationText(text.textContent,true);
           });
           if(kind === 'must') copy.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.removeAttribute('checked'); cb.removeAttribute('data-wired'); });
           if(kind === 'focus') copy.querySelectorAll('table[data-cnote]').forEach(t => t.remove());
@@ -2383,6 +2453,27 @@
       if(n.matches('.check-line')) lines.push(n);
     return lines;
   }
+  function appendHydrationToken(line,value,owner){
+    const drink = hydrationDrink(value), text = line && line.querySelector(':scope > .check-text');
+    const current = text && hydrationText(text.textContent);
+    if(!drink || current === null || !text){ setStatus('Use an amount and drink type, such as 8W or 8C'); return false; }
+    captureBeforeEdit(owner);
+    text.textContent = hydrationText(current + (/\|\s*$/.test(current) ? ' ' : ' · ') + drink.oz + drink.kind);
+    delete owner.dataset.seededNotes;
+    finishEditorEdit(owner); urgChanged(owner);
+    return true;
+  }
+  // Recalculate after editing a drink list, without moving the caret while typing.
+  document.addEventListener('focusout',e => {
+    const line = e.target.closest && e.target.closest('.journal-editor .check-line');
+    if(!line || !hydrationLine(line)) return;
+    const text = line.querySelector(':scope > .check-text'), value = hydrationText(text.textContent);
+    if(value !== null && value !== text.textContent){
+      const owner = line.closest('.journal-editor'); captureBeforeEdit(owner);
+      text.textContent = value; delete owner.dataset.seededNotes;
+      finishEditorEdit(owner); urgChanged(owner);
+    }
+  });
   function refreshPersistentNotes(date){
     const ed = document.querySelector('.journal-editor[data-date="' + CSS.escape(date) + '"]');
     if(!ed || ed.dataset.seededNotes !== '1') return;
@@ -6638,7 +6729,7 @@
   function urgItemCat(line,subs){
     try{
       const d = line.dataset.cat || '';
-      if(d === 'none') return '';
+      if(d === 'none' || d === 'life') return '';
       if(CARD_CAT_BY_KEY[d]) return d;
       if(!cardsAuto) return '';
       return guessCardCat(lineText(line),'',false,(subs || []).map(x => x.text).join(' ')) || '';
@@ -8284,6 +8375,16 @@
     const p = document.createElement('div');
     p.className = 'urg-picker';
     if(owner && owner.matches('.journal-editor') && dailySectionLines(owner).includes(line)){
+      if(hydrationLine(line)){
+        const row = document.createElement('div'); row.className = 'urg-hydration';
+        const entry = document.createElement('input'); entry.type = 'text'; entry.placeholder = '8W or 8C';
+        entry.setAttribute('aria-label','Drink amount in ounces and type');
+        const add = document.createElement('button'); add.type = 'button'; add.textContent = 'Add drink';
+        const submit = () => { if(appendHydrationToken(line,entry.value,owner)) hideUrgencyPicker(); };
+        add.addEventListener('click',submit);
+        entry.addEventListener('keydown',e => { if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); submit(); } });
+        row.append(entry,add); p.appendChild(row);
+      }
       const repeat = document.createElement('button');
       repeat.type = 'button'; repeat.className = 'urg-goto';
       repeat.textContent = line.dataset.rep === 'off' ? 'Lock — repeat daily' : 'Unlock — stop repeating';
@@ -9213,8 +9314,8 @@
     {key:'productivity', name:'Productivity', color:'#0891b2', words:'productivity, efficiency, efficient, workflow, workflows, automation, automate, organize, organizing, clean up, cleanup, consolidate, chatgpt, gemini, handoff, master instructions, docs cleanup, migrate, migration'},
     {key:'study',  name:'Study',  color:'#a78bfa', words:'a+, comptia, study, studying, course, class, quiz, exam, practice test, flashcard, flashcards, learn, lesson, lessons'},
     {key:'work',   name:'Work',   color:'#94a3b8', words:'dog walk, dog walks, dog walking, walk, walks, client, clients, rover, invoice, invoices'},
-    {key:'health', name:'Health', color:'#ec4899', words:'exercise, exercises, workout, gym, stretch, stretching, pt, physical therapy, sleep, doctor, dentist, skincare, running, lift, lifting, rehab'},
-    {key:'life',   name:'Life',   color:'#14b8a6', words:'errand, errands, clean, cleaning, laundry, groceries, grocery, car, oil change, home, garden, bill, bills, bank, appointment, appointments, dmv, shopping, cook, cooking, dishes'},
+    {key:'health', name:'P health', color:'#ec4899', words:'exercise, exercises, workout, gym, stretch, stretching, pt, physical therapy, sleep, doctor, dentist, skincare, running, lift, lifting, rehab, hydration, water'},
+    {key:'mhealth', name:'M health', color:'#a78bfa', words:'meditation, meditate, mindfulness'},
     {key:'fun',    name:'Fun',    color:'#f97316', words:'game, games, gaming, movie, movies, youtube, fun, spanish, japanese, language'},
   ];
   let CARD_CATS = [], CARD_CAT_BY_KEY = {};
@@ -9234,7 +9335,7 @@
     if(!Array.isArray(list)) return null;
     const seen = new Set(), out = [];
     list.forEach(c => {
-      if(!c || !/^[a-z]{2,12}$/.test(c.key || '') || c.key === 'none' || seen.has(c.key)) return;
+      if(!c || !/^[a-z]{2,12}$/.test(c.key || '') || c.key === 'none' || c.key === 'life' || String(c.name).toLowerCase() === 'life' || seen.has(c.key)) return;
       seen.add(c.key);
       out.push({key:c.key, name:String(c.name || c.key).slice(0,24), color:/^#[0-9a-f]{6}$/i.test(c.color || '') ? c.color : '#9ca3af', words:String(c.words || '').slice(0,2000)});
     });
@@ -9301,6 +9402,7 @@
   function cardCatFromName(t){
     const n = String(t || '').trim().toLowerCase();
     if(!n) return '';
+    if(n === 'life' || n === 'other' || n === 'uncategorized') return '';
     const byName = CARD_CATS.find(c => c.key === n || c.name.toLowerCase() === n);
     if(byName) return byName.key;
     return cardCatScore([[n,1]]).key;
@@ -9309,6 +9411,7 @@
     const m = String(text || '').match(/\s[·•]\s*([^·•]{1,40}?)\s*$/);
     if(!m) return '';
     const raw = m[1].trim();
+    if(/^#?(life|other|uncategorized)$/i.test(raw)) return 'none';
     // " · #Name" (2026-10-30, Julius): makes the subject/batch if it doesn't exist yet,
     // so ChatGPT's paste-ready tasks can create new Urgent batches with no Options step.
     if(raw[0] === '#'){ const k = cardCatEnsure(raw.slice(1).trim()); return k || cardCatFromName(raw.slice(1)); }
@@ -9320,6 +9423,7 @@
     name = String(name || '').replace(/\s+/g,' ').trim();
     if(!/^[\p{L}\p{N}][\p{L}\p{N} &\/+'-]{0,23}$/u.test(name)) return '';
     const low = name.toLowerCase();
+    if(low === 'life' || low === 'other' || low === 'uncategorized') return 'none';
     const have = CARD_CATS.find(c => c.key === low || c.name.toLowerCase() === low);
     if(have) return have.key;
     const key = low.replace(/[^a-z]/g,'').slice(0,12);
@@ -9356,7 +9460,8 @@
   }
   function guessCardCat(head,ctx,ctxGrp,rest){
     const tag = cardCatTag(head);
-    if(tag) return tag;
+    if(tag) return tag === 'none' ? '' : tag;
+    if(ctxGrp && /^life$/i.test(String(ctx || '').trim())) return '';
     if(ctxGrp){ const g = cardCatFromName(ctx); if(g) return g; }
     return cardCatScore([[head || '',2],[ctx || '',3],[rest || '',1]]).key;
   }
@@ -9376,12 +9481,13 @@
   function refreshCards(ed){
     if(!ed || !ed.isConnected) return false;
     // Care routines use an explicit Health tag instead of generic keyword guessing.
+    let dailyCat = 'health';
     if(ed.classList.contains('journal-editor')) dailySectionLines(ed).forEach(line => {
       // Newly typed Dailies are recurring too; do not wait for a page reload to show their lock.
       if(!line.hasAttribute('data-rep')) line.dataset.rep = 'daily';
       const text = tcText(line).toLowerCase();
-      if(/water|drink|hygiene|medicine|supplement|strength|stretch|steps|pillow|case|meditat/.test(text)) line.dataset.cat = 'health';
-      else if(/\bread(?:ing)?\b/.test(text) && !line.dataset.cat) line.dataset.cat = 'study';
+      if(!(Number(line.dataset.level) > 0)) dailyCat = dailyHealthCat(text);
+      line.dataset.cat = dailyCat;
     });
     let changed = ensureDaySections(ed);
     requestAnimationFrame(() => paintDaySecs(ed));
@@ -9393,7 +9499,7 @@
       if(!members.length) return;
       const head = members[0];
       let cat = head.dataset.cat || '';
-      if(cat === 'none') cat = '';
+      if(cat === 'none' || cat === 'life') cat = '';
       else if(!CARD_CAT_BY_KEY[cat]){
         cat = '';
         if(cardsAuto) cat = guessCardCat(tcText(head), ctx, ctxGrp, members.slice(1).map(tcText).join(' '));
@@ -11008,5 +11114,6 @@
 </script>
 </body>
 </html>
+
 
 

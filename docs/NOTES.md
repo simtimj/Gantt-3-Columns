@@ -2,6 +2,14 @@
 
 Read only the section you need.
 
+## Dailies health groups and hydration (Nov 3)
+
+- User chose total drinks toward the 64 oz target, flexible On waking/Morning/Before bed anchors, and legacy Life tasks preserved as Other. The subject key `health` is retained (display name P health); `mhealth` is added. `life` and trailing Life/#Life tags suppress automatic reclassification and never delete task data.
+- `upgradeDailies` applies to today/new future days only, marks `data-daily-health` on the section header, preserves existing task nodes/IDs/check states, splits the old Stretch name and adds missing flexible routines once. `data-daily-group` headings remain within `data-nsec=must`, not new time/day sections. `arrangeDailyGroups` retains all nodes, carrying child tasks with their parent category.
+- Hydration's visible drink tokens are its editable source of truth. `hydrationDrink` accepts positive amounts up to 256 oz per entry (input sanity limit, not an intake recommendation); `hydrationText` sums all supported drink types at 1:1 and preserves unrecognized notes rather than erasing them. The total is not a record of drinks unless tokens exist. Hold-menu Add drink and token edits use the existing undo/safe-save pipeline. Goal completion remains manual.
+- Carry-forward clears hydration totals/tokens along with checkbox completion, while retaining the goal and recurring routine. Waking water is a reminder checkbox, not automatic intake. Existing days/old check states stay intact. Voice-to-Sheet write routing, authentication and request deduplication remain a separate integration task; no public doPost was added here.
+
+
 ## Nov 3 request follow-through
 
 - Recurrence icon: `.check-text::after` uses closed/open SVG masks, white/#85858b, .7em, inline (no float). No inserted DOM nodes or saved icon text. Existing hold menu toggles `data-rep=daily/off` for the subtree, with normal completion and safe-save behavior preserved.
@@ -290,5 +298,6 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - **Scrolling top half** (2026-11-01): `appendDayRow` (type day) wraps `.day-label`, the Completed `.od-head` and `.day-editor` in `.od-top` (`display:contents` outside one-day). In one-day `.od-top` is the scroller (flex `--od-a`); the editor is `overflow:visible`, `flex:1 0 auto`. The `fw.odSplit` box measures from `.od-top`. CSS one-day selectors now use `.od-on .day-editor` / `.od-on .od-head`.
 - **Tight Notes lines** (2026-11-01): `.journal-editor > .check-line[data-tc^=f / $=l]` margin 1px, padding 2px (cards elsewhere unchanged).
 5. **Approach**: read sections selectively; preserve mobile layouts, notes, calendar, task logs, saved data, resize controls; never delete/overwrite content for the layout change.
+
 
 

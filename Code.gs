@@ -1087,6 +1087,21 @@ function getCardCats_() {
   if (!props.getProperty('cardCatsBatch1')) { out = cardCatsBatch1_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch1', '1'); }
   // 2026-10-30 (Julius): Music purple; IT lab words in Career / IT (cert studies fold in on the client).
   if (!props.getProperty('cardCatsBatch2')) { out = cardCatsBatch2_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch2', '1'); }
+  const health = cardCatsHealth_(out, !props.getProperty('cardCatsHealth1'));
+  if (JSON.stringify(health) !== JSON.stringify(out)) inboxWrite_('cardCats', health);
+  props.setProperty('cardCatsHealth1', '1');
+  out = health;
+  return out;
+}
+// Keep the user's task data intact; legacy Life tags render as uncategorized.
+function cardCatsHealth_(list, initialize) {
+  initialize = initialize !== false;
+  const out = list.filter(c => c.key !== 'life' && String(c.name || '').toLowerCase() !== 'life').map(c => {
+    const n = Object.assign({}, c);
+    if(initialize && n.key === 'health' && n.name === 'Health') n.name = 'P health';
+    return n;
+  });
+  if(initialize && !out.some(c => c.key === 'mhealth')) out.push({key:'mhealth',name:'M health',color:'#a78bfa',words:'meditation, meditate, mindfulness'});
   return out;
 }
 function cardCatsBatch2_(list) {
@@ -1124,12 +1139,13 @@ function cardCatsBatch1_(list) {
 // Card subjects (name, color, keywords) edited in Options — one list for all devices (2026-10-27).
 function saveCardCats(list) {
   if (!Array.isArray(list)) return false;
-  const clean = list.filter(c => c && /^[a-z]{2,12}$/.test(c.key || '')).slice(0, 30).map(c => ({
+  const clean = cardCatsHealth_(list.filter(c => c && /^[a-z]{2,12}$/.test(c.key || '')), false).slice(0, 30).map(c => ({
     key: c.key, name: String(c.name || c.key).slice(0, 24),
     color: /^#[0-9a-f]{6}$/i.test(c.color || '') ? c.color : '#9ca3af',
     words: String(c.words || '').slice(0, 2000)
   }));
   inboxWrite_('cardCats', clean);
+  PropertiesService.getUserProperties().setProperty('cardCatsHealth1', '1');
   return true;
 }
 // Claude's items can't be edited in inbox.js from the app, so edits / archive
@@ -2167,6 +2183,7 @@ function saveLookSnapshot(slot, json, ua) {
   sh.getRange(row, 1, 1, 4).setValues([[slot, dev, new Date(), String(json).slice(0, 45000)]]);
   return true;
 }
+
 
 
 

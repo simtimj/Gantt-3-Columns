@@ -2192,7 +2192,7 @@
       state.days=state.days.filter(d=>d.date>=from && d.date<=to);
     }
     renderDays();
-    setTimeout(tsecPlaceAi,0);
+    { const placeAi = () => typeof tsecPlaceAi === 'function' ? tsecPlaceAi() : setTimeout(placeAi,100); setTimeout(placeAi,0); } // lives in a later <script>
     renderReference();
     applyReferenceCollapseState();
     initUrgentSource(data.urgent);

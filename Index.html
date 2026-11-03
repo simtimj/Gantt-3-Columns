@@ -10897,6 +10897,7 @@
     }
     function save(d){
       const x = st(d); clearTimeout(x.timer); x.timer = 0;
+      if(dictatingPads.has(d)){ x.pending = true; return; }
       if(x.inFlight){ x.pending = true; return; }
       const pad = padEl(d); if(!pad){ x.pending = false; return; }
       pad.querySelectorAll('input[data-wired]').forEach(cb => cb.removeAttribute('data-wired'));
@@ -10925,8 +10926,33 @@
         })
         .savePlanPad(d, html, b.h);
     }
+    // Android speech-to-text uses IME composition. Never replace the active
+    // contenteditable DOM during composition: doing so destroys the caret.
+    const dictatingPads = new Set();
+    const deferredPadMerges = new Map();
+    document.addEventListener('compositionstart', e => {
+      const pad = e.target.closest?.('.plan-pad');
+      if(pad) dictatingPads.add(pad.dataset.date);
+    }, true);
+    document.addEventListener('compositionend', e => {
+      const pad = e.target.closest?.('.plan-pad');
+      if(!pad) return;
+      const d = pad.dataset.date;
+      dictatingPads.delete(d);
+      schedule(d);
+      const deferred = deferredPadMerges.get(d);
+      if(deferred){
+        deferredPadMerges.delete(d);
+        // Wait for the IME's final input event before touching the editor.
+        setTimeout(() => merge(d, deferred.plan, deferred.h), 100);
+      }
+    }, true);
     // Server copy changed elsewhere: merge it with what's on screen (same 3-way merge as the cells).
     function merge(d, theirs, h){
+      if(dictatingPads.has(d)){
+        deferredPadMerges.set(d,{plan:theirs,h});
+        return;
+      }
       const b = base(d);
       padBase.set(d,{t:theirs || '', h});
       const pad = padEl(d); if(!pad) return;

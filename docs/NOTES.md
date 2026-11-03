@@ -2,6 +2,14 @@
 
 Read only the section you need.
 
+## Nov 3 request follow-through
+
+- Recurrence icon: `.check-text::after` uses closed/open SVG masks, white/#85858b, .7em, inline (no float). No inserted DOM nodes or saved icon text. Existing hold menu toggles `data-rep=daily/off` for the subtree, with normal completion and safe-save behavior preserved.
+- Keep In Mind changes are labels only: the stored `cats[].projects[].tasks[]` schema, IDs, saved Why focus and completion/mirroring are unchanged.
+- `build_deploy_log.py` generates `DeployLog.gs` before clasp push. Baseline is the last pre-enablement main commit. Full-history checkout plus first-parent traversal avoids duplicate branch/merge entries and retains missed deployments. Only commits changing `.gs`, `.js`, `.html` enter the ledger. No extra credentials or Google scopes. On initial app load, `applyDeployedCodeLog_` imports unseen SHA markers under the script lock, then existing `applyClaudeDone_` places them into History. Markers survive retry/crash and prevent re-import if a History line is later deleted. A Script Property signature skips the scan on unchanged builds. Import success is not feature verification. First deployment/phone rendering must still be checked.
+- `splitSchedule_` resets collection at time headers and keeps them in `rest`; it must not use `groupClaudeDone_`'s `section/current/slots` locals.
+
+
 ## Persistent Notes and Calendar Events (2026-11-03, Julius)
 
 - History: `tsecArrange` always emits all three headers, preserves existing section membership for untimed lines, and converts legacy section markers. It runs on every rendered History editor without auto-saving historical cells. Notes headers/dashboard are available on every date; missing sections use the latest current/past source rather than disappearing on date navigation.
@@ -282,4 +290,5 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - **Scrolling top half** (2026-11-01): `appendDayRow` (type day) wraps `.day-label`, the Completed `.od-head` and `.day-editor` in `.od-top` (`display:contents` outside one-day). In one-day `.od-top` is the scroller (flex `--od-a`); the editor is `overflow:visible`, `flex:1 0 auto`. The `fw.odSplit` box measures from `.od-top`. CSS one-day selectors now use `.od-on .day-editor` / `.od-on .od-head`.
 - **Tight Notes lines** (2026-11-01): `.journal-editor > .check-line[data-tc^=f / $=l]` margin 1px, padding 2px (cards elsewhere unchanged).
 5. **Approach**: read sections selectively; preserve mobile layouts, notes, calendar, task logs, saved data, resize controls; never delete/overwrite content for the layout change.
+
 

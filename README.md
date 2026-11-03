@@ -1,6 +1,6 @@
 # Gantt 3 Columns (Focus Workspace)
 
-Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` deploys automatically (`.github/workflows/deploy.yaml` → `clasp push` + update deployment).
+Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
 Last updated: 2026-11-03
 
@@ -48,6 +48,13 @@ Last updated: 2026-11-03
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-03)
+
+- **Dailies lock correction:** a smaller single-color lock sits immediately after the text. White closed lock = repeating daily; gray open lock = recurrence off. Hold/right-click the checkbox and choose **Lock — repeat daily / Unlock — stop repeating**; normal taps still check/uncheck. The icon is render-only CSS, so saved text stays clean.
+- **Softer styling:** subject borders remain 1px but are more transparent; project fold controls retain softer category colors. Category groups have more separation. Calendar Events gets slightly larger mobile text, wrapping headings and an easier refresh target, retaining the compact all-day/scheduled layout.
+- **Keep In Mind labels:** Category → Task → Subtask; **+ Task** replaces **+ Project**, **+ Subtask** replaces the nested **+ Task**. Why focus stays. Existing saved project/task keys and IDs are preserved.
+- **Automatic deployed-code history:** GitHub builds a commit ledger from code changes on main after enablement. On the next app load, each unrecorded commit is appended once to Done Log before History intake. It catches up across multiple deployments, uses Pacific commit dates, retries safely, and does not log failed/unpushed local work as shipped. This covers deployed repo code, not every outside-chat activity or unfinished plan.
+- **Schedule parser:** time-section headers remain in History and stop subtask collection when timed tasks move to Notes; fixes an undefined-variable exception from the previous history change.
+- **Request review:** current implementation and remaining planning/device checks are tracked in `docs/REQUEST_REVIEW.md`.
 
 - **Dailies:** right-side lock marks daily recurrence while items remain editable. Health routines use pink, including water, hygiene, medicine, supplements and strength training. Read 10+ pages (Study) and Meditate (Health) are added once to Nov 3 and carry forward; both are included in new starter lists.
 
@@ -383,5 +390,6 @@ Last updated: 2026-11-03
 - `donelog.js` — work done through Claude (`CLAUDE_DONE`), merged into each day's Today cell.
 - `Index.html` — the whole client UI (styles + script).
 - `appsscript.json` — Apps Script manifest.
+
 
 

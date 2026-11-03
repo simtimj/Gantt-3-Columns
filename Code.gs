@@ -500,6 +500,10 @@ function splitSchedule_(html) {
   const lines = [], rest = [];
   let takingLevel = -1;
   blocks.forEach(b => {
+    const sec = doneAttr_(b, 'data-tsec') || doneAttr_(b, 'data-sec');
+    if (sec || doneAttr_(b, 'data-secend') != null) {
+      section = sec || 'end'; current = null; slots.push({block:b}); return;
+    }
     const isLine = /^<div\b[^>]*class="[^"]*check-line/i.test(b);
     const level = Number(doneAttr_(b, 'data-level') || 0);
     if (isLine && takingLevel >= 0 && level > takingLevel) { lines.push(b); return; }
@@ -1295,10 +1299,19 @@ function groupClaudeDone_(html, list) {
     if (x.was) byOld[doneProject_(x) + '|' + String(x.was).replace(/\s+/g, ' ').trim()] = x;
   });
   const blocks = doneBlocks_(html);
-  const order = [], groups = {}, slots = [];
-  const groupOf = p => { if (!groups[p]) { groups[p] = []; order.push(p); slots.push({ group: p }); } return groups[p]; };
+  const groups = Object.create(null), slots = [];
+  let section = '';
+  const groupOf = p => {
+    const key = JSON.stringify([section,p]);
+    if (!groups[key]) { groups[key] = []; slots.push({ group: key, project: p }); }
+    return groups[key];
+  };
   let current = null;
   blocks.forEach(b => {
+    const sec = doneAttr_(b, 'data-tsec') || doneAttr_(b, 'data-sec');
+    if (sec || doneAttr_(b, 'data-secend') != null) {
+      section = sec || 'end'; current = null; slots.push({block:b}); return;
+    }
     const isLine = /^<div\b[^>]*class="[^"]*check-line/i.test(b);
     const level = Number(doneAttr_(b, 'data-level') || 0);
     const text = isLine ? doneText_(b) : null;
@@ -1346,7 +1359,7 @@ function groupClaudeDone_(html, list) {
     if (!groups[s.group].length) return;
     const prev = parts[parts.length - 1];
     if (prev && (prev.group || !isBlank(prev.block))) parts.push({ block: BLANK });
-    parts.push({ group: s.group, html: doneHeaderHtml_(s.group) + groups[s.group].join('') });
+    parts.push({ group: s.group, html: doneHeaderHtml_(s.project) + groups[s.group].join('') });
   });
   return parts.map(p => p.group ? p.html : p.block).join('');
 }
@@ -1359,15 +1372,31 @@ const DONE_SEC_ORDER_ = ['morning', 'afternoon', 'evening'];
 function doneSecNow_(date) {
   if (date < todayString_()) return 'evening';
   const hm = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm');
-  if (hm >= '18:30') return 'evening';
-  if (hm >= '15:45') return 'afternoon';
+  if (hm >= '19:00') return 'evening';
+  if (hm >= '14:00') return 'afternoon';
   return 'morning';
+}
+// Place only the new intake line; preserve historical groups and their sections.
+function appendDoneInSection_(html, line, sec) {
+  const blocks = doneBlocks_(html);
+  const sectionOf = b => doneAttr_(b, 'data-tsec') || doneAttr_(b, 'data-sec');
+  DONE_SEC_ORDER_.forEach((key,i) => {
+    if (blocks.some(b => sectionOf(b) === key)) return;
+    const next = blocks.findIndex(b => DONE_SEC_ORDER_.indexOf(sectionOf(b)) > i);
+    const header = '<div data-tsec="' + key + '" contenteditable="false">' + key[0].toUpperCase() + key.slice(1) + '</div>';
+    if (next < 0) blocks.push(header); else blocks.splice(next,0,header);
+  });
+  const start = blocks.findIndex(b => sectionOf(b) === sec);
+  let at = start + 1;
+  while (at < blocks.length && !sectionOf(blocks[at]) && doneAttr_(blocks[at],'data-secend') == null) at++;
+  blocks.splice(at,0,line);
+  return blocks.join('');
 }
 // Moves Claude groups that sit in a later block (or below the last block) into
 // `sec`, just above that block's own empty last line. Cells without blocks are untouched.
 function placeDoneInSection_(html, sec) {
   const blocks = doneBlocks_(html);
-  const secOf = b => { const m = /^<div\b[^>]*\sdata-sec="(\w+)"/i.exec(b); return m ? m[1].toLowerCase() : null; };
+  const secOf = b => { const m = /^<div\b[^>]*\sdata-(?:tsec|sec)="(\w+)"/i.exec(b); return m ? m[1].toLowerCase() : null; };
   const isEnd = b => /^<div\b[^>]*\sdata-secend=/i.test(b);
   const isBlank = b => /^<(p|div)\b[^>]*>(\s|&nbsp;|<br\b[^>]*>)*<\/(p|div)>$/i.test(b);
   const target = DONE_SEC_ORDER_.indexOf(sec);
@@ -1528,12 +1557,12 @@ function applyClaudeDone_() {
       const before = String(cell.getValue() || '');
       let html = before;
       byDate[date].forEach(x => {
-        if (html.indexOf('data-cid="' + doneEsc_(x.id) + '"') < 0) html += doneLineHtml_(x);
+        if (html.indexOf('data-cid="' + doneEsc_(x.id) + '"') < 0) html = appendDoneInSection_(html, doneLineHtml_(x), doneSecNow_(date));
         applied.push(String(x.id));
       });
       html = groupClaudeDone_(html, valid);
-      // Day blocks removed (Julius, 2026-10-29): no placing into Morning / Afternoon / Evening.
-      if (html !== before) cell.setValue(html);
+      // Groups stay separate in Morning, Afternoon and Evening (2026-11-03).
+      if (html !== before) { backupCell_(date, 'Today', 'Done Log section placement', before); cell.setValue(html); }
     });
     props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));
     props.setProperty('claudeDoneGrouped', '2');
@@ -2099,4 +2128,5 @@ function saveLookSnapshot(slot, json, ua) {
   sh.getRange(row, 1, 1, 4).setValues([[slot, dev, new Date(), String(json).slice(0, 45000)]]);
   return true;
 }
+
 

@@ -1212,12 +1212,12 @@
     [data-tlon]{display:flex!important;align-items:center;}
     [data-tlon] > .check-text{flex:0 1 auto;}
     [data-tlon]::after{order:2;}
-    [data-tlon]::before{content:"−";order:1;flex:0 0 auto;margin-left:4px;padding:0 1px;min-width:.75em;font-size:10px;font-weight:700;line-height:1.25;text-align:center;border:1px solid var(--border);border-radius:5px;color:var(--muted);background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
+    [data-tlon]::before{content:"−";order:1;flex:0 0 auto;margin-left:4px;padding:0 1px;min-width:.75em;font-size:10px;font-weight:700;line-height:1.25;text-align:center;border:1px solid var(--tc-cat,var(--border));border-radius:5px;color:var(--tc-cat,var(--muted));background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
     [data-tlon="c"]::before{content:"+  " attr(data-tlinfo);font-weight:600;}
     [data-tlhid]{display:none!important;}
     /* Folded summary (2026-10-29): bold starts of the hidden lines, as one condensed block under the title. */
     [data-tlon="c"][data-tlsum]{flex-wrap:wrap;}
-    [data-tlon="c"][data-tlsum]:not([data-due-label])::after{content:attr(data-tlsum);order:3;flex:1 0 100%;margin:2px 0 1px;padding:3px 8px;font-size:.84em;font-weight:400;line-height:1.4;font-style:normal;text-decoration:none;color:var(--muted);white-space:normal;border-left:2px solid var(--border);border-radius:0;}
+    [data-tlon="c"][data-tlsum]:not([data-due-label])::after{content:attr(data-tlsum);order:3;flex:1 0 100%;margin:2px 0 1px;padding:3px 8px;font-size:.84em;font-weight:400;line-height:1.4;font-style:normal;text-decoration:none;color:var(--muted);white-space:normal;border-left:2px solid var(--tc-cat,var(--border));border-radius:0;}
     /* Due group in Notes (2026-10-27): its own box under the Suggested day, collapsible. */
     .due-notes{margin:6px 0;padding:4px 8px 5px;border:1.5px solid var(--note-line-adj,var(--border));border-radius:10px;-webkit-user-select:text;user-select:text;}
     .dn-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.92em;cursor:pointer;-webkit-user-select:none;user-select:none;padding:1px 0;}
@@ -1551,7 +1551,8 @@
        section lines fit without overflowing) and never scrolls sideways. */
     body.one-day #todayScroll .od-on .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
     #journalScroll{overflow-x:hidden;}
-    /* Dailies repeat without a visible repeat symbol (Julius, 2026-11-03). */
+    /* The lock marks recurrence; daily items remain editable. */
+    .journal-editor .check-line[data-rep="daily"] > .check-text::after{content:"🔒";float:right;margin-left:8px;font-size:.8em;opacity:.7;}
     /* Focus Tracking dashboard (phase 1). Render-only, fits ~350px, no sideways scroll. */
     .fx{margin:2px 0 6px;font-size:calc(var(--paragraph-size,14px) * .95);-webkit-user-select:text;user-select:text;max-width:100%;overflow:hidden;}
     .fx-cat{margin:4px 0;}
@@ -2296,7 +2297,23 @@
     });
   }
   // Starter lines for a new day's Make sure you do (Julius, 2026-11-01). Edit here to change the defaults.
-  const MUST_DEFAULTS = ['Drink 64 oz water','10K steps','Stretch','Hygiene','Medicine','Supplements'];
+  const MUST_DEFAULTS = ['Drink 64 oz water','10K steps','Stretch','Hygiene','Medicine','Supplements','Read 10+ pages','Meditate'];
+  function upgradeDailies(ed,date){
+    const header = ed.querySelector(':scope > [data-nsec="must"]');
+    if(!header || date !== '2026-11-03' || header.dataset.dailyUpgrade === '1') return false;
+    const names = dailySectionLines(ed).map(line => line.textContent.trim().toLowerCase());
+    let at = header.nextElementSibling;
+    while(at && !at.matches('[data-nsec],table')) at = at.nextElementSibling;
+    [['Read 10+ pages','study',/\bread(?:ing)?\b/],['Meditate','health',/\bmeditat/]].forEach(([title,cat,re]) => {
+      if(names.some(name => re.test(name))) return;
+      const line = document.createElement('div');
+      line.className = 'check-line'; line.dataset.level = '0'; line.dataset.rep = 'daily'; line.dataset.cat = cat;
+      line.innerHTML = '<input type="checkbox"><span class="check-text">' + title + '</span>';
+      ed.insertBefore(line,at);
+    });
+    header.dataset.dailyUpgrade = '1';
+    return true;
+  }
   function persistentNotesHtml(kind, targetDate){
     // Prefer live loaded data, then the server's seed outside the visible window.
     const candidates = (state.days || []).filter(d => d.date <= state.today && d.date !== targetDate).slice();
@@ -2444,6 +2461,7 @@
           window.renderFocus && window.renderFocus(); } }
       // New Dailies repeat by default; explicit opt-outs survive reloads.
       dailySectionLines(jed).forEach(line => { if(!line.hasAttribute('data-rep')) line.dataset.rep = 'daily'; });
+      if(upgradeDailies(jed,day.date)) requestAnimationFrame(() => saveEditorOwner(jed));
     }
     if(type === 'day'){
       // One-day view (2026-10-29, Julius): top = Completed (this editor), bottom = Plan pad (Days column D).
@@ -4568,12 +4586,12 @@
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
   const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus'];
   function cardCleanHtml(el){
-    if(!el.querySelector('[data-tc],[data-tcdrag],[data-tcfocus],[data-render-due],[data-tlon],[data-tlhid],.tc-holdready')) return el.innerHTML;
+    if(!el.querySelector('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-render-due],[data-tlon],[data-tlhid],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
     c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid','data-tlsum'].forEach(a => n.removeAttribute(a)));
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
-    c.querySelectorAll('[data-tc],[data-tcdrag],[data-tcfocus]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
   }
   function saveDay(date){
@@ -9206,7 +9224,7 @@
     const plain = CARD_CATS.map(({re,reG,...c}) => c);
     try{ localStorage.setItem('fw.cardCats',JSON.stringify(plain)); }catch(e){}
     let css = '';
-    CARD_CATS.forEach(c => { css += `.check-line[data-tccat="${c.key}"]{--tc-cat:${c.color};}`; });
+    CARD_CATS.forEach(c => { css += `[data-tccat="${c.key}"]{--tc-cat:${c.color};}`; });
     let st = document.getElementById('cardCatCss');
     if(!st){ st = document.createElement('style'); st.id = 'cardCatCss'; document.head.appendChild(st); }
     st.textContent = css;
@@ -9332,6 +9350,12 @@
   }
   function refreshCards(ed){
     if(!ed || !ed.isConnected) return false;
+    // Care routines use an explicit Health tag instead of generic keyword guessing.
+    if(ed.classList.contains('journal-editor')) dailySectionLines(ed).forEach(line => {
+      const text = tcText(line).toLowerCase();
+      if(/water|drink|hygiene|medicine|supplement|strength|stretch|steps|pillow|case|meditat/.test(text)) line.dataset.cat = 'health';
+      else if(/\bread(?:ing)?\b/.test(text) && !line.dataset.cat) line.dataset.cat = 'study';
+    });
     let changed = ensureDaySections(ed);
     requestAnimationFrame(() => paintDaySecs(ed));
     // Older lines carry the one-line due label; switch them to the stacked one (display only).
@@ -9495,7 +9519,7 @@
       return out;
     }
     for(let n = t.nextElementSibling; n; n = n.nextElementSibling){
-      if(isEmptyLine(n) || isTitleLine(n)) break;
+      if(isEmptyLine(n) || isTitleLine(n) || n.hasAttribute('data-tsec') || n.hasAttribute('data-secend')) break;
       out.push(n);
     }
     return out;
@@ -9651,6 +9675,8 @@
     for(const n of ed.children){
       if(!isTitleLine(n)) continue;
       const cov = titleCovered(n);
+      // Project headers share their tasks' category, including the folded summary.
+      if(n.hasAttribute('data-cgrp')) setAttr(n,'data-tccat',cardCatFromName(n.dataset.cgrp || tcText(n)) || '');
       if(!cov.length && n.dataset.tl !== '1') continue;
       const fold = n.dataset.fold === '1' && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
@@ -9727,7 +9753,7 @@
     const meas = document.createElement('span');
     meas.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font-size:12px;font-weight:600;padding:0 5px;border:1px solid transparent;';
     document.body.appendChild(meas);
-    let suppress = null;
+    let suppress = null, press = null;
     function hit(e){
       const t = e.target && e.target.closest ? e.target.closest('[data-tlon]') : null;
       if(!t || !t.parentElement || !t.parentElement.matches('.day-editor,.journal-editor,.plan-editor,.ref-cell')) return null;
@@ -9745,11 +9771,24 @@
       return e.clientX >= right - 2 && e.clientX <= right + 6 + w + 6 ? t : null;
     }
     document.addEventListener('pointerdown',e => {
+      if(e.button !== 0 || e.isPrimary === false) return;
       const t = hit(e); if(!t) return;
       e.preventDefault(); e.stopPropagation();
       suppress = t;
+      press = {t,id:e.pointerId,x:e.clientX,y:e.clientY,at:Date.now(),moved:false};
+    },true);
+    document.addEventListener('pointermove',e => {
+      if(press && press.id === e.pointerId && Math.hypot(e.clientX - press.x,e.clientY - press.y) > 6) press.moved = true;
+    },true);
+    document.addEventListener('pointercancel',() => { press = null; },true);
+    document.addEventListener('dragstart',() => { press = null; },true);
+    document.addEventListener('pointerup',e => {
+      if(!press || press.id !== e.pointerId) return;
+      const p = press; press = null;
+      if(p.moved || Math.hypot(e.clientX - p.x,e.clientY - p.y) > 6 || Date.now() - p.at > 350 || hit(e) !== p.t) return;
+      e.preventDefault(); e.stopPropagation();
       window.__tlFoldAt = Date.now();
-      toggleTitleFold(t,t.parentElement);
+      toggleTitleFold(p.t,p.t.parentElement);
     },true);
     document.addEventListener('click',e => { if(suppress){ const s = suppress; suppress = null; if(s.contains(e.target)){ e.preventDefault(); e.stopPropagation(); } } },true);
   })();
@@ -10942,3 +10981,4 @@
 </script>
 </body>
 </html>
+

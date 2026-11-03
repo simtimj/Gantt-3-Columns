@@ -1506,6 +1506,12 @@
     /* Center Up stays put (Julius, 2026-11-01): scrolling inside Notes / Weather / Center Down never drags the pane or page. */
     #journalPane{overflow:hidden;}
     #journalScroll,#weatherScroll,#centerDownScroll{overscroll-behavior:contain;}
+    .ce-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+    .ce-head strong{font-size:.85em;}
+    .ce-head button{font-size:12px;padding:2px 6px;}
+    .ce-date,.ce-empty{font-size:.8em;color:var(--muted);margin:4px 0;}
+    .ce-event{display:grid;grid-template-columns:minmax(5em,auto) minmax(0,1fr);gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.85em;overflow-wrap:anywhere;}
+    .ce-time{font-size:.85em;color:var(--muted);}
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
@@ -1531,7 +1537,7 @@
     /* Section lines a bit thicker (1px was too thin, 2px too thick). */
     .editor > [data-nsec="must"]{border-bottom:1.5px solid #b55a56!important;}
     .editor > [data-nsec="focus"]{border-bottom:1.5px solid #1565c0!important;}
-    .editor > [data-nsec="focus"]{border-top:1.5px solid #1565c0!important;padding-top:5px!important;}
+    .editor > [data-nsec="focus"]{border-top:1.5px solid var(--note-line-adj,var(--note-line,var(--divider)))!important;padding-top:5px!important;}
     body.day-lines .editor > [data-nsec]{border-bottom:1.5px solid var(--note-line-adj)!important;}
     /* No double line under the header: the header keeps its line, today's row drops its top line. */
     .day-row.today.day-pane-row,.day-row.today.journal-pane-row{box-shadow:inset 0 -2px 0 var(--today-border-adj)!important;}
@@ -1542,8 +1548,7 @@
        section lines fit without overflowing) and never scrolls sideways. */
     body.one-day #todayScroll .od-on .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
     #journalScroll{overflow-x:hidden;}
-    /* Repeating tasks (Make sure you do starters repeat daily): small ↻ after the text. */
-    .check-line[data-rep] > .check-text::after{content:" \21BB";color:var(--muted,#888);font-size:.85em;font-weight:400;}
+    /* Dailies repeat without a visible repeat symbol (Julius, 2026-11-03). */
     /* Focus Tracking dashboard (phase 1). Render-only, fits ~350px, no sideways scroll. */
     .fx{margin:2px 0 6px;font-size:calc(var(--paragraph-size,14px) * .95);-webkit-user-select:text;user-select:text;max-width:100%;overflow:hidden;}
     .fx-cat{margin:4px 0;}
@@ -1554,6 +1559,9 @@
     .fx-proj{margin:3px 0 3px 6px;padding:3px 6px 4px;border-left:2px solid color-mix(in srgb,#1565c0 45%,transparent);}
     .fx-ph{display:flex;align-items:center;gap:4px;font-weight:600;}
     .fx-title{flex:1 1 auto;}
+    .fx-name,.fx-title{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;}
+    .fx-cat.fx-ungrouped > .fx-ch{display:none;}
+    .fx-cat.fx-ungrouped > .fx-body{display:block;}
     .fx-why{font-size:.88em;color:var(--muted,#777);margin:1px 0 0 1.8em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
     .fx-why:focus{display:block;-webkit-line-clamp:unset;}
     [data-fph]:empty::before{content:attr(data-fph);color:var(--muted,#999);font-weight:400;font-style:italic;}
@@ -1651,6 +1659,30 @@
     .plan-pad .check-line[data-tc]:not([data-urg="1"],[data-urg="2"],[data-urg="3"]){--urg:#8a8f98;}
     .plan-pad .check-line[data-tc]{border-color:color-mix(in srgb,var(--urg,#8a8f98) 32%,transparent)!important;}
     .plan-pad .check-line[data-tcfocus]{box-shadow:0 0 0 1.5px var(--urg,#8a8f98);}
+    /* Compact square resize notches (Julius, 2026-11-03); touch hit areas stay unchanged. */
+    .column-resizer::after,#refSplitBar::after,#notesSplitBar::after,
+    body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{
+      left:50%!important;right:auto!important;top:50%!important;margin:0!important;transform:translate(-50%,-50%);
+      border-radius:0!important;background-color:transparent!important;pointer-events:none;
+    }
+    .column-resizer::after,#mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{
+      width:3px!important;height:21px!important;
+      background:repeating-linear-gradient(to bottom,var(--grip,var(--divider)) 0 3px,transparent 3px 6px)!important;
+    }
+    #refSplitBar::after,#notesSplitBar::after,body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{
+      width:21px!important;height:3px!important;
+      background:repeating-linear-gradient(to right,var(--grip,var(--divider)) 0 3px,transparent 3px 6px)!important;
+    }
+    body.one-day #todayScroll .od-on > .od-pad-head::after{top:-1px!important;}
+    .column-resizer::before,#mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{
+      top:50%!important;bottom:auto!important;height:46px!important;margin-top:-23px!important;
+    }
+    #refSplitBar::before,#notesSplitBar::before,body.one-day #todayScroll .od-on > .od-pad-head::before,
+    #mobileSplitResizer[data-dir="row"]::before,#mobileSplitResizerThird[data-dir="row"]::before{
+      left:50%!important;right:auto!important;width:46px!important;margin-left:-23px!important;
+    }
 </style>
 <script>
   /* ===== Light / dark toggle, saved per device (Julius, 2026-10-27) =====
@@ -1874,8 +1906,8 @@
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
       <div class="scroll notes-review" id="reviewScroll"></div>
-      <!-- Center Down (2026-11-01, Julius): empty for now. -->
-      <div class="scroll" id="centerDownScroll"></div>
+      <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
+      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Calendar Events</strong><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
     <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
     <section
@@ -2263,6 +2295,76 @@
   }
   // Starter lines for a new day's Make sure you do (Julius, 2026-11-01). Edit here to change the defaults.
   const MUST_DEFAULTS = ['Drink 64 oz water','10K steps','Stretch','Hygiene','Medicine','Supplements'];
+  function persistentNotesHtml(kind, targetDate){
+    // Prefer live loaded data, then the server's seed outside the visible window.
+    const candidates = (state.days || []).filter(d => d.date <= state.today && d.date !== targetDate).slice();
+    const live = document.querySelector('.journal-editor[data-date="' + CSS.escape(state.today) + '"]');
+    if(live && state.today !== targetDate) candidates.unshift({date:state.today,journal:cardCleanHtml(live)});
+    const seed = state.notesSeeds && state.notesSeeds[kind];
+    if(seed && seed.date !== targetDate) candidates.push(seed);
+    candidates.sort((a,b) => b.date.localeCompare(a.date));
+    for(const day of candidates){
+      const holder = document.createElement('div');
+      holder.innerHTML = storedToHtml(day.journal || '');
+      const header = holder.querySelector(':scope > [data-nsec="' + kind + '"]');
+      if(!header) continue;
+      const out = document.createElement('div');
+      let skipLevel = null;
+      for(let n = header.nextSibling; n; n = n.nextSibling){
+        if(n.nodeType === 1 && (n.matches('[data-nsec]') || (kind === 'must' && n.matches('table')))) break;
+        if(kind === 'must' && n.nodeType === 1 && n.matches('.check-line')){
+          const level = Number(n.dataset.level) || 0;
+          if(skipLevel !== null && level > skipLevel) continue;
+          skipLevel = null;
+          if(n.dataset.rep === 'off'){ skipLevel = level; continue; }
+        }
+        const copy = n.cloneNode(true);
+        if(copy.nodeType === 1){
+          if(copy.matches('[data-render-due]') || (kind === 'focus' && copy.matches('table[data-cnote]'))) continue;
+          const lines = [...(copy.matches('.check-line') ? [copy] : []), ...copy.querySelectorAll('.check-line')];
+          if(kind === 'must') lines.forEach(line => {
+            line.classList.remove('done','urg-flash');
+            line.dataset.rep = 'daily';
+            ['data-tid','data-cid','data-htid','data-at','data-dt'].forEach(a => line.removeAttribute(a));
+          });
+          if(kind === 'must') copy.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.removeAttribute('checked'); cb.removeAttribute('data-wired'); });
+          if(kind === 'focus') copy.querySelectorAll('table[data-cnote]').forEach(t => t.remove());
+        }
+        out.appendChild(copy);
+      }
+      return cardCleanHtml(out);
+    }
+    if(kind === 'focus') return '<div><br></div>';
+    return MUST_DEFAULTS.map(t => '<div class="check-line" data-level="0" data-rep="daily"><input type="checkbox"><span class="check-text">' + t + '</span></div>').join('');
+  }
+  function dailySectionLines(ed){
+    const header = ed && ed.querySelector(':scope > [data-nsec="must"]');
+    const lines = [];
+    for(let n = header && header.nextElementSibling; n && !n.matches('[data-nsec],table'); n = n.nextElementSibling)
+      if(n.matches('.check-line')) lines.push(n);
+    return lines;
+  }
+  function refreshPersistentNotes(date){
+    const ed = document.querySelector('.journal-editor[data-date="' + CSS.escape(date) + '"]');
+    if(!ed || ed.dataset.seededNotes !== '1') return;
+    ['must','focus'].forEach(kind => {
+      if(ed.dataset['seeded' + kind] !== '1') return;
+      const header = ed.querySelector(':scope > [data-nsec="' + kind + '"]');
+      if(!header) return;
+      let n = header.nextSibling;
+      while(n){
+        if(n.nodeType === 1 && (n.matches('[data-nsec]') || n.matches('table[data-cnote]'))) break;
+        const next = n.nextSibling;
+        if(!(n.nodeType === 1 && n.matches('[data-render-due]'))) n.remove();
+        n = next;
+      }
+      const tmp = document.createElement('div');
+      tmp.innerHTML = persistentNotesHtml(kind, date);
+      [...tmp.childNodes].forEach(copy => ed.insertBefore(copy,n));
+    });
+    ed.querySelectorAll('input[type="checkbox"]').forEach(wireCheckbox);
+    if(typeof refreshCards === 'function') refreshCards(ed);
+  }
   function appendDayRow(
     day,
     container,
@@ -2313,17 +2415,24 @@
     // Renamed Task tracking (Julius, 2026-11-02): cells saved earlier still hold the old header text, on any day.
     if(type === 'journal') row.querySelectorAll('.editor > [data-nsec="must"]').forEach(h => { h.textContent = 'Dailies'; });
     if(type === 'journal') row.querySelectorAll('.editor > [data-nsec="focus"]').forEach(h => { h.textContent = 'Keep In Mind'; });
-    if(type === 'journal' && today){
+    if(type === 'journal'){
       const jed = row.querySelector('.editor');
-      if(!jed.querySelector(':scope > [data-nsec="must"]'))
-        jed.insertAdjacentHTML('afterbegin','<div data-nsec="must" contenteditable="false">Dailies</div>' + MUST_DEFAULTS.map(t => '<div class="check-line" data-level="0" data-rep="daily"><input type="checkbox"><span class="check-text">' + t + '</span></div>').join(''));
+      if(!jed.querySelector(':scope > [data-nsec="must"]')){
+        jed.insertAdjacentHTML('afterbegin','<div data-nsec="must" contenteditable="false">Dailies</div>' + persistentNotesHtml('must', day.date));
+        jed.dataset.seededmust = '1';
+      }
       // Focus tracking (2026-11-01, Julius: Backlog idea) goes after the Make sure you do lines, before any note table.
       if(!jed.querySelector(':scope > [data-nsec="focus"]')){
         let at = jed.querySelector(':scope > [data-nsec="must"]').nextSibling;
         while(at && !(at.nodeType === 1 && (at.matches('table,[data-nsec]')))) at = at.nextSibling;
         const tmp = document.createElement('div');
-        tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Keep In Mind</div><div><br></div>';
+        tmp.innerHTML = '<div data-nsec="focus" contenteditable="false">Keep In Mind</div>' + persistentNotesHtml('focus', day.date);
         [...tmp.childNodes].forEach(n => jed.insertBefore(n, at));
+        jed.dataset.seededfocus = '1';
+      }
+      if(jed.dataset.seededmust || jed.dataset.seededfocus){
+        jed.dataset.seededNotes = '1';
+        ['beforeinput','change','drop'].forEach(event => jed.addEventListener(event, () => { delete jed.dataset.seededNotes; }));
       }
       // Focus Tracking dashboard (phase 1): render-only host right under the Focus tracking header.
       // data-render-due = existing render-only marker (stripped on save, skipped by drag / card code).
@@ -2331,12 +2440,8 @@
         if(fh && !jed.querySelector(':scope > .fx')){
           fh.insertAdjacentHTML('afterend','<div class="fx" data-render-due contenteditable="false"></div>');
           window.renderFocus && window.renderFocus(); } }
-      // Repeating marker (2026-11-01): Make sure you do starters repeat every day → ↻ after the text (re-marked on load).
-      { const mustSet = new Set(MUST_DEFAULTS.map(t => t.toLowerCase()));
-        jed.querySelectorAll(':scope > .check-line').forEach(l => {
-          const t = (l.querySelector('.check-text')?.textContent || '').trim().toLowerCase();
-          if(mustSet.has(t)) l.dataset.rep = 'daily';
-        }); }
+      // New Dailies repeat by default; explicit opt-outs survive reloads.
+      dailySectionLines(jed).forEach(line => { if(!line.hasAttribute('data-rep')) line.dataset.rep = 'daily'; });
     }
     if(type === 'day'){
       // One-day view (2026-10-29, Julius): top = Completed (this editor), bottom = Plan pad (Days column D).
@@ -2360,6 +2465,7 @@
       ed,
       type
     );
+    if(type === 'day') requestAnimationFrame(() => { if(typeof tsecArrange === 'function') tsecArrange(ed); });
     // Plan pad = a full editor too (checkboxes, cards, menus, urgency, drag) — Julius 2026-10-29.
     const padEd = row.querySelector('.plan-editor');
     if(padEd){ padEd.style.fontSize = 'var(--paragraph-size)'; padEd.style.fontFamily = 'var(--paragraph-font)'; wireEditor(padEd,'plan'); }    // New days (incl. lazily loaded weeks) pick up tasks due on them.
@@ -6158,7 +6264,7 @@
     function html(){
       let out = '';
       data.cats.forEach(c => {
-        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + '" data-fid="' + c.id + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
+        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (!c.name && c.projects.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
           '<span class="fx-name" contenteditable="true" data-fx="name" data-fph="Category">' + h(c.name) + '</span>' +
           (c.col ? '<span class="fx-sub">' + c.projects.length + '</span>' : '') + '</div><div class="fx-body">';
         c.projects.forEach(p => {
@@ -6174,7 +6280,7 @@
         });
         out += '<button type="button" class="fx-add" data-fx="addp">+ Project</button></div></div>';
       });
-      return out + '<button type="button" class="fx-add" data-fx="addc">+ Category</button>';
+      return out + '<button type="button" class="fx-add" data-fx="addh">+ Heading</button>';
     }
     function render(){
       document.querySelectorAll('.journal-editor .fx[data-render-due]').forEach(host => {
@@ -6203,7 +6309,12 @@
         const b = e.target.closest('[data-fx]'); if(!b) return;
         const id = b.closest('[data-fid]')?.dataset.fid, f = id ? find(id) : {};
         if(b.dataset.fx === 'tg'){ const o = f.p || f.c; if(o){ o.col = !o.col; save(); render(); } }
-        else if(b.dataset.fx === 'addc'){ const c = {id:uid('c'),name:'',col:false,projects:[]}; data.cats.push(c); save(); render(); focusNew(c.id,'name'); }
+        else if(b.dataset.fx === 'addh'){
+          let c = data.cats.find(c => !c.name);
+          if(!c){ c = {id:uid('c'),name:'',col:false,projects:[]}; data.cats.push(c); }
+          const p = {id:uid('p'),title:'',why:'',col:false,tasks:[]};
+          c.projects.push(p); c.col = false; save(); render(); focusNew(p.id,'title');
+        }
         else if(b.dataset.fx === 'addp' && f.c){ const p = {id:uid('p'),title:'',why:'',col:false,tasks:[]}; f.c.projects.push(p); f.c.col = false; save(); render(); focusNew(p.id,'title'); }
         else if(b.dataset.fx === 'addt' && f.p){ const t = {id:tid(),t:'',d:0}; (f.p.tasks = f.p.tasks || []).push(t); f.p.col = false; save(); render(); focusTask(t.id); }
         else if(b.dataset.fx === 'send' && f.p){
@@ -7266,7 +7377,31 @@
   try{ calOpen = localStorage.getItem('fw.calOpen') !== '0'; }catch(e){}
   // Calendar panel back (2026-10-29, Julius): every calendar event lives here as a checkbox (tick = Graphite = done).
   const CAL_PANEL_ON = false; // Calendar panel off (2026-10-31, Julius): Reference top half is Urgent only.
+  let centerCalendarSeq = 0;
+  const centerCalendarCache = new Map();
+  function loadCenterCalendar(date, force){
+    date = date || window.odDate || state.today;
+    const box = document.getElementById('centerCalendarList');
+    if(!box || !date) return;
+    const seq = ++centerCalendarSeq;
+    const draw = data => {
+      if(seq !== centerCalendarSeq) return;
+      box.innerHTML = '<div class="ce-date">' + esc(formatDate(date)) + '</div>' +
+        (data.events.length ? data.events.map(ev => '<div class="ce-event"><span class="ce-time">' + esc(ev.time) + '</span><span>' + esc(ev.title) + '</span></div>').join('') : '<div class="ce-empty">No events.</div>');
+    };
+    const cached = centerCalendarCache.get(date);
+    if(!force && cached && Date.now() - cached.at < 60000){ draw(cached.data); return; }
+    box.textContent = 'Loading…';
+    google.script.run.withSuccessHandler(data => {
+      centerCalendarCache.set(date,{at:Date.now(),data:data}); draw(data);
+    }).withFailureHandler(() => {
+      if(seq === centerCalendarSeq) box.textContent = 'Could not load calendar events. Tap refresh to retry.';
+    }).getMainCalendarEvents(date);
+  }
+  document.addEventListener('click', e => { if(e.target.closest('[data-ce-refresh]')) loadCenterCalendar(null,true); });
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) loadCenterCalendar(); });
   function loadCalendar(){
+    loadCenterCalendar();
     if(!CAL_PANEL_ON){ const p = document.getElementById('calPanel'); if(p) p.remove(); return; }
     if(calLoading) return;
     calLoading = true; renderCalendar();
@@ -8105,6 +8240,20 @@
     const {line,owner} = t;
     const p = document.createElement('div');
     p.className = 'urg-picker';
+    if(owner && owner.matches('.journal-editor') && dailySectionLines(owner).includes(line)){
+      const repeat = document.createElement('button');
+      repeat.type = 'button'; repeat.className = 'urg-goto';
+      repeat.textContent = line.dataset.rep === 'off' ? 'Keep recurring daily' : 'Remove daily recurrence';
+      repeat.addEventListener('pointerdown', e => e.preventDefault());
+      repeat.addEventListener('click', () => {
+        captureBeforeEdit(owner);
+        const value = line.dataset.rep === 'off' ? 'daily' : 'off';
+        urgSubtree(line).forEach(item => { item.dataset.rep = value; });
+        delete owner.dataset.seededNotes;
+        finishEditorEdit(owner); urgChanged(owner); hideUrgencyPicker();
+      });
+      p.appendChild(repeat);
+    }
     [[1,'1'],[2,'2'],[3,'3'],[0,'✕']].forEach(([u,label]) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -8942,7 +9091,7 @@
      The mark is white with a dark outline so it reads on any fill. Option "Subject color: whole card" brings back the tinted cards. */
   body.tc-boxfill .check-line[data-tccat]{--tc-tint:transparent;}
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
-  body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:2px solid var(--tc-cat)!important;border-radius:7px;}
+  body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid var(--tc-cat)!important;border-radius:7px;}
   body.tc-borderonly .check-line[data-tccat] > input[type=checkbox]{background:transparent;}
 
   body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]{
@@ -10251,31 +10400,35 @@
     lines.forEach(el => { if(!el.dataset.at) el.dataset.at = now; });
   }
   function tsecArrange(ed){
-    const kids = [...ed.children].filter(el => !el.hasAttribute('data-tsec'));
+    const kids = [...ed.children];
     const blocks = [];
+    let section = '';
     for(let i = 0; i < kids.length; i++){
       const el = kids[i];
+      if(el.hasAttribute('data-tsec') || el.hasAttribute('data-sec')){
+        const key = el.dataset.tsec || el.dataset.sec;
+        section = TSEC.some(([k]) => k === key) ? key : '';
+        continue;
+      }
       if(tsecIsTask(el) && !tsecLevel(el)){
         const b = [el];
         while(i + 1 < kids.length && tsecLevel(kids[i + 1]) > 0) b.push(kids[++i]);
         const cb = el.querySelector('input[type="checkbox"]');
         const t = cb && cb.checked ? el.dataset.dt : el.dataset.at;
-        blocks.push({nodes:b,t:/^\d\d:\d\d$/.test(t || '') ? t : ''});
-      } else blocks.push({nodes:[el],t:'',blank:!el.textContent.trim() && !el.querySelector('input,img,hr')});
+        blocks.push({nodes:b,t:/^\d\d:\d\d$/.test(t || '') ? t : '',section:section});
+      } else blocks.push({nodes:[el],t:'',section:section,blank:!el.textContent.trim() && !el.querySelector('input,img,hr')});
     }
-    if(!blocks.some(b => b.t)){ ed.querySelectorAll(':scope > [data-tsec]').forEach(n => n.remove()); return false; }
     const top = [], tail = [], by = {morning:[],afternoon:[],evening:[]};
     let seenTimed = false;
     blocks.forEach(b => {
-      if(b.t){ seenTimed = true; by[tsecOf(b.t)].push(b); }
-      else if(b.blank && seenTimed){ if(!tail.length) tail.push(b); }
+      if(b.blank && (seenTimed || b.section)){ if(!tail.length) tail.push(b); }
+      else if(b.t || b.section){ seenTimed = true; by[b.t ? tsecOf(b.t) : b.section].push(b); }
       else top.push(b);
     });
     const out = [];
     top.forEach(b => out.push(...b.nodes));
     TSEC.forEach(([k,name]) => {
       const list = by[k].sort((a,b) => a.t < b.t ? -1 : a.t > b.t ? 1 : 0);
-      if(!list.length) return;
       const h = document.createElement('div');
       h.dataset.tsec = k; h.setAttribute('contenteditable','false');
       if(name) h.textContent = name; else h.innerHTML = '<br>';
@@ -10510,6 +10663,9 @@
       }
       document.querySelectorAll('#todayScroll > .day-row, #journalScroll > .day-row')
         .forEach(r => { r.classList.toggle('od-on', r.dataset.date === date); r.style.height = ''; });
+      refreshPersistentNotes(date);
+      if(window.renderFocus) window.renderFocus();
+      loadCenterCalendar(date);
       setH();
       [T(),J()].forEach(x => { if(x) x.scrollTop = 0; });
       const lbl = document.getElementById('dateLabel'); if(lbl) lbl.textContent = formatDate(date);

@@ -2,6 +2,16 @@
 
 Read only the section you need.
 
+## Persistent Notes and Calendar Events (2026-11-03, Julius)
+
+- History: `tsecArrange` always emits all three headers, preserves existing section membership for untimed lines, and converts legacy section markers. It runs on every rendered History editor without auto-saving historical cells. Notes headers/dashboard are available on every date; missing sections use the latest current/past source rather than disappearing on date navigation.
+
+- `getNotesSeeds_` reads the newest saved Dailies / Keep In Mind sections on or before today, independently, including dates outside the visible window. New day sections inherit that content without rewriting historical cells. Dailies reset completion and per-day identity/time markers; Keep In Mind free notes retain completion. Existing shared `getFocus`/`saveFocus` data is reused, not copied into cells. Newly seeded, unedited future sections refresh when selected; direct edits stop automatic replacement.
+- The shared dashboard offers **+ Heading** without requiring a category; existing named categories remain supported. Category/project titles are underlined. The top Keep In Mind rule follows `--note-line-adj`. Repeat-arrow decoration removed; border-only card subject outline is 1px.
+- Resize pseudo-elements use a centered 21px strip of 3px squares/gaps, oriented along the divider. The `::before` hit areas move to the same center with their original sizes; drag handlers are unchanged; all column, Notes/Reference, one-day Plan and mobile split dividers are covered.
+- Dailies checkbox hold menu sets `data-rep="daily"` or `"off"` on the selected task/subtree. Off lines remain in the current date but are excluded from new-day templates. Missing recurrence defaults to daily.
+- `getMainCalendarEvents(date)` reads only `EVENT_CALENDARS[0]`, for the selected calendar day. Unlike the old `getCalendarEvents`, it never invokes archival or event writes. Bottom-middle `#centerDownScroll` is titled **Calendar Events**, shows all-day events first then timed events, and has manual refresh, error/empty states, one-minute caching, and stale-response protection on date changes. The old Reference calendar remains off.
+
 ## Inbox — REMOVED 2026-10-31 (Julius)
 
 - The Inbox panel is gone (`INBOX_PANEL_ON = false`). Ideas Julius captures go to `CLAUDE_TASKS` in `tasks.js` with `date: 'backlog'`, `urg: 3` (Backlog cell, Can be later). Open in-app inbox items move to Backlog once via `migrateInboxToBacklog()` (only when the Backlog cell is loaded). `CLAUDE_INBOX` stays as an empty array. Old notes below are history.
@@ -272,3 +282,4 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - **Scrolling top half** (2026-11-01): `appendDayRow` (type day) wraps `.day-label`, the Completed `.od-head` and `.day-editor` in `.od-top` (`display:contents` outside one-day). In one-day `.od-top` is the scroller (flex `--od-a`); the editor is `overflow:visible`, `flex:1 0 auto`. The `fw.odSplit` box measures from `.od-top`. CSS one-day selectors now use `.od-on .day-editor` / `.od-on .od-head`.
 - **Tight Notes lines** (2026-11-01): `.journal-editor > .check-line[data-tc^=f / $=l]` margin 1px, padding 2px (cards elsewhere unchanged).
 5. **Approach**: read sections selectively; preserve mobile layouts, notes, calendar, task logs, saved data, resize controls; never delete/overwrite content for the layout change.
+

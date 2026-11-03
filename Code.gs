@@ -134,8 +134,29 @@ function getWorkspaceData() {
     urgent: getUrgentDays_(),
     inbox: (function () { try { return getInbox(); } catch (e) { return []; } })(),
     cardCats: getCardCats_(),
+    notesSeeds: getNotesSeeds_(today),
     today: today
   };
+}
+
+// Dailies belong to every day (Julius, 2026-11-03). Carry the latest saved
+// section forward, even after a gap longer than the visible date window.
+// Read only: historical cells and their completion states remain untouched.
+function getNotesSeeds_(today) {
+  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+  const count = sheet.getLastRow() - 1;
+  const seeds = {};
+  if (count < 1) return seeds;
+  sheet.getRange(2, 1, count, 3).getValues().forEach(row => {
+    const date = formatDate_(row[0]);
+    const journal = String(row[2] || '');
+    ['must', 'focus'].forEach(kind => {
+      if (date && date <= today && (!seeds[kind] || date > seeds[kind].date) &&
+          new RegExp('data-nsec=["\']' + kind + '["\']').test(journal))
+        seeds[kind] = { date: date, journal: journal };
+    });
+  });
+  return seeds;
 }
 
 
@@ -1726,6 +1747,25 @@ const EVENT_CALENDARS = [
 ];
 const EVENT_DAYS_AHEAD = 3;
 
+// Center-bottom list: main calendar only, strictly read-only (no archive path).
+function getMainCalendarEvents(dateString) {
+  const date = String(dateString || todayString_());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid calendar date');
+  const start = parseDate_(date), end = parseDate_(addDaysToDateString_(date, 1));
+  const cal = CalendarApp.getCalendarById(EVENT_CALENDARS[0]);
+  if (!cal) throw new Error('Main calendar is unavailable');
+  const tz = Session.getScriptTimeZone();
+  const events = cal.getEvents(start, end).map(ev => {
+    const allDay = ev.isAllDayEvent();
+    const s = ev.getStartTime(), e = ev.getEndTime();
+    return { title: ev.getTitle() || '(no title)', allDay: allDay,
+      start: s.getTime(), end: e.getTime(),
+      time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') };
+  });
+  events.sort((a,b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start);
+  return { date: date, events: events };
+}
+
 function getCalendarEvents() {
   // Auto archive first (when on), so the list below is already tidy.
   if (archiveAuto_()) { try { archiveCompletedTasks({}); } catch (e) { console.error(e); } }
@@ -2059,3 +2099,4 @@ function saveLookSnapshot(slot, json, ua) {
   sh.getRange(row, 1, 1, 4).setValues([[slot, dev, new Date(), String(json).slice(0, 45000)]]);
   return true;
 }
+

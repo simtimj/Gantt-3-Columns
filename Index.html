@@ -1532,6 +1532,19 @@
       .ce-group{margin-top:12px;}
       .ce-scheduled{margin:6px 0;}
     }
+    /* Center calendar: compact cards, Options typography and comfortable phone insets. */
+    #centerDownScroll{padding-inline:clamp(8px,2.5vw,16px);box-sizing:border-box;}
+    #centerCalendarList{font-family:var(--paragraph-font);font-size:var(--paragraph-size);}
+    #centerCalendarList .ce-date,#centerCalendarList .ce-group,#centerCalendarList .ce-event,#centerCalendarList .ce-time{font-size:inherit;}
+    #centerCalendarList .ce-event{box-sizing:border-box;margin:5px 0;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--panel);line-height:1.35;overflow-wrap:anywhere;}
+    #centerCalendarList .ce-scheduled{margin:6px 0;}
+    #centerCalendarList .ce-time{color:var(--muted);}
+    .ce-head [data-ce-refresh]{box-sizing:border-box;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1;border-radius:6px;}
+    @media(max-width:600px){
+      #centerDownScroll{padding-inline:10px;}
+      #centerCalendarList .ce-event{padding:9px 10px;}
+      .ce-head [data-ce-refresh]{width:28px;height:28px;min-width:28px;min-height:28px;}
+    }
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */

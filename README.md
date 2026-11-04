@@ -49,6 +49,10 @@ Last updated: 2026-11-04
 
 ## 🧪 To be confirmed (2026-11-04)
 
+- **Reference header:** Urgent live counts now render beneath the Reference title, instead of taking their own row in the upper panel. Needs mobile visual confirmation.
+- **Blocks editing:** adds toolbar indent/outdent and up/down controls for selected top-level Plan lines. Hierarchical parent-child movement and true nested block persistence are not complete.
+
+
 - **Blocks first pass:** bottom-left former Plan / think area is relabeled Blocks with + Block and + Task actions. It reuses the existing Days Plan column, rich-text editor and save path, preserving existing Plan contents. Block grouping and task checkbox conversion need live validation; dedicated block-level nesting/reordering controls and reusable templates are not implemented yet.
 
 

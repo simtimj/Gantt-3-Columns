@@ -585,6 +585,8 @@
     #scratchPad{display:none;min-height:40vh;padding:4px;outline:none;overflow-wrap:anywhere;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     #scratchPad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
     #referencePane[data-rtab="scratch"] #scratchPad{display:block;}
+    #referencePane .ref-tabs .sp-add{display:none;width:auto;font-size:12px;padding:0 7px;}
+    #referencePane[data-rtab="scratch"] .ref-tabs .sp-add{display:inline-block;}
     #referencePane[data-rtab="scratch"] #referenceTree,
     #referencePane[data-rtab="scratch"] #refOptions,
     #referencePane[data-rtab="scratch"] .ref-search,
@@ -1761,7 +1763,7 @@
     #refSplitBar,#notesSplitBar,body.one-day #todayScroll .od-on > .od-pad-head{pointer-events:none!important;cursor:default!important;}
     /* The Blocks header ignores touches so only its grip drags; its buttons must still take them (2026-11-04, Julius). */
     body.one-day #todayScroll .od-on > .od-pad-head{border-bottom:2px solid var(--divider);padding-bottom:4px;margin-bottom:3px;}
-    #centerDownScroll .ce-tools{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;}
+    #centerDownScroll .ce-tools{position:relative;z-index:6;display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;}
     #centerDownScroll .ce-head [data-ce-sort]{min-width:0;min-height:22px;height:22px;padding:0 6px;font-size:12px;line-height:1;}
     #centerDownScroll .ce-head{border-bottom:2px solid var(--divider);padding-bottom:3px;margin-bottom:3px;}
     body.one-day #todayScroll .od-on > .od-pad-head button{pointer-events:auto!important;position:relative;z-index:1;cursor:pointer!important;}
@@ -1865,7 +1867,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 #centerCalendarList .ce-check{flex:0 0 auto;width:15px;height:15px;margin:1px 0 0;accent-color:#777;cursor:pointer;touch-action:none;}
 /* Calendar rows take urgency + subject like task lines (2026-11-03, Julius). */
 .ce-event[data-urg="1"]{--urg:#e5484d;}.ce-event[data-urg="2"]{--urg:#f0b000;}.ce-event[data-urg="3"]{--urg:#3b82f6;}
-#centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid var(--urg);border-radius:3px;background:#fff;display:inline-grid;place-content:center;}
+#centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid var(--urg);border-radius:3px;background:transparent;display:inline-grid;place-content:center;}
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked{background:var(--urg);}
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
 /* Cal Events follow Options → Task subject color (2026-11-03, Julius): checkbox / whole card / subtle / border. */
@@ -1882,7 +1884,7 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerDownScroll{padding-inline:4px;}
 /* Tighter cells (2026-11-04, Julius): normal text spacing and a smaller checkbox. Holding the row opens the menu, so the box needn't be big. */
 #centerCalendarList .ce-event,#centerCalendarList .ce-event:has(.ce-meta:not(:empty)){display:flow-root;margin:2px 0;padding:2px 4px;line-height:1.22;}
-#centerCalendarList .ce-check{float:left;position:relative;z-index:1;width:12px;height:12px;margin:2px 5px -12px 0;}
+#centerCalendarList .ce-check{float:left;position:relative;z-index:1;width:calc(17px * var(--workspace-scale,1));height:calc(17px * var(--workspace-scale,1));margin:1px 5px -12px 0;} /* same box as task cells */
 #centerCalendarList .ce-event-text,#centerCalendarList .ce-meta{display:block;padding-left:0;}
 #centerCalendarList .ce-time{display:flow-root;}
 /* Cal Events groups (2026-11-03, Julius): more room and a line between them. */
@@ -2220,6 +2222,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           <span class="center-tabs ref-tabs" role="tablist">
             <button type="button" data-rtab="reference" class="on" title="Reference" aria-label="Reference">📚</button>
             <button type="button" data-rtab="scratch" title="Scratch Pad" aria-label="Scratch Pad">📝</button>
+            <button type="button" class="sp-add" data-sp-task title="Add a task to the Scratch Pad">+ Task</button>
           </span>
           <input
             id="refSearch"
@@ -2230,7 +2233,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           <button class="btn ref-tb-sm" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: sort, collapse, Urgent panel, padding">Options</button>
         </div>
         <div id="referenceTree"></div>
-        <div id="scratchPad" contenteditable="false" spellcheck="true"></div>
+        <div id="scratchPad" class="editor plan-editor" contenteditable="false" spellcheck="true"></div>
       </div>
     </section>
     <div id="referenceEdgeResize" title="Drag to resize Reference column"></div>
@@ -3117,6 +3120,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       'input',
       () => {
         autoFormat(el);
+        if(type === 'scratch') return; // saved by its own listener
         if(type === 'plan'){ if(window.odPadSave) odPadSave(el.dataset.date); return; }
         if(el.dataset.date){
           requestAnimationFrame(() => syncDayHeightStable(el.dataset.date));
@@ -3904,6 +3908,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!el){
       return;
     }
+    if(el.id === 'scratchPad'){ el.dispatchEvent(new Event('input',{bubbles:true})); return; }
     if(el.classList && el.classList.contains('plan-editor')){ if(window.odPadSave) odPadSave(el.dataset.date); return; }
     if(
       el.closest('.day-row')
@@ -6806,7 +6811,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     function send(){
       clearTimeout(timer); timer = 0;
       if(!dirty || sending || !date) return;
-      const d = date, html = ed.innerHTML;
+      const d = date, html = cardCleanHtml(ed);
       dirty = false; sending = true;
       google.script.run
         .withFailureHandler(err => {
@@ -6817,7 +6822,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         .withSuccessHandler(res => {
           sending = false;
           if(res && res.conflict){
-            const m = fwMerge3(fwBlocks(base.c),fwBlocks(d === date ? ed.innerHTML : html),fwBlocks(res.html || ''));
+            const m = fwMerge3(fwBlocks(base.c),fwBlocks(d === date ? cardCleanHtml(ed) : html),fwBlocks(res.html || ''));
             base = {c:res.html || '',h:res.h};
             if(d === date){ ed.innerHTML = m.blocks.join(''); dirty = true; setStatus('Merged with changes from elsewhere'); send(); }
             return;
@@ -6844,11 +6849,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           if(seq !== loadSeq || dirty) return;
           ed.innerHTML = res.html || '';
           base = {c:ed.innerHTML,h:res.h};
+          normalizeEditorTasks(ed);
           ed.setAttribute('contenteditable','true');
         })
         .getScratchPad(d);
     }
     window.scratchShow = show;
+    // A full editor like Blocks: checkboxes, task cells, hold menu, drag (2026-11-04, Julius).
+    wireEditor(ed,'scratch');
+    pane.querySelector('[data-sp-task]')?.addEventListener('click',() => {
+      if(ed.getAttribute('contenteditable') !== 'true') return;
+      captureBeforeEdit(ed);
+      const n = createCheckboxLine(0);
+      ed.appendChild(n);
+      ed.focus({preventScroll:true});
+      placeCaretInsideCheckbox(n.querySelector('.check-text'));
+      ed.dispatchEvent(new Event('input',{bubbles:true}));
+    });
     ed.addEventListener('input',() => {
       if(ed.textContent.trim() === '' && !ed.querySelector('img,input')) ed.innerHTML = ''; // keeps the placeholder
       dirty = true; setStatus('Unsaved scratch pad…');
@@ -8144,7 +8161,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(ceDraw) ceDraw(); // a new subject moves the row to that subject's group
     google.script.run.withFailureHandler(err => {
       setStatus('Could not save that calendar event: ' + (err && err.message || err));
-    }).setCalendarEventMeta(d.ceId,Number(d.ceStart),d.ceRec === '1',meta);
+    }).setCalendarEventMeta(d.ceId,Number(d.ceStart),d.ceRec === '1',meta,d.ceCal);
   }
   function loadCenterCalendar(date, force){
     date = date || window.odDate || state.today;

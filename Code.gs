@@ -1921,13 +1921,28 @@ function addAllDayTask(dateString, title) {
 function calMetaKey_(eventId, start, recurring) {
   return 'calMeta:' + String(eventId).slice(0, 60) + (recurring ? ':' + Number(start) : '');
 }
-function setCalendarEventMeta(eventId, start, recurring, meta) {
+// Urgency shows on the calendar too (2026-11-04, Julius): 1 red (Tomato), 2 yellow (Banana), 3 blue (Blueberry), none = calendar default.
+const URG_EVENT_COLOR_ = { '1': '11', '2': '5', '3': '9' };
+function syncCalUrgencyColor_(calId, eventId, start, urg) {
+  if (EVENT_CALENDARS.indexOf(calId) < 0) return;
+  const ev = calEventAt_(calId, eventId, start), color = URG_EVENT_COLOR_[urg] || '';
+  if (String(ev.getColor() || '') === '8') { // done stays Graphite; unticking brings back the new urgency color
+    PropertiesService.getScriptProperties().setProperty('calPrev:' + eventId.slice(0, 60) + ':' + Number(start), color || 'default');
+    return;
+  }
+  ev.setColor(color || '0');
+}
+
+function setCalendarEventMeta(eventId, start, recurring, meta, calId) {
   const m = meta || {}, clean = {};
   if (/^[123]$/.test(m.urg || '')) clean.urg = m.urg;
   if (/^\d{4}-\d{2}-\d{2}$/.test(m.due || '')) clean.due = m.due;
   if (/^\d{1,4}$/.test(String(m.dur || ''))) clean.dur = String(m.dur);
   if (/^[a-z]{2,12}$/.test(m.cat || '')) clean.cat = m.cat;
   const props = PropertiesService.getScriptProperties(), key = calMetaKey_(eventId, start, recurring);
+  let oldUrg = '';
+  try { oldUrg = (JSON.parse(props.getProperty(key) || '{}').urg) || ''; } catch (e) {}
+  if ((clean.urg || '') !== oldUrg) syncCalUrgencyColor_(calId, eventId, start, clean.urg || '');
   if (Object.keys(clean).length) props.setProperty(key, JSON.stringify(Object.assign({ s: Number(start) }, clean)));
   else props.deleteProperty(key);
   // Drop saved fields for events more than 60 days past.

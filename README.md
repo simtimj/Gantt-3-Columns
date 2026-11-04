@@ -52,12 +52,14 @@ Last updated: 2026-11-04
 - **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
+- **Scratch Pad is a full editor**: **+ Task**, `[]` + Space, the checkbox hold menu and task cells all work there, same as Blocks.
+- **Cal urgency color**: setting urgency in Cal Events colors the Google Calendar event: 1 red, 2 yellow, 3 blue, none = default. Done events stay Graphite until unticked.
 - **Cal Events order button**: next to refresh, switches between **Category** (all events together under their subject, no times) and **Time** (all-day first, then scheduled by start). Remembered per device.
 - **Cal + Task color**: new events get no color from the app, so you set urgency yourself.
 - **Urgent spacing**: the empty band above Urgent is gone.
 - **Subtle + border tint**: one tint everywhere, a hint of the subject color over the black cell, with Dailies matching.
 - **History wrap**: long task text runs under the checkbox at any column width, not only under 420px.
-- **Cal Events spacing**: tighter line spacing inside cells and a smaller 12px checkbox.
+- **Cal Events spacing**: tighter line spacing inside cells, with the checkbox the same size as task cells. An urgency box keeps its inside color instead of going white.
 - **Blocks rebuilt on task cells**: **+ Block** adds a `Block name` title to type over plus one empty task cell, with no popup. **+ Task** adds a cell inside the selected block. Indent and order come from the checkbox hold menu and drag and drop like other task cells; the → ← ↑ ↓ buttons are gone.
 - **Header lines**: a line under the Blocks and Cal Events headers.
 - **Blocks toolbar fixed**: every Blocks button was dead on all screens because the header ignores touches so only its grip drags. The buttons take taps now.
@@ -407,6 +409,8 @@ Last updated: 2026-11-04
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+- **Recurring blocks** (2026-11-04): a section at the bottom holding reusable blocks, so he can mark one as next, e.g. the usual morning block of stretch and coffee.
+- **Uniform look** (2026-11-04): come up with a way to make the separate sections look and work the same.
 - **Corner resize**: hold where a column line meets a section line and drag, like resizing a desktop window. On hold (2026-11-04): try the new resize pills first. Open question: how it picks the section; the drag direction could decide it (Julius, 2026-11-03).
 - **Center Up / Center Down (2026-11-01, Julius: spec saved; phases 1–2 done)**: hourly Weather built (Open-Meteo, to confirm); Center Down contents still to decide. **Make sure you do**: repeating marker ↻ built for daily starters (other repeat rules still to work out). Spec: `docs/NOTES.md` → "Center Up / Down + planning pause".
 - **Auto-reshuffle, Motion/Reclaim-style (Julius, 2026-10-28)**: ✅ step 1 task fields (duration above) · step 2 `Code.gs` reads today's calendar and finds free gaps, skipping the Chill and Repeat Tasks calendars · step 3 scheduler sorts by deadline + priority and puts each task in the first gap it fits · step 4 **Reshuffle** button that reruns it (auto-run later). Keep a manual mode too: set the parameters together with Claude in conversation. Target: Fri Nov 6.

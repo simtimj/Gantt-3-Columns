@@ -1468,6 +1468,8 @@
     .od-nav .btn{min-width:28px;padding:0 6px;line-height:1.4;}
     body.one-day .od-nav{display:inline-flex;}
     .od-head,.plan-pad{display:none;}
+    /* The Today: 70/72 done chip already says it (2026-11-03, Julius). */
+    body.one-day #todayScroll .od-on .od-head:not(.od-pad-head){display:none!important;}
     .fx-cat{border-left:2px solid var(--fx-category-color,#70baff);padding-left:5px;}
     .fx-cat>.fx-ch .fx-name{color:var(--fx-category-color,#70baff);}
 
@@ -1823,7 +1825,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked{background:var(--urg);}
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
 /* Cal Events follow Options → Task subject color (2026-11-03, Julius): checkbox / whole card / subtle / border. */
-body.tc-borderonly #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
+body:is(.tc-borderonly,.tc-subtleline) #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
 body:not(.tc-boxfill,.tc-borderonly) #centerCalendarList .ce-event[data-tccat]:not(.ce-done){background:color-mix(in srgb,var(--ce-cat) var(--tc-mix,22%),var(--panel));}
 body.tc-boxfill #centerCalendarList .ce-event[data-tccat]:not(.ce-done) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid color-mix(in srgb,var(--ce-cat) 55%,#555);border-radius:3px;background:var(--ce-cat);display:inline-grid;place-content:center;}
 body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done) > .ce-check{border-color:var(--urg);}
@@ -1852,8 +1854,12 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 
 .editor [data-nsec="must"]{position:relative;}
 /* Small and inside the DAILIES lines (2026-11-03, Julius): flow-root keeps the floated button within the header. */
-.editor > [data-nsec="must"]{display:flow-root;}
-.editor .daily-sort-btn{float:right;margin:4px 0 0;font:inherit;font-size:9px;line-height:1;letter-spacing:0;text-transform:none;border:1px solid currentColor;border-radius:3px;background:transparent;color:inherit;padding:0 3px;min-height:0;cursor:pointer;}
+.editor > [data-nsec="must"]{display:flex;align-items:center;justify-content:space-between;}
+/* DAILIES starts right at the header line, so its text and Options sit midway between the two lines. */
+.editor > [data-nsec="must"]{padding-top:2px;}
+body.one-day #journalScroll .day-row.od-on{padding-top:0!important;}
+body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!important;margin-top:0!important;}
+.editor .daily-sort-btn{flex:0 0 auto;margin:0;font:inherit;font-size:9px;line-height:1;letter-spacing:0;text-transform:none;border:1px solid currentColor;border-radius:3px;background:transparent;color:inherit;padding:0 3px;min-height:0;cursor:pointer;}
 .editor .daily-sort-menu{position:absolute;right:0;top:100%;z-index:20;background:var(--panel,#fff);border:1px solid var(--border,#888);border-radius:6px;padding:4px;box-shadow:0 5px 15px #0003;min-width:145px;}
 .editor .daily-sort-menu[hidden]{display:none!important;}
 .editor .daily-sort-menu button{display:block;width:100%;padding:7px;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;cursor:pointer;}
@@ -2015,7 +2021,7 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
     <label class="ts-check">Divider lines <input type="color" id="dividerColor" value="#1f2937" aria-label="Divider line color"> <button class="btn tiny" type="button" id="dividerReset">Reset</button></label>
     <label class="ts-check">Line strength <input type="range" id="lineStrength" min="20" max="100" step="5" value="70" aria-label="Dividing line strength"> <span id="lineStrengthVal">70%</span></label>
     <label class="ts-check"><input type="checkbox" id="oneDayOn" checked> One day at a time (▲ ▼ to change day; Completed on top, Plan pad below)</label>
-    <div class="ts-row"><span class="ts-label">Task subject color</span><select id="cardsColorMode" aria-label="Task subject color"><option value="checkbox">Checkbox only</option><option value="whole">Whole card</option><option value="subtle">Whole card, subtle</option><option value="border">Card border only</option></select></div>
+    <div class="ts-row"><span class="ts-label">Task subject color</span><select id="cardsColorMode" aria-label="Task subject color"><option value="checkbox">Checkbox only</option><option value="whole">Whole card</option><option value="subtle">Whole card, subtle</option><option value="subtleline">Subtle + border line</option><option value="border">Card border only</option></select></div>
     <div class="ts-row">
       <span class="ts-label" title="How red / yellow / blue urgency shows on a task">Urgency mark</span>
       <select id="urgMarkSelect" aria-label="Urgency mark"><option value="bar">Bar left of box</option><option value="under">Line under box</option><option value="text">Underline text</option><option value="box">Box border (old)</option></select>
@@ -9700,6 +9706,8 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
   body.tc-boxfill .check-line[data-tccat]{--tc-tint:transparent;}
   /* Whole card, subtle (2026-11-03, Julius): same tint at a third of the strength. */
   body.tc-subtle{--tc-mix:8%;}
+  /* Subtle + border line (2026-11-03, Julius): same tint, card outline in a brighter subject color. */
+  body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 60%,transparent);}
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
   body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}
   /* Keep subject colors readable without the bright outlines/fold controls. */
@@ -10427,8 +10435,8 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
     if(ds){ ds.checked = daySecsOn; ds.addEventListener('change',() => { daySecsOn = ds.checked; try{ localStorage.setItem('fw.daySecs',daySecsOn ? '1' : '0'); }catch(e){} refreshAllCards(); }); }
     const cm = document.getElementById('cardsColorMode');
     let colorMode = 'checkbox';
-    try{ const saved = localStorage.getItem('fw.cardsColorMode'); colorMode = ['checkbox','whole','subtle','border'].includes(saved) ? saved : (localStorage.getItem('fw.cardsBoxFill') === '0' ? 'whole' : 'checkbox'); }catch(e){}
-    const applyColorMode = v => { document.body.classList.toggle('tc-boxfill',v === 'checkbox'); document.body.classList.toggle('tc-borderonly',v === 'border'); document.body.classList.toggle('tc-subtle',v === 'subtle'); };
+    try{ const saved = localStorage.getItem('fw.cardsColorMode'); colorMode = ['checkbox','whole','subtle','subtleline','border'].includes(saved) ? saved : (localStorage.getItem('fw.cardsBoxFill') === '0' ? 'whole' : 'checkbox'); }catch(e){}
+    const applyColorMode = v => { document.body.classList.toggle('tc-boxfill',v === 'checkbox'); document.body.classList.toggle('tc-borderonly',v === 'border'); document.body.classList.toggle('tc-subtle',v === 'subtle' || v === 'subtleline'); document.body.classList.toggle('tc-subtleline',v === 'subtleline'); };
     applyColorMode(colorMode);
     if(cm){ cm.value = colorMode; cm.addEventListener('change',() => { applyColorMode(cm.value); try{ localStorage.setItem('fw.cardsColorMode',cm.value); }catch(e){} }); }
     const um = document.getElementById('urgMarkSelect'), UM = ['bar','under','text','box'];

@@ -1545,6 +1545,17 @@
       #centerCalendarList .ce-event{padding:9px 10px;}
       .ce-head [data-ce-refresh]{width:28px;height:28px;min-width:28px;min-height:28px;}
     }
+    /* Keep the calendar heading left-aligned and its refresh action truly compact. */
+    #centerDownScroll{container-type:inline-size;}
+    #centerDownScroll .ce-head{display:flex;flex-wrap:nowrap;justify-content:space-between;align-items:center;width:100%;gap:6px;}
+    #centerDownScroll .ce-head strong{flex:1 1 auto;min-width:0;font-size:var(--paragraph-size);text-align:left;}
+    #centerDownScroll .ce-head [data-ce-refresh]{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px;padding:0!important;margin:0;font-size:14px;line-height:1;}
+    #centerCalendarList .ce-date{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #centerCalendarList .ce-date-short{display:none;}
+    @container(max-width:360px){
+      #centerCalendarList .ce-date-long{display:none;}
+      #centerCalendarList .ce-date-short{display:inline;}
+    }
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
@@ -7539,7 +7550,7 @@
     const draw = data => {
       if(seq !== centerCalendarSeq) return;
       const allDay = data.events.filter(ev => ev.allDay), scheduled = data.events.filter(ev => !ev.allDay);
-      box.innerHTML = '<div class="ce-date">' + esc(formatDate(date)) + '</div>' +
+      box.innerHTML = '<div class="ce-date"><span class="ce-date-long">' + esc(formatDate(date)) + '</span><span class="ce-date-short">' + esc(formatDateShort(date)) + '</span></div>' +
         (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => '<div class="ce-event">' + esc(ev.title) + '</div>').join('') : '') +
         (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => '<div class="ce-event ce-scheduled"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></div>').join('') : '') +
         (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');

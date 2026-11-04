@@ -13,6 +13,9 @@ const data = {
   today, inbox: [], cardCats: [], notesSeeds: {}, urgent: [], refPins: [],
   days: [{ date: today, journal: '',
     tasks: line('Pay rent', ' data-urg="1"') + line('Walk dog') +
+      // Urgent checkmarks (2026-11-04): a finished urgent task (yellow) and one with a subtask.
+      '<div class="check-line done" data-level="0" data-urg="2"><input type="checkbox" checked><span class="check-text">Paid bill</span></div>' +
+      line('Book trip', ' data-urg="3"') + '<div class="check-line" data-level="1" data-urg="3" style="margin-left: 24px;"><input type="checkbox"><span class="check-text">Pick dates</span></div>' +
       // History modes (2026-11-04): a Morning section with a 50-item Claude group.
       '<div data-tsec="morning" contenteditable="false">Morning</div><div data-cgrp="Gantt"><b><u>Gantt</u></b></div>' +
       Array.from({ length: 50 }, (_, i) => '<div class="check-line done" data-level="0" data-cid="s-' + i + '" data-dt="09:' + String(i % 60).padStart(2, '0') + '"><input type="checkbox" checked><span class="check-text"><b>*Item ' + i + ' with a fairly long title that has to wrap</b>: details</span></div>').join('') +
@@ -27,7 +30,7 @@ const data = {
 };
 const stub = `<script>window.google={script:{run:new Proxy({},{get(t,k){let ok=null;const p=new Proxy({},{get(_,m){
   if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler'||m==='withUserObject')return()=>p;
-  return(...a)=>setTimeout(()=>ok&&ok(m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);}});return p[k];}})}};</script>`;
+  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
 let html = fs.readFileSync('Index.html', 'utf8')
   .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
   .replace('<?!= initialData ?>', JSON.stringify(data)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')
@@ -56,6 +59,41 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return '';
   });
   if (study) errs.push('IT study entry: ' + study);
+  // Urgent checkmarks + two-way sync with the real task (2026-11-04).
+  const urg = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const row = t => [...document.querySelectorAll('#urgentPanel .urg-row')].find(r => r.querySelector('.urg-text')?.textContent.trim() === t);
+    const line = t => [...document.querySelectorAll('#todayScroll .day-editor .check-line')].find(l => l.textContent.trim() === t);
+    const check = r => { const a = getComputedStyle(r.querySelector('.urg-box'), '::after'); return a.content !== 'none' && parseFloat(a.borderRightWidth) >= 2 && a.borderRightColor !== 'rgba(0, 0, 0, 0)'; };
+    const state = t => { const r = row(t), l = line(t); return { row: !!r && r.classList.contains('done'), mark: !!r && check(r), task: !!l && l.querySelector('input').checked }; };
+    const out = [];
+    const want = (label, t, on) => { const s = state(t); if (s.row !== on || s.mark !== on || s.task !== on) out.push(label + ' ' + JSON.stringify(s)); };
+    if (!row('Paid bill') || !row('Pay rent')) return ['rows missing in Urgent'];
+    want('done task shows a check:', 'Paid bill', true);
+    const pb = getComputedStyle(row('Paid bill').querySelector('.urg-box'));
+    if (pb.width !== '13px' || pb.height !== '13px') out.push('box size changed: ' + pb.width + ' × ' + pb.height);
+    want('open task has no check:', 'Pay rent', false);
+    row('Pay rent').querySelector('.urg-box').click(); await wait(400);
+    want('tick in Urgent → task done:', 'Pay rent', true);
+    row('Pay rent').querySelector('.urg-box').click(); await wait(400);
+    want('untick in Urgent → task open:', 'Pay rent', false);
+    line('Pay rent').querySelector('input').click(); await wait(400);
+    want('tick the task → Urgent checked:', 'Pay rent', true);
+    line('Pay rent').querySelector('input').click(); await wait(400);
+    want('untick the task → Urgent unchecked:', 'Pay rent', false);
+    row('Pick dates').querySelector('.urg-box').click(); await wait(400);
+    want('subtask tick in Urgent:', 'Pick dates', true);
+    if (!row('Book trip') || row('Book trip').classList.contains('done')) out.push('subtask tick changed its parent');
+    // Saved: the last save of the day has the subtask checked (so it survives a refresh) and keeps its urgency.
+    await wait(2500);
+    const saves = (window.__calls || []).filter(c => c[0] === 'saveDay').map(c => String(c[1][1] || ''));
+    const last = saves[saves.length - 1] || '';
+    const m = last.match(/<div[^>]*data-level="1"[^>]*>(?:(?!<\/div>).)*Pick dates/);
+    if (!m || !/data-urg="3"/.test(m[0])) out.push('saved subtask lost its urgency or was not saved');
+    if (!/<input[^>]*checked[^>]*>(?:(?!<\/div>).)*Pick dates/.test(last)) out.push('done state not in the saved day');
+    return out;
+  });
+  urg.forEach(x => errs.push('Urgent: ' + x));
   // History detail button: List = one line per item (all 50), hidden lines really hidden; Mini = counts only; back to Full.
   const modes = [];
   for (let i = 0; i < 3; i++) {

@@ -49,6 +49,7 @@ Last updated: 2026-11-04
 
 ## 🧪 To be confirmed (2026-11-04)
 
+- **Checkmarks in Urgent**: finished tasks in the Urgent panel now show a ✓ inside their box (white on red / blue, dark on yellow), not just a filled box. Ticking a task in Today now updates Urgent at once (it used to lag about 1.5 s). Ticking in either place still changes the same task.
 - **History detail button (▤ / ≡ / –)** next to HISTORY at the top of the History column. Tap to switch: **▤ Full** (as before; sections fold only when you tap them), **≡ List** (every Morning / Afternoon / Evening folded to one row per project, with every item on its own line), **– Mini** (one short line per project: name + count). Tap a section header to open just that one; in Mini, tap a count to see its list. Remembered on each device; it only changes the view, never your saved History. Older days (Oct 30 – Nov 1 style) and groups sitting outside the time sections fold the same way, and List / Mini hide their blank lines.
 - **Folded History really folds**: a style added Nov 4 kept every task visible under a folded Morning / Afternoon / Evening, which is why some sections never condensed. Fixed for all modes.
 - **One item per line in folded summaries**: no more single paragraph with "· +20 more"; all items kept, repeats shown once with ×2.

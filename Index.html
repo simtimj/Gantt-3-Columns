@@ -1160,6 +1160,11 @@
     .check-line[data-due-label]::after{content:attr(data-due-label);flex:0 0 auto;margin-left:6px;font-size:10.5px;line-height:1.15;text-align:right;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
     .urg-subtask{font-size:12px;color:var(--muted);padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .urg-row.done .urg-box{background:var(--urg);}
+    /* Done = a visible check, not just a filled box (2026-11-04). Drawn inside the box, so its size and spacing stay the
+       same. White on red / blue / gray; dark on yellow, where white is too faint. */
+    .urg-row.done .urg-box{position:relative;}
+    .urg-row.done .urg-box::after{content:"";position:absolute;left:2.5px;top:-.5px;width:3px;height:6.5px;border:solid var(--urg-check,#fff);border-width:0 2px 2px 0;transform:rotate(45deg);box-sizing:content-box;pointer-events:none;}
+    .urg-row.done[data-urg="2"] .urg-box{--urg-check:#1f1f1f;}
     .urg-row.done .urg-text{text-decoration:line-through;opacity:.6;}
     .urg-subtask.done{text-decoration:line-through;opacity:.7;}
     .check-line.urg-flash{animation:urgflash 1.3s ease-out;}
@@ -4295,6 +4300,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         // Task mirrors (2026-11-01): same data-tid elsewhere follows this tick.
         if(window.tidToggled) try{ tidToggled(line,cb.checked,root); }catch(err){}
         saveEditorOwner(root);
+        // Urgent follows the tick at once (2026-11-04): it used to wait ~1.5 s for the save to come round. Same cell
+        // content as the source, so there's still one completion state.
+        const uk = typeof ownerKey === 'function' ? ownerKey(root) : null;
+        if(uk && root && /data-(urg|due|arch)=/.test(root.innerHTML)) try{ noteUrgentDay(uk.date,root.innerHTML,true,uk.pane); }catch(err){}
       }
     );
   }

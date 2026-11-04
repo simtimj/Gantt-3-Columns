@@ -359,3 +359,9 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - Hold-to-expand: `.today-jump` resolves to `#todayScroll .od-on > .od-top` in one-day view (was `#todayPane`, which zoomed Blocks too); `open()` pins the Blocks pad's flex-basis to its current height while History is out of the row, `settle()` clears it.
 - Load: `readAllDays_()` once in `getWorkspaceData()` → `getUrgentDays_(all)`, `getNotesSeeds_(today, all)` (both still work without it). `syncConfirmCard_` = `confirmCardWork_(true)` dry run without the lock; lock (tryLock 5 s) only to write.
 - `tools/smoke.mjs` checks a 50-item section in all three modes (List lists ≥ 50 items, no hidden line displayed, nothing wider than the pane).
+
+## Urgent checkmarks (2026-11-04, Julius via ChatGPT handoff)
+
+- `.urg-box` is a bordered span (border-box, 9px inside). Done rows (`.urg-row.done`, set from the real task's checkbox in `urgItemRow`) get a CSS check: `::after` rotated L, color `--urg-check` (white; `#1f1f1f` on yellow `data-urg="2"`). Size / spacing unchanged.
+- Sync: Urgent box → `toggleDueTask` flips the real checkbox (change event) → `urgChanged`. Task checkbox → `wireCheckbox` change now also calls `noteUrgentDay(ownerKey(root)…, root.innerHTML)` when the cell has urgent / due / archived lines, so Urgent redraws at once instead of after the save round trip (~1.5 s). One source of truth: the cell HTML.
+- `tools/smoke.mjs`: done row shows the check, 13px box, open row has none; tick / untick both ways; a subtask tick leaves its parent open; the last `saveDay` keeps the subtask checked with `data-urg="3"`.

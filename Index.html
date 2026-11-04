@@ -1687,6 +1687,17 @@
     .fx-send{border:0;background:transparent;padding:0 2px;cursor:pointer;font-size:.8em;opacity:.35;flex:0 0 auto;}
     .fx-task:focus-within .fx-send,.fx-send:hover{opacity:1;}
     .fx-tasks > .fx-add{padding-left:0;}
+    /* A color set from the hold menu covers everything inside (2026-11-03, Julius); finished subtasks stay gray. */
+    .fx-colored :is(.fx-ch,.fx-ph,.fx-name,.fx-title,.fx-why,.fx-tt,.fx-tg,.fx-add,.fx-sub),.fx-colored .fx-task:not(.fx-done) .fx-tt{color:var(--fx-category-color);}
+    .fx-colored .fx-done .fx-tt{color:var(--muted,#888);}
+    .fx-colored .fx-task input{accent-color:var(--fx-category-color);}
+    .fx-colored .fx-proj,.fx-proj.fx-colored{border-left-color:var(--fx-category-color);}
+    .fx-menu{width:216px;max-width:216px;}
+    .fx-swatches{display:flex;flex-wrap:wrap;gap:6px;flex:1 0 100%;}
+    .fx-swatch{width:26px;height:26px;padding:0;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;line-height:1;cursor:pointer;}
+    .fx-swatch.on{box-shadow:0 0 0 2px var(--accent,#1a73e8);}
+    .fx-well{width:26px;height:26px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;}
+    .fx-hue{flex:1 0 100%;width:100%;height:22px;margin:4px 0 0;padding:0;-webkit-appearance:none;appearance:none;border-radius:6px;background:linear-gradient(to right,#ff7070,#ffd166,#7ee081,#6fe3e3,#70a0ff,#d38cff,#ff7070);cursor:pointer;touch-action:none;}
     /* Hourly weather (☁️ tab). */
     .wx-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;font-size:12px;color:var(--muted,#888);}
     .wx-head button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 4px;}
@@ -6699,11 +6710,11 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     function html(){
       let out = '';
       data.cats.forEach(c => {
-        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (!c.name && c.projects.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '" style="--fx-category-color:' + h(c.color || '#70baff') + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
+        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (c.color ? ' fx-colored' : '') + (!c.name && c.projects.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '" style="--fx-category-color:' + h(c.color || '#70baff') + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
           '<span class="fx-name" contenteditable="true" data-fx="name" data-fph="Category">' + h(c.name) + '</span>' +
           (c.col ? '<span class="fx-sub">' + c.projects.length + '</span>' : '') + '</div><div class="fx-body">';
         c.projects.forEach(p => {
-          out += '<div class="fx-proj' + (p.col ? ' fx-col' : '') + '" data-fid="' + p.id + '"><div class="fx-ph"><button type="button" class="fx-tg" data-fx="tg">' + (p.col ? '▸' : '▾') + '</button>' +
+          out += '<div class="fx-proj' + (p.col ? ' fx-col' : '') + (p.color ? ' fx-colored' : '') + '" data-fid="' + p.id + '"' + (p.color ? ' style="--fx-category-color:' + h(p.color) + '"' : '') + '><div class="fx-ph"><button type="button" class="fx-tg" data-fx="tg">' + (p.col ? '▸' : '▾') + '</button>' +
             '<span class="fx-title" contenteditable="true" data-fx="title" data-fph="Task">' + h(p.title) + '</span></div>' +
             '<div class="fx-why" contenteditable="true" data-fx="why" data-fph="Why focus…">' + h(p.why) + '</div><div class="fx-tasks">';
           (p.tasks || []).forEach(t => {
@@ -6734,6 +6745,63 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       if(fh && !ed.querySelector(':scope > .fx')) fh.insertAdjacentHTML('afterend','<div class="fx" data-render-due contenteditable="false"></div>');
       render();
     };
+    // Hold menu (2026-11-03, Julius): same look as the checkbox menu. Color is right at the top, with quick
+    // picks, a hue slider and the full color chooser; it changes all the text inside.
+    const FX_COLORS = ['#ff6b6b','#ffa94d','#ffd43b','#69db7c','#4dd4c6','#70baff','#b197fc','#f783ac'];
+    function fxHue(hue){
+      const l = .68, a = .8 * Math.min(l,1 - l);
+      const c = n => { const k = (n + hue / 30) % 12; return Math.round(255 * (l - a * Math.max(-1,Math.min(k - 3,9 - k,1)))).toString(16).padStart(2,'0'); };
+      return '#' + c(0) + c(8) + c(4);
+    }
+    function showFxMenu(id,f,x,y){
+      hideUrgencyPicker();
+      const o = f.p || f.c, active = document.activeElement;
+      if(active && active.closest && active.closest('.fx')) active.blur();
+      const m = document.createElement('div');
+      m.className = 'urg-picker fx-menu';
+      const paint = (color,keep) => {
+        if(color) o.color = color; else delete o.color;
+        save(); render();
+        m.querySelectorAll('.fx-swatch').forEach(b => b.classList.toggle('on',(b.dataset.c || '') === (o.color || '')));
+        if(!keep && color) well.value = color;
+      };
+      const row = document.createElement('div'); row.className = 'fx-swatches';
+      FX_COLORS.concat('').forEach(c => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'fx-swatch' + (c === (o.color || '') ? ' on' : ''); b.dataset.c = c;
+        if(c) b.style.background = c; else b.textContent = '✕';
+        b.title = c || 'No color'; b.setAttribute('aria-label',c ? 'Color ' + c : 'No color');
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',() => paint(c));
+        row.appendChild(b);
+      });
+      const well = document.createElement('input');
+      well.type = 'color'; well.className = 'fx-well'; well.value = o.color || '#70baff'; well.title = 'Choose any color'; well.setAttribute('aria-label','Choose any color');
+      well.addEventListener('input',() => paint(well.value,true));
+      row.appendChild(well);
+      m.appendChild(row);
+      const hue = document.createElement('input');
+      hue.type = 'range'; hue.className = 'fx-hue'; hue.min = 0; hue.max = 359; hue.value = 210; hue.setAttribute('aria-label','Color slider');
+      hue.addEventListener('input',() => paint(fxHue(Number(hue.value))));
+      m.appendChild(hue);
+      const item = (label,fn) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'urg-goto'; b.textContent = label;
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',() => { hideUrgencyPicker(); fn(); save(); render(); });
+        m.appendChild(b);
+      };
+      item('✎ Rename',() => setTimeout(() => focusNew(id,f.p ? 'title' : 'name')));
+      if(!f.p) item('+ Add task',() => { const p = {id:uid('p'),title:'',why:'',col:false,tasks:[]}; f.c.projects.push(p); f.c.col = false; setTimeout(() => focusNew(p.id,'title')); });
+      const arr = f.p ? f.c.projects : data.cats, at = arr.indexOf(o);
+      const move = d => () => { arr.splice(at,1); arr.splice(at + d,0,o); };
+      if(at > 0) item('↑ Move up',move(-1));
+      if(at < arr.length - 1) item('↓ Move down',move(1));
+      item(o.col ? '▾ Expand' : '▸ Collapse',() => { o.col = !o.col; });
+      document.body.appendChild(m);
+      placeUrgPicker(m,x,y);
+      urgPicker = m;
+    }
     function wire(host){
       // Hold the fold arrow to manage a category/task without extra visible buttons.
       let holdTimer = null, suppressToggle = false, downX = 0, downY = 0;
@@ -6741,27 +6809,14 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         const toggle = e.target.closest('.fx-tg'); if(!toggle) return;
         downX=e.clientX; downY=e.clientY; clearTimeout(holdTimer);
         holdTimer=setTimeout(()=>{
-          const id=toggle.closest('[data-fid]')?.dataset.fid, f=id?find(id):{}, o=f.p||f.c;
-          if(!o)return;
+          const id=toggle.closest('[data-fid]')?.dataset.fid, f=id?find(id):{};
+          if(!(f.p||f.c))return;
           suppressToggle=true;
-          const cmd=window.prompt('Keep in Mind: rename / color / move up / move down / add task / collapse','color');
-          if(!cmd)return;
-          const action=cmd.trim().toLowerCase();
-          if(action==='rename'){
-            const v=window.prompt('New name',f.p?f.p.title:f.c.name);
-            if(v!==null&&v.trim()) {if(f.p)f.p.title=v.trim();else f.c.name=v.trim();}
-          }else if(action==='color'&&f.c){
-            const v=window.prompt('Category color (#RRGGBB)',f.c.color||'#70baff');
-            if(v&&/^#[0-9a-f]{6}$/i.test(v.trim()))f.c.color=v.trim();
-          }else if(action==='collapse')o.col=!o.col;
-          else if(action==='add task'&&f.c)f.c.projects.push({id:uid('p'),title:'',why:'',col:false,tasks:[]});
-          else if(action==='move up'||action==='move down'){
-            const arr=f.p?f.c.projects:data.cats, i=arr.indexOf(o), j=i+(action==='move up'?-1:1);
-            if(j>=0&&j<arr.length){arr.splice(i,1);arr.splice(j,0,o);}
-          }
-          save();render();
-        },550);
+          if(navigator.vibrate) try{ navigator.vibrate(15); }catch(err){}
+          showFxMenu(id,f,downX,downY);
+        },450);
       },true);
+      host.addEventListener('contextmenu',e=>{if(e.target.closest('.fx-tg'))e.preventDefault();},true);
       host.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-downX)>10||Math.abs(e.clientY-downY)>10)clearTimeout(holdTimer);},true);
       ['pointerup','pointercancel'].forEach(t=>host.addEventListener(t,()=>clearTimeout(holdTimer),true));
       // Keep the Notes editor's own key / tap / drag handlers out of the dashboard.

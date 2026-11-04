@@ -65,6 +65,7 @@ Last updated: 2026-11-04
 ## 🧪 To be confirmed (2026-11-03)
 
 - **Cal Events checkboxes:** hold or right-click a calendar event's checkbox for urgency, due date, length and subject, the same menu as tasks. Tapping still marks it done. Delete, archive, move and title line stay task-only. Saved in the app, not on the Google Calendar event. Not shown in Urgent yet.
+- **Keep In Mind color menu:** holding a fold arrow opens a menu matching the checkbox menu, with quick colors, a hue slider and a full color chooser, plus Rename, Add task, Move and Collapse. Works on categories and tasks; the color covers all text inside, including subtasks. Finished subtasks stay gray.
 - **Keep In Mind tab:** ⭐ is the third Center Up tab and shows only Keep In Mind; 📋 now shows Dailies and your notes without it. Same saved cell, view only.
 - **Weather tab icon:** white cloud, brighter than the other inactive tabs.
 - **Cal Events text follows Options:** every line in the Cal Events cell, including its heading, now uses Text size × Scale like the other cells. The phone-only smaller text is gone.

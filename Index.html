@@ -2743,18 +2743,39 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         while(node && node.parentElement !== pad) node = node.parentElement;
         if(node && node.parentElement === pad) selectedBlockLine = node;
       });
+      const blockDepth = line => Math.max(0,Number(line.dataset.blockDepth)||0);
+      const blockGroup = line => {
+        const nodes=[line], depth=blockDepth(line);
+        let next=line.nextElementSibling;
+        while(next && blockDepth(next)>depth){nodes.push(next);next=next.nextElementSibling;}
+        return nodes;
+      };
       const changeBlockLine = action => {
-        const line = selectedBlockLine;
-        if(!line || line.parentElement !== pad) return;
-        if(action === 'indent' || action === 'outdent'){
-          const current = parseInt(line.dataset.blockDepth || '0',10) || 0;
-          const depth = Math.max(0, Math.min(8,current + (action === 'indent' ? 1 : -1)));
-          line.dataset.blockDepth = String(depth);
-          line.style.marginLeft = (depth * 18) + 'px';
-        } else if(action === 'up' && line.previousElementSibling){
-          pad.insertBefore(line,line.previousElementSibling);
-        } else if(action === 'down' && line.nextElementSibling){
-          pad.insertBefore(line.nextElementSibling,line);
+        const line=selectedBlockLine;
+        if(!line || line.parentElement!==pad)return;
+        const group=blockGroup(line), depth=blockDepth(line);
+        if(action==='indent'||action==='outdent'){
+          const delta=action==='indent'?1:-1;
+          // Never let a child outdent beyond zero or indent beyond eight.
+          if(group.some(n=>blockDepth(n)+delta<0||blockDepth(n)+delta>8))return;
+          group.forEach(n=>{
+            const d=blockDepth(n)+delta;
+            n.dataset.blockDepth=String(d);
+            n.style.marginLeft=(d*18)+'px';
+          });
+        }else if(action==='up'){
+          let previous=line.previousElementSibling;
+          if(!previous)return;
+          // Locate the preceding sibling, not an intervening child.
+          while(previous && blockDepth(previous)>depth)previous=previous.previousElementSibling;
+          if(!previous || blockDepth(previous)!==depth)return;
+          group.forEach(n=>pad.insertBefore(n,previous));
+        }else if(action==='down'){
+          const after=group[group.length-1].nextElementSibling;
+          if(!after || blockDepth(after)!==depth)return;
+          const siblingGroup=blockGroup(after);
+          const anchor=siblingGroup[siblingGroup.length-1].nextElementSibling;
+          group.forEach(n=>pad.insertBefore(n,anchor));
         }
         pad.dispatchEvent(new Event('input',{bubbles:true}));
       };

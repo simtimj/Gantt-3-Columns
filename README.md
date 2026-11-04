@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 ## Status key
 
@@ -46,6 +46,21 @@ Last updated: 2026-11-03
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-04)
+
+- **Blocks hierarchy:** indent/outdent and up/down actions now move the selected parent with contiguous deeper-indented descendants. This is editor-line hierarchy, not a new Sheet schema; drag handles and true arbitrary nesting remain to be implemented.
+- **Keep In Mind:** long-press fold arrow now exposes prompt-based rename, category color, reorder, add task, and collapse actions. Category colors persist in Focus data. Needs usability refinement; no claim of completed custom menu.
+
+
+- **Reference header:** Urgent live counts now render beneath the Reference title, instead of taking their own row in the upper panel. Needs mobile visual confirmation.
+- **Blocks editing:** adds toolbar indent/outdent and up/down controls for selected top-level Plan lines. Hierarchical parent-child movement and true nested block persistence are not complete.
+
+
+- **Blocks first pass:** bottom-left former Plan / think area is relabeled Blocks with + Block and + Task actions. It reuses the existing Days Plan column, rich-text editor and save path, preserving existing Plan contents. Block grouping and task checkbox conversion need live validation; dedicated block-level nesting/reordering controls and reusable templates are not implemented yet.
+
+
+- **Keep In Mind heading contrast:** lighter blue heading text and underline (#70baff), awaiting live phone confirmation. This is a visual-only change; other Keep In Mind redesign requests and Blocks are not yet implemented.
 
 ## 🧪 To be confirmed (2026-11-03)
 
@@ -402,3 +417,5 @@ Last updated: 2026-11-03
 
 
 
+
+- 🧪 **Next Block activation (2026-11-04):** Select a `Next Block` or `Next Block 2` title, press **Activate**, confirm retaining nested subtasks (Cancel safely aborts activation), then optionally enter a time range. Blank time produces `Block`; a supplied range produces `Block 9:00–10:30`. Cancelling the time prompt leaves the placeholder unchanged. Clearing subtasks is deferred to avoid accidental deletion during the experimental release.

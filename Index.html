@@ -1841,7 +1841,9 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 #todayScroll .day-editor > :not([data-tsec]):has(+ [data-tsec]),#todayScroll .day-editor > :not([data-tsec]):last-child{border-bottom:1px solid var(--hist-group);border-radius:0 0 7px 7px;padding-bottom:calc(5px * var(--pad-y,1));margin-bottom:6px;}
 
 .editor [data-nsec="must"]{position:relative;}
-.editor .daily-sort-btn{float:right;font:inherit;font-size:11px;letter-spacing:0;text-transform:none;border:1px solid currentColor;border-radius:5px;background:transparent;color:inherit;padding:2px 5px;cursor:pointer;}
+/* Small and inside the DAILIES lines (2026-11-03, Julius): flow-root keeps the floated button within the header. */
+.editor > [data-nsec="must"]{display:flow-root;}
+.editor .daily-sort-btn{float:right;margin:4px 0 0;font:inherit;font-size:9px;line-height:1;letter-spacing:0;text-transform:none;border:1px solid currentColor;border-radius:3px;background:transparent;color:inherit;padding:0 3px;min-height:0;cursor:pointer;}
 .editor .daily-sort-menu{position:absolute;right:0;top:100%;z-index:20;background:var(--panel,#fff);border:1px solid var(--border,#888);border-radius:6px;padding:4px;box-shadow:0 5px 15px #0003;min-width:145px;}
 .editor .daily-sort-menu[hidden]{display:none!important;}
 .editor .daily-sort-menu button{display:block;width:100%;padding:7px;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;cursor:pointer;}

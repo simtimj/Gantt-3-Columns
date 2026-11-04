@@ -1544,6 +1544,16 @@
     /* Center calendar: compact cards, Options typography and comfortable phone insets. */
     #centerDownScroll{padding-inline:clamp(8px,2.5vw,16px);box-sizing:border-box;}
     #centerCalendarList{font-family:var(--paragraph-font);font-size:var(--paragraph-size);}
+    /* Calendar cell contents follow Options font family and size, not card defaults. */
+    #centerCalendarList .ce-event,
+    #centerCalendarList .ce-event .ce-title,
+    #centerCalendarList .ce-event .ce-time,
+    #centerCalendarList .ce-group,
+    #centerCalendarList .ce-date,
+    #centerCalendarList .ce-empty{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+    }
     #centerCalendarList .ce-date,#centerCalendarList .ce-group,#centerCalendarList .ce-event,#centerCalendarList .ce-time{font-size:inherit;}
     #centerCalendarList .ce-event{box-sizing:border-box;margin:5px 0;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--panel);line-height:1.35;overflow-wrap:anywhere;}
     #centerCalendarList .ce-scheduled{margin:6px 0;}

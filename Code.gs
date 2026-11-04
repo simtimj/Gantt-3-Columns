@@ -1122,11 +1122,21 @@ function getCardCats_() {
   if (!props.getProperty('cardCatsBatch1')) { out = cardCatsBatch1_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch1', '1'); }
   // 2026-10-30 (Julius): Music purple; IT lab words in Career / IT (cert studies fold in on the client).
   if (!props.getProperty('cardCatsBatch2')) { out = cardCatsBatch2_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch2', '1'); }
+  // 2026-11-04 (Julius): "learn" counts toward Productivity.
+  if (!props.getProperty('cardCatsLearn1')) { out = cardCatsLearn_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsLearn1', '1'); }
   const health = cardCatsHealth_(out, !props.getProperty('cardCatsHealth1'));
   if (JSON.stringify(health) !== JSON.stringify(out)) inboxWrite_('cardCats', health);
   props.setProperty('cardCatsHealth1', '1');
   out = health;
   return out;
+}
+function cardCatsLearn_(list) {
+  const words = c => String(c.words || '').split(',').map(w => w.trim()).filter(Boolean);
+  return list.map(c => {
+    const w = words(c).filter(x => x.toLowerCase() !== 'learn');
+    if (c.key === 'productivity') w.push('learn');
+    return Object.assign({}, c, { words: w.join(', ') });
+  });
 }
 // Keep the user's task data intact; legacy Life tags render as uncategorized.
 function cardCatsHealth_(list, initialize) {

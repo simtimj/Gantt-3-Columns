@@ -56,6 +56,7 @@ Last updated: 2026-11-04
 - **Hold to expand a cell**: zooms open and closed slowly from the cell's own spot, in a smaller window. It keeps the cell's own color with nothing dimmed behind it, and holding a label no longer opens the format menu.
 - **Uniform section lines**: the top bar, column headers, section lines and DAILIES header line are all 2px in the same solid line color.
 - **Drag pills follow the day**: section drag pills use the color of the day being shown.
+- **Subject auto-guess**: the subject with the most matching words wins, each word counting the same; a tie goes to the word seen first. "learn" now counts toward Productivity.
 - **Daily weather tab**: new tab right after hourly showing the next 7 days: day, sky symbol, high and low, rain chance (10%+). Both tabs use a cloud icon, labeled HR and DLY. Rows are tight, and a narrow cell shows only the weekday and drops the 💧 so nothing is cut off.
 - **+ Task in Cal Events**: a **+ Task** button on the All-Day Tasks line, shown on every day. It adds a real all-day event to the main Julius Simtim calendar on the day being viewed, in yellow (open). Text typed in the box survives a refresh.
 - **History / Log**: the Completed heading is gone; the Today: done count stays.

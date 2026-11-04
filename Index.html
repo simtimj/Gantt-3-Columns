@@ -9984,8 +9984,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     {key:'career', name:'Career / IT', color:'#86efac', words:'resume, resumes, résumé, job, jobs, job search, application, applications, apply, interview, interviews, linkedin, career, cover letter, recruiter, recruiters, ats, cdcr, calcareers, it associate, hiring, portfolio, networking, soq, help desk, helpdesk, it support, tech support, it job, it jobs, it role, certification, cert, security, cloud security, devsecops, it lab, home lab, homelab, lab, labs'},
     // Music + Productivity added for Urgent batches (2026-10-30, Julius); server upgrades saved lists once (getCardCats_).
     {key:'music',  name:'Music',  color:'#a855f7', words:'music, guitar, sing, singing, song, songs, setlist, set list, the show, show prep, music show, gig, gigs, rehearsal, rehearse, band, vocals, pedal, pedals, amp, open mic, soundcheck'},
-    {key:'productivity', name:'Productivity', color:'#0891b2', words:'productivity, efficiency, efficient, workflow, workflows, automation, automate, organize, organizing, clean up, cleanup, consolidate, chatgpt, gemini, handoff, master instructions, docs cleanup, migrate, migration'},
-    {key:'study',  name:'Study',  color:'#a78bfa', words:'a+, comptia, study, studying, course, class, quiz, exam, practice test, flashcard, flashcards, learn, lesson, lessons'},
+    {key:'productivity', name:'Productivity', color:'#0891b2', words:'productivity, efficiency, efficient, workflow, workflows, automation, automate, organize, organizing, clean up, cleanup, consolidate, chatgpt, gemini, handoff, master instructions, docs cleanup, migrate, migration, learn'},
+    {key:'study',  name:'Study',  color:'#a78bfa', words:'a+, comptia, study, studying, course, class, quiz, exam, practice test, flashcard, flashcards, lesson, lessons'},
     {key:'work',   name:'Work',   color:'#94a3b8', words:'dog walk, dog walks, dog walking, walk, walks, client, clients, rover, invoice, invoices'},
     {key:'health', name:'P health', color:'#ec4899', words:'exercise, exercises, workout, gym, stretch, stretching, pt, physical therapy, sleep, doctor, dentist, skincare, running, lift, lifting, rehab, hydration, water'},
     {key:'mhealth', name:'M health', color:'#a78bfa', words:'meditation, meditate, mindfulness'},
@@ -10136,7 +10136,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(tag) return tag === 'none' ? '' : tag;
     if(ctxGrp && /^life$/i.test(String(ctx || '').trim())) return '';
     if(ctxGrp){ const g = cardCatFromName(ctx); if(g) return g; }
-    return cardCatScore([[head || '',2],[ctx || '',3],[rest || '',1]]).key;
+    // Most subject words wins, every word counts the same; a tie goes to the word seen first, head line first (2026-11-04, Julius).
+    return cardCatScore([[head || '',1],[ctx || '',1],[rest || '',1]]).key;
   }
   function isHeaderLike(n){
     if(n.matches('h1,h2,h3,[data-cgrp]')) return true;

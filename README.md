@@ -49,6 +49,9 @@ Last updated: 2026-11-04
 
 ## 🧪 To be confirmed (2026-11-04)
 
+- **Always a Next Block**: today's and later days' Blocks always end with a **Next Block** (title plus an empty task cell). It comes back by itself after Activate or Remove. A line across Blocks sets it apart from what's above.
+- **Enter on a block title** makes a task cell under it, checkbox included. Backspace on the checkbox if you want a plain line instead.
+- **Day Review cells**: each finished line is its own small cell, main point in bold and details muted, two lines max; tap a cell to see all of it.
 - **Search row slides on the phone**: the Reference header row (📚 📝, search, +, Arc, Options) slides left and right even when the swipe starts on the search box (the box used to grab it). A soft fade at the edge shows there's more. Tapping the box still opens it for typing.
 - **History log types (option 1)**: folded Morn / After / Night rows and the Day Review tab split each project into **New**, **Fixes** and **Tweaks**, with a count and the names under each (plus **Other** for lines with no type). Saved lines keep their time order; only the display groups them. The Done Log tab has a new **Type** column (New / Fix / Tweak) that Claude and ChatGPT fill in; older lines get a type guessed from their wording (e.g. "Restore…" = Fix, "Add…" = New, "Match…" = Tweak). Only Done Log lines are typed, not tasks you write yourself.
 - **Drag anything into Blocks**: hold a task's text in Today, Notes, Dailies, Reference, Scratch Pad, Urgent or Due, then drag it into Blocks. It lands as a **linked copy** (mirror): the original stays where it was, and ticking either one ticks both. Subtasks come along. Cal Events can be dragged too (hold the event's text): they land as a plain task copy of the title, and the calendar event isn't changed.

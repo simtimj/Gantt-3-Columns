@@ -12296,7 +12296,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const top = first.offsetTop - 5, bottom = last.offsetTop + last.offsetHeight + 4;
       const next = /^next block\b/i.test((first.textContent || '').trim());
       // A line across the pad above Next Block (2026-11-04, Julius), so it's set apart from what's above.
-      if(next) rects += '<line x1="2" x2="' + Math.max(10,W - 2) + '" y1="' + (top - 8.5) + '" y2="' + (top - 8.5) + '" stroke="' + ink + '" stroke-opacity=".55" stroke-width="1.5"/>';
+      if(next) rects += '<line x1="2" x2="' + Math.max(10,W - 2) + '" y1="' + (top - 6.5) + '" y2="' + (top - 6.5) + '" stroke="' + ink + '" stroke-opacity=".55" stroke-width="1.5"/>';
       rects += '<rect x="2" y="' + (top + .75) + '" width="' + Math.max(10,W - 4) + '" height="' + Math.max(10,bottom - top - 1.5) + '" rx="8" fill="none" stroke="' +
         (next ? '#f0b000' : ink) + '" stroke-opacity="' + (next ? '.9' : '.45') + '" stroke-width="1.5"' + (next ? ' stroke-dasharray="6 4"' : '') + '/>';
     });

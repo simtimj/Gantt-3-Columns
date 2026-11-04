@@ -317,7 +317,12 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - Drop into Blocks: in the drag IIFE, `finish()` sends a drop whose target is a `.plan-pad` that isn't the source to `window.tidMirror(nodes,src,pad,before,shift)` (Task mirrors block) instead of moving. It gives source lines a `data-tid` if missing, copies only the check-text and `data-cat` (no urg/due/rep, so Urgent doesn't list it twice), skips done lines and refuses a done head. One copy per tid per pad. Dailies carry-forward already strips `data-tid`, so mirroring a Daily never links across days.
 - Cal Events: `holdTarget` accepts `#centerCalendarList .ce-event` (not while a title is being edited) → `beginCal`/`finishCal`; the line comes from `calTaskLine(row)` (title + `data-cat`, no link to the event). It can drop into any cell, not just Blocks.
 - Hold menu: `tidMenuRow(p,line,owner,isCal)` now runs for every owner except the Blocks pad itself: **🧱 Mirror in Blocks** (subtree, appended at the end of `urgEditor(odDate,'plan')`) or **🧱 Copy to Blocks** for Cal. The old `sendToToday` is gone.
+- Next Block (later the same day): `ensureNext(pad)` (from `blkPaint`) appends `<div data-title data-tl=1><b>Next Block</b></div>` + an empty check-line when a pad dated today or later has no title starting "Next Block"; past days untouched. Render-only `data-blkn` on a Next Block title that has something above it gives it room (CSS margin) for the SVG `<line>` drawn above its box; stripped via `CARD_ATTRS`. A document-capture `keydown` makes Enter on a top-level title line insert `createCheckboxLine(0)` right under it.
 - Borders: `blkPaint(pad)` (called at the end of `refreshCards` for `.plan-pad`, and on pad input) sets render-only `data-blk` = f / m / l / fl, using the same grouping as `blockGroup` (title down to the next title or blank line). `data-blk` is in `CARD_ATTRS`, so `cardCleanHtml` strips it. The border itself is an SVG data-URL `background-image` on the pad (`background-attachment:local`, so it scrolls with the content), redrawn on resize. Stroke = pad text color at 45%; a `Next Block…` title = dashed `#f0b000`.
+
+## Day Review cells (2026-11-04, Julius)
+
+- `drLineHtml(n,t)` in `initDayReview`: bold head = the line's leading `<b>` (minus `*`), else the text before ":" (≤70 chars); rest in a muted `<span>`. `.dr-line` is a bordered cell clamped to 2 lines; a tap toggles `.dr-full`. Type buckets reuse the same HTML.
 
 ## History log types (2026-11-04, Julius: option 1)
 

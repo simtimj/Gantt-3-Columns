@@ -417,3 +417,5 @@ Last updated: 2026-11-04
 
 
 
+
+- 🧪 **Next Block activation (2026-11-04):** Select a `Next Block` or `Next Block 2` title, press **Activate**, choose whether to retain nested subtasks, then optionally enter a time range. Blank time produces `Block`; a supplied range produces `Block 9:00–10:30`. Cancelling the time prompt leaves the placeholder unchanged. Clearing subtasks deletes the currently nested lines and must be tested before relying on it.

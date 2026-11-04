@@ -2755,14 +2755,15 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         if(!strong || !/^Next Block(?:\\s+\\d+)?$/i.test(strong.textContent.trim())){
           setStatus('Activate works on Next Block placeholders');return;
         }
-        const keep=window.confirm('Keep the existing subtasks in this block? OK = keep; Cancel = clear.');
+        const keep=window.confirm('Keep existing subtasks? OK = keep. Cancel = do not activate.');
+        if(!keep){setStatus('Activation cancelled; subtasks preserved');return;}
         const descendants=[];
         let n=line.nextElementSibling;
         const depth=Number(line.dataset.blockDepth)||0;
         while(n && (Number(n.dataset.blockDepth)||0)>depth){descendants.push(n);n=n.nextElementSibling;}
         const time=window.prompt('Optional time range (e.g. 9:00–10:30). Leave blank for Block.','');
         if(time===null)return;
-        if(!keep)descendants.forEach(n=>n.remove());
+        // Existing subtasks are never deleted during activation.
         strong.textContent='Block'+(time.trim()?' '+time.trim():'');
         pad.dispatchEvent(new Event('input',{bubbles:true}));
         setStatus('Block activated');

@@ -562,6 +562,18 @@
     .center-tabs button{border:0;background:transparent;font-size:12px;line-height:1;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
     .center-tabs button.on{opacity:1;background:color-mix(in srgb,var(--divider) 45%,transparent);}
     /* Reference tabs + daily Scratch Pad (2026-11-03, Julius). */
+    #dayReviewScroll{display:none;flex:var(--ns-a,1) 1 0;padding:4px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    #journalPane[data-ctab="review"] #dayReviewScroll{display:block;}
+    #journalPane[data-ctab="review"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
+    .dr-cat{margin:0 0 6px;}
+    .dr-cat summary,.dr-group summary{display:flex;align-items:center;gap:6px;cursor:pointer;padding:2px 0;list-style:none;user-select:none;-webkit-user-select:none;}
+    .dr-cat summary::-webkit-details-marker,.dr-group summary::-webkit-details-marker{display:none;}
+    .dr-cat > summary{font-weight:700;}
+    .dr-cat > summary i{flex:0 0 auto;width:10px;height:10px;border-radius:3px;}
+    .dr-cat summary b,.dr-group summary b{margin-left:auto;font-variant-numeric:tabular-nums;}
+    .dr-group{margin-left:16px;}
+    .dr-line{margin-left:0;padding:2px 0 2px 8px;border-left:2px solid var(--divider);font-size:.92em;overflow-wrap:anywhere;}
     .ref-tabs{margin-left:0;flex:0 0 auto;align-self:center;}
     /* Reference toolbar scrolls sideways on narrow columns; search keeps a readable width. */
     .ref-toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
@@ -2089,6 +2101,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           <button type="button" data-ctab="notes" class="on" title="Dailies" aria-label="Dailies">📋</button>
           <button type="button" data-ctab="weather" title="Weather (hourly)" aria-label="Weather"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg></button>
           <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">⭐</button>
+          <button type="button" data-ctab="review" title="Day Review" aria-label="Day Review">📊</button>
         </span>
       </div>
       <div
@@ -2096,6 +2109,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         id="journalScroll">
       </div>
       <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Loading hourly weather…</div></div>
+      <div class="scroll" id="dayReviewScroll"></div>
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
@@ -6724,9 +6738,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       pane.dataset.ctab = t;
       pane.querySelectorAll('.center-tabs button').forEach(b => b.classList.toggle('on', b.dataset.ctab === t));
       try{ localStorage.setItem('fw.centerTab', t); }catch(e){}
+      if(window.renderDayReview) renderDayReview();
     };
     let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
-    set(t === 'weather' || t === 'focus' ? t : 'notes');
+    set(t === 'weather' || t === 'focus' || t === 'review' ? t : 'notes');
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
@@ -10148,6 +10163,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return (document.body.classList.contains('one-day') && window.odDate) || t;
   }
   function renderReview(){
+    if(window.renderDayReview) renderDayReview();
     clearTimeout(reviewTimer);
     reviewTimer = setTimeout(() => {
       const box = document.getElementById('reviewScroll');
@@ -10196,6 +10212,56 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
     setInterval(renderReview,60000);
     renderReview();
+  })();
+  /* Day Review tab (2026-11-03, Julius): finished lines of the day shown, collected by subject → group
+     (a Done Log project or a title line), with counts; tap to expand. Read-only, never saved. */
+  (function initDayReview(){
+    const box = document.getElementById('dayReviewScroll'), pane = document.getElementById('journalPane');
+    if(!box || !pane) return;
+    const closedCats = new Set(), openGroups = new Set();
+    let timer = null;
+    const txt = n => ((n.querySelector(':scope > .check-text') || n).textContent || '').replace(/\s+/g,' ').trim().replace(/^\*/,'');
+    const isDone = l => l.classList.contains('done') || !!(l.querySelector(':scope > input[type=checkbox]') || {}).checked;
+    function collect(ed){
+      const cats = new Map(); let group = null, total = 0;
+      [...ed.children].forEach(n => {
+        if(n.hasAttribute('data-cgrp') || n.dataset.tl === '1'){ group = {name:n.dataset.cgrp && n.dataset.cgrp !== '1' ? n.dataset.cgrp : txt(n),cat:n.dataset.tccat || cardCatFromName(txt(n)) || ''}; return; }
+        if(n.matches('[data-sec],[data-nsec]') || isEmptyLine(n)){ group = null; return; }
+        if(!n.matches('.check-line') || !isDone(n)) return;
+        const t = txt(n); if(!t) return;
+        const key = (group && group.cat) || n.dataset.tccat || 'other', gName = group ? group.name : 'Tasks';
+        if(!cats.has(key)) cats.set(key,{key,n:0,groups:new Map()});
+        const c = cats.get(key); c.n++; total++;
+        if(!c.groups.has(gName)) c.groups.set(gName,[]);
+        c.groups.get(gName).push(t);
+      });
+      return {cats:[...cats.values()].sort((a,b) => b.n - a.n),total};
+    }
+    function draw(){
+      if(pane.dataset.ctab !== 'review') return;
+      const date = reviewDate();
+      const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+      const {cats,total} = ed ? collect(ed) : {cats:[],total:0};
+      let h = `<div class="dr-head">Day Review · ${esc(formatDate(date))} · ${total} done</div>`;
+      if(!total) h += '<div class="center-placeholder">Nothing done yet.</div>';
+      cats.forEach(c => {
+        const info = CARD_CAT_BY_KEY[c.key], name = info ? info.name : 'Other';
+        h += `<details class="dr-cat" data-k="${esc(c.key)}"${closedCats.has(c.key) ? '' : ' open'}><summary><i style="background:${esc(info ? info.color : '#8a8f98')}"></i>${esc(name)}<b>${c.n}</b></summary>`;
+        [...c.groups.entries()].sort((a,b) => b[1].length - a[1].length).forEach(([g,list]) => {
+          const k = c.key + '|' + g;
+          h += `<details class="dr-group" data-k="${esc(k)}"${openGroups.has(k) ? ' open' : ''}><summary>${esc(g)}<b>${list.length}</b></summary>` +
+            list.map(t => `<div class="dr-line">${esc(t)}</div>`).join('') + '</details>';
+        });
+        h += '</details>';
+      });
+      if(box.dataset.h !== h){ box.dataset.h = h; const y = box.scrollTop; box.innerHTML = h; box.scrollTop = y; }
+    }
+    window.renderDayReview = () => { if(!timer) timer = setTimeout(() => { timer = null; draw(); },200); };
+    box.addEventListener('toggle',e => {
+      const d = e.target; if(!d.matches || !d.matches('details')) return;
+      if(d.classList.contains('dr-cat')) closedCats[d.open ? 'delete' : 'add'](d.dataset.k);
+      else openGroups[d.open ? 'add' : 'delete'](d.dataset.k);
+    },true);
   })();
   /* ===== Title lines (Julius, 2026-10-27: save room) =====
      A title line = a line marked data-tl="1" (hold a task's checkbox → Make
@@ -11305,7 +11371,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       box:() => {
         // Center Up (whichever tab is showing) above, Center Down below (2026-11-01).
         const p = document.getElementById('journalPane');
-        const t = document.getElementById(p && p.dataset.ctab === 'weather' ? 'weatherScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
+        const t = document.getElementById(p && p.dataset.ctab === 'weather' ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
         if(!t || !b) return null;
         const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};

@@ -52,6 +52,10 @@ Last updated: 2026-11-04
 - **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
+- **Cal Events order button**: next to refresh, switches between **Category** (all events together under their subject, no times) and **Time** (all-day first, then scheduled by start). Remembered per device.
+- **Cal + Task color**: new events get no color from the app, so you set urgency yourself.
+- **Urgent spacing**: the empty band above Urgent is gone.
+- **Subtle + border tint**: one tint everywhere, a hint of the subject color over the black cell, with Dailies matching.
 - **History wrap**: long task text runs under the checkbox at any column width, not only under 420px.
 - **Cal Events spacing**: tighter line spacing inside cells and a smaller 12px checkbox.
 - **Blocks rebuilt on task cells**: **+ Block** adds a `Block name` title to type over plus one empty task cell, with no popup. **+ Task** adds a cell inside the selected block. Indent and order come from the checkbox hold menu and drag and drop like other task cells; the → ← ↑ ↓ buttons are gone.

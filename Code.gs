@@ -1904,7 +1904,7 @@ function getMainCalendarEvents(dateString) {
   return { date: date, events: events };
 }
 
-// + Task in Cal Events (2026-11-04, Julius): a real all-day event on the main calendar, yellow = open.
+// + Task in Cal Events (2026-11-04, Julius): a real all-day event on the main calendar. No color is set; Julius picks urgency himself.
 function addAllDayTask(dateString, title) {
   const date = String(dateString || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid calendar date');
@@ -1913,7 +1913,6 @@ function addAllDayTask(dateString, title) {
   const cal = CalendarApp.getCalendarById(EVENT_CALENDARS[0]);
   if (!cal) throw new Error('Main calendar is unavailable');
   const ev = cal.createAllDayEvent(name, parseDate_(date));
-  ev.setColor('5');
   return { id: ev.getId(), date: date };
 }
 
@@ -2019,11 +2018,12 @@ function setCalendarEventDone(calId, eventId, start, done) {
   const key = 'calPrev:' + eventId.slice(0, 60) + ':' + Number(start);
   if (done) {
     const cur = String(ev.getColor() || '');
-    if (cur !== '8') props.setProperty(key, cur || '5');
+    if (cur !== '8') props.setProperty(key, cur || 'default');
     ev.setColor('8');
   } else {
     const prev = props.getProperty(key);
-    ev.setColor(prev && prev !== '8' ? prev : '5');
+    // '0' clears the event color so a default-colored event goes back to the calendar's own color.
+    ev.setColor(prev && prev !== '8' && prev !== 'default' ? prev : prev === 'default' ? '0' : '5');
     props.deleteProperty(key);
   }
   if (done && archiveAuto_()) { try { archiveCompletedTasks({}); } catch (e) { console.error(e); } }

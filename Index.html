@@ -1653,6 +1653,10 @@
     /* One line between Notes and Reference (Julius): the Urgent box's own outline sat a few px in from the
        column line (double line with a gap). No outline, like the Notes side; the 3 urgency boxes stay. */
     #urgentPanel{border:0!important;border-radius:0!important;}
+    /* No empty band above Urgent (2026-11-04, Julius). */
+    #refTopScroll{padding-top:2px!important;}
+    #urgentPanel{padding-top:0!important;}
+    #urgentPanel > .urg-group:first-child{margin-top:0!important;}
     /* Tight Notes lines (Julius, 2026-11-01): Make sure you do lines had the full card gap (5px margin + 4px
        padding each side). Notes check-lines get 1px margin + 2px padding, like the rest of the cell. */
     .journal-editor > .check-line[data-tc^="f"]{margin-top:1px!important;padding-top:2px!important;}
@@ -1757,6 +1761,8 @@
     #refSplitBar,#notesSplitBar,body.one-day #todayScroll .od-on > .od-pad-head{pointer-events:none!important;cursor:default!important;}
     /* The Blocks header ignores touches so only its grip drags; its buttons must still take them (2026-11-04, Julius). */
     body.one-day #todayScroll .od-on > .od-pad-head{border-bottom:2px solid var(--divider);padding-bottom:4px;margin-bottom:3px;}
+    #centerDownScroll .ce-tools{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;}
+    #centerDownScroll .ce-head [data-ce-sort]{min-width:0;min-height:22px;height:22px;padding:0 6px;font-size:12px;line-height:1;}
     #centerDownScroll .ce-head{border-bottom:2px solid var(--divider);padding-bottom:3px;margin-bottom:3px;}
     body.one-day #todayScroll .od-on > .od-pad-head button{pointer-events:auto!important;position:relative;z-index:1;cursor:pointer!important;}
     #refSplitBar::before,#notesSplitBar::before,body.one-day #todayScroll .od-on > .od-pad-head::before{pointer-events:auto!important;}
@@ -2156,7 +2162,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
       <div class="scroll notes-review" id="reviewScroll"></div>
       <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
-      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
+      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Category</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
     <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
     <section
@@ -8107,6 +8113,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Calendar panel back (2026-10-29, Julius): every calendar event lives here as a checkbox (tick = Graphite = done).
   const CAL_PANEL_ON = false; // Calendar panel off (2026-10-31, Julius): Reference top half is Urgent only.
   let centerCalendarSeq = 0, ceShownDate = '', ceDraw = null;
+  function ceSortMode(){ try{ return localStorage.getItem('fw.ceSort') === 'time' ? 'time' : 'cat'; }catch(e){ return 'cat'; } }
   // + Task box: kept outside the list so a refresh mid-typing doesn't lose the text.
   const ceAdd = {open:false,text:'',busy:false};
   const ceAddForm = () => '<form class="ce-add"><input type="text" maxlength="300" placeholder="Task name" aria-label="New all-day task"' + (ceAdd.busy ? ' disabled' : '') + ' value="' + esc(ceAdd.text) + '"><button type="submit" class="btn"' + (ceAdd.busy ? ' disabled' : '') + '>Add</button><button type="button" class="btn" data-ce-add-cancel aria-label="Cancel">✕</button></form>';
@@ -8164,10 +8171,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
             list.filter((ev,i) => keys[i] === k).map(one).join('');
         }).join('');
       };
-      box.innerHTML = '' +
-        '<div class="ce-group ce-group-add"><span>All-Day Tasks</span><button type="button" class="btn ce-add-btn" data-ce-add aria-label="Add an all-day task">+ Task</button></div>' + (ceAdd.open ? ceAddForm() : '') +
-        bySubject(allDay,ev => row(ev,'','<span class="ce-event-text ce-title">' + esc(ev.title) + '</span>')) +
-        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + bySubject(scheduled,ev => row(ev,' ce-scheduled','<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span>')) : '') +
+      const allDayRow = ev => row(ev,'','<span class="ce-event-text ce-title">' + esc(ev.title) + '</span>');
+      const timedRow = ev => row(ev,' ce-scheduled','<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span>');
+      const addHead = label => '<div class="ce-group ce-group-add"><span>' + label + '</span><button type="button" class="btn ce-add-btn" data-ce-add aria-label="Add an all-day task">+ Task</button></div>' + (ceAdd.open ? ceAddForm() : '');
+      const byCategory = ceSortMode() === 'cat';
+      const sortBtn = document.querySelector('[data-ce-sort]');
+      if(sortBtn) sortBtn.textContent = byCategory ? 'Category' : 'Time';
+      // Category = every event together under its subject, no times (2026-11-04, Julius). Time = all-day first, then by start.
+      box.innerHTML = (byCategory
+        ? addHead('Tasks') + bySubject(allDay.concat(scheduled),allDayRow)
+        : addHead('All-Day Tasks') + allDay.map(allDayRow).join('') +
+          (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.slice().sort((a,b) => String(a.start).localeCompare(String(b.start))).map(timedRow).join('') : '')) +
         (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');
     };
     const cached = centerCalendarCache.get(date);
@@ -8192,6 +8206,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   });
   document.addEventListener('click', e => {
     if(e.target.closest('[data-ce-refresh]')) loadCenterCalendar(null,true);
+    if(e.target.closest('[data-ce-sort]')){
+      try{ localStorage.setItem('fw.ceSort',ceSortMode() === 'cat' ? 'time' : 'cat'); }catch(err){}
+      if(ceDraw) ceDraw();
+    }
     const open = e.target.closest('[data-ce-add]');
     if(open){
       let form = document.querySelector('#centerCalendarList .ce-add');
@@ -9972,6 +9990,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   body.tc-boxfill .check-line[data-tccat]{--tc-tint:transparent;}
   /* Whole card, subtle (2026-11-03, Julius): same tint at a third of the strength. */
   body.tc-subtle{--tc-mix:8%;}
+  /* Subtle + border (2026-11-04, Julius): one tint everywhere, a hint of the subject color over the black cell. Dailies match. */
+  body.tc-subtle.tc-subtleline{--tc-mix:13%;}
+  body.tc-subtleline #journalScroll .day-row{background:transparent!important;}
+  body.tc-subtleline #journalPane .journal-editor .check-line[data-tc]{--tc-base:var(--panel);}
   /* Subtle + border line (2026-11-03, Julius): same tint, card outline in a brighter subject color. */
   body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 65%,#fff);border-left-width:1.5px;border-right-width:1.5px;}
   body.tc-subtleline .check-line[data-tccat][data-tc^="f"]{border-top-width:1.5px;}

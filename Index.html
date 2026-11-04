@@ -1778,6 +1778,17 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 #centerCalendarList .ce-check{flex:0 0 auto;width:15px;height:15px;margin:1px 0 0;accent-color:#777;cursor:pointer;}
 #centerCalendarList .ce-event-text{flex:1;min-width:0;}
 #centerCalendarList .ce-check:disabled{opacity:.5;}
+
+/* History / Log time-of-day containers: visual grouping without wrapping editable task DOM. */
+#todayScroll .day-editor > [data-tsec="morning"]{--hist-group:#e3bd43;}
+#todayScroll .day-editor > [data-tsec="afternoon"]{--hist-group:#df8b3a;}
+#todayScroll .day-editor > [data-tsec="evening"]{--hist-group:#9c74c9;}
+#todayScroll .day-editor > [data-tsec="morning"],#todayScroll .day-editor > [data-tsec="afternoon"],#todayScroll .day-editor > [data-tsec="evening"]{border:1px solid var(--hist-group)!important;border-bottom:0!important;border-radius:7px 7px 0 0;padding-top:5px!important;margin-top:8px!important;}
+#todayScroll .day-editor > [data-tsec="morning"] ~ :not([data-tsec]){--hist-group:#e3bd43;}
+#todayScroll .day-editor > [data-tsec="afternoon"] ~ :not([data-tsec]){--hist-group:#df8b3a;}
+#todayScroll .day-editor > [data-tsec="evening"] ~ :not([data-tsec]){--hist-group:#9c74c9;}
+#todayScroll .day-editor > [data-tsec="morning"] ~ :not([data-tsec]),#todayScroll .day-editor > [data-tsec="afternoon"] ~ :not([data-tsec]),#todayScroll .day-editor > [data-tsec="evening"] ~ :not([data-tsec]){border-left:1px solid var(--hist-group);border-right:1px solid var(--hist-group);padding-left:calc(6px * var(--pad-x,1));padding-right:calc(6px * var(--pad-x,1));}
+#todayScroll .day-editor > :not([data-tsec]):has(+ [data-tsec]),#todayScroll .day-editor > :not([data-tsec]):last-child{border-bottom:1px solid var(--hist-group);border-radius:0 0 7px 7px;padding-bottom:calc(5px * var(--pad-y,1));margin-bottom:6px;}
 </style>
 <script>
   /* ===== Light / dark toggle, saved per device (Julius, 2026-10-27) =====

@@ -1926,9 +1926,20 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayScroll .day-editor .check-line:not([data-tlon]){display:flow-root!important;}
 #todayScroll .day-editor .check-line:not([data-tlon]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
 #todayScroll .day-editor .check-line:not([data-tlon]) > .check-text{display:block;}
+/* Folded lines stay hidden (2026-11-04): the display:flow-root!important above (ID selector) beat [data-tlhid]{display:none},
+   so folded Morn / After / Night sections and groups still showed every task. */
+#todayScroll .day-editor > [data-tlhid][data-tlhid][data-tlhid]{display:none!important;} /* repeated attr = higher specificity than the rule above */
 #todayScroll .sec-host > .day-editor.sec-painted{margin-left:0!important;margin-right:0!important;padding-left:calc(15px * var(--side-k,1) + 4px)!important;}
 #todayScroll .ts-count{font:inherit;margin-left:6px;padding:1px 7px;min-height:24px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
-#todayScroll .ts-items{margin-top:2px;opacity:.85;overflow-wrap:anywhere;}
+#todayScroll .ts-items{margin-top:2px;opacity:.85;overflow-wrap:anywhere;min-width:0;}
+#todayScroll .ts-it{padding-left:.9em;text-indent:-.9em;overflow-wrap:anywhere;} /* one item per line; wraps under itself */
+#todayScroll .ts-it::before{content:"• ";}
+#todayScroll .ts-type > b{display:block;}
+[data-tlon="c"][data-tlsum]:not([data-due-label])::after{white-space:pre-line;overflow-wrap:anywhere;min-width:0;max-width:100%;box-sizing:border-box;}
+/* History detail button (2026-11-04): small, next to the HISTORY / LOG title; narrow panes drop "/ LOG" so it stays one line. */
+#todayPane.pane-narrow .hl-log{display:none;}
+#todayPane .pane-header .today-jump{white-space:nowrap;}
+#todayPane .hist-mode{font:inherit;font-size:.85em;font-weight:700;line-height:1;margin-left:4px;padding:2px 5px;min-width:22px;min-height:22px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;flex:0 0 auto;}
 #todayScroll .ts-type > b{margin-right:5px;font-weight:600;} /* History log types (2026-11-04) */
 #todayScroll .day-editor > [data-tsec]:not([data-tsf="o"]){border-bottom:0!important;}
 #todayScroll .day-editor > [data-tsf]{cursor:pointer;}
@@ -2146,7 +2157,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div id="workspace">
     <section class="pane" id="todayPane">
       <div class="pane-header">
-        <span class="today-jump" data-jump-today role="button" tabindex="0" title="Jump to today">HISTORY / LOG</span>
+        <span class="today-jump" data-jump-today role="button" tabindex="0" title="Jump to today">HISTORY<span class="hl-log"> / LOG</span></span>
+        <button type="button" id="histMode" class="hist-mode" title="History detail: Full (tap for Compact)">▤</button>
         <span id="focusStatus" class="focus-status">Loading…</span>
       </div>
       <div
@@ -10711,7 +10723,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      bold beginning of each top-level line it hides (e.g. "In Today marker · Safe sync · …"), so he can see what's
      in there without opening it. Lines with no bold start use the text before ":" (or a short cut of the text).
      Subtasks are skipped. Render-only data-tlsum, stripped in cardCleanHtml. Applies to every title line. */
-  function titleItemLabel(x){
+  function titleItemLabel(x,long){
     const txt = s => (s || '').replace(/[\s\u200b\u00a0]+/g,' ').trim();
     const all = txt(x.textContent); if(!all) return '';
     const b = x.querySelector('b,strong');
@@ -10719,22 +10731,79 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(b){ const t = txt(b.textContent); if(t && all.replace(/^[*\s]+/,'').startsWith(t.replace(/^[*\s]+/,''))) lab = t; }
     if(!lab){ const i = all.indexOf(':'); lab = i > 0 && i <= 60 ? all.slice(0,i) : all; }
     lab = lab.replace(/^\*+\s*/,'').replace(/[:\s]+$/,'');
+    if(long) return lab;
     return lab.length > 48 ? lab.slice(0,46).trim() + '…' : lab;
+  }
+  /* History lists (2026-11-04, Julius: 50 items in one paragraph is unreadable): one item per line, every item kept,
+     repeats shown once with ×N. An IT study entry shows its whole summary line. */
+  function histItemLabel(x){
+    if(x.dataset && x.dataset.study) return (x.textContent || '').replace(/[\s\u200b\u00a0]+/g,' ').trim();
+    return titleItemLabel(x,true);
+  }
+  function histList(labels){
+    const seen = new Map();
+    labels.forEach(l => { if(l) seen.set(l,(seen.get(l) || 0) + 1); });
+    return [...seen].map(([l,n]) => n > 1 ? l + ' ×' + n : l);
+  }
+  /* History detail (2026-11-04, Julius): Full = folds only where he folds (as before) · Compact = every Morning /
+     Afternoon / Evening (and old-style sections and project groups) folded to its list, one item per line · Mini =
+     the same, but each project row is just name + count. Per device (localStorage fw.histMode); display only, never
+     saved into a cell. Tapping a header opens just that one ('open:<key>' in the day's fw.tsecFold entry). */
+  const HIST_MODES = ['full','compact','mini'], HIST_LABEL = {full:'Full',compact:'List',mini:'Mini'}, HIST_ICON = {full:'▤',compact:'≡',mini:'–'}; // one symbol: the header is ~140px wide on a phone
+  let histMode = 'full';
+  try{ const m = localStorage.getItem('fw.histMode'); if(HIST_MODES.indexOf(m) >= 0) histMode = m; }catch(e){}
+  function histModeButton(){
+    const b = document.getElementById('histMode');
+    if(b){ const next = HIST_MODES[(HIST_MODES.indexOf(histMode) + 1) % 3]; b.textContent = HIST_ICON[histMode]; b.setAttribute('aria-label','History detail: ' + HIST_LABEL[histMode]); b.title = 'History detail: ' + HIST_LABEL[histMode] + ' (tap for ' + HIST_LABEL[next] + ')'; }
+    document.body.dataset.hist = histMode;
+  }
+  function histRefresh(ed){
+    refreshTitleLines(ed);
+    if(ed.dataset.date && typeof syncDayHeightStable === 'function') try{ syncDayHeightStable(ed.dataset.date); }catch(e){}
+    requestAnimationFrame(() => { if(typeof paintDaySecs === 'function') paintDaySecs(ed); });
+  }
+  function setHistMode(m){
+    histMode = m;
+    try{ localStorage.setItem('fw.histMode',m); }catch(e){}
+    histModeButton();
+    document.querySelectorAll('#todayScroll .day-editor').forEach(histRefresh);
+  }
+  document.addEventListener('click',e => {
+    const b = e.target && e.target.closest ? e.target.closest('#histMode') : null;
+    if(!b) return;
+    e.preventDefault(); e.stopPropagation();
+    setHistMode(HIST_MODES[(HIST_MODES.indexOf(histMode) + 1) % 3]);
+  },true);
+  histModeButton();
+  // Old-style day sections (data-sec) and project groups (data-cgrp) follow the mode too.
+  function histKey(n){
+    if(n.dataset.sec) return 'sec:' + n.dataset.sec;
+    if(n.hasAttribute('data-cgrp')) return 'grp:' + (n.dataset.cgrp || '') + ':' + [...n.parentElement.querySelectorAll(':scope > [data-cgrp]')].indexOf(n);
+    return '';
+  }
+  function histForced(n,ed){ return histMode !== 'full' && !!ed && ed.classList.contains('day-editor') && !!ed.closest('#todayScroll') && !!histKey(n); }
+  function histIsOpen(ed,key){ return !!((tsecFolds()[ed.dataset.date] || {})['open:' + key]); }
+  function histToggleOpen(ed,key){
+    const all = tsecFolds(), d = ed.dataset.date, day = all[d] = all[d] || {}, k = 'open:' + key;
+    if(day[k]) delete day[k]; else day[k] = 1;
+    if(!Object.keys(day).length) delete all[d];
+    try{ localStorage.setItem(TSEC_FOLD_KEY,JSON.stringify(all)); }catch(e){}
+    histRefresh(ed);
   }
   function titleSummary(cov){
     const labs = [];
     cov.forEach(x => {
       if(x.tagName === 'TABLE' || x.hasAttribute('data-cgrp') || +(x.dataset && x.dataset.level || 0) > 0) return;
-      const l = titleItemLabel(x); if(l) labs.push(l);
+      labs.push(histItemLabel(x));
     });
-    const MAX = 30;
-    return labs.length > MAX ? labs.slice(0,MAX).join(' · ') + ' · +' + (labs.length - MAX) + ' more' : labs.join(' · ');
+    return histList(labs).map(l => '• ' + l).join('\n'); // one per line (CSS white-space: pre-line)
   }
   /* Condensed Morn / After / Night (2026-11-04, Julius): tap a header to fold its tasks into the same one-line
      summary title lines use. Fold state is per device and day (localStorage), so viewing it never saves a cell. */
   const TSEC_FOLD_KEY = 'fw.tsecFold';
   function tsecFolds(){ try{ return JSON.parse(localStorage.getItem(TSEC_FOLD_KEY)) || {}; }catch(e){ return {}; } }
   function tsecToggleFold(h,ed){
+    if(histMode !== 'full'){ histToggleOpen(ed,h.dataset.tsec); return; }
     const all = tsecFolds(), d = ed.dataset.date, k = h.dataset.tsec, day = all[d] = all[d] || {};
     if(day[k]) delete day[k]; else day[k] = 1;
     if(!Object.keys(day).length) delete all[d];
@@ -10778,13 +10847,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return [...map].map(([name,lines]) => {
       const tasks = lines.filter(x => x.classList.contains('check-line') && !(+(x.dataset.level || 0) > 0));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      const types = logTypeBuckets(tasks,titleItemLabel);
-      return {name,count:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : lines.length + ' lines',sum:titleSummary(lines),
-        types:types ? types.map(t => ({name:t.name,n:t.items.length,sum:t.items.slice(0,30).join(' · ') + (t.items.length > 30 ? ' · +' + (t.items.length - 30) + ' more' : '')})) : null};
+      const types = logTypeBuckets(tasks,histItemLabel);
+      const items = histList(lines.filter(x => x.tagName !== 'TABLE' && !x.hasAttribute('data-cgrp') && !(+(x.dataset.level || 0) > 0)).map(histItemLabel));
+      return {name,count:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : lines.length + ' lines',items,
+        types:types ? types.map(t => ({name:t.name,n:t.items.length,items:histList(t.items)})) : null};
     });
   }
   function tsecDrawSum(n,rows,folds){
-    const k = n.dataset.tsec, sig = rows ? JSON.stringify(rows.map(r => [r.name,r.count,r.sum,r.types,!!folds[k + ':' + r.name]])) : '';
+    const k = n.dataset.tsec;
+    const shutOf = r => histMode === 'mini' ? !folds['show:' + k + ':' + r.name] : !!folds[k + ':' + r.name];
+    const sig = rows ? JSON.stringify([histMode,rows.map(r => [r.name,r.count,r.items,r.types,shutOf(r)])]) : '';
     if((n.dataset.tssum || '') === sig && !!n.querySelector(':scope > .ts-sum') === !!rows) return;
     n.querySelectorAll(':scope > .ts-sum').forEach(x => x.remove());
     setAttr(n,'data-tssum',sig);
@@ -10794,22 +10866,24 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const row = document.createElement('div'); row.className = 'ts-row';
       const name = document.createElement('b'); name.textContent = r.name;
       const b = document.createElement('button'); b.type = 'button'; b.className = 'ts-count'; b.dataset.proj = r.name;
-      const shut = !!folds[k + ':' + r.name];
+      const shut = shutOf(r);
       b.textContent = r.count + (shut ? ' +' : ' −'); b.title = shut ? 'Show the list' : 'Hide the list';
       row.append(name,b);
-      // Typed lines (New / Fixes / Tweaks): a count and the names under each, instead of one summary line.
+      // One item per line (2026-11-04, Julius). Typed lines (New / Fixes / Tweaks) get a heading per type.
+      const list = (items,cls) => { const t = document.createElement('div'); t.className = 'ts-items' + (cls ? ' ' + cls : '');
+        items.forEach(l => { const it = document.createElement('div'); it.className = 'ts-it'; it.textContent = l; t.appendChild(it); }); return t; };
       if(r.types && !shut) r.types.forEach(ty => {
-        const t = document.createElement('div'); t.className = 'ts-items ts-type';
+        const t = list(ty.items,'ts-type');
         const h = document.createElement('b'); h.textContent = ty.name + ' ' + ty.n;
-        t.append(h,ty.sum); row.appendChild(t);
+        t.prepend(h); row.appendChild(t);
       });
-      else if(r.sum && !shut){ const t = document.createElement('div'); t.className = 'ts-items'; t.textContent = r.sum; row.appendChild(t); }
+      else if(r.items.length && !shut) row.appendChild(list(r.items));
       box.appendChild(row);
     });
     n.appendChild(box);
   }
   function tsecToggleList(h,ed,proj){
-    const all = tsecFolds(), d = ed.dataset.date, key = h.dataset.tsec + ':' + proj, day = all[d] = all[d] || {};
+    const all = tsecFolds(), d = ed.dataset.date, key = (histMode === 'mini' ? 'show:' : '') + h.dataset.tsec + ':' + proj, day = all[d] = all[d] || {};
     if(day[key]) delete day[key]; else day[key] = 1;
     try{ localStorage.setItem(TSEC_FOLD_KEY,JSON.stringify(all)); }catch(e){}
     refreshTitleLines(ed);
@@ -10825,7 +10899,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(k !== 'morning' && k !== 'afternoon' && k !== 'evening') continue;
       const cov = titleCovered(n), tasks = cov.filter(x => x.classList.contains('check-line') && !(+(x.dataset.level || 0) > 0));
       if(!cov.length){ ['data-tsf','data-tsinfo'].forEach(a => n.removeAttribute(a)); tsecDrawSum(n,null,folds); continue; }
-      const fold = !!folds[k];
+      const fold = histMode === 'full' ? !!folds[k] : !folds['open:' + k];
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
       if(setAttr(n,'data-tsf',fold ? 'c' : 'o')) changed = true;
       setAttr(n,'data-tsinfo',tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : cov.length + ' lines');
@@ -10855,10 +10929,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Project headers share their tasks' category, including the folded summary.
       if(n.hasAttribute('data-cgrp')) setAttr(n,'data-tccat',cardCatFromName(n.dataset.cgrp || tcText(n)) || '');
       if(!cov.length && n.dataset.tl !== '1') continue;
-      const fold = n.dataset.fold === '1' && cov.length > 0;
+      const fold = (histForced(n,ed) ? !histIsOpen(ed,histKey(n)) : n.dataset.fold === '1') && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : cov.length + ' hidden', sum:fold ? titleSummary(cov) : ''});
+      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : cov.length + ' hidden', sum:fold && histMode !== 'mini' ? titleSummary(cov) : ''});
       if(fold){
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);
@@ -10868,6 +10942,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           if(isEmptyLine(x) && !(nx && nx.dataset && nx.dataset.sec)) hide.add(x);
         }
       }
+    }
+    // List / Mini: blank lines and empty old-style sections take no room (display only; the last line stays for typing).
+    if(histMode !== 'full' && ed.classList.contains('day-editor') && ed.closest('#todayScroll')){
+      const kids = [...ed.children];
+      kids.forEach((n,i) => {
+        if(i === kids.length - 1 || n.hasAttribute('data-tsec')) return;
+        if(n.dataset.sec ? !titleCovered(n).length : (!n.hasAttribute('data-tl') && !n.hasAttribute('data-cgrp') && isEmptyLine(n))) hide.add(n);
+      });
     }
     if(refreshTsecFolds(ed,hide)) changed = true;
     for(const n of ed.querySelectorAll(':scope > [data-tlon]')) if(!on.has(n)){ n.removeAttribute('data-tlon'); n.removeAttribute('data-tlinfo'); n.removeAttribute('data-tlsum'); changed = true; }
@@ -10922,6 +11004,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     titleEditDone(ed);
   }
   function toggleTitleFold(n,ed){
+    if(histForced(n,ed)){ histToggleOpen(ed,histKey(n)); return; } // mode fold: per device, never saved
     captureBeforeEdit(ed);
     if(n.dataset.fold === '1') delete n.dataset.fold; else n.dataset.fold = '1';
     titleEditDone(ed);
@@ -12470,7 +12553,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     backdrop.animate([{opacity:out?1:0},{opacity:out?0:1}],{...timing,fill:out?'forwards':'none'});
     return el.animate(out?[to,from]:[from,to],timing);
   }
-  function settle(el){backdrop.getAnimations().forEach(a => a.cancel());el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
+  // While History is zoomed out of its row, Blocks keeps the height it had instead of filling the gap.
+  function padOf(el){ return el.classList.contains('od-top') && el.parentElement ? el.parentElement.querySelector(':scope > .plan-pad') : null; }
+  function settle(el){const pad=padOf(el);if(pad)pad.style.removeProperty('flex');backdrop.getAnimations().forEach(a => a.cancel());el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
   function close(){
     if(!focused)return;
     const el=focused;focused=null;
@@ -12483,6 +12568,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(anim)anim.finish();
     close();if(anim)anim.finish();
     home=el.getBoundingClientRect();
+    const pad=padOf(el);if(pad)pad.style.setProperty('flex','0 0 '+Math.round(pad.getBoundingClientRect().height)+'px');
     const bg=shownBg(el);if(bg)el.style.setProperty('--fw-focus-bg',bg);
     focused=el;el.classList.add('fw-focus-target');document.body.classList.add('fw-focus-on');
     const a=anim=zoom(el,home,false);
@@ -12493,7 +12579,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(node.closest('#refSearch'))return document.getElementById('referenceScroll');
     if(node.closest('.ce-head strong'))return document.getElementById('centerDownScroll');
     if(node.closest('.urg-head'))return document.getElementById('urgentPanel');
-    if(node.closest('.today-jump'))return document.getElementById('todayPane');
+    // History only (2026-11-04, Julius): zooming the whole pane also stretched Blocks under it.
+    if(node.closest('.today-jump'))return (document.body.classList.contains('one-day') && document.querySelector('#todayScroll .od-on > .od-top')) || document.getElementById('todayPane');
     if(node.closest('.od-pad-head'))return document.querySelector('#todayScroll .od-on .plan-pad');
     if(node.closest('[data-nsec="must"]'))return document.getElementById('journalScroll');
     return null;

@@ -81,6 +81,7 @@
 - To Confirm card (2026-11-04, Julius)
 - Pinned Reference cards (2026-11-04, Julius)
 - IT study log (2026-11-04, Julius)
+- History detail modes + fold fixes (2026-11-04, Julius)
 
 ## IT study log (2026-11-04)
 

@@ -13,6 +13,9 @@ const data = {
   today, inbox: [], cardCats: [], notesSeeds: {}, urgent: [], refPins: [],
   days: [{ date: today, journal: '',
     tasks: line('Pay rent', ' data-urg="1"') + line('Walk dog') +
+      // History modes (2026-11-04): a Morning section with a 50-item Claude group.
+      '<div data-tsec="morning" contenteditable="false">Morning</div><div data-cgrp="Gantt"><b><u>Gantt</u></b></div>' +
+      Array.from({ length: 50 }, (_, i) => '<div class="check-line done" data-level="0" data-cid="s-' + i + '" data-dt="09:' + String(i % 60).padStart(2, '0') + '"><input type="checkbox" checked><span class="check-text"><b>*Item ' + i + ' with a fairly long title that has to wrap</b>: details</span></div>').join('') +
       // IT study entry (StudyLog.gs): folded title + its own detail lines.
       '<div class="check-line done" data-level="0" data-study="' + today + ':morning" data-tl="1" data-fold="1" data-at="11:17" data-dt="11:17">' +
       '<input type="checkbox" checked><span class="check-text"><b>IT study</b>: 20 min · 2 answered · 1 ✓ · 0 partial · 1 ✗ · DNS</span></div>' +
@@ -53,6 +56,21 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return '';
   });
   if (study) errs.push('IT study entry: ' + study);
+  // History detail button: List = one line per item (all 50), hidden lines really hidden; Mini = counts only; back to Full.
+  const modes = [];
+  for (let i = 0; i < 3; i++) {
+    await pg.click('#histMode'); await pg.waitForTimeout(250);
+    modes.push(await pg.evaluate(() => {
+      const ed = document.querySelector('#todayScroll .day-editor'), top = ed.closest('.od-top') || ed;
+      const leak = [...ed.querySelectorAll(':scope > [data-tlhid]')].filter(x => getComputedStyle(x).display !== 'none').length;
+      const wide = [...ed.querySelectorAll('.ts-it')].filter(x => x.getBoundingClientRect().right > top.getBoundingClientRect().right + 1).length;
+      return { mode: document.body.dataset.hist, items: ed.querySelectorAll('.ts-it').length, leak, wide };
+    }));
+  }
+  const [list, mini, full] = modes;
+  if (list.mode !== 'compact' || list.items < 50 || list.leak || list.wide) errs.push('History List mode: ' + JSON.stringify(list));
+  if (mini.mode !== 'mini' || mini.items || mini.leak) errs.push('History Mini mode: ' + JSON.stringify(mini));
+  if (full.mode !== 'full' || full.leak) errs.push('History Full mode: ' + JSON.stringify(full));
   if (errs.length) { fails += errs.length; console.error('✗ ' + name + ':\n  ' + errs.join('\n  ')); }
   else console.log('✓ ' + name + ': loads with no page errors');
 }

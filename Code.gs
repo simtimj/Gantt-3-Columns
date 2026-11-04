@@ -127,6 +127,9 @@ function getWorkspaceData() {
   try { removeDaySections_(); } catch (e) { console.error(e); }
 
   const today = todayString_();
+  // One read of the whole Days sheet for Urgent + Dailies seeds (2026-11-04: each used to read it on its own,
+  // ~800 rows of History HTML twice per load). Read after the apply steps above, so it includes their writes.
+  const allDays = readAllDays_();
 
   return {
     days: getDaysRange_(
@@ -134,11 +137,11 @@ function getWorkspaceData() {
       addDaysToDateString_(today, INITIAL_FUTURE_DAYS)
     ),
     reference: getReference_(),
-    urgent: getUrgentDays_(),
+    urgent: getUrgentDays_(allDays),
     inbox: (function () { try { return getInbox(); } catch (e) { return []; } })(),
     cardCats: getCardCats_(),
     refPins: getRefPins_(),
-    notesSeeds: getNotesSeeds_(today),
+    notesSeeds: getNotesSeeds_(today, allDays),
     today: today
   };
 }
@@ -146,14 +149,23 @@ function getWorkspaceData() {
 // Dailies belong to every day (Julius, 2026-11-03). Carry the latest saved
 // section forward, even after a gap longer than the visible date window.
 // Read only: historical cells and their completion states remain untouched.
-function getNotesSeeds_(today) {
+// Every Days row as {date, values} (columns A–D when present), read once.
+function readAllDays_() {
   const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const count = sheet.getLastRow() - 1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { width: 3, rows: [] };
+  const width = sheet.getMaxColumns() >= 4 ? 4 : 3;
+  return { width: width, rows: sheet.getRange(2, 1, lastRow - 1, width).getValues() };
+}
+
+function getNotesSeeds_(today, allDays) {
   const seeds = {};
-  if (count < 1) return seeds;
-  sheet.getRange(2, 1, count, 3).getValues().forEach(row => {
-    const date = formatDate_(row[0]);
+  const rows = (allDays || readAllDays_()).rows;
+  if (!rows.length) return seeds;
+  rows.forEach(row => {
     const journal = String(row[2] || '');
+    if (journal.indexOf('data-nsec') < 0) return; // skip the date formatting for most rows
+    const date = formatDate_(row[0]);
     ['must', 'focus'].forEach(kind => {
       if (date && date <= today && (!seeds[kind] || date > seeds[kind].date) &&
           new RegExp('data-nsec=["\']' + kind + '["\']').test(journal))
@@ -166,14 +178,12 @@ function getNotesSeeds_(today) {
 
 // Days whose Today or Notes text has an urgency-tagged task (data-urg), for the
 // Urgent panel in Reference. Reads only the Date and Today columns.
-function getUrgentDays_() {
-  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
+function getUrgentDays_(allDays) {
   // Today and Journal (Notes) columns: urgency set on a task in Notes counts too (Julius, 2026-10-27).
   // Plus the Plan pad (column D, 2026-10-29) when the sheet has it.
-  const width = sheet.getMaxColumns() >= 4 ? 4 : 3;
-  const values = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+  const all = allDays || readAllDays_();
+  const width = all.width, values = all.rows;
+  if (!values.length) return [];
   const out = [];
   const has = h => h.indexOf('data-urg=') >= 0 || h.indexOf('data-due=') >= 0; // urgent or has a due date
   values.forEach(row => {
@@ -1658,9 +1668,16 @@ function confirmCardHtml_(rows) {
 function syncConfirmCard_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss.getSheetByName('To Confirm')) return; // nothing until the tab exists
+  // Fast path (2026-11-04): most loads change nothing, so check without taking the script lock.
+  if (!confirmCardWork_(true)) return;
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) return;
-  try {
+  if (!lock.tryLock(5000)) return; // next load retries
+  try { confirmCardWork_(false); } finally { lock.releaseLock(); }
+}
+
+// dryRun: true → only report whether a write is needed.
+function confirmCardWork_(dryRun) {
+  {
     const sheet = getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
     const ref = getOrCreateSheet_('Reference', REF_HEADERS);
     let rows = confirmRows_(sheet);
@@ -1672,6 +1689,10 @@ function syncConfirmCard_() {
       const id = tag.match(/data-kid="([^"]+)"/)[1];
       if (/\bclass="[^"]*\bdone\b/.test(tag)) ticked.add(id);
     });
+    if (dryRun) {
+      const pending = rows.some(x => ticked.has(x.id) && x.status !== 'works');
+      return pending || !cardRow || cur.replace(/<!--fw-modified:\d+-->/, '') !== confirmCardHtml_(rows);
+    }
     const today = todayString_();
     rows.forEach(x => {
       if (ticked.has(x.id) && x.status !== 'works') {
@@ -1690,7 +1711,8 @@ function syncConfirmCard_() {
       pins.unshift(CONFIRM_CARD_ID);
       PropertiesService.getScriptProperties().setProperty('refPinned', JSON.stringify(pins.slice(0, 200)));
     }
-  } finally { lock.releaseLock(); }
+    return true;
+  }
 }
 
 function intakeDate_(value) {

@@ -64,6 +64,8 @@ Last updated: 2026-11-04
 
 ## 🧪 To be confirmed (2026-11-03)
 
+- **Cal Events text follows Options:** every line in the Cal Events cell, including its heading, now uses Text size × Scale like the other cells. The phone-only smaller text is gone.
+
 - **Dailies tab icon:** the clickable Dailies/Notes tab uses 📋 with a Dailies tooltip/accessibility label; Weather retains ☁️. Tab switching and content are unchanged.
 
 - **Dailies health groups and hydration:** underlined **P health** / **M health** groups; Read 10+ pages and Meditate go under M health, other routines under P health. Stretch becomes **Morning · Stretch**, with **Before bed · Stretch** and **On waking · Drink a glass of water** added once. Existing checkboxes/IDs remain intact; historical days are not rewritten.

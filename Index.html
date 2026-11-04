@@ -551,7 +551,7 @@
     #centerDownScroll{flex:var(--ns-b,1) 1 0;min-height:30px;}
     #journalPane[data-ctab="weather"] #journalScroll,#journalPane[data-ctab="weather"] #journalTemplateButton,
     #journalPane:not([data-ctab="weather"]) #weatherScroll{display:none!important;}
-    /* Keep In Mind tab (2026-11-03, Julius): 📋 shows the cell without that section, 📌 shows only it.
+    /* Keep In Mind tab (2026-11-03, Julius): 📋 shows the cell without that section, ⭐ shows only it.
        View only: the section stays in the same Notes cell and saves the same way. */
     #journalPane[data-ctab="notes"] .journal-editor > :is([data-nsec="focus"],[data-nsec="focus"] ~ :not(table,table ~ *)){display:none!important;}
     #journalPane[data-ctab="focus"] .journal-editor > :not([data-nsec="focus"],[data-nsec="focus"] ~ :not(table,table ~ *)){display:none!important;}
@@ -2042,7 +2042,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         <span class="center-tabs" role="tablist">
           <button type="button" data-ctab="notes" class="on" title="Dailies" aria-label="Dailies">📋</button>
           <button type="button" data-ctab="weather" title="Weather (hourly)" aria-label="Weather"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg></button>
-          <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">📌</button>
+          <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">⭐</button>
         </span>
       </div>
       <div

@@ -1842,10 +1842,10 @@
     }
 
 /* Floating Focus View: retain the live editor DOM and its autosave listeners. */
-/* Held-open cell (2026-11-04, Julius): same color as the cell it came from (set when it opens), nothing dimmed behind it, a smaller window. */
+/* Held-open cell (2026-11-04, Julius): same color as the cell it came from (set when it opens), a light dim behind it, a smaller window. */
 body{--fw-focus-bg:var(--dm-cell,var(--panel,#fff));}
 body.fw-focus-on .fw-focus-target{--panel:var(--fw-focus-bg);}
-#fwFocusBackdrop{position:fixed;inset:0;background:transparent;z-index:9000;display:none;}
+#fwFocusBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:9000;display:none;}
 body.fw-focus-on #fwFocusBackdrop{display:block;}
 body.fw-focus-on .fw-focus-target{position:fixed!important;inset:10dvh 8vw!important;width:84vw!important;height:80dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--fw-focus-bg)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
 body.fw-focus-on .fw-focus-target.plan-pad{padding-top:36px!important;}
@@ -11894,9 +11894,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     el.style.transformOrigin='0 0';
     const from={translate:(rect.left-end.left)+'px '+(rect.top-end.top)+'px',scale:(rect.width/end.width)+' '+(rect.height/end.height)};
     const to={translate:'0px 0px',scale:'1 1'};
-    return el.animate(out?[to,from]:[from,to],{duration:out?280:380,easing:'cubic-bezier(.22,.8,.3,1)'});
+    const timing={duration:out?520:680,easing:'cubic-bezier(.22,.8,.3,1)'};
+    backdrop.animate([{opacity:out?1:0},{opacity:out?0:1}],{...timing,fill:out?'forwards':'none'});
+    return el.animate(out?[to,from]:[from,to],timing);
   }
-  function settle(el){el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
+  function settle(el){backdrop.getAnimations().forEach(a => a.cancel());el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
   function close(){
     if(!focused)return;
     const el=focused;focused=null;

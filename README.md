@@ -53,7 +53,7 @@ Last updated: 2026-11-04
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
 - **Subtle + border line**: new Task subject color choice, subtle tint plus a lighter, brighter subject-colored outline, on task cards, Blocks, Urgent rows and Cal Events. Today cards use a 2px outline, Dailies cards 1px; other cards stay at 1.5px.
-- **Hold to expand a cell**: zooms open and closed slowly from the cell's own spot, in a smaller window. It keeps the cell's own color with nothing dimmed behind it, and holding a label no longer opens the format menu.
+- **Hold to expand a cell**: zooms open and closed slowly from the cell's own spot, in a smaller window. It keeps the cell's own color with a light dim behind it, and holding a label no longer opens the format menu.
 - **Uniform section lines**: the top bar, column headers, section lines and DAILIES header line are all 2px in the same solid line color.
 - **Drag pills follow the day**: section drag pills use the color of the day being shown.
 - **Subject auto-guess**: the subject with the most matching words wins, each word counting the same; a tie goes to the word seen first. "learn" now counts toward Productivity.

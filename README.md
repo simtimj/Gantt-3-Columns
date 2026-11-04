@@ -51,6 +51,7 @@ Last updated: 2026-11-04
 
 - **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
+- **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
 - **Blocks hierarchy:** indent/outdent and up/down actions now move the selected parent with contiguous deeper-indented descendants. This is editor-line hierarchy, not a new Sheet schema; drag handles and true arbitrary nesting remain to be implemented.
 - **Keep In Mind:** long-press fold arrow now exposes prompt-based rename, category color, reorder, add task, and collapse actions. Category colors persist in Focus data. Needs usability refinement; no claim of completed custom menu.
 

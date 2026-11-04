@@ -1822,7 +1822,11 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid var(--urg);border-radius:3px;background:#fff;display:inline-grid;place-content:center;}
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked{background:var(--urg);}
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
-#centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
+/* Cal Events follow Options → Task subject color (2026-11-03, Julius): checkbox / whole card / subtle / border. */
+body.tc-borderonly #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
+body:not(.tc-boxfill,.tc-borderonly) #centerCalendarList .ce-event[data-tccat]:not(.ce-done){background:color-mix(in srgb,var(--ce-cat) var(--tc-mix,22%),var(--panel));}
+body.tc-boxfill #centerCalendarList .ce-event[data-tccat]:not(.ce-done) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid color-mix(in srgb,var(--ce-cat) 55%,#555);border-radius:3px;background:var(--ce-cat);display:inline-grid;place-content:center;}
+body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done) > .ce-check{border-color:var(--urg);}
 #centerCalendarList .ce-event:has(.ce-meta:not(:empty)){flex-wrap:wrap;row-gap:1px;}
 #centerCalendarList .ce-meta{flex:1 0 100%;padding-left:22px;color:var(--muted);font-size:.85em;}
 #centerCalendarList .ce-meta:empty{display:none;}
@@ -2005,7 +2009,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     <label class="ts-check">Divider lines <input type="color" id="dividerColor" value="#1f2937" aria-label="Divider line color"> <button class="btn tiny" type="button" id="dividerReset">Reset</button></label>
     <label class="ts-check">Line strength <input type="range" id="lineStrength" min="20" max="100" step="5" value="70" aria-label="Dividing line strength"> <span id="lineStrengthVal">70%</span></label>
     <label class="ts-check"><input type="checkbox" id="oneDayOn" checked> One day at a time (▲ ▼ to change day; Completed on top, Plan pad below)</label>
-    <div class="ts-row"><span class="ts-label">Task subject color</span><select id="cardsColorMode" aria-label="Task subject color"><option value="checkbox">Checkbox only</option><option value="whole">Whole card</option><option value="border">Card border only</option></select></div>
+    <div class="ts-row"><span class="ts-label">Task subject color</span><select id="cardsColorMode" aria-label="Task subject color"><option value="checkbox">Checkbox only</option><option value="whole">Whole card</option><option value="subtle">Whole card, subtle</option><option value="border">Card border only</option></select></div>
     <div class="ts-row">
       <span class="ts-label" title="How red / yellow / blue urgency shows on a task">Urgency mark</span>
       <select id="urgMarkSelect" aria-label="Urgency mark"><option value="bar">Bar left of box</option><option value="under">Line under box</option><option value="text">Underline text</option><option value="box">Box border (old)</option></select>
@@ -9688,6 +9692,8 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
      fills the checkbox, urgency is its border (gray when none), done = the check mark.
      The mark is white with a dark outline so it reads on any fill. Option "Subject color: whole card" brings back the tinted cards. */
   body.tc-boxfill .check-line[data-tccat]{--tc-tint:transparent;}
+  /* Whole card, subtle (2026-11-03, Julius): same tint at a third of the strength. */
+  body.tc-subtle{--tc-mix:8%;}
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
   body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}
   /* Keep subject colors readable without the bright outlines/fold controls. */
@@ -10415,8 +10421,8 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     if(ds){ ds.checked = daySecsOn; ds.addEventListener('change',() => { daySecsOn = ds.checked; try{ localStorage.setItem('fw.daySecs',daySecsOn ? '1' : '0'); }catch(e){} refreshAllCards(); }); }
     const cm = document.getElementById('cardsColorMode');
     let colorMode = 'checkbox';
-    try{ const saved = localStorage.getItem('fw.cardsColorMode'); colorMode = ['checkbox','whole','border'].includes(saved) ? saved : (localStorage.getItem('fw.cardsBoxFill') === '0' ? 'whole' : 'checkbox'); }catch(e){}
-    const applyColorMode = v => { document.body.classList.toggle('tc-boxfill',v === 'checkbox'); document.body.classList.toggle('tc-borderonly',v === 'border'); };
+    try{ const saved = localStorage.getItem('fw.cardsColorMode'); colorMode = ['checkbox','whole','subtle','border'].includes(saved) ? saved : (localStorage.getItem('fw.cardsBoxFill') === '0' ? 'whole' : 'checkbox'); }catch(e){}
+    const applyColorMode = v => { document.body.classList.toggle('tc-boxfill',v === 'checkbox'); document.body.classList.toggle('tc-borderonly',v === 'border'); document.body.classList.toggle('tc-subtle',v === 'subtle'); };
     applyColorMode(colorMode);
     if(cm){ cm.value = colorMode; cm.addEventListener('change',() => { applyColorMode(cm.value); try{ localStorage.setItem('fw.cardsColorMode',cm.value); }catch(e){} }); }
     const um = document.getElementById('urgMarkSelect'), UM = ['bar','under','text','box'];

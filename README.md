@@ -52,6 +52,8 @@ Last updated: 2026-11-04
 - **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
+- **Blocks toolbar fixed**: every Blocks button was dead on all screens because the header ignores touches so only its grip drags. The buttons take taps now.
+- **Blocks + Task and Remove**: + Task makes a real checkbox and lands inside the selected block (a new block is selected automatically). New **Remove** deletes the selected line and what's nested under it, after a confirm. `Next Block 2` now activates too.
 - **Cal Events hold menu**: hold anywhere on a row, not just its small checkbox, to open the usual menu. Tapping the title still edits it, and it's off while a title is being typed.
 - **Condensed Morn / After / Night**: tap a section header in History / Log to fold its tasks into a one-line summary (e.g. "Walk LaDonna · Gantt zoom fix"), with a done count on the header; tap again to open. Remembered per day on each device, and folding never saves or changes the cell.
 - **History section borders**: each section is now one continuous box drawn behind the lines, in every view, so the sides and header line up. The section header icon and label also sit on one line.

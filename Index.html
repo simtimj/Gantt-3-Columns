@@ -1507,7 +1507,7 @@
     #referencePane .ref-pane-header .urg-head{width:100%;display:flex;align-items:center;flex-wrap:nowrap;padding:0;text-align:left;}
     #referencePane .ref-pane-header .urg-counts{flex:1;min-width:0;margin:0;gap:.45em;overflow:hidden;white-space:nowrap;}
 
-    .od-pad-head .blocks-add,.od-pad-head .blocks-task{font:inherit;letter-spacing:normal;text-transform:none;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:3px 7px;margin-left:5px;cursor:pointer;}
+    .od-pad-head .blocks-add,.od-pad-head .blocks-task,.od-pad-head .blocks-remove{font:inherit;letter-spacing:normal;text-transform:none;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:3px 7px;margin-left:5px;cursor:pointer;}
 
     body.one-day #todayScroll .day-row:not(.od-on),
     body.one-day #journalScroll .day-row:not(.od-on){display:none;}
@@ -1755,6 +1755,8 @@
        ignore touches (pointer-events:none; ::before hits still target the bar, so drag code is unchanged).
        Column / split lines keep their own 1–3px line (their drag code relies on pointer capture). */
     #refSplitBar,#notesSplitBar,body.one-day #todayScroll .od-on > .od-pad-head{pointer-events:none!important;cursor:default!important;}
+    /* The Blocks header ignores touches so only its grip drags; its buttons must still take them (2026-11-04, Julius). */
+    body.one-day #todayScroll .od-on > .od-pad-head button{pointer-events:auto!important;position:relative;z-index:1;cursor:pointer!important;}
     #refSplitBar::before,#notesSplitBar::before,body.one-day #todayScroll .od-on > .od-pad-head::before{pointer-events:auto!important;}
     .column-resizer::after{top:0!important;margin-top:0!important;}
     .column-resizer::before{top:0!important;bottom:auto!important;height:46px!important;left:-13px!important;right:-13px!important;cursor:col-resize!important;}
@@ -2824,11 +2826,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       { const top = document.createElement('div'); top.className = 'od-top';
         row.insertBefore(top, row.firstElementChild);
         [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-add" title="Add named block">+ Block</button> <button type="button" class="blocks-task" title="Add task to Blocks">+ Task</button> <button type="button" class="blocks-activate" title="Activate selected Next Block">Activate</button> <button type="button" class="blocks-indent" title="Indent selected line">→</button> <button type="button" class="blocks-outdent" title="Outdent selected line">←</button> <button type="button" class="blocks-up" title="Move selected line up">↑</button> <button type="button" class="blocks-down" title="Move selected line down">↓</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-add" title="Add named block">+ Block</button> <button type="button" class="blocks-task" title="Add task to Blocks">+ Task</button> <button type="button" class="blocks-activate" title="Activate selected Next Block">Activate</button> <button type="button" class="blocks-remove" title="Remove selected line and what is nested under it">Remove</button> <button type="button" class="blocks-indent" title="Indent selected line">→</button> <button type="button" class="blocks-outdent" title="Outdent selected line">←</button> <button type="button" class="blocks-up" title="Move selected line up">↑</button> <button type="button" class="blocks-down" title="Move selected line down">↓</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
       // Blocks MVP: reuse the existing Plan column, checkbox editor, indent/outdent,
       // drag/drop, and conflict-safe autosave. Never replace saved Plan content.
+      const blockDepth = line => Math.max(0,Number(line.dataset.blockDepth)||0);
+      const blockGroup = line => {
+        const nodes=[line], depth=blockDepth(line);
+        let next=line.nextElementSibling;
+        while(next && blockDepth(next)>depth){nodes.push(next);next=next.nextElementSibling;}
+        return nodes;
+      };
+      let selectedBlockLine = null;
       const blockAdd = row.querySelector('.blocks-add');
       const taskAdd = row.querySelector('.blocks-task');
       const addBlocksLine = (kind) => {
@@ -2837,23 +2847,33 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         // Empty block names get a readable placeholder; a time range can be supplied later.
         const title = name.trim() || (kind === 'block' ? 'Next Block' : '');
         if(!title) return;
-        const line = document.createElement('div');
+        let line;
         if (kind === 'block') {
+          line = document.createElement('div');
           line.setAttribute('data-title', '1');
           const strong = document.createElement('b');
           strong.textContent = title;
           line.appendChild(strong);
+          pad.appendChild(line);
+          selectedBlockLine = line; // the next + Task lands inside this block
         } else {
-          line.textContent = '[] ' + title;
+          line = createCheckboxLine(0);
+          line.querySelector('.check-text').textContent = title;
+          // A task goes inside the selected block, after what's already there; with nothing selected, at the bottom.
+          const parent = selectedBlockLine && selectedBlockLine.parentElement === pad ? selectedBlockLine : null;
+          if(parent){
+            const depth = blockDepth(parent) + (parent.hasAttribute('data-title') ? 1 : 0);
+            line.dataset.blockDepth = String(depth);
+            line.style.marginLeft = (depth * 18) + 'px';
+            blockGroup(parent).slice(-1)[0].insertAdjacentElement('afterend',line);
+          } else pad.appendChild(line);
         }
-        pad.appendChild(line);
         pad.dispatchEvent(new Event('input', {bubbles:true}));
       };
       blockAdd.addEventListener('click', () => addBlocksLine('block'));
       taskAdd.addEventListener('click', () => addBlocksLine('task'));
       // Explicit mobile-friendly hierarchy/order controls. A selection is captured
       // before toolbar focus changes; all mutations use the existing Plan save path.
-      let selectedBlockLine = null;
       pad.addEventListener('pointerup', e => {
         const line = e.target.closest('div, p');
         if(line && line.parentElement === pad) selectedBlockLine = line;
@@ -2865,13 +2885,24 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         while(node && node.parentElement !== pad) node = node.parentElement;
         if(node && node.parentElement === pad) selectedBlockLine = node;
       });
+      row.querySelector('.blocks-remove').addEventListener('click',()=>{
+        const line=selectedBlockLine;
+        if(!line || line.parentElement!==pad){setStatus('Tap a Blocks line first, then Remove');return;}
+        const group=blockGroup(line), name=(line.textContent||'').trim().slice(0,40)||'this line';
+        if(!window.confirm('Remove "'+name+'"'+(group.length>1?' and '+(group.length-1)+' nested line'+(group.length>2?'s':''):'')+'?'))return;
+        captureBeforeEdit(pad);
+        group.forEach(n=>n.remove());
+        selectedBlockLine=null;
+        pad.dispatchEvent(new Event('input',{bubbles:true}));
+        setStatus('Removed from Blocks');
+      });
       row.querySelector('.blocks-activate').addEventListener('click',()=>{
         const line=selectedBlockLine;
         if(!line || line.parentElement!==pad || !line.hasAttribute('data-title')){
           setStatus('Select a Next Block title first');return;
         }
         const strong=line.querySelector(':scope > b,:scope > strong');
-        if(!strong || !/^Next Block(?:\\s+\\d+)?$/i.test(strong.textContent.trim())){
+        if(!strong || !/^Next Block(?:\s+\d+)?$/i.test(strong.textContent.trim())){
           setStatus('Activate works on Next Block placeholders');return;
         }
         const keep=window.confirm('Keep existing subtasks? OK = keep. Cancel = do not activate.');
@@ -2887,13 +2918,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         pad.dispatchEvent(new Event('input',{bubbles:true}));
         setStatus('Block activated');
       });
-      const blockDepth = line => Math.max(0,Number(line.dataset.blockDepth)||0);
-      const blockGroup = line => {
-        const nodes=[line], depth=blockDepth(line);
-        let next=line.nextElementSibling;
-        while(next && blockDepth(next)>depth){nodes.push(next);next=next.nextElementSibling;}
-        return nodes;
-      };
       const changeBlockLine = action => {
         const line=selectedBlockLine;
         if(!line || line.parentElement!==pad)return;

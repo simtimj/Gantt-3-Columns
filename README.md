@@ -49,6 +49,7 @@ Last updated: 2026-11-04
 
 ## 🧪 To be confirmed (2026-11-04)
 
+- **✅ To Confirm card**: a pinned Reference card lists every shipped change that you haven't checked yet, grouped by project (Gantt, Exercise Tracker…), each with a one-line "how to check". Tick a line once it works on your phone; on the next ↻ it leaves the card and the `To Confirm` tab records it as works with the date. Claude adds a line every time it ships something, tells you what's still unchecked before starting new work in that app, and checks this list first when you report something broken. The old 🧪 backlog was condensed into about 37 lines to start.
 - **📌 Pin Reference cards**: tap the faint 📌 at the top right of a card to pin it; pinned cards stay at the top (in every sort mode) with a soft tint. Pins are saved on the server, so they're the same on phone and Mac. Tap again to unpin.
 - **Always a Next Block**: today's and later days' Blocks always end with a **Next Block** (title plus an empty task cell). It comes back by itself after Activate or Remove. A line across Blocks sets it apart from what's above.
 - **Enter on a block title** makes a task cell under it, checkbox included. Backspace on the checkbox if you want a plain line instead.

@@ -333,3 +333,10 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 
 - Server: script property `refPinned` (JSON id list); `getRefPins_()` goes out as `refPins` in `getWorkspaceData`; `setReferencePin(id,on)` (script lock) returns the new list. Not in the Reference sheet, so pinning never rewrites a card or touches its hash.
 - Client: `refPins` Set (set in `applyWorkspaceData`); `sortedReferenceItems` puts pinned first in every sort mode (siblings only, so a pinned child stays in its parent). `.ref-pin` button per card (moves left of Delete while Delete shows), `.ref-pinned` tint. Optimistic toggle, reverted on failure. Other open devices pick pins up on their next load.
+
+## To Confirm card (2026-11-04, Julius)
+
+- Tab `To Confirm` (Date, Project, Change, How to check, Status, Checked on) is the source of truth. `syncConfirmCard_()` (Code.gs, in `getWorkspaceData()` after `applyClaudeTasks_`) does nothing until the tab exists.
+- Card id `p-to-confirm` (title To Confirm), created on first sync and pinned (prepended to `refPinned`). Content is rebuilt from open rows (Status not `works`): `<h2>`, a count line, then per project `<div data-kgrp>` + check-lines `data-kid="k-<hash of date|project|change>"`, oldest first; `broken` rows get "⚠ broken ·".
+- Ticked lines (class `done` on a `data-kid` line) → row Status `works`, Checked on = today; they drop off on that rebuild. Card text is regenerated, so anything typed into it is replaced (old content goes to the backup sheet via `backupCell_`, throttled). Rewrites only when the HTML changes.
+- Backlog seeded 2026-11-04: README 🧪 items grouped into ~37 feature rows (Gantt + Exercise Tracker).

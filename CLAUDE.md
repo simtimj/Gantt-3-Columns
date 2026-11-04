@@ -22,6 +22,12 @@
 - **Every change that adds, changes or removes a feature must update `README.md` in the same commit.** New work goes under 🧪 To be confirmed (with the date); move it to ✅ Working once Julius says it works; anything he wants tweaked goes under 🔧; ideas he mentions but hasn't asked to build go under 📋. Update the "Last updated" date.
 - Keep useful info that's removed from the screen (e.g. the shortcuts list) in the README.
 
+## To Confirm (2026-11-04, Julius: standing rule, every project)
+
+- **Every shipped change gets a row in the `To Confirm` tab** of New Gantt Sheet (`1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`, Sheets connector, alongside the Done Log row): Date `YYYY-MM-DD`, Project, Change (short name), How to check (one line he can test on his phone), Status blank. One row per feature, not per commit. It shows in the pinned **To Confirm** Reference card; ticking a line there marks it `works`.
+- **Before new work in a project**, read its open rows and tell Julius how many are unchecked plus the oldest 3.
+- **When Julius says something is broken / not working**, check the tab first. If it was never confirmed, say so plainly ("shipped 11/2, never checked"). Broken → Status `broken` (stays open with ⚠). Works → Status `works` + Checked on date, and move its README item from 🧪 to ✅.
+
 ## Claude adds open tasks (2026-10-27, Julius)
 
 - "Add this to the Gantt …" = an open task, not an inbox item: append a row to the `New Tasks` tab (Sheets connector, no deploy): Date `YYYY-MM-DD` or `undated`, Title, Urgency 1/2/3, Due, Minutes, Subtasks split by ` | `, Added = current Pacific time `HH:MM` (2026-11-02: sets the Morn / After / Night section for a task dated today). `tasks.js` / `CLAUDE_TASKS` is the old route. His urgency words: "for later" / "can be later" = 3 (blue), "next" / "kind of urgent" = 2 (yellow), "must do" / "really important" = 1 (red). `applyClaudeTasks_()` (Code.gs, in `getWorkspaceData()` after notes) appends them once at the end of that day's Today cell (head line `data-tid` + `data-at`, subtasks level 1 with the same `data-urg`), and `tsecPlaceAi()` in Index.html sorts today's in on load (`data-ai-new`); applied ids in script property `claudeTasksApplied`. Same open-tab caveat as the done log (tap ↻ first).
@@ -72,4 +78,5 @@
 - Center Up / Down + planning pause (2026-11-01, Julius: spec, PENDING)
 - Drag into Blocks + block borders (2026-11-04, Julius)
 - History log types (2026-11-04, Julius: option 1)
+- To Confirm card (2026-11-04, Julius)
 - Pinned Reference cards (2026-11-04, Julius)

@@ -120,6 +120,7 @@ function getWorkspaceData() {
   try { applyClaudeDone_(); } catch (e) { console.error(e); }
   try { applyClaudeNotes_(); } catch (e) { console.error(e); }
   try { applyClaudeTasks_(); } catch (e) { console.error(e); }
+  try { syncConfirmCard_(); } catch (e) { console.error(e); }
   try { moveScheduleToNotes_(); } catch (e) { console.error(e); }
   try { fixUrgentBold_(); } catch (e) { console.error(e); }
   try { removeDaySections_(); } catch (e) { console.error(e); }
@@ -1612,6 +1613,80 @@ function applyDeployedCodeLog_() {
       added.add(marker);
     });
     props.setProperty('deployedCodeLog', signature);
+  } finally { lock.releaseLock(); }
+}
+
+/* To Confirm (2026-11-04, Julius: "things slip because nobody checked them"). Every shipped change gets a row
+   in the To Confirm tab; open rows show as check-lines in the pinned Reference card "To Confirm" (id
+   CONFIRM_CARD_ID). Ticking a line there marks its row Status = works with today's date on the next load,
+   and the line leaves the card. Status 'broken' keeps the row open with a ⚠. Rows are the source of truth. */
+const CONFIRM_HEADERS = ['Date', 'Project', 'Change', 'How to check', 'Status', 'Checked on'];
+const CONFIRM_CARD_ID = 'p-to-confirm';
+
+function confirmRows_(sheet) {
+  return sheet.getDataRange().getValues().slice(1).map((r, i) => {
+    const date = intakeDate_(r[0]);
+    const project = String(r[1] || '').trim() || 'Other';
+    const change = String(r[2] || '').trim();
+    return { row: i + 2, id: 'k-' + cellHash_([date, project, change].join('|')), date, project, change,
+      how: String(r[3] || '').trim(), status: String(r[4] || '').trim().toLowerCase() };
+  }).filter(x => x.change);
+}
+
+function confirmCardHtml_(rows) {
+  const open = rows.filter(x => x.status !== 'works');
+  const short = d => { const m = String(d).match(/^\d{4}-(\d{2})-(\d{2})$/); return m ? Number(m[1]) + '/' + Number(m[2]) : String(d); };
+  let html = '<h2>To Confirm</h2><p><i>' + (open.length ? open.length + ' to check' : 'Nothing to check') +
+    ' · tick a line once it works on your phone. Broken? Tell Claude. (From the To Confirm tab.)</i></p>';
+  const projects = [];
+  open.forEach(x => { if (projects.indexOf(x.project) < 0) projects.push(x.project); });
+  projects.forEach(p => {
+    const list = open.filter(x => x.project === p).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.row - b.row);
+    html += '<div data-kgrp="' + doneEsc_(p) + '"><b><u>' + doneEsc_(p) + ' (' + list.length + ')</u></b></div>';
+    list.forEach(x => {
+      html += '<div class="check-line" data-level="0" data-kid="' + x.id + '">' + doneCheck_(false) +
+        '<span class="check-text">' + (x.status === 'broken' ? '⚠ broken · ' : '') + '<b>' + doneEsc_(x.change) + '</b> · ' +
+        short(x.date) + (x.how ? ': ' + doneEsc_(x.how) : '') + '</span></div>';
+    });
+  });
+  return html;
+}
+
+function syncConfirmCard_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss.getSheetByName('To Confirm')) return; // nothing until the tab exists
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;
+  try {
+    const sheet = getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
+    const ref = getOrCreateSheet_('Reference', REF_HEADERS);
+    let rows = confirmRows_(sheet);
+    const cardRow = referenceRowMap_(ref).get(CONFIRM_CARD_ID);
+    const cur = cardRow ? String(ref.getRange(cardRow, 5).getValue() || '') : '';
+    // Ticked lines → Status works.
+    const ticked = new Set();
+    (cur.match(/<div\b[^>]*\bdata-kid="[^"]+"[^>]*>/g) || []).forEach(tag => {
+      const id = tag.match(/data-kid="([^"]+)"/)[1];
+      if (/\bclass="[^"]*\bdone\b/.test(tag)) ticked.add(id);
+    });
+    const today = todayString_();
+    rows.forEach(x => {
+      if (ticked.has(x.id) && x.status !== 'works') {
+        sheet.getRange(x.row, 5, 1, 2).setValues([['works', today]]);
+        x.status = 'works';
+      }
+    });
+    const html = confirmCardHtml_(rows);
+    if (cur.replace(/<!--fw-modified:\d+-->/, '') === html) return;
+    if (cardRow) {
+      if (cur) backupCell_('Reference ' + CONFIRM_CARD_ID, 'Content', 'To Confirm sync', cur, true);
+      ref.getRange(cardRow, 5).setValue(html);
+    } else {
+      ref.appendRow([CONFIRM_CARD_ID, '', 'item', 'To Confirm', html, true, 0]);
+      const pins = getRefPins_().filter(x => x !== CONFIRM_CARD_ID);
+      pins.unshift(CONFIRM_CARD_ID);
+      PropertiesService.getScriptProperties().setProperty('refPinned', JSON.stringify(pins.slice(0, 200)));
+    }
   } finally { lock.releaseLock(); }
 }
 

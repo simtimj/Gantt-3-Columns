@@ -1836,7 +1836,8 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked{background:var(--urg);}
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
 /* Cal Events follow Options → Task subject color (2026-11-03, Julius): checkbox / whole card / subtle / border. */
-body:is(.tc-borderonly,.tc-subtleline) #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
+body.tc-borderonly #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
+body.tc-subtleline #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 65%,#fff);border-width:1.5px;}
 body:not(.tc-boxfill,.tc-borderonly) #centerCalendarList .ce-event[data-tccat]:not(.ce-done){background:color-mix(in srgb,var(--ce-cat) var(--tc-mix,22%),var(--panel));}
 body.tc-boxfill #centerCalendarList .ce-event[data-tccat]:not(.ce-done) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid color-mix(in srgb,var(--ce-cat) 55%,#555);border-radius:3px;background:var(--ce-cat);display:inline-grid;place-content:center;}
 body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done) > .ce-check{border-color:var(--urg);}
@@ -9803,7 +9804,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Whole card, subtle (2026-11-03, Julius): same tint at a third of the strength. */
   body.tc-subtle{--tc-mix:8%;}
   /* Subtle + border line (2026-11-03, Julius): same tint, card outline in a brighter subject color. */
-  body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 60%,transparent);}
+  body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 65%,#fff);border-left-width:1.5px;border-right-width:1.5px;}
+  body.tc-subtleline .check-line[data-tccat][data-tc^="f"]{border-top-width:1.5px;}
+  body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1.5px;}
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
   body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}
   /* Keep subject colors readable without the bright outlines/fold controls. */

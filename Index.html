@@ -1665,6 +1665,15 @@
     .wx-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;font-size:12px;color:var(--muted,#888);}
     .wx-head button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 4px;}
     .wx-row{display:grid;grid-template-columns:3.4em 1.6em 2.6em 1fr;align-items:center;gap:4px;padding:3px 8px;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--border,#ddd) 60%,transparent);}
+
+/* History time-section folding controls (view-only; never stored in sheet cells). */
+#historyFoldAll{margin-left:auto;font-size:11px;padding:3px 6px;white-space:nowrap;}
+#todayScroll .day-editor > [data-tsec].hist-fold-head{position:relative;padding-right:28px!important;min-height:22px;}
+.hist-fold-btn{position:absolute;right:3px;top:2px;border:0;background:transparent;color:var(--muted,#888);font-size:15px;line-height:20px;min-width:24px;min-height:22px;cursor:pointer;}
+#todayScroll .day-editor > .hist-fold-hidden{display:none!important;}
+/* Give precipitation a little more space without crowding the temperature. */
+#weatherScroll .wx-row{grid-template-columns:3.2em 1.45em 2.35em minmax(0,1fr);column-gap:3px;padding-left:6px;padding-right:5px;}
+#weatherScroll .wx-p{white-space:nowrap;min-width:0;}
     .wx-row.wx-now{font-weight:700;}
     .wx-row .wx-t{color:var(--muted,#888);font-size:12px;}
     .wx-row .wx-p{color:#1e88e5;font-size:12px;}
@@ -1993,6 +2002,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         <span class="today-jump" data-jump-today role="button" tabindex="0" title="Jump to today">HISTORY / LOG</span>
         <span class="od-nav"><button class="btn tiny" type="button" id="odUp" title="Previous day" aria-label="Previous day">▲</button><button class="btn tiny" type="button" id="odDown" title="Next day" aria-label="Next day">▼</button></span>
         <span id="focusStatus" class="focus-status">Loading…</span>
+        <button type="button" id="historyFoldAll" class="btn tiny" title="Collapse all history sections">Collapse All</button>
       </div>
       <div
         class="scroll"
@@ -6628,6 +6638,51 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       .withFailureHandler(() => { data = {v:1,cats:[]}; render(); }).getFocus();
     else { data = {v:1,cats:[]}; }
     render();
+  })();
+
+  /* History folding is a visual preference. Controls are added only to the live DOM;
+     the existing editor save path must strip these controls and view-only classes. */
+  (function initHistorySectionFolding(){
+    const root=document.getElementById('todayScroll'), all=document.getElementById('historyFoldAll');
+    if(!root||!all)return;
+    const names=['morning','afternoon','evening'];
+    const folded=new Map();let queued=false,applying=false;
+    function sync(){
+      if(applying)return;applying=true;
+      root.querySelectorAll('.day-editor').forEach(ed=>{
+        const row=ed.closest('[data-date],.day-row');
+        const date=row?.dataset.date||row?.getAttribute('data-date')||Array.from(root.querySelectorAll('.day-editor')).indexOf(ed);
+        let current=null;
+        Array.from(ed.children).forEach(node=>{
+          if(node.hasAttribute('data-tsec')){
+            current=names.includes(node.dataset.tsec)?node.dataset.tsec:null;
+            if(current){
+              node.classList.add('hist-fold-head');
+              const key=date+':'+current, closed=folded.get(key)===true;
+              let btn=node.querySelector(':scope > .hist-fold-btn');
+              if(!btn){btn=document.createElement('button');btn.type='button';btn.className='hist-fold-btn';btn.contentEditable='false';node.appendChild(btn);}
+              btn.textContent=closed?'▸':'▾';btn.title=closed?'Expand '+current:'Collapse '+current;
+              btn.setAttribute('aria-label',btn.title);btn.dataset.histKey=key;
+            }
+          }else node.classList.toggle('hist-fold-hidden',current!==null&&folded.get(date+':'+current)===true);
+        });
+      });
+      const buttons=[...root.querySelectorAll('.hist-fold-btn')];
+      const allClosed=buttons.length>0&&buttons.every(b=>folded.get(b.dataset.histKey)===true);
+      all.textContent=allClosed?'Expand All':'Collapse All';all.title=all.textContent+' history sections';
+      applying=false;
+    }
+    function schedule(){if(queued||applying)return;queued=true;requestAnimationFrame(()=>{queued=false;sync();});}
+    root.addEventListener('click',e=>{
+      const btn=e.target.closest('.hist-fold-btn');if(!btn)return;
+      e.preventDefault();e.stopPropagation();folded.set(btn.dataset.histKey,folded.get(btn.dataset.histKey)!==true);sync();
+    },true);
+    all.addEventListener('click',()=>{
+      const buttons=[...root.querySelectorAll('.hist-fold-btn')];
+      const close=!buttons.every(b=>folded.get(b.dataset.histKey)===true);
+      buttons.forEach(b=>folded.set(b.dataset.histKey,close));sync();
+    });
+    new MutationObserver(schedule).observe(root,{childList:true,subtree:true});schedule();
   })();
   /* Hourly weather (2026-11-01, Julius): ☁️ tab. Open-Meteo (free, no key), Vallejo/Benicia area,
      next 24 hours. Loads when the tab is shown; refreshes if older than 30 min. */

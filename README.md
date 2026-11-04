@@ -53,6 +53,7 @@ Last updated: 2026-11-04
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
 - **Subtle + border line**: new Task subject color choice, subtle tint plus a lighter, brighter subject-colored outline, on task cards, Blocks, Urgent rows and Cal Events. Today cards use a 2px outline, Dailies cards 1px; other cards stay at 1.5px.
+- **Hold to expand a cell**: in dark mode the expanded cell now uses the normal dark cell gray instead of black, and the dim behind it is lighter.
 - **Daily weather tab**: new tab right after hourly showing the next 7 days: day, sky symbol, high and low, rain chance (10%+). Both tabs use a cloud icon, labeled HR and DLY.
 - **+ Task in Cal Events**: a **+ Task** button on the All-Day Tasks line, shown on every day. It adds a real all-day event to the main Julius Simtim calendar on the day being viewed, in yellow (open). Text typed in the box survives a refresh.
 - **History / Log**: the Completed heading is gone; the Today: done count stays.

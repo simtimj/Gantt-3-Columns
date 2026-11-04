@@ -1837,9 +1837,12 @@
     }
 
 /* Floating Focus View: retain the live editor DOM and its autosave listeners. */
-#fwFocusBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:9000;display:none;}
+/* Held-open cell (2026-11-04, Julius): the same gray as a normal dark cell, not pure black, and a lighter dim behind it. */
+body{--fw-focus-bg:var(--dm-cell,var(--panel,#fff));}
+body.fw-focus-on .fw-focus-target{--panel:var(--fw-focus-bg);}
+#fwFocusBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:9000;display:none;}
 body.fw-focus-on #fwFocusBackdrop{display:block;}
-body.fw-focus-on .fw-focus-target{position:fixed!important;inset:5vh 5vw!important;width:90vw!important;height:90dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--panel,#fff)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
+body.fw-focus-on .fw-focus-target{position:fixed!important;inset:5vh 5vw!important;width:90vw!important;height:90dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--fw-focus-bg)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
 body.fw-focus-on .fw-focus-target.plan-pad{padding-top:36px!important;}
 body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
 @media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:4vh 3vw!important;width:94vw!important;height:92dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}

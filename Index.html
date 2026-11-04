@@ -1461,6 +1461,9 @@
     .od-nav .btn{min-width:28px;padding:0 6px;line-height:1.4;}
     body.one-day .od-nav{display:inline-flex;}
     .od-head,.plan-pad{display:none;}
+    .fx-cat{border-left:2px solid var(--fx-category-color,#70baff);padding-left:5px;}
+    .fx-cat>.fx-ch .fx-name{color:var(--fx-category-color,#70baff);}
+
     #referencePane .ref-pane-header{display:flex;flex-direction:column;align-items:stretch;}
     #referencePane .ref-pane-header .urg-head-row{width:100%;margin-top:2px;}
     #referencePane .ref-pane-header .urg-head{width:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-align:left;}
@@ -6573,7 +6576,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     function html(){
       let out = '';
       data.cats.forEach(c => {
-        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (!c.name && c.projects.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
+        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (!c.name && c.projects.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '" style="--fx-category-color:' + h(c.color || '#70baff') + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
           '<span class="fx-name" contenteditable="true" data-fx="name" data-fph="Category">' + h(c.name) + '</span>' +
           (c.col ? '<span class="fx-sub">' + c.projects.length + '</span>' : '') + '</div><div class="fx-body">';
         c.projects.forEach(p => {
@@ -6609,6 +6612,35 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       render();
     };
     function wire(host){
+      // Hold the fold arrow to manage a category/task without extra visible buttons.
+      let holdTimer = null, suppressToggle = false, downX = 0, downY = 0;
+      host.addEventListener('pointerdown', e => {
+        const toggle = e.target.closest('.fx-tg'); if(!toggle) return;
+        downX=e.clientX; downY=e.clientY; clearTimeout(holdTimer);
+        holdTimer=setTimeout(()=>{
+          const id=toggle.closest('[data-fid]')?.dataset.fid, f=id?find(id):{}, o=f.p||f.c;
+          if(!o)return;
+          suppressToggle=true;
+          const cmd=window.prompt('Keep in Mind: rename / color / move up / move down / add task / collapse','color');
+          if(!cmd)return;
+          const action=cmd.trim().toLowerCase();
+          if(action==='rename'){
+            const v=window.prompt('New name',f.p?f.p.title:f.c.name);
+            if(v!==null&&v.trim()) {if(f.p)f.p.title=v.trim();else f.c.name=v.trim();}
+          }else if(action==='color'&&f.c){
+            const v=window.prompt('Category color (#RRGGBB)',f.c.color||'#70baff');
+            if(v&&/^#[0-9a-f]{6}$/i.test(v.trim()))f.c.color=v.trim();
+          }else if(action==='collapse')o.col=!o.col;
+          else if(action==='add task'&&f.c)f.c.projects.push({id:uid('p'),title:'',why:'',col:false,tasks:[]});
+          else if(action==='move up'||action==='move down'){
+            const arr=f.p?f.c.projects:data.cats, i=arr.indexOf(o), j=i+(action==='move up'?-1:1);
+            if(j>=0&&j<arr.length){arr.splice(i,1);arr.splice(j,0,o);}
+          }
+          save();render();
+        },550);
+      },true);
+      host.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-downX)>10||Math.abs(e.clientY-downY)>10)clearTimeout(holdTimer);},true);
+      ['pointerup','pointercancel'].forEach(t=>host.addEventListener(t,()=>clearTimeout(holdTimer),true));
       // Keep the Notes editor's own key / tap / drag handlers out of the dashboard.
       ['keydown','keyup','keypress','beforeinput','input','paste','cut','pointerdown','mousedown','touchstart','dragstart','contextmenu'].forEach(t =>
         host.addEventListener(t, e => { e.stopPropagation(); if(t === 'keydown' && e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); e.target.blur && e.target.blur(); } }));
@@ -6617,7 +6649,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         e.stopPropagation();
         const b = e.target.closest('[data-fx]'); if(!b) return;
         const id = b.closest('[data-fid]')?.dataset.fid, f = id ? find(id) : {};
-        if(b.dataset.fx === 'tg'){ const o = f.p || f.c; if(o){ o.col = !o.col; save(); render(); } }
+        if(b.dataset.fx === 'tg'){ if(suppressToggle){suppressToggle=false;return;} const o=f.p||f.c; if(o){o.col=!o.col;save();render();} }
         else if(b.dataset.fx === 'addh'){
           let c = data.cats.find(c => !c.name);
           if(!c){ c = {id:uid('c'),name:'',col:false,projects:[]}; data.cats.push(c); }

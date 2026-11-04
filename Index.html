@@ -2782,48 +2782,53 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       for(const [cls,action] of [['blocks-indent','indent'],['blocks-outdent','outdent'],['blocks-up','up'],['blocks-down','down']]){
         row.querySelector('.'+cls).addEventListener('click',()=>changeBlockLine(action));
       }
-      // Drag by the handle, not the editable text. The whole nested group moves.
-      let draggedBlock=null;
-      const addDragHandles=()=>{
-        [...pad.children].forEach(line=>{
-          if(line.matches('br')||line.querySelector(':scope > .block-drag'))return;
-          const grip=document.createElement('span');
-          grip.className='block-drag';
-          grip.textContent='⠿';
-          grip.title='Drag block or task with its subtasks';
-          grip.contentEditable='false';
-          grip.draggable=true;
-          grip.style.cssText='cursor:grab;touch-action:none;user-select:none;opacity:.55;margin-right:6px';
-          line.insertBefore(grip,line.firstChild);
-          grip.addEventListener('dragstart',e=>{
-            draggedBlock=line;selectedBlockLine=line;
-            e.dataTransfer.effectAllowed='move';
-            e.dataTransfer.setData('text/plain','block');
-          });
-          grip.addEventListener('dragend',()=>{draggedBlock=null;});
-        });
+      // A block's title/time-range line is its handle: long-press then move.
+      // No grip icons or extra markup are inserted into saved editor content.
+      let blockHold=null, blockDrag=null;
+      const topLine=node=>{
+        let n=node && (node.nodeType===3?node.parentElement:node);
+        while(n && n.parentElement!==pad)n=n.parentElement;
+        return n && n.parentElement===pad ? n : null;
       };
-      pad.addEventListener('dragover',e=>{
-        if(!draggedBlock)return;
-        e.preventDefault();e.dataTransfer.dropEffect='move';
+      const isBlockTitle=line=>line && (line.hasAttribute('data-title') || line.querySelector(':scope > b,strong'));
+      pad.addEventListener('pointerdown',e=>{
+        if(e.button!==0 || e.target.closest('input,button,a'))return;
+        const line=topLine(e.target);
+        if(!isBlockTitle(line))return;
+        const hold={line,x:e.clientX,y:e.clientY,id:e.pointerId,timer:null};
+        blockHold=hold;
+        hold.timer=setTimeout(()=>{
+          if(blockHold!==hold)return;
+          blockDrag=hold;
+          selectedBlockLine=line;
+          line.style.opacity='.65';
+          try{pad.setPointerCapture(e.pointerId);}catch(err){}
+        },500);
       });
-      pad.addEventListener('drop',e=>{
-        if(!draggedBlock)return;
+      pad.addEventListener('pointermove',e=>{
+        if(blockHold && !blockDrag && Math.hypot(e.clientX-blockHold.x,e.clientY-blockHold.y)>9){
+          clearTimeout(blockHold.timer);blockHold=null;
+        }
+        if(!blockDrag || e.pointerId!==blockDrag.id)return;
         e.preventDefault();
-        let target=e.target.closest('div,p');
-        while(target&&target.parentElement!==pad)target=target.parentElement;
-        if(!target||target===draggedBlock)return;
-        const group=blockGroup(draggedBlock);
-        if(group.includes(target))return;
-        const destination=blockGroup(target);
+        const hovered=document.elementFromPoint(e.clientX,e.clientY);
+        const target=topLine(hovered);
+        if(!target || target===blockDrag.line || blockGroup(blockDrag.line).includes(target))return;
+        const group=blockGroup(blockDrag.line);
+        const dest=blockGroup(target);
         const after=e.clientY>target.getBoundingClientRect().top+target.getBoundingClientRect().height/2;
-        const anchor=after?destination[destination.length-1].nextElementSibling:target;
+        const anchor=after?dest[dest.length-1].nextElementSibling:target;
         group.forEach(n=>pad.insertBefore(n,anchor));
-        draggedBlock=null;
-        pad.dispatchEvent(new Event('input',{bubbles:true}));
       });
-      addDragHandles();
-      pad.addEventListener('input',()=>setTimeout(addDragHandles,0));
+      const endBlockDrag=()=>{
+        if(blockHold){clearTimeout(blockHold.timer);blockHold=null;}
+        if(!blockDrag)return;
+        blockDrag.line.style.opacity='';
+        blockDrag=null;
+        pad.dispatchEvent(new Event('input',{bubbles:true}));
+      };
+      pad.addEventListener('pointerup',endBlockDrag);
+      pad.addEventListener('pointercancel',endBlockDrag);
       pad.querySelectorAll(':scope > [data-block-depth]').forEach(line=>{
         line.style.marginLeft = ((parseInt(line.dataset.blockDepth,10)||0)*18)+'px';
       });

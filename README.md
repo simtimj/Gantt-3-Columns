@@ -54,7 +54,8 @@ Last updated: 2026-11-04
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
 - **Subtle + border line**: new Task subject color choice, subtle tint plus a brighter subject-colored outline, on task cards and Cal Events.
 - **History / Log**: the Completed heading is gone; the Today: done count stays.
-- **Cal Events spacing**: smaller margins, and text wraps under the checkbox like the history log.
+- **Reference tabs**: 📚 Reference and 📝 Scratch Pad at the left of the Reference toolbar. The pad is free writing saved to the Sheet (one Reference row, type `scratch`, hidden from the cell list). The last tab is remembered on reopen, per device, same as the center tabs.
+- **Cal Events spacing**: smaller margins, text wraps under the checkbox like the history log, and a line plus extra space between the All-Day and Scheduled groups.
 - **Blocks hierarchy:** indent/outdent and up/down actions now move the selected parent with contiguous deeper-indented descendants. This is editor-line hierarchy, not a new Sheet schema; drag handles and true arbitrary nesting remain to be implemented.
 - **Keep In Mind:** long-press fold arrow now exposes prompt-based rename, category color, reorder, add task, and collapse actions. Category colors persist in Focus data. Needs usability refinement; no claim of completed custom menu.
 

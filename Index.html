@@ -7559,6 +7559,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const row = document.createElement('div');
     row.className = 'urg-row' + (level ? ' urg-subrow' : '') + (done ? ' done' : '');
     row.dataset.urg = u;
+    if(item.cat) row.dataset.tccat = item.cat;
     if(level) row.style.paddingLeft = (level * 21) + 'px';
     row.title = 'Tap the text to edit · tap the box to tick · tap the date side to go to it';
     const box = document.createElement('span'); box.className = 'urg-box';
@@ -9821,6 +9822,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Subtle + border line (2026-11-03, Julius): same tint, card outline in a brighter subject color. */
   body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 65%,#fff);border-left-width:1.5px;border-right-width:1.5px;}
   body.tc-subtleline .check-line[data-tccat][data-tc^="f"]{border-top-width:1.5px;}
+  body.tc-subtleline .plan-pad .check-line[data-tccat][data-tc]{border-color:var(--tc-bd)!important;}
+  /* Urgent rows become cells in this mode (2026-11-04, Julius). */
+  body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);border:1.5px solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
   body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1.5px;}
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
   body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}

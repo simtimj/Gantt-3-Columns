@@ -52,7 +52,7 @@ Last updated: 2026-11-04
 - **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
-- **Subtle + border line**: new Task subject color choice, subtle tint plus a brighter subject-colored outline, on task cards and Cal Events.
+- **Subtle + border line**: new Task subject color choice, subtle tint plus a lighter, brighter subject-colored outline, on task cards, Blocks, Urgent rows and Cal Events.
 - **History / Log**: the Completed heading is gone; the Today: done count stays.
 - **Reference tabs**: 📚 Reference and 📝 Scratch Pad at the left of the Reference toolbar. Each day has its own pad (follows ▲ ▼), saved in the Days sheet column E. The last tab is remembered on reopen, per device, same as the center tabs.
 - **Resize handles**: new rounded gray pills, centered on their lines, blue while dragging. Column pills sit a quarter of the way down so they don't land on section lines.

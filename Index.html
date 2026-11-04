@@ -1895,16 +1895,22 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 /* History / Log time-of-day containers: visual grouping without wrapping editable task DOM. */
 #todayScroll .day-editor > :is([data-tsec="morning"],[data-tsec="afternoon"],[data-tsec="evening"]){display:flex;align-items:flex-start;white-space:normal;margin:10px var(--sec-mr,0px) 3px var(--sec-ml,0px)!important;padding:1px var(--sec-pr,3px) 2px var(--sec-pl,3px)!important;}
 #todayScroll .day-editor > [data-tsec] > br{display:none;}
+#todayScroll .day-editor > [data-tsf]{flex-wrap:wrap;}
+#todayScroll .day-editor > [data-tsf]::after{flex:1 1 0;}
+#todayScroll .day-editor > [data-tsec] > .ts-sum{order:3;flex:0 0 100%;min-width:0;margin-top:3px;font-size:calc(var(--paragraph-size,14px) * .8);font-weight:400;line-height:1.3;text-transform:none;letter-spacing:0;white-space:normal;}
+#todayScroll .ts-row{margin:3px 0;}
+#todayScroll .ts-count{font:inherit;margin-left:6px;padding:1px 7px;min-height:24px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+#todayScroll .ts-items{margin-top:2px;opacity:.85;overflow-wrap:anywhere;}
 #todayScroll .day-editor > [data-tsec]:not([data-tsf="o"]){border-bottom:0!important;}
 #todayScroll .day-editor > [data-tsf]{cursor:pointer;}
 #todayScroll .day-editor > [data-tsec]::before{flex:0 0 auto;margin-top:.1em;}
 #todayScroll .day-editor > [data-tsec]::after{flex:1 1 auto;min-width:0;white-space:pre-line;overflow-wrap:anywhere;}
 #todayScroll .day-editor > [data-tsec="morning"][data-tsf="o"]::after{content:"Morn 8–2 · " attr(data-tsinfo) "\00A0\00A0−";}
-#todayScroll .day-editor > [data-tsec="morning"][data-tsf="c"]::after{content:"Morn 8–2 · " attr(data-tsinfo) "\00A0\00A0+\A" attr(data-tssum);}
+#todayScroll .day-editor > [data-tsec="morning"][data-tsf="c"]::after{content:"Morn 8–2 · " attr(data-tsinfo) "\00A0\00A0+";}
 #todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="o"]::after{content:"After 2–7 · " attr(data-tsinfo) "\00A0\00A0−";}
-#todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="c"]::after{content:"After 2–7 · " attr(data-tsinfo) "\00A0\00A0+\A" attr(data-tssum);}
+#todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="c"]::after{content:"After 2–7 · " attr(data-tsinfo) "\00A0\00A0+";}
 #todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]::after{content:"Night 7–10 · " attr(data-tsinfo) "\00A0\00A0−";}
-#todayScroll .day-editor > [data-tsec="evening"][data-tsf="c"]::after{content:"Night 7–10 · " attr(data-tsinfo) "\00A0\00A0+\A" attr(data-tssum);}
+#todayScroll .day-editor > [data-tsec="evening"][data-tsf="c"]::after{content:"Night 7–10 · " attr(data-tsinfo) "\00A0\00A0+";}
 
 .editor [data-nsec="must"]{position:relative;}
 /* Small and inside the DAILIES lines (2026-11-03, Julius): flow-root keeps the floated button within the header. */
@@ -5121,7 +5127,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const c = el.cloneNode(true);
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
     c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid','data-tlsum'].forEach(a => n.removeAttribute(a)));
-    c.querySelectorAll('[data-tsf]').forEach(n => ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
     c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
@@ -10661,6 +10667,49 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(ed.dataset.date && typeof syncDayHeightStable === 'function') try{ syncDayHeightStable(ed.dataset.date); }catch(e){}
     requestAnimationFrame(() => paintDaySecs(ed));
   }
+  /* Folded section = one row per project (a Claude group header) or subject: name, a count button, its task names.
+     The count button hides / shows that row's names (2026-11-04, Julius). The rows are render-only children of the header. */
+  function tsecGroups(cov){
+    const map = new Map(); let cur = null;
+    const get = name => { if(!map.has(name)) map.set(name,[]); return map.get(name); };
+    cov.forEach(x => {
+      if(x.hasAttribute('data-cgrp')){ cur = get((x.dataset.cgrp || x.textContent || '').trim() || 'Other'); return; }
+      const c = typeof CARD_CAT_BY_KEY !== 'undefined' && x.dataset.tccat ? CARD_CAT_BY_KEY[x.dataset.tccat] : null;
+      (cur || get(c ? c.name : 'Other')).push(x);
+    });
+    return [...map].map(([name,lines]) => {
+      const tasks = lines.filter(x => x.classList.contains('check-line') && !(+(x.dataset.level || 0) > 0));
+      const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
+      return {name,count:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : lines.length + ' lines',sum:titleSummary(lines)};
+    });
+  }
+  function tsecDrawSum(n,rows,folds){
+    const k = n.dataset.tsec, sig = rows ? JSON.stringify(rows.map(r => [r.name,r.count,r.sum,!!folds[k + ':' + r.name]])) : '';
+    if((n.dataset.tssum || '') === sig && !!n.querySelector(':scope > .ts-sum') === !!rows) return;
+    n.querySelectorAll(':scope > .ts-sum').forEach(x => x.remove());
+    setAttr(n,'data-tssum',sig);
+    if(!rows) return;
+    const box = document.createElement('div'); box.className = 'ts-sum';
+    rows.forEach(r => {
+      const row = document.createElement('div'); row.className = 'ts-row';
+      const name = document.createElement('b'); name.textContent = r.name;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ts-count'; b.dataset.proj = r.name;
+      const shut = !!folds[k + ':' + r.name];
+      b.textContent = r.count + (shut ? ' +' : ' −'); b.title = shut ? 'Show the list' : 'Hide the list';
+      row.append(name,b);
+      if(r.sum && !shut){ const t = document.createElement('div'); t.className = 'ts-items'; t.textContent = r.sum; row.appendChild(t); }
+      box.appendChild(row);
+    });
+    n.appendChild(box);
+  }
+  function tsecToggleList(h,ed,proj){
+    const all = tsecFolds(), d = ed.dataset.date, key = h.dataset.tsec + ':' + proj, day = all[d] = all[d] || {};
+    if(day[key]) delete day[key]; else day[key] = 1;
+    try{ localStorage.setItem(TSEC_FOLD_KEY,JSON.stringify(all)); }catch(e){}
+    refreshTitleLines(ed);
+    if(ed.dataset.date && typeof syncDayHeightStable === 'function') try{ syncDayHeightStable(ed.dataset.date); }catch(e){}
+    requestAnimationFrame(() => paintDaySecs(ed));
+  }
   function refreshTsecFolds(ed,hide){
     const folds = ed.classList.contains('day-editor') ? tsecFolds()[ed.dataset.date] || {} : null;
     if(!folds) return false;
@@ -10669,12 +10718,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const k = n.dataset && n.dataset.tsec;
       if(k !== 'morning' && k !== 'afternoon' && k !== 'evening') continue;
       const cov = titleCovered(n), tasks = cov.filter(x => x.classList.contains('check-line') && !(+(x.dataset.level || 0) > 0));
-      if(!cov.length){ ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); continue; }
+      if(!cov.length){ ['data-tsf','data-tsinfo'].forEach(a => n.removeAttribute(a)); tsecDrawSum(n,null,folds); continue; }
       const fold = !!folds[k];
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
       if(setAttr(n,'data-tsf',fold ? 'c' : 'o')) changed = true;
       setAttr(n,'data-tsinfo',tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : cov.length + ' lines');
-      setAttr(n,'data-tssum',fold ? titleSummary(cov) : '');
+      tsecDrawSum(n,fold ? tsecGroups(cov) : null,folds);
       if(fold){
         cov.forEach(x => hide.add(x));
         for(let x = n.nextElementSibling; x && !x.hasAttribute('data-tsec'); x = x.nextElementSibling) if(isEmptyLine(x) && x.nextElementSibling) hide.add(x);
@@ -10687,7 +10736,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!h) return;
     e.preventDefault(); e.stopPropagation();
     window.__tlFoldAt = Date.now();
-    tsecToggleFold(h,h.parentElement);
+    const btn = e.target.closest('.ts-count');
+    if(btn) tsecToggleList(h,h.parentElement,btn.dataset.proj);
+    else tsecToggleFold(h,h.parentElement);
   },true);
   function refreshTitleLines(ed){
     let changed = false;

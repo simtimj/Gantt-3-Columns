@@ -1765,6 +1765,14 @@
     #mobileSplitResizer[data-dir="row"]::before,#mobileSplitResizerThird[data-dir="row"]::before{
       left:50%!important;right:auto!important;width:46px!important;margin-left:-23px!important;
     }
+
+/* Floating Focus View: retain the live editor DOM and its autosave listeners. */
+#fwFocusBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:9000;display:none;}
+body.fw-focus-on #fwFocusBackdrop{display:block;}
+body.fw-focus-on .fw-focus-target{position:fixed!important;inset:5vh 5vw!important;width:90vw!important;height:90dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--panel,#fff)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
+body.fw-focus-on .fw-focus-target.plan-pad{padding-top:36px!important;}
+body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
+@media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:4vh 3vw!important;width:94vw!important;height:92dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
 </style>
 <script>
   /* ===== Light / dark toggle, saved per device (Julius, 2026-10-27) =====
@@ -11190,6 +11198,38 @@
       p.appendChild(b);
     };
   })();
+</script>
+<script>
+/* Long-press section labels to expand the original pane; tap backdrop to restore. */
+(function(){
+  let focused=null, timer=0, startX=0, startY=0, suppressUntil=0;
+  const backdrop=document.createElement('div');backdrop.id='fwFocusBackdrop';
+  document.body.appendChild(backdrop);
+  function close(){if(!focused)return;focused.classList.remove('fw-focus-target');focused=null;document.body.classList.remove('fw-focus-on');}
+  function open(el){if(!el)return;close();focused=el;el.classList.add('fw-focus-target');document.body.classList.add('fw-focus-on');}
+  function resolve(node){
+    if(!node || !node.closest)return null;
+    if(node.closest('#refSearch'))return document.getElementById('referenceScroll');
+    if(node.closest('.ce-head strong'))return document.getElementById('centerDownScroll');
+    if(node.closest('.urg-head'))return document.getElementById('urgentPanel');
+    if(node.closest('.today-jump'))return document.getElementById('todayPane');
+    if(node.closest('.od-pad-head'))return document.querySelector('#todayScroll .od-on .plan-pad');
+    if(node.closest('[data-nsec="must"]'))return document.getElementById('journalScroll');
+    return null;
+  }
+  document.addEventListener('pointerdown',e=>{
+    if(e.button!==0 || focused)return;
+    const target=resolve(e.target);if(!target)return;
+    startX=e.clientX;startY=e.clientY;clearTimeout(timer);
+    timer=setTimeout(()=>{timer=0;suppressUntil=Date.now()+650;open(target);if(document.activeElement?.id==='refSearch')document.activeElement.blur();},550);
+  },true);
+  document.addEventListener('pointermove',e=>{if(timer&&(Math.abs(e.clientX-startX)>12||Math.abs(e.clientY-startY)>12)){clearTimeout(timer);timer=0;}},true);
+  ['pointerup','pointercancel'].forEach(name=>document.addEventListener(name,()=>{clearTimeout(timer);timer=0;},true));
+  document.addEventListener('click',e=>{if(Date.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation();}},true);
+  backdrop.addEventListener('click',close);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&focused){e.preventDefault();close();}});
+  window.addEventListener('popstate',close);
+})();
 </script>
 </body>
 </html>

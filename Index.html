@@ -7594,7 +7594,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     const seq = ++centerCalendarSeq;
     const draw = data => {
       if(seq !== centerCalendarSeq) return;
-      const allDay = data.events.filter(ev => ev.allDay), scheduled = data.events.filter(ev => !ev.allDay);
+      const allDay = data.events.filter(ev => ev.allDay).sort((a,b) => Number(a.done) - Number(b.done)), scheduled = data.events.filter(ev => !ev.allDay);
       const checkbox = ev => '<input type="checkbox" class="ce-check" data-ce-id="' + esc(ev.id) + '" data-ce-cal="' + esc(ev.calId) + '" data-ce-start="' + ev.start + '"' + (ev.done ? ' checked' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
       box.innerHTML = '' +
         (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => '<div class="ce-event' + (ev.done ? ' ce-done' : '') + '">' + checkbox(ev) + '<span class="ce-event-text">' + esc(ev.title) + '</span></div>').join('') : '') +

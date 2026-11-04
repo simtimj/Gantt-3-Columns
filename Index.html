@@ -12303,6 +12303,54 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   document.addEventListener('input',e => { const pad = e.target && e.target.closest && e.target.closest('.plan-pad'); if(pad) window.blkPaint(pad); },true);
 })();
 </script>
+<style>
+  .ref-toolbar.hs-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);}
+  .ref-toolbar.hs-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);}
+  .ref-toolbar.hs-l.hs-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
+</style>
+<script>
+/* Header rows slide left / right on the phone (2026-11-04, Julius): the rows already scroll sideways, but a swipe
+   that starts on the search box was taken by the box itself (it's the widest thing there), so the row never moved.
+   A sideways swipe starting on a text box that isn't being typed in now scrolls its row instead. */
+(function(){
+  let s = null;
+  const ROWS = '.ref-toolbar';
+  document.addEventListener('touchstart',e => {
+    s = null;
+    const t = e.target, row = t && t.closest ? t.closest(ROWS) : null;
+    if(!row || e.touches.length !== 1 || !t.matches('input,textarea') || document.activeElement === t) return;
+    if(row.scrollWidth <= row.clientWidth + 1) return;
+    s = {row,x:e.touches[0].clientX,y:e.touches[0].clientY,left:row.scrollLeft,on:false};
+  },{capture:true,passive:true});
+  document.addEventListener('touchmove',e => {
+    if(!s) return;
+    const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
+    if(!s.on){
+      if(Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)){ s = null; return; }
+      if(Math.abs(dx) < 8) return;
+      s.on = true;
+    }
+    s.row.scrollLeft = s.left - dx;
+    if(e.cancelable) e.preventDefault();
+  },{capture:true,passive:false});
+  document.addEventListener('touchend',() => { s = null; },true);
+  document.addEventListener('touchcancel',() => { s = null; },true);  // A soft fade on the side that has more, so it's clear the row slides.
+  function edge(row){
+    const more = row.scrollWidth > row.clientWidth + 1;
+    row.classList.toggle('hs-l',more && row.scrollLeft > 2);
+    row.classList.toggle('hs-r',more && row.scrollLeft + row.clientWidth < row.scrollWidth - 2);
+  }
+  function wire(){
+    document.querySelectorAll(ROWS).forEach(row => {
+      if(row._hs) return; row._hs = true;
+      row.addEventListener('scroll',() => edge(row),{passive:true});
+      if(typeof ResizeObserver !== 'undefined') new ResizeObserver(() => edge(row)).observe(row);
+      edge(row);
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded',wire); else wire();
+})();
+</script>
 <script>
 /* Long-press section labels to expand the original pane; tap backdrop to restore. */
 (function(){

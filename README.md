@@ -52,7 +52,7 @@ Last updated: 2026-11-04
 - **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
-- **Subtle + border line**: new Task subject color choice, subtle tint plus a lighter, brighter subject-colored outline, on task cards, Blocks, Urgent rows and Cal Events. Today cards use a 2px outline, Dailies cards 1px; other cards stay at 1.5px.
+- **Subtle + border line**: new Task subject color choice, subtle tint plus a lighter, brighter subject-colored outline, on task cards, Blocks, Urgent rows and Cal Events. Dailies cards use a 1px outline; other cards use 1.5px. In this mode Urgent and History / Log match Cal Events: same section background, card fill, border and corners.
 - **Hold to expand a cell**: zooms open and closed slowly from the cell's own spot, in a smaller window. It keeps the cell's own color with a light dim behind it, and holding a label no longer opens the format menu.
 - **Uniform section lines**: the top bar, column headers, section lines and DAILIES header line are all 2px in the same solid line color.
 - **Drag pills follow the day**: section drag pills use the color of the day being shown.

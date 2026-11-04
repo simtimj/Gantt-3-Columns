@@ -9958,12 +9958,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   body.tc-subtleline .check-line[data-tccat][data-tc^="f"]{border-top-width:1.5px;}
   body.tc-subtleline .check-line[data-tccat][data-tc],body.tc-subtleline .plan-pad .check-line[data-tccat][data-tc]{border-color:var(--tc-bd)!important;} /* beats Quiet cards */
   /* Urgent rows become cells in this mode (2026-11-04, Julius). */
-  body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);border:1.5px solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
+  body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),var(--panel));border:1.5px solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
   body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1.5px;}
-  /* Card outline widths (2026-11-04, Julius): 2px on Today, 1px on Dailies; other cards keep 1.5px. */
-  body.tc-subtleline #todayScroll .day-editor .check-line[data-tccat]{border-left-width:2px;border-right-width:2px;}
-  body.tc-subtleline #todayScroll .day-editor .check-line[data-tccat][data-tc^="f"]{border-top-width:2px;}
-  body.tc-subtleline #todayScroll .day-editor .check-line[data-tccat][data-tc$="l"]{border-bottom-width:2px;}
+  /* Urgent + History / Log styled exactly like Cal Events (2026-11-04, Julius): same section background,
+     card fill over --panel, 1.5px subject border, radius 7; a card with no subject gets the plain Cal Events look. */
+  body.tc-subtleline #urgentPanel,body.tc-subtleline #todayScroll .day-row{background:transparent!important;}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc]{--tc-base:var(--panel);}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc][data-tc^="f"]{border-top-left-radius:7px;border-top-right-radius:7px;}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc][data-tc$="l"]{border-bottom-left-radius:7px;border-bottom-right-radius:7px;}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc]:not([data-tccat]){--tc-bd:#fff;border-color:#fff!important;}
+  body.tc-subtleline #urgentPanel .urg-row:not([data-tccat]){box-sizing:border-box;margin:3px 0;padding:3px 5px;background:var(--panel);border:1px solid #fff;border-radius:7px;}
   body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat]{border-left-width:1px;border-right-width:1px;}
   body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat][data-tc^="f"]{border-top-width:1px;}
   body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1px;}

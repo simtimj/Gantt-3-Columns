@@ -80,3 +80,7 @@
 - History log types (2026-11-04, Julius: option 1)
 - To Confirm card (2026-11-04, Julius)
 - Pinned Reference cards (2026-11-04, Julius)
+
+## Active cross-assistant task: IT study History automation (2026-11-04)
+
+Read `docs/IT_STUDY_HISTORY_AUTOMATION.md` before implementing. User approved automatic per-daypart study summaries, expandable question-level detail, spaced-repetition tracking, authenticated ingestion, and live write verification. Status: requirements recorded; implementation/deployment not yet verified. Coordinate with ChatGPT; do not duplicate or overwrite other ongoing work.

@@ -1789,6 +1789,12 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 #todayScroll .day-editor > [data-tsec="evening"] ~ :not([data-tsec]){--hist-group:#9c74c9;}
 #todayScroll .day-editor > [data-tsec="morning"] ~ :not([data-tsec]),#todayScroll .day-editor > [data-tsec="afternoon"] ~ :not([data-tsec]),#todayScroll .day-editor > [data-tsec="evening"] ~ :not([data-tsec]){border-left:1px solid var(--hist-group);border-right:1px solid var(--hist-group);padding-left:calc(6px * var(--pad-x,1));padding-right:calc(6px * var(--pad-x,1));}
 #todayScroll .day-editor > :not([data-tsec]):has(+ [data-tsec]),#todayScroll .day-editor > :not([data-tsec]):last-child{border-bottom:1px solid var(--hist-group);border-radius:0 0 7px 7px;padding-bottom:calc(5px * var(--pad-y,1));margin-bottom:6px;}
+
+.editor [data-nsec="must"]{position:relative;}
+.editor .daily-sort-btn{float:right;font:inherit;font-size:11px;letter-spacing:0;text-transform:none;border:1px solid currentColor;border-radius:5px;background:transparent;color:inherit;padding:2px 5px;cursor:pointer;}
+.editor .daily-sort-menu{position:absolute;right:0;top:100%;z-index:20;background:var(--panel,#fff);border:1px solid var(--border,#888);border-radius:6px;padding:4px;box-shadow:0 5px 15px #0003;min-width:145px;}
+.editor .daily-sort-menu[hidden]{display:none!important;}
+.editor .daily-sort-menu button{display:block;width:100%;padding:7px;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;cursor:pointer;}
 </style>
 <script>
   /* ===== Light / dark toggle, saved per device (Julius, 2026-10-27) =====
@@ -2443,17 +2449,48 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       }
       group.push(n);
     });
-    [['physical','P health',physical],['mental','M health',mental]].forEach(([key,title,items]) => {
+    [['physical','P Health',physical],['mental','M Health',mental]].forEach(([key,title,items]) => {
       const heading = document.createElement('div'); heading.dataset.dailyGroup = key;
       heading.setAttribute('contenteditable','false'); heading.innerHTML = '<u>' + title + '</u>';
       ed.insertBefore(heading,end); items.forEach(n => ed.insertBefore(n,end));
     });
   }
+  /* Dailies sort is a view preference; move the original editable nodes, never clone them. */
+  function dailySortMode(){try{return localStorage.getItem('fw.dailySort')||'category';}catch(e){return 'category';}}
+  function dailyTimelineGroup(text){const t=String(text||'').toLowerCase();return /before bed|evening|night|bedtime/.test(t)?'evening':/afternoon|midday|lunch/.test(t)?'afternoon':'morning';}
+  function arrangeDailyTimeline(ed){
+    const header=ed.querySelector(':scope > [data-nsec="must"]');if(!header)return;
+    const nodes=[];let end=header.nextSibling;
+    while(end&&!(end.nodeType===1&&end.matches('[data-nsec],table'))){nodes.push(end);end=end.nextSibling;}
+    const groups={morning:[],afternoon:[],evening:[]};let current='morning';
+    nodes.forEach(n=>{
+      if(n.nodeType===1&&n.hasAttribute('data-daily-group')){n.remove();return;}
+      if(n.nodeType===1&&n.matches('.check-line')&&!(Number(n.dataset.level)||0))current=dailyTimelineGroup((n.querySelector(':scope > .check-text')||n).textContent);
+      groups[current].push(n);
+    });
+    [['morning','Morning'],['afternoon','Afternoon'],['evening','Evening']].forEach(([key,label])=>{
+      if(!groups[key].some(n=>n.nodeType===1&&n.matches('.check-line')))return;
+      const h=document.createElement('div');h.dataset.dailyGroup=key;h.contentEditable='false';h.innerHTML='<u>'+label+'</u>';ed.insertBefore(h,end);
+      groups[key].forEach(n=>ed.insertBefore(n,end));
+    });
+  }
+  function applyDailySort(ed){if(dailySortMode()==='timeline')arrangeDailyTimeline(ed);else arrangeDailyGroups(ed);}
+  function ensureDailySortButton(ed){
+    const header=ed.querySelector(':scope > [data-nsec="must"]');if(!header||header.querySelector('.daily-sort-btn'))return;
+    const btn=document.createElement('button');btn.type='button';btn.className='daily-sort-btn';btn.textContent='Options';btn.contentEditable='false';btn.title='Sort Dailies';
+    btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const menu=header.querySelector('.daily-sort-menu');menu.hidden=!menu.hidden;});
+    const menu=document.createElement('span');menu.className='daily-sort-menu';menu.hidden=true;menu.contentEditable='false';
+    [['category','Sort by Category'],['timeline','Sort by Timeline']].forEach(([mode,label])=>{
+      const option=document.createElement('button');option.type='button';option.textContent=label;
+      option.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();try{localStorage.setItem('fw.dailySort',mode);}catch(err){}applyDailySort(ed);menu.hidden=true;});menu.appendChild(option);
+    });
+    header.appendChild(btn);header.appendChild(menu);
+  }
   function upgradeDailies(ed,date){
     const header = ed.querySelector(':scope > [data-nsec="must"]');
     if(!header || date < state.today) return false;
     if(header.dataset.dailyHealth === '1'){
-      const before = ed.innerHTML; arrangeDailyGroups(ed); return ed.innerHTML !== before;
+      const before = ed.innerHTML; applyDailySort(ed); ensureDailySortButton(ed); return ed.innerHTML !== before;
     }
     dailySectionLines(ed).forEach(line => {
       const text = line.querySelector(':scope > .check-text'); if(!text) return;
@@ -2476,7 +2513,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       ed.insertBefore(line,at);
     });
     header.dataset.dailyHealth = '1';
-    arrangeDailyGroups(ed);
+    applyDailySort(ed); ensureDailySortButton(ed);
     return true;
   }
   function persistentNotesHtml(kind, targetDate){

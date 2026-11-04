@@ -1843,6 +1843,7 @@ function getMainCalendarEvents(dateString) {
     const allDay = ev.isAllDayEvent();
     const s = ev.getStartTime(), e = ev.getEndTime();
     return { title: ev.getTitle() || '(no title)', allDay: allDay,
+      done: String(ev.getColor() || '') === '8',
       start: s.getTime(), end: e.getTime(),
       time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') };
   });

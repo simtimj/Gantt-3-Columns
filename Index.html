@@ -1819,7 +1819,7 @@
     body.one-day #todayScroll .od-on > .od-pad-head::after,
     #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{
       left:50%!important;right:auto!important;top:50%!important;margin:0!important;transform:translate(-50%,-50%);
-      border-radius:999px!important;background:#6b7280!important;opacity:1!important;
+      border-radius:999px!important;background:var(--grip-day,#6b7280)!important;opacity:1!important;
       box-shadow:none!important;pointer-events:none;transition:background-color .12s,transform .12s;
     }
     .column-resizer::after,#mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:28px!important;top:25%!important;}
@@ -1837,15 +1837,15 @@
     }
 
 /* Floating Focus View: retain the live editor DOM and its autosave listeners. */
-/* Held-open cell (2026-11-04, Julius): the same gray as a normal dark cell, not pure black, and a lighter dim behind it. */
+/* Held-open cell (2026-11-04, Julius): same color as the cell it came from (set when it opens), nothing dimmed behind it, a smaller window. */
 body{--fw-focus-bg:var(--dm-cell,var(--panel,#fff));}
 body.fw-focus-on .fw-focus-target{--panel:var(--fw-focus-bg);}
-#fwFocusBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:9000;display:none;}
+#fwFocusBackdrop{position:fixed;inset:0;background:transparent;z-index:9000;display:none;}
 body.fw-focus-on #fwFocusBackdrop{display:block;}
-body.fw-focus-on .fw-focus-target{position:fixed!important;inset:5vh 5vw!important;width:90vw!important;height:90dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--fw-focus-bg)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
+body.fw-focus-on .fw-focus-target{position:fixed!important;inset:10dvh 8vw!important;width:84vw!important;height:80dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--fw-focus-bg)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
 body.fw-focus-on .fw-focus-target.plan-pad{padding-top:36px!important;}
 body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
-@media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:4vh 3vw!important;width:94vw!important;height:92dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
+@media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:10dvh 6vw!important;width:88vw!important;height:80dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
 
 #centerCalendarList .ce-event{display:flex;align-items:flex-start;gap:7px;}
 #centerCalendarList .ce-check{flex:0 0 auto;width:15px;height:15px;margin:1px 0 0;accent-color:#777;cursor:pointer;touch-action:none;}
@@ -4420,7 +4420,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function initContextMenu(){
     document.addEventListener('pointerdown',e => { lastPointerType = e.pointerType || 'mouse'; },true);
+    // Hold-to-expand labels open the zoomed cell, not the format menu (2026-11-04, Julius).
+    const expandLabel = n => !!n?.closest?.('.ce-head strong,.urg-head,.today-jump,.od-pad-head,[data-nsec="must"]');
     document.addEventListener('contextmenu',e => {
+      if(expandLabel(e.target)){ e.preventDefault(); cancelLongPress(); return; }
       if(urgencyCheckbox(e.target)){ e.preventDefault(); cancelLongPress(); return; }
       const ed = editorFromTarget(e.target);
       if(!ed) return;
@@ -4440,7 +4443,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.addEventListener('touchstart',e => {
       cancelLongPress();
       if(e.touches.length !== 1) return;
-      if(urgencyCheckbox(e.target)) return;
+      if(urgencyCheckbox(e.target) || expandLabel(e.target)) return;
       const ed = editorFromTarget(e.target);
       if(!ed) return;
       const t = e.touches[0];
@@ -9956,6 +9959,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fd,0) * 1%),transparent);--tc-bd:rgba(255,255,255,.14);--tc-mix:22%;}
     .urg-cat-row{border-top-color:#333;}
   }
+  /* Uniform section lines (2026-11-04, Julius): every section and header line is 2px in --divider. */
+  #toolbar,.pane-header,body.day-lines .pane-header,.editor > [data-nsec="must"],body.day-lines .editor > [data-nsec="must"]{border-bottom:2px solid var(--divider)!important;}
+  /* Hold-to-expand labels never select text (2026-11-04, Julius). */
+  .ce-head strong,.urg-head,.today-jump,.od-pad-head,.editor > [data-nsec="must"]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 </style>
 <script>fwTheme.collect();</script>
 <script>
@@ -11469,7 +11476,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const setDiv = () => {
       root.style.removeProperty('--divider');
       const base = divColor || getComputedStyle(root).getPropertyValue('--divider').trim() || '#1f2937';
-      root.style.setProperty('--divider', lineK >= 100 ? base : `color-mix(in srgb, ${base} ${lineK}%, transparent)`);
+      root.style.setProperty('--divider', lineK >= 100 ? base : `color-mix(in srgb, ${base} ${lineK}%, var(--panel,#fff))`);
       root.style.setProperty('--line-k', lineK + '%');
       root.style.setProperty('--grip', base);
       if(rv) rv.textContent = lineK + '%';
@@ -11489,6 +11496,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       let on = false; try{ on = localStorage.getItem('fw.dayLines') === '1'; }catch(e){}
       document.body.classList.toggle('day-lines', on);
       const b = document.body.style;
+      // Drag pills follow the day being shown (2026-11-04, Julius).
+      const shown = document.querySelector('.day-row.od-on') || document.querySelector('.day-row.today');
+      const gc = shown && getComputedStyle(shown).getPropertyValue('--note-line-adj').trim();
+      if(gc) b.setProperty('--grip-day', gc);
       if(!on){ b.removeProperty('--divider'); b.removeProperty('--grip'); return; }
       const row = document.querySelector('.day-row.today') || document.querySelector('.day-row.od-on') || document.querySelector('.day-row');
       const c = row && getComputedStyle(row).getPropertyValue('--note-line-adj').trim();
@@ -11573,7 +11584,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       window.odDate = date;
       odApply();
     }
-    window.odApply = odApply;
+    window.odApply = () => { odApply(); if(window.applyDayLines) applyDayLines(); };
     window.odGo = odGo;
     const step = n => () => odGo(addDays(window.odDate || state.today, n));
     document.getElementById('odUp')?.addEventListener('click', step(-1));
@@ -11860,8 +11871,43 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   let focused=null, timer=0, startX=0, startY=0, suppressUntil=0;
   const backdrop=document.createElement('div');backdrop.id='fwFocusBackdrop';
   document.body.appendChild(backdrop);
-  function close(){if(!focused)return;focused.classList.remove('fw-focus-target');focused=null;document.body.classList.remove('fw-focus-on');}
-  function open(el){if(!el)return;close();focused=el;el.classList.add('fw-focus-target');document.body.classList.add('fw-focus-on');}
+  let home=null, anim=null;
+  const still=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // The color the cell shows right now: its own background, or the first solid one behind it.
+  function shownBg(el){
+    for(let n=el;n&&n.nodeType===1;n=n.parentElement){
+      const c=getComputedStyle(n).backgroundColor;
+      if(c && c!=='transparent' && !/rgba\([^)]*,\s*0?\.?\d*\)|\/\s*0?\.\d+\)|\/\s*0\)/.test(c))return c;
+    }
+    return '';
+  }
+  // Zoom between the cell's place and the window: scale + translate, so nothing re-wraps mid-way.
+  function zoom(el,rect,out){
+    const end=el.getBoundingClientRect();
+    if(still()||!rect||!rect.width||!rect.height||!end.width||!end.height)return null;
+    el.style.transformOrigin='0 0';
+    const from={translate:(rect.left-end.left)+'px '+(rect.top-end.top)+'px',scale:(rect.width/end.width)+' '+(rect.height/end.height)};
+    const to={translate:'0px 0px',scale:'1 1'};
+    return el.animate(out?[to,from]:[from,to],{duration:out?280:380,easing:'cubic-bezier(.22,.8,.3,1)'});
+  }
+  function settle(el){el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
+  function close(){
+    if(!focused)return;
+    const el=focused;focused=null;
+    if(anim)anim.cancel();
+    const a=anim=zoom(el,home,true);
+    if(a)a.onfinish=()=>{settle(el);anim=null;};else settle(el);
+  }
+  function open(el){
+    if(!el)return;
+    if(anim)anim.finish();
+    close();if(anim)anim.finish();
+    home=el.getBoundingClientRect();
+    const bg=shownBg(el);if(bg)el.style.setProperty('--fw-focus-bg',bg);
+    focused=el;el.classList.add('fw-focus-target');document.body.classList.add('fw-focus-on');
+    const a=anim=zoom(el,home,false);
+    if(a)a.onfinish=()=>{if(anim===a)anim=null;};
+  }
   function resolve(node){
     if(!node || !node.closest)return null;
     if(node.closest('#refSearch'))return document.getElementById('referenceScroll');

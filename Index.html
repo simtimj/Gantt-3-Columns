@@ -2714,15 +2714,18 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       const taskAdd = row.querySelector('.blocks-task');
       const addBlocksLine = (kind) => {
         const name = kind === 'block' ? window.prompt('Block name') : window.prompt('Task name');
-        if (name === null || !name.trim()) return;
+        if (name === null) return;
+        // Empty block names get a readable placeholder; a time range can be supplied later.
+        const title = name.trim() || (kind === 'block' ? 'Next Block' : '');
+        if(!title) return;
         const line = document.createElement('div');
         if (kind === 'block') {
           line.setAttribute('data-title', '1');
           const strong = document.createElement('b');
-          strong.textContent = name.trim();
+          strong.textContent = title;
           line.appendChild(strong);
         } else {
-          line.textContent = '[] ' + name.trim();
+          line.textContent = '[] ' + title;
         }
         pad.appendChild(line);
         pad.dispatchEvent(new Event('input', {bubbles:true}));

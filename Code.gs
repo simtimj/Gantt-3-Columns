@@ -1124,6 +1124,8 @@ function getCardCats_() {
   if (!props.getProperty('cardCatsBatch2')) { out = cardCatsBatch2_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch2', '1'); }
   // 2026-11-04 (Julius): "learn" counts toward Productivity.
   if (!props.getProperty('cardCatsLearn1')) { out = cardCatsLearn_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsLearn1', '1'); }
+  // 2026-11-04 (Julius): Productivity is silver.
+  if (!props.getProperty('cardCatsSilver1')) { out = out.map(c => c.key === 'productivity' ? Object.assign({}, c, { color: '#c0c4cc' }) : c); inboxWrite_('cardCats', out); props.setProperty('cardCatsSilver1', '1'); }
   const health = cardCatsHealth_(out, !props.getProperty('cardCatsHealth1'));
   if (JSON.stringify(health) !== JSON.stringify(out)) inboxWrite_('cardCats', health);
   props.setProperty('cardCatsHealth1', '1');

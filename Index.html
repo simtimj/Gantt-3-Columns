@@ -2726,7 +2726,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       // before toolbar focus changes; all mutations use the existing Plan save path.
       let selectedBlockLine = null;
       pad.addEventListener('pointerup', e => {
-        const line = e.target.closest(':scope > div, :scope > p');
+        const line = e.target.closest('div, p');
         if(line && line.parentElement === pad) selectedBlockLine = line;
       });
       pad.addEventListener('keyup', () => {

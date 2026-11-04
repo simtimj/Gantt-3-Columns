@@ -1569,6 +1569,14 @@
     #centerCalendarList .ce-title{margin-top:calc(1px * var(--pad-y,1));}
     #centerDownScroll .ce-head [data-ce-refresh]{font-size:12px;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;max-width:22px;max-height:22px;}
     @media(max-width:600px){#centerDownScroll{padding-inline:calc(8px * var(--pad-x,1) * var(--side-k,1));}#centerCalendarList .ce-event{padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}}
+    /* Plan / Think-like separation; graphite is the completion signal. */
+    #centerDownScroll .ce-head{margin-bottom:calc(7px * var(--pad-y,1));}
+    #centerCalendarList .ce-group{margin:calc(9px * var(--pad-y,1)) 0 calc(4px * var(--pad-y,1));}
+    #centerCalendarList .ce-event{border:1px solid #fff;color:var(--text);margin:calc(5px * var(--pad-y,1)) 0;}
+    #centerCalendarList .ce-event.ce-done{border-color:#666;color:#666;}
+    #centerCalendarList .ce-event.ce-done .ce-time{color:#666;}
+    #centerCalendarList .ce-scheduled{margin:calc(8px * var(--pad-y,1)) 0;}
+    #centerCalendarList .ce-scheduled .ce-time{margin-bottom:calc(3px * var(--pad-y,1));}
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
@@ -7563,9 +7571,9 @@
     const draw = data => {
       if(seq !== centerCalendarSeq) return;
       const allDay = data.events.filter(ev => ev.allDay), scheduled = data.events.filter(ev => !ev.allDay);
-      box.innerHTML = '<div class="ce-date"><span class="ce-date-long">' + esc(formatDate(date)) + '</span><span class="ce-date-short">' + esc(formatDateShort(date)) + '</span></div>' +
-        (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => '<div class="ce-event">' + esc(ev.title) + '</div>').join('') : '') +
-        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => '<div class="ce-event ce-scheduled"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></div>').join('') : '') +
+      box.innerHTML = '' +
+        (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => '<div class="ce-event' + (ev.done ? ' ce-done' : '') + '">' + esc(ev.title) + '</div>').join('') : '') +
+        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => '<div class="ce-event ce-scheduled' + (ev.done ? ' ce-done' : '') + '"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></div>').join('') : '') +
         (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');
     };
     const cached = centerCalendarCache.get(date);

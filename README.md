@@ -59,7 +59,7 @@ Last updated: 2026-11-04
 - **Reference tabs**: 📚 Reference and 📝 Scratch Pad at the left of the Reference toolbar. Each day has its own pad (follows ▲ ▼), saved in the Days sheet column E. The last tab is remembered on reopen, per device, same as the center tabs.
 - **Resize handles**: new rounded gray pills, centered on their lines, blue while dragging. Column pills sit a quarter of the way down so they don't land on section lines.
 - **Reference toolbar**: scrolls sideways on narrow columns, and the search box keeps a readable width.
-- **Day Review tab** (📊, top middle): the finished lines of the day shown, grouped by subject then project with counts; tap to expand. Read-only.
+- **Day Review tab** (📊, top middle): the finished lines of the day shown, grouped by subject then project with counts; tap to expand. Read-only. Subjects and projects sit in cells, with a line under each subject header. The date is gone from the heading.
 - **Cal Events spacing**: smaller margins, text wraps under the checkbox like the history log, and a line plus extra space between the All-Day and Scheduled groups.
 - **Blocks hierarchy:** indent/outdent and up/down actions now move the selected parent with contiguous deeper-indented descendants. This is editor-line hierarchy, not a new Sheet schema; drag handles and true arbitrary nesting remain to be implemented.
 - **Keep In Mind:** long-press fold arrow now exposes prompt-based rename, category color, reorder, add task, and collapse actions. Category colors persist in Focus data. Needs usability refinement; no claim of completed custom menu.

@@ -566,13 +566,15 @@
     #journalPane[data-ctab="review"] #dayReviewScroll{display:block;}
     #journalPane[data-ctab="review"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
     .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
-    .dr-cat{margin:0 0 6px;}
+    /* Category and group cells, underlined category header (2026-11-04, Julius). */
+    .dr-cat{--dr-c:#8a8f98;margin:0 0 8px;padding:3px 7px 5px;border:1px solid color-mix(in srgb,var(--dr-c) 55%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--dr-c) 7%,transparent);}
+    .dr-cat[open] > summary{margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid color-mix(in srgb,var(--dr-c) 70%,var(--border));}
     .dr-cat summary,.dr-group summary{display:flex;align-items:center;gap:6px;cursor:pointer;padding:2px 0;list-style:none;user-select:none;-webkit-user-select:none;}
     .dr-cat summary::-webkit-details-marker,.dr-group summary::-webkit-details-marker{display:none;}
     .dr-cat > summary{font-weight:700;}
     .dr-cat > summary i{flex:0 0 auto;width:10px;height:10px;border-radius:3px;}
     .dr-cat summary b,.dr-group summary b{margin-left:auto;font-variant-numeric:tabular-nums;}
-    .dr-group{margin-left:16px;}
+    .dr-group{margin:4px 0 0;padding:1px 6px;border:1px solid var(--border);border-radius:6px;}
     .dr-line{margin-left:0;padding:2px 0 2px 8px;border-left:2px solid var(--divider);font-size:.92em;overflow-wrap:anywhere;}
     .ref-tabs{margin-left:0;flex:0 0 auto;align-self:center;}
     /* Reference toolbar scrolls sideways on narrow columns; search keeps a readable width. */
@@ -10312,11 +10314,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const date = reviewDate();
       const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
       const {cats,total} = ed ? collect(ed) : {cats:[],total:0};
-      let h = `<div class="dr-head">Day Review · ${esc(formatDate(date))} · ${total} done</div>`;
+      let h = `<div class="dr-head">Day Review · ${total} done</div>`;
       if(!total) h += '<div class="center-placeholder">Nothing done yet.</div>';
       cats.forEach(c => {
         const info = CARD_CAT_BY_KEY[c.key], name = info ? info.name : 'Other';
-        h += `<details class="dr-cat" data-k="${esc(c.key)}"${closedCats.has(c.key) ? '' : ' open'}><summary><i style="background:${esc(info ? info.color : '#8a8f98')}"></i>${esc(name)}<b>${c.n}</b></summary>`;
+        h += `<details class="dr-cat" data-k="${esc(c.key)}" style="--dr-c:${esc(info ? info.color : '#8a8f98')}"${closedCats.has(c.key) ? '' : ' open'}><summary><i style="background:var(--dr-c)"></i>${esc(name)}<b>${c.n}</b></summary>`;
         [...c.groups.entries()].sort((a,b) => b[1].length - a[1].length).forEach(([g,list]) => {
           const k = c.key + '|' + g;
           h += `<details class="dr-group" data-k="${esc(k)}"${openGroups.has(k) ? ' open' : ''}><summary>${esc(g)}<b>${list.length}</b></summary>` +

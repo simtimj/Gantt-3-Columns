@@ -52,7 +52,8 @@ Last updated: 2026-11-04
 - **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
-- **Subtle + border line**: new Task subject color choice, subtle tint plus a lighter, brighter subject-colored outline, on task cards, Blocks, Urgent rows and Cal Events.
+- **Subtle + border line**: new Task subject color choice, subtle tint plus a lighter, brighter subject-colored outline, on task cards, Blocks, Urgent rows and Cal Events. Today and Dailies cards use a 2px outline; other cards stay at 1.5px.
+- **+ Task in Cal Events**: a **+ Task** button on the All-Day Tasks line, shown on every day. It adds a real all-day event to the main Julius Simtim calendar on the day being viewed, in yellow (open). Text typed in the box survives a refresh.
 - **History / Log**: the Completed heading is gone; the Today: done count stays.
 - **Reference tabs**: 📚 Reference and 📝 Scratch Pad at the left of the Reference toolbar. Each day has its own pad (follows ▲ ▼), saved in the Days sheet column E. The last tab is remembered on reopen, per device, same as the center tabs.
 - **Resize handles**: new rounded gray pills, centered on their lines, blue while dragging. Column pills sit a quarter of the way down so they don't land on section lines.
@@ -384,7 +385,7 @@ Last updated: 2026-11-04
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
-- **Corner resize**: hold where a column line meets a section line and drag, like resizing a desktop window. Open question: how it picks the section; the drag direction could decide it (Julius, 2026-11-03).
+- **Corner resize**: hold where a column line meets a section line and drag, like resizing a desktop window. On hold (2026-11-04): try the new resize pills first. Open question: how it picks the section; the drag direction could decide it (Julius, 2026-11-03).
 - **Center Up / Center Down (2026-11-01, Julius: spec saved; phases 1–2 done)**: hourly Weather built (Open-Meteo, to confirm); Center Down contents still to decide. **Make sure you do**: repeating marker ↻ built for daily starters (other repeat rules still to work out). Spec: `docs/NOTES.md` → "Center Up / Down + planning pause".
 - **Auto-reshuffle, Motion/Reclaim-style (Julius, 2026-10-28)**: ✅ step 1 task fields (duration above) · step 2 `Code.gs` reads today's calendar and finds free gaps, skipping the Chill and Repeat Tasks calendars · step 3 scheduler sorts by deadline + priority and puts each task in the first gap it fits · step 4 **Reshuffle** button that reruns it (auto-run later). Keep a manual mode too: set the parameters together with Claude in conversation. Target: Fri Nov 6.
 - **Calendar column, like Google Calendar** (Julius, 2026-10-28): a full calendar view as its own column (or swipe in from the right / a button that swaps it in for Reference), so while scheduling with Claude he can see the day at a glance on phone, tablet and computer. Details to settle: day vs 3-day vs week view, read-only first or drag tasks onto it.

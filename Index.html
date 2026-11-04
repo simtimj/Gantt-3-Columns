@@ -1867,6 +1867,12 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-group{margin:14px 0 4px;padding-top:7px;border-top:1px solid var(--divider);color:var(--text);font-weight:700;}
 #centerCalendarList .ce-group:first-child{margin-top:2px;padding-top:0;border-top:0;}
 #centerCalendarList .ce-check:disabled{opacity:.5;}
+/* + Task in All-Day Tasks (2026-11-04, Julius). */
+#centerCalendarList .ce-group-add{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+#centerCalendarList .ce-add-btn{flex:0 0 auto;min-width:0;min-height:26px;padding:1px 7px;font-size:.85em;font-weight:600;line-height:1.2;}
+#centerCalendarList .ce-add{display:flex;align-items:center;gap:4px;margin:3px 0 5px;}
+#centerCalendarList .ce-add input{flex:1 1 auto;min-width:0;box-sizing:border-box;height:30px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);font:inherit;}
+#centerCalendarList .ce-add .btn{flex:0 0 auto;min-width:0;min-height:30px;padding:2px 7px;font-size:.85em;}
 
 /* History / Log time-of-day containers: visual grouping without wrapping editable task DOM. */
 #todayScroll .day-editor > [data-tsec="morning"]{--hist-group:#e3bd43;}
@@ -8047,7 +8053,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   try{ calOpen = localStorage.getItem('fw.calOpen') !== '0'; }catch(e){}
   // Calendar panel back (2026-10-29, Julius): every calendar event lives here as a checkbox (tick = Graphite = done).
   const CAL_PANEL_ON = false; // Calendar panel off (2026-10-31, Julius): Reference top half is Urgent only.
-  let centerCalendarSeq = 0;
+  let centerCalendarSeq = 0, ceShownDate = '';
+  // + Task box: kept outside the list so a refresh mid-typing doesn't lose the text.
+  const ceAdd = {open:false,text:'',busy:false};
+  const ceAddForm = () => '<form class="ce-add"><input type="text" maxlength="300" placeholder="Task name" aria-label="New all-day task"' + (ceAdd.busy ? ' disabled' : '') + ' value="' + esc(ceAdd.text) + '"><button type="submit" class="btn"' + (ceAdd.busy ? ' disabled' : '') + '>Add</button><button type="button" class="btn" data-ce-add-cancel aria-label="Cancel">✕</button></form>';
   const centerCalendarCache = new Map();
   // Subject color for a calendar row: the saved subject, else the same auto guess cards use.
   function calRowCat(ev){
@@ -8083,12 +8092,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const seq = ++centerCalendarSeq;
     const draw = data => {
       if(seq !== centerCalendarSeq) return;
+      ceShownDate = data.date;
       const allDay = data.events.filter(ev => ev.allDay).sort((a,b) => Number(a.done) - Number(b.done)), scheduled = data.events.filter(ev => !ev.allDay);
       const checkbox = ev => '<input type="checkbox" class="ce-check"' + (ev.done ? ' checked' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
       // Row carries the event's id + its menu fields (urgency, due, length, subject), like a task line.
       const row = (ev,cls,inner) => '<div class="ce-event' + cls + (ev.done ? ' ce-done' : '') + '"' + calRowAttrs(ev) + '>' + checkbox(ev) + inner + '<span class="ce-meta">' + esc(lineMetaLabel(ev.due,ev.dur) || '') + '</span></div>';
       box.innerHTML = '' +
-        (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => row(ev,'','<span class="ce-event-text">' + esc(ev.title) + '</span>')).join('') : '') +
+        '<div class="ce-group ce-group-add"><span>All-Day Tasks</span><button type="button" class="btn ce-add-btn" data-ce-add aria-label="Add an all-day task">+ Task</button></div>' + (ceAdd.open ? ceAddForm() : '') +
+        (allDay.length ? allDay.map(ev => row(ev,'','<span class="ce-event-text">' + esc(ev.title) + '</span>')).join('') : '') +
         (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => row(ev,' ce-scheduled','<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span>')).join('') : '') +
         (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');
     };
@@ -8112,7 +8123,39 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       alert('Could not update calendar event: '+(err?.message||err));
     }).setCalendarEventDone(row.dataset.ceCal,row.dataset.ceId,Number(row.dataset.ceStart),desired);
   });
-  document.addEventListener('click', e => { if(e.target.closest('[data-ce-refresh]')) loadCenterCalendar(null,true); });
+  document.addEventListener('click', e => {
+    if(e.target.closest('[data-ce-refresh]')) loadCenterCalendar(null,true);
+    const open = e.target.closest('[data-ce-add]');
+    if(open){
+      let form = document.querySelector('#centerCalendarList .ce-add');
+      if(!form){
+        ceAdd.open = true;
+        open.closest('.ce-group').insertAdjacentHTML('afterend',ceAddForm());
+        form = document.querySelector('#centerCalendarList .ce-add');
+      }
+      form.querySelector('input').focus(); // same tap, so the phone keyboard opens
+    }
+    if(e.target.closest('[data-ce-add-cancel]') && !ceAdd.busy){
+      ceAdd.open = false; ceAdd.text = '';
+      document.querySelector('#centerCalendarList .ce-add')?.remove();
+    }
+  });
+  document.addEventListener('input', e => { if(e.target.matches?.('#centerCalendarList .ce-add input')) ceAdd.text = e.target.value; });
+  document.addEventListener('submit', e => {
+    const form = e.target.closest?.('#centerCalendarList .ce-add'); if(!form) return;
+    e.preventDefault();
+    const title = ceAdd.text.trim(), date = ceShownDate;
+    if(!title || !date || ceAdd.busy) return;
+    const lock = on => { ceAdd.busy = on; document.querySelectorAll('#centerCalendarList .ce-add :is(input,button[type=submit])').forEach(n => { n.disabled = on; }); };
+    lock(true);
+    google.script.run.withSuccessHandler(() => {
+      ceAdd.open = false; ceAdd.text = ''; ceAdd.busy = false;
+      centerCalendarCache.delete(date); loadCenterCalendar(null,true);
+    }).withFailureHandler(err => {
+      lock(false);
+      setStatus('Could not add that task: ' + (err && err.message || err));
+    }).addAllDayTask(date,title);
+  });
   document.addEventListener('visibilitychange', () => { if(!document.hidden) loadCenterCalendar(); });
   function loadCalendar(){
     loadCenterCalendar();
@@ -9826,6 +9869,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Urgent rows become cells in this mode (2026-11-04, Julius). */
   body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);border:1.5px solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
   body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1.5px;}
+  /* 2px on Today and Dailies cards (2026-11-04, Julius); other cards keep 1.5px. */
+  body.tc-subtleline :is(#todayScroll .day-editor,#journalPane[data-ctab="notes"] .journal-editor) .check-line[data-tccat]{border-left-width:2px;border-right-width:2px;}
+  body.tc-subtleline :is(#todayScroll .day-editor,#journalPane[data-ctab="notes"] .journal-editor) .check-line[data-tccat][data-tc^="f"]{border-top-width:2px;}
+  body.tc-subtleline :is(#todayScroll .day-editor,#journalPane[data-ctab="notes"] .journal-editor) .check-line[data-tccat][data-tc$="l"]{border-bottom-width:2px;}
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
   body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}
   /* Keep subject colors readable without the bright outlines/fold controls. */

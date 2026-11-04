@@ -304,5 +304,8 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - **Tight Notes lines** (2026-11-01): `.journal-editor > .check-line[data-tc^=f / $=l]` margin 1px, padding 2px (cards elsewhere unchanged).
 5. **Approach**: read sections selectively; preserve mobile layouts, notes, calendar, task logs, saved data, resize controls; never delete/overwrite content for the layout change.
 
+## + Task in Cal Events (2026-11-04, Julius)
 
-
+- `addAllDayTask(date, title)` in Code.gs creates an all-day event on `EVENT_CALENDARS[0]`, color 5 (yellow = open).
+- The All-Day Tasks heading now always shows, so the button is there on empty days. `ceAdd` holds the box state outside the list, so a redraw keeps typed text.
+- The event goes on `ceShownDate`, the day the list is showing.

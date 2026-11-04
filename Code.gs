@@ -1866,7 +1866,7 @@ const EVENT_CALENDARS = [
 ];
 const EVENT_DAYS_AHEAD = 3;
 
-// Center-bottom list: main calendar only, strictly read-only (no archive path).
+// Center-bottom list: main calendar only (no archive path).
 function getMainCalendarEvents(dateString) {
   const date = String(dateString || todayString_());
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid calendar date');
@@ -1890,6 +1890,19 @@ function getMainCalendarEvents(dateString) {
   });
   events.sort((a,b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start);
   return { date: date, events: events };
+}
+
+// + Task in Cal Events (2026-11-04, Julius): a real all-day event on the main calendar, yellow = open.
+function addAllDayTask(dateString, title) {
+  const date = String(dateString || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid calendar date');
+  const name = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!name) throw new Error('Task name is empty');
+  const cal = CalendarApp.getCalendarById(EVENT_CALENDARS[0]);
+  if (!cal) throw new Error('Main calendar is unavailable');
+  const ev = cal.createAllDayEvent(name, parseDate_(date));
+  ev.setColor('5');
+  return { id: ev.getId(), date: date };
 }
 
 // Hold-menu fields for a calendar event (2026-11-03, Julius): urgency, due, length, subject. Kept app-side so the

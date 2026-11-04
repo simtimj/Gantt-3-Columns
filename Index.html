@@ -1739,7 +1739,10 @@
     .wx-row.wx-now{font-weight:700;}
     .wx-row .wx-t{color:var(--muted,#888);font-size:12px;}
     .wx-row .wx-p{color:#1e88e5;font-size:12px;}
-    .wx-row.wx-d{grid-template-columns:4.6em 1.6em 4.6em 1fr;}
+    /* Daily rows fit the cell (2026-11-04, Julius): tight columns; a narrow cell drops the date and the 💧. */
+    #weatherScroll{container-type:inline-size;}
+    .wx-row.wx-d{grid-template-columns:4.1em 1.4em 3.8em minmax(0,1fr);gap:2px;padding-inline:5px;white-space:nowrap;}
+    @container (max-width:190px){.wx-row.wx-d{grid-template-columns:2.1em 1.3em 3.4em minmax(0,1fr);gap:1px;padding-inline:2px;font-size:12px;}.wx-row.wx-d .wx-t,.wx-row.wx-d .wx-p{font-size:11px;}.wx-d .wx-date,.wx-d .wx-drop{display:none;}}
     .wx-row.wx-d .wx-lo{color:var(--muted,#888);}
     .wx-day{padding:6px 8px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#888);}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
@@ -7080,8 +7083,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const w = d.daily;
       box.innerHTML = head() + w.time.map((t,k) => {
         const [y,m,dd] = t.split('-').map(Number), day = new Date(y,m - 1,dd), p = w.precipitation_probability_max[k];
-        return '<div class="wx-row wx-d' + (k ? '' : ' wx-now') + '"><span class="wx-t">' + (k ? day.toLocaleDateString('en-US',{weekday:'short'}) + ' ' + m + '/' + dd : 'Today') + '</span><span>' + icon(w.weather_code[k],1) +
-          '</span><span>' + Math.round(w.temperature_2m_max[k]) + '° <span class="wx-lo">' + Math.round(w.temperature_2m_min[k]) + '°</span></span><span class="wx-p">' + (p >= 10 ? '💧' + p + '%' : '') + '</span></div>';
+        return '<div class="wx-row wx-d' + (k ? '' : ' wx-now') + '"><span class="wx-t">' + (k ? day.toLocaleDateString('en-US',{weekday:'short'}) + '<span class="wx-date"> ' + m + '/' + dd + '</span>' : 'Tod<span class="wx-date">ay</span>') + '</span><span>' + icon(w.weather_code[k],1) +
+          '</span><span>' + Math.round(w.temperature_2m_max[k]) + '° <span class="wx-lo">' + Math.round(w.temperature_2m_min[k]) + '°</span></span><span class="wx-p">' + (p >= 10 ? '<span class="wx-drop">💧</span>' + p + '%' : '') + '</span></div>';
       }).join('');
     }
     function drawHourly(d){

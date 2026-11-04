@@ -1312,7 +1312,21 @@ function doneCheck_(checked) { return '<input type="checkbox"' + (checked ? ' ch
 function doneHeaderHtml_(project) {
   return '<div data-cgrp="' + doneEsc_(project) + '"><b><u>' + doneEsc_(project) + '</u></b></div>';
 }
-function doneItemHtml_(name, details, checked, cid, mine) {
+/* History log types (2026-11-04, Julius: option 1). Done Log column F "Type" = New / Fix / Tweak, filled in by
+   Claude and ChatGPT; the line carries data-ltype="new|fix|tweak". Lines without one are guessed from their
+   wording in the app (logTypeOf in Index.html), never saved. guessLogType_ uses the same rules. */
+function normLogType_(v) {
+  const t = String(v || '').trim().toLowerCase();
+  return /^new/.test(t) ? 'new' : /^fix/.test(t) ? 'fix' : /^tweak/.test(t) ? 'tweak' : '';
+}
+function guessLogType_(text) {
+  const t = String(text || '');
+  if (/\b(fix|fixe[ds]|fixing|bug|broken|repair|restor|recover|prevent|correct|resolv|crash|fail|missing|stuck|wrong|glitch)/i.test(t)) return 'fix';
+  if (/\b(add|adds|added|adding|new|build|built|creat|implement|enable|introduc|support|allow|launch|set up|setup)/i.test(t)) return 'new';
+  if (/\b(tweak|adjust|move|moved|renam|smaller|larger|bigger|lighten|lighter|darker|tight|shrink|spacing|colou?r|align|match|simplif|polish|thinner|thicker|softer|reorder|sort|capitaliz|abbreviat|change|refine|compact|condens|swap|replace|font|typograph|border|tint|gap|padding|margin)/i.test(t)) return 'tweak';
+  return '';
+}
+function doneItemHtml_(name, details, checked, cid, mine, type) {
   // Claude's lines start with "*" (no space) so Julius can tell them from his own (2026-10-26).
   // `mine` = his own Graphite calendar task transferred by Claude: no "*", ends " X" (2026-10-29).
   if (cid && mine) {
@@ -1326,8 +1340,8 @@ function doneItemHtml_(name, details, checked, cid, mine) {
   const text = name && details ? '<b>' + doneEsc_(name) + '</b>: ' + doneEsc_(details)
     : name ? '<b>' + doneEsc_(name) + '</b>' : doneEsc_(details);
   return '<div class="check-line' + (checked ? ' done' : '') + '" data-level="0"' +
-    (cid ? ' data-cid="' + doneEsc_(cid) + '"' : '') + '>' + doneCheck_(checked) +
-    '<span class="check-text">' + text + '</span></div>';
+    (cid ? ' data-cid="' + doneEsc_(cid) + '"' : '') + (normLogType_(type) ? ' data-ltype="' + normLogType_(type) + '"' : '') +
+    '>' + doneCheck_(checked) + '<span class="check-text">' + text + '</span></div>';
 }
 // Old single-line form, still written first and then folded into its group.
 function doneLineHtml_(item) {
@@ -1394,14 +1408,14 @@ function groupClaudeDone_(html, list) {
         if (m && projects[doneStrip_(m[2])]) {
           proj = doneStrip_(m[2]);
           item = item || byOld[proj + '|' + doneStrip_(m[3])];
-          if (!item) { groupOf(proj).push(doneItemHtml_('', doneStrip_(m[3]), checked, cid)); return; }
+          if (!item) { groupOf(proj).push(doneItemHtml_('', doneStrip_(m[3]), checked, cid, false, doneAttr_(b, 'data-ltype'))); return; }
         }
       }
       if (proj) {
         proj = doneUnesc_(proj);
         const name = item ? doneItemName_(item) : '';
         const details = item ? String(item.details || '') : doneStrip_(text);
-        groupOf(proj).push(doneItemHtml_(name, details, checked, item ? item.id : cid, !!(item && item.mine)));
+        groupOf(proj).push(doneItemHtml_(name, details, checked, item ? item.id : cid, !!(item && item.mine), (item && item.type) || doneAttr_(b, 'data-ltype')));
         return;
       }
     }
@@ -1538,7 +1552,7 @@ function removeDaySections_() {
    "New Tasks" tab, with no deploy. Rows are never edited; the next app load
    applies each new one once. The id comes from the row's text, so an exact
    repeat is added once and a line he deletes stays deleted. */
-const DONE_LOG_HEADERS = ['Date', 'Project', 'Title', 'Details', 'Done by'];
+const DONE_LOG_HEADERS = ['Date', 'Project', 'Title', 'Details', 'Done by', 'Type'];
 const NEW_TASKS_HEADERS = ['Date', 'Title', 'Urgency', 'Due', 'Minutes', 'Subtasks', 'Added'];
 const DONE_LOG_DAYS = 30; // older rows are ignored, so the applied-id list can't age out
 
@@ -1573,7 +1587,8 @@ function applyDeployedCodeLog_() {
       sheet.appendRow([entry.date, 'Gantt', text(entry.title),
         text('Code included in deployed build. ' + marker + '\n' + String(entry.details || '') +
           '\nFeature behavior still needs user/device confirmation.'),
-        /^(ChatGPT|Claude|Julius)$/.test(entry.by || '') ? entry.by : 'Julius']);
+        /^(ChatGPT|Claude|Julius)$/.test(entry.by || '') ? entry.by : 'Julius',
+        ({ new: 'New', fix: 'Fix', tweak: 'Tweak' })[guessLogType_(entry.title)] || '']);
       added.add(marker);
     });
     props.setProperty('deployedCodeLog', signature);
@@ -1596,6 +1611,7 @@ function intakeTime_(value) {
 
 function sheetDoneRows_() {
   const sheet = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
+  if (sheet.getRange(1, 6).getValue() !== 'Type') sheet.getRange(1, 6).setValue('Type'); // tab made before this column
   const oldest = addDaysToDateString_(todayString_(), -DONE_LOG_DAYS);
   return sheet.getDataRange().getValues().slice(1).map(r => {
     const date = intakeDate_(r[0]);
@@ -1605,6 +1621,7 @@ function sheetDoneRows_() {
     return {
       id: 's-' + cellHash_([date, project, title, details].join('|')), date, project: project || 'Other', title, details,
       mine: /^(julius|me)$/i.test(String(r[4] || '').trim()),
+      type: normLogType_(r[5]), // not in the id, so adding a type never re-adds a line
     };
   }).filter(x => x.title && x.date >= oldest);
 }

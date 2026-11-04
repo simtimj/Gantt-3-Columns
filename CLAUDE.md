@@ -26,7 +26,7 @@
 
 ## Done-with-Claude log (2026-10-26, Julius: standing rule)
 
-- **Whenever Julius finishes something through Claude (any project), append a row to the `Done Log` tab of New Gantt Sheet (`1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`) with the Sheets connector; no clone, push or deploy (2026-11-02, Julius).** Columns: Date `YYYY-MM-DD`, Project (group header), Title (main point of the work, never the project name again), Details, Done by (`Claude`, `ChatGPT`, or `Julius` for his own work). One row per finished task. Never edit `Days`, or edit or delete Done Log rows. `donelog.js` is the old route; don't add to it.
+- **Whenever Julius finishes something through Claude (any project), append a row to the `Done Log` tab of New Gantt Sheet (`1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`) with the Sheets connector; no clone, push or deploy (2026-11-02, Julius).** Columns: Date `YYYY-MM-DD`, Project (group header), Title (main point of the work, never the project name again), Details, Done by (`Claude`, `ChatGPT`, or `Julius` for his own work), Type (`New`, `Fix` or `Tweak`, 2026-11-04). One row per finished task. Never edit `Days`, or edit or delete Done Log rows. `donelog.js` is the old route; don't add to it.
 - Graphite transfers (2026-10-29, Julius): his own finished calendar tasks (Graphite) go in the Done Log with Done by `Julius` → `doneItemHtml_` drops the `*` and ends the line with " X". Then rename the calendar event to start with `[x] ` (the only "accounted for" marker; no trailing X, no extra words). Skip events already starting `[x] `.
 - Rows apply on the next app load via `sheetDoneRows_()` / `sheetTaskRows_()`; the id is a hash of the row text. Done Log rows older than 30 days are ignored.
 - Mechanics (applyClaudeDone_, grouping, day blocks): see `docs/NOTES.md` → "Done-with-Claude log".
@@ -69,3 +69,4 @@
 - Task mirrors (2026-11-01, Julius: spec phase 1)
 - Center Up / Down + planning pause (2026-11-01, Julius: spec, PENDING)
 - Drag into Blocks + block borders (2026-11-04, Julius)
+- History log types (2026-11-04, Julius: option 1)

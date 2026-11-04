@@ -575,6 +575,8 @@
     .dr-cat > summary i{flex:0 0 auto;width:10px;height:10px;border-radius:3px;}
     .dr-cat summary b,.dr-group summary b{margin-left:auto;font-variant-numeric:tabular-nums;}
     .dr-group{margin:4px 0 0;padding:1px 6px;border:1px solid var(--border);border-radius:6px;}
+    .dr-type{margin:4px 0 1px;font-size:.85em;font-weight:600;opacity:.8;} /* History log types (2026-11-04) */
+    .dr-tcount{margin-left:6px;font-weight:400;font-size:.85em;opacity:.75;}
     .dr-line{margin-left:0;padding:2px 0 2px 8px;border-left:2px solid var(--divider);font-size:.92em;overflow-wrap:anywhere;}
     .ref-tabs{margin-left:0;flex:0 0 auto;align-self:center;}
     /* Reference toolbar scrolls sideways on narrow columns; search keeps a readable width. */
@@ -1917,6 +1919,7 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayScroll .sec-host > .day-editor.sec-painted{margin-left:0!important;margin-right:0!important;padding-left:calc(15px * var(--side-k,1) + 4px)!important;}
 #todayScroll .ts-count{font:inherit;margin-left:6px;padding:1px 7px;min-height:24px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
 #todayScroll .ts-items{margin-top:2px;opacity:.85;overflow-wrap:anywhere;}
+#todayScroll .ts-type > b{margin-right:5px;font-weight:600;} /* History log types (2026-11-04) */
 #todayScroll .day-editor > [data-tsec]:not([data-tsf="o"]){border-bottom:0!important;}
 #todayScroll .day-editor > [data-tsf]{cursor:pointer;}
 #todayScroll .day-editor > [data-tsec]::before{flex:0 0 auto;margin-top:.1em;}
@@ -10448,7 +10451,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(!cats.has(key)) cats.set(key,{key,n:0,groups:new Map()});
         const c = cats.get(key); c.n++; total++;
         if(!c.groups.has(gName)) c.groups.set(gName,[]);
-        c.groups.get(gName).push(t);
+        c.groups.get(gName).push({t,n});
       });
       return {cats:[...cats.values()].sort((a,b) => b.n - a.n),total};
     }
@@ -10464,8 +10467,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         h += `<details class="dr-cat" data-k="${esc(c.key)}" style="--dr-c:${esc(info ? info.color : '#8a8f98')}"${closedCats.has(c.key) ? '' : ' open'}><summary><i style="background:var(--dr-c)"></i>${esc(name)}<b>${c.n}</b></summary>`;
         [...c.groups.entries()].sort((a,b) => b[1].length - a[1].length).forEach(([g,list]) => {
           const k = c.key + '|' + g;
-          h += `<details class="dr-group" data-k="${esc(k)}"${openGroups.has(k) ? ' open' : ''}><summary>${esc(g)}<b>${list.length}</b></summary>` +
-            list.map(t => `<div class="dr-line">${esc(t)}</div>`).join('') + '</details>';
+          // History log types (2026-11-04): New / Fixes / Tweaks counts in the summary, names under each.
+          const types = logTypeBuckets(list.map(x => x.n),x => txt(x));
+          const tc = types ? '<span class="dr-tcount">' + types.filter(t => t.k).map(t => esc(t.name) + ' ' + t.items.length).join(' · ') + '</span>' : '';
+          h += `<details class="dr-group" data-k="${esc(k)}"${openGroups.has(k) ? ' open' : ''}><summary>${esc(g)}${tc}<b>${list.length}</b></summary>` +
+            (types ? types.map(ty => `<div class="dr-type">${esc(ty.name)} · ${ty.items.length}</div>` + ty.items.map(t => `<div class="dr-line">${esc(t)}</div>`).join('')).join('')
+              : list.map(x => `<div class="dr-line">${esc(x.t)}</div>`).join('')) + '</details>';
         });
         h += '</details>';
       });
@@ -10694,6 +10701,27 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   /* Folded section = one row per project (a Claude group header) or subject: name, a count button, its task names.
      The count button hides / shows that row's names (2026-11-04, Julius). The rows are render-only children of the header. */
+  /* History log types (2026-11-04, Julius: option 1). A done line's type: data-ltype from the Done Log's Type
+     column (Code.gs normLogType_), else guessed from its wording, only for Done Log lines (data-cid) so his own
+     tasks stay untyped. Same rules as guessLogType_ in Code.gs. Display only: lines keep their saved order. */
+  const LOG_TYPES = [['new','New'],['fix','Fixes'],['tweak','Tweaks']];
+  function logTypeOf(x){
+    const t = x.dataset && x.dataset.ltype;
+    if(t === 'new' || t === 'fix' || t === 'tweak') return t;
+    if(!x.hasAttribute || !x.hasAttribute('data-cid')) return '';
+    const s = (x.textContent || '').replace(/^\s*\*+/,'');
+    if(/\b(fix|fixe[ds]|fixing|bug|broken|repair|restor|recover|prevent|correct|resolv|crash|fail|missing|stuck|wrong|glitch)/i.test(s)) return 'fix';
+    if(/\b(add|adds|added|adding|new|build|built|creat|implement|enable|introduc|support|allow|launch|set up|setup)/i.test(s)) return 'new';
+    if(/\b(tweak|adjust|move|moved|renam|smaller|larger|bigger|lighten|lighter|darker|tight|shrink|spacing|colou?r|align|match|simplif|polish|thinner|thicker|softer|reorder|sort|capitaliz|abbreviat|change|refine|compact|condens|swap|replace|font|typograph|border|tint|gap|padding|margin)/i.test(s)) return 'tweak';
+    return '';
+  }
+  // [{k,name,items}] for New / Fixes / Tweaks (+ Other), or null when nothing in the list has a type.
+  function logTypeBuckets(lines,label){
+    const by = {new:[],fix:[],tweak:[],'':[]};
+    lines.forEach(x => by[logTypeOf(x)].push(label(x)));
+    if(!by.new.length && !by.fix.length && !by.tweak.length) return null;
+    return LOG_TYPES.concat([['','Other']]).filter(([k]) => by[k].length).map(([k,name]) => ({k,name,items:by[k].filter(Boolean)}));
+  }
   function tsecGroups(cov){
     const map = new Map(); let cur = null;
     const get = name => { if(!map.has(name)) map.set(name,[]); return map.get(name); };
@@ -10705,11 +10733,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return [...map].map(([name,lines]) => {
       const tasks = lines.filter(x => x.classList.contains('check-line') && !(+(x.dataset.level || 0) > 0));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      return {name,count:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : lines.length + ' lines',sum:titleSummary(lines)};
+      const types = logTypeBuckets(tasks,titleItemLabel);
+      return {name,count:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : lines.length + ' lines',sum:titleSummary(lines),
+        types:types ? types.map(t => ({name:t.name,n:t.items.length,sum:t.items.slice(0,30).join(' · ') + (t.items.length > 30 ? ' · +' + (t.items.length - 30) + ' more' : '')})) : null};
     });
   }
   function tsecDrawSum(n,rows,folds){
-    const k = n.dataset.tsec, sig = rows ? JSON.stringify(rows.map(r => [r.name,r.count,r.sum,!!folds[k + ':' + r.name]])) : '';
+    const k = n.dataset.tsec, sig = rows ? JSON.stringify(rows.map(r => [r.name,r.count,r.sum,r.types,!!folds[k + ':' + r.name]])) : '';
     if((n.dataset.tssum || '') === sig && !!n.querySelector(':scope > .ts-sum') === !!rows) return;
     n.querySelectorAll(':scope > .ts-sum').forEach(x => x.remove());
     setAttr(n,'data-tssum',sig);
@@ -10722,7 +10752,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const shut = !!folds[k + ':' + r.name];
       b.textContent = r.count + (shut ? ' +' : ' −'); b.title = shut ? 'Show the list' : 'Hide the list';
       row.append(name,b);
-      if(r.sum && !shut){ const t = document.createElement('div'); t.className = 'ts-items'; t.textContent = r.sum; row.appendChild(t); }
+      // Typed lines (New / Fixes / Tweaks): a count and the names under each, instead of one summary line.
+      if(r.types && !shut) r.types.forEach(ty => {
+        const t = document.createElement('div'); t.className = 'ts-items ts-type';
+        const h = document.createElement('b'); h.textContent = ty.name + ' ' + ty.n;
+        t.append(h,ty.sum); row.appendChild(t);
+      });
+      else if(r.sum && !shut){ const t = document.createElement('div'); t.className = 'ts-items'; t.textContent = r.sum; row.appendChild(t); }
       box.appendChild(row);
     });
     n.appendChild(box);

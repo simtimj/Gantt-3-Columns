@@ -1989,11 +1989,8 @@ function getCalendarEvents() {
   return { today: today, events: out, archive: archive };
 }
 
-/* Calendar checkbox (2026-10-29, Julius): ticking an event in the Reference Calendar panel marks it done the
-   same way he does by hand — Graphite color. Unticking puts back the color it had (yellow = open if unknown).
-   start = the event's start time (ms), so the right day of a repeating event is changed. */
-function setCalendarEventDone(calId, eventId, start, done) {
-  if (EVENT_CALENDARS.indexOf(calId) < 0) throw new Error('Not one of the app calendars');
+// One event by id + start time, so the right day of a repeating event is the one found.
+function calEventAt_(calId, eventId, start) {
   const cal = CalendarApp.getCalendarById(calId);
   if (!cal) throw new Error('Calendar not found');
   const t = new Date(Number(start));
@@ -2001,6 +1998,23 @@ function setCalendarEventDone(calId, eventId, start, done) {
     .filter(e => e.getId() === eventId && Math.abs((e.isAllDayEvent() ? e.getAllDayStartDate() : e.getStartTime()).getTime() - t.getTime()) < 60000)[0]
     || cal.getEvents(new Date(t.getTime() - DAY_MS), new Date(t.getTime() + DAY_MS)).filter(e => e.getId() === eventId)[0];
   if (!ev) throw new Error('Event not found (moved or deleted?) — tap ↻ on the Calendar');
+  return ev;
+}
+// Editing a title in Cal Events changes the Google Calendar event (2026-11-04, Julius).
+function setCalendarEventTitle(calId, eventId, start, title) {
+  if (EVENT_CALENDARS.indexOf(calId) < 0) throw new Error('Not one of the app calendars');
+  const name = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!name) throw new Error('Title is empty');
+  calEventAt_(calId, eventId, start).setTitle(name);
+  return { title: name };
+}
+
+/* Calendar checkbox (2026-10-29, Julius): ticking an event in the Reference Calendar panel marks it done the
+   same way he does by hand — Graphite color. Unticking puts back the color it had (yellow = open if unknown).
+   start = the event's start time (ms), so the right day of a repeating event is changed. */
+function setCalendarEventDone(calId, eventId, start, done) {
+  if (EVENT_CALENDARS.indexOf(calId) < 0) throw new Error('Not one of the app calendars');
+  const ev = calEventAt_(calId, eventId, start);
   const props = PropertiesService.getScriptProperties();
   const key = 'calPrev:' + eventId.slice(0, 60) + ':' + Number(start);
   if (done) {

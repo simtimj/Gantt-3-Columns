@@ -1879,6 +1879,11 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-group{margin:14px 0 4px;padding-top:7px;border-top:1px solid var(--divider);color:var(--text);font-weight:700;}
 #centerCalendarList .ce-group:first-child{margin-top:2px;padding-top:0;border-top:0;}
 #centerCalendarList .ce-check:disabled{opacity:.5;}
+/* Cal Events subjects + title editing (2026-11-04, Julius): app-side sorting only, nothing goes to Google Calendar except the title. */
+#centerCalendarList .ce-cat{margin:7px 0 2px;font-size:.8em;font-weight:700;color:color-mix(in srgb,var(--ce-cat,var(--muted)) 75%,var(--text,#888));}
+#centerCalendarList .ce-group + .ce-cat,#centerCalendarList .ce-add + .ce-cat{margin-top:2px;}
+#centerCalendarList .ce-event.ce-picked{outline:1px solid var(--accent);outline-offset:0;}
+#centerCalendarList [data-ce-editing]{outline:0;cursor:text;-webkit-user-select:text;user-select:text;}
 /* + Task in All-Day Tasks (2026-11-04, Julius). */
 #centerCalendarList .ce-group-add{display:flex;align-items:center;justify-content:space-between;gap:6px;}
 #centerCalendarList .ce-add-btn{flex:0 0 auto;min-width:0;min-height:26px;padding:1px 7px;font-size:.85em;font-weight:600;line-height:1.2;}
@@ -8082,7 +8087,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   try{ calOpen = localStorage.getItem('fw.calOpen') !== '0'; }catch(e){}
   // Calendar panel back (2026-10-29, Julius): every calendar event lives here as a checkbox (tick = Graphite = done).
   const CAL_PANEL_ON = false; // Calendar panel off (2026-10-31, Julius): Reference top half is Urgent only.
-  let centerCalendarSeq = 0, ceShownDate = '';
+  let centerCalendarSeq = 0, ceShownDate = '', ceDraw = null;
   // + Task box: kept outside the list so a refresh mid-typing doesn't lose the text.
   const ceAdd = {open:false,text:'',busy:false};
   const ceAddForm = () => '<form class="ce-add"><input type="text" maxlength="300" placeholder="Task name" aria-label="New all-day task"' + (ceAdd.busy ? ' disabled' : '') + ' value="' + esc(ceAdd.text) + '"><button type="submit" class="btn"' + (ceAdd.busy ? ' disabled' : '') + '>Add</button><button type="button" class="btn" data-ce-add-cancel aria-label="Cancel">✕</button></form>';
@@ -8110,6 +8115,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(cat){ line.dataset.tccat = cat; line.style.setProperty('--ce-cat',CARD_CAT_BY_KEY[cat].color); }
       else { delete line.dataset.tccat; line.style.removeProperty('--ce-cat'); }
     }));
+    if(ceDraw) ceDraw(); // a new subject moves the row to that subject's group
     google.script.run.withFailureHandler(err => {
       setStatus('Could not save that calendar event: ' + (err && err.message || err));
     }).setCalendarEventMeta(d.ceId,Number(d.ceStart),d.ceRec === '1',meta);
@@ -8118,18 +8124,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     date = date || window.odDate || state.today;
     const box = document.getElementById('centerCalendarList');
     if(!box || !date) return;
+    if(box.querySelector('[data-ce-editing]')) return; // never redraw over a title being typed
     const seq = ++centerCalendarSeq;
     const draw = data => {
-      if(seq !== centerCalendarSeq) return;
+      if(seq !== centerCalendarSeq || box.querySelector('[data-ce-editing]')) return;
       ceShownDate = data.date;
+      ceDraw = () => draw(data);
       const allDay = data.events.filter(ev => ev.allDay).sort((a,b) => Number(a.done) - Number(b.done)), scheduled = data.events.filter(ev => !ev.allDay);
       const checkbox = ev => '<input type="checkbox" class="ce-check"' + (ev.done ? ' checked' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
       // Row carries the event's id + its menu fields (urgency, due, length, subject), like a task line.
       const row = (ev,cls,inner) => '<div class="ce-event' + cls + (ev.done ? ' ce-done' : '') + '"' + calRowAttrs(ev) + '>' + checkbox(ev) + inner + '<span class="ce-meta">' + esc(lineMetaLabel(ev.due,ev.dur) || '') + '</span></div>';
+      // Rows sorted under their subject, in Options order; no subject goes last, under Other.
+      const bySubject = (list,one) => {
+        const keys = list.map(calRowCat), order = Object.keys(CARD_CAT_BY_KEY).concat('');
+        const used = order.filter(k => keys.includes(k));
+        const heads = used.length > 1 || used[0];
+        return used.map(k => {
+          const info = CARD_CAT_BY_KEY[k];
+          return (heads ? '<div class="ce-cat"' + (info ? ' style="--ce-cat:' + esc(info.color) + '"' : '') + '>' + esc(info ? info.name : 'Other') + '</div>' : '') +
+            list.filter((ev,i) => keys[i] === k).map(one).join('');
+        }).join('');
+      };
       box.innerHTML = '' +
         '<div class="ce-group ce-group-add"><span>All-Day Tasks</span><button type="button" class="btn ce-add-btn" data-ce-add aria-label="Add an all-day task">+ Task</button></div>' + (ceAdd.open ? ceAddForm() : '') +
-        (allDay.length ? allDay.map(ev => row(ev,'','<span class="ce-event-text">' + esc(ev.title) + '</span>')).join('') : '') +
-        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => row(ev,' ce-scheduled','<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span>')).join('') : '') +
+        bySubject(allDay,ev => row(ev,'','<span class="ce-event-text ce-title">' + esc(ev.title) + '</span>')) +
+        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + bySubject(scheduled,ev => row(ev,' ce-scheduled','<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span>')) : '') +
         (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');
     };
     const cached = centerCalendarCache.get(date);
@@ -8170,6 +8189,49 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
   });
   document.addEventListener('input', e => { if(e.target.matches?.('#centerCalendarList .ce-add input')) ceAdd.text = e.target.value; });
+  /* Title editing (2026-11-04, Julius): first tap picks the row, second tap edits, like task cells.
+     Leaving the title saves it to the Google Calendar event; Esc or an empty title puts it back. */
+  (function initCalTitles(){
+    const list = document.getElementById('centerCalendarList');
+    if(!list) return;
+    const clearPick = () => list.querySelectorAll('.ce-picked').forEach(n => n.classList.remove('ce-picked'));
+    let undo = false;
+    list.addEventListener('click',e => {
+      const title = e.target.closest('.ce-title'), row = title && title.closest('.ce-event');
+      if(!row){ if(!e.target.closest('[data-ce-editing]')) clearPick(); return; }
+      if(title.dataset.ceEditing) return;
+      if(!row.classList.contains('ce-picked')){ clearPick(); row.classList.add('ce-picked'); return; }
+      title.dataset.ceEditing = '1'; title.contentEditable = 'plaintext-only'; title.spellcheck = false;
+      title.focus();
+      getSelection().selectAllChildren(title); getSelection().collapseToEnd();
+    });
+    list.addEventListener('keydown',e => {
+      if(!e.target.dataset?.ceEditing) return;
+      e.stopPropagation();
+      if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); }
+      if(e.key === 'Escape'){ e.preventDefault(); undo = true; e.target.blur(); }
+    });
+    list.addEventListener('focusout',e => {
+      const title = e.target; if(!title.dataset?.ceEditing) return;
+      const row = title.closest('.ce-event'), d = row.dataset, old = d.ceTitle;
+      const name = title.textContent.replace(/\s+/g,' ').trim(), keep = undo || !name || name === old;
+      undo = false;
+      delete title.dataset.ceEditing; title.removeAttribute('contenteditable');
+      clearPick();
+      title.textContent = keep ? old : name;
+      if(keep) return;
+      const put = t => {
+        d.ceTitle = t;
+        centerCalendarCache.forEach(entry => entry.data.events.forEach(ev => { if(ev.id === d.ceId && Number(ev.start) === Number(d.ceStart)) ev.title = t; }));
+        if(ceDraw) ceDraw();
+      };
+      put(name);
+      google.script.run.withFailureHandler(err => {
+        put(old);
+        setStatus('Could not rename that event: ' + (err && err.message || err));
+      }).setCalendarEventTitle(d.ceCal,d.ceId,Number(d.ceStart),name);
+    });
+  })();
   document.addEventListener('submit', e => {
     const form = e.target.closest?.('#centerCalendarList .ce-add'); if(!form) return;
     e.preventDefault();
@@ -11876,7 +11938,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 (function(){
   let focused=null, timer=0, startX=0, startY=0, suppressUntil=0;
   const backdrop=document.createElement('div');backdrop.id='fwFocusBackdrop';
-  document.body.appendChild(backdrop);
+  (document.getElementById('app') || document.body).appendChild(backdrop); // inside #app's stacking context, or it covers the expanded cell
   let home=null, anim=null;
   const still=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
   // The color the cell shows right now: its own background, or the first solid one behind it.

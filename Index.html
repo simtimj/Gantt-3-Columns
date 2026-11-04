@@ -1461,6 +1461,8 @@
     .od-nav .btn{min-width:28px;padding:0 6px;line-height:1.4;}
     body.one-day .od-nav{display:inline-flex;}
     .od-head,.plan-pad{display:none;}
+    .od-pad-head .blocks-add,.od-pad-head .blocks-task{font:inherit;letter-spacing:normal;text-transform:none;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:3px 7px;margin-left:5px;cursor:pointer;}
+
     body.one-day #todayScroll .day-row:not(.od-on),
     body.one-day #journalScroll .day-row:not(.od-on){display:none;}
     body.one-day #todayScroll{overflow:hidden;}
@@ -2696,9 +2698,31 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       { const top = document.createElement('div'); top.className = 'od-top';
         row.insertBefore(top, row.firstElementChild);
         [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Plan / think</div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Priorities, plans, thoughts…"></div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-add" title="Add named block">+ Block</button> <button type="button" class="blocks-task" title="Add task to Blocks">+ Task</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
+      // Blocks MVP: reuse the existing Plan column, checkbox editor, indent/outdent,
+      // drag/drop, and conflict-safe autosave. Never replace saved Plan content.
+      const blockAdd = row.querySelector('.blocks-add');
+      const taskAdd = row.querySelector('.blocks-task');
+      const addBlocksLine = (kind) => {
+        const name = kind === 'block' ? window.prompt('Block name') : window.prompt('Task name');
+        if (name === null || !name.trim()) return;
+        const line = document.createElement('div');
+        if (kind === 'block') {
+          line.setAttribute('data-title', '1');
+          const strong = document.createElement('b');
+          strong.textContent = name.trim();
+          line.appendChild(strong);
+        } else {
+          line.textContent = '[] ' + name.trim();
+        }
+        pad.appendChild(line);
+        pad.dispatchEvent(new Event('input', {bubbles:true}));
+      };
+      blockAdd.addEventListener('click', () => addBlocksLine('block'));
+      taskAdd.addEventListener('click', () => addBlocksLine('task'));
+
     }
     container.appendChild(row);
     const ed =

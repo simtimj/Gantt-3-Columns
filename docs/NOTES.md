@@ -328,3 +328,8 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 
 - Done Log column F `Type` (New / Fix / Tweak). `sheetDoneRows_` adds the header if missing and reads `type: normLogType_(r[5])`; the type is NOT in the row id, so filling it in later never re-adds a line. `doneItemHtml_(…, type)` writes `data-ltype="new|fix|tweak"`; the regroup pass keeps an existing `data-ltype` when the item is gone. `applyDeployedCodeLog_` fills F with `guessLogType_(title)`.
 - Client: `logTypeOf(line)` = `data-ltype`, else a wording guess (same regexes as `guessLogType_`: fix words first, then new, then tweak) only for `data-cid` lines. `logTypeBuckets(lines,label)` → New / Fixes / Tweaks / Other, or null if nothing is typed (then the old single summary shows). Used by `tsecGroups` / `tsecDrawSum` (`.ts-type` rows) and Day Review `collect` / `draw` (`.dr-type`, counts in the group summary). Display only; saved order unchanged (option 2, subheadings that reorder the cell, was not picked).
+
+## Pinned Reference cards (2026-11-04, Julius)
+
+- Server: script property `refPinned` (JSON id list); `getRefPins_()` goes out as `refPins` in `getWorkspaceData`; `setReferencePin(id,on)` (script lock) returns the new list. Not in the Reference sheet, so pinning never rewrites a card or touches its hash.
+- Client: `refPins` Set (set in `applyWorkspaceData`); `sortedReferenceItems` puts pinned first in every sort mode (siblings only, so a pinned child stays in its parent). `.ref-pin` button per card (moves left of Delete while Delete shows), `.ref-pinned` tint. Optimistic toggle, reverted on failure. Other open devices pick pins up on their next load.

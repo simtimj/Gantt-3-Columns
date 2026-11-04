@@ -49,6 +49,7 @@ Last updated: 2026-11-04
 
 ## 🧪 To be confirmed (2026-11-04)
 
+- **📌 Pin Reference cards**: tap the faint 📌 at the top right of a card to pin it; pinned cards stay at the top (in every sort mode) with a soft tint. Pins are saved on the server, so they're the same on phone and Mac. Tap again to unpin.
 - **Always a Next Block**: today's and later days' Blocks always end with a **Next Block** (title plus an empty task cell). It comes back by itself after Activate or Remove. A line across Blocks sets it apart from what's above.
 - **Enter on a block title** makes a task cell under it, checkbox included. Backspace on the checkbox if you want a plain line instead.
 - **Day Review cells**: each finished line is its own small cell, main point in bold and details muted, two lines max; tap a cell to see all of it.
@@ -467,6 +468,7 @@ Last updated: 2026-11-04
 - `donelog.js` — work done through Claude (`CLAUDE_DONE`), merged into each day's Today cell.
 - `Index.html` — the whole client UI (styles + script).
 - `appsscript.json` — Apps Script manifest.
+- `tools/check.mjs` — syntax check of everything clasp pushes; the deploy runs it first and stops on an error. `tools/smoke.mjs` — loads the page headless with sample data (desktop + phone) and reports page errors. `.mjs` so clasp never pushes them.
 
 
 

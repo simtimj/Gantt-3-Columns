@@ -135,6 +135,7 @@ function getWorkspaceData() {
     urgent: getUrgentDays_(),
     inbox: (function () { try { return getInbox(); } catch (e) { return []; } })(),
     cardCats: getCardCats_(),
+    refPins: getRefPins_(),
     notesSeeds: getNotesSeeds_(today),
     today: today
   };
@@ -603,6 +604,25 @@ function findDayRow_(sheet, dateString) {
 /* =========================================================
    REFERENCE
    ========================================================= */
+
+/* Pinned Reference cards (2026-11-04, Julius): ids in script property refPinned, so pins follow him across
+   devices. Pinned cards sort to the top in every sort mode (Index.html sortedReferenceItems). */
+function getRefPins_() {
+  try { const v = JSON.parse(PropertiesService.getScriptProperties().getProperty('refPinned') || '[]'); return Array.isArray(v) ? v.map(String) : []; }
+  catch (e) { return []; }
+}
+function setReferencePin(id, on) {
+  id = String(id || '');
+  if (!id) return getRefPins_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const list = getRefPins_().filter(x => x !== id);
+    if (on) list.unshift(id);
+    PropertiesService.getScriptProperties().setProperty('refPinned', JSON.stringify(list.slice(0, 200)));
+    return list;
+  } finally { lock.releaseLock(); }
+}
 
 function getReference_() {
   const sheet = getOrCreateSheet_('Reference', REF_HEADERS);

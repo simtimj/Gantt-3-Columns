@@ -18,6 +18,10 @@ jobs:
         with:
           node-version: 20
 
+      # Stops the deploy if any pushed script has a syntax error (2026-11-04).
+      - name: Syntax check
+        run: node tools/check.mjs
+
       - name: Install clasp
         run: npm install -g @google/clasp@3.4.1
 

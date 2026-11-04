@@ -6,6 +6,8 @@
 - Files: `Code.gs` (server), `Index.html` (all UI), `WeekdayIcons.html` (header icons, base64), `appsscript.json`.
 - **Keep this file short** (Julius 2026-10-31). Detailed feature notes live in `docs/NOTES.md`; open only the section you need (`grep -n "^## " docs/NOTES.md`, then read that range). New feature notes go there, not here.
 - Julius's words (2026-11-01): **task cell** = a task line / card; **urgency cell** = the Urgent area; **reference cell** = a Reference card.
+- **Before every push**: `node tools/check.mjs && node tools/smoke.mjs` (syntax + headless load, desktop and phone). Don't rebuild a test harness; extend `tools/smoke.mjs`.
+- **Reference cards** (Julius 2026-11-04): a one-line "How to use" at the top, sections, short `<b>Name</b>: details` lines, done items out of the list, machine-only notes under a bottom `🔒 DB — don't touch` heading. Back up the old HTML to the Backup tab (copyPaste, then check `=E=…`) before a rewrite. Over ~8k characters → condense.
 - Be token-lean: if a request is vague, ask Julius a short clarifying question before digging through `Index.html` (~9.8k lines); grep for the function/section instead of reading whole files.
 
 ## Central Data Hub card (2026-10-29, Julius: permanent rule)
@@ -70,3 +72,4 @@
 - Center Up / Down + planning pause (2026-11-01, Julius: spec, PENDING)
 - Drag into Blocks + block borders (2026-11-04, Julius)
 - History log types (2026-11-04, Julius: option 1)
+- Pinned Reference cards (2026-11-04, Julius)

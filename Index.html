@@ -667,6 +667,12 @@
     .ref-cell-wrapper:focus-within{
       box-shadow:inset 2px 0 0 var(--accent);
     }
+    /* Pin (2026-11-04, Julius): faint until pinned; pinned cards get a soft accent tint. */
+    .ref-pin{position:absolute;right:2px;top:calc(6px * var(--pad-y,1) * var(--ref-pad-y,1));border:0;background:transparent;padding:2px 3px;font-size:12px;line-height:1;cursor:pointer;z-index:4;opacity:.22;filter:grayscale(1);}
+    .ref-pinned > .ref-pin{opacity:1;filter:none;}
+    .ref-cell-wrapper:hover:not(:has(.ref-children .ref-cell-wrapper:hover)) > .ref-pin,.ref-cell-wrapper:has(> .ref-cell:focus) > .ref-pin{right:72px;} /* clear of Delete */
+    #referenceTree .ref-cell-wrapper.ref-pinned{background:color-mix(in srgb,var(--accent,#1a73e8) 7%,transparent);}
+    .ref-cell-wrapper > .ref-cell > :first-child{padding-right:20px;}
     .ref-drag{position:absolute;left:18px;top:8px;width:18px;height:27px;border:0;background:transparent;color:#777;cursor:grab;touch-action:none;z-index:4;font-size:18px;}
     .ref-drag:active{cursor:grabbing;}
     .ref-drop-before{box-shadow:inset 0 3px #1a73e8!important;}
@@ -2490,6 +2496,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     state = data;
     (state.days || []).forEach(d => fwSetDayBase(d, true));
     (state.reference || []).forEach(refBase);
+    refPins = new Set((data.refPins || []).map(String));
     fwLastSync = Date.now();
     if(state.today && Array.isArray(state.days)){
       const from=addDays(state.today,-7),to=addDays(state.today,3);
@@ -5565,8 +5572,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const title = wrapper.querySelector('h2,h1,h3,p,div') || wrapper;
     return (title.textContent || item.title || '').trim();
   }
+  // Pinned cards first in every sort mode (2026-11-04, Julius); ids come from the server (getRefPins_).
+  let refPins = new Set();
   function sortedReferenceItems(){
     return [...state.reference].sort((a,b) => {
+      const pa = refPins.has(String(a.id)), pb = refPins.has(String(b.id));
+      if(pa !== pb) return pa ? -1 : 1;
       if(referenceSortMode === 'title'){
         const order = referenceCollator.compare(referenceTitle(a),referenceTitle(b));
         if(order) return order;
@@ -5792,12 +5803,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         'div'
       );
     wrap.className =
-      'ref-cell-wrapper' + (item.expanded === false ? ' ref-collapsed' : '');
+      'ref-cell-wrapper' + (item.expanded === false ? ' ref-collapsed' : '') + (refPins.has(String(item.id)) ? ' ref-pinned' : '');
     wrap.dataset.id =
       item.id;
     wrap.innerHTML =
       `<button class="ref-disclosure" type="button" data-toggle title="Expand/collapse reference cell">${item.expanded === false ? '▸' : '▾'}</button>
       <button class="ref-drag" type="button" aria-label="Drag to reorder reference cell" title="Drag to reorder">⠿</button>
+      <button class="ref-pin" type="button" data-pin aria-label="Pin to top" title="Pin to top">📌</button>
       <div
         class="ref-cell"
         contenteditable="true"
@@ -5823,6 +5835,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     wireCodeBlocks(ed);
     wireEditorHistory(ed);
     ed.addEventListener('blur',() => setTimeout(applyReferenceSort,0));
+    // 📌 pins the card to the top of Reference, synced through the server.
+    wrap.querySelector(':scope > [data-pin]').addEventListener('click',e => {
+      e.preventDefault(); e.stopPropagation();
+      const id = String(item.id), on = !refPins.has(id);
+      const apply = v => { if(v) refPins.add(id); else refPins.delete(id); wrap.classList.toggle('ref-pinned',v); applyReferenceSort(); };
+      apply(on);
+      setStatus(on ? 'Pinned to the top' : 'Unpinned');
+      google.script.run
+        .withSuccessHandler(list => { if(Array.isArray(list)){ refPins = new Set(list.map(String)); applyReferenceSort(); } })
+        .withFailureHandler(err => { apply(!on); setStatus('Could not save the pin: ' + (err && err.message || err)); })
+        .setReferencePin(id,on);
+    });
     ed.addEventListener(
       'focus',
       () => {

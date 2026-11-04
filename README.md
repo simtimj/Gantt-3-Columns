@@ -49,6 +49,10 @@ Last updated: 2026-11-04
 
 ## 🧪 To be confirmed (2026-11-04)
 
+- **Blocks hierarchy:** indent/outdent and up/down actions now move the selected parent with contiguous deeper-indented descendants. This is editor-line hierarchy, not a new Sheet schema; drag handles and true arbitrary nesting remain to be implemented.
+- **Keep In Mind:** long-press fold arrow now exposes prompt-based rename, category color, reorder, add task, and collapse actions. Category colors persist in Focus data. Needs usability refinement; no claim of completed custom menu.
+
+
 - **Reference header:** Urgent live counts now render beneath the Reference title, instead of taking their own row in the upper panel. Needs mobile visual confirmation.
 - **Blocks editing:** adds toolbar indent/outdent and up/down controls for selected top-level Plan lines. Hierarchical parent-child movement and true nested block persistence are not complete.
 

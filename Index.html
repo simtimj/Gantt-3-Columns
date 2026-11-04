@@ -1564,6 +1564,19 @@
       #centerCalendarList .ce-event{padding:9px 10px;}
       .ce-head [data-ce-refresh]{width:28px;height:28px;min-width:28px;min-height:28px;}
     }
+    /* Phone-only Cal Events typography: keep desktop Options sizing unchanged. */
+    @media(max-width:600px){
+      #centerCalendarList .ce-group,
+      #centerCalendarList .ce-date,
+      #centerCalendarList .ce-empty,
+      #centerCalendarList .ce-event,
+      #centerCalendarList .ce-event .ce-title,
+      #centerCalendarList .ce-event .ce-time{
+        font-size:calc(var(--paragraph-size) * .82);
+        font-family:var(--paragraph-font);
+      }
+      #centerCalendarList .ce-event{line-height:1.25;}
+    }
     /* Keep the calendar heading left-aligned and its refresh action truly compact. */
     #centerDownScroll{container-type:inline-size;}
     #centerDownScroll .ce-head{display:flex;flex-wrap:nowrap;justify-content:space-between;align-items:center;width:100%;gap:6px;}

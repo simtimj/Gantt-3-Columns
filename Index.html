@@ -1556,6 +1556,19 @@
       #centerCalendarList .ce-date-long{display:none;}
       #centerCalendarList .ce-date-short{display:inline;}
     }
+    /* Calendar follows the same Options font and padding controls as editable cells. */
+    #centerDownScroll{padding-inline:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--side-k,1));font-family:var(--paragraph-font);font-size:var(--paragraph-size);line-height:1.18;}
+    #centerDownScroll .ce-head{gap:calc(4px * var(--pad-x,1));margin-bottom:calc(3px * var(--pad-y,1));}
+    #centerDownScroll .ce-head strong{font:inherit;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #centerCalendarList{font:inherit;line-height:inherit;}
+    #centerCalendarList .ce-date,#centerCalendarList .ce-group,#centerCalendarList .ce-event,#centerCalendarList .ce-time,#centerCalendarList .ce-title{font-family:inherit;font-size:inherit;line-height:inherit;}
+    #centerCalendarList .ce-date{margin:calc(2px * var(--pad-y,1)) 0;}
+    #centerCalendarList .ce-group{margin:calc(5px * var(--pad-y,1)) 0 calc(2px * var(--pad-y,1));}
+    #centerCalendarList .ce-event{margin:calc(2px * var(--pad-y,1)) 0;padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}
+    #centerCalendarList .ce-scheduled{margin:calc(2px * var(--pad-y,1)) 0;}
+    #centerCalendarList .ce-title{margin-top:calc(1px * var(--pad-y,1));}
+    #centerDownScroll .ce-head [data-ce-refresh]{font-size:12px;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;max-width:22px;max-height:22px;}
+    @media(max-width:600px){#centerDownScroll{padding-inline:calc(8px * var(--pad-x,1) * var(--side-k,1));}#centerCalendarList .ce-event{padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}}
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
@@ -1968,7 +1981,7 @@
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
       <div class="scroll notes-review" id="reviewScroll"></div>
       <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
-      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Calendar Events</strong><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
+      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
     <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
     <section

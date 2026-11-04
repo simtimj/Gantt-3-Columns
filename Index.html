@@ -9822,7 +9822,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Subtle + border line (2026-11-03, Julius): same tint, card outline in a brighter subject color. */
   body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 65%,#fff);border-left-width:1.5px;border-right-width:1.5px;}
   body.tc-subtleline .check-line[data-tccat][data-tc^="f"]{border-top-width:1.5px;}
-  body.tc-subtleline .plan-pad .check-line[data-tccat][data-tc]{border-color:var(--tc-bd)!important;}
+  body.tc-subtleline .check-line[data-tccat][data-tc],body.tc-subtleline .plan-pad .check-line[data-tccat][data-tc]{border-color:var(--tc-bd)!important;} /* beats Quiet cards */
   /* Urgent rows become cells in this mode (2026-11-04, Julius). */
   body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);border:1.5px solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
   body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1.5px;}

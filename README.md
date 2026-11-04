@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 ## Status key
 
@@ -46,6 +46,10 @@ Last updated: 2026-11-03
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-04)
+
+- **Keep In Mind heading contrast:** lighter blue heading text and underline (#70baff), awaiting live phone confirmation. This is a visual-only change; other Keep In Mind redesign requests and Blocks are not yet implemented.
 
 ## 🧪 To be confirmed (2026-11-03)
 

@@ -5116,15 +5116,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.addEventListener('input',later,true);
   })();
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
-  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus'];
+  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus','data-blk'];
   function cardCleanHtml(el){
-    if(!el.querySelector('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
+    if(!el.querySelector('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
     c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid','data-tlsum'].forEach(a => n.removeAttribute(a)));
     c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
-    c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
   }
   function saveDay(date){
@@ -9296,7 +9296,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       }
     }
     // Reference task → Plan / think of the selected day, as a linked mirror (2026-11-01).
-    if(window.tidMenuRow && !isCal) try{ tidMenuRow(p,line,owner); }catch(err){}
+    // Mirror in Blocks (2026-11-04, Julius): every section's tasks, Cal Events as a copy.
+    if(window.tidMenuRow) try{ tidMenuRow(p,line,owner,isCal); }catch(err){}
     // Delete the task + its subtasks (2026-10-27, Julius) — every checkbox, all columns.
     if(!isCal){
       const n = urgSubtree(line).length - 1;
@@ -10334,6 +10335,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       setAttr(n,'data-tccat',p.cat);
     });
     if(refreshTitleLines(ed)) changed = true;
+    if(ed.classList.contains('plan-pad') && window.blkPaint) blkPaint(ed);
     if(ed.classList.contains('day-editor')) updateDash();
     // Card edges add a little height; keep the day row fitted.
     if(changed && ed.dataset.date && typeof syncDayHeightStable === 'function') requestAnimationFrame(() => syncDayHeightStable(ed.dataset.date));
@@ -11104,6 +11106,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(t.closest('#tcGrip,input,button,a,select,textarea,label,[data-tlhid],.urg-box,.di-box,.inbox-box,.urg-fold,.urg-meta,.di-from,#inboxPanel')) return null;
       const act = document.activeElement;
       const typing = root => !!(root && act && (act === root || root.contains(act)) && root.getAttribute('inputmode') !== 'none');
+      // Cal Events row (2026-11-04, Julius): hold its text, then drag a copy into Blocks or any cell.
+      const ce = t.closest('#centerCalendarList .ce-event');
+      if(ce) return ce.matches('[data-ce-editing]') || ce.querySelector('[data-ce-editing]') ? null : {cal:ce,mark:ce};
       const copy = t.closest('#urgentPanel .urg-text, .due-notes .di-text');
       if(copy){
         if(typing(copy)) return null;
@@ -11133,6 +11138,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     function holdReady(){
       const h = hold;
       if(!h) return;
+      if(h.cal){
+        h.ready = true;
+        document.body.classList.add('urg-pressing');
+        try{ const sel = window.getSelection(); if(sel) sel.removeAllRanges(); }catch(err){}
+        h.mark.classList.add('tc-holdready');
+        if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
+        press = {cb:h.el,cal:h.cal,x:h.x,y:h.y,id:h.id,grip:true,hold:true};
+        return;
+      }
       let line = h.line, ed = h.ed;
       if(h.copy){
         const src = typeof dueSource === 'function' ? dueSource(h.copy) : null;
@@ -11159,6 +11173,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
     function begin(e){
       if(press.inbox) return beginInbox(e);
+      if(press.cal) return beginCal(e);
       const {line,ed} = press;
       if(hold){ clearTimeout(hold.timer); if(hold.mark) hold.mark.classList.remove('tc-holdready'); hold.ready = false; hold = null; }
       const nodes = block(line);
@@ -11212,6 +11227,47 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       press = null;
       move(e);
       drag.raf = requestAnimationFrame(autoScroll);
+    }
+    // Cal Events → a plain task copy with the event's title; the event itself is never changed.
+    function beginCal(e){
+      const row = press.cal;
+      if(hold){ clearTimeout(hold.timer); if(hold.mark) hold.mark.classList.remove('tc-holdready'); hold.ready = false; hold = null; }
+      if(typeof hideUrgencyPicker === 'function') hideUrgencyPicker();
+      try{ urgPress && clearTimeout(urgPress.timer); urgPress = null; }catch(err){}
+      try{ document.activeElement && document.activeElement.blur && document.activeElement.blur(); }catch(err){}
+      window.getSelection && window.getSelection().removeAllRanges();
+      const line = window.calTaskLine ? calTaskLine(row) : null;
+      if(!line){ press = null; return; }
+      const r = row.getBoundingClientRect();
+      const ghost = document.createElement('div');
+      ghost.className = 'tc-ghost';
+      ghost.style.width = Math.min(Math.max(r.width,160),window.innerWidth - 12) + 'px';
+      const g = line.cloneNode(true); g.setAttribute('data-tc','fl'); g.setAttribute('data-tchead','0');
+      ghost.appendChild(g);
+      document.body.appendChild(ghost);
+      const ind = document.createElement('div'); ind.className = 'tc-drop'; ind.hidden = true; document.body.appendChild(ind);
+      document.body.classList.add('tc-dragging');
+      grip.hidden = true;
+      if(navigator.vibrate) try{ navigator.vibrate(10); }catch(err){}
+      drag = {nodes:[line],cal:row,src:null,line,ghost,ind,offX:e.clientX - r.left,offY:e.clientY - r.top,x0:e.clientX,x:e.clientX,y:e.clientY,base:0,target:null};
+      try{ press.cb.setPointerCapture(press.id); }catch(err){}
+      press = null;
+      move(e);
+      drag.raf = requestAnimationFrame(autoScroll);
+    }
+    function finishCal(d,t){
+      if(!t || t.retag || t.row || !t.ed) return;
+      const line = d.line;
+      line.dataset.level = String(t.level);
+      line.style.marginLeft = t.level ? (t.level * 24) + 'px' : '';
+      captureBeforeEdit(t.ed);
+      const blank = !t.ed.textContent.trim() && !t.ed.querySelector('input,img,hr');
+      if(blank && !t.ed.classList.contains('ref-cell')) t.ed.replaceChildren(line);
+      else if(t.before) t.ed.insertBefore(line,t.before); else t.ed.appendChild(line);
+      refreshCards(t.ed); finishEditorEdit(t.ed); urgChanged(t.ed);
+      line.classList.add('urg-flash');
+      setTimeout(() => line.classList.remove('urg-flash'),1400);
+      setStatus(t.ed.classList.contains('plan-pad') ? 'Copied to Blocks' : 'Event copied as a task');
     }
     function finishInbox(d,t){
       if(d.row) d.row.classList.remove('inbox-dragging');
@@ -11384,6 +11440,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       suppressUntil = Date.now() + 450;
       const t = cancelled ? null : d.target;
       if(d.inbox) return finishInbox(d,t);
+      if(d.cal) return finishCal(d,t);
       if(!t) return;
       if(t.retag){
         if(d.nodes.every(n => n.dataset.urg === t.urg)) return;
@@ -11394,6 +11451,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         return;
       }
       const shift = t.level - d.base;
+      // Into Blocks from any other section (2026-11-04, Julius): a linked copy (mirror), the original stays put.
+      if(!t.row && t.ed !== d.src && t.ed.classList.contains('plan-pad') && window.tidMirror){ tidMirror(d.nodes,d.src,t.ed,t.before,shift); return; }
       const samePlace = t.ed === d.src && shift === 0 && (t.before === d.nodes[d.nodes.length - 1].nextElementSibling);
       const urgSame = !t.urg || d.nodes.every(n => n.dataset.urg === t.urg);
       if(samePlace && urgSame) return;
@@ -12069,42 +12128,144 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
     if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded',watch); else watch();
 
-    function sendToToday(line,owner){
-      const date = window.odDate || (typeof state !== 'undefined' && state.today) || localToday();
-      const pad = urgEditor(date,'plan');
-      if(!pad){ setStatus('That day isn’t loaded — open it, then try again'); return; }
-      if(isOn(line)){ setStatus('That task is done — untick it first'); return; }
-      let tid = line.dataset.tid;
-      // No id yet, or a stray duplicate in the same cell → a fresh stable id, saved with the cell.
-      if(!tid || owner.querySelectorAll('.check-line[data-tid=' + q(tid) + ']').length > 1)
-        edit(owner,() => { line.dataset.tid = tid = newTid(); });
-      const have = pad.querySelector('.check-line[data-tid=' + q(tid) + ']');
+    /* Mirror in Blocks (2026-11-04, Julius). Tasks from any section (Today, Notes, Dailies, Reference,
+       Scratch Pad, Urgent, Due) land in the Blocks pad of the day shown as linked copies: same data-tid, so a
+       tick on either side ticks both. The original never moves. Done lines are skipped. Cal Events have no
+       cell to link to, so they come over as a plain copy of the title (calTaskLine). */
+    const blocksPad = () => urgEditor(window.odDate || todayStr(),'plan');
+    window.tidMirror = function(nodes,src,pad,before,shift){
+      pad = pad || blocksPad();
+      if(!pad){ setStatus('Blocks isn’t loaded — open that day, then try again'); return false; }
+      const head = nodes && nodes[0];
+      if(!head || !src) return false;
+      if(isOn(head)){ setStatus('That task is done — untick it first'); return false; }
+      const live = nodes.filter(n => n.classList && n.classList.contains('check-line') && !isOn(n));
+      // No id yet, or a stray duplicate in the same cell → a fresh stable id, saved with the source cell.
+      const need = live.filter(n => !n.dataset.tid || src.querySelectorAll('.check-line[data-tid=' + q(n.dataset.tid) + ']').length > 1);
+      if(need.length) edit(src,() => need.forEach(n => { n.dataset.tid = newTid(); }));
+      const have = pad.querySelector('.check-line[data-tid=' + q(head.dataset.tid) + ']');
       if(have){
-        setStatus('Already in Plan / think for ' + shortDate(date));
+        setStatus('Already in Blocks');
         have.classList.add('urg-flash'); setTimeout(() => have.classList.remove('urg-flash'),1300);
-        return;
+        return false;
       }
+      const lvl = n => Math.max(0,Math.min(6,Math.floor(Number(n.dataset.level) || 0)));
+      const made = live.filter(n => !pad.querySelector('.check-line[data-tid=' + q(n.dataset.tid) + ']')).map(n => {
+        const c = createCheckboxLine(Math.max(0,Math.min(6,lvl(n) + (shift || 0))));
+        c.dataset.tid = n.dataset.tid;
+        if(n.dataset.cat) c.dataset.cat = n.dataset.cat;
+        const tx = n.querySelector(':scope > .check-text') || n.querySelector('.check-text');
+        c.querySelector('.check-text').innerHTML = tx && tx.textContent.trim() ? tx.innerHTML : '<br>';
+        return c;
+      });
+      edit(pad,() => {
+        if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren();
+        if(before && before.parentElement !== pad) before = null;
+        made.forEach(c => { if(before) pad.insertBefore(c,before); else pad.appendChild(c); });
+      });
+      if(typeof refreshCards === 'function') refreshCards(pad);
+      made[0].classList.add('urg-flash'); setTimeout(() => made[0].classList.remove('urg-flash'),1400);
+      setStatus('Mirrored in Blocks' + (made.length > 1 ? ' (with ' + (made.length - 1) + ' subtask' + (made.length > 2 ? 's' : '') + ')' : ''));
+      return true;
+    };
+    window.calTaskLine = function(row){
+      const title = row && (row.dataset.ceTitle || (row.querySelector('.ce-title') || {}).textContent || '').trim();
+      if(!title) return null;
       const n = createCheckboxLine(0);
-      n.dataset.tid = tid;
-      if(line.dataset.cat) n.dataset.cat = line.dataset.cat;
-      const src = line.querySelector('.check-text');
-      n.querySelector('.check-text').innerHTML = src && src.textContent.trim() ? src.innerHTML : '<br>';
+      n.querySelector('.check-text').textContent = title;
+      if(row.dataset.cat && row.dataset.cat !== 'none') n.dataset.cat = row.dataset.cat;
+      return n;
+    };
+    function calToBlocks(row){
+      const pad = blocksPad();
+      if(!pad){ setStatus('Blocks isn’t loaded — open that day, then try again'); return; }
+      const n = calTaskLine(row); if(!n) return;
       edit(pad,() => {
         if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren();
         pad.appendChild(n);
       });
-      setStatus('Sent to Plan / think · ' + shortDate(date));
+      if(typeof refreshCards === 'function') refreshCards(pad);
+      n.classList.add('urg-flash'); setTimeout(() => n.classList.remove('urg-flash'),1400);
+      setStatus('Copied to Blocks');
     }
-    // Hold-menu button, Reference tasks only (Backlog is a Reference cell too).
-    window.tidMenuRow = function(p,line,owner){
-      if(!owner || !owner.classList || !owner.classList.contains('ref-cell')) return;
+    // Hold-menu button on every task outside Blocks (2026-11-04, Julius); replaces Reference's Send to Today.
+    window.tidMenuRow = function(p,line,owner,isCal){
+      if(!isCal && (!owner || !owner.classList || owner.classList.contains('plan-pad'))) return;
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'urg-goto'; b.textContent = '📌 Send to Today (Plan / think)';
+      b.type = 'button'; b.className = 'urg-goto'; b.textContent = isCal ? '🧱 Copy to Blocks' : '🧱 Mirror in Blocks';
       b.addEventListener('pointerdown',e => e.preventDefault());
-      b.addEventListener('click',() => { hideUrgencyPicker(); sendToToday(line,owner); });
+      b.addEventListener('click',() => {
+        hideUrgencyPicker();
+        if(isCal) calToBlocks(line);
+        else window.tidMirror(urgSubtree(line),owner,null,null,-(Number(line.dataset.level) || 0));
+      });
       p.appendChild(b);
     };
   })();
+</script>
+<style>
+  /* Block borders (2026-11-04, Julius): see the script below. */
+  .plan-pad{position:relative;}
+  .plan-pad > [data-blk]{position:relative;left:7px;margin-right:14px;}
+  .plan-pad > [data-blk^="f"]{margin-top:9px;}
+  .plan-pad > [data-blk$="l"],.plan-pad > .check-line[data-blk$="l"]{margin-bottom:10px;}
+</style>
+<script>
+/* Block borders (2026-11-04, Julius): each block in Blocks (its title line plus the task cells under it, down
+   to the next title or an empty line) sits inside one rounded border, so it's clear what a block contains.
+   Next Block placeholders get a dashed yellow border, so the next block stands out. Render-only: the border is
+   an SVG background on the pad (scrolls with it) and data-blk is stripped before saving (cardCleanHtml). */
+(function(){
+  const isTitle = n => n.hasAttribute('data-title');
+  const isBlank = n => !n.classList.contains('check-line') && !n.textContent.trim() && !n.querySelector('input,img,hr');
+  function groups(pad){
+    const out = []; let cur = null;
+    for(const n of pad.children){
+      if(isTitle(n)){ cur = [n]; out.push(cur); continue; }
+      if(!cur) continue;
+      if(isBlank(n)){ cur = null; continue; }
+      cur.push(n);
+    }
+    return out;
+  }
+  const pending = new Set();
+  function draw(pad){
+    if(!pad.isConnected) return;
+    const gs = groups(pad);
+    const W = pad.clientWidth, H = pad.scrollHeight;
+    if(!gs.length || !W){ pad.style.removeProperty('background-image'); return; }
+    const ink = getComputedStyle(pad).color || '#888';
+    let rects = '';
+    gs.forEach(g => {
+      const vis = g.filter(n => n.offsetParent !== null);
+      if(!vis.length) return;
+      const first = vis[0], last = vis[vis.length - 1];
+      const top = first.offsetTop - 5, bottom = last.offsetTop + last.offsetHeight + 4;
+      const next = /^next block\b/i.test((first.textContent || '').trim());
+      rects += '<rect x="2" y="' + (top + .75) + '" width="' + Math.max(10,W - 4) + '" height="' + Math.max(10,bottom - top - 1.5) + '" rx="8" fill="none" stroke="' +
+        (next ? '#f0b000' : ink) + '" stroke-opacity="' + (next ? '.9' : '.45') + '" stroke-width="1.5"' + (next ? ' stroke-dasharray="6 4"' : '') + '/>';
+    });
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
+    Object.assign(pad.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',
+      backgroundAttachment:'local',backgroundSize:W + 'px ' + H + 'px',backgroundPosition:'0 0'});
+  }
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => schedule(e.target))) : null;
+  function schedule(pad){
+    if(pending.has(pad)) return;
+    pending.add(pad);
+    requestAnimationFrame(() => { pending.delete(pad); try{ draw(pad); }catch(e){} });
+  }
+  // Called from refreshCards for the Blocks pad.
+  window.blkPaint = function(pad){
+    const want = new Map();
+    groups(pad).forEach(g => g.forEach((n,i) => want.set(n,(i === 0 ? 'f' : 'm') + (i === g.length - 1 ? 'l' : ''))));
+    pad.querySelectorAll(':scope > [data-blk]').forEach(n => { if(!want.has(n)) n.removeAttribute('data-blk'); });
+    want.forEach((v,n) => { if(n.getAttribute('data-blk') !== v) n.setAttribute('data-blk',v); });
+    if(ro && !pad._blkRO){ pad._blkRO = true; ro.observe(pad); }
+    schedule(pad);
+  };
+  document.addEventListener('input',e => { const pad = e.target && e.target.closest && e.target.closest('.plan-pad'); if(pad) window.blkPaint(pad); },true);
+})();
 </script>
 <script>
 /* Long-press section labels to expand the original pane; tap backdrop to restore. */

@@ -67,3 +67,4 @@
 - Edge grips (2026-11-01, Julius)
 - Task mirrors (2026-11-01, Julius: spec phase 1)
 - Center Up / Down + planning pause (2026-11-01, Julius: spec, PENDING)
+- Drag into Blocks + block borders (2026-11-04, Julius)

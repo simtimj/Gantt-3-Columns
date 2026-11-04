@@ -311,3 +311,10 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - `addAllDayTask(date, title)` in Code.gs creates an all-day event on `EVENT_CALENDARS[0]`, color 5 (yellow = open).
 - The All-Day Tasks heading now always shows, so the button is there on empty days. `ceAdd` holds the box state outside the list, so a redraw keeps typed text.
 - The event goes on `ceShownDate`, the day the list is showing.
+
+## Drag into Blocks + block borders (2026-11-04, Julius)
+
+- Drop into Blocks: in the drag IIFE, `finish()` sends a drop whose target is a `.plan-pad` that isn't the source to `window.tidMirror(nodes,src,pad,before,shift)` (Task mirrors block) instead of moving. It gives source lines a `data-tid` if missing, copies only the check-text and `data-cat` (no urg/due/rep, so Urgent doesn't list it twice), skips done lines and refuses a done head. One copy per tid per pad. Dailies carry-forward already strips `data-tid`, so mirroring a Daily never links across days.
+- Cal Events: `holdTarget` accepts `#centerCalendarList .ce-event` (not while a title is being edited) → `beginCal`/`finishCal`; the line comes from `calTaskLine(row)` (title + `data-cat`, no link to the event). It can drop into any cell, not just Blocks.
+- Hold menu: `tidMenuRow(p,line,owner,isCal)` now runs for every owner except the Blocks pad itself: **🧱 Mirror in Blocks** (subtree, appended at the end of `urgEditor(odDate,'plan')`) or **🧱 Copy to Blocks** for Cal. The old `sendToToday` is gone.
+- Borders: `blkPaint(pad)` (called at the end of `refreshCards` for `.plan-pad`, and on pad input) sets render-only `data-blk` = f / m / l / fl, using the same grouping as `blockGroup` (title down to the next title or blank line). `data-blk` is in `CARD_ATTRS`, so `cardCleanHtml` strips it. The border itself is an SVG data-URL `background-image` on the pad (`background-attachment:local`, so it scrolls with the content), redrawn on resize. Stroke = pad text color at 45%; a `Next Block…` title = dashed `#f0b000`.

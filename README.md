@@ -49,6 +49,9 @@ Last updated: 2026-11-04
 
 ## 🧪 To be confirmed (2026-11-04)
 
+- **Blocks first pass:** bottom-left former Plan / think area is relabeled Blocks with + Block and + Task actions. It reuses the existing Days Plan column, rich-text editor and save path, preserving existing Plan contents. Block grouping and task checkbox conversion need live validation; dedicated block-level nesting/reordering controls and reusable templates are not implemented yet.
+
+
 - **Keep In Mind heading contrast:** lighter blue heading text and underline (#70baff), awaiting live phone confirmation. This is a visual-only change; other Keep In Mind redesign requests and Blocks are not yet implemented.
 
 ## 🧪 To be confirmed (2026-11-03)

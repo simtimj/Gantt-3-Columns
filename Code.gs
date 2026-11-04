@@ -347,6 +347,41 @@ function savePlanPad(dateString, html, baseHash) {
   }
 }
 
+/* Daily Scratch Pad (2026-11-03, Julius): one free-writing pad per day, Days column E. Loaded on demand.
+   Safe save like savePlanPad: the server copy comes back if it changed since the app read it. */
+function ensureScratchCol_(sheet) {
+  if (sheet.getMaxColumns() < 5) sheet.insertColumnsAfter(sheet.getMaxColumns(), 5 - sheet.getMaxColumns());
+  if (!sheet.getRange(1, 5).getValue()) sheet.getRange(1, 5).setValue('Scratch');
+}
+function getScratchPad(dateString) {
+  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+  ensureScratchCol_(sheet);
+  const row = findDayRow_(sheet, dateString);
+  const html = row ? String(sheet.getRange(row, 5).getValue() || '') : '';
+  return { html: html, h: cellHash_(html) };
+}
+function saveScratchPad(dateString, html, baseHash) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    ensureScratchCol_(sheet);
+    let row = findDayRow_(sheet, dateString);
+    const cur = row ? String(sheet.getRange(row, 5).getValue() || '') : '';
+    html = String(html || '');
+    if (baseHash && cellHash_(cur) !== baseHash) return { conflict: true, html: cur, h: cellHash_(cur) };
+    if (cur.length > 400 && html.length < cur.length * 0.6) backupCell_(dateString, 'Scratch', 'big shrink', cur);
+    if (!row) {
+      sheet.appendRow([parseDate_(dateString), '', '']);
+      row = sheet.getLastRow();
+    }
+    sheet.getRange(row, 5).setValue(html);
+    return { h: cellHash_(html) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // One column of a safe save. baseHash = version the app started from (null = it had no row).
 function syncCol_(cur, mine, baseHash, changed, where, label, baseText) {
   // No hash yet (a cell made in that tab): compare against the text it was made with (2026-10-31).

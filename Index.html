@@ -561,18 +561,15 @@
     .center-tabs button[data-ctab="weather"]{opacity:.9;}
     .center-tabs button{border:0;background:transparent;font-size:12px;line-height:1;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
     .center-tabs button.on{opacity:1;background:color-mix(in srgb,var(--divider) 45%,transparent);}
-    /* Reference tabs + Scratch Pad (2026-11-03, Julius): the pad is one Reference cell shown alone. */
+    /* Reference tabs + daily Scratch Pad (2026-11-03, Julius). */
     .ref-tabs{margin-left:0;flex:0 0 auto;align-self:center;}
-    #referencePane:not([data-rtab="scratch"]) #referenceTree [data-scratch]{display:none!important;}
-    #referencePane[data-rtab="scratch"] #referenceTree > .ref-cell-wrapper:not([data-scratch]),
-    #referencePane[data-rtab="scratch"] #referenceTree > .empty,
+    #scratchPad{display:none;min-height:40vh;padding:4px;outline:none;overflow-wrap:anywhere;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    #scratchPad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
+    #referencePane[data-rtab="scratch"] #scratchPad{display:block;}
+    #referencePane[data-rtab="scratch"] #referenceTree,
     #referencePane[data-rtab="scratch"] #refOptions,
     #referencePane[data-rtab="scratch"] .ref-search,
-    #referencePane[data-rtab="scratch"] .ref-toolbar .btn,
-    #referenceTree [data-scratch] > :is(.ref-disclosure,.ref-drag,.ref-actions,.ref-children),
-    #referenceTree [data-scratch] > .ref-cell > h2:first-child{display:none!important;}
-    #referencePane #referenceTree .ref-cell-wrapper[data-scratch]{margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;}
-    #referenceTree [data-scratch] > .ref-cell{min-height:40vh;padding:4px!important;margin:0!important;border:0!important;background:transparent!important;}
+    #referencePane[data-rtab="scratch"] .ref-toolbar .btn{display:none!important;}
     .center-placeholder{padding:10px 12px;color:var(--muted,#888);font-size:13px;line-height:1.4;}
     #notesSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
     #notesSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
@@ -2169,6 +2166,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           <button class="btn ref-tb-sm" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: sort, collapse, Urgent panel, padding">Options</button>
         </div>
         <div id="referenceTree"></div>
+        <div id="scratchPad" contenteditable="false" spellcheck="true"></div>
       </div>
     </section>
     <div id="referenceEdgeResize" title="Drag to resize Reference column"></div>
@@ -2426,7 +2424,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     { const placeAi = () => typeof tsecPlaceAi === 'function' ? tsecPlaceAi() : setTimeout(placeAi,100); setTimeout(placeAi,0); } // lives in a later <script>
     renderReference();
     applyReferenceCollapseState();
-    if(window.ensureScratch) window.ensureScratch();
+    if(window.scratchShow) window.scratchShow();
     initUrgentSource(data.urgent);
     setInbox(data.inbox);
     if(typeof applyServerCardCats === 'function') applyServerCardCats(data.cardCats); else window.__FW_CARDCATS__ = data.cardCats;
@@ -5715,10 +5713,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         'div'
       );
     wrap.className =
-      'ref-cell-wrapper' + (item.expanded === false && !isScratchItem(item) ? ' ref-collapsed' : '');
+      'ref-cell-wrapper' + (item.expanded === false ? ' ref-collapsed' : '');
     wrap.dataset.id =
       item.id;
-    if(isScratchItem(item)) wrap.dataset.scratch = '1';
     wrap.innerHTML =
       `<button class="ref-disclosure" type="button" data-toggle title="Expand/collapse reference cell">${item.expanded === false ? '▸' : '▾'}</button>
       <button class="ref-drag" type="button" aria-label="Drag to reorder reference cell" title="Drag to reorder">⠿</button>
@@ -6006,7 +6003,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const items = state.reference || [];
     document.querySelectorAll('#referenceTree .ref-cell-wrapper').forEach(w => {
       const item = items.find(x => x.id === w.dataset.id);
-      const collapsed = isScratchItem(item) ? false : item ? item.expanded === false : referenceCollapsed;
+      const collapsed = item ? item.expanded === false : referenceCollapsed;
       w.classList.toggle('ref-collapsed', collapsed);
       const arrow = w.querySelector(':scope > [data-toggle]');
       if(arrow) arrow.textContent = collapsed ? '▸' : '▾';
@@ -6529,7 +6526,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       .forEach(w => {
         const matches =
           !q ||
-          !!w.dataset.scratch ||
           w.innerText
             .toLowerCase()
             .includes(q);
@@ -6732,42 +6728,79 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
   })();
-  /* Reference tabs (2026-11-03, Julius): 📚 Reference cells, 📝 Scratch Pad. Last tab remembered per device.
-     The pad is one Reference row with type "scratch", so it saves and merges like any cell. */
+  /* Reference tabs + daily Scratch Pad (2026-11-03, Julius): 📚 Reference cells, 📝 a pad for the day shown
+     (follows ▲ ▼). Last tab remembered per device. Pad = Days column E, loaded only when shown; saves like
+     the Plan pad (hash check, three-way merge on a conflict, retry, never drop an edit). */
   (function initRefTabs(){
-    const pane = document.getElementById('referencePane');
-    if(!pane) return;
-    let making = false;
-    function ensureScratch(focus){
-      if(pane.dataset.rtab !== 'scratch' || !state || !state.today || making) return;
-      if((state.reference || []).some(isScratchItem)) return;
-      making = true;
-      const content = '<h2>Scratch Pad</h2><p><br></p>';
+    const pane = document.getElementById('referencePane'), ed = document.getElementById('scratchPad');
+    if(!pane || !ed) return;
+    let date = '', base = {c:'',h:null}, timer = 0, dirty = false, sending = false, loadSeq = 0;
+    const cur = () => window.odDate || (typeof state !== 'undefined' && state && state.today) || '';
+    function send(){
+      clearTimeout(timer); timer = 0;
+      if(!dirty || sending || !date) return;
+      const d = date, html = ed.innerHTML;
+      dirty = false; sending = true;
       google.script.run
-        .withFailureHandler(err => { making = false; setStatus('Could not make the Scratch Pad: ' + (err && err.message || err)); })
-        .withSuccessHandler(id => {
-          making = false;
-          const item = {id:id,parentId:'',type:'scratch',title:'Scratch Pad',content:content,expanded:true,sort:Date.now()};
-          item._b = {c:content,h:null};
-          state.reference.push(item);
-          document.querySelector('#referenceTree > .empty')?.remove();
-          const wrap = createReferenceCell(item);
-          sendRefItem(item,() => {},err => setStatus('Save error: ' + err.message));
-          if(focus){ const ed = wrap.querySelector('.ref-cell'); ed.focus(); placeEnd(ed); }
+        .withFailureHandler(err => {
+          sending = false; dirty = true;
+          setStatus('Save error: ' + (err && err.message || err) + ' — retrying');
+          timer = setTimeout(send,5000); // never drop an edit
         })
-        .addReferenceItem('','Scratch Pad',content);
+        .withSuccessHandler(res => {
+          sending = false;
+          if(res && res.conflict){
+            const m = fwMerge3(fwBlocks(base.c),fwBlocks(d === date ? ed.innerHTML : html),fwBlocks(res.html || ''));
+            base = {c:res.html || '',h:res.h};
+            if(d === date){ ed.innerHTML = m.blocks.join(''); dirty = true; setStatus('Merged with changes from elsewhere'); send(); }
+            return;
+          }
+          if(d === date) base = {c:html,h:res && res.h};
+          setStatus('Saved');
+          if(dirty && d === date) send();
+        })
+        .saveScratchPad(d,html,base.h);
     }
-    window.ensureScratch = ensureScratch;
+    function show(force){
+      if(pane.dataset.rtab !== 'scratch') return;
+      const d = cur();
+      if(!d || (d === date && !force)) return;
+      if(dirty || sending){ if(dirty) send(); setTimeout(() => show(force),300); return; }
+      const seq = ++loadSeq;
+      ed.setAttribute('contenteditable','false');
+      if(d !== date) ed.innerHTML = '';
+      date = d;
+      ed.dataset.placeholder = 'Write anything for ' + formatDate(d) + '…';
+      google.script.run
+        .withFailureHandler(err => { if(seq === loadSeq) setStatus('Could not load the Scratch Pad: ' + (err && err.message || err)); })
+        .withSuccessHandler(res => {
+          if(seq !== loadSeq || dirty) return;
+          ed.innerHTML = res.html || '';
+          base = {c:ed.innerHTML,h:res.h};
+          ed.setAttribute('contenteditable','true');
+        })
+        .getScratchPad(d);
+    }
+    window.scratchShow = show;
+    ed.addEventListener('input',() => {
+      if(ed.textContent.trim() === '' && !ed.querySelector('img,input')) ed.innerHTML = ''; // keeps the placeholder
+      dirty = true; setStatus('Unsaved scratch pad…');
+      clearTimeout(timer); timer = setTimeout(send,700);
+    });
+    ed.addEventListener('blur',() => { if(dirty) send(); });
+    document.addEventListener('visibilitychange',() => {
+      if(document.hidden){ if(dirty) send(); } else if(!dirty && !sending) show(true);
+    });
     const set = t => {
       pane.dataset.rtab = t;
       pane.querySelectorAll('.ref-tabs button').forEach(b => b.classList.toggle('on', b.dataset.rtab === t));
       try{ localStorage.setItem('fw.refTab', t); }catch(e){}
+      show();
     };
     let t = 'reference'; try{ t = localStorage.getItem('fw.refTab') || t; }catch(e){}
     set(t === 'scratch' ? t : 'reference');
     pane.querySelector('.ref-tabs')?.addEventListener('click', e => {
-      const b = e.target.closest('button[data-rtab]');
-      if(b){ set(b.dataset.rtab); ensureScratch(true); }
+      const b = e.target.closest('button[data-rtab]'); if(b) set(b.dataset.rtab);
     });
   })();
   /* Focus Tracking dashboard (2026-11-01, Julius: phase 1). Categories → project cards, each with an
@@ -7091,7 +7124,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      aren't for any day yet. They show in Urgent like the rest (pane 'backlog', date 'backlog'). */
   // Renamed "Undated Tasks" (Julius, 2026-11-01); the old "Backlog" title still works.
   const BACKLOG_NAME = 'Undated Tasks';
-  function isScratchItem(item){ return !!item && item.type === 'scratch'; }
   function isBacklogItem(item){ return !!item && /^(backlog|undated tasks)$/i.test(referenceTitle(item)); }
   function backlogItem(){ return (state.reference || []).find(isBacklogItem) || null; }
   function backlogCell(){
@@ -11380,6 +11412,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       refreshPersistentNotes(date);
       if(window.renderFocus) window.renderFocus();
       loadCenterCalendar(date);
+      if(window.scratchShow) window.scratchShow();
       setH();
       [T(),J()].forEach(x => { if(x) x.scrollTop = 0; });
       const lbl = document.getElementById('dateLabel'); if(lbl) lbl.textContent = formatDate(date);

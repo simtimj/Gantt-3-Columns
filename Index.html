@@ -1773,6 +1773,11 @@ body.fw-focus-on .fw-focus-target{position:fixed!important;inset:5vh 5vw!importa
 body.fw-focus-on .fw-focus-target.plan-pad{padding-top:36px!important;}
 body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
 @media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:4vh 3vw!important;width:94vw!important;height:92dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
+
+#centerCalendarList .ce-event{display:flex;align-items:flex-start;gap:7px;}
+#centerCalendarList .ce-check{flex:0 0 auto;width:15px;height:15px;margin:1px 0 0;accent-color:#777;cursor:pointer;}
+#centerCalendarList .ce-event-text{flex:1;min-width:0;}
+#centerCalendarList .ce-check:disabled{opacity:.5;}
 </style>
 <script>
   /* ===== Light / dark toggle, saved per device (Julius, 2026-10-27) =====
@@ -7579,9 +7584,10 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     const draw = data => {
       if(seq !== centerCalendarSeq) return;
       const allDay = data.events.filter(ev => ev.allDay), scheduled = data.events.filter(ev => !ev.allDay);
+      const checkbox = ev => '<input type="checkbox" class="ce-check" data-ce-id="' + esc(ev.id) + '" data-ce-cal="' + esc(ev.calId) + '" data-ce-start="' + ev.start + '"' + (ev.done ? ' checked' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
       box.innerHTML = '' +
-        (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => '<div class="ce-event' + (ev.done ? ' ce-done' : '') + '">' + esc(ev.title) + '</div>').join('') : '') +
-        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => '<div class="ce-event ce-scheduled' + (ev.done ? ' ce-done' : '') + '"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></div>').join('') : '') +
+        (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => '<div class="ce-event' + (ev.done ? ' ce-done' : '') + '">' + checkbox(ev) + '<span class="ce-event-text">' + esc(ev.title) + '</span></div>').join('') : '') +
+        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => '<div class="ce-event ce-scheduled' + (ev.done ? ' ce-done' : '') + '">' + checkbox(ev) + '<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span></div>').join('') : '') +
         (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');
     };
     const cached = centerCalendarCache.get(date);
@@ -7593,6 +7599,17 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       if(seq === centerCalendarSeq) box.textContent = 'Could not load calendar events. Tap refresh to retry.';
     }).getMainCalendarEvents(date);
   }
+  document.addEventListener('change', e => {
+    const cb=e.target.closest?.('#centerCalendarList .ce-check');if(!cb)return;
+    const desired=cb.checked;cb.disabled=true;
+    google.script.run.withSuccessHandler(()=>{
+      cb.disabled=false;cb.closest('.ce-event')?.classList.toggle('ce-done',desired);
+      centerCalendarCache.clear();
+    }).withFailureHandler(err=>{
+      cb.checked=!desired;cb.disabled=false;
+      alert('Could not update calendar event: '+(err?.message||err));
+    }).setCalendarEventDone(cb.dataset.ceCal,cb.dataset.ceId,Number(cb.dataset.ceStart),desired);
+  });
   document.addEventListener('click', e => { if(e.target.closest('[data-ce-refresh]')) loadCenterCalendar(null,true); });
   document.addEventListener('visibilitychange', () => { if(!document.hidden) loadCenterCalendar(); });
   function loadCalendar(){

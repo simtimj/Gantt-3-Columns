@@ -42,13 +42,14 @@ Last updated: 2026-11-04
 - Urgent panel at the top of Reference lists every urgent task from every day, grouped 1/2/3, with its subtasks underneath. Tap a task to jump to it in Today. Panel is collapsible.
 
 **Reference**
-- Cells with a title line and body; collapse/expand each, or all at once with **Ref −/+**.
+- Cells with a title line and body; collapse/expand each, or all at once with the **−/+** in Reference Options (top-bar Ref button removed 2026-11-04).
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-04)
 
+- **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Blocks hierarchy:** indent/outdent and up/down actions now move the selected parent with contiguous deeper-indented descendants. This is editor-line hierarchy, not a new Sheet schema; drag handles and true arbitrary nesting remain to be implemented.
 - **Keep In Mind:** long-press fold arrow now exposes prompt-based rename, category color, reorder, add task, and collapse actions. Category colors persist in Focus data. Needs usability refinement; no claim of completed custom menu.
 

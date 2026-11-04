@@ -1471,9 +1471,11 @@
     .fx-cat{border-left:2px solid var(--fx-category-color,#70baff);padding-left:5px;}
     .fx-cat>.fx-ch .fx-name{color:var(--fx-category-color,#70baff);}
 
-    #referencePane .ref-pane-header{display:flex;flex-direction:column;align-items:stretch;}
-    #referencePane .ref-pane-header .urg-head-row{width:100%;margin-top:2px;}
-    #referencePane .ref-pane-header .urg-head{width:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-align:left;}
+    /* Reference header (2026-11-03, Julius): just the Urgent numbers, always one line; fitUrgCounts() shrinks them to fit. */
+    #referencePane .ref-pane-header{display:flex;align-items:center;padding-left:6px;padding-right:6px;}
+    #referencePane .ref-pane-header .urg-head-row{flex:1;width:100%;min-width:0;margin:0;}
+    #referencePane .ref-pane-header .urg-head{width:100%;display:flex;align-items:center;flex-wrap:nowrap;padding:0;text-align:left;}
+    #referencePane .ref-pane-header .urg-counts{flex:1;min-width:0;margin:0;gap:.45em;overflow:hidden;white-space:nowrap;}
 
     .od-pad-head .blocks-add,.od-pad-head .blocks-task{font:inherit;letter-spacing:normal;text-transform:none;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:3px 7px;margin-left:5px;cursor:pointer;}
 
@@ -1634,7 +1636,9 @@
     .day-row.today.day-pane-row,.day-row.today.journal-pane-row{box-shadow:inset 0 -2px 0 var(--today-border-adj)!important;}
     /* Active tab icon: soft see-through white, not the day color. */
     .center-tabs button.on{background:rgba(255,255,255,.6)!important;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);}
-    html[data-theme="dark"] .center-tabs button.on{background:rgba(255,255,255,.14)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);}
+    html[data-theme="dark"] .center-tabs button.on{background:rgba(255,255,255,.42)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.6);}
+    /* One thin header line across all three columns (2026-11-03, Julius). */
+    .pane-header,body.mobile-mode .pane-header{flex:0 0 calc(28px * var(--mobile-scale,1))!important;min-height:0;}
     /* Completed stays inside its area while scrolling: the editor spans the row edge to edge (so the
        section lines fit without overflowing) and never scrolls sideways. */
     body.one-day #todayScroll .od-on .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
@@ -1916,7 +1920,6 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
-    <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref −</button>
     <button class="btn" type="button" data-layout="show-toolbar" title="Show toolbar">Show toolbar</button>
   </div>
   <div id="typeSettings" class="type-settings hidden" role="dialog" aria-label="Scale, padding and fonts">
@@ -2016,6 +2019,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
   <div id="toolbar">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn theme-toggle" type="button" id="themeToggle" aria-label="Light / dark">☾</button>
+    <span class="od-nav"><button class="btn tiny" type="button" id="odUp" title="Previous day" aria-label="Previous day">▲</button><button class="btn tiny" type="button" id="odDown" title="Next day" aria-label="Next day">▼</button></span>
     <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
@@ -2023,7 +2027,6 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     </div>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
-    <button class="btn" type="button" data-layout="reference" title="Expand or collapse all Reference cells">Ref −</button>
     <!-- Focus (hide toolbar) shelved 2026-10-26 — code kept; put this back to restore:
     <button class="btn" type="button" data-layout="focus" title="Hide the top toolbar">Focus</button> -->
     <span id="dateLabel"></span>
@@ -2037,7 +2040,6 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     <section class="pane" id="todayPane">
       <div class="pane-header">
         <span class="today-jump" data-jump-today role="button" tabindex="0" title="Jump to today">HISTORY / LOG</span>
-        <span class="od-nav"><button class="btn tiny" type="button" id="odUp" title="Previous day" aria-label="Previous day">▲</button><button class="btn tiny" type="button" id="odDown" title="Next day" aria-label="Next day">▼</button></span>
         <span id="focusStatus" class="focus-status">Loading…</span>
       </div>
       <div
@@ -2073,7 +2075,6 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       class="pane"
       id="referencePane">
       <div class="pane-header ref-pane-header">
-        <span class="ref-pane-title">REFERENCE</span>
       </div>
       <!-- Reference split (2026-10-31, Julius): top = Urgent, Calendar and the other panels,
            bottom = the Reference cells. Each half scrolls on its own, like Today. -->
@@ -7211,6 +7212,18 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
   function refTopHost(tree){
     return document.getElementById('refTopScroll') || tree.parentNode;
   }
+  // Keep the Reference header numbers on one line: step the size down until they fit (2026-11-03, Julius).
+  function fitUrgCounts(){
+    const c = document.querySelector('#referencePane .ref-pane-header .urg-counts');
+    if(!c) return;
+    c.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(c).fontSize) || 13;
+    while(c.scrollWidth > c.clientWidth && size > 8){ size -= .5; c.style.fontSize = size + 'px'; }
+    if(!fitUrgCounts.watch && window.ResizeObserver){
+      fitUrgCounts.watch = new ResizeObserver(() => fitUrgCounts());
+      fitUrgCounts.watch.observe(c.closest('.ref-pane-header'));
+    }
+  }
   function renderUrgent(){
     try{ renderDueBlocks(); }catch(e){}
     const tree = document.getElementById('referenceTree');
@@ -7262,7 +7275,8 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       n.title = name + ': ' + t.n + (t.t ? ' · subtasks ' + t.d + '/' + t.t + ' done' : '');
       counts.append(n);
     });
-    head.append(document.createTextNode('Urgent'), counts); // no − box (Julius 2026-11-01); tap still folds
+    head.append(counts); // numbers only (Julius 2026-11-03); tap still folds
+    head.setAttribute('aria-label','Urgent');
     head.title = 'Tap to collapse/expand · hold to add a task';
     head.addEventListener('click',() => {
       if(urgCreateSuppress){ urgCreateSuppress = false; return; }
@@ -7279,6 +7293,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     if(previousHead) previousHead.remove();
     if(refHeader) refHeader.appendChild(headRow);
     else panel.appendChild(headRow);
+    fitUrgCounts();
     if(!urgentOpen) return;
     [1,2,3,0].forEach(u => {
       const group = items.filter(x => x.urg === u)

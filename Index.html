@@ -2698,7 +2698,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       { const top = document.createElement('div'); top.className = 'od-top';
         row.insertBefore(top, row.firstElementChild);
         [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-add" title="Add named block">+ Block</button> <button type="button" class="blocks-task" title="Add task to Blocks">+ Task</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-add" title="Add named block">+ Block</button> <button type="button" class="blocks-task" title="Add task to Blocks">+ Task</button> <button type="button" class="blocks-indent" title="Indent selected line">→</button> <button type="button" class="blocks-outdent" title="Outdent selected line">←</button> <button type="button" class="blocks-up" title="Move selected line up">↑</button> <button type="button" class="blocks-down" title="Move selected line down">↓</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
       // Blocks MVP: reuse the existing Plan column, checkbox editor, indent/outdent,
@@ -2722,6 +2722,42 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       };
       blockAdd.addEventListener('click', () => addBlocksLine('block'));
       taskAdd.addEventListener('click', () => addBlocksLine('task'));
+      // Explicit mobile-friendly hierarchy/order controls. A selection is captured
+      // before toolbar focus changes; all mutations use the existing Plan save path.
+      let selectedBlockLine = null;
+      pad.addEventListener('pointerup', e => {
+        const line = e.target.closest(':scope > div, :scope > p');
+        if(line && line.parentElement === pad) selectedBlockLine = line;
+      });
+      pad.addEventListener('keyup', () => {
+        const sel = window.getSelection();
+        let node = sel && sel.anchorNode;
+        if(node && node.nodeType === 3) node = node.parentElement;
+        while(node && node.parentElement !== pad) node = node.parentElement;
+        if(node && node.parentElement === pad) selectedBlockLine = node;
+      });
+      const changeBlockLine = action => {
+        const line = selectedBlockLine;
+        if(!line || line.parentElement !== pad) return;
+        if(action === 'indent' || action === 'outdent'){
+          const current = parseInt(line.dataset.blockDepth || '0',10) || 0;
+          const depth = Math.max(0, Math.min(8,current + (action === 'indent' ? 1 : -1)));
+          line.dataset.blockDepth = String(depth);
+          line.style.marginLeft = (depth * 18) + 'px';
+        } else if(action === 'up' && line.previousElementSibling){
+          pad.insertBefore(line,line.previousElementSibling);
+        } else if(action === 'down' && line.nextElementSibling){
+          pad.insertBefore(line.nextElementSibling,line);
+        }
+        pad.dispatchEvent(new Event('input',{bubbles:true}));
+      };
+      for(const [cls,action] of [['blocks-indent','indent'],['blocks-outdent','outdent'],['blocks-up','up'],['blocks-down','down']]){
+        row.querySelector('.'+cls).addEventListener('click',()=>changeBlockLine(action));
+      }
+      pad.querySelectorAll(':scope > [data-block-depth]').forEach(line=>{
+        line.style.marginLeft = ((parseInt(line.dataset.blockDepth,10)||0)*18)+'px';
+      });
+
 
     }
     container.appendChild(row);

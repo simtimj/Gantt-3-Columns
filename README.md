@@ -54,6 +54,8 @@ Last updated: 2026-11-04
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
 - **History wrap**: long task text runs under the checkbox at any column width, not only under 420px.
 - **Cal Events spacing**: tighter line spacing inside cells and a smaller 12px checkbox.
+- **Blocks rebuilt on task cells**: **+ Block** adds a `Block name` title to type over plus one empty task cell, with no popup. **+ Task** adds a cell inside the selected block. Indent and order come from the checkbox hold menu and drag and drop like other task cells; the → ← ↑ ↓ buttons are gone.
+- **Header lines**: a line under the Blocks and Cal Events headers.
 - **Blocks toolbar fixed**: every Blocks button was dead on all screens because the header ignores touches so only its grip drags. The buttons take taps now.
 - **Blocks + Task and Remove**: + Task makes a real checkbox and lands inside the selected block (a new block is selected automatically). New **Remove** deletes the selected line and what's nested under it, after a confirm. `Next Block 2` now activates too.
 - **Cal Events hold menu**: hold anywhere on a row, not just its small checkbox, to open the usual menu. Tapping the title still edits it, and it's off while a title is being typed.

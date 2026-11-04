@@ -1634,7 +1634,7 @@
     #centerCalendarList .ce-event.ce-done{border-color:#666;color:#666;}
     #centerCalendarList .ce-event.ce-done .ce-time{color:#666;}
     #centerCalendarList .ce-scheduled{margin:calc(8px * var(--pad-y,1)) 0;}
-    #centerCalendarList .ce-scheduled .ce-time{margin-bottom:calc(3px * var(--pad-y,1));}
+    #centerCalendarList .ce-scheduled .ce-time{margin-bottom:1px;}
     /* Today time-section lines reach the column walls like the Notes section lines. */
     .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
     /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
@@ -1872,8 +1872,9 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-event-text{flex:1;min-width:0;}
 /* Tight Cal Events (2026-11-03, Julius): small margins, text runs under the checkbox like the history log. */
 #centerDownScroll{padding-inline:4px;}
-#centerCalendarList .ce-event,#centerCalendarList .ce-event:has(.ce-meta:not(:empty)){display:flow-root;margin:2px 0;padding:2px 4px;line-height:max(1.4em,20px);}
-#centerCalendarList .ce-check{float:left;position:relative;z-index:1;margin:2px 5px -15px 0;}
+/* Tighter cells (2026-11-04, Julius): normal text spacing and a smaller checkbox. Holding the row opens the menu, so the box needn't be big. */
+#centerCalendarList .ce-event,#centerCalendarList .ce-event:has(.ce-meta:not(:empty)){display:flow-root;margin:2px 0;padding:2px 4px;line-height:1.22;}
+#centerCalendarList .ce-check{float:left;position:relative;z-index:1;width:12px;height:12px;margin:2px 5px -12px 0;}
 #centerCalendarList .ce-event-text,#centerCalendarList .ce-meta{display:block;padding-left:0;}
 #centerCalendarList .ce-time{display:flow-root;}
 /* Cal Events groups (2026-11-03, Julius): more room and a line between them. */
@@ -1896,15 +1897,19 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayScroll .day-editor > :is([data-tsec="morning"],[data-tsec="afternoon"],[data-tsec="evening"]){display:flex;align-items:flex-start;white-space:normal;margin:10px var(--sec-mr,0px) 3px var(--sec-ml,0px)!important;padding:1px var(--sec-pr,3px) 2px var(--sec-pl,3px)!important;}
 #todayScroll .day-editor > [data-tsec] > br{display:none;}
 #todayScroll .day-editor > [data-tsf]{flex-wrap:wrap;}
-#todayScroll .day-editor > [data-tsf]::after{flex:1 1 0;}
 #todayScroll .day-editor > [data-tsec] > .ts-sum{order:3;flex:0 0 100%;min-width:0;margin-top:3px;font-size:calc(var(--paragraph-size,14px) * .8);font-weight:400;line-height:1.3;text-transform:none;letter-spacing:0;white-space:normal;}
 #todayScroll .ts-row{margin:3px 0;}
+/* History / Log: long task text runs under the checkbox at any pane width, not only under 420px (2026-11-04, Julius). */
+#todayScroll .day-editor .check-line:not([data-tlon]){display:flow-root!important;}
+#todayScroll .day-editor .check-line:not([data-tlon]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
+#todayScroll .day-editor .check-line:not([data-tlon]) > .check-text{display:block;}
+#todayScroll .sec-host > .day-editor.sec-painted{margin-left:0!important;margin-right:0!important;padding-left:calc(15px * var(--side-k,1) + 4px)!important;}
 #todayScroll .ts-count{font:inherit;margin-left:6px;padding:1px 7px;min-height:24px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
 #todayScroll .ts-items{margin-top:2px;opacity:.85;overflow-wrap:anywhere;}
 #todayScroll .day-editor > [data-tsec]:not([data-tsf="o"]){border-bottom:0!important;}
 #todayScroll .day-editor > [data-tsf]{cursor:pointer;}
 #todayScroll .day-editor > [data-tsec]::before{flex:0 0 auto;margin-top:.1em;}
-#todayScroll .day-editor > [data-tsec]::after{flex:1 1 auto;min-width:0;white-space:pre-line;overflow-wrap:anywhere;}
+#todayScroll .day-editor > [data-tsec]::after{flex:1 1 0;min-width:0;white-space:pre-line;overflow-wrap:anywhere;}
 #todayScroll .day-editor > [data-tsec="morning"][data-tsf="o"]::after{content:"Morn 8–2 · " attr(data-tsinfo) "\00A0\00A0−";}
 #todayScroll .day-editor > [data-tsec="morning"][data-tsf="c"]::after{content:"Morn 8–2 · " attr(data-tsinfo) "\00A0\00A0+";}
 #todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="o"]::after{content:"After 2–7 · " attr(data-tsinfo) "\00A0\00A0−";}

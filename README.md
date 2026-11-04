@@ -52,6 +52,8 @@ Last updated: 2026-11-04
 - **Header cleanup**: thin one-line headers across all three columns; the REFERENCE and Urgent words are gone, leaving the Urgent numbers on one line (they shrink to fit; tap still folds, hold still adds a task); the active center tab highlight is lighter in dark mode; ▲ ▼ moved to the top bar between the moon and Options; Ref −/+ removed from the top bar.
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
+- **History wrap**: long task text runs under the checkbox at any column width, not only under 420px.
+- **Cal Events spacing**: tighter line spacing inside cells and a smaller 12px checkbox.
 - **Blocks toolbar fixed**: every Blocks button was dead on all screens because the header ignores touches so only its grip drags. The buttons take taps now.
 - **Blocks + Task and Remove**: + Task makes a real checkbox and lands inside the selected block (a new block is selected automatically). New **Remove** deletes the selected line and what's nested under it, after a confirm. `Next Block 2` now activates too.
 - **Cal Events hold menu**: hold anywhere on a row, not just its small checkbox, to open the usual menu. Tapping the title still edits it, and it's off while a title is being typed.

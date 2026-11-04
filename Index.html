@@ -577,7 +577,11 @@
     .dr-group{margin:4px 0 0;padding:1px 6px;border:1px solid var(--border);border-radius:6px;}
     .dr-type{margin:4px 0 1px;font-size:.85em;font-weight:600;opacity:.8;} /* History log types (2026-11-04) */
     .dr-tcount{margin-left:6px;font-weight:400;font-size:.85em;opacity:.75;}
-    .dr-line{margin-left:0;padding:2px 0 2px 8px;border-left:2px solid var(--divider);font-size:.92em;overflow-wrap:anywhere;}
+    /* Day Review lines as small cells (2026-11-04, Julius): bold main point, muted details, two lines max; tap to show all. */
+    .dr-line{margin:3px 0;padding:2px 6px;border:1px solid var(--border);border-radius:5px;font-size:.9em;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;cursor:pointer;}
+    .dr-line.dr-full{display:block;}
+    .dr-line > b{font-weight:700;}
+    .dr-line > span{color:var(--muted,#888);}
     .ref-tabs{margin-left:0;flex:0 0 auto;align-self:center;}
     /* Reference toolbar scrolls sideways on narrow columns; search keeps a readable width. */
     .ref-toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
@@ -5119,15 +5123,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.addEventListener('input',later,true);
   })();
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
-  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus','data-blk'];
+  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn'];
   function cardCleanHtml(el){
-    if(!el.querySelector('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
+    if(!el.querySelector('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
     c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid','data-tlsum'].forEach(a => n.removeAttribute(a)));
     c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
-    c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
   }
   function saveDay(date){
@@ -10440,6 +10444,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     let timer = null;
     const txt = n => ((n.querySelector(':scope > .check-text') || n).textContent || '').replace(/\s+/g,' ').trim().replace(/^\*/,'');
     const isDone = l => l.classList.contains('done') || !!(l.querySelector(':scope > input[type=checkbox]') || {}).checked;
+    // Main point in bold (the line's bold start, else the text before ":"), details muted after it.
+    function drLineHtml(n,t){
+      const b = n.querySelector(':scope > .check-text > b, :scope > .check-text > strong');
+      let head = b ? (b.textContent || '').replace(/\s+/g,' ').trim().replace(/^\*+/,'') : '';
+      if(head && !t.startsWith(head)) head = '';
+      if(!head){ const i = t.indexOf(':'); if(i > 0 && i <= 70) head = t.slice(0,i); }
+      if(!head) return esc(t);
+      const rest = t.slice(head.length).replace(/^\s*:\s*/,'');
+      return '<b>' + esc(head) + '</b>' + (rest ? '<span>: ' + esc(rest) + '</span>' : '');
+    }
     function collect(ed){
       const cats = new Map(); let group = null, total = 0;
       [...ed.children].forEach(n => {
@@ -10451,7 +10465,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(!cats.has(key)) cats.set(key,{key,n:0,groups:new Map()});
         const c = cats.get(key); c.n++; total++;
         if(!c.groups.has(gName)) c.groups.set(gName,[]);
-        c.groups.get(gName).push({t,n});
+        c.groups.get(gName).push({t,n,h:drLineHtml(n,t)});
       });
       return {cats:[...cats.values()].sort((a,b) => b.n - a.n),total};
     }
@@ -10468,17 +10482,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         [...c.groups.entries()].sort((a,b) => b[1].length - a[1].length).forEach(([g,list]) => {
           const k = c.key + '|' + g;
           // History log types (2026-11-04): New / Fixes / Tweaks counts in the summary, names under each.
-          const types = logTypeBuckets(list.map(x => x.n),x => txt(x));
+          const htmlOf = new Map(list.map(x => [x.n,x.h]));
+          const types = logTypeBuckets(list.map(x => x.n),x => htmlOf.get(x));
           const tc = types ? '<span class="dr-tcount">' + types.filter(t => t.k).map(t => esc(t.name) + ' ' + t.items.length).join(' · ') + '</span>' : '';
           h += `<details class="dr-group" data-k="${esc(k)}"${openGroups.has(k) ? ' open' : ''}><summary>${esc(g)}${tc}<b>${list.length}</b></summary>` +
-            (types ? types.map(ty => `<div class="dr-type">${esc(ty.name)} · ${ty.items.length}</div>` + ty.items.map(t => `<div class="dr-line">${esc(t)}</div>`).join('')).join('')
-              : list.map(x => `<div class="dr-line">${esc(x.t)}</div>`).join('')) + '</details>';
+            (types ? types.map(ty => `<div class="dr-type">${esc(ty.name)} · ${ty.items.length}</div>` + ty.items.map(h => `<div class="dr-line">${h}</div>`).join('')).join('')
+              : list.map(x => `<div class="dr-line">${x.h}</div>`).join('')) + '</details>';
         });
         h += '</details>';
       });
       if(box.dataset.h !== h){ box.dataset.h = h; const y = box.scrollTop; box.innerHTML = h; box.scrollTop = y; }
     }
     window.renderDayReview = () => { if(!timer) timer = setTimeout(() => { timer = null; draw(); },200); };
+    box.addEventListener('click',e => { const l = e.target.closest && e.target.closest('.dr-line'); if(l) l.classList.toggle('dr-full'); });
     box.addEventListener('toggle',e => {
       const d = e.target; if(!d.matches || !d.matches('details')) return;
       if(d.classList.contains('dr-cat')) closedCats[d.open ? 'delete' : 'add'](d.dataset.k);
@@ -12245,6 +12261,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .plan-pad > [data-blk]{position:relative;left:7px;margin-right:14px;}
   .plan-pad > [data-blk^="f"]{margin-top:9px;}
   .plan-pad > [data-blk$="l"],.plan-pad > .check-line[data-blk$="l"]{margin-bottom:10px;}
+  .plan-pad > [data-blkn]{margin-top:21px;} /* room for the line above Next Block */
 </style>
 <script>
 /* Block borders (2026-11-04, Julius): each block in Blocks (its title line plus the task cells under it, down
@@ -12278,6 +12295,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const first = vis[0], last = vis[vis.length - 1];
       const top = first.offsetTop - 5, bottom = last.offsetTop + last.offsetHeight + 4;
       const next = /^next block\b/i.test((first.textContent || '').trim());
+      // A line across the pad above Next Block (2026-11-04, Julius), so it's set apart from what's above.
+      if(next) rects += '<line x1="2" x2="' + Math.max(10,W - 2) + '" y1="' + (top - 8.5) + '" y2="' + (top - 8.5) + '" stroke="' + ink + '" stroke-opacity=".55" stroke-width="1.5"/>';
       rects += '<rect x="2" y="' + (top + .75) + '" width="' + Math.max(10,W - 4) + '" height="' + Math.max(10,bottom - top - 1.5) + '" rx="8" fill="none" stroke="' +
         (next ? '#f0b000' : ink) + '" stroke-opacity="' + (next ? '.9' : '.45') + '" stroke-width="1.5"' + (next ? ' stroke-dasharray="6 4"' : '') + '/>';
     });
@@ -12292,15 +12311,59 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     requestAnimationFrame(() => { pending.delete(pad); try{ draw(pad); }catch(e){} });
   }
   // Called from refreshCards for the Blocks pad.
+  const isNext = n => /^next block\b/i.test((n.textContent || '').trim());
   window.blkPaint = function(pad){
     const want = new Map();
     groups(pad).forEach(g => g.forEach((n,i) => want.set(n,(i === 0 ? 'f' : 'm') + (i === g.length - 1 ? 'l' : ''))));
     pad.querySelectorAll(':scope > [data-blk]').forEach(n => { if(!want.has(n)) n.removeAttribute('data-blk'); });
     want.forEach((v,n) => { if(n.getAttribute('data-blk') !== v) n.setAttribute('data-blk',v); });
+    pad.querySelectorAll(':scope > [data-blkn]').forEach(n => { if(!(isTitle(n) && isNext(n))) n.removeAttribute('data-blkn'); });
+    [...pad.children].forEach(n => { if(isTitle(n) && isNext(n) && n.previousElementSibling && !n.hasAttribute('data-blkn')) n.setAttribute('data-blkn','1'); });
+    ensureNext(pad);
     if(ro && !pad._blkRO){ pad._blkRO = true; ro.observe(pad); }
     schedule(pad);
   };
   document.addEventListener('input',e => { const pad = e.target && e.target.closest && e.target.closest('.plan-pad'); if(pad) window.blkPaint(pad); },true);
+  /* There's always a Next Block (2026-11-04, Julius): today's and later days' Blocks get a "Next Block" title plus an
+     empty task cell at the end whenever none is there (after Activate, after Remove, on load). Past days are left alone. */
+  const todayIso = () => (typeof state !== 'undefined' && state && state.today) || (typeof localToday === 'function' ? localToday() : '');
+  function ensureNext(pad){
+    if(pad._blkEnsure || !pad.isConnected || !pad.isContentEditable) return;
+    const d = pad.dataset.date, t = todayIso();
+    if(!d || !t || d < t) return;
+    if([...pad.children].some(n => isTitle(n) && isNext(n))) return;
+    pad._blkEnsure = true;
+    setTimeout(() => {
+      pad._blkEnsure = false;
+      if(!pad.isConnected || [...pad.children].some(n => isTitle(n) && isNext(n))) return;
+      if(typeof captureBeforeEdit === 'function') captureBeforeEdit(pad);
+      pad.querySelectorAll(':scope > br').forEach(n => n.remove());
+      const title = document.createElement('div');
+      title.setAttribute('data-title','1'); title.dataset.tl = '1';
+      const b = document.createElement('b'); b.textContent = 'Next Block'; title.appendChild(b);
+      const cell = typeof createCheckboxLine === 'function' ? createCheckboxLine(0) : null;
+      // Keep it at the very end, after any trailing empty lines.
+      pad.appendChild(title); if(cell) pad.appendChild(cell);
+      pad.dispatchEvent(new Event('input',{bubbles:true}));
+    },0);
+  }
+  /* Enter on a block title makes a task cell under it, checkbox included (2026-11-04, Julius). Backspace on the
+     checkbox turns it back into a plain line, as anywhere else. */
+  document.addEventListener('keydown',e => {
+    if(e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    const pad = e.target && e.target.closest ? e.target.closest('.plan-pad') : null;
+    if(!pad) return;
+    const sel = window.getSelection(); if(!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    let n = sel.anchorNode; if(n && n.nodeType === 3) n = n.parentElement;
+    while(n && n.parentElement !== pad) n = n.parentElement;
+    if(!n || !isTitle(n)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if(typeof captureBeforeEdit === 'function') captureBeforeEdit(pad);
+    const cell = createCheckboxLine(0);
+    n.insertAdjacentElement('afterend',cell);
+    if(typeof placeCaretInsideCheckbox === 'function') placeCaretInsideCheckbox(cell.querySelector('.check-text'));
+    pad.dispatchEvent(new Event('input',{bubbles:true}));
+  },true);
 })();
 </script>
 <style>

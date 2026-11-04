@@ -1846,10 +1846,38 @@ function getMainCalendarEvents(dateString) {
       id: ev.getId(), calId: EVENT_CALENDARS[0],
       done: String(ev.getColor() || '') === '8',
       start: (allDay ? ev.getAllDayStartDate() : s).getTime(), end: e.getTime(),
+      recurring: ev.isRecurringEvent(),
       time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') };
+  });
+  const saved = PropertiesService.getScriptProperties().getProperties();
+  events.forEach(ev => {
+    try { Object.assign(ev, JSON.parse(saved[calMetaKey_(ev.id, ev.start, ev.recurring)] || '{}')); } catch (e) { console.error(e); }
   });
   events.sort((a,b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start);
   return { date: date, events: events };
+}
+
+// Hold-menu fields for a calendar event (2026-11-03, Julius): urgency, due, length, subject. Kept app-side so the
+// event itself stays unchanged. A one-off keeps them when moved; a repeating event has them per occurrence.
+function calMetaKey_(eventId, start, recurring) {
+  return 'calMeta:' + String(eventId).slice(0, 60) + (recurring ? ':' + Number(start) : '');
+}
+function setCalendarEventMeta(eventId, start, recurring, meta) {
+  const m = meta || {}, clean = {};
+  if (/^[123]$/.test(m.urg || '')) clean.urg = m.urg;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(m.due || '')) clean.due = m.due;
+  if (/^\d{1,4}$/.test(String(m.dur || ''))) clean.dur = String(m.dur);
+  if (/^[a-z]{2,12}$/.test(m.cat || '')) clean.cat = m.cat;
+  const props = PropertiesService.getScriptProperties(), key = calMetaKey_(eventId, start, recurring);
+  if (Object.keys(clean).length) props.setProperty(key, JSON.stringify(Object.assign({ s: Number(start) }, clean)));
+  else props.deleteProperty(key);
+  // Drop saved fields for events more than 60 days past.
+  const cutoff = Date.now() - 60 * DAY_MS, all = props.getProperties();
+  Object.keys(all).forEach(k => {
+    if (k.indexOf('calMeta:') !== 0) return;
+    try { if (JSON.parse(all[k]).s < cutoff) props.deleteProperty(k); } catch (e) { props.deleteProperty(k); }
+  });
+  return clean;
 }
 
 function getCalendarEvents() {

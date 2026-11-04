@@ -551,7 +551,14 @@
     #centerDownScroll{flex:var(--ns-b,1) 1 0;min-height:30px;}
     #journalPane[data-ctab="weather"] #journalScroll,#journalPane[data-ctab="weather"] #journalTemplateButton,
     #journalPane:not([data-ctab="weather"]) #weatherScroll{display:none!important;}
+    /* Keep In Mind tab (2026-11-03, Julius): 📋 shows the cell without that section, 📌 shows only it.
+       View only: the section stays in the same Notes cell and saves the same way. */
+    #journalPane[data-ctab="notes"] .journal-editor > :is([data-nsec="focus"],[data-nsec="focus"] ~ :not(table,table ~ *)){display:none!important;}
+    #journalPane[data-ctab="focus"] .journal-editor > :not([data-nsec="focus"],[data-nsec="focus"] ~ :not(table,table ~ *)){display:none!important;}
+    #journalPane[data-ctab="focus"] .journal-editor > [data-nsec="focus"]{margin-top:0;border-top:0!important;}
+    #journalPane[data-ctab="focus"] #journalTemplateButton{display:none!important;}
     .center-tabs{display:inline-flex;gap:2px;margin-left:-6px;}
+    .center-tabs button[data-ctab="weather"]{opacity:.9;}
     .center-tabs button{border:0;background:transparent;font-size:12px;line-height:1;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
     .center-tabs button.on{opacity:1;background:color-mix(in srgb,var(--divider) 45%,transparent);}
     .center-placeholder{padding:10px 12px;color:var(--muted,#888);font-size:13px;line-height:1.4;}
@@ -1794,7 +1801,16 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 @media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:4vh 3vw!important;width:94vw!important;height:92dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
 
 #centerCalendarList .ce-event{display:flex;align-items:flex-start;gap:7px;}
-#centerCalendarList .ce-check{flex:0 0 auto;width:15px;height:15px;margin:1px 0 0;accent-color:#777;cursor:pointer;}
+#centerCalendarList .ce-check{flex:0 0 auto;width:15px;height:15px;margin:1px 0 0;accent-color:#777;cursor:pointer;touch-action:none;}
+/* Calendar rows take urgency + subject like task lines (2026-11-03, Julius). */
+.ce-event[data-urg="1"]{--urg:#e5484d;}.ce-event[data-urg="2"]{--urg:#f0b000;}.ce-event[data-urg="3"]{--urg:#3b82f6;}
+#centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid var(--urg);border-radius:3px;background:#fff;display:inline-grid;place-content:center;}
+#centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked{background:var(--urg);}
+#centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
+#centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
+#centerCalendarList .ce-event:has(.ce-meta:not(:empty)){flex-wrap:wrap;row-gap:1px;}
+#centerCalendarList .ce-meta{flex:1 0 100%;padding-left:22px;color:var(--muted);font-size:.85em;}
+#centerCalendarList .ce-meta:empty{display:none;}
 #centerCalendarList .ce-event-text{flex:1;min-width:0;}
 #centerCalendarList .ce-check:disabled{opacity:.5;}
 
@@ -2025,7 +2041,8 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         <!-- Center Up tabs (2026-11-01, Julius): small symbols switch what Center Up shows. -->
         <span class="center-tabs" role="tablist">
           <button type="button" data-ctab="notes" class="on" title="Dailies" aria-label="Dailies">📋</button>
-          <button type="button" data-ctab="weather" title="Weather (hourly)">☁️</button>
+          <button type="button" data-ctab="weather" title="Weather (hourly)" aria-label="Weather"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg></button>
+          <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">📌</button>
         </span>
       </div>
       <div
@@ -5373,7 +5390,8 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
   document.addEventListener('click',e => {
     const ed = e.target;
     if(!ed || !ed.matches || !ed.matches('#todayScroll .day-editor, #journalScroll .journal-editor, #todayScroll .plan-editor')) return;
-    const kids = [...ed.children].filter(n => !n.matches('[data-render-due],.due-notes'));
+    // Only what the current tab shows (Dailies / Keep In Mind), so a new line lands in that section.
+    const kids = [...ed.children].filter(n => !n.matches('[data-render-due],.due-notes') && n.offsetParent !== null);
     if(!kids.length) return;
     const end = kids[kids.length - 1].matches('[data-secend]') ? kids[kids.length - 1] : null;
     let target = end ? end.previousElementSibling : kids[kids.length - 1];
@@ -5385,7 +5403,9 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       captureBeforeEdit(ed);
       target = document.createElement('div');
       target.innerHTML = '<br>';
-      if(end) end.before(target); else ed.appendChild(target);
+      let at = kids[kids.length - 1];
+      while(at.nextElementSibling && at.nextElementSibling.matches('[data-render-due],.due-notes')) at = at.nextElementSibling;
+      if(end) end.before(target); else at.after(target);
       finishEditorEdit(ed);
       saveEditorOwner(ed);
     }
@@ -6654,7 +6674,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       try{ localStorage.setItem('fw.centerTab', t); }catch(e){}
     };
     let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
-    set(t === 'weather' ? 'weather' : 'notes');
+    set(t === 'weather' || t === 'focus' ? t : 'notes');
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
@@ -6976,7 +6996,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
   let urgentOpen = true;
   try{ urgentOpen = localStorage.getItem('fw.urgentOpen') !== '0'; }catch(e){}
   function urgencyCheckbox(t){
-    const box = t && t.closest ? t.closest('#urgentPanel .urg-box, .due-notes .di-box, #inboxPanel .inbox-box') : null;
+    const box = t && t.closest ? t.closest('#urgentPanel .urg-box, .due-notes .di-box, #inboxPanel .inbox-box, #centerCalendarList .ce-check') : null;
     if(box) return box;
     const cb = t && t.closest ? t.closest('input[type=checkbox]') : null;
     if(!cb) return null;
@@ -7828,6 +7848,33 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
   const CAL_PANEL_ON = false; // Calendar panel off (2026-10-31, Julius): Reference top half is Urgent only.
   let centerCalendarSeq = 0;
   const centerCalendarCache = new Map();
+  // Subject color for a calendar row: the saved subject, else the same auto guess cards use.
+  function calRowCat(ev){
+    if(ev.cat === 'none') return '';
+    const key = ev.cat || (typeof guessCardCat === 'function' ? guessCardCat(ev.title) : '');
+    return typeof CARD_CAT_BY_KEY !== 'undefined' && CARD_CAT_BY_KEY[key] ? key : '';
+  }
+  function calRowAttrs(ev){
+    const cat = calRowCat(ev), color = cat ? CARD_CAT_BY_KEY[cat].color : '';
+    return ' data-ce-id="' + esc(ev.id) + '" data-ce-cal="' + esc(ev.calId) + '" data-ce-start="' + ev.start + '" data-ce-rec="' + (ev.recurring ? 1 : 0) + '" data-ce-title="' + esc(ev.title) + '"' +
+      (ev.urg ? ' data-urg="' + esc(ev.urg) + '"' : '') + (ev.due ? ' data-due="' + esc(ev.due) + '"' : '') + (ev.dur ? ' data-dur="' + esc(ev.dur) + '"' : '') +
+      (ev.cat ? ' data-cat="' + esc(ev.cat) + '"' : '') + (cat ? ' data-tccat="' + esc(cat) + '" style="--ce-cat:' + esc(color) + '"' : '');
+  }
+  function saveCalMeta(line){
+    const d = line.dataset, meta = {urg:d.urg || '',due:d.due || '',dur:d.dur || '',cat:d.cat || ''};
+    const label = line.querySelector('.ce-meta');
+    if(label) label.textContent = lineMetaLabel(d.due,d.dur) || '';
+    centerCalendarCache.forEach(entry => entry.data.events.forEach(ev => {
+      if(ev.id !== d.ceId || Number(ev.start) !== Number(d.ceStart)) return;
+      Object.assign(ev,meta);
+      const cat = calRowCat(ev);
+      if(cat){ line.dataset.tccat = cat; line.style.setProperty('--ce-cat',CARD_CAT_BY_KEY[cat].color); }
+      else { delete line.dataset.tccat; line.style.removeProperty('--ce-cat'); }
+    }));
+    google.script.run.withFailureHandler(err => {
+      setStatus('Could not save that calendar event: ' + (err && err.message || err));
+    }).setCalendarEventMeta(d.ceId,Number(d.ceStart),d.ceRec === '1',meta);
+  }
   function loadCenterCalendar(date, force){
     date = date || window.odDate || state.today;
     const box = document.getElementById('centerCalendarList');
@@ -7836,10 +7883,12 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     const draw = data => {
       if(seq !== centerCalendarSeq) return;
       const allDay = data.events.filter(ev => ev.allDay).sort((a,b) => Number(a.done) - Number(b.done)), scheduled = data.events.filter(ev => !ev.allDay);
-      const checkbox = ev => '<input type="checkbox" class="ce-check" data-ce-id="' + esc(ev.id) + '" data-ce-cal="' + esc(ev.calId) + '" data-ce-start="' + ev.start + '"' + (ev.done ? ' checked' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
+      const checkbox = ev => '<input type="checkbox" class="ce-check"' + (ev.done ? ' checked' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
+      // Row carries the event's id + its menu fields (urgency, due, length, subject), like a task line.
+      const row = (ev,cls,inner) => '<div class="ce-event' + cls + (ev.done ? ' ce-done' : '') + '"' + calRowAttrs(ev) + '>' + checkbox(ev) + inner + '<span class="ce-meta">' + esc(lineMetaLabel(ev.due,ev.dur) || '') + '</span></div>';
       box.innerHTML = '' +
-        (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => '<div class="ce-event' + (ev.done ? ' ce-done' : '') + '">' + checkbox(ev) + '<span class="ce-event-text">' + esc(ev.title) + '</span></div>').join('') : '') +
-        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => '<div class="ce-event ce-scheduled' + (ev.done ? ' ce-done' : '') + '">' + checkbox(ev) + '<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span></div>').join('') : '') +
+        (allDay.length ? '<div class="ce-group">All-Day Tasks</div>' + allDay.map(ev => row(ev,'','<span class="ce-event-text">' + esc(ev.title) + '</span>')).join('') : '') +
+        (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.map(ev => row(ev,' ce-scheduled','<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span>')).join('') : '') +
         (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');
     };
     const cached = centerCalendarCache.get(date);
@@ -7853,14 +7902,14 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
   }
   document.addEventListener('change', e => {
     const cb=e.target.closest?.('#centerCalendarList .ce-check');if(!cb)return;
-    const desired=cb.checked;cb.disabled=true;
+    const row=cb.closest('.ce-event'),desired=cb.checked;cb.disabled=true;
     google.script.run.withSuccessHandler(()=>{
       cb.disabled=false;cb.closest('.ce-event')?.classList.toggle('ce-done',desired);
       centerCalendarCache.clear();
     }).withFailureHandler(err=>{
       cb.checked=!desired;cb.disabled=false;
       alert('Could not update calendar event: '+(err?.message||err));
-    }).setCalendarEventDone(cb.dataset.ceCal,cb.dataset.ceId,Number(cb.dataset.ceStart),desired);
+    }).setCalendarEventDone(row.dataset.ceCal,row.dataset.ceId,Number(row.dataset.ceStart),desired);
   });
   document.addEventListener('click', e => { if(e.target.closest('[data-ce-refresh]')) loadCenterCalendar(null,true); });
   document.addEventListener('visibilitychange', () => { if(!document.hidden) loadCenterCalendar(); });
@@ -8699,9 +8748,12 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     hideUrgencyPicker();
     if(typeof hideContextMenu === 'function') hideContextMenu();
     if(cb.classList && cb.classList.contains('inbox-box')){ showInboxPicker(cb,x,y); return; }
-    const t = urgTarget(cb);
+    // Calendar events (2026-11-03, Julius): same menu, minus what only fits a task saved in a cell.
+    const isCal = !!(cb.classList && cb.classList.contains('ce-check'));
+    const t = isCal ? {line:cb.closest('.ce-event'),owner:null} : urgTarget(cb);
     if(!t){ setStatus('Scroll Today to that day first, then change it'); return; }
     const {line,owner} = t;
+    const metaChanged = () => { if(isCal) saveCalMeta(line); else urgChanged(owner); };
     const p = document.createElement('div');
     p.className = 'urg-picker';
     if(owner && owner.matches('.journal-editor') && dailySectionLines(owner).includes(line)){
@@ -8741,7 +8793,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         urgSubtree(line).forEach(l => { if(u) l.dataset.urg = String(u); else delete l.dataset.urg; });
         // Stay open so a due date can be set right after (Julius, 2026-10-26).
         p.querySelectorAll('.urg-pick').forEach(x => x.classList.toggle('on', x === b));
-        urgChanged(owner);
+        metaChanged();
       });
       p.appendChild(b);
     });
@@ -8759,7 +8811,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       showUrgCal(chip,line.dataset.due || '',iso => {
         setDue(line,iso);
         hideUrgencyPicker();
-        urgChanged(owner);
+        metaChanged();
       });
     });
     dueRow.appendChild(chip);
@@ -8767,7 +8819,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       const clr = document.createElement('button');
       clr.type = 'button'; clr.className = 'urg-due-clear'; clr.textContent = '×'; clr.title = 'Clear due date';
       clr.addEventListener('pointerdown',e => e.preventDefault());
-      clr.addEventListener('click',() => { setDue(line,''); hideUrgencyPicker(); urgChanged(owner); });
+      clr.addEventListener('click',() => { setDue(line,''); hideUrgencyPicker(); metaChanged(); });
       dueRow.appendChild(clr);
     }
     p.appendChild(dueRow);
@@ -8791,7 +8843,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       const pick = m => {
         setDur(line,m);
         durRow.querySelectorAll('.urg-dur-pick').forEach(x => x.classList.toggle('on', Number(x.dataset.m) === durMin(m)));
-        urgChanged(owner);
+        metaChanged();
       };
       quick.forEach(m => { const b = mk(durLabel(m),m + ' min',() => pick(m === durMin(line.dataset.dur) ? 0 : m),m === cur); b.dataset.m = m; });
       const other = mk(cur && quick.indexOf(cur) < 0 ? durLabel(cur) : '…','Other length (minutes)',() => {
@@ -8818,7 +8870,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       p.appendChild(tb);
     }
     // Archive / unarchive the task + its subtasks (2026-10-27, Julius).
-    {
+    if(!isCal){
       const ab = document.createElement('button');
       ab.type = 'button'; ab.className = 'urg-goto';
       ab.textContent = line.dataset.arch ? '↩ Unarchive (back to Urgent)' : '🗄 Archive (keep as a log, dated today)';
@@ -8828,7 +8880,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     }
     // Not today → Backlog, or Backlog → Today (Julius, 2026-10-28): moves the task + its subtasks,
     // keeps urgency and due date, so it stays in Urgent.
-    {
+    if(!isCal){
       const k = ownerKey(owner);
       if(k && (k.pane === 'today' || k.pane === 'journal' || k.pane === 'plan' || k.pane === 'backlog')){
         const toToday = k.pane === 'backlog';
@@ -8854,9 +8906,9 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       }
     }
     // Reference task → Plan / think of the selected day, as a linked mirror (2026-11-01).
-    if(window.tidMenuRow) try{ tidMenuRow(p,line,owner); }catch(err){}
+    if(window.tidMenuRow && !isCal) try{ tidMenuRow(p,line,owner); }catch(err){}
     // Delete the task + its subtasks (2026-10-27, Julius) — every checkbox, all columns.
-    {
+    if(!isCal){
       const n = urgSubtree(line).length - 1;
       const db = document.createElement('button');
       db.type = 'button'; db.className = 'urg-goto urg-del';
@@ -10375,7 +10427,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
     row.className = 'urg-cat-row';
     const h = document.createElement('span'); h.className = 'uc-head'; h.textContent = 'Card color · subject'; row.appendChild(h);
     const cur = head.dataset.cat || '';
-    const guess = cur ? '' : (head.dataset.tccat || guessCardCat(tcText(head)));
+    const guess = cur ? '' : (head.dataset.tccat || guessCardCat(head.classList.contains('ce-event') ? (head.dataset.ceTitle || '') : tcText(head)));
     const opts = [...CARD_CATS.map(c => [c.key,c.name,c.color]), ['', 'Auto' + (guess && !cur ? ' (' + CARD_CAT_BY_KEY[guess].name + ')' : ''), '#bbb'], ['none','None','transparent']];
     opts.forEach(([key,name,color]) => {
       const b = document.createElement('button');
@@ -10388,7 +10440,8 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         if(key) head.dataset.cat = key; else delete head.dataset.cat;
         row.querySelectorAll('.urg-cat').forEach(x => x.classList.toggle('on',x === b));
         // urgChanged also re-sorts the Urgent batches (2026-10-30).
-        if(owner){ refreshCards(owner); if(typeof finishEditorEdit === 'function') finishEditorEdit(owner); if(typeof urgChanged === 'function') urgChanged(owner); else saveEditorOwner(owner); }
+        if(line.classList.contains('ce-event')) saveCalMeta(line);
+        else if(owner){ refreshCards(owner); if(typeof finishEditorEdit === 'function') finishEditorEdit(owner); if(typeof urgChanged === 'function') urgChanged(owner); else saveEditorOwner(owner); }
       });
       row.appendChild(b);
     });

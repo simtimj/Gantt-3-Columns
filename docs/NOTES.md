@@ -56,6 +56,11 @@ Read only the section you need.
 - This replaces the old "tap ↻ first" caveat: an open tab's save can no longer overwrite merged done-log lines.
 - Tests: merge + server helpers in Node; client in Playwright with a Proxy stub for `google.script.run` (don't commit the harness).
 
+## Calendar event hold menu + Keep In Mind tab (2026-11-03, Julius)
+
+- `.ce-check` is an `urgencyCheckbox`; `showUrgencyPicker` uses the `.ce-event` row as `line` with `owner: null` (`isCal`) and `metaChanged()` → `saveCalMeta(line)` → `setCalendarEventMeta(id, start, recurring, meta)`. Stored in script property `calMeta:<id>` (one-off) or `calMeta:<id>:<start>` (repeating, per occurrence); entries 60+ days past are pruned on save. `getMainCalendarEvents` merges them. Not read by `collectUrgent()`.
+- Center Up `data-ctab="focus"` is CSS only: the Keep In Mind section is `[data-nsec="focus"]` plus following siblings up to the first table. The empty-space tap handler uses visible children, so a new line lands in the current tab's section.
+
 ## Schedule cell + calendar checkboxes + empty space (2026-10-29, Julius)
 
 - `moveScheduleToNotes_()` (in `getWorkspaceData` and `getSyncState`): for today..+7, check-lines whose text starts `H:MM–H:MM ·` (`SCHED_RE_`) plus their deeper subtasks move from Today into `<table data-cnote="s-YYYYMMDD" data-ckind="sched">` in Notes, right after the plan table (else top); later ones append inside it. Blue banner CSS (the only filled banner: plan/wrap titles are quiet colored text + underline, no section bars — Julius 2026-10-29); the Due group goes after it (`placeDueNotes`).

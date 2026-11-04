@@ -549,8 +549,8 @@
        Notes split bar, Center Down = empty cell below it (can shrink to a 30px strip). Review stays hidden. */
     #journalScroll,#weatherScroll{flex:var(--ns-a,1) 1 0;}
     #centerDownScroll{flex:var(--ns-b,1) 1 0;min-height:30px;}
-    #journalPane[data-ctab="weather"] #journalScroll,#journalPane[data-ctab="weather"] #journalTemplateButton,
-    #journalPane:not([data-ctab="weather"]) #weatherScroll{display:none!important;}
+    #journalPane:is([data-ctab="weather"],[data-ctab="wxdaily"]) :is(#journalScroll,#journalTemplateButton),
+    #journalPane:not([data-ctab="weather"],[data-ctab="wxdaily"]) #weatherScroll{display:none!important;}
     /* Keep In Mind tab (2026-11-03, Julius): 📋 shows the cell without that section, ⭐ shows only it.
        View only: the section stays in the same Notes cell and saves the same way. */
     #journalPane[data-ctab="notes"] .journal-editor > :is([data-nsec="focus"],[data-nsec="focus"] ~ :not(table,table ~ *)){display:none!important;}
@@ -558,7 +558,7 @@
     #journalPane[data-ctab="focus"] .journal-editor > [data-nsec="focus"]{margin-top:0;border-top:0!important;}
     #journalPane[data-ctab="focus"] #journalTemplateButton{display:none!important;}
     .center-tabs{display:inline-flex;gap:2px;margin-left:-6px;}
-    .center-tabs button[data-ctab="weather"]{opacity:.9;}
+    .center-tabs button:is([data-ctab="weather"],[data-ctab="wxdaily"]){opacity:.9;}
     .center-tabs button{border:0;background:transparent;font-size:12px;line-height:1;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
     .center-tabs button.on{opacity:1;background:color-mix(in srgb,var(--divider) 45%,transparent);}
     /* Reference tabs + daily Scratch Pad (2026-11-03, Julius). */
@@ -1737,6 +1737,8 @@
     .wx-row.wx-now{font-weight:700;}
     .wx-row .wx-t{color:var(--muted,#888);font-size:12px;}
     .wx-row .wx-p{color:#1e88e5;font-size:12px;}
+    .wx-row.wx-d{grid-template-columns:4.6em 1.6em 4.6em 1fr;}
+    .wx-row.wx-d .wx-lo{color:var(--muted,#888);}
     .wx-day{padding:6px 8px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#888);}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
     #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
@@ -2105,7 +2107,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         <!-- Center Up tabs (2026-11-01, Julius): small symbols switch what Center Up shows. -->
         <span class="center-tabs" role="tablist">
           <button type="button" data-ctab="notes" class="on" title="Dailies" aria-label="Dailies">📋</button>
-          <button type="button" data-ctab="weather" title="Weather (hourly)" aria-label="Weather"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/></svg></button>
+          <button type="button" data-ctab="weather" title="Weather (hourly)" aria-label="Weather hourly"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/><text x="12" y="16.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="8.5" font-weight="700" fill="#111">HR</text></svg></button>
+          <button type="button" data-ctab="wxdaily" title="Weather (daily)" aria-label="Weather daily"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/><text x="12" y="16.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7.5" font-weight="700" fill="#111">DLY</text></svg></button>
           <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">⭐</button>
           <button type="button" data-ctab="review" title="Day Review" aria-label="Day Review">📊</button>
         </span>
@@ -2114,7 +2117,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         class="scroll"
         id="journalScroll">
       </div>
-      <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Loading hourly weather…</div></div>
+      <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Loading weather…</div></div>
       <div class="scroll" id="dayReviewScroll"></div>
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
@@ -6747,7 +6750,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(window.renderDayReview) renderDayReview();
     };
     let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
-    set(t === 'weather' || t === 'focus' || t === 'review' ? t : 'notes');
+    set(t === 'weather' || t === 'wxdaily' || t === 'focus' || t === 'review' ? t : 'notes');
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
@@ -7041,12 +7044,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     render();
   })();
   /* Hourly weather (2026-11-01, Julius): ☁️ tab. Open-Meteo (free, no key), Vallejo/Benicia area,
-     next 24 hours. Loads when the tab is shown; refreshes if older than 30 min. */
+     next 24 hours. Daily tab (2026-11-04, Julius): next 7 days from the same fetch. Loads when either
+     tab is shown; refreshes if older than 30 min. */
   (function initWeather(){
     const box = document.getElementById('weatherScroll'), pane = document.getElementById('journalPane');
     if(!box || !pane) return;
     const LAT = 38.08, LON = -122.19, PLACE = 'Vallejo';
-    let at = 0, busy = false;
+    let at = 0, busy = false, data = null;
+    const isWx = () => pane.dataset.ctab === 'weather' || pane.dataset.ctab === 'wxdaily';
     const icon = (c,day) => c === 0 ? (day ? '☀️' : '🌙') : c <= 2 ? (day ? '🌤️' : '☁️') : c === 3 ? '☁️' : c <= 48 ? '🌫️' :
       c <= 57 ? '🌦️' : c <= 67 ? '🌧️' : c <= 77 ? '❄️' : c <= 82 ? '🌧️' : c <= 86 ? '🌨️' : '⛈️';
     const hr = h => (h % 12 || 12) + (h < 12 ? ' am' : ' pm');
@@ -7055,15 +7060,26 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       busy = true;
       fetch('https://api.open-meteo.com/v1/forecast?latitude=' + LAT + '&longitude=' + LON +
         '&hourly=temperature_2m,precipitation_probability,weather_code,is_day' +
-        '&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=2')
-        .then(r => r.json()).then(d => { at = Date.now(); draw(d.hourly); })
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
+        '&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=7')
+        .then(r => r.json()).then(d => { at = Date.now(); data = d; draw(); })
         .catch(() => { box.innerHTML = '<div class="center-placeholder">☁️ Weather didn\'t load. <button type="button" class="btn" data-wx-retry>Retry</button></div>'; })
         .finally(() => { busy = false; });
     }
-    function draw(h){
-      const now = new Date(), key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + 'T' + String(now.getHours()).padStart(2,'0');
+    const draw = () => { if(data && isWx()) (pane.dataset.ctab === 'wxdaily' ? drawDaily : drawHourly)(data); };
+    const head = () => '<div class="wx-head"><span>' + PLACE + '</span><button type="button" data-wx-retry title="Refresh">↻</button></div>';
+    function drawDaily(d){
+      const w = d.daily;
+      box.innerHTML = head() + w.time.map((t,k) => {
+        const [y,m,dd] = t.split('-').map(Number), day = new Date(y,m - 1,dd), p = w.precipitation_probability_max[k];
+        return '<div class="wx-row wx-d' + (k ? '' : ' wx-now') + '"><span class="wx-t">' + (k ? day.toLocaleDateString('en-US',{weekday:'short'}) + ' ' + m + '/' + dd : 'Today') + '</span><span>' + icon(w.weather_code[k],1) +
+          '</span><span>' + Math.round(w.temperature_2m_max[k]) + '° <span class="wx-lo">' + Math.round(w.temperature_2m_min[k]) + '°</span></span><span class="wx-p">' + (p >= 10 ? '💧' + p + '%' : '') + '</span></div>';
+      }).join('');
+    }
+    function drawHourly(d){
+      const h = d.hourly, now = new Date(), key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + 'T' + String(now.getHours()).padStart(2,'0');
       let i = h.time.findIndex(t => t.slice(0,13) === key); if(i < 0) i = 0;
-      let html = '<div class="wx-head"><span>' + PLACE + '</span><button type="button" data-wx-retry title="Refresh">↻</button></div>', lastDay = h.time[i].slice(0,10);
+      let html = head(), lastDay = h.time[i].slice(0,10);
       for(let k = i; k < Math.min(i + 24, h.time.length); k++){
         const d = h.time[k].slice(0,10), H = +h.time[k].slice(11,13);
         if(d !== lastDay){ html += '<div class="wx-day">Tomorrow</div>'; lastDay = d; }
@@ -7074,7 +7090,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       box.innerHTML = html;
     }
     box.addEventListener('click', e => { if(e.target.closest('[data-wx-retry]')) load(true); });
-    const check = () => { if(pane.dataset.ctab === 'weather') load(false); };
+    const check = () => { if(isWx()){ draw(); load(false); } };
     new MutationObserver(check).observe(pane, {attributes:true, attributeFilter:['data-ctab']});
     document.addEventListener('visibilitychange', () => { if(!document.hidden) check(); });
     check();
@@ -9869,10 +9885,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Urgent rows become cells in this mode (2026-11-04, Julius). */
   body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);border:1.5px solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
   body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1.5px;}
-  /* 2px on Today and Dailies cards (2026-11-04, Julius); other cards keep 1.5px. */
-  body.tc-subtleline :is(#todayScroll .day-editor,#journalPane[data-ctab="notes"] .journal-editor) .check-line[data-tccat]{border-left-width:2px;border-right-width:2px;}
-  body.tc-subtleline :is(#todayScroll .day-editor,#journalPane[data-ctab="notes"] .journal-editor) .check-line[data-tccat][data-tc^="f"]{border-top-width:2px;}
-  body.tc-subtleline :is(#todayScroll .day-editor,#journalPane[data-ctab="notes"] .journal-editor) .check-line[data-tccat][data-tc$="l"]{border-bottom-width:2px;}
+  /* Card outline widths (2026-11-04, Julius): 2px on Today, 1px on Dailies; other cards keep 1.5px. */
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tccat]{border-left-width:2px;border-right-width:2px;}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tccat][data-tc^="f"]{border-top-width:2px;}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tccat][data-tc$="l"]{border-bottom-width:2px;}
+  body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat]{border-left-width:1px;border-right-width:1px;}
+  body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat][data-tc^="f"]{border-top-width:1px;}
+  body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1px;}
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
   body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}
   /* Keep subject colors readable without the bright outlines/fold controls. */
@@ -11422,7 +11441,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       box:() => {
         // Center Up (whichever tab is showing) above, Center Down below (2026-11-01).
         const p = document.getElementById('journalPane');
-        const t = document.getElementById(p && p.dataset.ctab === 'weather' ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
+        const t = document.getElementById(p && (p.dataset.ctab === 'weather' || p.dataset.ctab === 'wxdaily') ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
         if(!t || !b) return null;
         const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};

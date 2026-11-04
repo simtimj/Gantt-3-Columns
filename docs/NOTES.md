@@ -340,3 +340,12 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - Card id `p-to-confirm` (title To Confirm), created on first sync and pinned (prepended to `refPinned`). Content is rebuilt from open rows (Status not `works`): `<h2>`, a count line, then per project `<div data-kgrp>` + check-lines `data-kid="k-<hash of date|project|change>"`, oldest first; `broken` rows get "⚠ broken ·".
 - Ticked lines (class `done` on a `data-kid` line) → row Status `works`, Checked on = today; they drop off on that rebuild. Card text is regenerated, so anything typed into it is replaced (old content goes to the backup sheet via `backupCell_`, throttled). Rewrites only when the HTML changes.
 - Backlog seeded 2026-11-04: README 🧪 items grouped into ~37 feature rows (Gantt + Exercise Tracker).
+
+## IT study log (2026-11-04, Julius; spec + ChatGPT protocol: docs/IT_STUDY_HISTORY_AUTOMATION.md)
+
+- `StudyLog.gs`: `syncStudyLog_()` runs in `getWorkspaceData()` after `syncConfirmCard_`. Skips unless tab `Study Sessions` exists and its A–L values + today changed (script property `studySig`); `tryLock` (next load retries).
+- `studySegments_` (last row per ID wins; times from display values via `intakeTime_`), `studyGroups_` (date + window from Started; <8 → morning, ≥22 → evening), `studyBlockHtml_` = head `check-line done data-study="<date>:<window>" data-tl="1" data-fold="1" data-at/dt=<first start>` + detail divs `data-level="1" data-study-of="<key>"` (all text through `doneEsc_`). `studyPutBlock_` replaces the old key's blocks in place, else `appendDoneInSection_`. Applied hash per key in `studyApplied`; same hash → untouched (deleted stays deleted). Backup before every cell write.
+- Next review in an entry is computed from sessions up to that entry only, so later sessions never rewrite older days.
+- Guards: `groupClaudeDone_` treats `data-study`/`data-study-of` blocks as standalone; `placeDoneInSection_` stops at them. Client `titleCovered()` covers only matching `data-study-of` siblings; `tsecArrange` keeps them with the head (data-level > 0).
+- Writes: Days Today cells, column M `Logged` of the intake tab, and the derived `Study Review` tab. Never edits other intake columns.
+- Tests: Node harness with in-memory sheets (sporadic segments, afternoon split, retry, update, draft / bad rows, unknown counts, delete, Claude regroup); `tools/smoke.mjs` checks the fold in the browser.

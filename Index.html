@@ -10552,6 +10552,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       }
       return out;
     }
+    // IT study entries (StudyLog.gs, 2026-11-04) cover only their own detail lines.
+    if(t.dataset && t.dataset.study){
+      for(let n = t.nextElementSibling; n && n.dataset && n.dataset.studyOf === t.dataset.study; n = n.nextElementSibling) out.push(n);
+      return out;
+    }
     // Morn / After / Night headers cover everything down to the next header.
     if(t.dataset && t.dataset.tsec){
       for(let n = t.nextElementSibling; n && !n.hasAttribute('data-tsec'); n = n.nextElementSibling) if(!isEmptyLine(n)) out.push(n);

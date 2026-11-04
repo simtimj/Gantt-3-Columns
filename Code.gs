@@ -121,6 +121,7 @@ function getWorkspaceData() {
   try { applyClaudeNotes_(); } catch (e) { console.error(e); }
   try { applyClaudeTasks_(); } catch (e) { console.error(e); }
   try { syncConfirmCard_(); } catch (e) { console.error(e); }
+  try { syncStudyLog_(); } catch (e) { console.error(e); }
   try { moveScheduleToNotes_(); } catch (e) { console.error(e); }
   try { fixUrgentBold_(); } catch (e) { console.error(e); }
   try { removeDaySections_(); } catch (e) { console.error(e); }
@@ -1411,6 +1412,8 @@ function groupClaudeDone_(html, list) {
     if (sec || doneAttr_(b, 'data-secend') != null) {
       section = sec || 'end'; current = null; slots.push({block:b}); return;
     }
+    // IT study entries (StudyLog.gs) are their own block: never pulled into a project group.
+    if (doneAttr_(b, 'data-study') != null || doneAttr_(b, 'data-study-of') != null) { current = null; slots.push({ block: b }); return; }
     const isLine = /^<div\b[^>]*class="[^"]*check-line/i.test(b);
     const level = Number(doneAttr_(b, 'data-level') || 0);
     const text = isLine ? doneText_(b) : null;
@@ -1515,7 +1518,7 @@ function placeDoneInSection_(html, sec) {
     if (doneAttr_(b, 'data-cgrp') != null && region[i] > target) {
       moved.push(b);
       let j = i + 1;
-      while (j < blocks.length && /^<div\b[^>]*class="[^"]*check-line/i.test(blocks[j])) moved.push(blocks[j++]);
+      while (j < blocks.length && /^<div\b[^>]*class="[^"]*check-line/i.test(blocks[j]) && doneAttr_(blocks[j], 'data-study') == null) moved.push(blocks[j++]);
       // Drop the blank spacer we left behind if it now doubles up.
       if (j < blocks.length && isBlank(blocks[j]) && keep.length && isBlank(keep[keep.length - 1])) j++;
       i = j - 1;

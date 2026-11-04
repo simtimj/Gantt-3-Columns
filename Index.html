@@ -2705,7 +2705,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
       { const top = document.createElement('div'); top.className = 'od-top';
         row.insertBefore(top, row.firstElementChild);
         [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-add" title="Add named block">+ Block</button> <button type="button" class="blocks-task" title="Add task to Blocks">+ Task</button> <button type="button" class="blocks-indent" title="Indent selected line">→</button> <button type="button" class="blocks-outdent" title="Outdent selected line">←</button> <button type="button" class="blocks-up" title="Move selected line up">↑</button> <button type="button" class="blocks-down" title="Move selected line down">↓</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-add" title="Add named block">+ Block</button> <button type="button" class="blocks-task" title="Add task to Blocks">+ Task</button> <button type="button" class="blocks-activate" title="Activate selected Next Block">Activate</button> <button type="button" class="blocks-indent" title="Indent selected line">→</button> <button type="button" class="blocks-outdent" title="Outdent selected line">←</button> <button type="button" class="blocks-up" title="Move selected line up">↑</button> <button type="button" class="blocks-down" title="Move selected line down">↓</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
       // Blocks MVP: reuse the existing Plan column, checkbox editor, indent/outdent,
@@ -2745,6 +2745,27 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
         if(node && node.nodeType === 3) node = node.parentElement;
         while(node && node.parentElement !== pad) node = node.parentElement;
         if(node && node.parentElement === pad) selectedBlockLine = node;
+      });
+      row.querySelector('.blocks-activate').addEventListener('click',()=>{
+        const line=selectedBlockLine;
+        if(!line || line.parentElement!==pad || !line.hasAttribute('data-title')){
+          setStatus('Select a Next Block title first');return;
+        }
+        const strong=line.querySelector(':scope > b,:scope > strong');
+        if(!strong || !/^Next Block(?:\\s+\\d+)?$/i.test(strong.textContent.trim())){
+          setStatus('Activate works on Next Block placeholders');return;
+        }
+        const keep=window.confirm('Keep the existing subtasks in this block? OK = keep; Cancel = clear.');
+        const descendants=[];
+        let n=line.nextElementSibling;
+        const depth=Number(line.dataset.blockDepth)||0;
+        while(n && (Number(n.dataset.blockDepth)||0)>depth){descendants.push(n);n=n.nextElementSibling;}
+        const time=window.prompt('Optional time range (e.g. 9:00–10:30). Leave blank for Block.','');
+        if(time===null)return;
+        if(!keep)descendants.forEach(n=>n.remove());
+        strong.textContent='Block'+(time.trim()?' '+time.trim():'');
+        pad.dispatchEvent(new Event('input',{bubbles:true}));
+        setStatus('Block activated');
       });
       const blockDepth = line => Math.max(0,Number(line.dataset.blockDepth)||0);
       const blockGroup = line => {

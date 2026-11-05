@@ -2909,7 +2909,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       { const top = document.createElement('div'); top.className = 'od-top';
         row.insertBefore(top, row.firstElementChild);
         [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-add" title="Add named block">+ Block</button> <button type="button" class="blocks-task" title="Add task to Blocks">+ Task</button> <button type="button" class="blocks-activate" title="Activate selected Next Block">Activate</button> <button type="button" class="blocks-remove" title="Remove selected line and what is nested under it">Remove</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-remove" title="Remove selected line and what is nested under it">Remove</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
       // Blocks MVP: reuse the existing Plan column, checkbox editor, indent/outdent,
@@ -2931,41 +2931,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         return line;
       };
       let selectedBlockLine = null;
-      const blockAdd = row.querySelector('.blocks-add');
-      const taskAdd = row.querySelector('.blocks-task');
-      // + Block = a title to type over plus one task cell, ready to use (2026-11-04, Julius). No popups.
-      const addBlockTask = (after) => {
-        const n = createCheckboxLine(0);
-        if(after) after.insertAdjacentElement('afterend',n); else pad.appendChild(n);
-        return n;
-      };
-      const addBlocksLine = (kind) => {
-        captureBeforeEdit(pad);
-        pad.querySelectorAll(':scope > br').forEach(n => n.remove());
-        if (kind === 'block') {
-          const line = document.createElement('div');
-          line.setAttribute('data-title', '1');
-          line.dataset.tl = '1';
-          const strong = document.createElement('b');
-          strong.textContent = 'Block name';
-          line.appendChild(strong);
-          pad.appendChild(line);
-          addBlockTask(line);
-          selectedBlockLine = line;
-          pad.focus({preventScroll:true});
-          const r = document.createRange(); r.selectNodeContents(strong);
-          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-        } else {
-          const at = selectedBlockLine && selectedBlockLine.parentElement === pad ? blockOwner(selectedBlockLine) : null;
-          const n = addBlockTask(at ? blockGroup(at).slice(-1)[0] : null);
-          selectedBlockLine = n;
-          pad.focus({preventScroll:true});
-          placeCaretInsideCheckbox(n.querySelector('.check-text'));
-        }
-        pad.dispatchEvent(new Event('input', {bubbles:true}));
-      };
-      blockAdd.addEventListener('click', () => addBlocksLine('block'));
-      taskAdd.addEventListener('click', () => addBlocksLine('task'));
+      // + Block / + Task / Activate removed 2026-11-05 (Julius): Next Block is always there, Enter adds tasks, ▶ starts and names a block.
       // Explicit mobile-friendly hierarchy/order controls. A selection is captured
       // before toolbar focus changes; all mutations use the existing Plan save path.
       pad.addEventListener('pointerup', e => {
@@ -2989,24 +2955,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         selectedBlockLine=null;
         pad.dispatchEvent(new Event('input',{bubbles:true}));
         setStatus('Removed from Blocks');
-      });
-      row.querySelector('.blocks-activate').addEventListener('click',()=>{
-        const line=selectedBlockLine;
-        if(!line || line.parentElement!==pad || !line.hasAttribute('data-title')){
-          setStatus('Select a Next Block title first');return;
-        }
-        const strong=line.querySelector(':scope > b,:scope > strong');
-        if(!strong || !/^(?:Block name|Next Block(?:\s+\d+)?)$/i.test(strong.textContent.trim())){
-          setStatus('Activate works on Next Block placeholders');return;
-        }
-        const keep=window.confirm('Keep existing subtasks? OK = keep. Cancel = do not activate.');
-        if(!keep){setStatus('Activation cancelled; subtasks preserved');return;}
-        const time=window.prompt('Optional time range (e.g. 9:00–10:30). Leave blank for Block.','');
-        if(time===null)return;
-        // Existing subtasks are never deleted during activation.
-        strong.textContent='Block'+(time.trim()?' '+time.trim():'');
-        pad.dispatchEvent(new Event('input',{bubbles:true}));
-        setStatus('Block activated');
       });
       // A block's title/time-range line is its handle: long-press then move.
       // No grip icons or extra markup are inserted into saved editor content.

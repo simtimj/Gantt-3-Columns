@@ -10252,6 +10252,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   /* Uniform section lines (2026-11-04, Julius): every section and header line is 2px in --divider. */
   #toolbar,.pane-header,body.day-lines .pane-header,.editor > [data-nsec="must"],body.day-lines .editor > [data-nsec="must"]{border-bottom:2px solid var(--divider)!important;}
+  /* Uniform lines, round 2 (2026-11-05, Julius: "match the thickest, all look the same"): the lines the first pass
+     missed. Every divider is 2px solid --divider (day color only under Options → Lines in the day color). */
+  .pane{border-right:0!important;} /* the 1px light pane edge; column lines come from .column-resizer (2px) */
+  #workspace .pane.peek-pane{border-left:2px solid var(--divider)!important;}
+  #workspace .pane.peek-pane.peek-left{border-left:0!important;border-right:2px solid var(--divider)!important;}
+  .editor > [data-tsec]:not([data-tsec="gap"]){border-bottom-width:2px!important;border-bottom-color:var(--divider)!important;}
+  .editor > [data-nsec]{border-bottom:2px solid var(--divider)!important;}
+  .editor > [data-nsec="focus"]{border-top-width:2px!important;border-top-color:var(--divider)!important;}
+  body.day-lines .editor > [data-nsec]{border-bottom:2px solid var(--note-line-adj,var(--divider))!important;}
+  body.day-lines .editor > [data-nsec="must"]{border-bottom-color:var(--divider)!important;}
+  #centerCalendarList .ce-group{border-top:2px solid var(--divider)!important;}
+  #centerDownScroll > .ce-head{margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px;width:auto!important;box-sizing:border-box;} /* line runs wall to wall like the other headers */
+  #centerCalendarList > .ce-group:first-child{border-top:0!important;margin-top:4px;padding-top:0;} /* right under the Cal Events line: no double line */
   /* Hold-to-expand labels never select text (2026-11-04, Julius). */
   .ce-head strong,.urg-head,.today-jump,.od-pad-head,.editor > [data-nsec="must"]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 </style>
@@ -12512,6 +12525,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return out;
   }
   const pending = new Set();
+  // --divider resolved to a plain color an SVG data URL understands (it can be a color-mix()).
+  function divInk(pad){
+    const head = pad.parentElement && pad.parentElement.querySelector(':scope > .od-pad-head');
+    const c = head ? getComputedStyle(head).borderTopColor : getComputedStyle(pad).color;
+    try{ const x = document.createElement('canvas').getContext('2d'); x.fillStyle = '#888'; x.fillStyle = c; return x.fillStyle; }catch(e){ return '#888'; }
+  }
   function draw(pad){
     if(!pad.isConnected) return;
     const gs = groups(pad);
@@ -12526,7 +12545,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const top = first.offsetTop - 5, bottom = last.offsetTop + last.offsetHeight + 4;
       const next = /^next block\b/i.test((first.textContent || '').trim());
       // A line across the pad above Next Block (2026-11-04, Julius), so it's set apart from what's above.
-      if(next) rects += '<line x1="2" x2="' + Math.max(10,W - 2) + '" y1="' + (top - 6.5) + '" y2="' + (top - 6.5) + '" stroke="' + ink + '" stroke-opacity=".55" stroke-width="1.5"/>';
+      // Same 2px line color as every other divider (2026-11-05); none when Next Block is first (the Blocks header line is right there).
+      if(next && first.previousElementSibling) rects += '<line x1="2" x2="' + Math.max(10,W - 2) + '" y1="' + (top - 6.5) + '" y2="' + (top - 6.5) + '" stroke="' + divInk(pad) + '" stroke-width="2"/>';
       rects += '<rect x="2" y="' + (top + .75) + '" width="' + Math.max(10,W - 4) + '" height="' + Math.max(10,bottom - top - 1.5) + '" rx="8" fill="none" stroke="' +
         ink + '" stroke-opacity=".45" stroke-width="1.5"' + (next ? ' stroke-dasharray="6 4"' : '') + '/>'; // Next Block: same soft color, dashed (2026-11-05, Julius: yellow was too bright)
     });

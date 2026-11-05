@@ -12596,6 +12596,387 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 })();
 </script>
 <style>
+  /* Block timer MVP (2026-11-05, Julius). Bar + chips are render-only: they live next to the Blocks pad, never in it. */
+  .tmr-bar,.tmr-layer{display:none;}
+  body.one-day #todayScroll .od-on > .tmr-bar.on{display:flex;}
+  body.one-day #todayScroll .od-on > .tmr-layer{display:block;}
+  .tmr-bar{flex:0 0 auto;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;line-height:1.3;padding:3px 2px 4px;color:var(--muted);}
+  .tmr-bar .tmr-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  .tmr-bar .tmr-name{color:var(--text,inherit);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-bar .tmr-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-bar .tmr-clock{font-variant-numeric:tabular-nums;font-weight:600;color:var(--text,inherit);cursor:pointer;}
+  .tmr-bar.run .tmr-clock{color:#1e9e4a;}
+  .tmr-bar button{font:inherit;font-size:12px;padding:2px 7px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;}
+  .tmr-bar i{font-style:normal;}
+  .tmr-bar .tmr-btns{display:flex;gap:4px;flex:0 0 auto;}
+  .tmr-bar.narrow i{display:none;}
+  .tmr-bar.narrow .tmr-main{flex-basis:100%;}
+  .tmr-bar .tmr-sync{font-size:10px;opacity:.75;}
+  .tmr-layer{position:absolute;overflow:hidden;pointer-events:none;z-index:2;}
+  .tmr-chip{position:absolute;right:4px;display:flex;align-items:center;gap:2px;pointer-events:auto;font-size:11px;line-height:1;
+    font-variant-numeric:tabular-nums;color:var(--muted);}
+  .tmr-chip .tmr-t{cursor:pointer;padding:2px 1px;}
+  .tmr-chip button{font:inherit;font-size:10px;width:20px;height:18px;padding:0;border-radius:5px;border:1px solid currentColor;
+    background:transparent;color:inherit;cursor:pointer;opacity:.55;}
+  .tmr-chip.blk button{opacity:.8;}
+  .tmr-chip.on{color:#1e9e4a;font-weight:600;}
+  .tmr-chip.on button{opacity:1;}
+  .tmr-chip.pz{color:#d08a00;}
+  .plan-pad > [data-blk]{padding-right:58px;}
+</style>
+<script>
+/* Block timer MVP (2026-11-05, Julius; design = Reference card "📜 Timer App", Nov 3 decisions).
+   - ▶ on a block title starts that block's timer; ▶ on a task in it starts that task's timer (and the block's).
+   - One block runs at a time (starting another pauses it); one task timer per block (starting another stops it).
+   - Ticking the running task stops its timer, the block keeps going. Pause pauses both; ▶ resumes both.
+   - ☕ Break is its own task in the block. Block time not on a task stays "unassigned", never spread out.
+   - Finish stops the block; unfinished tasks stay as they are.
+   - Every tap is an event with a unique op id (the timestamps are the record, not a ticking counter), so locking the
+     phone or closing the page never loses time. Events are saved on the device first, then sent to the "Timer Log"
+     tab (Timer.gs, skips op ids it already has). Totals are rebuilt from the events. Tap a time to correct it; the
+     measured time is kept, the correction is its own event. Blocks / tasks are tied to their lines by data-tmr. */
+(function(){
+  const KEY = 'fw.timer.v1', BREAK = 'break', KEEP_DAYS = 14, FORGOT_MS = 2 * 3600e3;
+  const run = () => (window.google && google.script && google.script.run) || null;
+  const today = () => (typeof state !== 'undefined' && state && state.today) || new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0,10);
+  const status = s => { try{ setStatus(s); }catch(e){} };
+  const rid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  let dev = ''; try{ dev = localStorage.getItem('fw.dev') || ''; if(!dev){ dev = rid('d'); localStorage.setItem('fw.dev',dev); } }catch(e){ dev = 'nostore'; }
+
+  /* ---- event store (device first) ---- */
+  let events = [], sent = new Set();
+  try{ const s = JSON.parse(localStorage.getItem(KEY) || '{}'); events = Array.isArray(s.events) ? s.events : []; sent = new Set(s.sent || []); }catch(e){}
+  function persist(){
+    const cut = Date.now() - KEEP_DAYS * 864e5;
+    events = events.filter(e => e.at >= cut || !sent.has(e.op));
+    const ops = new Set(events.map(e => e.op));
+    sent = new Set([...sent].filter(o => ops.has(o)));
+    try{ localStorage.setItem(KEY, JSON.stringify({events, sent:[...sent]})); }catch(e){}
+  }
+  function merge(list, fromServer){
+    const have = new Set(events.map(e => e.op));
+    let added = 0;
+    (list || []).forEach(e => {
+      if(!e || !e.op) return;
+      if(fromServer) sent.add(e.op);
+      if(have.has(e.op)) return;
+      have.add(e.op); events.push({op:e.op,date:e.date,at:Number(e.at),act:e.act,blk:e.blk||'',item:e.item||'',name:e.name||'',value:e.value === undefined ? null : e.value,dev:e.dev||''});
+      added++;
+    });
+    if(added || fromServer) persist();
+    return added;
+  }
+
+  /* ---- replay: events -> state ---- */
+  function replay(now){
+    const B = {}, fix = {};
+    let cur = null;
+    const blk = id => B[id] || (B[id] = {run:false,since:0,ms:0,child:null,cs:0,items:{},paused:false,done:false,last:0,date:''});
+    const stopChild = (b,t) => { if(b.child && b.run) b.items[b.child] = (b.items[b.child] || 0) + Math.max(0,t - b.cs); };
+    const pause = (id,t) => { const b = B[id]; if(!b || !b.run) return; stopChild(b,t); b.ms += Math.max(0,t - b.since); b.run = false; b.paused = true; if(cur === id) cur = null; };
+    const start = (id,t) => { if(cur && cur !== id) pause(cur,t); const b = blk(id); if(b.run) return b; b.run = true; b.since = t; b.paused = false; b.done = false; if(b.child) b.cs = t; cur = id; return b; };
+    [...events].sort((a,b) => a.at - b.at || (a.op < b.op ? -1 : 1)).forEach(e => {
+      const t = e.at;
+      if(e.blk){ const b = blk(e.blk); b.last = t; b.date = b.date || e.date; }
+      if(e.act === 'start') start(e.blk,t);
+      else if(e.act === 'pause') pause(e.blk,t);
+      else if(e.act === 'finish'){ const b = B[e.blk]; if(b){ pause(e.blk,t); b.child = null; b.paused = false; b.done = true; } }
+      else if(e.act === 'istart'){ const b = start(e.blk,t); if(b.child === e.item) return; stopChild(b,t); b.child = e.item; b.cs = t; }
+      else if(e.act === 'istop'){ const b = B[e.blk]; if(b && b.child === e.item){ stopChild(b,t); b.child = null; } }
+      else if(e.act === 'fix') fix[e.blk + '|' + (e.item || '')] = e.value === null || e.value === '' ? null : Number(e.value);
+    });
+    const out = {cur, blocks:{}};
+    Object.keys(B).forEach(id => {
+      const b = B[id], items = {};
+      Object.keys(b.items).forEach(k => items[k] = b.items[k]);
+      if(b.run && b.child) items[b.child] = (items[b.child] || 0) + Math.max(0, now - b.cs);
+      const raw = b.ms + (b.run ? Math.max(0, now - b.since) : 0);
+      const shown = {}; Object.keys(items).forEach(k => { const f = fix[id + '|' + k]; shown[k] = f === null || f === undefined ? items[k] : f; });
+      const f = fix[id + '|'];
+      const assigned = Object.keys(items).reduce((s,k) => s + items[k], 0);
+      out.blocks[id] = {run:b.run, paused:b.paused, done:b.done, child:b.child, raw, ms: f === null || f === undefined ? raw : f, fixed: f !== null && f !== undefined,
+        items, shown, unassigned: Math.max(0, raw - assigned), since:b.run ? b.since : 0, last:b.last, date:b.date};
+    });
+    return out;
+  }
+
+  /* ---- send queue ---- */
+  let flushing = false, flushTimer = 0, backoff = 2000, lastSync = '';
+  function flush(){
+    clearTimeout(flushTimer);
+    const r = run(); if(!r || flushing) return;
+    const todo = events.filter(e => !sent.has(e.op));
+    if(!todo.length){ lastSync = 'saved'; return; }
+    flushing = true; lastSync = 'saving…';
+    r.withSuccessHandler(res => {
+      flushing = false; backoff = 2000;
+      ((res && res.saved) || todo.map(e => e.op)).forEach(o => sent.add(o));
+      persist(); lastSync = 'saved'; paintAll();
+      if(events.some(e => !sent.has(e.op))) flushTimer = setTimeout(flush, 300);
+    }).withFailureHandler(() => {
+      flushing = false; lastSync = 'offline · kept on this device';
+      flushTimer = setTimeout(flush, backoff); backoff = Math.min(backoff * 2, 60000); paintAll();
+    }).saveTimerEvents(todo);
+  }
+  let pulling = false, lastPull = 0;
+  function pull(){
+    const r = run(); if(!r || pulling) return;
+    pulling = true; lastPull = Date.now();
+    const since = new Date(Date.now() - 7 * 864e5 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0,10);
+    r.withSuccessHandler(list => { pulling = false; merge(Array.isArray(list) ? list : [], true); paintAll(); checkForgot(); flush(); })
+     .withFailureHandler(() => { pulling = false; }).getTimerEvents(since);
+  }
+
+  /* ---- lines <-> ids ---- */
+  const isTitle = n => n.hasAttribute('data-title');
+  const isBlank = n => !n.classList.contains('check-line') && !n.textContent.trim() && !n.querySelector('input,img,hr');
+  function groups(pad){
+    const out = []; let cur = null;
+    for(const n of pad.children){
+      if(isTitle(n)){ cur = {title:n, items:[]}; out.push(cur); continue; }
+      if(!cur) continue;
+      if(isBlank(n)){ cur = null; continue; }
+      if(n.classList.contains('check-line')) cur.items.push(n);
+    }
+    return out;
+  }
+  const lineName = n => ((n.querySelector('.check-text') || n).textContent || '').replace(/\s+/g,' ').trim().slice(0,120);
+  const isDone = n => n.classList.contains('done') || !!(n.querySelector(':scope > input[type=checkbox]') || {}).checked;
+  function idFor(line, prefix, pad){
+    if(line.dataset.tmr) return line.dataset.tmr;
+    if(typeof captureBeforeEdit === 'function') captureBeforeEdit(pad);
+    line.dataset.tmr = rid(prefix);
+    pad.dispatchEvent(new Event('input',{bubbles:true}));
+    return line.dataset.tmr;
+  }
+  // Enter in a line copies its attributes to the new line: the first line keeps the id, copies lose it.
+  function dedupe(pad){
+    const seen = new Set(); let changed = false;
+    pad.querySelectorAll('[data-tmr]').forEach(n => { if(seen.has(n.dataset.tmr)){ n.removeAttribute('data-tmr'); changed = true; } else seen.add(n.dataset.tmr); });
+    if(changed && pad.isContentEditable) pad.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  function findLine(id){
+    if(!id) return null;
+    for(const pad of document.querySelectorAll('#todayScroll .plan-pad')){ const n = pad.querySelector('[data-tmr="' + CSS.escape(id) + '"]'); if(n) return {pad, line:n}; }
+    return null;
+  }
+  const PLACEHOLDER = /^(?:Next Block(?:\s+\d+)?|Block name)$/i;
+
+  /* ---- actions ---- */
+  let lastTap = {k:'', el:null, t:0};
+  function record(act, blk, item, name, date, value){
+    const e = {op:rid('t'), date: date || today(), at: Date.now(), act, blk: blk || '', item: item || '', name: name || '', value: value === undefined ? null : value, dev};
+    events.push(e); persist();
+    return e;
+  }
+  function act(kind, pad, title, line){
+    const el = line || title; // same line + same button within 600 ms = one tap (names can change on start)
+    if(lastTap.k === kind && lastTap.el === el && Date.now() - lastTap.t < 600) return;
+    lastTap = {k:kind, el, t:Date.now()};
+    const date = pad.dataset.date || today();
+    const s = replay(Date.now());
+    if(kind === 'block' || kind === 'item' || kind === 'break'){
+      // Starting a Next Block placeholder names it after the start time; Blocks then adds a fresh Next Block.
+      const strong = title.querySelector(':scope > b,:scope > strong');
+      if(strong && PLACEHOLDER.test(strong.textContent.trim()) && pad.isContentEditable){
+        if(typeof captureBeforeEdit === 'function') captureBeforeEdit(pad);
+        strong.textContent = 'Block ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+        pad.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    }
+    const bid = idFor(title,'b-',pad), b = s.blocks[bid];
+    if(kind === 'block'){
+      if(b && b.run) record('pause', bid, '', lineName(title), date);
+      else record('start', bid, '', lineName(title), date);
+    } else if(kind === 'item'){
+      const iid = idFor(line,'i-',pad);
+      if(b && b.run && b.child === iid) record('istop', bid, iid, lineName(line), date);
+      else record('istart', bid, iid, lineName(line), date);
+    } else if(kind === 'break'){
+      if(b && b.run && b.child === BREAK) record('istop', bid, BREAK, 'Break', date);
+      else record('istart', bid, BREAK, 'Break', date);
+    } else if(kind === 'finish'){
+      record('finish', bid, '', lineName(title), date);
+    }
+    paintAll(); flush();
+  }
+  function parseDur(v){
+    v = String(v || '').trim().toLowerCase();
+    if(!v) return null;
+    let m = v.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/);
+    if(m) return m[3] !== undefined ? ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3])) * 1e3 : ((+m[1]) * 3600 + (+m[2]) * 60) * 1e3;
+    m = v.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+)\s*m(?:in)?)?$/);
+    if(m && (m[1] || m[2])) return Math.round(((+m[1] || 0) * 3600 + (+m[2] || 0) * 60) * 1e3);
+    if(/^\d+$/.test(v)) return (+v) * 60e3;
+    return undefined;
+  }
+  function correct(pad, title, line, itemId){
+    const bid = title.dataset.tmr; if(!bid) return;
+    const s = replay(Date.now()), b = s.blocks[bid]; if(!b) return;
+    const iid = itemId || (line && line.dataset.tmr) || '';
+    const measured = iid ? (b.items[iid] || 0) : b.raw;
+    const v = window.prompt('Correct the time for "' + (iid === BREAK ? 'Break' : lineName(line || title)) + '" (e.g. 45m, 1h 10m, 1:10).\nMeasured: ' + fmt(measured, true) + '. Leave empty to go back to the measured time.', iid ? fmt(b.shown[iid] || 0, true) : fmt(b.ms, true));
+    if(v === null) return;
+    const ms = parseDur(v);
+    if(ms === undefined){ status('Timer: could not read "' + v + '"'); return; }
+    record('fix', bid, iid, iid === BREAK ? 'Break' : lineName(line || title), pad.dataset.date, ms);
+    status(ms === null ? 'Timer: back to the measured time' : 'Timer: corrected to ' + fmt(ms, true));
+    paintAll(); flush();
+  }
+
+  /* ---- drawing ---- */
+  function fmt(ms, words){
+    const s = Math.max(0, Math.floor((ms || 0) / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    if(words) return h ? h + 'h ' + m + 'm' : m ? m + 'm' : x + 's';
+    return h ? h + ':' + String(m).padStart(2,'0') + ':' + String(x).padStart(2,'0') : m + ':' + String(x).padStart(2,'0');
+  }
+  function attach(pad){
+    if(pad._tmr && pad._tmr.bar.isConnected && pad._tmr.layer.isConnected) return pad._tmr;
+    const bar = document.createElement('div'); bar.className = 'tmr-bar'; bar.setAttribute('contenteditable','false');
+    const layer = document.createElement('div'); layer.className = 'tmr-layer'; layer.setAttribute('contenteditable','false');
+    pad.insertAdjacentElement('beforebegin', bar);
+    pad.insertAdjacentElement('afterend', layer);
+    if(!pad._tmrWired){
+      pad._tmrWired = true;
+      pad.addEventListener('scroll', () => paint(pad), {passive:true});
+      pad.addEventListener('input', () => requestAnimationFrame(() => paint(pad)));
+      // Ticking the running task stops its timer; the block keeps running.
+      pad.addEventListener('change', e => {
+        const line = e.target.closest && e.target.closest('.check-line');
+        if(!line || !line.dataset.tmr) return;
+        requestAnimationFrame(() => {
+          if(!isDone(line)) return;
+          const g = groups(pad).find(x => x.items.includes(line)); if(!g || !g.title.dataset.tmr) return;
+          const b = replay(Date.now()).blocks[g.title.dataset.tmr];
+          if(b && b.child === line.dataset.tmr){ record('istop', g.title.dataset.tmr, line.dataset.tmr, lineName(line), pad.dataset.date); paintAll(); flush(); }
+        });
+      });
+    }
+    bar.addEventListener('click', e => {
+      const btn = e.target.closest('[data-tact]'); if(!btn) return;
+      e.preventDefault(); e.stopPropagation();
+      const hit = findLine(bar.dataset.blk); if(!hit) return;
+      const a = btn.dataset.tact;
+      if(a === 'fix-blk') correct(hit.pad, hit.line, null, '');
+      else if(a === 'fix-item'){ const it = bar.dataset.item === BREAK ? null : findLine(bar.dataset.item); correct(hit.pad, hit.line, it && it.line, bar.dataset.item); }
+      else act(a, hit.pad, hit.line, null);
+    });
+    layer.addEventListener('click', e => {
+      const el = e.target.closest('[data-tact]'); if(!el) return;
+      e.preventDefault(); e.stopPropagation();
+      const chip = el.closest('.tmr-chip'), line = chip && chip._line, title = chip && chip._title;
+      if(!line || !line.isConnected) return;
+      if(el.dataset.tact === 'fix') correct(pad, title, line === title ? null : line, '');
+      else act(line === title ? 'block' : 'item', pad, title, line === title ? null : line);
+    });
+    // Keep taps on the overlay from moving the caret / starting a drag in the pad underneath.
+    ['pointerdown','mousedown','touchstart'].forEach(t => layer.addEventListener(t, e => { if(e.target.closest('.tmr-chip')) e.stopPropagation(); }, {passive:true}));
+    pad._tmr = {bar, layer};
+    return pad._tmr;
+  }
+  let snap = null;
+  function paint(pad, s){
+    if(!pad.isConnected) return;
+    s = s || snap || replay(Date.now());
+    dedupe(pad);
+    const {bar, layer} = attach(pad);
+    Object.assign(layer.style, {top: pad.offsetTop + 'px', left: pad.offsetLeft + 'px', width: pad.clientWidth + 'px', height: pad.clientHeight + 'px'});
+    const gs = groups(pad), want = [];
+    gs.forEach(g => {
+      const bid = g.title.dataset.tmr, b = bid && s.blocks[bid];
+      want.push({line:g.title, title:g.title, blk:true, on: !!(b && b.run), pz: !!(b && b.paused), ms: b ? b.ms : 0, has: !!b});
+      g.items.forEach(n => {
+        const iid = n.dataset.tmr, on = !!(b && b.run && iid && b.child === iid), ms = b && iid ? (b.shown[iid] || 0) : 0;
+        if(isDone(n) && !ms) return; // finished and never timed: nothing to show
+        want.push({line:n, title:g.title, blk:false, on, pz: !!(b && b.paused && iid && b.child === iid), ms, has: ms > 0 || on, done: isDone(n)});
+      });
+    });
+    const chips = [...layer.children];
+    while(chips.length > want.length) chips.pop().remove();
+    want.forEach((w,i) => {
+      let c = chips[i];
+      if(!c){ c = document.createElement('div'); c.innerHTML = '<span class="tmr-t" data-tact="fix"></span><button type="button" data-tact="go"></button>'; layer.appendChild(c); }
+      c._line = w.line; c._title = w.title;
+      c.className = 'tmr-chip' + (w.blk ? ' blk' : '') + (w.on ? ' on' : '') + (w.pz ? ' pz' : '');
+      const t = c.firstChild, btn = c.lastChild;
+      const txt = w.has ? fmt(w.ms) : '';
+      if(t.textContent !== txt) t.textContent = txt;
+      t.title = w.has ? 'Tap to correct this time' : '';
+      btn.style.display = w.done ? 'none' : '';
+      const sym = w.on ? '❚❚' : '▶';
+      if(btn.textContent !== sym) btn.textContent = sym;
+      btn.title = w.blk ? (w.on ? 'Pause this block (and its task)' : 'Start this block') : (w.on ? 'Stop this task’s timer' : 'Time this task');
+      btn.setAttribute('aria-label', btn.title);
+      c.style.top = (w.line.offsetTop - pad.scrollTop + Math.max(0, (Math.min(w.line.offsetHeight, 24) - 18) / 2)) + 'px';
+      c.style.visibility = w.line.offsetParent === null ? 'hidden' : '';
+    });
+    // Bar: the running (or last paused) block of this pad, else today's total.
+    const ids = new Set(gs.map(g => g.title.dataset.tmr).filter(Boolean));
+    let bid = s.cur && ids.has(s.cur) ? s.cur : null;
+    if(!bid){ let last = -1; ids.forEach(id => { const b = s.blocks[id]; if(b && b.paused && !b.done && b.last > last){ last = b.last; bid = id; } }); }
+    const total = [...ids].reduce((n,id) => n + (s.blocks[id] ? s.blocks[id].ms : 0), 0);
+    const brk = [...ids].reduce((n,id) => n + (s.blocks[id] ? (s.blocks[id].shown[BREAK] || 0) : 0), 0);
+    const pending = events.some(e => !sent.has(e.op));
+    const sync = pending ? (lastSync === 'offline · kept on this device' ? lastSync : 'saving…') : '';
+    let html = '', on = false;
+    if(bid){
+      const b = s.blocks[bid], hit = gs.find(g => g.title.dataset.tmr === bid);
+      const child = b.child, cl = child && child !== BREAK ? pad.querySelector('[data-tmr="' + CSS.escape(child) + '"]') : null;
+      const cname = child === BREAK ? '☕ Break' : cl ? lineName(cl) : child ? 'task' : '';
+      bar.dataset.blk = bid; bar.dataset.item = child || '';
+      const sub = (child ? '<span data-tact="fix-item" class="tmr-clock">' + esc(cname) + ' ' + fmt(b.shown[child] || 0) + '</span> · ' : '') +
+        (b.shown[BREAK] && child !== BREAK ? '☕ ' + fmt(b.shown[BREAK], true) + ' · ' : '') + 'unassigned ' + fmt(b.unassigned, true);
+      html = '<div class="tmr-main"><div class="tmr-name">' + (b.run ? '⏱ ' : '❚❚ ') + esc(hit ? lineName(hit.title) : 'Block') + ' <span class="tmr-clock" data-tact="fix-blk" title="Tap to correct">' + fmt(b.ms) + '</span></div>' +
+        '<div class="tmr-sub">' + sub + (sync ? ' <span class="tmr-sync">· ' + sync + '</span>' : '') + '</div></div>' +
+        '<span class="tmr-btns"><button type="button" data-tact="block" title="' + (b.run ? 'Pause' : 'Resume') + '">' + (b.run ? '❚❚<i> Pause</i>' : '▶<i> Resume</i>') + '</button>' +
+        '<button type="button" data-tact="break" title="' + (child === BREAK && b.run ? 'End break' : 'Break') + '">☕<i>' + (child === BREAK && b.run ? ' End break' : ' Break') + '</i></button>' +
+        '<button type="button" data-tact="finish" title="Finish">■<i> Finish</i></button></span>';
+      on = true;
+      bar.classList.toggle('run', b.run);
+    } else if(total){
+      bar.dataset.blk = ''; bar.classList.remove('run');
+      html = '<div class="tmr-main"><div class="tmr-sub">⏱ ' + (pad.dataset.date === today() ? 'Today' : pad.dataset.date) + ': ' + fmt(total, true) + ' tracked' + (brk ? ' · ☕ ' + fmt(brk, true) : '') + (sync ? ' · ' + sync : '') + '</div></div>';
+      on = true;
+    }
+    if(bar._html !== html){ bar.innerHTML = html; bar._html = html; }
+    bar.classList.toggle('narrow', pad.clientWidth > 0 && pad.clientWidth < 300);
+    bar.classList.toggle('on', on);
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+  function paintAll(){
+    snap = replay(Date.now());
+    document.querySelectorAll('#todayScroll .plan-pad').forEach(p => { try{ paint(p, snap); }catch(e){ console.error(e); } });
+    snap = null;
+  }
+  // A timer left running for hours: say so once per block, so the time can be corrected (it's never trimmed).
+  const warned = new Set();
+  function checkForgot(){
+    const s = replay(Date.now());
+    Object.keys(s.blocks).forEach(id => {
+      const b = s.blocks[id];
+      if(b.run && Date.now() - b.since > FORGOT_MS && !warned.has(id)){
+        warned.add(id);
+        const hit = findLine(id);
+        status('⏱ "' + (hit ? lineName(hit.line) : 'A block') + '" has been running ' + fmt(b.ms, true) + ' — tap its time to correct it if you forgot to stop');
+      }
+    });
+  }
+  window.fwTimer = {replay: () => replay(Date.now()), events: () => events.slice(), merge: l => { const n = merge(l, false); paintAll(); return n; }, flush, pull, paintAll, parseDur, checkForgot};
+
+  setInterval(() => { if(document.visibilityState !== 'hidden') paintAll(); }, 1000);
+  window.addEventListener('resize', () => paintAll());
+  window.addEventListener('online', flush);
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState !== 'visible') return;
+    paintAll(); checkForgot(); flush();
+    if(Date.now() - lastPull > 30000) pull();
+  });
+  // After the page has drawn: show device events at once, then merge the Timer Log and send anything unsent.
+  setTimeout(() => { paintAll(); checkForgot(); }, 300);
+  setTimeout(pull, 1500);
+})();
+</script>
+<style>
   .ref-toolbar.hs-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);}
   .ref-toolbar.hs-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);}
   .ref-toolbar.hs-l.hs-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}

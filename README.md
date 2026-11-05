@@ -49,6 +49,7 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Block timer (MVP)**: in Blocks, every block title and task has a small **▶**. ▶ on a block starts its timer; ▶ on a task times that task (and starts its block). One block runs at a time (starting another pauses it) and one task per block (starting another stops the last). Ticking the running task stops its timer, the block keeps going. A bar above Blocks shows the running block, its task, ☕ break time and unassigned time, with **❚❚ Pause / ▶ Resume**, **☕ Break** and **■ Finish** (unfinished tasks stay as they are). Starting a Next Block names it "Block 9:41" and a new Next Block appears. Time comes from saved start/stop times, so locking the phone or closing the app never loses it; after 2 h running you get a note in case you forgot. Tap any time to correct it (45m, 1h 10m, 1:10; empty = back to measured); the measured time is kept. Taps are saved on the phone first, then to the new **Timer Log** tab, and show on your other devices. Not yet: History Log entries, task estimates, Calendar/Toggl import, bulk quick-add.
 - **Faster start + live updates**: the page now opens with what's already saved and fills in new Done Log lines, AI-added tasks, the To Confirm card and study entries a few seconds later, in place, without reloading. While the app is open it checks for changes every minute (imports every 3 minutes and whenever you come back to it), so things added by Claude or ChatGPT show up on their own. Fewer settings reads on each load, too.
 - **Keep In Mind: category + free task list**: under each category (e.g. Crabbing prep) it's just tasks and subtasks you nest however you want: Enter adds a line, Tab / Shift+Tab (or the small ‹ › buttons on the line you're in, on the phone) move it in or out, Backspace on an empty line removes it. The old Task cards, "Why focus" lines and the deep left indent are gone, so the list starts right under the category. Your existing items were converted: each old Task is a top line with its subtasks under it, and a "why" note is a gray line under it. 📌 Send to Today and ticking still work.
 
@@ -441,7 +442,7 @@ Last updated: 2026-11-05
 - **Calendar column, like Google Calendar** (Julius, 2026-10-28): a full calendar view as its own column (or swipe in from the right / a button that swaps it in for Reference), so while scheduling with Claude he can see the day at a glance on phone, tablet and computer. Details to settle: day vs 3-day vs week view, read-only first or drag tasks onto it.
 - **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)
 - **Hold anywhere on a card to move it (2026-10-27)**: hold and grab a card (not just its checkbox) to drag it; a plain tap on the card still goes into the text for editing, selecting, highlighting
-- **Idea: built-in time tracking → plan vs actual (2026-10-27)**: own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)
+- **Idea: built-in time tracking → plan vs actual (2026-10-27)** (step 1 = Block timer MVP, 2026-11-05): own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)
 - **Mirrored tasks (Today ↔ Reference)**: send a carry-over to Today but keep it tracked in its Reference area (e.g. CDCR under State / IT Associate); one linked task in both places, so checking it off in Today also checks it in Reference. Approach to work out (shared task id, show it in both, one source of truth)
 
 - Hide the "created by a Google Apps Script user" banner — only if the Exercise Tracker's wrapper experiment works out (it's shelved there for being slow).
@@ -476,6 +477,7 @@ Last updated: 2026-11-05
 
 ## Files
 
+- `Timer.gs` — Block timer: appends timer taps to the Timer Log tab (skips duplicates) and reads them back.
 - `Code.gs` — server: serves the page, sets up the sheets, loads/saves days and Reference cells, archive, urgent days, inbox.
 - `inbox.js` — Inbox items Claude adds (`CLAUDE_INBOX`).
 - `donelog.js` — work done through Claude (`CLAUDE_DONE`), merged into each day's Today cell.

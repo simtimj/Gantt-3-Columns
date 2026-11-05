@@ -381,3 +381,14 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - `ensureSetup_`: one property read when `lastSetupDate` is today. `getCardCats_`: one `getProperties()`, writes only when something changes (it set `cardCatsHealth1` every load).
 - The fallback client load (`getWorkspaceData()` without opts) still runs the imports inline.
 - `tools/smoke.mjs` stubs `runImports` / `getSyncState` with an extra line and checks it merges into the open page.
+
+## Block timer MVP (2026-11-05, Julius; design = Reference card "📜 Timer App", Nov 3 decisions)
+
+- Server `Timer.gs`: tab `Timer Log` (Op, Date, At ISO, Action, Block, Item, Name, Value, Device; Date/At stored as text). `saveTimerEvents(list)` appends rows whose Op isn't there yet (script lock) and returns the stored ops; `getTimerEvents(since)` returns rows with Date ≥ since. No totals on the server.
+- Client: IIFE after the block-borders script in Index.html, `window.fwTimer` (replay, events, merge, flush, pull, paintAll, parseDur, checkForgot) for tests. Actions: `start` / `pause` / `finish` (block), `istart` / `istop` (item; Break = item id `break`), `fix` (Value = corrected ms, empty = clear). `replay()` sorts by `at` and applies the Nov 3 rules: start pauses the running block; istart starts its block and stops the previous child; pause keeps the child for resume; finish clears the child. Unassigned = block raw − all item raw. Corrections only change what's shown (`ms` / `shown`), `raw` / `items` stay measured.
+- Ids: `data-tmr` on the block title (`b-…`) and task line (`i-…`), set on the first tap and saved with the pad (not stripped). `dedupe(pad)` drops copies (Enter copies attributes to the new line). Starting a title that is `Next Block` / `Block name` renames it `Block <time>`, so `ensureNext` adds a fresh one.
+- Device first: localStorage `fw.timer.v1` {events, sent}; unsent events go out right after each tap, retried with backoff (2 s → 60 s), on `online` and on return. Events kept 14 days locally (unsent ones always). Pull: 1.5 s after load and on return (> 30 s since last), last 7 days, union by op id. Double tap = same button + same line within 600 ms.
+- Render-only: `.tmr-bar` (before the pad) and `.tmr-layer` (after it, absolutely over it; chips placed at `line.offsetTop - pad.scrollTop`, repainted on scroll / input / resize and every second). Both shown only in one-day view. Pad lines in a block get `padding-right:58px` for the chips. Nothing timer-related is inside the pad, so saving is untouched.
+- Forgotten timer: a block running > 2 h gets a status note once per block (load / return); time is never trimmed.
+- Smoke (`tools/smoke.mjs`): double tap, task-starts-block, rename + fresh Next Block, tick stops task only, Break / Pause / Resume / correct / Finish, 3-hour-old start (lock-proof) + note, events sent, ids saved without chips, events survive reload.
+

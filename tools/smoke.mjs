@@ -136,6 +136,71 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   if (list.mode !== 'compact' || list.items < 50 || list.leak || list.wide) errs.push('History List mode: ' + JSON.stringify(list));
   if (mini.mode !== 'mini' || mini.items || mini.leak) errs.push('History Mini mode: ' + JSON.stringify(mini));
   if (full.mode !== 'full' || full.leak) errs.push('History Full mode: ' + JSON.stringify(full));
+  // Block timer MVP (2026-11-05): ▶ on a task starts it + its block, double tap = one tap, tick stops the task,
+  // Break / Pause / Resume / correct / Finish, ids saved with the pad, events sent, time from timestamps (lock-proof).
+  const tmr = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const out = [];
+    const pad = document.querySelector('#todayScroll .plan-pad');
+    if (!pad || !window.fwTimer) return ['no Blocks pad or timer'];
+    const layer = () => pad.parentElement.querySelector('.tmr-layer');
+    const bar = () => pad.parentElement.querySelector('.tmr-bar');
+    const chip = t => [...(layer()?.children || [])].find(c => c._line && c._line.textContent.trim() === t);
+    const evs = a => fwTimer.events().filter(e => e.act === a);
+    const email = [...pad.querySelectorAll('.check-line')].find(l => l.textContent.trim() === 'Email');
+    const title = pad.querySelector('[data-title]');
+    if (!chip('Next Block') || !chip('Email')) return ['chips missing: ' + [...(layer()?.children || [])].length];
+    const off = Math.abs(chip('Email').getBoundingClientRect().top - email.getBoundingClientRect().top);
+    if (getComputedStyle(pad).display !== 'none' && off > 20) out.push('Email chip is ' + off + 'px away from its line');
+    // Lock-proof: a block started 3 hours ago (e.g. phone locked since) shows 3h, and the forgotten-timer note appears.
+    const old = document.createElement('div'); old.setAttribute('data-title', '1'); old.dataset.tmr = 'b-old'; old.innerHTML = '<b>Old block</b>';
+    pad.insertBefore(old, pad.firstChild);
+    fwTimer.merge([{ op: 'x-old', date: '2000-01-01', at: Date.now() - 3 * 3600e3, act: 'start', blk: 'b-old' }]);
+    fwTimer.checkForgot(); const so = fwTimer.replay();
+    if (!so.blocks['b-old'] || so.blocks['b-old'].ms < 3 * 3600e3 - 5000) out.push('3h-old start shows ' + JSON.stringify(so.blocks['b-old']));
+    if (!/has been running 3h/.test(document.getElementById('status')?.textContent || '')) out.push('no forgotten-timer note');
+    fwTimer.merge([{ op: 'x-old2', date: '2000-01-01', at: Date.now(), act: 'finish', blk: 'b-old' }]); old.remove();
+    const go = c => c.querySelector('button').click();
+    go(chip('Email')); go(chip('Email')); await wait(150);
+    if (evs('istart').length !== 1) out.push('double tap made ' + evs('istart').length + ' starts');
+    let s = fwTimer.replay();
+    if (!title.dataset.tmr || !email.dataset.tmr) return out.concat('ids not set on the lines');
+    if (s.cur !== title.dataset.tmr || s.blocks[s.cur].child !== email.dataset.tmr) out.push('task start did not start its block: ' + JSON.stringify(s.cur));
+    if (!/^Block \d/.test(title.textContent.trim())) out.push('Next Block not renamed on start: ' + title.textContent);
+    if (![...pad.querySelectorAll('[data-title]')].some(n => /^Next Block/.test(n.textContent.trim()))) out.push('no fresh Next Block after starting');
+    if (!bar().classList.contains('on') || !bar().classList.contains('run')) out.push('bar not showing the running block');
+    email.querySelector('input').click(); await wait(150);
+    s = fwTimer.replay();
+    if (!evs('istop').length || s.blocks[title.dataset.tmr].child || !s.blocks[title.dataset.tmr].run) out.push('tick did not stop only the task');
+    const tap = a => bar().querySelector('[data-tact="' + a + '"]').click();
+    tap('break'); await wait(700); s = fwTimer.replay();
+    if (s.blocks[title.dataset.tmr].child !== 'break') out.push('Break did not start');
+    tap('block'); await wait(700); s = fwTimer.replay();
+    if (s.blocks[title.dataset.tmr].run || !s.blocks[title.dataset.tmr].paused || s.cur) out.push('Pause did not pause');
+    tap('block'); await wait(700); s = fwTimer.replay();
+    if (!s.blocks[title.dataset.tmr].run || s.blocks[title.dataset.tmr].child !== 'break') out.push('Resume did not bring back the block + break');
+    window.prompt = () => '45m';
+    bar().querySelector('[data-tact="fix-blk"]').click(); await wait(100); s = fwTimer.replay();
+    if (s.blocks[title.dataset.tmr].ms !== 45 * 60e3 || s.blocks[title.dataset.tmr].raw > 60e3) out.push('correction: ' + JSON.stringify(s.blocks[title.dataset.tmr]));
+    tap('finish'); await wait(150); s = fwTimer.replay();
+    if (s.cur || !s.blocks[title.dataset.tmr].done) out.push('Finish did not stop the block');
+    if (!/Today: 45m tracked/.test(bar().textContent)) out.push('day total: ' + bar().textContent);
+    if (email.classList.contains('done') !== true) out.push('Finish changed the task');
+    await wait(2500);
+    const calls = window.__calls || [];
+    const sentOps = calls.filter(c => c[0] === 'saveTimerEvents').flatMap(c => c[1][0].map(e => e.op));
+    const mine = fwTimer.events().filter(e => !/^x-old/.test(e.op)).map(e => e.op);
+    if (!mine.every(o => sentOps.includes(o))) out.push('events not all sent to the Timer Log');
+    const plans = calls.filter(c => c[0] === 'savePlanPad').map(c => String(c[1][1]));
+    if (!plans.length || !plans[plans.length - 1].includes('data-tmr="' + email.dataset.tmr + '"')) out.push('task id not saved with the Blocks pad');
+    if (plans.some(p => /tmr-chip|tmr-bar/.test(p))) out.push('timer chips leaked into the saved pad');
+    return out;
+  });
+  tmr.forEach(x => errs.push('Timer: ' + x));
+  const before = await pg.evaluate(() => window.fwTimer.events().length);
+  await pg.reload(); await pg.waitForTimeout(800);
+  const after = await pg.evaluate(() => window.fwTimer && window.fwTimer.events().length);
+  if (after !== before) errs.push('Timer: events lost on reload (' + before + ' → ' + after + ')');
   if (errs.length) { fails += errs.length; console.error('✗ ' + name + ':\n  ' + errs.join('\n  ')); }
   else console.log('✓ ' + name + ': loads with no page errors');
 }

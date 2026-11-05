@@ -49,6 +49,10 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Urgent tick = log + archive, one tap**: ticking an urgent task's box in Urgent finishes it, copies it as a done line into today's History (in the current time section; tasks already in today's cell are logged by their own tick) and moves it to Urgent → Archive. Unticking it in the Archive undoes all three. Subtasks still just tick.
+- **History top tidied**: empty lines piled above the first time section are removed (today had 8 under "Today: x/y done").
+- **Time headers in 2 lines max**: when "Morn 8–2 (6a–2p)" and "· 6 done −" don't fit on one line, the count moves under the label as one piece instead of spreading over 4 lines.
+- **Compact timer bar**: smaller icon-only ❚❚ / ☕ / ■ buttons (names in the tooltips), tighter spacing.
 - **Cal Events 4-box view (first try)**: **⊞** next to Cats splits Cal Events into four boxes that flow clockwise: **1 Sort** (top left: everything new, ordered by Cats or Time, + to add) → **2 Urgency** (top right) → **3 Schedule** (bottom right) → **4 Done** (bottom left). Tap **1 / 2 / 3** on an event in box 1 to set its urgency (it moves to box 2; events that already have an urgency start there). Tap **→ 🧱** in box 2 to copy it into today's Blocks (it moves to box 3; delete that Blocks line and it goes back). Tick it and it moves to Done. **☰** goes back to the normal list. Drag-to-drop urgency isn't built (buttons for now).
 - **Cats**: the Category button in Cal Events is now just **Cats** (Time stays Time).
 - **Full time windows in History**: the three sections now cover the whole day in 8-hour windows: **Morning 6 am – 2 pm**, **Afternoon 2 – 8 pm**, **Night 8 pm – 6 am**. Headers keep your working hours and add the full window small: *Morn 8–2 (6a–2p)* · *After 2–7 (2p–8p)* · *Night 7–10 (8p–6a)*. Work after midnight sorts at the end of Night.

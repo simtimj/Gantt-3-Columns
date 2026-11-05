@@ -2004,9 +2004,11 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]::after{content:"Night 7–10 · " attr(data-tsinfo) "\00A0\00A0−";}
 #todayScroll .day-editor > [data-tsec="evening"][data-tsf="c"]::after{content:"Night 7–10 · " attr(data-tsinfo) "\00A0\00A0+";}
 /* Full time windows (2026-11-05, Julius): label = render-only .ts-lab ("Morn 8–2" + small "(6a–2p)"), ::after keeps only the count. */
-#todayScroll .day-editor > [data-tsec] > .ts-lab{order:1;flex:0 0 auto;font-size:calc(var(--paragraph-size,14px) * .75)!important;font-weight:600;letter-spacing:.02em;text-transform:none;white-space:nowrap;}
+#todayScroll .day-editor > [data-tsec] > .ts-lab{order:1;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:calc(var(--paragraph-size,14px) * .75)!important;font-weight:600;letter-spacing:.02em;text-transform:none;white-space:nowrap;}
 #todayScroll .day-editor > [data-tsec] > .ts-lab small{font-size:.8em;font-weight:500;opacity:.75;margin-left:.3em;}
-#todayScroll .day-editor > [data-tsec]:has(> .ts-lab)::after{order:2;content:""!important;}
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab)::after{order:2;content:""!important;flex:0 0 auto!important;white-space:nowrap!important;overflow-wrap:normal!important;}
+/* Too narrow for one line: the count moves under the label as one piece (2 lines, never 4). */
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){flex-wrap:wrap;row-gap:0;}
 #todayScroll .day-editor > [data-tsec][data-tsf="o"]:has(> .ts-lab)::after{content:"\00A0· " attr(data-tsinfo) "\00A0\00A0−"!important;}
 #todayScroll .day-editor > [data-tsec][data-tsf="c"]:has(> .ts-lab)::after{content:"\00A0· " attr(data-tsinfo) "\00A0\00A0+"!important;}
 
@@ -7795,7 +7797,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const box = document.createElement('span'); box.className = 'urg-box';
     box.dataset.date = item.date; box.dataset.pane = item.pane; box.dataset.index = index;
     box.title = 'Tap = done · hold (or right-click) = urgency, due date, archive';
-    box.addEventListener('click',e => { e.stopPropagation(); toggleDueTask(item.date,index,item.pane); });
+    box.addEventListener('click',e => {
+      e.stopPropagation();
+      // One tap = done + logged + archived (2026-11-05, Julius) for an urgent task's own box; subtasks just tick.
+      if(isHead && !level && (item.urg > 0 || item.arch)) urgDoneLogArchive(item,index);
+      else toggleDueTask(item.date,index,item.pane);
+    });
     const tx = document.createElement('span'); tx.className = 'urg-text';
     tx.dataset.date = item.date; tx.dataset.pane = item.pane; tx.dataset.index = index;
     if(html) tx.innerHTML = html; else if(text !== '(empty task)') tx.textContent = text;
@@ -7916,6 +7923,49 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(typeof renderDueBlocks === 'function') try{ renderDueBlocks(); }catch(err){}
     setStatus('Delete undone');
   });
+  /* Urgent tick = log + archive (2026-11-05, Julius). Ticking an urgent task in the Urgent panel:
+     1) ticks the real task, 2) puts a done copy in today's History (current time section) unless the task already
+     lives in today's cell (that one is logged by its own tick), 3) archives it (Urgent → Archive).
+     Unticking it from the Archive reverses all three. The copy is tied to the task by data-ulog / data-ulogof. */
+  function urgDoneLogArchive(item,index){
+    const ed = urgEditor(item.date,item.pane);
+    const line = ed ? ed.querySelectorAll('.check-line')[index] : null;
+    const cb = line ? line.querySelector('input[type=checkbox]') : null;
+    if(!cb){ setStatus('That day isn’t loaded — scroll to ' + urgWhere(item.date)); return; }
+    const today = localToday();
+    const tEd = document.querySelector('#todayScroll .day-editor[data-date="' + CSS.escape(today) + '"]');
+    const wasDone = cb.checked;
+    if(wasDone && !item.arch){ toggleDueTask(item.date,index,item.pane); return; } // done but never archived: plain untick
+    if(!wasDone){
+      toggleDueTask(item.date,index,item.pane);
+      if(tEd && ed !== tEd){
+        if(!line.dataset.ulog) line.dataset.ulog = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+        if(!tEd.querySelector('[data-ulogof="' + CSS.escape(line.dataset.ulog) + '"]')){
+          captureBeforeEdit(tEd);
+          const n = createCheckboxLine(0);
+          const src = line.querySelector('.check-text');
+          n.querySelector('.check-text').innerHTML = src ? src.innerHTML : esc(lineText(line));
+          n.classList.add('done');
+          const c2 = n.querySelector('input'); c2.checked = true; c2.setAttribute('checked','');
+          const hm = tsecNow();
+          n.dataset.at = hm; n.dataset.dt = hm; n.dataset.ulogof = line.dataset.ulog;
+          if(line.dataset.cat) n.dataset.cat = line.dataset.cat;
+          tEd.appendChild(n);
+          tsecArrange(tEd);
+          if(typeof refreshCards === 'function') try{ refreshCards(tEd); }catch(e){}
+          saveEditorOwner(tEd);
+        }
+      }
+      setArchived(line,ed,true);
+      setStatus('Done · logged in today’s History · archived (Urgent → Archive)');
+    } else {
+      toggleDueTask(item.date,index,item.pane);
+      const copy = tEd && line.dataset.ulog ? tEd.querySelector('[data-ulogof="' + CSS.escape(line.dataset.ulog) + '"]') : null;
+      if(copy){ captureBeforeEdit(tEd); copy.remove(); saveEditorOwner(tEd); }
+      setArchived(line,ed,false);
+      setStatus('Back in Urgent · removed from today’s History');
+    }
+  }
   function setArchived(line,owner,on){
     const day = localToday();
     urgSubtree(line).forEach(l => { if(on) l.dataset.arch = day; else delete l.dataset.arch; });
@@ -11949,7 +11999,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const now = tsecNow();
     lines.forEach(el => { if(!el.dataset.at) el.dataset.at = now; });
   }
+  // Empty lines above the first time section (2026-11-05, Julius: "8 lines of space under Today: 6/6 done"):
+  // drop leading ones and squeeze runs to one. Only plain empty lines; anything with text stays.
+  function tsecTrimTop(ed){
+    const first = ed.querySelector(':scope > [data-tsec]');
+    if(!first) return false;
+    const blank = el => !el.hasAttribute('data-tsec') && !el.classList.contains('check-line') && !el.textContent.trim() && !el.querySelector('input,img,hr,table') && !el.matches('[data-render-due]');
+    const before = [];
+    for(let el = ed.firstElementChild; el && el !== first; el = el.nextElementSibling) before.push(el);
+    let changed = false, prevBlank = true; // true = leading blanks go too
+    before.forEach(el => { if(blank(el)){ if(prevBlank){ el.remove(); changed = true; } prevBlank = true; } else prevBlank = false; });
+    // A single blank right above the first section adds nothing either.
+    const last = first.previousElementSibling;
+    if(last && blank(last)){ last.remove(); changed = true; }
+    return changed;
+  }
   function tsecArrange(ed){
+    tsecTrimTop(ed);
     const kids = [...ed.children];
     const blocks = [], oldHead = {};
     let section = '';
@@ -11996,7 +12062,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function tsecPlaceAi(){
     const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(localToday())}"]`);
     const fresh = ed ? ed.querySelectorAll(':scope > .check-line[data-ai-new]') : [];
-    if(!fresh.length) return;
+    if(!fresh.length){ if(ed && tsecTrimTop(ed)) saveEditorOwner(ed); return; }
     fresh.forEach(l => { delete l.dataset.aiNew; });
     tsecArrange(ed);
     saveEditorOwner(ed);
@@ -12685,17 +12751,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .tmr-bar,.tmr-layer{display:none;}
   body.one-day #todayScroll .od-on > .tmr-bar.on{display:flex;}
   body.one-day #todayScroll .od-on > .tmr-layer{display:block;}
-  .tmr-bar{flex:0 0 auto;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;line-height:1.3;padding:3px 2px 4px;color:var(--muted);}
+  .tmr-bar{flex:0 0 auto;align-items:center;gap:2px 4px;flex-wrap:wrap;font-size:12px;line-height:1.25;padding:2px 2px 3px;color:var(--muted);}
   .tmr-bar .tmr-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
   .tmr-bar .tmr-name{color:var(--text,inherit);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .tmr-bar .tmr-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .tmr-bar .tmr-clock{font-variant-numeric:tabular-nums;font-weight:600;color:var(--text,inherit);cursor:pointer;}
   .tmr-bar.run .tmr-clock{color:#1e9e4a;}
-  .tmr-bar button{font:inherit;font-size:12px;padding:2px 7px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;}
+  .tmr-bar button{font:inherit;font-size:11px;line-height:1;min-width:24px;height:22px;padding:0 5px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
   .tmr-bar i{font-style:normal;}
   .tmr-bar .tmr-btns{display:flex;gap:4px;flex:0 0 auto;}
-  .tmr-bar.narrow i{display:none;}
+  .tmr-bar i{display:none;} /* icons only (2026-11-05, Julius: compact); labels are in the tooltips */
   .tmr-bar.narrow .tmr-main{flex-basis:100%;}
+  .tmr-bar.narrow .tmr-btns{margin-left:auto;}
+  .tmr-bar .tmr-sub{font-size:11px;}
   .tmr-bar .tmr-sync{font-size:10px;opacity:.75;}
   .tmr-layer{position:absolute;overflow:hidden;pointer-events:none;z-index:2;}
   .tmr-chip{position:absolute;right:4px;display:flex;align-items:center;gap:2px;pointer-events:auto;font-size:11px;line-height:1;

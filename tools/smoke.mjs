@@ -8,19 +8,20 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const yday = new Date(Date.now() - 864e5 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const line = (t, a = '') => `<div class="check-line" data-level="0"${a}><input type="checkbox"><span class="check-text">${t}</span></div>`;
 // Keep In Mind (2026-11-05): old-shape data (Task cards with why + subtasks) that must convert to a free nested list.
 const focus = { v: 1, cats: [{ id: 'c1', name: 'Crabbing prep', col: false, projects: [
   { id: 'p1', title: 'Gear', why: 'Before Friday', col: false, tasks: [{ id: 'm-a', t: 'Gloves', d: 0 }, { id: 'm-b', t: 'Bait', d: 1 }] }] }] };
 const data = {
   today, inbox: [], cardCats: [], notesSeeds: {}, urgent: [], refPins: [],
-  days: [{ date: today, journal: '',
+  days: [{ date: yday, journal: '', plan: '', tasks: line('Renew license', ' data-urg="2"') }, { date: today, journal: '',
     tasks: line('Pay rent', ' data-urg="1"') + line('Walk dog') +
       // Urgent checkmarks (2026-11-04): a finished urgent task (yellow) and one with a subtask.
       '<div class="check-line done" data-level="0" data-urg="2"><input type="checkbox" checked><span class="check-text">Paid bill</span></div>' +
       line('Book trip', ' data-urg="3"') + '<div class="check-line" data-level="1" data-urg="3" style="margin-left: 24px;"><input type="checkbox"><span class="check-text">Pick dates</span></div>' +
       // History modes (2026-11-04): a Morning section with a 50-item Claude group.
-      '<div data-tsec="morning" contenteditable="false">Morning</div><div data-cgrp="Gantt"><b><u>Gantt</u></b></div>' +
+      '<div><br></div><div><br></div><div><br></div>' + '<div data-tsec="morning" contenteditable="false">Morning</div><div data-cgrp="Gantt"><b><u>Gantt</u></b></div>' +
       Array.from({ length: 50 }, (_, i) => '<div class="check-line done" data-level="0" data-cid="s-' + i + '" data-dt="09:' + String(i % 60).padStart(2, '0') + '"><input type="checkbox" checked><span class="check-text"><b>*Item ' + i + ' with a fairly long title that has to wrap</b>: details</span></div>').join('') +
       // IT study entry (StudyLog.gs): folded title + its own detail lines.
       '<div class="check-line done" data-level="0" data-study="' + today + ':morning" data-tl="1" data-fold="1" data-at="11:17" data-dt="11:17">' +
@@ -34,7 +35,7 @@ const data = {
 // Fast start (2026-11-05): the page loads without imports, then runImports() returns the changed cells to merge in.
 data.timing = { fast: true, total: 1, steps: {} };
 const imported = { build: 'smoke', ref: {}, inbox: [], days: { [today]: { th: 'h-imported', jh: '',
-  tasks: data.days[0].tasks + '<div class="check-line" data-level="0" data-at="09:30"><input type="checkbox"><span class="check-text">From import</span></div>' } } };
+  tasks: data.days[1].tasks + '<div class="check-line" data-level="0" data-at="09:30"><input type="checkbox"><span class="check-text">From import</span></div>' } } };
 const stub = `<script>window.google={script:{run:new Proxy({},{get(t,k){let ok=null;const p=new Proxy({},{get(_,m){
   if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler'||m==='withUserObject')return()=>p;
   return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='runImports'||m==='getSyncState'?${JSON.stringify(imported)}:m==='getFocus'?${JSON.stringify(focus)}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
@@ -85,10 +86,24 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     const pb = getComputedStyle(row('Paid bill').querySelector('.urg-box'));
     if (pb.width !== '13px' || pb.height !== '13px') out.push('box size changed: ' + pb.width + ' × ' + pb.height);
     want('open task has no check:', 'Pay rent', false);
+    // Urgent tick = done + archived (2026-11-05); unticking it in Archive brings it back.
     row('Pay rent').querySelector('.urg-box').click(); await wait(400);
-    want('tick in Urgent → task done:', 'Pay rent', true);
-    row('Pay rent').querySelector('.urg-box').click(); await wait(400);
-    want('untick in Urgent → task open:', 'Pay rent', false);
+    if (!line('Pay rent')?.querySelector('input').checked || !line('Pay rent').dataset.arch) out.push('Urgent tick did not finish + archive Pay rent');
+    const levelRow = [...document.querySelectorAll('#urgentPanel .urg-group:not(.urg-arch) .urg-row')].some(r => r.querySelector('.urg-text')?.textContent.trim() === 'Pay rent');
+    if (levelRow) out.push('archived task still in its urgency group');
+    if (!document.querySelector('#urgentPanel .urg-arch .urg-row')) document.querySelector('#urgentPanel .urg-arch-head')?.click();
+    await wait(200);
+    row('Pay rent')?.querySelector('.urg-box').click(); await wait(400);
+    want('untick in Archive → task open + back in Urgent:', 'Pay rent', false);
+    if (line('Pay rent')?.dataset.arch) out.push('untick did not unarchive');
+    // A task that lives outside today (Reference card): ticking it in Urgent copies a done line into today's History.
+    row('Renew license')?.querySelector('.urg-box').click(); await wait(500);
+    const copy = [...document.querySelectorAll('#todayScroll .day-editor .check-line[data-ulogof]')].find(l => /Renew license/.test(l.textContent));
+    if (!copy || !copy.classList.contains('done') || !copy.dataset.dt) out.push('Reference urgent task not logged in today’s History');
+    if (document.querySelector('#urgentPanel .urg-arch .urg-row') === null) document.querySelector('#urgentPanel .urg-arch-head')?.click();
+    await wait(200);
+    row('Renew license')?.querySelector('.urg-box').click(); await wait(500);
+    if ([...document.querySelectorAll('#todayScroll .day-editor .check-line[data-ulogof]')].some(l => /Renew license/.test(l.textContent))) out.push('untick did not remove the History copy');
     line('Pay rent').querySelector('input').click(); await wait(400);
     want('tick the task → Urgent checked:', 'Pay rent', true);
     line('Pay rent').querySelector('input').click(); await wait(400);
@@ -110,10 +125,10 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   const kim = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     document.querySelector('[data-ctab="focus"]')?.click(); await wait(300);
-    const rows = () => [...document.querySelectorAll('.fx .fx-task')].map(t => (t.style.getPropertyValue('--lv') || '0') + (t.classList.contains('fx-note') ? '~' : '') + t.querySelector('.fx-tt').textContent);
+    const rows = () => [...document.querySelectorAll('.journal-editor[data-date="' + localToday() + '"] .fx .fx-task')].map(t => (t.style.getPropertyValue('--lv') || '0') + (t.classList.contains('fx-note') ? '~' : '') + t.querySelector('.fx-tt').textContent);
     const got = rows().join('|');
     if (got !== '0Gear|1~Before Friday|1Gloves|1Bait') return ['converted list: ' + got];
-    const bait = [...document.querySelectorAll('.fx .fx-tt')].find(x => x.textContent === 'Bait');
+    const bait = [...document.querySelectorAll('.journal-editor[data-date="' + localToday() + '"] .fx .fx-tt')].find(x => x.textContent === 'Bait');
     bait.focus(); bait.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })); await wait(900);
     const after = rows().join('|');
     const saves = (window.__calls || []).filter(c => c[0] === 'saveFocus');
@@ -126,7 +141,7 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   for (let i = 0; i < 3; i++) {
     await pg.click('#histMode'); await pg.waitForTimeout(250);
     modes.push(await pg.evaluate(() => {
-      const ed = document.querySelector('#todayScroll .day-editor'), top = ed.closest('.od-top') || ed;
+      const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]'), top = ed.closest('.od-top') || ed;
       const leak = [...ed.querySelectorAll(':scope > [data-tlhid]')].filter(x => getComputedStyle(x).display !== 'none').length;
       const wide = [...ed.querySelectorAll('.ts-it')].filter(x => x.getBoundingClientRect().right > top.getBoundingClientRect().right + 1).length;
       return { mode: document.body.dataset.hist, items: ed.querySelectorAll('.ts-it').length, leak, wide };
@@ -148,6 +163,11 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     } else out.push('tsecOf not reachable');
     const saves = (window.__calls || []).filter(c => c[0] === 'saveDay').map(c => String(c[1][1] || ''));
     if (saves.some(x => /ts-lab/.test(x))) out.push('window label leaked into the saved day');
+    // No empty lines piled up right above Morning (2026-11-05).
+    const prev = h && h.previousElementSibling;
+    if (prev && !prev.textContent.trim() && !prev.classList.contains('check-line') && !prev.querySelector('input')) out.push('empty line left above Morning');
+    // Header: count stays one piece (its own line when narrow), label one line.
+    if (h) { const lh = parseFloat(getComputedStyle(lab).lineHeight) || 14; if (h.getBoundingClientRect().height > lh * 3.2 + 12 && !h.querySelector('.ts-sum')) out.push('Morning header too tall: ' + Math.round(h.getBoundingClientRect().height) + 'px'); }
     return out;
   });
   win.forEach(x => errs.push('Time windows: ' + x));
@@ -168,7 +188,7 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     list.querySelector('.ce-q1 [data-ce-urg="2"]').click(); await wait(100);
     if (!inBox(2) || list.querySelector('.ce-event[data-ce-id="e1"]').dataset.urg !== '2') out.push('urgency did not move it to box 2');
     list.querySelector('.ce-q2 [data-ce-sched]').click(); await wait(200);
-    const pad = document.querySelector('#todayScroll .plan-pad');
+    const pad = document.querySelector('#todayScroll .plan-pad[data-date="' + localToday() + '"]');
     if (!inBox(3) || !pad.querySelector('[data-ceid^="e1|"]')) out.push('→ 🧱 did not move it to box 3');
     list.querySelector('.ce-q3 .ce-check').click(); await wait(200);
     if (!inBox(4)) out.push('tick did not move it to box 4');
@@ -184,7 +204,7 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   const tmr = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const out = [];
-    const pad = document.querySelector('#todayScroll .plan-pad');
+    const pad = document.querySelector('#todayScroll .plan-pad[data-date="' + localToday() + '"]');
     if (!pad || !window.fwTimer) return ['no Blocks pad or timer'];
     const layer = () => pad.parentElement.querySelector('.tmr-layer');
     const bar = () => pad.parentElement.querySelector('.tmr-bar');

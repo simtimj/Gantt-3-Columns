@@ -409,3 +409,8 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - `tsecTrimTop(ed)` (start of `tsecArrange`, and `tsecPlaceAi` on load): drops leading empty lines before the first `[data-tsec]`, squeezes runs, and the one right above it.
 - Time headers: `.ts-lab` flex 0 1 auto (ellipsis), ::after flex 0 0 auto nowrap, header `flex-wrap:wrap` → the count wraps as one piece.
 
+## Zoom stacking + Cal box buttons (2026-11-05, Julius)
+
+- Hold-to-zoom: `body.fw-focus-on :has(.fw-focus-target){z-index:auto!important}` — the today `.day-row` has `z-index:2`, which capped the fixed `.fw-focus-target` (z 9001) under the backdrop and later panes. Window 92vw × 90dvh (phone 94vw). History (`.od-top`) gets a same-height `.fw-focus-spacer` before it while zoomed, so Blocks doesn't move; `repaintSecs` reruns `paintDaySecs` after open / close.
+- Cal 4-box: action buttons are inside `.ce-event-text` after an inline `.ce-title`, `float:right` → end of the title's last line when it fits.
+

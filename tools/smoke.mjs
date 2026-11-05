@@ -199,6 +199,24 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return out;
   });
   quad.forEach(x => errs.push('Cal 4-box: ' + x));
+  // Hold-to-zoom (2026-11-05): History zooms alone, on top of everything, and closes cleanly.
+  const zm = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const j = document.querySelector('.today-jump'); if (!j) return ['no HISTORY label'];
+    const r = j.getBoundingClientRect(), o = { bubbles: true, clientX: r.left + 5, clientY: r.top + 5, button: 0 };
+    j.dispatchEvent(new PointerEvent('pointerdown', o)); await wait(1400);
+    j.dispatchEvent(new PointerEvent('pointerup', o));
+    const t = document.querySelector('.fw-focus-target'); if (!t) return ['History did not zoom'];
+    const out = [];
+    if (t.querySelector('.plan-pad') || t.matches('.plan-pad')) out.push('zoom includes Blocks');
+    const b = t.getBoundingClientRect(), hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    if (!hit || !t.contains(hit)) out.push('something draws over the zoomed History: ' + (hit && hit.className));
+    if (b.width < innerWidth * .85) out.push('zoom narrower than 85% of the window');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(900);
+    if (document.querySelector('.fw-focus-target') || document.querySelector('.fw-focus-spacer')) out.push('zoom did not close cleanly');
+    return out;
+  });
+  zm.forEach(x => errs.push('Zoom: ' + x));
   // Block timer MVP (2026-11-05): ▶ on a task starts it + its block, double tap = one tap, tick stops the task,
   // Break / Pause / Resume / correct / Finish, ids saved with the pad, events sent, time from timestamps (lock-proof).
   const tmr = await pg.evaluate(async () => {

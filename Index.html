@@ -1888,10 +1888,13 @@ body{--fw-focus-bg:var(--dm-cell,var(--panel,#fff));}
 body.fw-focus-on .fw-focus-target{--panel:var(--fw-focus-bg);}
 #fwFocusBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:9000;display:none;}
 body.fw-focus-on #fwFocusBackdrop{display:block;}
-body.fw-focus-on .fw-focus-target{position:fixed!important;inset:10dvh 8vw!important;width:84vw!important;height:80dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--fw-focus-bg)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
+/* Zoomed cell on top of everything (2026-11-05): a parent with its own z-index (the day row has z-index:2) capped it, so
+   other columns drew over the zoom and its Blocks neighbour showed. While zoomed, its parents drop their z-index. */
+body.fw-focus-on :has(.fw-focus-target){z-index:auto!important;}
+body.fw-focus-on .fw-focus-target{position:fixed!important;inset:5dvh 4vw!important;width:92vw!important;height:90dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--fw-focus-bg)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
 body.fw-focus-on .fw-focus-target.plan-pad{padding-top:36px!important;}
 body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
-@media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:10dvh 6vw!important;width:88vw!important;height:80dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
+@media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:5dvh 3vw!important;width:94vw!important;height:90dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
 
 #centerCalendarList .ce-event{display:flex;align-items:flex-start;gap:7px;}
 #centerCalendarList .ce-check{flex:0 0 auto;width:15px;height:15px;margin:1px 0 0;accent-color:#777;cursor:pointer;touch-action:none;}
@@ -1944,8 +1947,9 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-q-h .ce-add-btn{min-height:20px;padding:0 6px;font-size:12px;}
 #centerCalendarList .ce-q-b{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 4px 6px;}
 #centerCalendarList .ce-q-empty{font-size:11px;font-style:italic;color:var(--muted);padding:4px 2px;}
-#centerCalendarList .ce-q-act{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle;}
-#centerCalendarList .ce-q-act button{font:inherit;font-size:10px;font-weight:700;line-height:1;min-width:18px;height:18px;padding:0 4px;border-radius:5px;border:1.5px solid currentColor;background:transparent;color:var(--muted);cursor:pointer;}
+#centerCalendarList .ce-q .ce-title{display:inline;}
+#centerCalendarList .ce-q-act{display:inline-flex;gap:2px;float:right;margin:1px 0 0 4px;}
+#centerCalendarList .ce-q-act button{font:inherit;font-size:10px;font-weight:700;line-height:1;min-width:16px;height:17px;padding:0 3px;border-radius:5px;border:1.5px solid currentColor;background:transparent;color:var(--muted);cursor:pointer;}
 #centerCalendarList .ce-q-u.u1{color:#e5484d;} #centerCalendarList .ce-q-u.u2{color:#d99a00;} #centerCalendarList .ce-q-u.u3{color:#3b82f6;}
 #centerCalendarList .ce-q .ce-event{margin:3px 0;}
 #centerDownScroll .ce-head [data-ce-grid]{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px;padding:0!important;margin:0;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
@@ -1959,7 +1963,7 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
   #centerCalendarList .ce-q .ce-q-h{font-size:8.5px;letter-spacing:0;padding:2px 3px 1px!important;}
   #centerCalendarList .ce-q-arrow{font-size:9px;}
   #centerCalendarList .ce-q-b{padding:0 2px 4px;}
-  #centerCalendarList .ce-q-act{margin-left:0;gap:2px;}
+  #centerCalendarList .ce-q-act{margin-left:3px;gap:2px;}
   #centerCalendarList .ce-q-act button{font-size:9px;min-width:14px;height:15px;padding:0 2px;border-width:1px;}
   #centerCalendarList .ce-q-empty{font-size:10px;}
 }
@@ -8341,8 +8345,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const q = {1:[],2:[],3:[],4:[]};
     data.events.forEach(ev => q[ev.done ? 4 : sched.has(ceKey(ev)) ? 3 : ev.urg ? 2 : 1].push(ev));
     const byStart = (a,b) => (b.allDay - a.allDay) || String(a.start).localeCompare(String(b.start));
-    const text = ev => '<span class="ce-event-text">' + (ev.allDay ? '' : '<span class="ce-time">' + esc(ev.time) + '</span>') + '<span class="ce-title">' + esc(ev.title) + '</span></span>';
-    const r = (ev, extra) => f.row(ev, ev.allDay ? '' : ' ce-scheduled', text(ev) + (extra || ''));
+    // Buttons go inside the text, after the title, floated right: they sit at the end of the title's last line
+    // when there's room, else on the line below (2026-11-05, Julius: save room).
+    const text = (ev, extra) => '<span class="ce-event-text">' + (ev.allDay ? '' : '<span class="ce-time">' + esc(ev.time) + '</span>') + '<span class="ce-title">' + esc(ev.title) + '</span>' + (extra || '') + '</span>';
+    const r = (ev, extra) => f.row(ev, ev.allDay ? '' : ' ce-scheduled', text(ev, extra));
     const urgBtns = '<span class="ce-q-act">' + [1,2,3].map(n => '<button type="button" class="ce-q-u u' + n + '" data-ce-urg="' + n + '" aria-label="Urgency ' + n + '">' + n + '</button>').join('') + '</span>';
     const go = '<span class="ce-q-act"><button type="button" class="ce-q-go" data-ce-sched title="Copy into today’s Blocks">→ 🧱</button></span>';
     const box1 = f.byCategory ? f.bySubject(q[1], ev => r(ev, urgBtns)) : q[1].slice().sort(byStart).map(ev => r(ev, urgBtns)).join('');
@@ -13265,7 +13271,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   // While History is zoomed out of its row, Blocks keeps the height it had instead of filling the gap.
   function padOf(el){ return el.classList.contains('od-top') && el.parentElement ? el.parentElement.querySelector(':scope > .plan-pad') : null; }
-  function settle(el){const pad=padOf(el);if(pad)pad.style.removeProperty('flex');backdrop.getAnimations().forEach(a => a.cancel());el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
+  // Section outlines are drawn for the cell's size: redraw them for the zoomed / normal size.
+  function repaintSecs(el){ requestAnimationFrame(() => { const ed = el.matches('.day-editor') ? el : el.querySelector('.day-editor'); if(ed && typeof paintDaySecs === 'function') try{ paintDaySecs(ed); }catch(e){} }); }
+  // History zoomed out of its row: a same-height spacer keeps Blocks where it was (2026-11-05, Julius).
+  let spacer=null;
+  function settle(el){if(spacer){spacer.remove();spacer=null;}repaintSecs(el);const pad=padOf(el);if(pad)pad.style.removeProperty('flex');backdrop.getAnimations().forEach(a => a.cancel());el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
   function close(){
     if(!focused)return;
     const el=focused;focused=null;
@@ -13278,11 +13288,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(anim)anim.finish();
     close();if(anim)anim.finish();
     home=el.getBoundingClientRect();
-    const pad=padOf(el);if(pad)pad.style.setProperty('flex','0 0 '+Math.round(pad.getBoundingClientRect().height)+'px');
+    const pad=padOf(el);if(pad){pad.style.setProperty('flex','0 0 '+Math.round(pad.getBoundingClientRect().height)+'px');spacer=document.createElement('div');spacer.className='fw-focus-spacer';spacer.style.cssText='flex:0 0 '+Math.round(home.height)+'px;height:'+Math.round(home.height)+'px';el.before(spacer);}
     const bg=shownBg(el);if(bg)el.style.setProperty('--fw-focus-bg',bg);
     focused=el;el.classList.add('fw-focus-target');document.body.classList.add('fw-focus-on');
     const a=anim=zoom(el,home,false);
-    if(a)a.onfinish=()=>{if(anim===a)anim=null;};
+    if(a)a.onfinish=()=>{if(anim===a)anim=null;repaintSecs(el);};else repaintSecs(el);
   }
   function resolve(node){
     if(!node || !node.closest)return null;

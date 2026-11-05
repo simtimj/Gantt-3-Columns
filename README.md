@@ -49,6 +49,7 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Time Tracker (new, separate app)**: open the /dev link with `?app=tracker` at the end. Phone-first Toggl-style tracker with its own sheet ("Time Tracker DB"), nothing shared with Gantt data: blocks with tasks (`Yard: sweep leaves, wash truck, clean garage` makes 3), one-tap ▶ start (starting another stops the last), task timers, Pause / Stop / Resume, Next Block staging, manual (estimated) entries, "still running?" fix after 2 h, Calendar day/week with planned and recurring blocks (tap ▶ to start now, drag ☰ / bottom edge), Day tab with measured vs estimated vs unaccounted and a week summary, search, CSV/JSON export, categories (you choose what's productive), optional break tips. Details, checklist and what's deferred: `tracker/README.md`.
 - **Calendar color = urgency, both ways**: an event colored red / yellow / blue anywhere (Calendar app, Claude, ChatGPT) now shows with that urgency in Cal Events (and lands in box 2 of the 4-box view), unless the app already has an urgency saved for it.
 - **Zoom fixed + bigger**: holding a section label (HISTORY, BLOCKS, Cal Events, Urgent, DAILIES, Reference search) zooms it to about 92% of the screen (was 84%). The zoomed History was drawn *under* the other columns (its row had its own stacking level), so other columns and Blocks showed through; now it's on top, alone, Blocks stays where it was behind it, and the Morn / After / Night outlines redraw for the zoomed size.
 - **Cal Events box 1: 1 / 2 / 3 on the same line**: the urgency buttons (and → 🧱 in box 2) sit at the right end of the event's last line, and only drop below when the line is full. Slightly smaller buttons.
@@ -494,6 +495,7 @@ Last updated: 2026-11-05
 
 ## Files
 
+- `tracker/` — Time Tracker (separate app, `?app=tracker`): `Core.html` logic, `App.html` UI, `Server.gs` sync to its own sheet, `README.md` handoff. Tests: `tools/tracker-test.mjs` + the tracker part of `tools/smoke.mjs`.
 - `Timer.gs` — Block timer: appends timer taps to the Timer Log tab (skips duplicates) and reads them back.
 - `Code.gs` — server: serves the page, sets up the sheets, loads/saves days and Reference cells, archive, urgent days, inbox.
 - `inbox.js` — Inbox items Claude adds (`CLAUDE_INBOX`).

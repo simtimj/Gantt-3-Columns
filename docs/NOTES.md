@@ -414,3 +414,9 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - Hold-to-zoom: `body.fw-focus-on :has(.fw-focus-target){z-index:auto!important}` — the today `.day-row` has `z-index:2`, which capped the fixed `.fw-focus-target` (z 9001) under the backdrop and later panes. Window 92vw × 90dvh (phone 94vw). History (`.od-top`) gets a same-height `.fw-focus-spacer` before it while zoomed, so Blocks doesn't move; `repaintSecs` reruns `paintDaySecs` after open / close.
 - Cal 4-box: action buttons are inside `.ce-event-text` after an inline `.ce-title`, `float:right` → end of the title's last line when it fits.
 
+## Time Tracker app (2026-11-05, Julius: separate app)
+
+- Separate app in `tracker/`, served by the same deployment: `doGet(e)` returns `trackerPage_()` when `?app=tracker`. Own spreadsheet "Time Tracker DB" (`TRACKER_DB_ID` script property, created inside the lock on first `trackerSync`), own localStorage (`tt.v1`, `tt.ui.v1`). Never touches Gantt tabs or `Timer.gs`.
+- `Core.html` = pure `TT` (also loaded by `tools/tracker-test.mjs`); `App.html` includes it with `<?!= trackerInclude_('tracker/Core') ?>`. Records `{id, kind, u}` merged last-write-wins; one open entry max (`normalize()` after merges). Full model, milestones, deferred list and integration contracts: `tracker/README.md`.
+- Tests: `node tools/tracker-test.mjs`; smoke builds `tracker-smoke.html` with a fake `trackerSync` and walks the acceptance scenarios (desktop + phone). `check.mjs` now also parses `tracker/`.
+

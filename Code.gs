@@ -28,7 +28,9 @@ const VIEWPORT =
   'viewport-fit=cover, interactive-widget=resizes-content';
 
 
-function doGet() {
+function doGet(e) {
+  // Time Tracker (2026-11-05): separate app in tracker/, its own spreadsheet; /dev?app=tracker.
+  if (e && e.parameter && e.parameter.app === 'tracker') return trackerPage_();
   const template = HtmlService.createTemplateFromFile('Index');
 
   let initial = null;

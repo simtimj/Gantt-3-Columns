@@ -1,0 +1,584 @@
+<script>
+/* Time Tracker core (2026-11-05). Pure logic, no DOM, no Apps Script: runs in the page and in Node tests
+   (tools/tracker-test.mjs). Everything is a record {id, kind, u (last write ms), del?, ...}; the Store merges
+   records last-write-wins, so the device and the server (tracker/Server.gs) can sync in any order.
+
+   Time model
+   - entry = one measured or manual segment {blockId, itemId|null, start, end|null, source:'timer'|'manual'}.
+     At most ONE entry is open (end == null) at a time: starting anything closes the open one first, so
+     timers never overlap. Block total = all its segments; item time = segments with that itemId;
+     unassigned = segments with itemId null. Nothing is counted twice.
+   - plan / series = planned time on the calendar. Never written by the timer; starting a planned block makes
+     (or reuses) a normal block linked by planKey, the plan keeps its own start / duration. */
+var TT = (function () {
+  'use strict';
+  var MIN = 60000, HOUR = 3600000, DAY = 86400000;
+  var KINDS = ['cat', 'block', 'item', 'entry', 'plan', 'series', 'cfg'];
+
+  function uid(p) {
+    return (p || 'r') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  // Local calendar date (device time zone) of a timestamp, yyyy-mm-dd.
+  function dateOf(ms) { var d = new Date(ms); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  // Local midnight of a yyyy-mm-dd date, in ms (DST-safe: built from local fields).
+  function dayStartMs(date) { var p = date.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).getTime(); }
+  function addDays(date, n) { var p = date.split('-'); return dateOf(new Date(+p[0], +p[1] - 1, +p[2] + n, 12).getTime()); }
+  function atMinute(date, min) { var p = date.split('-'); return new Date(+p[0], +p[1] - 1, +p[2], 0, min).getTime(); }
+  function weekday(date) { var p = date.split('-'); return new Date(+p[0], +p[1] - 1, +p[2], 12).getDay(); }
+  function tzName() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; } }
+
+  /* ---------- Store ---------- */
+  function Store(opts) {
+    opts = opts || {};
+    this.recs = {};
+    this.dirty = {};
+    this.now = opts.now || function () { return Date.now(); };
+  }
+  Store.prototype.get = function (id) { var r = this.recs[id]; return r && !r.del ? r : null; };
+  Store.prototype.all = function (kind) {
+    var out = [];
+    for (var id in this.recs) { var r = this.recs[id]; if (r.kind === kind && !r.del) out.push(r); }
+    return out;
+  };
+  Store.prototype.put = function (rec) {
+    if (!rec.id || KINDS.indexOf(rec.kind) < 0) throw new Error('bad record');
+    var old = this.recs[rec.id];
+    var copy = {};
+    for (var k in rec) copy[k] = rec[k];
+    copy.u = Math.max(this.now(), old ? old.u + 1 : 0);
+    this.recs[rec.id] = copy;
+    this.dirty[rec.id] = 1;
+    return copy;
+  };
+  Store.prototype.patch = function (id, fields) {
+    var r = this.recs[id];
+    if (!r) throw new Error('missing ' + id);
+    var next = {};
+    for (var k in r) next[k] = r[k];
+    for (var f in fields) next[f] = fields[f];
+    return this.put(next);
+  };
+  Store.prototype.del = function (id) { if (this.recs[id]) this.patch(id, { del: 1 }); };
+  // Last-write-wins merge of records from elsewhere. Returns how many changed.
+  Store.prototype.merge = function (list) {
+    var n = 0;
+    (list || []).forEach(function (r) {
+      if (!r || !r.id || KINDS.indexOf(r.kind) < 0) return;
+      var mine = this.recs[r.id];
+      if (!mine || r.u > mine.u) { this.recs[r.id] = r; delete this.dirty[r.id]; n++; }
+    }, this);
+    return n;
+  };
+  Store.prototype.dirtyList = function () {
+    var out = [];
+    for (var id in this.dirty) if (this.recs[id]) out.push(this.recs[id]);
+    return out;
+  };
+  Store.prototype.toJSON = function () { return { recs: this.recs, dirty: this.dirty }; };
+  Store.prototype.load = function (o) { if (o && o.recs) { this.recs = o.recs; this.dirty = o.dirty || {}; } return this; };
+
+  /* ---------- Defaults ---------- */
+  var DEFAULT_CATS = [
+    { id: 'cat-work', name: 'Work', color: '#2f6fde', productive: true },
+    { id: 'cat-coding', name: 'Coding', color: '#7b4fd6', productive: true },
+    { id: 'cat-study', name: 'Study', color: '#138a72', productive: true },
+    { id: 'cat-chores', name: 'Chores', color: '#c27c0e', productive: true },
+    { id: 'cat-personal', name: 'Personal', color: '#8a8f98', productive: false }
+  ];
+  var DEFAULT_CFG = { id: 'cfg', kind: 'cfg', dayStart: 7 * 60, dayEnd: 23 * 60, longRunH: 2,
+    breakTips: true, breakEveryMin: 50, breakRatio: 0.2, breakGapMin: 5 };
+  function ensureDefaults(s) {
+    if (!s.recs.cfg) s.put(DEFAULT_CFG);
+    if (!s.recs['cat-work']) DEFAULT_CATS.forEach(function (c) { if (!s.recs[c.id]) s.put(assign({ kind: 'cat' }, c)); });
+  }
+  function cfg(s) { return assign(assign({}, DEFAULT_CFG), s.get('cfg') || {}); }
+  function assign(a, b) { for (var k in b) a[k] = b[k]; return a; }
+
+  /* ---------- Parsing ---------- */
+  // "wash dishes, clean truck, sweep leaves" -> 3 items. Commas inside "double" or “curly” quotes stay.
+  function parseItems(text) {
+    var out = [], cur = '', q = null;
+    var s = String(text || '');
+    for (var i = 0; i < s.length; i++) {
+      var c = s[i];
+      if (q) {
+        if (c === q) { q = null; continue; }
+        cur += c;
+      } else if (c === '"' || c === '“') {
+        q = c === '"' ? '"' : '”';
+      } else if (c === ',' || c === '\n' || c === ';') {
+        out.push(cur); cur = '';
+      } else cur += c;
+    }
+    out.push(cur);
+    return out.map(function (t) { return t.replace(/\s+/g, ' ').trim(); }).filter(Boolean);
+  }
+  // "1h30", "1h 30m", "90", "90m", "1:30", "1.5h", "45 min" -> minutes (null if unreadable).
+  function parseDuration(text) {
+    var s = String(text || '').trim().toLowerCase();
+    if (!s) return null;
+    var m = s.match(/^(\d+):(\d{1,2})$/);
+    if (m) return +m[1] * 60 + +m[2];
+    if (/^\d+(\.\d+)?$/.test(s)) return Math.round(parseFloat(s));
+    m = s.match(/^(?:(\d+(?:\.\d+)?)\s*h(?:ours?|rs?)?)?\s*(?:(\d+)\s*m?(?:in(?:utes?|s)?)?)?$/);
+    if (m && (m[1] || m[2])) return Math.round((m[1] ? parseFloat(m[1]) * 60 : 0) + (m[2] ? +m[2] : 0));
+    return null;
+  }
+  // "14:05" / "2:05pm" / "905" -> minutes after midnight.
+  function parseClock(text) {
+    var s = String(text || '').trim().toLowerCase().replace(/\s+/g, '');
+    var m = s.match(/^(\d{1,2})(?::?(\d{2}))?(am|pm|a|p)?$/);
+    if (!m) return null;
+    var h = +m[1], mi = m[2] ? +m[2] : 0;
+    if (m[3]) { if (h === 12) h = 0; if (m[3][0] === 'p') h += 12; }
+    if (h > 23 || mi > 59) return null;
+    return h * 60 + mi;
+  }
+  function isBreakTitle(t) { return /^(break|☕ ?break|rest)$/i.test(String(t).trim()); }
+
+  /* ---------- Blocks + items ---------- */
+  function addBlock(s, o) {
+    o = o || {};
+    var title = String(o.title || '').trim() || 'Untitled block';
+    var now = s.now();
+    var b = s.put({ id: o.id || uid('b'), kind: 'block', title: title, catId: o.catId || '', date: o.date || dateOf(now),
+      createdAt: now, status: 'open', staged: !!o.staged, order: o.order != null ? o.order : now, planKey: o.planKey || '',
+      activeItemId: '' });
+    if (o.items) addItems(s, b.id, o.items);
+    return b;
+  }
+  function itemsOf(s, blockId) {
+    return s.all('item').filter(function (i) { return i.blockId === blockId; })
+      .sort(function (a, b) { return a.order - b.order; });
+  }
+  function addItems(s, blockId, text) {
+    if (!s.get(blockId)) throw new Error('No such block');
+    var titles = Array.isArray(text) ? text : parseItems(text);
+    var base = s.now(), have = itemsOf(s, blockId);
+    var top = have.length ? have[have.length - 1].order : 0;
+    return titles.map(function (t, i) {
+      return s.put({ id: uid('i'), kind: 'item', blockId: blockId, title: t, done: false, doneAt: 0,
+        order: Math.max(top + 1, base) + i, isBreak: isBreakTitle(t), createdAt: base });
+    });
+  }
+  function moveItem(s, itemId, dir) {
+    var it = s.get(itemId); if (!it) return;
+    var list = itemsOf(s, it.blockId), i = list.indexOf(it), j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    var o = list[j].order;
+    s.patch(list[j].id, { order: it.order });
+    s.patch(it.id, { order: o });
+  }
+
+  /* ---------- Timer transitions ---------- */
+  function openEntries(s) { return s.all('entry').filter(function (e) { return e.end == null; }).sort(function (a, b) { return a.start - b.start; }); }
+  function running(s) { var o = openEntries(s); return o.length ? o[o.length - 1] : null; }
+  function closeRunning(s, at) {
+    var r = running(s);
+    if (!r) return null;
+    var end = Math.max(at, r.start);
+    if (end - r.start < 1000) { s.del(r.id); return null; } // sub-second taps leave nothing behind
+    return s.patch(r.id, { end: end });
+  }
+  function openSegment(s, blockId, itemId, at) {
+    return s.put({ id: uid('e'), kind: 'entry', blockId: blockId, itemId: itemId || null, start: at, end: null,
+      source: 'timer', tz: tzName(), note: '' });
+  }
+  // Two devices can each start a timer offline; after a merge, close every older open entry where the next begins.
+  function normalize(s) {
+    var o = openEntries(s), n = 0;
+    for (var i = 0; i < o.length - 1; i++) { s.patch(o[i].id, { end: Math.max(o[i].start, o[i + 1].start) }); n++; }
+    return n;
+  }
+  function startBlock(s, blockId, at) {
+    at = at || s.now();
+    var b = s.get(blockId); if (!b) throw new Error('No such block');
+    var r = running(s);
+    if (r && r.blockId === blockId) return r; // already running: one tap never restarts
+    closeRunning(s, at);
+    var item = b.activeItemId && s.get(b.activeItemId);
+    var resume = item && !item.done ? item.id : '';
+    s.patch(blockId, { staged: false, status: 'open', lastAt: at, activeItemId: resume });
+    return openSegment(s, blockId, resume, at);
+  }
+  function pause(s, at) { return closeRunning(s, at || s.now()); } // block keeps activeItemId for Resume
+  function stop(s, at) {
+    var r = running(s), e = closeRunning(s, at || s.now());
+    if (r && s.get(r.blockId)) s.patch(r.blockId, { activeItemId: '' });
+    return e;
+  }
+  function resumeLast(s, at) {
+    var last = s.all('entry').filter(function (e) { return e.source === 'timer'; }).sort(function (a, b) { return b.start - a.start; })[0];
+    return last && s.get(last.blockId) ? startBlock(s, last.blockId, at) : null;
+  }
+  function startItem(s, itemId, at) {
+    at = at || s.now();
+    var it = s.get(itemId); if (!it) throw new Error('No such item');
+    var r = running(s);
+    if (r && r.itemId === itemId) return r;
+    closeRunning(s, at);
+    if (it.done) s.patch(itemId, { done: false, doneAt: 0 });
+    s.patch(it.blockId, { staged: false, status: 'open', lastAt: at, activeItemId: itemId });
+    return openSegment(s, it.blockId, itemId, at);
+  }
+  // Stop the item but keep the block running (time goes back to unassigned).
+  function stopItem(s, at) {
+    at = at || s.now();
+    var r = running(s);
+    if (!r || !r.itemId) return null;
+    closeRunning(s, at);
+    s.patch(r.blockId, { activeItemId: '' });
+    return openSegment(s, r.blockId, '', at);
+  }
+  function completeItem(s, itemId, at) {
+    at = at || s.now();
+    var it = s.get(itemId); if (!it) throw new Error('No such item');
+    var r = running(s);
+    if (r && r.itemId === itemId) stopItem(s, at);
+    var b = s.get(it.blockId);
+    if (b && b.activeItemId === itemId) s.patch(b.id, { activeItemId: '' });
+    return s.patch(itemId, { done: true, doneAt: at });
+  }
+  function uncompleteItem(s, itemId) { return s.patch(itemId, { done: false, doneAt: 0 }); }
+  function finishBlock(s, blockId, at) {
+    at = at || s.now();
+    var r = running(s);
+    if (r && r.blockId === blockId) closeRunning(s, at);
+    return s.patch(blockId, { status: 'done', doneAt: at, activeItemId: '' });
+  }
+  function reopenBlock(s, blockId) { return s.patch(blockId, { status: 'open', doneAt: 0, date: dateOf(s.now()) }); }
+  function deleteBlock(s, blockId) {
+    var r = running(s);
+    if (r && r.blockId === blockId) closeRunning(s, s.now());
+    itemsOf(s, blockId).forEach(function (i) { s.del(i.id); });
+    s.all('entry').forEach(function (e) { if (e.blockId === blockId) s.del(e.id); });
+    s.del(blockId);
+  }
+  // Timer left running: stop it at a chosen earlier time (never before its start, never in the future).
+  function stopAt(s, at) {
+    var r = running(s); if (!r) return null;
+    var end = Math.min(Math.max(at, r.start), s.now());
+    return stop(s, end);
+  }
+  function longRunning(s, now) {
+    var r = running(s); if (!r) return null;
+    var limit = cfg(s).longRunH * HOUR;
+    return now - r.start > limit ? r : null;
+  }
+
+  /* ---------- Next Block staging + quick add (also the future voice / watch contract) ---------- */
+  function stagedBlocks(s) {
+    return s.all('block').filter(function (b) { return b.staged && b.status !== 'done'; }).sort(function (a, b) { return a.order - b.order; });
+  }
+  function currentBlock(s) {
+    var r = running(s);
+    if (r) return s.get(r.blockId);
+    return null;
+  }
+  // Adds items to the RUNNING block without touching its timer; with no running block they go to Next Block
+  // (created if needed). Never picks an unrelated block. Returns {ok, blockId, routed, items, message}.
+  function quickAdd(s, text, target) {
+    var titles = parseItems(text);
+    if (!titles.length) return { ok: false, message: 'Nothing to add' };
+    var b = null, routed = '';
+    if (target && target !== 'current' && target !== 'next') { b = s.get(target); routed = 'block'; }
+    if (!b && target !== 'next') { b = currentBlock(s); routed = 'current'; }
+    if (!b) {
+      b = stagedBlocks(s)[0] || addBlock(s, { title: 'Next Block', staged: true });
+      routed = 'next';
+    }
+    var items = addItems(s, b.id, titles);
+    return { ok: true, blockId: b.id, routed: routed, items: items,
+      message: 'Added ' + items.length + ' to ' + (routed === 'next' ? 'Next Block' : '"' + b.title + '"') };
+  }
+
+  /* ---------- Manual entries + edits ---------- */
+  function overlaps(s, start, end, exceptId) {
+    var now = s.now();
+    return s.all('entry').filter(function (e) {
+      if (e.id === exceptId) return false;
+      var eEnd = e.end == null ? now : e.end;
+      return e.start < end && start < eEnd;
+    });
+  }
+  // o = {blockId | title, itemId?, start, end} or {start, dur (min)} or {end, dur}. Rejects overlaps unless o.force.
+  function addManual(s, o) {
+    var start = o.start, end = o.end;
+    if (o.dur != null) {
+      if (start != null && end == null) end = start + o.dur * MIN;
+      else if (end != null && start == null) start = end - o.dur * MIN;
+    }
+    if (!(start > 0) || !(end > 0)) return { ok: false, error: 'Need a start and an end (or a duration)' };
+    if (end <= start) return { ok: false, error: 'End must be after start' };
+    if (end > s.now() + MIN) return { ok: false, error: 'Can’t log time in the future' };
+    if (end - start > 24 * HOUR) return { ok: false, error: 'Longer than 24 hours' };
+    var hit = overlaps(s, start, end);
+    if (hit.length && !o.force) return { ok: false, error: 'Overlaps ' + hit.length + ' entr' + (hit.length > 1 ? 'ies' : 'y'), overlaps: hit };
+    var blockId = o.blockId;
+    if (!blockId) blockId = addBlock(s, { title: o.title || 'Untitled', catId: o.catId || '', date: dateOf(start) }).id;
+    var e = s.put({ id: uid('e'), kind: 'entry', blockId: blockId, itemId: o.itemId || null, start: start, end: end,
+      source: 'manual', tz: tzName(), note: o.note || '' });
+    return { ok: true, entry: e, overlaps: hit };
+  }
+  function editEntry(s, id, p) {
+    var e = s.get(id); if (!e) return { ok: false, error: 'Missing entry' };
+    var start = p.start != null ? p.start : e.start;
+    var end = p.end !== undefined ? p.end : e.end;
+    if (end != null && end <= start) return { ok: false, error: 'End must be after start' };
+    if (end == null && e.end != null) return { ok: false, error: 'Can’t reopen a stopped entry' };
+    if (start > s.now()) return { ok: false, error: 'Start is in the future' };
+    var hit = overlaps(s, start, end == null ? s.now() : end, id);
+    if (hit.length && !p.force) return { ok: false, error: 'Overlaps ' + hit.length + ' entr' + (hit.length > 1 ? 'ies' : 'y'), overlaps: hit };
+    var fields = { start: start, end: end };
+    ['note', 'blockId', 'itemId', 'productive'].forEach(function (k) { if (p[k] !== undefined) fields[k] = p[k]; });
+    return { ok: true, entry: s.patch(id, fields) };
+  }
+
+  /* ---------- Totals + reconciliation ---------- */
+  function dur(e, now) { return Math.max(0, (e.end == null ? now : e.end) - e.start); }
+  function clip(e, a, b, now) { var x = Math.max(e.start, a), y = Math.min(e.end == null ? now : e.end, b); return Math.max(0, y - x); }
+  function blockTotals(s, blockId, now) {
+    now = now || s.now();
+    var t = { total: 0, unassigned: 0, items: {}, breaks: 0 };
+    s.all('entry').forEach(function (e) {
+      if (e.blockId !== blockId) return;
+      var d = dur(e, now);
+      t.total += d;
+      if (e.itemId) {
+        t.items[e.itemId] = (t.items[e.itemId] || 0) + d;
+        var it = s.recs[e.itemId];
+        if (it && it.isBreak) t.breaks += d;
+      } else t.unassigned += d;
+    });
+    return t;
+  }
+  // 'break' | 'productive' | 'other' | 'unclassified'
+  function classify(s, e) {
+    var it = e.itemId && s.recs[e.itemId];
+    if (it && it.isBreak) return 'break';
+    if (e.productive === true) return 'productive';
+    if (e.productive === false) return 'other';
+    var b = s.recs[e.blockId], c = b && b.catId && s.get(b.catId);
+    if (!c) return 'unclassified';
+    return c.productive ? 'productive' : 'other';
+  }
+  function unionLength(iv) {
+    iv.sort(function (a, b) { return a[0] - b[0]; });
+    var total = 0, cs = -1, ce = -1;
+    iv.forEach(function (x) {
+      if (x[0] > ce) { if (ce > cs) total += ce - cs; cs = x[0]; ce = x[1]; }
+      else if (x[1] > ce) ce = x[1];
+    });
+    if (ce > cs) total += ce - cs;
+    return total;
+  }
+  // Day reconciliation. Waking window = cfg.dayStart..dayEnd (capped at now for today, widened to cover entries).
+  // unaccounted = window minus the union of all entries: never guessed, never labelled.
+  function daySummary(s, date, now) {
+    now = now || s.now();
+    var c = cfg(s), a = dayStartMs(date), z = dayStartMs(addDays(date, 1));
+    var r = { date: date, measured: 0, estimated: 0, productive: 0, breaks: 0, other: 0, unclassified: 0,
+      tracked: 0, overlap: 0, window: 0, unaccounted: 0, byCat: {}, byBlock: {}, entries: [] };
+    var iv = [], wA = atMinute(date, c.dayStart), wZ = atMinute(date, c.dayEnd);
+    s.all('entry').forEach(function (e) {
+      var d = clip(e, a, z, now);
+      if (!d) return;
+      r.entries.push(e);
+      if (e.source === 'manual') r.estimated += d; else r.measured += d;
+      var cl = classify(s, e);
+      r[cl === 'break' ? 'breaks' : cl] += d;
+      var b = s.recs[e.blockId], cat = (b && b.catId) || '';
+      r.byCat[cat] = (r.byCat[cat] || 0) + d;
+      r.byBlock[e.blockId] = (r.byBlock[e.blockId] || 0) + d;
+      var x = Math.max(e.start, a), y = Math.min(e.end == null ? now : e.end, z);
+      iv.push([x, y]);
+      wA = Math.min(wA, x); wZ = Math.max(wZ, y);
+    });
+    r.entries.sort(function (p, q) { return p.start - q.start; });
+    r.tracked = unionLength(iv);
+    r.overlap = r.measured + r.estimated - r.tracked;
+    if (now < wZ) wZ = Math.max(now, wA);
+    r.window = Math.max(0, wZ - wA);
+    r.windowStart = wA; r.windowEnd = wZ;
+    r.unaccounted = Math.max(0, r.window - r.tracked);
+    return r;
+  }
+  function rangeSummary(s, from, to, now) {
+    var out = { days: [], measured: 0, estimated: 0, productive: 0, breaks: 0, other: 0, unclassified: 0, tracked: 0, byCat: {}, byBlock: {} };
+    for (var d = from; d <= to; d = addDays(d, 1)) {
+      var x = daySummary(s, d, now);
+      out.days.push(x);
+      ['measured', 'estimated', 'productive', 'breaks', 'other', 'unclassified', 'tracked'].forEach(function (k) { out[k] += x[k]; });
+      ['byCat', 'byBlock'].forEach(function (k) { for (var id in x[k]) out[k][id] = (out[k][id] || 0) + x[k][id]; });
+    }
+    return out;
+  }
+  // Back-to-back work segments (gaps < breakGapMin, breaks end the period) -> suggested break, or null.
+  function breakSuggestion(s, now) {
+    var c = cfg(s);
+    if (!c.breakTips) return null;
+    var r = running(s);
+    if (!r || classify(s, r) === 'break') return null;
+    var list = s.all('entry').filter(function (e) { return e.start <= now; }).sort(function (a, b) { return b.start - a.start; });
+    var start = r.start, work = 0, edge = r.start;
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i], end = e.end == null ? now : e.end;
+      if (end < edge - c.breakGapMin * MIN) break;
+      if (classify(s, e) === 'break') break;
+      work += Math.max(0, Math.min(end, now) - e.start);
+      start = Math.min(start, e.start); edge = Math.min(edge, e.start);
+    }
+    var mins = Math.round(work / MIN);
+    if (mins < c.breakEveryMin) return null;
+    return { workMin: mins, since: start, breakMin: Math.max(5, Math.round(mins * c.breakRatio / 5) * 5) };
+  }
+
+  /* ---------- Planned time + recurrence ---------- */
+  // plan   {date, start (min), dur (min), title, catId, items?}
+  // series {title, catId, start, dur, freq:'daily'|'weekly', days:[0-6], from, until?, ex:{date:{skip}|{start,dur,title}}}
+  function addPlan(s, o) {
+    if (!o.date || !(o.dur > 0) || o.start == null) throw new Error('Plan needs a date, start and duration');
+    return s.put({ id: uid('p'), kind: 'plan', title: String(o.title || 'Planned block').trim(), catId: o.catId || '',
+      date: o.date, start: o.start, dur: o.dur, items: o.items || '', tz: tzName() });
+  }
+  function addSeries(s, o) {
+    if (!o.from || !(o.dur > 0) || o.start == null) throw new Error('Series needs a start date, time and duration');
+    var days = o.freq === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : (o.days || []).slice().sort();
+    if (!days.length) throw new Error('Pick at least one weekday');
+    return s.put({ id: uid('s'), kind: 'series', title: String(o.title || 'Routine').trim(), catId: o.catId || '',
+      start: o.start, dur: o.dur, freq: o.freq || 'weekly', days: days, from: o.from, until: o.until || '',
+      ex: {}, items: o.items || '', tz: tzName() });
+  }
+  function occurrences(s, from, to) {
+    var out = [];
+    s.all('plan').forEach(function (p) {
+      if (p.date >= from && p.date <= to) out.push({ key: p.id, planId: p.id, seriesId: '', date: p.date, start: p.start,
+        dur: p.dur, title: p.title, catId: p.catId, items: p.items || '' });
+    });
+    s.all('series').forEach(function (r) {
+      var a = from > r.from ? from : r.from, z = r.until && r.until < to ? r.until : to;
+      for (var d = a; d <= z; d = addDays(d, 1)) {
+        if (r.days.indexOf(weekday(d)) < 0) continue;
+        var x = (r.ex || {})[d] || {};
+        if (x.skip) continue;
+        out.push({ key: r.id + '@' + d, planId: '', seriesId: r.id, date: d, start: x.start != null ? x.start : r.start,
+          dur: x.dur || r.dur, title: x.title || r.title, catId: r.catId, items: r.items || '', edited: !!(x.start != null || x.dur || x.title) });
+      }
+    });
+    return out.sort(function (p, q) { return p.date < q.date ? -1 : p.date > q.date ? 1 : p.start - q.start; });
+  }
+  function splitKey(key) { var i = key.indexOf('@'); return i < 0 ? { id: key } : { id: key.slice(0, i), date: key.slice(i + 1) }; }
+  // scope 'one' = only this occurrence (series exception); 'series' = every occurrence (keeps per-date edits).
+  function editOccurrence(s, key, p, scope) {
+    var k = splitKey(key), rec = s.get(k.id);
+    if (!rec) throw new Error('Missing plan');
+    if (p.dur != null && !(p.dur > 0)) throw new Error('Duration must be positive');
+    if (rec.kind === 'plan') {
+      var f = {};
+      ['date', 'start', 'dur', 'title', 'catId', 'items'].forEach(function (n) { if (p[n] != null) f[n] = p[n]; });
+      return s.patch(rec.id, f);
+    }
+    if (scope === 'series') {
+      var g = {};
+      ['start', 'dur', 'title', 'catId', 'items', 'days', 'until'].forEach(function (n) { if (p[n] != null) g[n] = p[n]; });
+      return s.patch(rec.id, g);
+    }
+    var ex = assign({}, rec.ex || {}), cur = assign({}, ex[k.date] || {});
+    ['start', 'dur', 'title'].forEach(function (n) { if (p[n] != null) cur[n] = p[n]; });
+    if (p.date && p.date !== k.date) { // moved to another day: skip here, one-off plan there
+      ex[k.date] = { skip: 1 };
+      s.patch(rec.id, { ex: ex });
+      return addPlan(s, { date: p.date, start: cur.start != null ? cur.start : rec.start, dur: cur.dur || rec.dur,
+        title: cur.title || rec.title, catId: rec.catId, items: rec.items });
+    }
+    ex[k.date] = cur;
+    return s.patch(rec.id, { ex: ex });
+  }
+  function deleteOccurrence(s, key, scope) {
+    var k = splitKey(key), rec = s.get(k.id);
+    if (!rec) return;
+    if (rec.kind === 'plan' || scope === 'series') return s.del(rec.id);
+    var ex = assign({}, rec.ex || {});
+    ex[k.date] = { skip: 1 };
+    s.patch(rec.id, { ex: ex });
+  }
+  function findOcc(s, key) {
+    var k = splitKey(key), rec = s.get(k.id);
+    if (!rec) return null;
+    var d = rec.kind === 'plan' ? rec.date : k.date;
+    return occurrences(s, d, d).filter(function (o) { return o.key === key; })[0] || null;
+  }
+  // Start a planned block now, whatever its scheduled time. Reuses the block already made for it.
+  function startPlanned(s, key, at) {
+    at = at || s.now();
+    var b = s.all('block').filter(function (x) { return x.planKey === key; })[0];
+    if (!b) {
+      var o = findOcc(s, key);
+      if (!o) throw new Error('Missing plan');
+      b = addBlock(s, { title: o.title, catId: o.catId, date: dateOf(at), planKey: key, items: o.items || undefined });
+    } else if (b.status === 'done') reopenBlock(s, b.id);
+    return startBlock(s, b.id, at);
+  }
+  // Planned vs actual for one day, matched through planKey only (no guessing).
+  function planVsActual(s, date, now) {
+    return occurrences(s, date, date).map(function (o) {
+      var b = s.all('block').filter(function (x) { return x.planKey === o.key; })[0];
+      return { occ: o, blockId: b ? b.id : '', actual: b ? blockTotals(s, b.id, now).total : 0 };
+    });
+  }
+
+  /* ---------- Search + export ---------- */
+  function findEntries(s, f) {
+    f = f || {};
+    var q = String(f.q || '').toLowerCase();
+    return s.all('entry').filter(function (e) {
+      var b = s.recs[e.blockId] || {}, it = e.itemId ? s.recs[e.itemId] || {} : {};
+      var d = dateOf(e.start);
+      if (f.from && d < f.from) return false;
+      if (f.to && d > f.to) return false;
+      if (f.catId && (b.catId || '') !== (f.catId === 'none' ? '' : f.catId)) return false;
+      if (f.blockId && e.blockId !== f.blockId) return false;
+      if (f.source && e.source !== f.source) return false;
+      if (q && (String(b.title) + ' ' + String(it.title || '') + ' ' + String(e.note || '')).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    }).sort(function (a, b) { return b.start - a.start; });
+  }
+  function csvCell(v) { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function iso(ms) { return ms == null ? '' : new Date(ms).toISOString(); }
+  function entriesCsv(s, list) {
+    var rows = [['id', 'date', 'start', 'end', 'minutes', 'source', 'block', 'item', 'category', 'class', 'note', 'tz']];
+    (list || findEntries(s, {})).slice().reverse().forEach(function (e) {
+      var b = s.recs[e.blockId] || {}, it = e.itemId ? s.recs[e.itemId] || {} : {}, c = b.catId ? s.recs[b.catId] || {} : {};
+      rows.push([e.id, dateOf(e.start), iso(e.start), iso(e.end), e.end == null ? '' : Math.round((e.end - e.start) / MIN),
+        e.source, b.title || '', it.title || '', c.name || '', classify(s, e), e.note || '', e.tz || '']);
+    });
+    return rows.map(function (r) { return r.map(csvCell).join(','); }).join('\n');
+  }
+
+  function fmt(ms, secs) {
+    ms = Math.max(0, ms || 0);
+    var t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), x = t % 60;
+    if (secs) return h + ':' + pad2(m) + ':' + pad2(x);
+    return h ? h + 'h ' + pad2(m) + 'm' : m + 'm';
+  }
+  function clock(min) { return pad2(Math.floor(min / 60) % 24) + ':' + pad2(min % 60); }
+
+  return {
+    MIN: MIN, HOUR: HOUR, DAY: DAY, Store: Store, uid: uid, dateOf: dateOf, dayStartMs: dayStartMs, addDays: addDays,
+    atMinute: atMinute, weekday: weekday, ensureDefaults: ensureDefaults, cfg: cfg,
+    parseItems: parseItems, parseDuration: parseDuration, parseClock: parseClock,
+    addBlock: addBlock, itemsOf: itemsOf, addItems: addItems, moveItem: moveItem,
+    running: running, openEntries: openEntries, normalize: normalize, startBlock: startBlock, pause: pause, stop: stop,
+    resumeLast: resumeLast, startItem: startItem, stopItem: stopItem, completeItem: completeItem, uncompleteItem: uncompleteItem,
+    finishBlock: finishBlock, reopenBlock: reopenBlock, deleteBlock: deleteBlock, stopAt: stopAt, longRunning: longRunning,
+    stagedBlocks: stagedBlocks, currentBlock: currentBlock, quickAdd: quickAdd,
+    overlaps: overlaps, addManual: addManual, editEntry: editEntry,
+    blockTotals: blockTotals, classify: classify, daySummary: daySummary, rangeSummary: rangeSummary, breakSuggestion: breakSuggestion,
+    addPlan: addPlan, addSeries: addSeries, occurrences: occurrences, editOccurrence: editOccurrence, deleteOccurrence: deleteOccurrence,
+    findOcc: findOcc, startPlanned: startPlanned, planVsActual: planVsActual,
+    findEntries: findEntries, entriesCsv: entriesCsv, fmt: fmt, clock: clock
+  };
+})();
+if (typeof module !== 'undefined') module.exports = TT;
+</script>

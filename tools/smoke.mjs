@@ -305,5 +305,135 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   if (errs.length) { fails += errs.length; console.error('✗ ' + name + ':\n  ' + errs.join('\n  ')); }
   else console.log('✓ ' + name + ': loads with no page errors');
 }
+// Time Tracker (2026-11-05): tracker/App.html with Core inlined and an in-page fake trackerSync (last write wins,
+// like tracker/Server.gs). Walks the acceptance scenarios on desktop and phone. Core logic: tools/tracker-test.mjs.
+{
+  const ttStub = `<script>window.__srv={seq:0,rows:{}};window.google={script:{run:new Proxy({},{get(t,k){let ok=null,bad=null;const p=new Proxy({},{get(_,m){
+    if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler')return f=>{bad=f;return p;};
+    return(req)=>setTimeout(()=>{const S=window.__srv,acc=[];(req.changes||[]).forEach(r=>{const o=S.rows[r.id];if(!o||o.r.u<r.u){S.rows[r.id]={s:++S.seq,r};}acc.push({id:r.id,u:r.u});});
+      ok&&ok({seq:S.seq,accepted:acc,changes:Object.values(S.rows).filter(x=>x.s>req.since).map(x=>x.r),url:'#sheet'});},20);}});return p[k];}})}};</script>`;
+  const tHtml = fs.readFileSync('tracker/App.html', 'utf8')
+    .replace("<?!= trackerInclude_('tracker/Core') ?>", fs.readFileSync('tracker/Core.html', 'utf8')).replace('<head>', '<head>' + ttStub);
+  const tOut = path.join(os.tmpdir(), 'tracker-smoke.html');
+  fs.writeFileSync(tOut, tHtml);
+  for (const [name, view] of [['desktop', { width: 1200, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]]) {
+    const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch });
+    const pg = await ctx.newPage();
+    const errs = [];
+    pg.on('pageerror', e => errs.push(e.message));
+    pg.on('dialog', d => d.accept());
+    await pg.goto('file://' + tOut);
+    await pg.waitForTimeout(500);
+    const q = async (text, mode, play) => {
+      await pg.click(`[data-a="mode"][data-m="${mode}"]`); await pg.fill('#qa', text);
+      if (play) await pg.click('[data-a="quickStart"]'); else await pg.press('#qa', 'Enter');
+      await pg.waitForTimeout(80);
+    };
+    const S = () => pg.evaluate(() => { const s = ttApp.store, T = ttApp.TT, r = T.running(s);
+      return { blocks: s.all('block').map(b => ({ id: b.id, t: b.title, staged: b.staged, plan: b.planKey, items: T.itemsOf(s, b.id).map(i => [i.title, i.done]) })),
+        run: r && { b: (s.get(r.blockId) || {}).title, item: r.itemId && s.get(r.itemId).title, start: r.start }, entries: s.all('entry').length,
+        manual: s.all('entry').filter(e => e.source === 'manual').length, dirty: s.dirtyList().length, srv: Object.keys(window.__srv.rows).length }; });
+    // Task with nothing running -> Next Block
+    await q('call bank, renew tags', 'task');
+    let s = await S();
+    const nb = s.blocks.find(x => x.t === 'Next Block');
+    if (!nb || !nb.staged || nb.items.length !== 2) errs.push('task with nothing running did not land in Next Block: ' + JSON.stringify(s.blocks));
+    // Block with comma items, tap it -> timer starts
+    await q('Yard: sweep leaves, wash truck, clean garage', 'block');
+    s = await S();
+    const yard = s.blocks.find(x => x.t === 'Yard');
+    if (!yard || yard.items.map(i => i[0]).join('|') !== 'sweep leaves|wash truck|clean garage') errs.push('comma items: ' + JSON.stringify(yard));
+    await pg.click(`.card[data-bid="${yard.id}"] [data-a="toggleBlock"]`); await pg.waitForTimeout(80);
+    s = await S();
+    if (!s.run || s.run.b !== 'Yard' || !(await pg.textContent('#bar')).includes('Yard')) errs.push('tap block did not start it');
+    // Add a task while running -> goes to Yard, timer not restarted
+    const st0 = s.run.start;
+    await q('rake path', 'task'); s = await S();
+    if (!s.blocks.find(x => x.t === 'Yard').items.some(i => i[0] === 'rake path') || s.run.start !== st0) errs.push('quick add to running block');
+    // Item start, then check it complete
+    const itemBtn = (n, a) => pg.click(`.card.run .it:nth-child(${n}) [data-a="${a}"]`);
+    await itemBtn(1, 'itemPlay'); await pg.waitForTimeout(1100); s = await S();
+    if (!s.run || s.run.item !== 'sweep leaves') errs.push('item timer did not start');
+    await itemBtn(1, 'toggleItem'); await pg.waitForTimeout(80); s = await S();
+    if (!s.blocks.find(x => x.t === 'Yard').items[0][1] || !s.run || s.run.item) errs.push('complete did not stop the item / keep the block: ' + JSON.stringify(s.run));
+    // Pause from the top bar: everything stops
+    await itemBtn(2, 'itemPlay'); await pg.waitForTimeout(1100);
+    await pg.click('#bar [data-a="pause"]'); await pg.waitForTimeout(80); s = await S();
+    if (s.run) errs.push('pause left a timer running');
+    // Switch blocks: no overlap
+    await q('Email', 'block', true); await pg.waitForTimeout(1100);
+    await pg.click(`.card[data-bid="${yard.id}"] [data-a="toggleBlock"]`); await pg.waitForTimeout(80);
+    const open = await pg.evaluate(() => ttApp.TT.openEntries(ttApp.store).length);
+    if (open !== 1) errs.push('open entries after switching: ' + open);
+    // Lock screen: pretend the open entry started 3 h ago, reload -> elapsed from timestamps + "still on it?" banner
+    await pg.evaluate(() => { const s = ttApp.store, r = ttApp.TT.running(s); s.patch(r.id, { start: Date.now() - 3 * 3600e3 }); ttApp.render(); });
+    await pg.waitForTimeout(900);
+    await pg.reload(); await pg.waitForTimeout(500);
+    const el = await pg.textContent('[data-live="el"]');
+    if (!/^3:0\d:\d\d$/.test(el)) errs.push('elapsed after reload: ' + el);
+    if (!(await pg.$('[data-ban="long"]'))) errs.push('no long-running banner');
+    await pg.click('[data-a="stopAtSheet"]'); await pg.click('[data-a="stopAgo"][data-m="60"]'); await pg.click('[data-a="stopAtSave"]'); await pg.waitForTimeout(80);
+    s = await S();
+    if (s.run) errs.push('stop at… left it running');
+    // Manual (estimated) entry
+    await pg.click('[data-a="manualSheet"]:not([data-id])');
+    await pg.fill('#mTitle', 'Researching Android browsers'); await pg.fill('#mStart', '');
+    await pg.fill('#mDur', '30m'); await pg.click('[data-a="saveManual"]'); await pg.waitForTimeout(80);
+    s = await S();
+    if (s.manual !== 1) errs.push('manual entry not saved: ' + await pg.textContent('#err').catch(() => ''));
+    // Calendar: plan tomorrow, start it now; the plan keeps its time
+    await pg.click('[data-a="view"][data-v="cal"]');
+    await pg.click('[data-a="calNav"][data-n="1"]');
+    await pg.click('[data-a="planSheet"]');
+    await pg.fill('#pTitle', 'Clean truck'); await pg.fill('#pStart', '14:00'); await pg.fill('#pDur', '1h'); await pg.fill('#pItems', 'vacuum, wash');
+    await pg.click('[data-a="savePlan"]'); await pg.waitForTimeout(80);
+    const plan = await pg.$('.plan');
+    if (!plan) errs.push('planned block not drawn');
+    else {
+      // Drag the grip down one hour -> 15:00 (this occurrence)
+      const g = await pg.$('.plan .grip'), bb = await g.boundingBox();
+      await pg.evaluate(([x, y]) => { const t = document.querySelector('.plan .grip'), o = { bubbles: true, pointerId: 7, clientX: x, clientY: y };
+        t.dispatchEvent(new PointerEvent('pointerdown', o)); document.dispatchEvent(new PointerEvent('pointermove', { ...o, clientY: y + 48 }));
+        document.dispatchEvent(new PointerEvent('pointerup', { ...o, clientY: y + 48 })); }, [bb.x + 5, bb.y + 5]);
+      await pg.waitForTimeout(80);
+      const startMin = await pg.evaluate(() => ttApp.store.all('plan')[0].start);
+      if (startMin !== 15 * 60) errs.push('drag move: start = ' + startMin);
+      await pg.click('.plan [data-a="startPlan"]'); await pg.waitForTimeout(80);
+      s = await S();
+      const pb = s.blocks.find(x => x.plan);
+      if (!s.run || s.run.b !== 'Clean truck' || !pb || pb.items.length !== 2) errs.push('start planned block: ' + JSON.stringify(s.run));
+      const p0 = await pg.evaluate(() => ttApp.store.all('plan')[0]);
+      if (p0.start !== 900 || p0.dur !== 60) errs.push('plan changed by tracking');
+    }
+    // Recurring: Mon/Wed/Fri study -> 3 in week view, no new entries
+    const before = (await S()).entries;
+    await pg.click('[data-a="planSheet"]');
+    await pg.fill('#pTitle', 'Study'); await pg.fill('#pStart', '08:00'); await pg.fill('#pDur', '45m');
+    await pg.selectOption('#pRep', 'weekly');
+    await pg.evaluate(() => { const d = document.getElementById('pDate'); d.value = ttApp.TT.addDays(d.value, -ttApp.TT.weekday(d.value)); });
+    await pg.evaluate(() => document.querySelectorAll('.pDay').forEach(x => { x.checked = [1, 3, 5].includes(+x.value); }));
+    await pg.click('[data-a="savePlan"]'); await pg.click('[data-a="calMode"][data-m="week"]'); await pg.waitForTimeout(80);
+    const nStudy = await pg.$$eval('.plan .pt', xs => xs.filter(x => /Study/.test(x.textContent)).length);
+    if (nStudy !== 3) errs.push('weekly occurrences shown: ' + nStudy);
+    if ((await S()).entries !== before) errs.push('recurrence created time entries');
+    // Day view: measured vs estimated vs unaccounted
+    await pg.click('[data-a="view"][data-v="day"]');
+    const day = await pg.textContent('#main');
+    if (!/Measured \(timer\)/.test(day) || !/Estimated \(manual\)/.test(day) || !/Unaccounted/.test(day)) errs.push('day view missing reconciliation rows');
+    await pg.click('[data-a="view"][data-v="more"]');
+    if (!(await pg.$('[data-a="exportCsv"]'))) errs.push('no export');
+    // Sync: everything reached the fake server and nothing is left dirty
+    await pg.waitForTimeout(1500);
+    s = await S();
+    if (s.dirty || s.srv < 10) errs.push('sync: ' + s.dirty + ' dirty, ' + s.srv + ' on server');
+    const wide = await pg.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
+    if (wide) errs.push('page scrolls sideways');
+    const shot = process.argv.indexOf('--shot');
+    if (shot > 0) { await pg.click('[data-a="view"][data-v="blocks"]'); await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-tracker-' + name + '.png') }); }
+    if (errs.length) { fails += errs.length; console.error('✗ tracker ' + name + ':\n  ' + errs.join('\n  ')); }
+    else console.log('✓ tracker ' + name + ': acceptance walk-through passes');
+    await ctx.close();
+  }
+}
 await b.close();
 process.exit(fails ? 1 : 0);

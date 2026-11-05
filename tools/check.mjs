@@ -7,7 +7,8 @@ const parse = (code, where) => {
   try { new Function(code); }
   catch (e) { bad++; console.error('✗ ' + where + ': ' + e.message); }
 };
-for (const f of fs.readdirSync('.')) {
+// tracker/ (2026-11-05): clasp pushes subfolders too, so the Time Tracker files get the same check.
+for (const f of [...fs.readdirSync('.'), ...fs.readdirSync('tracker').map(x => 'tracker/' + x)]) {
   if (/\.(gs|js)$/.test(f)) parse(fs.readFileSync(f, 'utf8'), f);
   if (/\.html$/.test(f)) {
     const html = fs.readFileSync(f, 'utf8');

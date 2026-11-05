@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Time Tracker</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1b1d22;--mute:#6b7280;--line:#e3e6eb;--acc:#d6336c;--acc2:#2f6fde;--ok:#138a72;--warn:#c27c0e;
+  --brk:#0ea5b7;--unk:#d0d4da;--est:#9aa3ae;--chip:#eef0f3;--shadow:0 1px 2px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.04)}
+@media (prefers-color-scheme:dark){:root{--bg:#111317;--card:#1b1e24;--ink:#e8eaed;--mute:#9aa1ab;--line:#2c3038;--chip:#262a31;--unk:#3a3f48;--shadow:none}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+.hidden{display:none!important}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);padding:max(8px,env(safe-area-inset-top)) 12px 6px}
+.bar{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow);border:1px solid var(--line)}
+.bar.on{border-color:var(--acc)}
+.bar .who{flex:1;min-width:0}
+.bar .bt{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .bs{font-size:12.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .el{font:600 22px/1 ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.rb{width:42px;height:42px;border-radius:50%;border:0;display:grid;place-items:center;font-size:16px;background:var(--chip)}
+.rb.go{background:var(--acc);color:#fff}
+.banner{margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--card);border:1px solid var(--warn);font-size:13.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.banner.tip{border-color:var(--brk)}
+.banner span{flex:1;min-width:160px}
+.sync{font-size:11.5px;color:var(--mute);text-align:right;margin-top:3px;min-height:14px}
+main{padding:4px 12px 90px;max-width:820px;margin:0 auto}
+.qa{display:flex;gap:6px;margin:6px 0 2px}
+.qa input{flex:1;min-width:0;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:16px}
+.qa button{border:0;border-radius:12px;padding:0 14px;background:var(--acc2);color:#fff;font-weight:600}
+.qa button.play{background:var(--acc)}
+.modes{display:flex;gap:6px;align-items:center;margin:6px 0 10px;font-size:12.5px;color:var(--mute);flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--chip);border-radius:9px;padding:2px}
+.seg button{border:0;background:none;padding:5px 10px;border-radius:7px;font-size:13px;color:var(--mute)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
+h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:16px 2px 6px;display:flex;justify-content:space-between;align-items:center}
+h3 button{font-size:12px;text-transform:none;letter-spacing:0;border:0;background:none;color:var(--acc2)}
+.card{background:var(--card);border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:8px;overflow:hidden}
+.card.run{border-color:var(--acc)}
+.blk-h{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.play{flex:none;width:38px;height:38px;border-radius:50%;border:0;background:var(--chip);font-size:14px;display:grid;place-items:center}
+.card.run .play{background:var(--acc);color:#fff}
+.blk-t{flex:1;min-width:0;cursor:pointer}
+.blk-t .t{font-weight:600;overflow-wrap:anywhere}
+.sub{font-size:12px;color:var(--mute);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--unk)}
+.tot{font-variant-numeric:tabular-nums;font-size:14px;color:var(--mute);white-space:nowrap}
+.card.run .tot{color:var(--ink);font-weight:600}
+.chev{border:0;background:none;color:var(--mute);width:28px;height:32px;font-size:14px}
+.items{list-style:none;margin:0;padding:0 10px 4px 10px;border-top:1px solid var(--line)}
+.it{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.it:last-child{border-bottom:0}
+.cb{flex:none;width:24px;height:24px;border-radius:7px;border:2px solid var(--mute);background:none;font-size:13px;color:#fff;display:grid;place-items:center;padding:0}
+.it.done .cb{background:var(--ok);border-color:var(--ok)}
+.it.done .it-t{text-decoration:line-through;color:var(--mute)}
+.it.act{background:linear-gradient(90deg,rgba(214,51,108,.08),transparent)}
+.it-t{flex:1;min-width:0;overflow-wrap:anywhere}
+.it-time{font-size:12.5px;color:var(--mute);font-variant-numeric:tabular-nums}
+.ip{flex:none;border:1px solid var(--line);background:none;border-radius:8px;width:32px;height:28px;font-size:12px}
+.it.act .ip{background:var(--acc);color:#fff;border-color:var(--acc)}
+.mv{border:0;background:none;color:var(--mute);width:22px;padding:0;font-size:12px}
+.add-it{display:flex;gap:6px;padding:6px 10px 8px}
+.add-it input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:15px}
+.add-it button,.foot button,.btn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 11px;font-size:13.5px}
+.btn.pri{background:var(--acc2);border-color:var(--acc2);color:#fff;font-weight:600}
+.btn.go{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.btn.del{color:#c0392b}
+.foot{display:flex;gap:6px;flex-wrap:wrap;padding:0 10px 10px;align-items:center}
+.foot .un{margin-left:auto;font-size:12px;color:var(--mute)}
+.empty{color:var(--mute);font-size:13.5px;padding:10px 4px}
+.ent{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.ent:last-child{border-bottom:0}
+.ent .r{font-size:12.5px;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ent .m{flex:1;min-width:0}
+.ent .m div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ent .d{font-variant-numeric:tabular-nums;white-space:nowrap}
+.badge{font-size:10.5px;border-radius:5px;padding:1px 5px;background:var(--chip);color:var(--mute)}
+.badge.est{border:1px dashed var(--est)}
+.badge.live{background:var(--acc);color:#fff}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{flex:1;border:0;background:none;padding:10px 0 9px;font-size:12px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabs button b{font-size:18px;font-weight:400}
+.tabs button.on{color:var(--acc)}
+/* calendar */
+.calbar{display:flex;gap:6px;align-items:center;margin:6px 0 8px;flex-wrap:wrap}
+.calbar .ttl{flex:1;font-weight:600;text-align:center;min-width:120px}
+.cal{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:auto;height:calc(100dvh - 220px);min-height:320px}
+.grid{position:relative;display:flex}
+.hours{flex:none;width:42px;position:relative}
+.hours div{position:absolute;right:6px;font-size:10.5px;color:var(--mute);transform:translateY(-6px)}
+.col{flex:1;position:relative;border-left:1px solid var(--line);min-width:0}
+.col .hl{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.lanes{display:flex;height:100%}
+.lane-plan{flex:1;position:relative}
+.lane-act{flex:none;width:34%;position:relative;border-left:1px dashed var(--line)}
+.plan{position:absolute;left:3px;right:3px;border-radius:8px;background:color-mix(in srgb,var(--c,#2f6fde) 18%,var(--card));border-left:4px solid var(--c,#2f6fde);padding:3px 26px 3px 6px;font-size:12px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow)}
+.plan .pt{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan .pm{color:var(--mute);font-size:11px}
+.plan .ps{position:absolute;right:2px;top:2px;width:24px;height:24px;border:0;border-radius:50%;background:var(--acc);color:#fff;font-size:10px;padding:0}
+.plan .grip{position:absolute;right:2px;bottom:2px;width:24px;height:18px;touch-action:none;cursor:grab;color:var(--mute);font-size:12px;text-align:center;line-height:18px}
+.plan .rs{position:absolute;left:0;right:28px;bottom:0;height:10px;touch-action:none;cursor:ns-resize}
+.plan .rs::after{content:"";position:absolute;left:50%;bottom:3px;width:24px;margin-left:-12px;height:3px;border-radius:2px;background:var(--mute);opacity:.5}
+.plan.started{outline:2px solid var(--acc);outline-offset:-2px}
+.plan.drag{opacity:.85;z-index:5}
+.act{position:absolute;left:3px;right:3px;border-radius:5px;background:color-mix(in srgb,var(--c,#8a8f98) 45%,var(--card));font-size:10.5px;overflow:hidden;padding:1px 3px;cursor:pointer;color:var(--ink)}
+.act.est{background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--c,#8a8f98) 30%,var(--card)) 0 5px,var(--card) 5px 9px)}
+.act.brk{--c:var(--brk)}
+.now{position:absolute;left:0;right:0;border-top:2px solid var(--acc);z-index:4;pointer-events:none}
+.colhead{display:flex;position:sticky;top:0;z-index:6;background:var(--card);border-bottom:1px solid var(--line)}
+.colhead div{flex:1;text-align:center;font-size:11.5px;padding:5px 0;color:var(--mute);cursor:pointer}
+.colhead div.today{color:var(--acc);font-weight:700}
+.colhead .sp{flex:none;width:42px;cursor:default}
+.lanehead{display:flex;font-size:10.5px;color:var(--mute);padding:3px 0 3px 42px;position:sticky;top:0;z-index:6;background:var(--card);border-bottom:1px solid var(--line)}
+.lanehead div:first-child{flex:1;padding-left:6px}.lanehead div:last-child{width:34%;padding-left:6px}
+/* report */
+.stack{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--unk);margin:6px 0}
+.stack i{display:block;height:100%}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 12px;font-size:14px}
+.kv .k{display:flex;align-items:center;gap:7px}
+.kv .v{font-variant-numeric:tabular-nums;text-align:right}
+.kv .h{grid-column:1/-1;font-size:12px;color:var(--mute);margin-top:6px;text-transform:uppercase;letter-spacing:.05em}
+.wk{display:grid;grid-template-columns:48px 1fr 56px;gap:6px;align-items:center;padding:4px 12px;font-size:13px}
+.wk .stack{margin:0;height:12px}
+.wk .v{text-align:right;font-variant-numeric:tabular-nums}
+/* sheet */
+.sheet{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center}
+.sheet-card{background:var(--card);width:100%;max-width:560px;max-height:88dvh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px max(16px,env(safe-area-inset-bottom))}
+@media (min-width:700px){.sheet{align-items:center}.sheet-card{border-radius:18px}}
+.sheet-card h2{font-size:17px;margin:2px 0 12px}
+.f{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:13px;color:var(--mute)}
+.f input,.f select,.f textarea{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:16px;color:var(--ink)}
+.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.err{color:#c0392b;font-size:13.5px;min-height:18px;margin:4px 0}
+.days{display:flex;gap:4px;flex-wrap:wrap}
+.days label{display:inline-flex;align-items:center;justify-content:center;width:38px;height:32px;border:1px solid var(--line);border-radius:8px;color:var(--ink);font-size:13px}
+.days input{display:none}.days input:checked+span{color:var(--acc);font-weight:700}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#222;color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;z-index:60;max-width:90vw;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.small{font-size:12px;color:var(--mute)}
+.catrow{display:flex;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line)}
+.catrow input[type=text]{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.catrow input[type=color]{width:34px;height:30px;border:0;background:none;padding:0}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="bar" id="bar"></div>
+  <div id="banners"></div>
+  <div class="sync" id="sync"></div>
+</div>
+<main id="main"></main>
+<nav class="tabs" id="tabs">
+  <button data-a="view" data-v="blocks"><b>▤</b>Blocks</button>
+  <button data-a="view" data-v="cal"><b>▦</b>Calendar</button>
+  <button data-a="view" data-v="day"><b>◑</b>Day</button>
+  <button data-a="view" data-v="more"><b>⋯</b>More</button>
+</nav>
+<div class="sheet hidden" id="sheet"><div class="sheet-card" id="sheetCard"></div></div>
+<?!= trackerInclude_('tracker/Core') ?>
+<script>
+/* Time Tracker page (2026-11-05). Device first: every tap changes the local Store (saved to localStorage at
+   once), then syncs with tracker/Server.gs. Elapsed time is always now - start from saved timestamps, so a
+   locked screen, a reload or another device all show the same time. */
+(function () {
+  'use strict';
+  var LS = 'tt.v1', LSUI = 'tt.ui.v1';
+  var store = new TT.Store();
+  var meta = { seq: 0, dev: '', url: '', lastSync: 0 };
+  var ui = { view: 'blocks', calMode: 'day', addMode: 'task', calDate: '', repDate: '', open: {}, snooze: {}, tipSnooze: 0,
+    q: { q: '', catId: '', from: '', to: '', source: '' } };
+  var hasServer = !!(window.google && google.script && google.script.run);
+  var syncing = false, syncTimer = 0, backoff = 2000, syncNote = '';
+
+  function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+  function load() {
+    var d = lsGet(LS);
+    if (d) { store.load(d); meta.seq = d.seq || 0; meta.dev = d.dev || ''; meta.url = d.url || ''; meta.lastSync = d.lastSync || 0; }
+    if (!meta.dev) meta.dev = (/Mobi|Android/i.test(navigator.userAgent) ? 'phone-' : 'pc-') + Math.random().toString(36).slice(2, 6);
+    var u = lsGet(LSUI);
+    if (u) ['view', 'calMode', 'addMode', 'open'].forEach(function (k) { if (u[k] != null) ui[k] = u[k]; });
+    TT.ensureDefaults(store);
+    TT.normalize(store);
+    save();
+  }
+  function save() {
+    var d = store.toJSON();
+    d.seq = meta.seq; d.dev = meta.dev; d.url = meta.url; d.lastSync = meta.lastSync;
+    if (!lsSet(LS, d)) syncNote = 'Couldn’t save on this device';
+    lsSet(LSUI, { view: ui.view, calMode: ui.calMode, addMode: ui.addMode, open: ui.open });
+  }
+
+  /* ---------- sync ---------- */
+  function scheduleSync(ms) { clearTimeout(syncTimer); syncTimer = setTimeout(sync, ms == null ? 700 : ms); }
+  function sync() {
+    if (!hasServer) { paintSync(); return; }
+    if (syncing) { scheduleSync(1500); return; }
+    syncing = true;
+    var sent = store.dirtyList(), sentU = {};
+    sent.forEach(function (r) { sentU[r.id] = r.u; });
+    paintSync();
+    google.script.run.withSuccessHandler(function (res) {
+      syncing = false; backoff = 2000; syncNote = '';
+      (res.accepted || []).forEach(function (a) { if (store.recs[a.id] && store.recs[a.id].u === sentU[a.id]) delete store.dirty[a.id]; });
+      var changed = store.merge(res.changes || []);
+      var fixed = TT.normalize(store);
+      meta.seq = Math.max(meta.seq, res.seq || 0); meta.url = res.url || meta.url; meta.lastSync = Date.now();
+      save();
+      if (changed && !editing()) render(); else paintSync();
+      if (fixed || store.dirtyList().length) scheduleSync(1500);
+    }).withFailureHandler(function (err) {
+      syncing = false;
+      syncNote = 'Saved on this device · sync retry in ' + Math.round(backoff / 1000) + 's';
+      paintSync();
+      scheduleSync(backoff); backoff = Math.min(backoff * 2, 60000);
+      if (window.console) console.warn('trackerSync', err);
+    }).trackerSync({ since: meta.seq, changes: sent, dev: meta.dev });
+  }
+  function paintSync() {
+    var n = store.dirtyList().length, el = document.getElementById('sync');
+    if (!el) return;
+    el.textContent = syncNote || (!hasServer ? 'Local only (this device)' : syncing ? 'Syncing…' :
+      n ? n + ' change' + (n > 1 ? 's' : '') + ' waiting to sync' : meta.lastSync ? 'Synced ' + TT.clock(minOf(meta.lastSync)) : '');
+  }
+  function editing() {
+    var a = document.activeElement;
+    return (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || !document.getElementById('sheet').classList.contains('hidden');
+  }
+
+  /* ---------- helpers ---------- */
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function now() { return Date.now(); }
+  function minOf(ms) { var d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); }
+  function hm(ms) { return TT.clock(minOf(ms)); }
+  function cat(id) { return id ? store.get(id) : null; }
+  function cats() { return store.all('cat').sort(function (a, b) { return a.name < b.name ? -1 : 1; }); }
+  function catColor(id) { var c = cat(id); return c ? c.color : '#8a8f98'; }
+  function catOptions(sel, blank) {
+    return '<option value="">' + (blank || 'No category') + '</option>' + cats().map(function (c) {
+      return '<option value="' + c.id + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('');
+  }
+  function toast(msg) {
+    document.querySelectorAll('.toast').forEach(function (x) { x.remove(); });
+    var t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+    document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2600);
+  }
+  function act(fn) {
+    try { var r = fn(); save(); render(); scheduleSync(); return r; }
+    catch (err) { toast(err.message || String(err)); save(); render(); }
+  }
+  function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+  function fromDT(date, time) { var m = TT.parseClock(time); return m == null || !date ? null : TT.atMinute(date, m); }
+  function shortDate(d) {
+    var t = TT.dateOf(now());
+    if (d === t) return 'Today'; if (d === TT.addDays(t, -1)) return 'Yesterday'; if (d === TT.addDays(t, 1)) return 'Tomorrow';
+    var p = d.split('-'); return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][TT.weekday(d)] + ' ' + (+p[1]) + '/' + (+p[2]);
+  }
+
+  /* ---------- top bar + banners ---------- */
+  function paintBar() {
+    var r = TT.running(store), bar = document.getElementById('bar');
+    if (r) {
+      var b = store.get(r.blockId) || {}, it = r.itemId ? store.get(r.itemId) : null;
+      bar.className = 'bar on';
+      bar.innerHTML = '<div class="who"><div class="bt">' + esc(b.title) + '</div><div class="bs">' + (it ? '▸ ' + esc(it.title) + ' · ' : '') +
+        'block <span data-live="btot">' + TT.fmt(TT.blockTotals(store, b.id).total) + '</span> · since ' + hm(r.start) + '</div></div>' +
+        '<div class="el" data-live="el">' + TT.fmt(now() - r.start, 1) + '</div>' +
+        '<button class="rb" data-a="pause" title="Pause" aria-label="Pause">❚❚</button>' +
+        '<button class="rb" data-a="stop" title="Stop" aria-label="Stop">■</button>';
+    } else {
+      var last = lastBlock();
+      bar.className = 'bar';
+      bar.innerHTML = '<div class="who"><div class="bt">No timer running</div><div class="bs">' +
+        (last ? 'Last: ' + esc(last.title) : 'Tap ▶ on a block to start') + '</div></div>' +
+        '<div class="el">0:00:00</div>' + (last ? '<button class="rb go" data-a="resume" title="Resume" aria-label="Resume">▶</button>' : '');
+    }
+  }
+  function lastBlock() {
+    var e = store.all('entry').filter(function (x) { return x.source === 'timer'; }).sort(function (a, b) { return b.start - a.start; })[0];
+    var b = e && store.get(e.blockId);
+    return b && b.status !== 'done' ? b : null;
+  }
+  function paintBanners() {
+    var el = document.getElementById('banners'), out = '', t = now();
+    var lr = TT.longRunning(store, t);
+    if (lr && !(ui.snooze[lr.id] > t)) {
+      out += '<div class="banner" data-ban="long"><span>⏰ Running for ' + TT.fmt(t - lr.start) + ' (since ' + hm(lr.start) + '). Still on it?</span>' +
+        '<button class="btn" data-a="keepRunning" data-id="' + lr.id + '">Yes, keep</button><button class="btn pri" data-a="stopAtSheet">Stop at…</button></div>';
+    }
+    var tip = TT.breakSuggestion(store, t);
+    if (tip && !(ui.tipSnooze > t)) {
+      out += '<div class="banner tip"><span>☕ ' + tip.workMin + ' min of work since ' + hm(tip.since) + ' — a ' + tip.breakMin + ' min break?</span>' +
+        '<button class="btn" data-a="startBreak">Start break</button><button class="btn" data-a="tipLater">Later</button></div>';
+    }
+    el.innerHTML = out;
+  }
+  function tick() {
+    var r = TT.running(store), t = now();
+    if (r) {
+      var el = document.querySelector('[data-live="el"]'); if (el) el.textContent = TT.fmt(t - r.start, 1);
+      var tot = TT.blockTotals(store, r.blockId, t);
+      document.querySelectorAll('[data-live="btot"],[data-tb="' + r.blockId + '"]').forEach(function (x) { x.textContent = TT.fmt(tot.total); });
+      if (r.itemId) document.querySelectorAll('[data-ti="' + r.itemId + '"]').forEach(function (x) { x.textContent = TT.fmt(tot.items[r.itemId]); });
+      document.querySelectorAll('[data-te="' + r.id + '"]').forEach(function (x) { x.textContent = TT.fmt(t - r.start); });
+      var un = document.querySelector('[data-tu="' + r.blockId + '"]'); if (un) un.textContent = 'Unassigned ' + TT.fmt(tot.unassigned);
+    }
+    if (new Date(t).getSeconds() === 0) { paintBanners(); if (ui.view === 'cal' || ui.view === 'day') { if (!editing()) render(); } }
+  }
+
+  /* ---------- Blocks view ---------- */
+  function blockCard(b, opts) {
+    var r = TT.running(store), t = now(), run = r && r.blockId === b.id;
+    var tot = TT.blockTotals(store, b.id, t), items = TT.itemsOf(store, b.id);
+    var done = items.filter(function (i) { return i.done; }).length;
+    var open = opts.open != null ? opts.open : !!ui.open[b.id];
+    var paused = !run && b.activeItemId;
+    var c = cat(b.catId);
+    var h = '<div class="card blk' + (run ? ' run' : '') + '" data-bid="' + b.id + '"><div class="blk-h">' +
+      '<button class="play" data-a="toggleBlock" data-id="' + b.id + '" aria-label="' + (run ? 'Pause' : 'Start') + '">' + (run ? '❚❚' : '▶') + '</button>' +
+      '<div class="blk-t" data-a="blockMenu" data-id="' + b.id + '"><div class="t">' + esc(b.title) + '</div><div class="sub">' +
+      (c ? '<span class="dot" style="background:' + esc(c.color) + '"></span>' + esc(c.name) : '<span class="dot"></span>No category') +
+      (items.length ? ' · ' + done + '/' + items.length + ' done' : '') + (b.status === 'done' ? ' · finished' : '') +
+      (paused ? ' · paused' : '') + (b.planKey ? ' · planned' : '') + (opts.carried ? ' · from ' + shortDate(b.date) : '') + '</div></div>' +
+      '<div class="tot" data-tb="' + b.id + '">' + TT.fmt(tot.total) + '</div>' +
+      '<button class="chev" data-a="toggleOpen" data-id="' + b.id + '" aria-label="Show tasks">' + (open ? '▴' : '▾') + '</button></div>';
+    if (!open) return h + '</div>';
+    h += '<ul class="items">' + items.map(function (it, i) {
+      var active = r && r.itemId === it.id;
+      return '<li class="it' + (it.done ? ' done' : '') + (active ? ' act' : '') + '">' +
+        '<button class="cb" data-a="toggleItem" data-id="' + it.id + '" aria-label="Done">' + (it.done ? '✓' : '') + '</button>' +
+        '<span class="it-t">' + (it.isBreak ? '☕ ' : '') + esc(it.title) + '</span>' +
+        '<span class="it-time" data-ti="' + it.id + '">' + (tot.items[it.id] ? TT.fmt(tot.items[it.id]) : '') + '</span>' +
+        (i ? '<button class="mv" data-a="itemUp" data-id="' + it.id + '" aria-label="Move up">↑</button>' : '<span class="mv"></span>') +
+        '<button class="ip" data-a="itemPlay" data-id="' + it.id + '" aria-label="' + (active ? 'Stop task timer' : 'Start task timer') + '">' + (active ? '❚❚' : '▶') + '</button></li>';
+    }).join('') + '</ul>' +
+      '<form class="add-it" data-f="addItems" data-id="' + b.id + '"><input name="t" placeholder="Add tasks: a, b, c" enterkeyhint="done" autocomplete="off"><button>Add</button></form>' +
+      '<div class="foot"><button data-a="addBreak" data-id="' + b.id + '">☕ Break</button>' +
+      '<button data-a="manualSheet" data-id="' + b.id + '">+ Time</button>' +
+      (b.status === 'done' ? '<button data-a="reopen" data-id="' + b.id + '">Reopen</button>' : '<button data-a="finish" data-id="' + b.id + '">✓ Finish</button>') +
+      '<span class="un" data-tu="' + b.id + '">' + (tot.unassigned ? 'Unassigned ' + TT.fmt(tot.unassigned) : '') + '</span></div>';
+    return h + '</div>';
+  }
+  function viewBlocks() {
+    var t = now(), today = TT.dateOf(t), r = TT.running(store);
+    var cur = r ? store.get(r.blockId) : null;
+    if (!cur) { var lb = lastBlock(); if (lb && lb.activeItemId !== undefined && TT.dateOf(lb.lastAt || 0) === today && !lb.staged) cur = lb; }
+    var all = store.all('block');
+    var staged = TT.stagedBlocks(store).filter(function (b) { return !cur || b.id !== cur.id; });
+    var open = all.filter(function (b) { return b.status !== 'done' && !b.staged && (!cur || b.id !== cur.id); })
+      .sort(function (a, b) { return (b.lastAt || b.createdAt) - (a.lastAt || a.createdAt); });
+    var todays = open.filter(function (b) { return b.date >= today || TT.dateOf(b.lastAt || 0) === today; });
+    var carried = open.filter(function (b) { return todays.indexOf(b) < 0; });
+    var doneToday = all.filter(function (b) { return b.status === 'done' && TT.dateOf(b.doneAt || 0) === today; });
+    var h = '<form class="qa" data-f="quick"><input id="qa" placeholder="' + (ui.addMode === 'task' ? 'Add tasks to current block: a, b, c' : 'New block (Title: task, task)') +
+      '" enterkeyhint="go" autocomplete="off"><button aria-label="Add">+</button><button type="button" class="play" data-a="quickStart" aria-label="Add and start">▶</button></form>' +
+      '<div class="modes"><span class="seg"><button type="button" data-a="mode" data-m="task" class="' + (ui.addMode === 'task' ? 'on' : '') + '">Task</button>' +
+      '<button type="button" data-a="mode" data-m="block" class="' + (ui.addMode === 'block' ? 'on' : '') + '">Block</button></span>' +
+      '<span>' + (ui.addMode === 'task' ? (cur && r ? '→ ' + esc(cur.title) : '→ Next Block (nothing running)') : 'commas = several blocks · ▶ = start now') + '</span></div>';
+    h += '<h3>Now</h3>' + (cur ? blockCard(cur, { open: true }) : '<div class="empty">Nothing running. Tap ▶ on a block, or type a title and tap ▶.</div>');
+    h += '<h3>Next Block <button data-a="newStaged">+ New</button></h3>' + (staged.length ? staged.map(function (b) { return blockCard(b, { open: true }); }).join('') :
+      '<div class="empty">Stage what comes next. Tasks added with nothing running land here.</div>');
+    h += '<h3>Today</h3>' + (todays.length ? todays.map(function (b) { return blockCard(b, {}); }).join('') : '<div class="empty">No other blocks yet.</div>');
+    if (carried.length) h += '<h3>Still open</h3>' + carried.map(function (b) { return blockCard(b, { carried: true }); }).join('');
+    if (doneToday.length) h += '<h3>Finished today</h3>' + doneToday.map(function (b) { return blockCard(b, {}); }).join('');
+    var ents = TT.findEntries(store, { from: today, to: today });
+    var sum = TT.daySummary(store, today, t);
+    h += '<h3>Entries today · ' + TT.fmt(sum.tracked) + '<button data-a="manualSheet">+ Manual entry</button></h3>' +
+      '<div class="card">' + (ents.length ? ents.map(entryRow).join('') : '<div class="empty" style="padding:12px">No time yet today.</div>') + '</div>';
+    return h;
+  }
+  function entryRow(e) {
+    var b = store.recs[e.blockId] || {}, it = e.itemId ? store.recs[e.itemId] || {} : null, t = now();
+    var cl = TT.classify(store, e);
+    return '<div class="ent" data-a="entrySheet" data-id="' + e.id + '"><span class="dot" style="background:' + (cl === 'break' ? 'var(--brk)' : catColor(b.catId)) + '"></span>' +
+      '<div class="m"><div>' + esc(b.title || '(deleted block)') + '</div><div class="small">' + (it ? '▸ ' + esc(it.title) + ' · ' : '') +
+      shortDate(TT.dateOf(e.start)) + ' ' + hm(e.start) + '–' + (e.end == null ? 'now' : hm(e.end)) + (e.note ? ' · ' + esc(e.note) : '') + '</div></div>' +
+      (e.end == null ? '<span class="badge live">live</span>' : e.source === 'manual' ? '<span class="badge est">est.</span>' : '') +
+      '<span class="d" ' + (e.end == null ? 'data-te="' + e.id + '"' : '') + '>' + TT.fmt((e.end == null ? t : e.end) - e.start) + '</span></div>';
+  }
+
+  /* ---------- Calendar view ---------- */
+  var PX = { day: 48, week: 34 };
+  function viewCal() {
+    var d = ui.calDate || TT.dateOf(now()), week = ui.calMode === 'week';
+    var from = week ? TT.addDays(d, -TT.weekday(d)) : d, to = week ? TT.addDays(from, 6) : d;
+    var h = '<div class="calbar"><button class="btn" data-a="calNav" data-n="-1" aria-label="Back">‹</button>' +
+      '<div class="ttl">' + (week ? shortDate(from) + ' – ' + shortDate(to) : shortDate(d)) + '</div>' +
+      '<button class="btn" data-a="calNav" data-n="1" aria-label="Forward">›</button>' +
+      '<span class="seg"><button data-a="calMode" data-m="day" class="' + (!week ? 'on' : '') + '">Day</button><button data-a="calMode" data-m="week" class="' + (week ? 'on' : '') + '">Week</button></span>' +
+      '<button class="btn" data-a="calToday">Today</button><button class="btn pri" data-a="planSheet">+ Plan</button></div>';
+    var px = week ? PX.week : PX.day, hgt = 24 * px, t = now(), today = TT.dateOf(t);
+    var occ = TT.occurrences(store, from, to), started = {};
+    store.all('block').forEach(function (b) { if (b.planKey) started[b.planKey] = 1; });
+    var days = []; for (var x = from; x <= to; x = TT.addDays(x, 1)) days.push(x);
+    h += '<div class="cal" id="cal">';
+    if (week) h += '<div class="colhead"><div class="sp"></div>' + days.map(function (x) { return '<div data-a="calDay" data-d="' + x + '" class="' + (x === today ? 'today' : '') + '">' + shortDate(x) + '</div>'; }).join('') + '</div>';
+    else h += '<div class="lanehead"><div>Planned</div><div>Actual</div></div>';
+    h += '<div class="grid" style="height:' + hgt + 'px"><div class="hours">';
+    for (var i = 1; i < 24; i++) h += '<div style="top:' + i * px + 'px">' + (i < 10 ? '0' : '') + i + ':00</div>';
+    h += '</div>';
+    days.forEach(function (day) {
+      h += '<div class="col">';
+      for (var j = 1; j < 24; j++) h += '<div class="hl" style="top:' + j * px + 'px"></div>';
+      h += '<div class="lanes"><div class="lane-plan" data-a="newPlanAt" data-d="' + day + '">';
+      occ.filter(function (o) { return o.date === day; }).forEach(function (o) {
+        var top = o.start / 60 * px, ht = Math.max(week ? 16 : 22, o.dur / 60 * px);
+        h += '<div class="plan' + (started[o.key] ? ' started' : '') + '" data-a="planOpen" data-key="' + o.key + '" style="--c:' + esc(catColor(o.catId)) + ';top:' + top + 'px;height:' + ht + 'px">' +
+          '<div class="pt">' + (o.seriesId ? '↻ ' : '') + esc(o.title) + '</div>' + (week ? '' : '<div class="pm" data-pm>' + TT.clock(o.start) + '–' + TT.clock(o.start + o.dur) + '</div>') +
+          '<button class="ps" data-a="startPlan" data-key="' + o.key + '" aria-label="Start now">▶</button>' +
+          (week ? '' : '<div class="grip" data-drag="move" aria-label="Drag to move">☰</div><div class="rs" data-drag="size" aria-label="Drag to resize"></div>') + '</div>';
+      });
+      h += '</div><div class="lane-act">';
+      var a = TT.dayStartMs(day), z = TT.dayStartMs(TT.addDays(day, 1));
+      store.all('entry').forEach(function (e) {
+        var s0 = Math.max(e.start, a), e0 = Math.min(e.end == null ? t : e.end, z);
+        if (e0 <= s0) return;
+        var b = store.recs[e.blockId] || {}, cl = TT.classify(store, e);
+        var top = (s0 - a) / 3600000 * px, ht = Math.max(3, (e0 - s0) / 3600000 * px);
+        h += '<div class="act' + (e.source === 'manual' ? ' est' : '') + (cl === 'break' ? ' brk' : '') + '" data-a="entrySheet" data-id="' + e.id + '" style="--c:' + esc(catColor(b.catId)) +
+          ';top:' + top + 'px;height:' + ht + 'px" title="' + esc(b.title) + '">' + (ht > 13 && !week ? esc(b.title) : '') + '</div>';
+      });
+      h += '</div></div>';
+      if (day === today) h += '<div class="now" style="top:' + (minOf(t) / 60 * px) + 'px"></div>';
+      h += '</div>';
+    });
+    h += '</div></div><div class="small" style="margin-top:6px">Tap empty space to plan · ▶ starts now · ☰ drag to move, bottom edge to resize (15 min steps) · right lane = actual time (striped = estimated).</div>';
+    return h;
+  }
+  function scrollCal() {
+    var c = document.getElementById('cal'); if (!c) return;
+    var px = ui.calMode === 'week' ? PX.week : PX.day;
+    c.scrollTop = Math.max(0, (Math.max(6 * 60, minOf(now()) - 90)) / 60 * px - 10);
+  }
+  // Touch drag: only the ☰ grip and the bottom edge take the pointer, so the timeline still scrolls everywhere else.
+  var drag = null;
+  document.addEventListener('pointerdown', function (e) {
+    var hnd = e.target.closest && e.target.closest('[data-drag]');
+    if (!hnd) return;
+    var card = hnd.closest('.plan');
+    e.preventDefault(); e.stopPropagation();
+    try { hnd.setPointerCapture(e.pointerId); } catch (x) {}
+    drag = { hnd: hnd, card: card, mode: hnd.dataset.drag, y: e.clientY, top: parseFloat(card.style.top), h: parseFloat(card.style.height), px: PX.day, moved: false };
+    card.classList.add('drag');
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var snap = drag.px / 4, dy = e.clientY - drag.y;
+    if (Math.abs(dy) > 3) drag.moved = true;
+    if (drag.mode === 'move') drag.card.style.top = Math.max(0, Math.min(24 * drag.px - drag.h, Math.round((drag.top + dy) / snap) * snap)) + 'px';
+    else drag.card.style.height = Math.max(snap, Math.round((drag.h + dy) / snap) * snap) + 'px';
+    var s = Math.round(parseFloat(drag.card.style.top) / drag.px * 60), d = Math.round(parseFloat(drag.card.style.height) / drag.px * 60);
+    var pm = drag.card.querySelector('[data-pm]'); if (pm) pm.textContent = TT.clock(s) + '–' + TT.clock(s + d);
+  });
+  function endDrag() {
+    if (!drag) return;
+    var g = drag; drag = null;
+    g.card.classList.remove('drag');
+    g.card.dataset.dragged = '1'; setTimeout(function () { delete g.card.dataset.dragged; }, 400);
+    if (!g.moved) return;
+    var key = g.card.dataset.key;
+    var s = Math.round(parseFloat(g.card.style.top) / g.px * 60), d = Math.round(parseFloat(g.card.style.height) / g.px * 60);
+    act(function () {
+      TT.editOccurrence(store, key, g.mode === 'move' ? { start: s } : { dur: d }, 'one');
+      toast((key.indexOf('@') > 0 ? 'This occurrence ' : '') + (g.mode === 'move' ? 'moved to ' + TT.clock(s) : 'now ' + TT.fmt(d * 60000)));
+    });
+  }
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+
+  /* ---------- Day view (reconciliation + week) ---------- */
+  function stack(parts, total) {
+    return '<div class="stack">' + parts.map(function (p) { return p[0] > 0 ? '<i style="width:' + (100 * p[0] / total).toFixed(2) + '%;background:' + p[1] + '" title="' + p[2] + '"></i>' : ''; }).join('') + '</div>';
+  }
+  function viewDay() {
+    var t = now(), d = ui.repDate || TT.dateOf(t), s = TT.daySummary(store, d, t);
+    var h = '<div class="calbar"><button class="btn" data-a="repNav" data-n="-1">‹</button><div class="ttl">' + shortDate(d) + ' · ' + d + '</div>' +
+      '<button class="btn" data-a="repNav" data-n="1">›</button><button class="btn" data-a="repToday">Today</button></div>';
+    var win = Math.max(s.window, s.tracked, 1);
+    h += '<div class="card"><div class="kv"><div class="h" style="margin-top:0">Reconciliation ' + (s.window ? hm(s.windowStart) + '–' + hm(s.windowEnd) : '') + '</div></div>' +
+      '<div style="padding:0 12px">' + stack([[s.productive, 'var(--ok)', 'Productive'], [s.breaks, 'var(--brk)', 'Breaks'], [s.other, 'var(--warn)', 'Not productive'],
+        [s.unclassified, 'var(--est)', 'Unclassified'], [s.unaccounted, 'var(--unk)', 'Unaccounted']], win) + '</div>' +
+      '<div class="kv">' +
+      kv('var(--acc)', 'Measured (timer)', s.measured) + kv('var(--est)', 'Estimated (manual)', s.estimated) +
+      kv('var(--unk)', 'Unaccounted', s.unaccounted) + kv('', 'Day window', s.window) +
+      (s.overlap > 0 ? kv('#c0392b', 'Overlapping (not double counted)', s.overlap) : '') +
+      '<div class="h">What it was</div>' +
+      kv('var(--ok)', 'Productive', s.productive) + kv('var(--brk)', 'Breaks', s.breaks) + kv('var(--warn)', 'Not productive', s.other) + kv('var(--est)', 'Unclassified', s.unclassified) +
+      '<div class="h">By category</div>' + Object.keys(s.byCat).sort(function (a, b) { return s.byCat[b] - s.byCat[a]; }).map(function (c) {
+        var x = cat(c); return kv(x ? x.color : 'var(--unk)', x ? x.name : 'No category', s.byCat[c]); }).join('') +
+      '<div class="h">By block</div>' + Object.keys(s.byBlock).sort(function (a, b) { return s.byBlock[b] - s.byBlock[a]; }).map(function (id) {
+        var b = store.recs[id] || {}; return kv(catColor(b.catId), esc(b.title || '?'), s.byBlock[id]); }).join('') +
+      '</div></div>';
+    var pva = TT.planVsActual(store, d, t);
+    if (pva.length) h += '<h3>Planned vs actual</h3><div class="card"><div class="kv">' + pva.map(function (p) {
+      return '<div class="k"><span class="dot" style="background:' + esc(catColor(p.occ.catId)) + '"></span>' + esc(p.occ.title) + ' <span class="small">' + TT.clock(p.occ.start) + ' · plan ' + TT.fmt(p.occ.dur * 60000) + '</span></div>' +
+        '<div class="v">' + (p.blockId ? TT.fmt(p.actual) : '<span class="small">not started</span>') + '</div>'; }).join('') + '</div></div>';
+    var from = TT.addDays(d, -TT.weekday(d)), w = TT.rangeSummary(store, from, TT.addDays(from, 6), t);
+    var max = Math.max.apply(null, w.days.map(function (x) { return x.tracked; }).concat([1]));
+    h += '<h3>Week · ' + TT.fmt(w.tracked) + ' tracked · ' + TT.fmt(w.productive) + ' productive</h3><div class="card" style="padding:6px 0">' + w.days.map(function (x) {
+      return '<div class="wk" data-a="repDay" data-d="' + x.date + '" style="cursor:pointer"><span>' + ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][TT.weekday(x.date)] + '</span><div style="width:' + Math.max(2, 100 * x.tracked / max) + '%">' +
+        stack([[x.productive, 'var(--ok)', ''], [x.breaks, 'var(--brk)', ''], [x.other, 'var(--warn)', ''], [x.unclassified, 'var(--est)', '']], Math.max(x.tracked, 1)) + '</div><span class="v">' + TT.fmt(x.tracked) + '</span></div>';
+    }).join('') + '<div class="kv">' + Object.keys(w.byCat).sort(function (a, b) { return w.byCat[b] - w.byCat[a]; }).map(function (c) {
+      var x = cat(c); return kv(x ? x.color : 'var(--unk)', x ? x.name : 'No category', w.byCat[c]); }).join('') + '</div></div>';
+    h += '<div class="small" style="margin:8px 2px">Unaccounted = day window (More → Settings) minus all tracked time. It is never guessed or labelled.</div>';
+    return h;
+  }
+  function kv(color, label, ms) {
+    return '<div class="k">' + (color ? '<span class="dot" style="background:' + color + '"></span>' : '') + label + '</div><div class="v">' + TT.fmt(ms) + '</div>';
+  }
+
+  /* ---------- More view: search, export, categories, settings ---------- */
+  function viewMore() {
+    var q = ui.q, list = TT.findEntries(store, q), c = TT.cfg(store), tot = 0, t = now();
+    list.forEach(function (e) { tot += (e.end == null ? t : e.end) - e.start; });
+    var h = '<h3>Search entries</h3><div class="card" style="padding:10px 12px">' +
+      '<div class="f"><input id="sq" placeholder="Block, task or note" value="' + esc(q.q) + '" data-q="q"></div>' +
+      '<div class="row"><div class="f">Category<select data-q="catId">' + catOptions(q.catId, 'Any') + '<option value="none"' + (q.catId === 'none' ? ' selected' : '') + '>No category</option></select></div>' +
+      '<div class="f">Source<select data-q="source"><option value="">Any</option><option value="timer"' + (q.source === 'timer' ? ' selected' : '') + '>Measured</option><option value="manual"' + (q.source === 'manual' ? ' selected' : '') + '>Estimated</option></select></div></div>' +
+      '<div class="row"><div class="f">From<input type="date" data-q="from" value="' + esc(q.from) + '"></div><div class="f">To<input type="date" data-q="to" value="' + esc(q.to) + '"></div></div>' +
+      '<div class="small">' + list.length + ' entries · ' + TT.fmt(tot) + '</div></div>' +
+      '<div class="card">' + list.slice(0, 100).map(entryRow).join('') + (list.length > 100 ? '<div class="empty" style="padding:10px">Showing 100 of ' + list.length + '</div>' : '') + '</div>';
+    h += '<h3>Export</h3><div class="card" style="padding:10px 12px"><div class="acts"><button class="btn" data-a="exportCsv">CSV (these entries)</button><button class="btn" data-a="exportJson">Full backup (JSON)</button>' +
+      (meta.url ? '<a class="btn" href="' + esc(meta.url) + '" target="_blank" rel="noopener">Open the Time Tracker sheet</a>' : '') + '</div>' +
+      '<textarea id="exportBox" class="hidden" style="width:100%;height:140px;margin-top:8px;font-size:12px" readonly></textarea></div>';
+    h += '<h3>Categories <button data-a="addCat">+ Add</button></h3><div class="card">' + cats().map(function (x) {
+      return '<div class="catrow"><input type="color" value="' + esc(x.color) + '" data-cat="' + x.id + '" data-k="color"><input type="text" value="' + esc(x.name) + '" data-cat="' + x.id + '" data-k="name">' +
+        '<label class="small"><input type="checkbox" data-cat="' + x.id + '" data-k="productive"' + (x.productive ? ' checked' : '') + '> productive</label>' +
+        '<button class="mv" data-a="delCat" data-id="' + x.id + '" aria-label="Delete">✕</button></div>'; }).join('') + '</div>' +
+      '<div class="small" style="margin:4px 2px">You decide what counts as productive. Blocks without a category show as Unclassified. Break tasks always count as breaks.</div>';
+    h += '<h3>Settings</h3><div class="card" style="padding:10px 12px">' +
+      '<div class="row"><div class="f">Day starts<input type="time" data-cfg="dayStart" value="' + TT.clock(c.dayStart) + '"></div><div class="f">Day ends<input type="time" data-cfg="dayEnd" value="' + TT.clock(c.dayEnd) + '"></div></div>' +
+      '<div class="row"><div class="f">Ask after running (hours)<input type="number" min="0.5" step="0.5" data-cfg="longRunH" value="' + c.longRunH + '"></div>' +
+      '<div class="f">Break tip after (min work)<input type="number" min="10" step="5" data-cfg="breakEveryMin" value="' + c.breakEveryMin + '"></div></div>' +
+      '<div class="row"><div class="f">Break length (% of work)<input type="number" min="5" max="50" step="5" data-cfg="breakRatio" value="' + Math.round(c.breakRatio * 100) + '"></div>' +
+      '<div class="f">Gap that ends a work period (min)<input type="number" min="1" step="1" data-cfg="breakGapMin" value="' + c.breakGapMin + '"></div></div>' +
+      '<label class="small"><input type="checkbox" data-cfg="breakTips"' + (c.breakTips ? ' checked' : '') + '> Show break suggestions</label></div>';
+    h += '<div class="small" style="margin:12px 2px">Device ' + esc(meta.dev) + ' · ' + Object.keys(store.recs).length + ' records · ' + (hasServer ? 'syncs with your own Time Tracker sheet' : 'local only') + '. Separate from Gantt: nothing here writes to the Gantt sheet.</div>';
+    return h;
+  }
+
+  /* ---------- sheets (forms) ---------- */
+  function openSheet(html) { document.getElementById('sheetCard').innerHTML = html; document.getElementById('sheet').classList.remove('hidden'); }
+  function closeSheet() { document.getElementById('sheet').classList.add('hidden'); document.getElementById('sheetCard').innerHTML = ''; render(); }
+  function setErr(msg, extra) { var e = document.getElementById('err'); if (e) e.innerHTML = esc(msg) + (extra || ''); }
+
+  function blockOptions(sel) {
+    var t = TT.dateOf(now());
+    var list = store.all('block').filter(function (b) { return b.status !== 'done' || TT.dateOf(b.doneAt || 0) >= TT.addDays(t, -7) || b.id === sel; })
+      .sort(function (a, b) { return (b.lastAt || b.createdAt) - (a.lastAt || a.createdAt); });
+    return '<option value="">➕ New block…</option>' + list.map(function (b) { return '<option value="' + b.id + '"' + (b.id === sel ? ' selected' : '') + '>' + esc(b.title) + '</option>'; }).join('');
+  }
+  function manualSheet(blockId) {
+    var t = now(), d = TT.dateOf(t);
+    openSheet('<h2>Manual time entry</h2>' +
+      '<div class="f">Block<select id="mBlock" data-chg="mBlock">' + blockOptions(blockId) + '</select></div>' +
+      '<div class="f' + (blockId ? ' hidden' : '') + '" id="mNewWrap">New block title<input id="mTitle" placeholder="e.g. Researching Android browsers"></div>' +
+      '<div class="f' + (blockId ? ' hidden' : '') + '" id="mCatWrap">Category<select id="mCat">' + catOptions('') + '</select></div>' +
+      '<div class="f" id="mItemWrap">Task (optional)<select id="mItem">' + itemOptions(blockId) + '</select></div>' +
+      '<div class="row"><div class="f">Date<input type="date" id="mDate" value="' + d + '"></div><div class="f">Start<input type="time" id="mStart" value="' + hm(t - 3600000) + '"></div></div>' +
+      '<div class="row"><div class="f">End<input type="time" id="mEnd" value="' + hm(t) + '"></div><div class="f">or Duration<input id="mDur" placeholder="45m, 1h30" inputmode="text"></div></div>' +
+      '<div class="small">With a duration and no end, it runs from Start; clear Start to have it end at End.</div>' +
+      '<div class="f">Note<input id="mNote" placeholder="optional"></div><div class="err" id="err"></div>' +
+      '<div class="acts"><button class="btn pri" data-a="saveManual">Save (estimated)</button><button class="btn" data-a="closeSheet">Cancel</button></div>');
+  }
+  function itemOptions(blockId, sel) {
+    return '<option value="">Whole block (unassigned)</option>' + (blockId ? TT.itemsOf(store, blockId).map(function (i) {
+      return '<option value="' + i.id + '"' + (i.id === sel ? ' selected' : '') + '>' + esc(i.title) + '</option>'; }).join('') : '');
+  }
+  function saveManual(force) {
+    var d = val('mDate'), st = fromDT(d, val('mStart')), en = fromDT(d, val('mEnd')), dur = TT.parseDuration(val('mDur'));
+    if (val('mDur') && dur == null) return setErr('Can’t read that duration');
+    if (st != null && en != null && en <= st && dur == null) en += 86400000; // past midnight
+    var o = { blockId: val('mBlock'), title: val('mTitle').trim(), catId: val('mCat'), itemId: val('mItem') || null, note: val('mNote').trim(), force: !!force };
+    if (!o.blockId && !o.title) return setErr('Pick a block or type a title');
+    if (dur != null) { o.dur = dur; if (st != null) o.start = st; else o.end = en; } else { o.start = st; o.end = en; }
+    var r = TT.addManual(store, o);
+    if (!r.ok) return setErr(r.error, r.overlaps ? ' <button class="btn" data-a="saveManualForce">Save anyway</button>' : '');
+    save(); scheduleSync(); closeSheet(); toast('Logged ' + TT.fmt(r.entry.end - r.entry.start) + ' (estimated)');
+  }
+
+  function entrySheet(id) {
+    var e = store.get(id); if (!e) return;
+    var b = store.recs[e.blockId] || {}, live = e.end == null;
+    openSheet('<h2>' + (live ? 'Running entry' : 'Edit entry') + '</h2>' +
+      '<div class="small" style="margin-bottom:8px">' + (e.source === 'manual' ? 'Estimated / manual' : 'Measured by timer') + (e.tz ? ' · ' + esc(e.tz) : '') + '</div>' +
+      '<div class="f">Block<select id="eBlock" data-chg="eBlock">' + blockOptions(e.blockId).replace(/<option value="">[^<]*<\/option>/, '') + '</select></div>' +
+      '<div class="f">Task<select id="eItem">' + itemOptions(e.blockId, e.itemId) + '</select></div>' +
+      '<div class="row"><div class="f">Date<input type="date" id="eDate" value="' + TT.dateOf(e.start) + '"></div><div class="f">Start<input type="time" id="eStart" value="' + hm(e.start) + '"></div>' +
+      (live ? '' : '<div class="f">End<input type="time" id="eEnd" value="' + hm(e.end) + '"></div>') + '</div>' +
+      '<div class="f">Counts as<select id="eProd"><option value="">Use the category</option><option value="1"' + (e.productive === true ? ' selected' : '') + '>Productive</option><option value="0"' + (e.productive === false ? ' selected' : '') + '>Not productive</option></select></div>' +
+      '<div class="f">Note<input id="eNote" value="' + esc(e.note || '') + '"></div><div class="err" id="err"></div>' +
+      '<div class="acts"><button class="btn pri" data-a="saveEntry" data-id="' + id + '">Save</button>' +
+      (live ? '<button class="btn" data-a="stopAtSheet">Stop at…</button>' : '<button class="btn del" data-a="delEntry" data-id="' + id + '">Delete</button>') +
+      '<button class="btn" data-a="closeSheet">Cancel</button></div>');
+  }
+  function saveEntry(id, force) {
+    var e = store.get(id), d = val('eDate'), st = fromDT(d, val('eStart'));
+    if (st == null) return setErr('Start time?');
+    var p = { start: st, note: val('eNote').trim(), force: !!force, blockId: val('eBlock') || e.blockId, itemId: val('eItem') || null,
+      productive: val('eProd') === '' ? null : val('eProd') === '1' };
+    if (e.end != null) { var en = fromDT(d, val('eEnd')); if (en == null) return setErr('End time?'); if (en <= st) en += 86400000; p.end = en; }
+    var r = TT.editEntry(store, id, p);
+    if (!r.ok) return setErr(r.error, r.overlaps ? ' <button class="btn" data-a="saveEntryForce" data-id="' + id + '">Save anyway</button>' : '');
+    save(); scheduleSync(); closeSheet();
+  }
+  function stopAtSheet() {
+    var r = TT.running(store); if (!r) return;
+    openSheet('<h2>Stop the timer at…</h2><div class="small">Started ' + shortDate(TT.dateOf(r.start)) + ' ' + hm(r.start) + '. Pick when you actually stopped.</div>' +
+      '<div class="row" style="margin-top:10px"><div class="f">Date<input type="date" id="sDate" value="' + TT.dateOf(now()) + '"></div><div class="f">Time<input type="time" id="sTime" value="' + hm(now()) + '"></div></div>' +
+      '<div class="acts">' + [15, 30, 60].map(function (m) { return '<button class="btn" data-a="stopAgo" data-m="' + m + '">' + m + ' min ago</button>'; }).join('') + '</div>' +
+      '<div class="err" id="err"></div><div class="acts"><button class="btn pri" data-a="stopAtSave">Stop there</button><button class="btn" data-a="closeSheet">Cancel</button></div>');
+  }
+
+  function blockMenu(id) {
+    var b = store.get(id); if (!b) return;
+    openSheet('<h2>Block</h2><div class="f">Title<input id="bTitle" value="' + esc(b.title) + '"></div>' +
+      '<div class="f">Category<select id="bCat">' + catOptions(b.catId) + '</select></div>' +
+      '<label class="small"><input type="checkbox" id="bStaged"' + (b.staged ? ' checked' : '') + '> In Next Block (staged)</label><div class="err" id="err"></div>' +
+      '<div class="acts"><button class="btn pri" data-a="saveBlock" data-id="' + id + '">Save</button><button class="btn go" data-a="startFromMenu" data-id="' + id + '">▶ Start</button>' +
+      '<button class="btn" data-a="manualSheet" data-id="' + id + '">+ Time</button><button class="btn del" data-a="delBlock" data-id="' + id + '">Delete</button>' +
+      '<button class="btn" data-a="closeSheet">Cancel</button></div>');
+  }
+
+  function planSheet(key, preset) {
+    var o = key ? TT.findOcc(store, key) : null, series = o && o.seriesId ? store.get(o.seriesId) : null;
+    preset = preset || {};
+    var d = o ? o.date : preset.date || ui.calDate || TT.dateOf(now()), st = o ? o.start : preset.start != null ? preset.start : Math.ceil(minOf(now()) / 15) * 15 % 1440;
+    var days = series ? series.days : [TT.weekday(d)];
+    openSheet('<h2>' + (o ? 'Planned block' : 'Plan a block') + '</h2>' +
+      (series ? '<div class="small" style="margin-bottom:8px">↻ Repeats ' + (series.freq === 'daily' ? 'daily' : 'on ' + series.days.map(function (x) { return 'SMTWTFS'[x]; }).join(' ')) + '</div>' : '') +
+      '<div class="f">Title<input id="pTitle" value="' + esc(o ? o.title : '') + '" placeholder="e.g. Deep work"></div>' +
+      '<div class="row"><div class="f">Date<input type="date" id="pDate" value="' + d + '"></div><div class="f">Start<input type="time" id="pStart" value="' + TT.clock(st) + '"></div>' +
+      '<div class="f">Length<input id="pDur" value="' + (o ? TT.fmt(o.dur * 60000).replace(' ', '') : '1h') + '"></div></div>' +
+      '<div class="f">Category<select id="pCat">' + catOptions(o ? o.catId : '') + '</select></div>' +
+      '<div class="f">Tasks (made when you start it)<input id="pItems" value="' + esc(o ? o.items : '') + '" placeholder="a, b, c"></div>' +
+      (o ? (series ? '<div class="f">Apply changes to<select id="pScope"><option value="one">Only this one (' + shortDate(o.date) + ')</option><option value="series">Every occurrence</option></select></div>' : '') :
+        '<div class="f">Repeat<select id="pRep" data-chg="pRep"><option value="">Doesn’t repeat</option><option value="daily">Every day</option><option value="weekly">Weekly on…</option></select></div>' +
+        '<div id="pDaysWrap" class="hidden"><div class="days" style="margin-bottom:8px">' + ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(function (x, i) {
+          return '<label><input type="checkbox" value="' + i + '" class="pDay"' + (days.indexOf(i) >= 0 ? ' checked' : '') + '><span>' + x + '</span></label>'; }).join('') + '</div></div>' +
+        '<div class="f hidden" id="pUntilWrap">Until (optional)<input type="date" id="pUntil"></div>') +
+      '<div class="err" id="err"></div><div class="acts">' +
+      '<button class="btn pri" data-a="savePlan" data-key="' + (key || '') + '">Save</button>' +
+      (o ? '<button class="btn go" data-a="startPlan" data-key="' + key + '">▶ Start now</button><button class="btn del" data-a="delPlan" data-key="' + key + '">Delete</button>' : '') +
+      '<button class="btn" data-a="closeSheet">Cancel</button></div>');
+  }
+  function savePlan(key) {
+    var title = val('pTitle').trim(), d = val('pDate'), st = TT.parseClock(val('pStart')), dur = TT.parseDuration(val('pDur'));
+    if (!title) return setErr('Give it a title');
+    if (!d || st == null) return setErr('Date and start time?');
+    if (!(dur > 0)) return setErr('Length? e.g. 45m or 1h30');
+    var f = { title: title, date: d, start: st, dur: dur, catId: val('pCat'), items: val('pItems').trim() };
+    try {
+      if (key) {
+        var scope = val('pScope') || 'one';
+        if (scope === 'series') delete f.date;
+        TT.editOccurrence(store, key, f, scope);
+      } else if (val('pRep')) {
+        var days = [].slice.call(document.querySelectorAll('.pDay:checked')).map(function (x) { return +x.value; });
+        TT.addSeries(store, { title: title, start: st, dur: dur, catId: f.catId, items: f.items, freq: val('pRep'), days: days, from: d, until: val('pUntil') });
+      } else TT.addPlan(store, f);
+    } catch (err) { return setErr(err.message); }
+    save(); scheduleSync(); closeSheet();
+  }
+  function delPlanSheet(key) {
+    var o = TT.findOcc(store, key); if (!o) return;
+    if (!o.seriesId) { if (confirm('Delete this planned block? (Tracked time is kept.)')) { TT.deleteOccurrence(store, key); save(); scheduleSync(); closeSheet(); } return; }
+    openSheet('<h2>Delete repeating block</h2><div class="small">Tracked time is never deleted with a plan.</div><div class="acts" style="margin-top:10px">' +
+      '<button class="btn del" data-a="delPlanScope" data-key="' + key + '" data-s="one">Only ' + shortDate(o.date) + '</button>' +
+      '<button class="btn del" data-a="delPlanScope" data-key="' + key + '" data-s="series">Whole series</button><button class="btn" data-a="closeSheet">Cancel</button></div>');
+  }
+
+  function download(name, text, type) {
+    try {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: type }));
+      a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { /* the box below still has it */ }
+    var box = document.getElementById('exportBox');
+    if (box) { box.value = text; box.classList.remove('hidden'); }
+  }
+
+  /* ---------- actions ---------- */
+  var A = {
+    view: function (el) { ui.view = el.dataset.v; save(); render(); if (ui.view === 'cal') scrollCal(); window.scrollTo(0, 0); },
+    pause: function () { act(function () { TT.pause(store); }); },
+    stop: function () { act(function () { TT.stop(store); }); },
+    resume: function () { act(function () { TT.resumeLast(store); }); },
+    toggleBlock: function (el) {
+      var r = TT.running(store), id = el.dataset.id;
+      act(function () { if (r && r.blockId === id) TT.pause(store); else TT.startBlock(store, id); });
+    },
+    toggleOpen: function (el) { ui.open[el.dataset.id] = !ui.open[el.dataset.id]; save(); render(); },
+    toggleItem: function (el) {
+      var it = store.get(el.dataset.id);
+      act(function () { if (it.done) TT.uncompleteItem(store, it.id); else TT.completeItem(store, it.id); });
+    },
+    itemPlay: function (el) {
+      var r = TT.running(store), id = el.dataset.id;
+      act(function () { if (r && r.itemId === id) TT.stopItem(store); else TT.startItem(store, id); });
+    },
+    itemUp: function (el) { act(function () { TT.moveItem(store, el.dataset.id, -1); }); },
+    addBreak: function (el) {
+      var id = el.dataset.id;
+      act(function () {
+        var brk = TT.itemsOf(store, id).filter(function (i) { return i.isBreak && !i.done; })[0] || TT.addItems(store, id, ['Break'])[0];
+        TT.startItem(store, brk.id);
+      });
+    },
+    startBreak: function () {
+      var r = TT.running(store); if (!r) return;
+      A.addBreak({ dataset: { id: r.blockId } });
+    },
+    tipLater: function () { ui.tipSnooze = now() + 25 * 60000; paintBanners(); },
+    keepRunning: function (el) { var r = TT.running(store); ui.snooze[el.dataset.id] = now() + TT.cfg(store).longRunH * 3600000; paintBanners(); },
+    finish: function (el) { act(function () { TT.finishBlock(store, el.dataset.id); }); },
+    reopen: function (el) { act(function () { TT.reopenBlock(store, el.dataset.id); }); },
+    mode: function (el) { ui.addMode = el.dataset.m; save(); render(); var q = document.getElementById('qa'); if (q) q.focus(); },
+    quickStart: function () { quick(true); },
+    newStaged: function () {
+      var t = prompt('Next block title', ''); if (t === null) return;
+      act(function () { TT.addBlock(store, { title: t || 'Next Block', staged: true }); });
+    },
+    blockMenu: function (el) { blockMenu(el.dataset.id); },
+    saveBlock: function (el) {
+      var id = el.dataset.id, t = val('bTitle').trim();
+      if (!t) return setErr('Title?');
+      store.patch(id, { title: t, catId: val('bCat'), staged: document.getElementById('bStaged').checked });
+      save(); scheduleSync(); closeSheet();
+    },
+    startFromMenu: function (el) { TT.startBlock(store, el.dataset.id); save(); scheduleSync(); closeSheet(); },
+    delBlock: function (el) {
+      var id = el.dataset.id, n = store.all('entry').filter(function (e) { return e.blockId === id; }).length;
+      if (!confirm('Delete this block' + (n ? ' and its ' + n + ' time entr' + (n > 1 ? 'ies' : 'y') : '') + '?')) return;
+      TT.deleteBlock(store, id); save(); scheduleSync(); closeSheet();
+    },
+    manualSheet: function (el) { manualSheet(el.dataset.id || ''); },
+    saveManual: function () { saveManual(false); },
+    saveManualForce: function () { saveManual(true); },
+    entrySheet: function (el) { entrySheet(el.dataset.id); },
+    saveEntry: function (el) { saveEntry(el.dataset.id, false); },
+    saveEntryForce: function (el) { saveEntry(el.dataset.id, true); },
+    delEntry: function (el) { if (!confirm('Delete this time entry?')) return; store.del(el.dataset.id); save(); scheduleSync(); closeSheet(); },
+    stopAtSheet: function () { stopAtSheet(); },
+    stopAgo: function (el) { var t = new Date(now() - el.dataset.m * 60000); document.getElementById('sDate').value = TT.dateOf(+t); document.getElementById('sTime').value = hm(+t); },
+    stopAtSave: function () {
+      var r = TT.running(store), at = fromDT(val('sDate'), val('sTime'));
+      if (!r) return closeSheet();
+      if (at == null) return setErr('Time?');
+      if (at < r.start) return setErr('That’s before it started (' + hm(r.start) + ')');
+      if (at > now()) return setErr('That’s in the future');
+      TT.stopAt(store, at); save(); scheduleSync(); closeSheet(); toast('Stopped at ' + hm(at));
+    },
+    closeSheet: function () { closeSheet(); },
+    calNav: function (el) { var d = ui.calDate || TT.dateOf(now()); ui.calDate = TT.addDays(d, (ui.calMode === 'week' ? 7 : 1) * el.dataset.n); render(); },
+    calMode: function (el) { ui.calMode = el.dataset.m; save(); render(); scrollCal(); },
+    calToday: function () { ui.calDate = ''; render(); scrollCal(); },
+    calDay: function (el) { ui.calDate = el.dataset.d; ui.calMode = 'day'; save(); render(); scrollCal(); },
+    newPlanAt: function (el, e) {
+      if (e.target !== el) return;
+      var px = ui.calMode === 'week' ? PX.week : PX.day, y = e.clientY - el.getBoundingClientRect().top;
+      planSheet('', { date: el.dataset.d, start: Math.min(23 * 60 + 45, Math.floor(y / px * 4) * 15) });
+    },
+    planSheet: function () { planSheet(''); },
+    planOpen: function (el) { if (el.dataset.dragged) return; planSheet(el.dataset.key); },
+    savePlan: function (el) { savePlan(el.dataset.key); },
+    startPlan: function (el) {
+      var key = el.dataset.key;
+      act(function () { TT.startPlanned(store, key); });
+      if (!document.getElementById('sheet').classList.contains('hidden')) closeSheet();
+      toast('Tracking now');
+    },
+    delPlan: function (el) { delPlanSheet(el.dataset.key); },
+    delPlanScope: function (el) { TT.deleteOccurrence(store, el.dataset.key, el.dataset.s); save(); scheduleSync(); closeSheet(); },
+    repNav: function (el) { ui.repDate = TT.addDays(ui.repDate || TT.dateOf(now()), +el.dataset.n); render(); },
+    repToday: function () { ui.repDate = ''; render(); },
+    repDay: function (el) { ui.repDate = el.dataset.d; render(); },
+    exportCsv: function () { download('time-entries-' + TT.dateOf(now()) + '.csv', TT.entriesCsv(store, TT.findEntries(store, ui.q)), 'text/csv'); },
+    exportJson: function () { download('time-tracker-backup-' + TT.dateOf(now()) + '.json', JSON.stringify({ exported: new Date().toISOString(), records: store.recs }, null, 1), 'application/json'); },
+    addCat: function () {
+      var n = prompt('Category name', ''); if (!n) return;
+      act(function () { store.put({ id: TT.uid('cat'), kind: 'cat', name: n.trim(), color: '#5b8def', productive: true }); });
+    },
+    delCat: function (el) {
+      var used = store.all('block').some(function (b) { return b.catId === el.dataset.id; });
+      if (!confirm('Delete this category?' + (used ? ' Its blocks become Unclassified.' : ''))) return;
+      act(function () { store.del(el.dataset.id); });
+    }
+  };
+  function quick(startNow) {
+    var inp = document.getElementById('qa'), text = inp ? inp.value.trim() : '';
+    if (!text) { if (inp) inp.focus(); return; }
+    act(function () {
+      if (ui.addMode === 'task' && !startNow) {
+        var r = TT.quickAdd(store, text);
+        if (!r.ok) throw new Error(r.message);
+        if (r.routed === 'next') ui.open[r.blockId] = true;
+        toast(r.message);
+        return;
+      }
+      var made = [], m = text.match(/^([^:,]+):(.*)$/);
+      if (m) made.push(TT.addBlock(store, { title: m[1].trim(), items: m[2] }));
+      else if (ui.addMode === 'task' && startNow) made.push(TT.addBlock(store, { title: text }));
+      else TT.parseItems(text).forEach(function (t) { made.push(TT.addBlock(store, { title: t })); });
+      if (startNow && made[0]) TT.startBlock(store, made[0].id);
+      toast(startNow ? 'Started "' + made[0].title + '"' : 'Added ' + made.length + ' block' + (made.length > 1 ? 's' : ''));
+    });
+    var again = document.getElementById('qa'); if (again) { again.value = ''; again.focus(); }
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target.id === 'sheet') return closeSheet();
+    var el = e.target.closest('[data-a]');
+    if (!el || el.closest('[data-drag]')) return;
+    var f = A[el.dataset.a];
+    if (f) { e.preventDefault(); f(el, e); }
+  });
+  document.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = e.target, kind = f.dataset.f;
+    if (kind === 'quick') return quick(false);
+    if (kind === 'addItems') {
+      var inp = f.querySelector('input'), text = inp.value, id = f.dataset.id;
+      if (!text.trim()) return;
+      act(function () { var n = TT.addItems(store, id, text).length; ui.open[id] = true; toast('Added ' + n + ' task' + (n > 1 ? 's' : '')); });
+      var again = document.querySelector('form[data-f="addItems"][data-id="' + id + '"] input'); if (again) again.focus();
+    }
+  });
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.dataset.chg === 'mBlock') {
+      var id = t.value;
+      document.getElementById('mNewWrap').classList.toggle('hidden', !!id);
+      document.getElementById('mCatWrap').classList.toggle('hidden', !!id);
+      document.getElementById('mItem').innerHTML = itemOptions(id);
+    }
+    if (t.dataset.chg === 'eBlock') document.getElementById('eItem').innerHTML = itemOptions(t.value);
+    if (t.dataset.chg === 'pRep') {
+      document.getElementById('pDaysWrap').classList.toggle('hidden', t.value !== 'weekly');
+      document.getElementById('pUntilWrap').classList.toggle('hidden', !t.value);
+    }
+    if (t.dataset.q) { ui.q[t.dataset.q] = t.value; render(); }
+    if (t.dataset.cat) {
+      var v = t.type === 'checkbox' ? t.checked : t.value;
+      if (t.dataset.k === 'name' && !String(v).trim()) return render();
+      act(function () { var p = {}; p[t.dataset.k] = v; store.patch(t.dataset.cat, p); });
+    }
+    if (t.dataset.cfg) {
+      var k = t.dataset.cfg, x;
+      if (k === 'dayStart' || k === 'dayEnd') x = TT.parseClock(t.value);
+      else if (k === 'breakTips') x = t.checked;
+      else if (k === 'breakRatio') x = Math.min(0.5, Math.max(0.05, (+t.value || 20) / 100));
+      else x = Math.max(0, +t.value || 0);
+      if (x == null) return;
+      act(function () { var p = {}; p[k] = x; store.patch('cfg', p); });
+    }
+  });
+  document.addEventListener('input', function (e) {
+    if (e.target.id === 'sq') { ui.q.q = e.target.value; clearTimeout(A._sq); A._sq = setTimeout(function () { render(); var s = document.getElementById('sq'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }, 300); }
+  });
+
+  function render() {
+    paintBar(); paintBanners(); paintSync();
+    document.querySelectorAll('#tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === ui.view); });
+    var m = document.getElementById('main'), y = window.scrollY, cal = document.getElementById('cal'), cy = cal ? cal.scrollTop : null;
+    m.innerHTML = ui.view === 'cal' ? viewCal() : ui.view === 'day' ? viewDay() : ui.view === 'more' ? viewMore() : viewBlocks();
+    var c2 = document.getElementById('cal'); if (c2 && cy != null) c2.scrollTop = cy;
+    window.scrollTo(0, y);
+  }
+
+  // Coming back (unlock, tab switch): redraw from timestamps, pull other devices' changes.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') { var d = lsGet(LS); if (d && d.recs) { store.merge(Object.keys(d.recs).map(function (k) { return d.recs[k]; })); } if (!editing()) render(); scheduleSync(100); }
+  });
+  window.addEventListener('online', function () { scheduleSync(100); });
+  window.addEventListener('storage', function (e) { if (e.key === LS && e.newValue) { try { store.merge(Object.values(JSON.parse(e.newValue).recs || {})); if (!editing()) render(); } catch (x) {} } });
+
+  load();
+  render();
+  if (ui.view === 'cal') scrollCal();
+  setInterval(tick, 1000);
+  setInterval(function () { if (document.visibilityState === 'visible') scheduleSync(0); }, 60000);
+  scheduleSync(300);
+  window.ttApp = { store: store, TT: TT, ui: ui, render: render, sync: sync, meta: meta };
+})();
+</script>
+</body>
+</html>

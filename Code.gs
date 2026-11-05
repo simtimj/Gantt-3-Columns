@@ -2146,6 +2146,7 @@ function getMainCalendarEvents(dateString) {
     return { title: ev.getTitle() || '(no title)', allDay: allDay,
       id: ev.getId(), calId: EVENT_CALENDARS[0],
       done: String(ev.getColor() || '') === '8',
+      color: String(ev.getColor() || ''),
       start: (allDay ? ev.getAllDayStartDate() : s).getTime(), end: e.getTime(),
       recurring: ev.isRecurringEvent(),
       time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') };
@@ -2153,6 +2154,10 @@ function getMainCalendarEvents(dateString) {
   const saved = PropertiesService.getScriptProperties().getProperties();
   events.forEach(ev => {
     try { Object.assign(ev, JSON.parse(saved[calMetaKey_(ev.id, ev.start, ev.recurring)] || '{}')); } catch (e) { console.error(e); }
+    // Color = urgency both ways (2026-11-05, Julius): an event colored red / yellow / blue elsewhere (Calendar app,
+    // Claude, ChatGPT) shows with that urgency here when the app hasn't saved one for it.
+    if (!ev.urg) { const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === ev.color); if (u) ev.urg = u; }
+    delete ev.color;
   });
   events.sort((a,b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start);
   return { date: date, events: events };

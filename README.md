@@ -49,6 +49,7 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Calendar color = urgency, both ways**: an event colored red / yellow / blue anywhere (Calendar app, Claude, ChatGPT) now shows with that urgency in Cal Events (and lands in box 2 of the 4-box view), unless the app already has an urgency saved for it.
 - **Zoom fixed + bigger**: holding a section label (HISTORY, BLOCKS, Cal Events, Urgent, DAILIES, Reference search) zooms it to about 92% of the screen (was 84%). The zoomed History was drawn *under* the other columns (its row had its own stacking level), so other columns and Blocks showed through; now it's on top, alone, Blocks stays where it was behind it, and the Morn / After / Night outlines redraw for the zoomed size.
 - **Cal Events box 1: 1 / 2 / 3 on the same line**: the urgency buttons (and → 🧱 in box 2) sit at the right end of the event's last line, and only drop below when the line is full. Slightly smaller buttons.
 - **Urgent tick = log + archive, one tap**: ticking an urgent task's box in Urgent finishes it, copies it as a done line into today's History (in the current time section; tasks already in today's cell are logged by their own tick) and moves it to Urgent → Archive. Unticking it in the Archive undoes all three. Subtasks still just tick.

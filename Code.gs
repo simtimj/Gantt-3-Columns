@@ -1548,12 +1548,39 @@ function groupClaudeDone_(html, list) {
    hasn't started yet. A time before a block's start rounds back to the
    previous one (the nap gap 2–3:45 pm counts as Morning). Past days: Evening. */
 const DONE_SEC_ORDER_ = ['morning', 'afternoon', 'evening'];
+/* Full time windows (2026-11-05, Julius): the day is split into three 8-hour windows, Morning 6 am – 2 pm,
+   Afternoon 2 – 8 pm, Night 8 pm – 6 am. The labels keep his working hours (Morn 8–2 · After 2–7 · Night 7–10). */
+function doneNowHm_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm'); }
+function doneSecOfHm_(hm) { return hm < '06:00' ? 'evening' : hm < '14:00' ? 'morning' : hm < '20:00' ? 'afternoon' : 'evening'; }
 function doneSecNow_(date) {
   if (date < todayString_()) return 'evening';
-  const hm = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm');
-  if (hm >= '19:00') return 'evening';
-  if (hm >= '14:00') return 'afternoon';
-  return 'morning';
+  return doneSecOfHm_(doneNowHm_());
+}
+// Nothing can be done in the future (2026-11-05, Julius): a row dated after today counts as today, and work logged
+// between midnight and 6 am belongs to the night before.
+function doneTargetDate_(date) {
+  const today = todayString_();
+  let d = date > today ? today : date;
+  if (d === today && doneNowHm_() < '06:00') d = addDaysToDateString_(today, -1);
+  return d;
+}
+// Repair (2026-11-05): Claude / ChatGPT done lines sitting in a time window of today that hasn't started yet
+// (e.g. rows applied last night to today's date) move to the previous day's Night. Only data-cid lines move.
+function doneFutureLines_(html) {
+  const order = DONE_SEC_ORDER_;
+  const hm = doneNowHm_();
+  const nowIdx = hm < '06:00' ? -1 : order.indexOf(doneSecOfHm_(hm));
+  const blocks = doneBlocks_(html);
+  const keep = [], moved = [];
+  let cur = -1;
+  blocks.forEach(b => {
+    const k = doneAttr_(b, 'data-tsec') || doneAttr_(b, 'data-sec');
+    if (k) cur = order.indexOf(k);
+    else if (doneAttr_(b, 'data-secend') != null) cur = -1;
+    if (!k && cur > nowIdx && doneAttr_(b, 'data-cid') != null && /^<div\b[^>]*class="[^"]*check-line/i.test(b)) { moved.push(b); return; }
+    keep.push(b);
+  });
+  return { html: moved.length ? keep.join('') : html, moved: moved };
 }
 // Place only the new intake line; preserve historical groups and their sections.
 function appendDoneInSection_(html, line, sec) {
@@ -1844,13 +1871,36 @@ function applyClaudeDone_() {
   const migrate = props.getProperty('claudeDoneGrouped') !== '2';
   // One-time (2026-10-29): pull today's lines out of blocks that hadn't started yet.
   const secFix = props.getProperty('claudeDoneSec') !== '1';
-  if (!fresh.length && !migrate && !secFix) return;
+  // Cheap check (one cell read): does today's cell hold done lines in a window that hasn't started yet?
+  const daysSheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+  const tRow0 = findDayRow_(daysSheet, todayString_());
+  const needFix = !!tRow0 && doneFutureLines_(String(daysSheet.getRange(tRow0, 2).getValue() || '')).moved.length > 0;
+  if (!fresh.length && !migrate && !secFix && !needFix) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    const sheet = daysSheet;
     const byDate = {};
-    fresh.forEach(x => { (byDate[x.date] = byDate[x.date] || []).push(x); });
+    fresh.forEach(x => { const d = doneTargetDate_(x.date); (byDate[d] = byDate[d] || []).push(x); });
+    // Move today's lines that sit in a window that hasn't started yet back to the night before (see doneFutureLines_).
+    const today = todayString_(), yday = addDaysToDateString_(today, -1);
+    const todayRow = findDayRow_(sheet, today);
+    if (todayRow) {
+      const tc = sheet.getRange(todayRow, 2), tBefore = String(tc.getValue() || '');
+      const fut = doneFutureLines_(tBefore);
+      if (fut.moved.length) {
+        let yRow = findDayRow_(sheet, yday);
+        if (!yRow) { sheet.appendRow([parseDate_(yday), '', '']); yRow = sheet.getLastRow(); }
+        const yc = sheet.getRange(yRow, 2), yBefore = String(yc.getValue() || '');
+        let yHtml = yBefore;
+        fut.moved.forEach(line => { yHtml = appendDoneInSection_(yHtml, line, 'evening'); });
+        yHtml = groupClaudeDone_(yHtml, valid);
+        backupCell_(yday, 'Today', 'Done lines moved from tomorrow (not yet started window)', yBefore);
+        yc.setValue(yHtml);
+        backupCell_(today, 'Today', 'Done lines moved to the night before', tBefore);
+        tc.setValue(groupClaudeDone_(fut.html, valid));
+      }
+    }
     if (migrate) valid.forEach(x => { byDate[x.date] = byDate[x.date] || []; });
     if (secFix) byDate[todayString_()] = byDate[todayString_()] || [];
     Object.keys(byDate).forEach(date => {

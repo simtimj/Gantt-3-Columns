@@ -1902,7 +1902,7 @@ body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';positi
 #centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
 /* Cal Events follow Options → Task subject color (2026-11-03, Julius): checkbox / whole card / subtle / border. */
 body.tc-borderonly #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
-body.tc-subtleline #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 65%,#fff);border-width:1.5px;}
+body.tc-subtleline #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 65%,#fff);border-width:var(--sl-w,1.5px);}
 body:not(.tc-boxfill,.tc-borderonly) #centerCalendarList .ce-event[data-tccat]:not(.ce-done){background:color-mix(in srgb,var(--ce-cat) var(--tc-mix,22%),var(--panel));}
 body.tc-boxfill #centerCalendarList .ce-event[data-tccat]:not(.ce-done) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid color-mix(in srgb,var(--ce-cat) 55%,#555);border-radius:3px;background:var(--ce-cat);display:inline-grid;place-content:center;}
 body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done) > .ce-check{border-color:var(--urg);}
@@ -1968,6 +1968,12 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="c"]::after{content:"After 2–7 · " attr(data-tsinfo) "\00A0\00A0+";}
 #todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]::after{content:"Night 7–10 · " attr(data-tsinfo) "\00A0\00A0−";}
 #todayScroll .day-editor > [data-tsec="evening"][data-tsf="c"]::after{content:"Night 7–10 · " attr(data-tsinfo) "\00A0\00A0+";}
+/* Full time windows (2026-11-05, Julius): label = render-only .ts-lab ("Morn 8–2" + small "(6a–2p)"), ::after keeps only the count. */
+#todayScroll .day-editor > [data-tsec] > .ts-lab{order:1;flex:0 0 auto;font-size:calc(var(--paragraph-size,14px) * .75)!important;font-weight:600;letter-spacing:.02em;text-transform:none;white-space:nowrap;}
+#todayScroll .day-editor > [data-tsec] > .ts-lab small{font-size:.8em;font-weight:500;opacity:.75;margin-left:.3em;}
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab)::after{order:2;content:""!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf="o"]:has(> .ts-lab)::after{content:"\00A0· " attr(data-tsinfo) "\00A0\00A0−"!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf="c"]:has(> .ts-lab)::after{content:"\00A0· " attr(data-tsinfo) "\00A0\00A0+"!important;}
 
 .editor [data-nsec="must"]{position:relative;}
 /* Small and inside the DAILIES lines (2026-11-03, Julius): flow-root keeps the floated button within the header. */
@@ -2909,7 +2915,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       { const top = document.createElement('div'); top.className = 'od-top';
         row.insertBefore(top, row.firstElementChild);
         [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks <button type="button" class="blocks-remove" title="Remove selected line and what is nested under it">Remove</button></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks</div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
       // Blocks MVP: reuse the existing Plan column, checkbox editor, indent/outdent,
@@ -2945,9 +2951,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         while(node && node.parentElement !== pad) node = node.parentElement;
         if(node && node.parentElement === pad) selectedBlockLine = node;
       });
-      row.querySelector('.blocks-remove').addEventListener('click',()=>{
-        const line=selectedBlockLine;
-        if(!line || line.parentElement!==pad){setStatus('Tap a Blocks line first, then Remove');return;}
+      // Remove moved into the block title menu (2026-11-05, Julius): tap a block's title → Remove block.
+      pad._blkRemove=(line)=>{
+        if(!line || line.parentElement!==pad){setStatus('Tap a block title first');return;}
         const group=blockGroup(line), name=(line.textContent||'').trim().slice(0,40)||'this line';
         if(!window.confirm('Remove "'+name+'"'+(group.length>1?' and '+(group.length-1)+' nested line'+(group.length>2?'s':''):'')+'?'))return;
         captureBeforeEdit(pad);
@@ -2955,7 +2961,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         selectedBlockLine=null;
         pad.dispatchEvent(new Event('input',{bubbles:true}));
         setStatus('Removed from Blocks');
-      });
+      };
       // A block's title/time-range line is its handle: long-press then move.
       // No grip icons or extra markup are inserted into saved editor content.
       let blockHold=null, blockDrag=null;
@@ -10122,12 +10128,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   body.tc-subtleline #journalScroll .day-row{background:transparent!important;}
   body.tc-subtleline #journalPane .journal-editor .check-line[data-tc]{--tc-base:var(--panel);}
   /* Subtle + border line (2026-11-03, Julius): same tint, card outline in a brighter subject color. */
-  body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 65%,#fff);border-left-width:1.5px;border-right-width:1.5px;}
-  body.tc-subtleline .check-line[data-tccat][data-tc^="f"]{border-top-width:1.5px;}
+  body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 65%,#fff);border-left-width:var(--sl-w,1.5px);border-right-width:var(--sl-w,1.5px);}
+  body.tc-subtleline .check-line[data-tccat][data-tc^="f"]{border-top-width:var(--sl-w,1.5px);}
   body.tc-subtleline .check-line[data-tccat][data-tc],body.tc-subtleline .plan-pad .check-line[data-tccat][data-tc]{border-color:var(--tc-bd)!important;} /* beats Quiet cards */
   /* Urgent rows become cells in this mode (2026-11-04, Julius). */
-  body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),var(--panel));border:1.5px solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
-  body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1.5px;}
+  body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),var(--panel));border:var(--sl-w,1.5px) solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
+  body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:var(--sl-w,1.5px);}
+  /* Thinner outline in Cal Events, Urgent and History / Log (2026-11-05, Julius: "a little"; was 1.5px — to go back, set --sl-w to 1.5px). */
+  body.tc-subtleline #centerCalendarList,body.tc-subtleline #urgentPanel,body.tc-subtleline #todayScroll .day-editor{--sl-w:1.2px;}
   /* Urgent + History / Log styled exactly like Cal Events (2026-11-04, Julius): same section background,
      card fill over --panel, 1.5px subject border, radius 7; a card with no subject gets the plain Cal Events look. */
   body.tc-subtleline #urgentPanel,body.tc-subtleline #todayScroll .day-row{background:transparent!important;}
@@ -10968,6 +10976,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(ed.dataset.date && typeof syncDayHeightStable === 'function') try{ syncDayHeightStable(ed.dataset.date); }catch(e){}
     requestAnimationFrame(() => paintDaySecs(ed));
   }
+  const TSEC_LABEL = {morning:'Morn 8–2<small>(6a–2p)</small>', afternoon:'After 2–7<small>(2p–8p)</small>', evening:'Night 7–10<small>(8p–6a)</small>'};
   function refreshTsecFolds(ed,hide){
     const folds = ed.classList.contains('day-editor') ? tsecFolds()[ed.dataset.date] || {} : null;
     if(!folds) return false;
@@ -10975,6 +10984,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     for(const n of ed.children){
       const k = n.dataset && n.dataset.tsec;
       if(k !== 'morning' && k !== 'afternoon' && k !== 'evening') continue;
+      // Label with the full window, small (render-only, stripped on save via data-render-due).
+      if(!n.querySelector(':scope > .ts-lab')){
+        const lab = document.createElement('span'); lab.className = 'ts-lab'; lab.setAttribute('data-render-due','');
+        lab.innerHTML = TSEC_LABEL[k]; n.insertBefore(lab, n.firstChild);
+      }
       const cov = titleCovered(n), tasks = cov.filter(x => x.classList.contains('check-line') && !(+(x.dataset.level || 0) > 0));
       if(!cov.length){ ['data-tsf','data-tsinfo'].forEach(a => n.removeAttribute(a)); tsecDrawSum(n,null,folds); continue; }
       const fold = histMode === 'full' ? !!folds[k] : !folds['open:' + k];
@@ -11826,10 +11840,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const TSEC = [['morning','Morning','8 am – 2 pm'],['afternoon','Afternoon','2 – 7 pm'],['evening','Evening','7 – 10 pm']];
   const tsecNow = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
   function tsecIsToday(ed){ return !!ed && ed.classList && ed.classList.contains('day-editor') && ed.dataset.date === localToday(); }
+  // Full windows (2026-11-05, Julius): Morning 6 am – 2 pm, Afternoon 2 – 8 pm, Night 8 pm – 6 am (labels keep his
+  // working hours 8–2 / 2–7 / 7–10, with the full window small in brackets). Same boundaries as doneSecOfHm_ in Code.gs.
   function tsecOf(hm){
     const m = +hm.slice(0,2) * 60 + +hm.slice(3,5);
-    return m < 14 * 60 ? 'morning' : m < 19 * 60 ? 'afternoon' : 'evening';
+    return m < 6 * 60 ? 'evening' : m < 14 * 60 ? 'morning' : m < 20 * 60 ? 'afternoon' : 'evening';
   }
+  const tsecKey = t => { if(!t) return -1; const m = +t.slice(0,2) * 60 + +t.slice(3,5); return m < 6 * 60 ? m + 1440 : m; }; // after midnight sorts last in Night
   const tsecLevel = el => Math.floor(Number(el.dataset && el.dataset.level) || 0);
   const tsecIsTask = el => el.classList && el.classList.contains('check-line');
   // Old lines get data-at="-" once (no time); any task line without data-at after that is new.
@@ -11870,7 +11887,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const out = [];
     top.forEach(b => out.push(...b.nodes));
     TSEC.forEach(([k,name]) => {
-      const list = by[k].sort((a,b) => a.t < b.t ? -1 : a.t > b.t ? 1 : 0);
+      const list = by[k].sort((a,b) => tsecKey(a.t) - tsecKey(b.t));
       const h = oldHead[k] || document.createElement('div'); // reused so its fold marks survive a re-sort
       if(!oldHead[k]){ h.dataset.tsec = k; h.setAttribute('contenteditable','false'); if(name) h.textContent = name; else h.innerHTML = '<br>'; }
       out.push(h);
@@ -12597,6 +12614,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .tmr-chip.on button{opacity:1;}
   .tmr-chip.pz{color:#d08a00;}
   .plan-pad > [data-blk]{padding-right:58px;}
+  .tmr-menu{position:fixed;z-index:9500;min-width:170px;max-width:260px;display:flex;flex-direction:column;padding:4px;border-radius:9px;
+    background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc);box-shadow:0 8px 28px rgba(0,0,0,.28);}
+  .tmr-menu-t{font-size:11px;font-weight:700;opacity:.65;padding:4px 8px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-menu button{font:inherit;font-size:14px;text-align:left;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;}
+  .tmr-menu button:hover{background:color-mix(in srgb,currentColor 10%,transparent);}
 </style>
 <script>
 /* Block timer MVP (2026-11-05, Julius; design = Reference card "📜 Timer App", Nov 3 decisions).
@@ -12812,6 +12834,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     pad.insertAdjacentElement('afterend', layer);
     if(!pad._tmrWired){
       pad._tmrWired = true;
+      wireTitleMenu(pad);
       pad.addEventListener('scroll', () => paint(pad), {passive:true});
       pad.addEventListener('input', () => requestAnimationFrame(() => paint(pad)));
       // Ticking the running task stops its timer; the block keeps running.
@@ -12866,6 +12889,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       });
     });
     const chips = [...layer.children];
+    const padR = pad.getBoundingClientRect().left + pad.clientLeft + pad.clientWidth;
     while(chips.length > want.length) chips.pop().remove();
     want.forEach((w,i) => {
       let c = chips[i];
@@ -12882,6 +12906,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       btn.title = w.blk ? (w.on ? 'Pause this block (and its task)' : 'Start this block') : (w.on ? 'Stop this task’s timer' : 'Time this task');
       btn.setAttribute('aria-label', btn.title);
       c.style.top = (w.line.offsetTop - pad.scrollTop + Math.max(0, (Math.min(w.line.offsetHeight, 24) - 18) / 2)) + 'px';
+      // Inside the line's own box (its cell border), not at the pad edge (2026-11-05, Julius).
+      c.style.right = Math.max(4, padR - w.line.getBoundingClientRect().right + 6) + 'px';
       c.style.visibility = w.line.offsetParent === null ? 'hidden' : '';
     });
     // Bar: the running (or last paused) block of this pad, else today's total.
@@ -12933,6 +12959,56 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const hit = findLine(id);
         status('⏱ "' + (hit ? lineName(hit.line) : 'A block') + '" has been running ' + fmt(b.ms, true) + ' — tap its time to correct it if you forgot to stop');
       }
+    });
+  }
+  /* Block title menu (2026-11-05, Julius): tap a block's title → Start / Pause, Finish, Rename, Remove block.
+     A tap while you're already typing in that title just edits it (so Rename, then typing, works as before). */
+  let menuEl = null;
+  function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; } }
+  document.addEventListener('pointerdown', e => { if(menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
+  window.addEventListener('scroll', closeMenu, true);
+  function topOf(pad, node){ let n = node && (node.nodeType === 3 ? node.parentElement : node); while(n && n.parentElement !== pad) n = n.parentElement; return n && n.parentElement === pad ? n : null; }
+  function wireTitleMenu(pad){
+    let press = null;
+    pad.addEventListener('pointerdown', e => {
+      const t = topOf(pad, e.target);
+      if(!t || !isTitle(t) || e.button !== 0){ press = null; return; }
+      const sel = window.getSelection();
+      const editing = document.activeElement === pad && sel && sel.rangeCount && t.contains(sel.anchorNode);
+      press = {t, at:Date.now(), x:e.clientX, y:e.clientY, editing};
+    });
+    pad.addEventListener('click', e => {
+      const p = press; press = null;
+      if(!p || p.editing || topOf(pad, e.target) !== p.t) return;
+      if(Date.now() - p.at > 450 || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 9) return; // a hold / drag, not a tap
+      openMenu(pad, p.t, e.clientX, e.clientY);
+    });
+  }
+  function openMenu(pad, title, x, y){
+    closeMenu();
+    if(document.activeElement === pad) pad.blur(); // no keyboard popping up on the phone
+    const b = title.dataset.tmr ? replay(Date.now()).blocks[title.dataset.tmr] : null;
+    const items = [[b && b.run ? '❚❚ Pause' : (b && b.paused ? '▶ Resume' : '▶ Start'), 'go']];
+    if(b && (b.run || b.paused)) items.push(['■ Finish', 'finish']);
+    items.push(['✎ Rename', 'rename'], ['🗑 Remove block', 'remove']);
+    menuEl = document.createElement('div');
+    menuEl.className = 'tmr-menu';
+    menuEl.innerHTML = '<div class="tmr-menu-t">' + esc(lineName(title) || 'Block') + '</div>' + items.map(([l,a]) => '<button type="button" data-m="' + a + '">' + esc(l) + '</button>').join('');
+    document.body.appendChild(menuEl);
+    const r = menuEl.getBoundingClientRect();
+    menuEl.style.left = Math.max(8, Math.min(x - 20, innerWidth - r.width - 8)) + 'px';
+    menuEl.style.top = Math.max(8, Math.min(y + 10, innerHeight - r.height - 8)) + 'px';
+    menuEl.addEventListener('click', e => {
+      const btn = e.target.closest('[data-m]'); if(!btn) return;
+      const m = btn.dataset.m; closeMenu();
+      if(m === 'go') act('block', pad, title, null);
+      else if(m === 'finish') act('finish', pad, title, null);
+      else if(m === 'rename'){
+        pad.focus({preventScroll:true});
+        const target = title.querySelector(':scope > b,:scope > strong') || title;
+        const r2 = document.createRange(); r2.selectNodeContents(target);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r2);
+      } else if(m === 'remove' && typeof pad._blkRemove === 'function') pad._blkRemove(title);
     });
   }
   window.fwTimer = {replay: () => replay(Date.now()), events: () => events.slice(), merge: l => { const n = merge(l, false); paintAll(); return n; }, flush, pull, paintAll, parseDur, checkForgot};

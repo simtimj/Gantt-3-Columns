@@ -49,6 +49,11 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Full time windows in History**: the three sections now cover the whole day in 8-hour windows: **Morning 6 am – 2 pm**, **Afternoon 2 – 8 pm**, **Night 8 pm – 6 am**. Headers keep your working hours and add the full window small: *Morn 8–2 (6a–2p)* · *After 2–7 (2p–8p)* · *Night 7–10 (8p–6a)*. Work after midnight sorts at the end of Night.
+- **Nothing lands in the future**: a Done Log row dated after today counts as today, and anything logged between midnight and 6 am goes to the night before. Done lines already sitting in a window of today that hasn't started yet (like last night's rows that landed in Thursday's Night) move to the previous day's Night on the next load (old cell backed up).
+- **Thinner Subtle + border outline (Cal Events, Urgent, History / Log)**: 1.5px → 1.2px, in Subtle + border line mode only. Easy to undo: say "go back" and it's one value (`--sl-w`).
+- **Block title menu**: tap a block's title for **▶ Start / ❚❚ Pause**, **■ Finish**, **✎ Rename** and **🗑 Remove block**. The Remove button in the BLOCKS header is gone. A tap while you're typing in the title just edits it; holding the title still drags the block.
+- **▶ buttons inside their cells**: the timer buttons now sit inside each task's / block title's own border instead of at the pad's edge.
 - **Blocks header: just Remove**: **+ Block**, **+ Task** and **Activate** are gone. Next Block is always at the bottom (type over its name), Enter on a block title or task adds a task, and ▶ starts a block and names it "Block 9:41". **Remove** stays (deletes a block and what's under it in one tap).
 - **Every line the same (round 2)**: the lines the 11/4 pass missed now match the rest: 2px, same solid line color. That's the Morning / Afternoon / Evening lines, all Notes section lines (Make sure you do, Focus tracking), the Cal Events group lines and the line above Next Block. The thin light edge on each column is gone (the 2px column line is the only one), and the line under Cal Events runs wall to wall. No more double lines under Cal Events or at the top of Blocks.
 - **Calmer Next Block**: its border is now the same soft color as the other blocks (still dashed, no more bright yellow), and its empty task shows a gray hint: *Tasks for your next block · ▶ starts it* (disappears as you type, never saved).

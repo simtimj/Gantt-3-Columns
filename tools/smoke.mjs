@@ -136,6 +136,21 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   if (list.mode !== 'compact' || list.items < 50 || list.leak || list.wide) errs.push('History List mode: ' + JSON.stringify(list));
   if (mini.mode !== 'mini' || mini.items || mini.leak) errs.push('History Mini mode: ' + JSON.stringify(mini));
   if (full.mode !== 'full' || full.leak) errs.push('History Full mode: ' + JSON.stringify(full));
+  // Full time windows (2026-11-05): label "Morn 8–2" + small "(6a–2p)", never saved; 1 am and 9 pm are Night, 7 pm is Afternoon.
+  const win = await pg.evaluate(() => {
+    const out = [];
+    const h = document.querySelector('#todayScroll .day-editor > [data-tsec="morning"]');
+    const lab = h && h.querySelector('.ts-lab');
+    if (!lab || !/Morn 8–2/.test(lab.textContent) || !/\(6a–2p\)/.test(lab.querySelector('small')?.textContent || '')) out.push('Morning label: ' + (lab ? lab.textContent : 'missing'));
+    if (typeof tsecOf === 'function') {
+      const got = ['00:30', '05:59', '06:00', '13:59', '14:00', '19:30', '20:00'].map(tsecOf).join(',');
+      if (got !== 'evening,evening,morning,morning,afternoon,afternoon,evening') out.push('windows: ' + got);
+    } else out.push('tsecOf not reachable');
+    const saves = (window.__calls || []).filter(c => c[0] === 'saveDay').map(c => String(c[1][1] || ''));
+    if (saves.some(x => /ts-lab/.test(x))) out.push('window label leaked into the saved day');
+    return out;
+  });
+  win.forEach(x => errs.push('Time windows: ' + x));
   // Block timer MVP (2026-11-05): ▶ on a task starts it + its block, double tap = one tap, tick stops the task,
   // Break / Pause / Resume / correct / Finish, ids saved with the pad, events sent, time from timestamps (lock-proof).
   const tmr = await pg.evaluate(async () => {
@@ -160,6 +175,9 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if (!so.blocks['b-old'] || so.blocks['b-old'].ms < 3 * 3600e3 - 5000) out.push('3h-old start shows ' + JSON.stringify(so.blocks['b-old']));
     if (!/has been running 3h/.test(document.getElementById('status')?.textContent || '')) out.push('no forgotten-timer note');
     fwTimer.merge([{ op: 'x-old2', date: '2000-01-01', at: Date.now(), act: 'finish', blk: 'b-old' }]); old.remove();
+    // ▶ buttons sit inside their own cell border (2026-11-05).
+    const inside = ['Next Block', 'Email'].map(n => { const c = chip(n); return c.getBoundingClientRect().right <= c._line.getBoundingClientRect().right + 0.5; });
+    if (getComputedStyle(pad).display !== 'none' && inside.includes(false)) out.push('▶ outside its cell: ' + inside);
     const go = c => c.querySelector('button').click();
     go(chip('Email')); go(chip('Email')); await wait(150);
     if (evs('istart').length !== 1) out.push('double tap made ' + evs('istart').length + ' starts');
@@ -190,13 +208,25 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if (s.cur || !s.blocks[title.dataset.tmr].done) out.push('Finish did not stop the block');
     if (!/Today: 45m tracked/.test(bar().textContent)) out.push('day total: ' + bar().textContent);
     if (email.classList.contains('done') !== true) out.push('Finish changed the task');
+    // Title menu (2026-11-05): tapping the block title opens Start / Finish / Rename / Remove; Remove deletes the block.
+    const tapAt = el => { const r = el.getBoundingClientRect(), o = { bubbles: true, clientX: r.left + 10, clientY: r.top + 5, button: 0 };
+      el.dispatchEvent(new PointerEvent('pointerdown', o)); el.dispatchEvent(new MouseEvent('click', o)); };
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    tapAt(title.querySelector('b') || title);
+    const menu = document.querySelector('.tmr-menu');
+    const labels = menu ? [...menu.querySelectorAll('button')].map(x => x.textContent).join('|') : '';
+    if (!/Start|Resume/.test(labels) || !/Rename/.test(labels) || !/Remove block/.test(labels)) out.push('title menu: ' + (labels || 'missing'));
+    window.confirm = () => true;
+    menu?.querySelector('[data-m="remove"]')?.click(); await wait(100);
+    if (title.isConnected || email.isConnected) out.push('Remove block left the block');
     await wait(2500);
     const calls = window.__calls || [];
     const sentOps = calls.filter(c => c[0] === 'saveTimerEvents').flatMap(c => c[1][0].map(e => e.op));
     const mine = fwTimer.events().filter(e => !/^x-old/.test(e.op)).map(e => e.op);
     if (!mine.every(o => sentOps.includes(o))) out.push('events not all sent to the Timer Log');
     const plans = calls.filter(c => c[0] === 'savePlanPad').map(c => String(c[1][1]));
-    if (!plans.length || !plans[plans.length - 1].includes('data-tmr="' + email.dataset.tmr + '"')) out.push('task id not saved with the Blocks pad');
+    if (!plans.some(p => p.includes('data-tmr="' + email.dataset.tmr + '"'))) out.push('task id not saved with the Blocks pad');
+    if (plans.length && plans[plans.length - 1].includes('Email')) out.push('removed block still in the last save');
     if (plans.some(p => /tmr-chip|tmr-bar/.test(p))) out.push('timer chips leaked into the saved pad');
     if (plans.some(p => /data-blkph/.test(p))) out.push('Next Block hint marker leaked into the saved pad');
     return out;

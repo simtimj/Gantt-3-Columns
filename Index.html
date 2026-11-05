@@ -2011,6 +2011,13 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayPane .hist-mode{font:inherit;font-size:.85em;font-weight:700;line-height:1;margin-left:4px;padding:2px 5px;min-width:22px;min-height:22px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;flex:0 0 auto;}
 #todayScroll .ts-type > b{margin-right:5px;font-weight:600;} /* History log types (2026-11-04) */
 #todayScroll .day-editor > [data-tsec]:not([data-tsf="o"]){border-bottom:0!important;}
+/* History readability (2026-11-05, Julius): a line + room between Morn / After / Night, smaller count buttons,
+   underlined New / Fixes / Tweaks headings with space between them. */
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){margin-top:14px!important;border-top:1px solid var(--divider,#888)!important;padding-top:7px!important;}
+#todayScroll .ts-count{font-size:.82em;line-height:1.2;padding:0 6px;min-height:20px;}
+#todayScroll .ts-row + .ts-row{margin-top:7px;}
+#todayScroll .ts-type{margin-top:5px;}
+#todayScroll .ts-type > b{text-decoration:underline;text-underline-offset:2px;margin-bottom:1px;}
 #todayScroll .day-editor > [data-tsf]{cursor:pointer;}
 #todayScroll .day-editor > [data-tsec]::before{flex:0 0 auto;margin-top:.1em;}
 #todayScroll .day-editor > [data-tsec]::after{flex:1 1 0;min-width:0;white-space:pre-line;overflow-wrap:anywhere;}

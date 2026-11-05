@@ -33,7 +33,7 @@ function doGet() {
 
   let initial = null;
   try {
-    initial = getWorkspaceData();
+    initial = getWorkspaceData({ fast: true }); // imports run after the page draws (runImports)
   } catch (err) {
     // The page falls back to loading the data itself.
     console.error(err);
@@ -93,12 +93,10 @@ function setupWorkspace() {
 function ensureSetup_() {
   const today = todayString_();
   const props = PropertiesService.getScriptProperties();
+  // Already set up today: one property read (2026-11-05: the two sheet look-ups cost ~0.3 s every load;
+  // a missing tab is still created by getOrCreateSheet_ wherever it's used).
+  if (props.getProperty('lastSetupDate') === today) return;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetsExist = ss.getSheetByName('Days') && ss.getSheetByName('Reference');
-
-  if (sheetsExist && props.getProperty('lastSetupDate') === today) {
-    return;
-  }
 
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) {
@@ -124,9 +122,11 @@ function ensureSetup_() {
    WEB APP DATA
    ========================================================= */
 
-function getWorkspaceData() {
-  const t = speedTimer_();
-  ensureSetup_(); t.mark('setup');
+/* Imports that write into the sheet (Done Log, AI tasks, To Confirm card, study log, schedule moves, one-time
+   fixes). Fast start (2026-11-05, Julius: "update what it needs, like Google Sheets"): the first page load
+   (doGet → getWorkspaceData({fast:true})) skips them and shows what's saved; the page then calls runImports(),
+   which runs them and returns only the cells that changed, merged in place by the same code as fwSync. */
+function runImportSteps_(t) {
   try { applyDeployedCodeLog_(); } catch (e) { console.error(e); } t.mark('deployLog');
   try { applyClaudeDone_(); } catch (e) { console.error(e); } t.mark('done');
   try { applyClaudeNotes_(); } catch (e) { console.error(e); } t.mark('notes');
@@ -136,6 +136,22 @@ function getWorkspaceData() {
   try { moveScheduleToNotes_(); } catch (e) { console.error(e); } t.mark('schedule');
   try { fixUrgentBold_(); } catch (e) { console.error(e); } t.mark('fixBold');
   try { removeDaySections_(); } catch (e) { console.error(e); } t.mark('fixSecs');
+}
+
+function runImports(req) {
+  const t = speedTimer_();
+  runImportSteps_(t);
+  const out = syncDiff_(req || {}, t);
+  try { out.inbox = getInbox(); } catch (e) { console.error(e); } t.mark('inbox');
+  out.timing = t.done();
+  return out;
+}
+
+function getWorkspaceData(opts) {
+  const fast = !!(opts && opts.fast);
+  const t = speedTimer_();
+  ensureSetup_(); t.mark('setup');
+  if (!fast) runImportSteps_(t);
 
   const today = todayString_();
   // One read of the whole Days sheet for Urgent + Dailies seeds (2026-11-04: each used to read it on its own,
@@ -148,7 +164,7 @@ function getWorkspaceData() {
   ); t.mark('days');
   const reference = getReference_(); t.mark('reference');
   const urgent = getUrgentDays_(allDays); t.mark('urgent');
-  const inbox = (function () { try { return getInbox(); } catch (e) { return []; } })(); t.mark('inbox');
+  const inbox = fast ? [] : (function () { try { return getInbox(); } catch (e) { return []; } })(); t.mark('inbox'); // fast: comes with runImports
   const cardCats = getCardCats_(); t.mark('cardCats');
   const refPins = getRefPins_(); t.mark('pins');
   const notesSeeds = getNotesSeeds_(today, allDays); t.mark('seeds');
@@ -162,7 +178,7 @@ function getWorkspaceData() {
     refPins: refPins,
     notesSeeds: notesSeeds,
     today: today,
-    timing: Object.assign(t.done(), { dayRows: allDays.rows.length, refRows: reference.length })
+    timing: Object.assign(t.done(), { dayRows: allDays.rows.length, refRows: reference.length, fast: fast })
   };
 }
 
@@ -487,9 +503,15 @@ function backupCell_(where, col, reason, content, throttle) {
 // Called when the app comes back into view (and every few minutes): returns anything that changed
 // elsewhere since the app loaded it. req = { days: { date: {th, jh} }, ref: { id: ch } }
 function getSyncState(req) {
-  req = req || {};
   const t = speedTimer_();
   try { moveScheduleToNotes_(); } catch (e) { console.error(e); } t.mark('schedule');
+  const out = syncDiff_(req || {}, t);
+  out.timing = t.done();
+  return out;
+}
+
+// Cells whose hash differs from what the page has (days by date, Reference cards by id).
+function syncDiff_(req, t) {
   const out = { build: appBuild_(), days: {}, ref: {} }; t.mark('build');
   const dates = Object.keys(req.days || {}).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
   if (dates.length) {
@@ -511,7 +533,6 @@ function getSyncState(req) {
     });
   }
   t.mark('reference');
-  out.timing = t.done();
   return out;
 }
 
@@ -1191,22 +1212,24 @@ const CARD_CATS_BATCH1_ = [
 ];
 const CARD_CATS_CAREER_WORDS_ = 'help desk, helpdesk, it support, tech support, it job, it jobs, it role, certification, cert, security, cloud security, devsecops';
 function getCardCats_() {
-  const list = inboxRead_('cardCats', null);
-  if (!Array.isArray(list) || !list.length) return list;
+  // One read of all user properties (2026-11-05: was up to 7 separate reads + a write on every load).
   const props = PropertiesService.getUserProperties();
+  const all = props.getProperties();
+  let list = null;
+  try { list = all.cardCats ? JSON.parse(all.cardCats) : null; } catch (e) { list = null; }
+  if (!Array.isArray(list) || !list.length) return list;
   let out = list;
-  if (!props.getProperty('cardCatsBatch1')) { out = cardCatsBatch1_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch1', '1'); }
+  if (!all.cardCatsBatch1) { out = cardCatsBatch1_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch1', '1'); }
   // 2026-10-30 (Julius): Music purple; IT lab words in Career / IT (cert studies fold in on the client).
-  if (!props.getProperty('cardCatsBatch2')) { out = cardCatsBatch2_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch2', '1'); }
+  if (!all.cardCatsBatch2) { out = cardCatsBatch2_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch2', '1'); }
   // 2026-11-04 (Julius): "learn" counts toward Productivity.
-  if (!props.getProperty('cardCatsLearn1')) { out = cardCatsLearn_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsLearn1', '1'); }
+  if (!all.cardCatsLearn1) { out = cardCatsLearn_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsLearn1', '1'); }
   // 2026-11-04 (Julius): Productivity is silver.
-  if (!props.getProperty('cardCatsSilver1')) { out = out.map(c => c.key === 'productivity' ? Object.assign({}, c, { color: '#c0c4cc' }) : c); inboxWrite_('cardCats', out); props.setProperty('cardCatsSilver1', '1'); }
-  const health = cardCatsHealth_(out, !props.getProperty('cardCatsHealth1'));
+  if (!all.cardCatsSilver1) { out = out.map(c => c.key === 'productivity' ? Object.assign({}, c, { color: '#c0c4cc' }) : c); inboxWrite_('cardCats', out); props.setProperty('cardCatsSilver1', '1'); }
+  const health = cardCatsHealth_(out, !all.cardCatsHealth1);
   if (JSON.stringify(health) !== JSON.stringify(out)) inboxWrite_('cardCats', health);
-  props.setProperty('cardCatsHealth1', '1');
-  out = health;
-  return out;
+  if (!all.cardCatsHealth1) props.setProperty('cardCatsHealth1', '1');
+  return health;
 }
 function cardCatsLearn_(list) {
   const words = c => String(c.words || '').split(',').map(w => w.trim()).filter(Boolean);

@@ -372,3 +372,12 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - Rows: `.fx-task` with `--lv` (14px per level), `.fx-tools` (‹ › 📌) shown on focus / hover; tool buttons `preventDefault` on pointerdown so the caret stays. Keys (registered before the generic stopper): Enter = new line after (first child if the line has children; empty line → outdent or blur), Tab / Shift+Tab = `shift()` (subtree moves too, max one deeper than the line above), Backspace on empty = remove. `edit(fn, focus)` commits the current line, blurs anything focused in `.fx` (render skips while focus is inside), changes, saves, redraws, refocuses. Empty line on blur is removed and its children move up a level.
 - Mirrors unchanged: `findTask` / `focusTidToggled` / `focusReconcile` / 📌 `tidPlace` use item ids. Hold menu on a category's fold arrow: Rename, + Add task, Move, Collapse.
 - `tools/smoke.mjs` checks the conversion and a Tab nest (+ saved levels).
+
+## Fast start + live updates (2026-11-05, Julius: "like Google Sheets, update only what's needed")
+
+- Speed Log baseline before this (3 loads 11/4 ~20:40): server 4.8 / 5.9 / 4.9 s + ~1.8 s browser. Biggest steps: done 1.1 s, setup 0.3–1.2 s, cardCats 0.5 s, confirm 0.5 s, tasks 0.45 s, study 0.3 s, inbox 0.2 s.
+- `doGet` → `getWorkspaceData({fast:true})`: skips `runImportSteps_()` (deployLog, done, notes, tasks, confirm, study, schedule, fixBold, fixSecs) and inbox; `timing.fast = true`. Client `applyWorkspaceData` then calls `fwSync(true)` → `runImports(req)` = import steps + `syncDiff_(req)` (shared with `getSyncState`) + inbox. Changed cells merge via `fwReconcileDay` / `fwReconcileRef`; `tsecPlaceAi()` runs after a day changes. A cell skipped because its own save is pending/in flight triggers a light `fwSync(false)` 2.5 s later.
+- Cadence: light sync when > 55 s since the last (checked every 15 s, visible only); imports when > 3 min since the last import, and on tab return (> 60 s). Speed Log kinds: load / sync / imports.
+- `ensureSetup_`: one property read when `lastSetupDate` is today. `getCardCats_`: one `getProperties()`, writes only when something changes (it set `cardCatsHealth1` every load).
+- The fallback client load (`getWorkspaceData()` without opts) still runs the imports inline.
+- `tools/smoke.mjs` stubs `runImports` / `getSyncState` with an extra line and checks it merges into the open page.

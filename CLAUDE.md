@@ -84,6 +84,7 @@
 - History detail modes + fold fixes (2026-11-04, Julius)
 - Urgent checkmarks (2026-11-04, Julius)
 - Keep In Mind free list (2026-11-05, Julius)
+- Fast start + live updates (2026-11-05, Julius)
 
 ## IT study log (2026-11-04)
 

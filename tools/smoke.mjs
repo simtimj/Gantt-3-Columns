@@ -31,9 +31,13 @@ const data = {
     plan: '<div data-title="1" data-tl="1"><b>Next Block</b></div>' + line('Email') }],
   reference: [{ id: 'r1', parentId: '', type: 'item', title: '', content: '<h2>Sample card</h2><p>text</p>', expanded: true, sort: 1 }],
 };
+// Fast start (2026-11-05): the page loads without imports, then runImports() returns the changed cells to merge in.
+data.timing = { fast: true, total: 1, steps: {} };
+const imported = { build: 'smoke', ref: {}, inbox: [], days: { [today]: { th: 'h-imported', jh: '',
+  tasks: data.days[0].tasks + '<div class="check-line" data-level="0" data-at="09:30"><input type="checkbox"><span class="check-text">From import</span></div>' } } };
 const stub = `<script>window.google={script:{run:new Proxy({},{get(t,k){let ok=null;const p=new Proxy({},{get(_,m){
   if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler'||m==='withUserObject')return()=>p;
-  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='getFocus'?${JSON.stringify(focus)}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
+  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='runImports'||m==='getSyncState'?${JSON.stringify(imported)}:m==='getFocus'?${JSON.stringify(focus)}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
 let html = fs.readFileSync('Index.html', 'utf8')
   .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
   .replace('<?!= initialData ?>', JSON.stringify(data)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')
@@ -50,6 +54,11 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   await pg.waitForTimeout(2000);
   const shot = process.argv.indexOf('--shot');
   if (shot > 0) await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-' + name + '.png') });
+  // Fast start: the imported line is merged into the open page (no reload), after the load's own save if needed.
+  await pg.waitForTimeout(2600);
+  const merged = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll .day-editor .check-text')].some(x => x.textContent === 'From import')
+    && (window.__calls || []).some(c => c[0] === 'runImports'));
+  if (!merged) errs.push('Fast start: the runImports line did not merge into the page');
   // The study entry stays folded: its 2 detail lines are hidden, the next task is not, and they follow it.
   const study = await pg.evaluate(() => {
     const head = document.querySelector('.day-editor [data-study]');

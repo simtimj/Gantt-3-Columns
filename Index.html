@@ -2541,6 +2541,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(typeof applyServerCardCats === 'function') applyServerCardCats(data.cardCats); else window.__FW_CARDCATS__ = data.cardCats;
     loadCalendar();
     setStatus('Ready');
+    // Fast start (2026-11-05): the page came without the imports (Done Log, AI tasks, To Confirm, study log);
+    // fetch them now and merge only the changed cells.
+    if(data.timing && data.timing.fast) setTimeout(() => fwSync(true),400);
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
   }
   // Speed timing (2026-11-04): sent after drawing, so it can't slow the load. See logSpeed in Code.gs.
@@ -5501,8 +5504,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(a) fwGuardReload(e,a);
   },true);
   /* Pull what changed elsewhere. Cells with a save waiting or in flight are skipped (that save merges). */
-  function fwSync(){
+  // withImports (2026-11-05): runImports() first writes the Done Log / AI tasks / To Confirm / study log into the
+  // sheet, then returns the same diff as getSyncState. Light syncs skip the imports.
+  let fwLastImport = 0;
+  function fwSync(withImports){
     if(fwSyncBusy || !state.days || !state.days.length) return;
+    withImports = withImports === true;
+    if(withImports) fwLastImport = Date.now();
     const req = {days:{},ref:{}};
     state.days.forEach(d => {
       const b = dayBase.get(d.date);
@@ -5517,12 +5525,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         fwLastSync = Date.now();
         if(!out) return;
         fwCheckBuild(out.build);
-        let note = '';
+        let note = '', retry = false;
         Object.keys(out.days || {}).forEach(date => {
           const e = out.days[date];
           if(e.plan !== undefined && window.odPadTheirs) odPadTheirs(date,e.plan,e.ph);
           const info = daySaveState.get(date);
-          if(info && (info.inFlight || info.pending)) return;
+          if(info && (info.inFlight || info.pending)){ retry = true; return; } // that save merges; check again shortly
           if(e.tasks !== undefined) note = fwReconcileDay(date,'tasks',e.tasks,e.th) || note;
           if(e.journal !== undefined) note = fwReconcileDay(date,'journal',e.journal,e.jh) || note;
         });
@@ -5532,16 +5540,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           note = fwReconcileRef(it,out.ref[id].content,out.ref[id].ch) || note;
         });
         if(note) setStatus(note);
-        if(out.timing) google.script.run.withFailureHandler(() => {}).logSpeed('sync',out.timing,{});
+        if(Array.isArray(out.inbox)) try{ setInbox(out.inbox); }catch(e){}
+        if(retry) setTimeout(() => fwSync(false),2500);
+        // New AI tasks arrive with data-ai-new: sort them into today's time sections.
+        if(Object.keys(out.days || {}).length && typeof tsecPlaceAi === 'function') setTimeout(() => { try{ tsecPlaceAi(); }catch(e){} },0);
+        if(out.timing) google.script.run.withFailureHandler(() => {}).logSpeed(withImports ? 'imports' : 'sync',out.timing,{});
       })
       .withFailureHandler(() => { fwSyncBusy = false; })
-      .getSyncState(req);
+      [withImports ? 'runImports' : 'getSyncState'](req);
   }
+  // Live updates while the app is open (2026-11-05, Julius: "update what it needs, without a reset"): a light check
+  // every minute, imports every 3 minutes and whenever the tab comes back into view.
+  const fwImportsDue = () => Date.now() - fwLastImport > 180000;
   document.addEventListener('visibilitychange',() => {
-    if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 15000) fwSync();
+    if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 15000) fwSync(fwImportsDue() || Date.now() - fwLastSync > 60000);
   });
-  window.addEventListener('focus',() => { if(Date.now() - fwLastSync > 15000) fwSync(); });
-  setInterval(() => { if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 170000) fwSync(); },30000);
+  window.addEventListener('focus',() => { if(Date.now() - fwLastSync > 15000) fwSync(fwImportsDue()); });
+  setInterval(() => { if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 55000) fwSync(fwImportsDue()); },15000);
   window.addEventListener('pagehide',() => { try{ fwFlushAll(); }catch(e){} });
   /* No stray bold (2026-10-29, Julius: Urgent rows were bold when they shouldn't be). Typing into an empty
      line/task whose only content is a leftover <b>/<strong> (the browser carries bold over from the line
@@ -7474,7 +7489,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     try{
       const d = line.dataset.cat || '';
       if(d === 'none' || d === 'life') return '';
-      if(CARD_CAT_BY_KEY[d]) return d;
+      let known = false; try{ known = !!CARD_CAT_BY_KEY[d]; }catch(e){} // not declared yet during early startup
+      if(known) return d;
       if(!cardsAuto) return '';
       return guessCardCat(lineText(line),'',false,(subs || []).map(x => x.text).join(' ')) || '';
     }catch(e){ return ''; }
@@ -8322,11 +8338,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const row = (ev,cls,inner) => '<div class="ce-event' + cls + (ev.done ? ' ce-done' : '') + '"' + calRowAttrs(ev) + '>' + checkbox(ev) + inner + '<span class="ce-meta">' + esc(lineMetaLabel(ev.due,ev.dur) || '') + '</span></div>';
       // Rows sorted under their subject, in Options order; no subject goes last, under Other.
       const bySubject = (list,one) => {
-        const keys = list.map(calRowCat), order = Object.keys(CARD_CAT_BY_KEY).concat('');
+        // The subject list is declared in a later <script>; an early calendar reply can land before it loads.
+        const cats = typeof CARD_CAT_BY_KEY !== 'undefined' ? CARD_CAT_BY_KEY : {};
+        const keys = list.map(calRowCat), order = Object.keys(cats).concat('');
         const used = order.filter(k => keys.includes(k));
         const heads = used.length > 1 || used[0];
         return used.map(k => {
-          const info = CARD_CAT_BY_KEY[k];
+          const info = cats[k];
           return (heads ? '<div class="ce-cat"' + (info ? ' style="--ce-cat:' + esc(info.color) + '"' : '') + '>' + esc(info ? info.name : 'Other') + '</div>' : '') +
             list.filter((ev,i) => keys[i] === k).map(one).join('');
         }).join('');

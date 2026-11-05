@@ -49,6 +49,7 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Faster start + live updates**: the page now opens with what's already saved and fills in new Done Log lines, AI-added tasks, the To Confirm card and study entries a few seconds later, in place, without reloading. While the app is open it checks for changes every minute (imports every 3 minutes and whenever you come back to it), so things added by Claude or ChatGPT show up on their own. Fewer settings reads on each load, too.
 - **Keep In Mind: category + free task list**: under each category (e.g. Crabbing prep) it's just tasks and subtasks you nest however you want: Enter adds a line, Tab / Shift+Tab (or the small ‹ › buttons on the line you're in, on the phone) move it in or out, Backspace on an empty line removes it. The old Task cards, "Why focus" lines and the deep left indent are gone, so the list starts right under the category. Your existing items were converted: each old Task is a top line with its subtasks under it, and a "why" note is a gray line under it. 📌 Send to Today and ticking still work.
 
 ## 🧪 To be confirmed (2026-11-04)

@@ -1517,7 +1517,7 @@
     .od-head,.plan-pad{display:none;}
     /* The Today: 70/72 done chip already says it (2026-11-03, Julius). */
     body.one-day #todayScroll .od-on .od-head:not(.od-pad-head){display:none!important;}
-    .fx-cat{border-left:2px solid var(--fx-category-color,#70baff);padding-left:5px;}
+    .fx-cat{border-left:2px solid var(--fx-category-color,#70baff);padding-left:3px;}
     .fx-cat>.fx-ch .fx-name{color:var(--fx-category-color,#70baff);}
 
     /* Reference header (2026-11-03, Julius): just the Urgent numbers, always one line; fitUrgCounts() shrinks them to fit. */
@@ -1743,6 +1743,18 @@
     .fx-task input{margin:.2em 0 0;flex:0 0 auto;accent-color:#1565c0;}
     .fx-tt{flex:1 1 auto;outline:none;min-width:2em;word-break:break-word;overflow-wrap:anywhere;}
     .fx-done .fx-tt{text-decoration:line-through;color:var(--muted,#888);}
+    /* Free list (2026-11-05, Julius: use the space): no card borders or deep margins; 14px per nesting level. */
+    .fx-ch{gap:2px;}
+    .fx-tg{width:1.1em;padding:0;}
+    .fx-body{padding-left:2px;}
+    .fx .fx-task{padding:1px 0 1px calc(var(--lv,0) * 14px);gap:4px;}
+    .fx-tt{word-break:normal;overflow-wrap:break-word;}
+    .fx-note .fx-tt{font-style:italic;color:var(--muted,#888);font-size:.92em;}
+    .fx-tools{display:none;flex:0 0 auto;gap:1px;align-self:center;}
+    .fx-task:focus-within .fx-tools,.fx-task:hover .fx-tools{display:inline-flex;}
+    .fx-tools button{border:1px solid var(--border,#999);background:transparent;color:inherit;border-radius:5px;font:inherit;font-size:.85em;line-height:1;min-width:22px;height:22px;padding:0 3px;cursor:pointer;}
+    .fx-tools .fx-send{border:0;opacity:.6;}
+    .fx-body > .fx-add{padding-left:2px;}
     .fx-send{border:0;background:transparent;padding:0 2px;cursor:pointer;font-size:.8em;opacity:.35;flex:0 0 auto;}
     .fx-task:focus-within .fx-send,.fx-send:hover{opacity:1;}
     .fx-tasks > .fx-add{padding-left:0;}
@@ -6968,30 +6980,59 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       clearTimeout(saveT);
       saveT = setTimeout(() => { if(window.google && google.script) google.script.run.withFailureHandler(e => setStatus && setStatus('Focus not saved: ' + (e && e.message || e))).saveFocus(data); }, 700);
     }
-    function find(id){
-      for(const c of data.cats){ if(c.id === id) return {c}; for(const p of c.projects) if(p.id === id) return {c,p}; }
-      return {};
+    function find(id){ for(const c of data.cats) if(c.id === id) return {c}; return {}; }
+    /* Free list under each category (2026-11-05, Julius: "a category, then just tasks and subtasks, nested how I
+       want"). c.items = [{id, t, d, lv, n?}]: lv = nesting depth (0–8), n = a note line without a box. Older data
+       (projects with title / why / tasks) converts once on load; the old shape is kept in c.legacy. */
+    const itemsOf = c => c.items || (c.items = []);
+    function migrate(d){
+      let ch = false;
+      d.cats.forEach(c => {
+        if(Array.isArray(c.items)) return;
+        const items = [];
+        (c.projects || []).forEach(p => {
+          const head = !!(p.title || '').trim(), base = head ? 1 : 0;
+          if(head) items.push({id:tid(),t:p.title,d:0,lv:0});
+          if((p.why || '').trim()) items.push({id:tid(),t:p.why,d:0,lv:base,n:1});
+          (p.tasks || []).forEach(t => items.push({id:t.id || tid(),t:t.t || '',d:t.d ? 1 : 0,lv:base}));
+        });
+        c.items = items;
+        if((c.projects || []).length) c.legacy = c.projects;
+        delete c.projects;
+        ch = true;
+      });
+      return ch;
+    }
+    function findItem(id){
+      for(const c of data.cats){ const i = itemsOf(c).findIndex(t => t.id === id); if(i >= 0) return {c,i,t:c.items[i],list:c.items}; }
+      return null;
+    }
+    // The line plus everything nested under it.
+    function subtreeEnd(list,i){ let j = i + 1; while(j < list.length && (list[j].lv || 0) > (list[i].lv || 0)) j++; return j; }
+    // In / out by one, children along with it; never deeper than one past the line above.
+    function shift(list,i,d){
+      const t = list[i], lv = t.lv || 0, end = subtreeEnd(list,i);
+      if(d > 0){ const prev = list[i - 1]; if(!prev || lv > (prev.lv || 0)) return; }
+      if(d < 0 && !lv) return;
+      for(let k = i; k < end; k++) list[k].lv = Math.max(0,Math.min(8,(list[k].lv || 0) + d));
     }
     function html(){
       let out = '';
       data.cats.forEach(c => {
-        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (c.color ? ' fx-colored' : '') + (!c.name && c.projects.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '" style="--fx-category-color:' + h(c.color || '#70baff') + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
+        const items = itemsOf(c), open = items.filter(t => !t.n && !t.d).length;
+        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (c.color ? ' fx-colored' : '') + (!c.name && items.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '" style="--fx-category-color:' + h(c.color || '#70baff') + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
           '<span class="fx-name" contenteditable="true" data-fx="name" data-fph="Category">' + h(c.name) + '</span>' +
-          (c.col ? '<span class="fx-sub">' + c.projects.length + '</span>' : '') + '</div><div class="fx-body">';
-        c.projects.forEach(p => {
-          out += '<div class="fx-proj' + (p.col ? ' fx-col' : '') + (p.color ? ' fx-colored' : '') + '" data-fid="' + p.id + '"' + (p.color ? ' style="--fx-category-color:' + h(p.color) + '"' : '') + '><div class="fx-ph"><button type="button" class="fx-tg" data-fx="tg">' + (p.col ? '▸' : '▾') + '</button>' +
-            '<span class="fx-title" contenteditable="true" data-fx="title" data-fph="Task">' + h(p.title) + '</span></div>' +
-            '<div class="fx-why" contenteditable="true" data-fx="why" data-fph="Why focus…">' + h(p.why) + '</div><div class="fx-tasks">';
-          (p.tasks || []).forEach(t => {
-            out += '<div class="fx-task' + (t.d ? ' fx-done' : '') + '" data-ftid="' + h(t.id) + '"><input type="checkbox" data-fx="tick"' + (t.d ? ' checked' : '') + '>' +
-              '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="Subtask">' + h(t.t) + '</span>' +
-              '<button type="button" class="fx-send" data-fx="send" title="Send to Today (Plan / think)">📌</button></div>';
-          });
-          out += '<button type="button" class="fx-add" data-fx="addt">+ Subtask</button></div></div>';
+          (c.col && items.length ? '<span class="fx-sub">' + open + ' open</span>' : '') + '</div><div class="fx-body">';
+        items.forEach(t => {
+          out += '<div class="fx-task' + (t.d ? ' fx-done' : '') + (t.n ? ' fx-note' : '') + '" data-ftid="' + h(t.id) + '" style="--lv:' + (t.lv || 0) + '">' +
+            (t.n ? '' : '<input type="checkbox" data-fx="tick"' + (t.d ? ' checked' : '') + '>') +
+            '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="' + (t.lv ? 'Subtask' : 'Task') + '">' + h(t.t) + '</span>' +
+            '<span class="fx-tools"><button type="button" data-fx="out" title="Less indent" aria-label="Less indent">‹</button><button type="button" data-fx="in" title="Indent" aria-label="Indent">›</button>' +
+            (t.n ? '' : '<button type="button" class="fx-send" data-fx="send" title="Send to Today (Plan / think)">📌</button>') + '</span></div>';
         });
-        out += '<button type="button" class="fx-add" data-fx="addp">+ Task</button></div></div>';
+        out += '<button type="button" class="fx-add" data-fx="addt">+ Task</button></div></div>';
       });
-      return out + '<button type="button" class="fx-add" data-fx="addh">+ Heading</button>';
+      return out + '<button type="button" class="fx-add" data-fx="addh">+ Category</button>';
     }
     function render(){
       document.querySelectorAll('.journal-editor .fx[data-render-due]').forEach(host => {
@@ -7057,7 +7098,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         m.appendChild(b);
       };
       item('✎ Rename',() => setTimeout(() => focusNew(id,f.p ? 'title' : 'name')));
-      if(!f.p) item('+ Add task',() => { const p = {id:uid('p'),title:'',why:'',col:false,tasks:[]}; f.c.projects.push(p); f.c.col = false; setTimeout(() => focusNew(p.id,'title')); });
+      if(!f.p) item('+ Add task',() => { const n = {id:tid(),t:'',d:0,lv:0}; itemsOf(f.c).push(n); f.c.col = false; setTimeout(() => focusTask(n.id)); });
       const arr = f.p ? f.c.projects : data.cats, at = arr.indexOf(o);
       const move = d => () => { arr.splice(at,1); arr.splice(at + d,0,o); };
       if(at > 0) item('↑ Move up',move(-1));
@@ -7084,6 +7125,28 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       host.addEventListener('contextmenu',e=>{if(e.target.closest('.fx-tg'))e.preventDefault();},true);
       host.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-downX)>10||Math.abs(e.clientY-downY)>10)clearTimeout(holdTimer);},true);
       ['pointerup','pointercancel'].forEach(t=>host.addEventListener(t,()=>clearTimeout(holdTimer),true));
+      // Enter = new line (first child if it has any), Tab / Shift+Tab = in / out, Backspace on an empty line = remove.
+      host.addEventListener('keydown', e => {
+        const tt = e.target.closest && e.target.closest('[data-fx="tt"]'); if(!tt) return;
+        const r = findItem(tt.closest('[data-ftid]').dataset.ftid); if(!r) return;
+        const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); e.stopPropagation(); };
+        if(e.key === 'Enter' && !e.shiftKey){
+          stop();
+          if(!readText(tt)){ if(r.t.lv) edit(() => shift(r.list,r.i,-1),r.t.id); else tt.blur(); return; }
+          const next = r.list[r.i + 1], lv = next && (next.lv || 0) > (r.t.lv || 0) ? next.lv : (r.t.lv || 0);
+          const n = {id:tid(),t:'',d:0,lv};
+          edit(() => r.list.splice(r.i + 1,0,n),n.id);
+        } else if(e.key === 'Tab'){
+          stop();
+          edit(() => shift(r.list,r.i,e.shiftKey ? -1 : 1),r.t.id);
+        } else if(e.key === 'Backspace' && !tt.textContent){
+          stop();
+          const prev = r.list[r.i - 1];
+          edit(() => r.list.splice(r.i,1),prev && prev.id);
+        }
+      });
+      // The ‹ › 📌 buttons keep the caret in the line (so they stay shown on a phone).
+      host.addEventListener('pointerdown', e => { if(e.target.closest && e.target.closest('.fx-tools button')) e.preventDefault(); });
       // Keep the Notes editor's own key / tap / drag handlers out of the dashboard.
       ['keydown','keyup','keypress','beforeinput','input','paste','cut','pointerdown','mousedown','touchstart','dragstart','contextmenu'].forEach(t =>
         host.addEventListener(t, e => { e.stopPropagation(); if(t === 'keydown' && e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); e.target.blur && e.target.blur(); } }));
@@ -7093,16 +7156,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const b = e.target.closest('[data-fx]'); if(!b) return;
         const id = b.closest('[data-fid]')?.dataset.fid, f = id ? find(id) : {};
         if(b.dataset.fx === 'tg'){ if(suppressToggle){suppressToggle=false;return;} const o=f.p||f.c; if(o){o.col=!o.col;save();render();} }
-        else if(b.dataset.fx === 'addh'){
-          let c = data.cats.find(c => !c.name);
-          if(!c){ c = {id:uid('c'),name:'',col:false,projects:[]}; data.cats.push(c); }
-          const p = {id:uid('p'),title:'',why:'',col:false,tasks:[]};
-          c.projects.push(p); c.col = false; save(); render(); focusNew(p.id,'title');
+        else if(b.dataset.fx === 'addh'){ const c = {id:uid('c'),name:'',col:false,items:[]}; edit(() => data.cats.push(c),() => focusNew(c.id,'name')); }
+        else if(b.dataset.fx === 'addt' && f.c){ const n = {id:tid(),t:'',d:0,lv:0}; itemsOf(f.c).push(n); f.c.col = false; edit(() => {},n.id); }
+        else if(b.dataset.fx === 'in' || b.dataset.fx === 'out'){
+          const r = findItem(b.closest('[data-ftid]').dataset.ftid);
+          if(r) edit(() => shift(r.list,r.i,b.dataset.fx === 'in' ? 1 : -1),r.t.id);
         }
-        else if(b.dataset.fx === 'addp' && f.c){ const p = {id:uid('p'),title:'',why:'',col:false,tasks:[]}; f.c.projects.push(p); f.c.col = false; save(); render(); focusNew(p.id,'title'); }
-        else if(b.dataset.fx === 'addt' && f.p){ const t = {id:tid(),t:'',d:0}; (f.p.tasks = f.p.tasks || []).push(t); f.p.col = false; save(); render(); focusTask(t.id); }
-        else if(b.dataset.fx === 'send' && f.p){
-          const t = task(f.p, b.closest('[data-ftid]').dataset.ftid); if(!t) return;
+        else if(b.dataset.fx === 'send'){
+          const r = findItem(b.closest('[data-ftid]').dataset.ftid), t = r && r.t; if(!t) return;
           if(!t.t){ setStatus && setStatus('Give the task a name first'); return; }
           window.tidPlace && window.tidPlace(t.id, h(t.t), !!t.d);
         }
@@ -7111,34 +7172,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       host.addEventListener('change', e => {
         e.stopPropagation();
         const cb = e.target.closest('[data-fx="tick"]'); if(!cb) return;
-        const f = find(cb.closest('[data-fid]').dataset.fid), t = f.p && task(f.p, cb.closest('[data-ftid]').dataset.ftid);
+        const r = findItem(cb.closest('[data-ftid]').dataset.ftid), t = r && r.t;
         if(!t) return;
         t.d = cb.checked ? 1 : 0; save();
         cb.closest('.fx-task').classList.toggle('fx-done', !!t.d);
         window.tidSet && window.tidSet(t.id, !!t.d, h(t.t));
       });
       host.addEventListener('focusout', e => {
+        if(quiet) return;
         const tt = e.target.closest && e.target.closest('[data-fx="tt"]');
         if(tt){
-          const f = find(tt.closest('[data-fid]').dataset.fid), id = tt.closest('[data-ftid]').dataset.ftid, t = f.p && task(f.p, id);
+          const r = findItem(tt.closest('[data-ftid]').dataset.ftid), t = r && r.t;
           if(!t) return;
-          const v = tt.textContent.replace(/\s+/g,' ').trim().slice(0,300);
-          if(!v){ f.p.tasks = f.p.tasks.filter(x => x !== t); save(); setTimeout(render); return; }
+          const v = readText(tt);
+          // An empty line goes away (its nested lines stay, one level up).
+          if(!v){ const end = subtreeEnd(r.list,r.i); for(let k = r.i + 1; k < end; k++) r.list[k].lv = Math.max(0,(r.list[k].lv || 0) - 1); r.list.splice(r.i,1); save(); setTimeout(render); return; }
           if(v !== t.t){ t.t = v; save(); window.tidRetitle && window.tidRetitle(t.id, h(v)); }
           return;
         }
-        const el = e.target.closest && e.target.closest('[data-fx="name"],[data-fx="title"],[data-fx="why"]'); if(!el) return;
-        const id = el.closest('[data-fid]').dataset.fid, f = find(id), v = el.textContent.replace(/\s+/g,' ').trim();
-        const k = el.dataset.fx;
-        if(k === 'name' && f.c && !f.p){
-          if(!v && !f.c.projects.length){ data.cats = data.cats.filter(x => x !== f.c); save(); setTimeout(render); return; }
-          if(!v && f.c.projects.length){ el.textContent = f.c.name; return; }
-          if(v !== f.c.name){ f.c.name = v; save(); }
-        } else if(k === 'title' && f.p){
-          if(!v && !f.p.why && !(f.p.tasks||[]).length){ f.c.projects = f.c.projects.filter(x => x !== f.p); save(); setTimeout(render); return; }
-          if(v !== f.p.title){ f.p.title = v; save(); }
-        } else if(k === 'why' && f.p && v !== f.p.why){ f.p.why = v.slice(0,240); save(); }
-        if(!el.textContent && v === '') el.textContent = '';
+        const el = e.target.closest && e.target.closest('[data-fx="name"]'); if(!el) return;
+        const f = find(el.closest('[data-fid]').dataset.fid), v = el.textContent.replace(/\s+/g,' ').trim();
+        if(!f.c) return;
+        const n = itemsOf(f.c).length;
+        if(!v && !n){ data.cats = data.cats.filter(x => x !== f.c); save(); setTimeout(render); return; }
+        if(!v && n){ el.textContent = f.c.name; return; }
+        if(v !== f.c.name){ f.c.name = v; save(); }
       });
     }
     function focusNew(id,k){
@@ -7147,9 +7205,26 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
     // Phase 2 (2026-11-01): tasks. id = the task's data-tid (same 'm-' form as Task mirrors).
     const tid = () => 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-    const task = (p,id) => (p.tasks || []).find(t => t.id === id);
-    function findTask(id){ for(const c of data.cats) for(const p of c.projects){ const t = task(p,id); if(t) return t; } return null; }
-    function focusTask(id){ const el = document.querySelector('.fx [data-ftid="' + id + '"] [data-fx="tt"]'); if(el) el.focus(); }
+    function findTask(id){ const r = findItem(id); return r ? r.t : null; }
+    function focusTask(id){
+      const el = document.querySelector('.fx [data-ftid="' + id + '"] [data-fx="tt"]'); if(!el) return;
+      el.focus();
+      try{ const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); }catch(err){}
+    }
+    const readText = el => el.textContent.replace(/\s+/g,' ').trim().slice(0,300);
+    // Structural change: keep what's typed in the current line, change the list, redraw, put the caret back.
+    let quiet = false;
+    function edit(fn,focusId){
+      const a = document.activeElement;
+      if(a && a.matches && a.matches('.fx [data-fx="tt"]')){
+        const r = findItem(a.closest('[data-ftid]').dataset.ftid), v = readText(a);
+        if(r && v !== r.t.t){ r.t.t = v; window.tidRetitle && window.tidRetitle(r.t.id, h(v)); }
+      }
+      // Anything focused inside (a line, a category name, a button) would stop the redraw.
+      if(a && a.closest && a.closest('.fx')){ quiet = true; a.blur(); quiet = false; }
+      fn(); save(); render();
+      if(typeof focusId === 'function') focusId(); else if(focusId) focusTask(focusId);
+    }
     // A copy ticked / unticked elsewhere (Today, Plan / think, Reference) → the focus task follows.
     window.focusTidToggled = (id,on) => {
       if(!data) return;
@@ -7160,10 +7235,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     window.focusReconcile = anyOn => {
       if(!data || !anyOn) return;
       let ch = false;
-      data.cats.forEach(c => c.projects.forEach(p => (p.tasks || []).forEach(t => { if(!t.d && anyOn(t.id)){ t.d = 1; ch = true; } })));
+      data.cats.forEach(c => itemsOf(c).forEach(t => { if(!t.n && !t.d && anyOn(t.id)){ t.d = 1; ch = true; } }));
       if(ch){ save(); render(); }
     };
-    if(window.google && google.script) google.script.run.withSuccessHandler(d => { data = (d && Array.isArray(d.cats)) ? d : {v:1,cats:[]}; render(); window.tidAnyOn && window.focusReconcile(window.tidAnyOn); })
+    if(window.google && google.script) google.script.run.withSuccessHandler(d => { data = (d && Array.isArray(d.cats)) ? d : {v:1,cats:[]}; if(migrate(data)) save(); render(); window.tidAnyOn && window.focusReconcile(window.tidAnyOn); })
       .withFailureHandler(() => { data = {v:1,cats:[]}; render(); }).getFocus();
     else { data = {v:1,cats:[]}; }
     render();

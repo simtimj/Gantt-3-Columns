@@ -9,6 +9,9 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const line = (t, a = '') => `<div class="check-line" data-level="0"${a}><input type="checkbox"><span class="check-text">${t}</span></div>`;
+// Keep In Mind (2026-11-05): old-shape data (Task cards with why + subtasks) that must convert to a free nested list.
+const focus = { v: 1, cats: [{ id: 'c1', name: 'Crabbing prep', col: false, projects: [
+  { id: 'p1', title: 'Gear', why: 'Before Friday', col: false, tasks: [{ id: 'm-a', t: 'Gloves', d: 0 }, { id: 'm-b', t: 'Bait', d: 1 }] }] }] };
 const data = {
   today, inbox: [], cardCats: [], notesSeeds: {}, urgent: [], refPins: [],
   days: [{ date: today, journal: '',
@@ -30,7 +33,7 @@ const data = {
 };
 const stub = `<script>window.google={script:{run:new Proxy({},{get(t,k){let ok=null;const p=new Proxy({},{get(_,m){
   if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler'||m==='withUserObject')return()=>p;
-  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
+  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='getFocus'?${JSON.stringify(focus)}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
 let html = fs.readFileSync('Index.html', 'utf8')
   .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
   .replace('<?!= initialData ?>', JSON.stringify(data)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')
@@ -94,6 +97,21 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return out;
   });
   urg.forEach(x => errs.push('Urgent: ' + x));
+  // Keep In Mind: converted to Gear > (note, Gloves, Bait); Tab nests a line one deeper and saves.
+  const kim = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    document.querySelector('[data-ctab="focus"]')?.click(); await wait(300);
+    const rows = () => [...document.querySelectorAll('.fx .fx-task')].map(t => (t.style.getPropertyValue('--lv') || '0') + (t.classList.contains('fx-note') ? '~' : '') + t.querySelector('.fx-tt').textContent);
+    const got = rows().join('|');
+    if (got !== '0Gear|1~Before Friday|1Gloves|1Bait') return ['converted list: ' + got];
+    const bait = [...document.querySelectorAll('.fx .fx-tt')].find(x => x.textContent === 'Bait');
+    bait.focus(); bait.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })); await wait(900);
+    const after = rows().join('|');
+    const saves = (window.__calls || []).filter(c => c[0] === 'saveFocus');
+    const saved = saves.length ? saves[saves.length - 1][1][0].cats[0].items.map(i => i.lv).join('') : '';
+    return after === '0Gear|1~Before Friday|1Gloves|2Bait' && saved === '0112' ? [] : ['Tab nesting: ' + after + ' saved ' + saved];
+  });
+  kim.forEach(x => errs.push('Keep In Mind: ' + x));
   // History detail button: List = one line per item (all 50), hidden lines really hidden; Mini = counts only; back to Full.
   const modes = [];
   for (let i = 0; i < 3; i++) {

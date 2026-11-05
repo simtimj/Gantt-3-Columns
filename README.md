@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 
 ## Status key
 
@@ -46,6 +46,10 @@ Last updated: 2026-11-04
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-05)
+
+- **Keep In Mind: category + free task list**: under each category (e.g. Crabbing prep) it's just tasks and subtasks you nest however you want: Enter adds a line, Tab / Shift+Tab (or the small ‹ › buttons on the line you're in, on the phone) move it in or out, Backspace on an empty line removes it. The old Task cards, "Why focus" lines and the deep left indent are gone, so the list starts right under the category. Your existing items were converted: each old Task is a top line with its subtasks under it, and a "why" note is a gray line under it. 📌 Send to Today and ticking still work.
 
 ## 🧪 To be confirmed (2026-11-04)
 

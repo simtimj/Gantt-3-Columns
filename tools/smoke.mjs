@@ -168,6 +168,10 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if (s.cur !== title.dataset.tmr || s.blocks[s.cur].child !== email.dataset.tmr) out.push('task start did not start its block: ' + JSON.stringify(s.cur));
     if (!/^Block \d/.test(title.textContent.trim())) out.push('Next Block not renamed on start: ' + title.textContent);
     if (![...pad.querySelectorAll('[data-title]')].some(n => /^Next Block/.test(n.textContent.trim()))) out.push('no fresh Next Block after starting');
+    await wait(100);
+    // Next Block hint (2026-11-05): its empty task shows the placeholder, and it's never saved.
+    const ph = pad.querySelector('[data-blkph] > .check-text');
+    if (!ph || !/next block/i.test(getComputedStyle(ph, '::before').content)) out.push('Next Block hint missing');
     if (!bar().classList.contains('on') || !bar().classList.contains('run')) out.push('bar not showing the running block');
     email.querySelector('input').click(); await wait(150);
     s = fwTimer.replay();
@@ -194,6 +198,7 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     const plans = calls.filter(c => c[0] === 'savePlanPad').map(c => String(c[1][1]));
     if (!plans.length || !plans[plans.length - 1].includes('data-tmr="' + email.dataset.tmr + '"')) out.push('task id not saved with the Blocks pad');
     if (plans.some(p => /tmr-chip|tmr-bar/.test(p))) out.push('timer chips leaked into the saved pad');
+    if (plans.some(p => /data-blkph/.test(p))) out.push('Next Block hint marker leaked into the saved pad');
     return out;
   });
   tmr.forEach(x => errs.push('Timer: ' + x));

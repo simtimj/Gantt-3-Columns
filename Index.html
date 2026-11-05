@@ -5180,15 +5180,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.addEventListener('input',later,true);
   })();
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
-  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn'];
+  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn','data-blkph'];
   function cardCleanHtml(el){
-    if(!el.querySelector('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
+    if(!el.querySelector('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
     c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid','data-tlsum'].forEach(a => n.removeAttribute(a)));
     c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
-    c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
   }
   function saveDay(date){
@@ -12490,12 +12490,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .plan-pad > [data-blk]{position:relative;left:7px;margin-right:14px;}
   .plan-pad > [data-blk^="f"]{margin-top:9px;}
   .plan-pad > [data-blk$="l"],.plan-pad > .check-line[data-blk$="l"]{margin-bottom:10px;}
-  .plan-pad > [data-blkn]{margin-top:21px;} /* room for the line above Next Block */
+  .plan-pad > [data-blkn]{margin-top:21px;}
+  .plan-pad > [data-blkph] > .check-text:empty::before{content:'Tasks for your next block · ▶ starts it';color:var(--muted,#999);font-style:italic;opacity:.8;pointer-events:none;} /* room for the line above Next Block */
 </style>
 <script>
 /* Block borders (2026-11-04, Julius): each block in Blocks (its title line plus the task cells under it, down
    to the next title or an empty line) sits inside one rounded border, so it's clear what a block contains.
-   Next Block placeholders get a dashed yellow border, so the next block stands out. Render-only: the border is
+   Next Block placeholders get a dashed border in the same soft color (yellow until 2026-11-05). Render-only: the border is
    an SVG background on the pad (scrolls with it) and data-blk is stripped before saving (cardCleanHtml). */
 (function(){
   const isTitle = n => n.hasAttribute('data-title');
@@ -12527,7 +12528,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // A line across the pad above Next Block (2026-11-04, Julius), so it's set apart from what's above.
       if(next) rects += '<line x1="2" x2="' + Math.max(10,W - 2) + '" y1="' + (top - 6.5) + '" y2="' + (top - 6.5) + '" stroke="' + ink + '" stroke-opacity=".55" stroke-width="1.5"/>';
       rects += '<rect x="2" y="' + (top + .75) + '" width="' + Math.max(10,W - 4) + '" height="' + Math.max(10,bottom - top - 1.5) + '" rx="8" fill="none" stroke="' +
-        (next ? '#f0b000' : ink) + '" stroke-opacity="' + (next ? '.9' : '.45') + '" stroke-width="1.5"' + (next ? ' stroke-dasharray="6 4"' : '') + '/>';
+        ink + '" stroke-opacity=".45" stroke-width="1.5"' + (next ? ' stroke-dasharray="6 4"' : '') + '/>'; // Next Block: same soft color, dashed (2026-11-05, Julius: yellow was too bright)
     });
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
     Object.assign(pad.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',
@@ -12548,6 +12549,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     want.forEach((v,n) => { if(n.getAttribute('data-blk') !== v) n.setAttribute('data-blk',v); });
     pad.querySelectorAll(':scope > [data-blkn]').forEach(n => { if(!(isTitle(n) && isNext(n))) n.removeAttribute('data-blkn'); });
     [...pad.children].forEach(n => { if(isTitle(n) && isNext(n) && n.previousElementSibling && !n.hasAttribute('data-blkn')) n.setAttribute('data-blkn','1'); });
+    // Hint in Next Block's first empty task (2026-11-05, Julius): says what the block is for. Render-only, stripped on save.
+    let ph = null;
+    groups(pad).forEach(g => { if(!ph && isNext(g[0])) ph = g.find(n => n.classList.contains('check-line') && !n.textContent.trim()) || null; });
+    pad.querySelectorAll(':scope > [data-blkph]').forEach(n => { if(n !== ph) n.removeAttribute('data-blkph'); });
+    if(ph && !ph.hasAttribute('data-blkph')) ph.setAttribute('data-blkph','1');
     ensureNext(pad);
     if(ro && !pad._blkRO){ pad._blkRO = true; ro.observe(pad); }
     schedule(pad);

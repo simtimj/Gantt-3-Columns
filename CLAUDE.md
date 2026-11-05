@@ -88,6 +88,7 @@
 - Fast start + live updates (2026-11-05, Julius)
 - Block timer MVP (2026-11-05, Julius)
 - Time windows, future-dated done lines, title menu (2026-11-05, Julius)
+- Cal Events 4-box view (2026-11-05, Julius)
 
 ## IT study log (2026-11-04)
 

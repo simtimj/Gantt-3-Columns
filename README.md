@@ -49,6 +49,8 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Cal Events 4-box view (first try)**: **⊞** next to Cats splits Cal Events into four boxes that flow clockwise: **1 Sort** (top left: everything new, ordered by Cats or Time, + to add) → **2 Urgency** (top right) → **3 Schedule** (bottom right) → **4 Done** (bottom left). Tap **1 / 2 / 3** on an event in box 1 to set its urgency (it moves to box 2; events that already have an urgency start there). Tap **→ 🧱** in box 2 to copy it into today's Blocks (it moves to box 3; delete that Blocks line and it goes back). Tick it and it moves to Done. **☰** goes back to the normal list. Drag-to-drop urgency isn't built (buttons for now).
+- **Cats**: the Category button in Cal Events is now just **Cats** (Time stays Time).
 - **Full time windows in History**: the three sections now cover the whole day in 8-hour windows: **Morning 6 am – 2 pm**, **Afternoon 2 – 8 pm**, **Night 8 pm – 6 am**. Headers keep your working hours and add the full window small: *Morn 8–2 (6a–2p)* · *After 2–7 (2p–8p)* · *Night 7–10 (8p–6a)*. Work after midnight sorts at the end of Night.
 - **Nothing lands in the future**: a Done Log row dated after today counts as today, and anything logged between midnight and 6 am goes to the night before. Done lines already sitting in a window of today that hasn't started yet (like last night's rows that landed in Thursday's Night) move to the previous day's Night on the next load (old cell backed up).
 - **Thinner Subtle + border outline (Cal Events, Urgent, History / Log)**: 1.5px → 1.2px, in Subtle + border line mode only. Easy to undo: say "go back" and it's one value (`--sl-w`).

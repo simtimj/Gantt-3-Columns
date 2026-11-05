@@ -1644,7 +1644,7 @@
     #centerCalendarList .ce-event{margin:calc(2px * var(--pad-y,1)) 0;padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}
     #centerCalendarList .ce-scheduled{margin:calc(2px * var(--pad-y,1)) 0;}
     #centerCalendarList .ce-title{margin-top:calc(1px * var(--pad-y,1));}
-    #centerDownScroll .ce-head [data-ce-refresh]{font-size:12px;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;max-width:22px;max-height:22px;}
+    #centerDownScroll .ce-head :is([data-ce-refresh],[data-ce-grid]){font-size:12px;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;max-width:22px;max-height:22px;}
     @media(max-width:600px){#centerDownScroll{padding-inline:calc(8px * var(--pad-x,1) * var(--side-k,1));}#centerCalendarList .ce-event{padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}}
     /* Plan / Think-like separation; graphite is the completion signal. */
     #centerDownScroll .ce-head{margin-bottom:calc(7px * var(--pad-y,1));}
@@ -1928,6 +1928,41 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList [data-ce-editing]{outline:0;cursor:text;-webkit-user-select:text;user-select:text;}
 /* + Task in All-Day Tasks (2026-11-04, Julius). */
 #centerCalendarList .ce-group-add{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+/* Cal Events 4-box view (2026-11-05, Julius): 1 top left → 2 top right → 3 bottom right → 4 bottom left. */
+#centerDownScroll.ce-grid-on{display:flex!important;flex-direction:column;overflow:hidden!important;}
+#centerDownScroll.ce-grid-on > .ce-head{flex:0 0 auto;}
+#centerDownScroll.ce-grid-on > #centerCalendarList{flex:1 1 0;min-height:0;}
+#centerCalendarList.ce-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"q1 q2" "q4 q3";height:100%;margin:0 -4px;}
+#centerCalendarList .ce-q{min-width:0;min-height:0;display:flex;flex-direction:column;border:0 solid var(--divider);}
+#centerCalendarList .ce-q1{grid-area:q1;border-right-width:2px;border-bottom-width:2px;}
+#centerCalendarList .ce-q2{grid-area:q2;border-bottom-width:2px;}
+#centerCalendarList .ce-q3{grid-area:q3;}
+#centerCalendarList .ce-q4{grid-area:q4;border-right-width:2px;}
+#centerCalendarList .ce-q-h{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:4px;margin:0!important;padding:3px 5px 2px!important;border:0!important;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+#centerCalendarList .ce-q-h small{font-weight:600;opacity:.7;}
+#centerCalendarList .ce-q-arrow{display:inline-flex;align-items:center;gap:4px;opacity:.8;}
+#centerCalendarList .ce-q-h .ce-add-btn{min-height:20px;padding:0 6px;font-size:12px;}
+#centerCalendarList .ce-q-b{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 4px 6px;}
+#centerCalendarList .ce-q-empty{font-size:11px;font-style:italic;color:var(--muted);padding:4px 2px;}
+#centerCalendarList .ce-q-act{display:inline-flex;gap:3px;margin-left:6px;vertical-align:middle;}
+#centerCalendarList .ce-q-act button{font:inherit;font-size:10px;font-weight:700;line-height:1;min-width:18px;height:18px;padding:0 4px;border-radius:5px;border:1.5px solid currentColor;background:transparent;color:var(--muted);cursor:pointer;}
+#centerCalendarList .ce-q-u.u1{color:#e5484d;} #centerCalendarList .ce-q-u.u2{color:#d99a00;} #centerCalendarList .ce-q-u.u3{color:#3b82f6;}
+#centerCalendarList .ce-q .ce-event{margin:3px 0;}
+#centerDownScroll .ce-head [data-ce-grid]{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px;padding:0!important;margin:0;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
+#centerCalendarList .ce-q .ce-q-h{border:0!important;margin:0!important;padding:3px 5px 2px!important;}
+/* Narrow column (phone, 3 columns): smaller text so words don't break letter by letter. */
+#centerCalendarList.ce-grid{container-type:size;}
+@container (max-width:340px){
+  #centerCalendarList .ce-q .ce-event{font-size:11.5px;line-height:1.25;padding:2px 3px;}
+  #centerCalendarList .ce-q .ce-event :is(.ce-title,.ce-time,.ce-event-text,.ce-meta){font-size:11.5px!important;line-height:1.25;}
+  #centerCalendarList .ce-q .ce-event input[type=checkbox]{width:13px;height:13px;margin-right:3px;}
+  #centerCalendarList .ce-q .ce-q-h{font-size:8.5px;letter-spacing:0;padding:2px 3px 1px!important;}
+  #centerCalendarList .ce-q-arrow{font-size:9px;}
+  #centerCalendarList .ce-q-b{padding:0 2px 4px;}
+  #centerCalendarList .ce-q-act{margin-left:0;gap:2px;}
+  #centerCalendarList .ce-q-act button{font-size:9px;min-width:14px;height:15px;padding:0 2px;border-width:1px;}
+  #centerCalendarList .ce-q-empty{font-size:10px;}
+}
 #centerCalendarList .ce-add-btn{flex:0 0 auto;min-width:0;min-height:26px;padding:1px 7px;font-size:.85em;font-weight:600;line-height:1.2;}
 #centerCalendarList .ce-add{display:flex;align-items:center;gap:4px;margin:3px 0 5px;}
 #centerCalendarList .ce-add input{flex:1 1 auto;min-width:0;box-sizing:border-box;height:30px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);font:inherit;}
@@ -2213,7 +2248,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
       <div class="scroll notes-review" id="reviewScroll"></div>
       <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
-      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Category</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
+      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Cats</button><button type="button" class="btn" data-ce-grid aria-label="Switch Cal Events between list and 4 boxes" title="4 boxes: Sort → Urgency → Schedule → Done">⊞</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
     <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
     <section
@@ -8243,6 +8278,35 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Calendar panel back (2026-10-29, Julius): every calendar event lives here as a checkbox (tick = Graphite = done).
   const CAL_PANEL_ON = false; // Calendar panel off (2026-10-31, Julius): Reference top half is Urgent only.
   let centerCalendarSeq = 0, ceShownDate = '', ceDraw = null;
+  /* 4-box view (2026-11-05, Julius): ⊞ splits Cal Events into 1 Sort (top left) → 2 Urgency (top right) →
+     3 Schedule (bottom right) → 4 Done (bottom left), one clockwise flow. Where an event sits is worked out each draw:
+     done → 4; copied into that day's Blocks (a line with its data-ceid) → 3; has an urgency → 2; else 1.
+     Box 1 rows get 1 / 2 / 3 buttons (sets urgency → the row moves to 2); box 2 rows get → Blocks (copies the
+     event into Blocks → 3). Nothing new is stored: urgency is the event's own, scheduling is the Blocks line. */
+  function ceGridOn(){ try{ return localStorage.getItem('fw.ceGrid') === '1'; }catch(e){ return false; } }
+  const ceKey = ev => ev.id + '|' + ev.start;
+  function ceGridHtml(data, f){
+    const pad = document.querySelector('#todayScroll .plan-pad[data-date="' + CSS.escape(data.date) + '"]');
+    const sched = new Set(pad ? [...pad.querySelectorAll('[data-ceid]')].map(n => n.dataset.ceid) : []);
+    const q = {1:[],2:[],3:[],4:[]};
+    data.events.forEach(ev => q[ev.done ? 4 : sched.has(ceKey(ev)) ? 3 : ev.urg ? 2 : 1].push(ev));
+    const byStart = (a,b) => (b.allDay - a.allDay) || String(a.start).localeCompare(String(b.start));
+    const text = ev => '<span class="ce-event-text">' + (ev.allDay ? '' : '<span class="ce-time">' + esc(ev.time) + '</span>') + '<span class="ce-title">' + esc(ev.title) + '</span></span>';
+    const r = (ev, extra) => f.row(ev, ev.allDay ? '' : ' ce-scheduled', text(ev) + (extra || ''));
+    const urgBtns = '<span class="ce-q-act">' + [1,2,3].map(n => '<button type="button" class="ce-q-u u' + n + '" data-ce-urg="' + n + '" aria-label="Urgency ' + n + '">' + n + '</button>').join('') + '</span>';
+    const go = '<span class="ce-q-act"><button type="button" class="ce-q-go" data-ce-sched title="Copy into today’s Blocks">→ 🧱</button></span>';
+    const box1 = f.byCategory ? f.bySubject(q[1], ev => r(ev, urgBtns)) : q[1].slice().sort(byStart).map(ev => r(ev, urgBtns)).join('');
+    const box2 = q[2].slice().sort((a,b) => (+a.urg - +b.urg) || byStart(a,b)).map(ev => r(ev, go)).join('');
+    const box3 = q[3].slice().sort(byStart).map(ev => r(ev)).join('');
+    const box4 = q[4].slice().sort(byStart).map(ev => r(ev)).join('');
+    const empty = t => '<div class="ce-q-empty">' + t + '</div>';
+    const sec = (n, name, arrow, body, head) => '<section class="ce-q ce-q' + n + '">' + (head || '<div class="ce-q-h"><span>' + n + ' · ' + name + ' <small>' + q[n].length + '</small></span><span class="ce-q-arrow">' + arrow + '</span></div>') + '<div class="ce-q-b">' + body + '</div></section>';
+    const head1 = '<div class="ce-q-h ce-group ce-group-add"><span>1 · Sort <small>' + q[1].length + '</small></span><span class="ce-q-arrow"><button type="button" class="btn ce-add-btn" data-ce-add aria-label="Add an all-day task">+</button> →</span></div>' + (ceAdd.open ? ceAddForm() : '');
+    return sec(1, 'Sort', '→', box1 || empty('Nothing to sort'), head1) +
+      sec(2, 'Urgency', '↓', box2 || empty('Tap 1 / 2 / 3 in box 1')) +
+      sec(3, 'Schedule', '←', box3 || empty('→ 🧱 in box 2 copies to Blocks')) +
+      sec(4, 'Done', '', box4 || empty('Tick an event'));
+  }
   function ceSortMode(){ try{ return localStorage.getItem('fw.ceSort') === 'time' ? 'time' : 'cat'; }catch(e){ return 'cat'; } }
   // + Task box: kept outside the list so a refresh mid-typing doesn't lose the text.
   const ceAdd = {open:false,text:'',busy:false};
@@ -8308,7 +8372,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const addHead = label => '<div class="ce-group ce-group-add"><span>' + label + '</span><button type="button" class="btn ce-add-btn" data-ce-add aria-label="Add an all-day task">+ Task</button></div>' + (ceAdd.open ? ceAddForm() : '');
       const byCategory = ceSortMode() === 'cat';
       const sortBtn = document.querySelector('[data-ce-sort]');
-      if(sortBtn) sortBtn.textContent = byCategory ? 'Category' : 'Time';
+      if(sortBtn) sortBtn.textContent = byCategory ? 'Cats' : 'Time'; // short label (2026-11-05, Julius)
+      const grid = ceGridOn();
+      const gridBtn = document.querySelector('[data-ce-grid]');
+      if(gridBtn){ gridBtn.textContent = grid ? '☰' : '⊞'; gridBtn.setAttribute('aria-pressed', grid ? 'true' : 'false'); }
+      box.classList.toggle('ce-grid', grid);
+      box.parentElement && box.parentElement.classList.toggle('ce-grid-on', grid);
+      if(grid){ box.innerHTML = ceGridHtml(data, {row, allDayRow, timedRow, bySubject, byCategory, addHead}); return; }
       // Category = every event together under its subject, no times (2026-11-04, Julius). Time = all-day first, then by start.
       box.innerHTML = (byCategory
         ? addHead('Tasks') + bySubject(allDay.concat(scheduled),allDayRow)
@@ -8330,6 +8400,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const row=cb.closest('.ce-event'),desired=cb.checked;cb.disabled=true;
     google.script.run.withSuccessHandler(()=>{
       cb.disabled=false;cb.closest('.ce-event')?.classList.toggle('ce-done',desired);
+      centerCalendarCache.forEach(entry => entry.data.events.forEach(ev => { if(ev.id === row.dataset.ceId && Number(ev.start) === Number(row.dataset.ceStart)) ev.done = desired; }));
+      if(ceGridOn() && ceDraw) ceDraw(); // 4-box view: the row moves to / out of Done
       centerCalendarCache.clear();
     }).withFailureHandler(err=>{
       cb.checked=!desired;cb.disabled=false;
@@ -8338,6 +8410,20 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   });
   document.addEventListener('click', e => {
     if(e.target.closest('[data-ce-refresh]')) loadCenterCalendar(null,true);
+    if(e.target.closest('[data-ce-grid]')){
+      try{ localStorage.setItem('fw.ceGrid', ceGridOn() ? '0' : '1'); }catch(err){}
+      if(ceDraw) ceDraw();
+    }
+    const urgB = e.target.closest('[data-ce-urg]');
+    if(urgB){
+      const r = urgB.closest('.ce-event');
+      if(r){ r.dataset.urg = urgB.dataset.ceUrg; saveCalMeta(r); setStatus('Urgency ' + urgB.dataset.ceUrg + ' → box 2'); }
+    }
+    const schB = e.target.closest('[data-ce-sched]');
+    if(schB){
+      const r = schB.closest('.ce-event');
+      if(r && typeof window.calToBlocks === 'function'){ window.calToBlocks(r); if(ceDraw) ceDraw(); }
+    }
     if(e.target.closest('[data-ce-sort]')){
       try{ localStorage.setItem('fw.ceSort',ceSortMode() === 'cat' ? 'time' : 'cat'); }catch(err){}
       if(ceDraw) ceDraw();
@@ -8358,6 +8444,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
   });
   document.addEventListener('input', e => { if(e.target.matches?.('#centerCalendarList .ce-add input')) ceAdd.text = e.target.value; });
+  // 4-box view: removing (or adding) a copied line in Blocks moves the event out of (into) box 3.
+  let ceGridT = 0;
+  document.addEventListener('input', e => {
+    if(!ceGridOn() || !ceDraw || !(e.target.closest && e.target.closest('.plan-pad'))) return;
+    clearTimeout(ceGridT); ceGridT = setTimeout(() => ceDraw && ceDraw(), 500);
+  }, true);
   /* Title editing (2026-11-04, Julius): first tap picks the row, second tap edits, like task cells.
      Leaving the title saves it to the Google Calendar event; Esc or an empty title puts it back. */
   (function initCalTitles(){
@@ -12433,6 +12525,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const n = createCheckboxLine(0);
       n.querySelector('.check-text').textContent = title;
       if(row.dataset.cat && row.dataset.cat !== 'none') n.dataset.cat = row.dataset.cat;
+      if(row.dataset.ceId) n.dataset.ceid = row.dataset.ceId + '|' + row.dataset.ceStart; // Cal Events box 3 (Schedule) finds it by this
       return n;
     };
     function calToBlocks(row){
@@ -12447,6 +12540,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       n.classList.add('urg-flash'); setTimeout(() => n.classList.remove('urg-flash'),1400);
       setStatus('Copied to Blocks');
     }
+    window.calToBlocks = calToBlocks;
     // Hold-menu button on every task outside Blocks (2026-11-04, Julius); replaces Reference's Send to Today.
     window.tidMenuRow = function(p,line,owner,isCal){
       if(!isCal && (!owner || !owner.classList || owner.classList.contains('plan-pad'))) return;

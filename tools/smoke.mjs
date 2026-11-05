@@ -151,6 +151,34 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return out;
   });
   win.forEach(x => errs.push('Time windows: ' + x));
+  // Cal Events 4-box view (2026-11-05): Cats label; ⊞ → 1 Sort (TL) → 2 Urgency (TR) → 3 Schedule (BR) → 4 Done (BL).
+  const quad = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const out = [];
+    if (document.querySelector('[data-ce-sort]')?.textContent !== 'Cats') out.push('sort button not "Cats"');
+    document.querySelector('[data-ce-grid]').click(); await wait(100);
+    const list = document.getElementById('centerCalendarList');
+    const boxes = [...list.querySelectorAll(':scope > .ce-q')];
+    if (boxes.length !== 4) return out.concat('boxes: ' + boxes.length);
+    const pos = n => { const r = list.querySelector('.ce-q' + n).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; };
+    const [p1, p2, p3, p4] = [1, 2, 3, 4].map(pos);
+    if (getComputedStyle(list).display === 'grid' && list.offsetParent && !(p1[0] < p2[0] && p1[1] === p2[1] && p3[0] === p2[0] && p3[1] > p2[1] && p4[0] === p1[0] && p4[1] === p3[1])) out.push('box order not clockwise: ' + JSON.stringify([p1, p2, p3, p4]));
+    const inBox = n => !!list.querySelector('.ce-q' + n + ' .ce-event[data-ce-id="e1"]');
+    if (!inBox(1)) out.push('new event not in box 1');
+    list.querySelector('.ce-q1 [data-ce-urg="2"]').click(); await wait(100);
+    if (!inBox(2) || list.querySelector('.ce-event[data-ce-id="e1"]').dataset.urg !== '2') out.push('urgency did not move it to box 2');
+    list.querySelector('.ce-q2 [data-ce-sched]').click(); await wait(200);
+    const pad = document.querySelector('#todayScroll .plan-pad');
+    if (!inBox(3) || !pad.querySelector('[data-ceid^="e1|"]')) out.push('→ 🧱 did not move it to box 3');
+    list.querySelector('.ce-q3 .ce-check').click(); await wait(200);
+    if (!inBox(4)) out.push('tick did not move it to box 4');
+    pad.querySelector('[data-ceid^="e1|"]').remove(); // leave the Blocks pad as it was for the timer test
+    pad.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-ce-grid]').click(); await wait(100);
+    if (list.classList.contains('ce-grid')) out.push('☰ did not go back to the list');
+    return out;
+  });
+  quad.forEach(x => errs.push('Cal 4-box: ' + x));
   // Block timer MVP (2026-11-05): ▶ on a task starts it + its block, double tap = one tap, tick stops the task,
   // Break / Pause / Resume / correct / Finish, ids saved with the pad, events sent, time from timestamps (lock-proof).
   const tmr = await pg.evaluate(async () => {

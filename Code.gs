@@ -39,6 +39,14 @@ function doGet() {
     console.error(err);
   }
 
+  const evalStart = Date.now();
+  if (initial && initial.timing) {
+    const kb = v => Math.round(JSON.stringify(v || '').length / 1024);
+    initial.timing.kb = { days: kb(initial.days), reference: kb(initial.reference), urgent: kb(initial.urgent), seeds: kb(initial.notesSeeds) };
+    // How long the previous load spent building the page (can't be known before it's built).
+    try { initial.timing.steps.prevPageBuild = Number(CacheService.getScriptCache().get('speedPageMs')) || 0; } catch (e) {}
+  }
+
   template.initialData = JSON.stringify(initial)
     .replace(/</g, '\\u003c')
     .replace(/\u2028/g, '\\u2028')
@@ -48,10 +56,12 @@ function doGet() {
   try { template.appUrl = ScriptApp.getService().getUrl(); } catch (err) { template.appUrl = ''; }
   template.build = appBuild_(true);
 
-  return template.evaluate()
+  const page = template.evaluate()
     .setTitle('Focus Workspace')
     .addMetaTag('viewport', VIEWPORT)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  try { CacheService.getScriptCache().put('speedPageMs', String(Date.now() - evalStart), 3600); } catch (e) {}
+  return page;
 }
 
 
@@ -115,35 +125,65 @@ function ensureSetup_() {
    ========================================================= */
 
 function getWorkspaceData() {
-  ensureSetup_();
-  try { applyDeployedCodeLog_(); } catch (e) { console.error(e); }
-  try { applyClaudeDone_(); } catch (e) { console.error(e); }
-  try { applyClaudeNotes_(); } catch (e) { console.error(e); }
-  try { applyClaudeTasks_(); } catch (e) { console.error(e); }
-  try { syncConfirmCard_(); } catch (e) { console.error(e); }
-  try { syncStudyLog_(); } catch (e) { console.error(e); }
-  try { moveScheduleToNotes_(); } catch (e) { console.error(e); }
-  try { fixUrgentBold_(); } catch (e) { console.error(e); }
-  try { removeDaySections_(); } catch (e) { console.error(e); }
+  const t = speedTimer_();
+  ensureSetup_(); t.mark('setup');
+  try { applyDeployedCodeLog_(); } catch (e) { console.error(e); } t.mark('deployLog');
+  try { applyClaudeDone_(); } catch (e) { console.error(e); } t.mark('done');
+  try { applyClaudeNotes_(); } catch (e) { console.error(e); } t.mark('notes');
+  try { applyClaudeTasks_(); } catch (e) { console.error(e); } t.mark('tasks');
+  try { syncConfirmCard_(); } catch (e) { console.error(e); } t.mark('confirm');
+  try { syncStudyLog_(); } catch (e) { console.error(e); } t.mark('study');
+  try { moveScheduleToNotes_(); } catch (e) { console.error(e); } t.mark('schedule');
+  try { fixUrgentBold_(); } catch (e) { console.error(e); } t.mark('fixBold');
+  try { removeDaySections_(); } catch (e) { console.error(e); } t.mark('fixSecs');
 
   const today = todayString_();
   // One read of the whole Days sheet for Urgent + Dailies seeds (2026-11-04: each used to read it on its own,
   // ~800 rows of History HTML twice per load). Read after the apply steps above, so it includes their writes.
-  const allDays = readAllDays_();
+  const allDays = readAllDays_(); t.mark('readAllDays');
+
+  const days = getDaysRange_(
+    addDaysToDateString_(today, -INITIAL_PAST_DAYS),
+    addDaysToDateString_(today, INITIAL_FUTURE_DAYS)
+  ); t.mark('days');
+  const reference = getReference_(); t.mark('reference');
+  const urgent = getUrgentDays_(allDays); t.mark('urgent');
+  const inbox = (function () { try { return getInbox(); } catch (e) { return []; } })(); t.mark('inbox');
+  const cardCats = getCardCats_(); t.mark('cardCats');
+  const refPins = getRefPins_(); t.mark('pins');
+  const notesSeeds = getNotesSeeds_(today, allDays); t.mark('seeds');
 
   return {
-    days: getDaysRange_(
-      addDaysToDateString_(today, -INITIAL_PAST_DAYS),
-      addDaysToDateString_(today, INITIAL_FUTURE_DAYS)
-    ),
-    reference: getReference_(),
-    urgent: getUrgentDays_(allDays),
-    inbox: (function () { try { return getInbox(); } catch (e) { return []; } })(),
-    cardCats: getCardCats_(),
-    refPins: getRefPins_(),
-    notesSeeds: getNotesSeeds_(today, allDays),
-    today: today
+    days: days,
+    reference: reference,
+    urgent: urgent,
+    inbox: inbox,
+    cardCats: cardCats,
+    refPins: refPins,
+    notesSeeds: notesSeeds,
+    today: today,
+    timing: Object.assign(t.done(), { dayRows: allDays.rows.length, refRows: reference.length })
   };
+}
+
+/* Speed timing (2026-11-04, Julius: measure, then fix). Each load's server steps + the browser's numbers go to
+   the "Speed Log" tab, sent by the page after it has drawn, so logging never slows the load. Last 300 rows kept. */
+const SPEED_HEADERS = ['When', 'Kind', 'Total ms', 'Steps', 'Client', 'KB'];
+function speedTimer_() {
+  const start = Date.now(), steps = {};
+  let last = start;
+  return {
+    mark: name => { const n = Date.now(); steps[name] = n - last; last = n; },
+    done: () => ({ total: Date.now() - start, steps: steps })
+  };
+}
+function logSpeed(kind, timing, client) {
+  const sheet = getOrCreateSheet_('Speed Log', SPEED_HEADERS);
+  const t = timing || {};
+  sheet.appendRow([new Date(), String(kind || ''), Number(t.total) || 0, JSON.stringify(t.steps || {}),
+    JSON.stringify(client || {}), JSON.stringify(t.kb || {})]);
+  const last = sheet.getLastRow();
+  if (last > 320) sheet.deleteRows(2, last - 301);
 }
 
 // Dailies belong to every day (Julius, 2026-11-03). Carry the latest saved
@@ -448,8 +488,9 @@ function backupCell_(where, col, reason, content, throttle) {
 // elsewhere since the app loaded it. req = { days: { date: {th, jh} }, ref: { id: ch } }
 function getSyncState(req) {
   req = req || {};
-  try { moveScheduleToNotes_(); } catch (e) { console.error(e); }
-  const out = { build: appBuild_(), days: {}, ref: {} };
+  const t = speedTimer_();
+  try { moveScheduleToNotes_(); } catch (e) { console.error(e); } t.mark('schedule');
+  const out = { build: appBuild_(), days: {}, ref: {} }; t.mark('build');
   const dates = Object.keys(req.days || {}).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
   if (dates.length) {
     getDaysRange_(dates[0], dates[dates.length - 1]).forEach(d => {
@@ -462,12 +503,15 @@ function getSyncState(req) {
       if (e.tasks !== undefined || e.journal !== undefined || e.plan !== undefined) out.days[d.date] = e;
     });
   }
+  t.mark('days');
   const refWant = req.ref || {};
   if (Object.keys(refWant).length) {
     getReference_().forEach(r => {
       if (Object.prototype.hasOwnProperty.call(refWant, r.id) && refWant[r.id] !== r.ch) out.ref[r.id] = { content: r.content, ch: r.ch };
     });
   }
+  t.mark('reference');
+  out.timing = t.done();
   return out;
 }
 

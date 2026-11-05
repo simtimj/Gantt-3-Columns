@@ -2531,11 +2531,25 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     setStatus('Ready');
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
   }
+  // Speed timing (2026-11-04): sent after drawing, so it can't slow the load. See logSpeed in Code.gs.
+  function fwSpeedLog(kind,timing,t0){
+    if(!timing) return;
+    const render = Math.round(performance.now() - t0);
+    setTimeout(() => {
+      const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
+      const client = { render: render, frameFirstByte: Math.round(nav.responseStart || 0), frameDone: Math.round(nav.responseEnd || 0),
+        dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()), w: window.innerWidth };
+      setStatus('Ready · server ' + (timing.total / 1000).toFixed(1) + 's · draw ' + (render / 1000).toFixed(1) + 's');
+      google.script.run.withFailureHandler(() => {}).logSpeed(kind,timing,client);
+    },1500);
+  }
   function loadWorkspace(){
     const initial = window.__FW_INITIAL__;
     window.__FW_INITIAL__ = null;
     if(initial && Array.isArray(initial.days) && initial.today){
+      const t0 = performance.now();
       applyWorkspaceData(initial);
+      fwSpeedLog('load',initial.timing,t0);
       return;
     }
     google.script.run
@@ -5506,6 +5520,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           note = fwReconcileRef(it,out.ref[id].content,out.ref[id].ch) || note;
         });
         if(note) setStatus(note);
+        if(out.timing) google.script.run.withFailureHandler(() => {}).logSpeed('sync',out.timing,{});
       })
       .withFailureHandler(() => { fwSyncBusy = false; })
       .getSyncState(req);

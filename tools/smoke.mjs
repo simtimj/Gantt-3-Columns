@@ -136,6 +136,25 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return after === '0Gear|1~Before Friday|1Gloves|2Bait' && saved === '0112' ? [] : ['Tab nesting: ' + after + ' saved ' + saved];
   });
   kim.forEach(x => errs.push('Keep In Mind: ' + x));
+  // Fun tab: 🎮 shows its own list; typing + Enter adds a line and saves; ticking moves it to Done.
+  const fun = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    document.querySelector('[data-ctab="fun"]')?.click(); await wait(200);
+    const box = document.getElementById('funScroll');
+    if(!box || getComputedStyle(box).display === 'none') return ['tab not shown'];
+    if(getComputedStyle(document.getElementById('journalScroll')).display !== 'none') return ['Notes still shown'];
+    const inp = document.getElementById('funInput'); inp.value = 'Play Stardew update';
+    inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(900);
+    const item = [...document.querySelectorAll('#funList .fun-item .fun-t')].find(x => x.textContent === 'Play Stardew update');
+    if(!item) return ['added line missing'];
+    const saved = (window.__calls || []).filter(c => c[0] === 'saveFun').pop();
+    if(!saved || !saved[1][0].items.some(i => i.t === 'Play Stardew update')) return ['not saved'];
+    item.closest('.fun-item').querySelector('input').click(); await wait(100);
+    if(!/Done 1/.test(document.getElementById('funList').textContent)) return ['tick did not move it to Done'];
+    document.querySelector('[data-ctab="notes"]')?.click(); await wait(100);
+    return [];
+  });
+  fun.forEach(x => errs.push('Fun tab: ' + x));
   // History detail button: List = one line per item (all 50), hidden lines really hidden; Mini = counts only; back to Full.
   const modes = [];
   for (let i = 0; i < 3; i++) {

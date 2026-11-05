@@ -95,6 +95,7 @@
 - Cal Events 4-box view (2026-11-05, Julius)
 - Urgent tick = log + archive (2026-11-05, Julius)
 - Time Tracker app (2026-11-05, Julius: separate app in `tracker/`, `?app=tracker`)
+- Fun for later tab (2026-11-05, Julius)
 
 ## IT study log (2026-11-04)
 

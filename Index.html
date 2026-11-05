@@ -565,6 +565,19 @@
     #dayReviewScroll{display:none;flex:var(--ns-a,1) 1 0;padding:4px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     #journalPane[data-ctab="review"] #dayReviewScroll{display:block;}
     #journalPane[data-ctab="review"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    /* Fun for later tab (2026-11-05, Julius): 🎮 its own list, not part of the Notes cell. */
+    #funScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    #journalPane[data-ctab="fun"] #funScroll{display:block;}
+    #journalPane[data-ctab="fun"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    .fun-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
+    .fun-add{display:flex;gap:6px;margin:0 0 8px;}
+    .fun-add input{flex:1;min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
+    .fun-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid color-mix(in srgb,#b47be0 45%,var(--border,#ccc));border-radius:7px;background:color-mix(in srgb,#b47be0 6%,transparent);}
+    .fun-item input[type=checkbox]{margin-top:3px;flex:none;}
+    .fun-item .fun-t{flex:1;min-width:0;outline:none;word-break:break-word;}
+    .fun-item.done .fun-t{text-decoration:line-through;color:var(--muted,#888);}
+    .fun-item .fun-x{border:0;background:transparent;color:var(--muted,#888);cursor:pointer;padding:0 2px;font-size:.9em;}
+    .fun-done-head{margin:10px 0 4px;font-size:.85em;color:var(--muted,#777);cursor:pointer;user-select:none;}
     .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
     /* Category and group cells, underlined category header (2026-11-04, Julius). */
     .dr-cat{--dr-c:#8a8f98;margin:0 0 8px;padding:3px 7px 5px;border:1px solid color-mix(in srgb,var(--dr-c) 55%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--dr-c) 7%,transparent);}
@@ -2241,6 +2254,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           <button type="button" data-ctab="wxdaily" title="Weather (daily)" aria-label="Weather daily"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/><text x="12" y="16.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7.5" font-weight="700" fill="#111">DLY</text></svg></button>
           <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">⭐</button>
           <button type="button" data-ctab="review" title="Day Review" aria-label="Day Review">📊</button>
+          <button type="button" data-ctab="fun" title="Fun for later" aria-label="Fun for later">🎮</button>
         </span>
       </div>
       <div
@@ -2249,6 +2263,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       </div>
       <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Loading weather…</div></div>
       <div class="scroll" id="dayReviewScroll"></div>
+      <div class="scroll" id="funScroll"><div class="fun-add"><input id="funInput" type="text" placeholder="Something fun for later… (e.g. play Stardew update)" enterkeyhint="done" autocomplete="off"><button type="button" class="btn" id="funAddBtn">+</button></div><div id="funList"><div class="center-placeholder">Loading…</div></div></div>
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
@@ -6885,7 +6900,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(window.renderDayReview) renderDayReview();
     };
     let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
-    set(t === 'weather' || t === 'wxdaily' || t === 'focus' || t === 'review' ? t : 'notes');
+    set(t === 'weather' || t === 'wxdaily' || t === 'focus' || t === 'review' || t === 'fun' ? t : 'notes');
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
@@ -7252,6 +7267,62 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       .withFailureHandler(() => { data = {v:1,cats:[]}; render(); }).getFocus();
     else { data = {v:1,cats:[]}; }
     render();
+  })();
+  /* Fun for later (2026-11-05, Julius): 🎮 tab = "I want to do this for fun later" (e.g. play Stardew's update).
+     Device first: localStorage fw.fun.v1, then getFun / saveFun (server merges by id, newest u wins). */
+  (function initFun(){
+    const list = document.getElementById('funList'), inp = document.getElementById('funInput');
+    if(!list || !inp) return;
+    const KEY = 'fw.fun.v1';
+    const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    let data = {v:1, items:[]}, saveT = null, doneOpen = false;
+    try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = c; }catch(e){}
+    const merge = srv => { const by = {}; data.items.forEach(i => by[i.id] = i); ((srv && srv.items) || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); data = {v:1, items:Object.values(by)}; };
+    const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} };
+    function save(){
+      keep(); clearTimeout(saveT);
+      saveT = setTimeout(() => { if(window.google && google.script) google.script.run
+        .withSuccessHandler(d => { merge(d); keep(); if(!list.contains(document.activeElement)) render(); })
+        .withFailureHandler(e => { window.setStatus && setStatus('Fun list not saved: ' + (e && e.message || e)); setTimeout(save, 15000); })
+        .saveFun(data); }, 600);
+    }
+    function render(){
+      const live = data.items.filter(i => !i.x), open = live.filter(i => !i.d), done = live.filter(i => i.d);
+      open.sort((a,b) => (b.c || 0) - (a.c || 0)); done.sort((a,b) => (b.u || 0) - (a.u || 0));
+      const row = i => '<div class="fun-item' + (i.d ? ' done' : '') + '" data-id="' + h(i.id) + '"><input type="checkbox"' + (i.d ? ' checked' : '') + ' aria-label="Done"><div class="fun-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div><button type="button" class="fun-x" aria-label="Remove" title="Remove">✕</button></div>';
+      list.innerHTML = '<div class="fun-head">🎮 Fun for later · ' + open.length + '</div>'
+        + (open.length ? open.map(row).join('') : '<div class="center-placeholder">Nothing yet. When something fun pops into your head while working, drop it here.</div>')
+        + (done.length ? '<div class="fun-done-head" data-fun-done>' + (doneOpen ? '▾' : '▸') + ' Done ' + done.length + '</div>' + (doneOpen ? done.map(row).join('') : '') : '');
+    }
+    const byId = id => data.items.find(i => i.id === id);
+    function add(){
+      const t = inp.value.trim(); if(!t) return;
+      const now = Date.now();
+      data.items.push({id:'f' + now.toString(36) + Math.random().toString(36).slice(2,5), t, d:0, c:now, u:now});
+      inp.value = ''; render(); save();
+    }
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); add(); } });
+    document.getElementById('funAddBtn').addEventListener('click', add);
+    list.addEventListener('click', e => {
+      if(e.target.closest('[data-fun-done]')){ doneOpen = !doneOpen; render(); return; }
+      const row = e.target.closest('.fun-item'); if(!row) return;
+      const it = byId(row.dataset.id); if(!it) return;
+      if(e.target.matches('input[type=checkbox]')){ it.d = e.target.checked ? 1 : 0; it.u = Date.now(); render(); save(); }
+      else if(e.target.closest('.fun-x')){ it.x = 1; it.u = Date.now(); render(); save(); }
+    });
+    list.addEventListener('keydown', e => { if(e.target.closest('.fun-t')){ e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); } } });
+    list.addEventListener('focusout', e => {
+      const t = e.target.closest('.fun-t'); if(!t) return;
+      const it = byId(t.closest('.fun-item').dataset.id); if(!it) return;
+      const v = t.textContent.trim();
+      if(!v){ it.x = 1; it.u = Date.now(); save(); render(); }
+      else if(v !== it.t){ it.t = v; it.u = Date.now(); save(); }
+    });
+    render();
+    const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(!list.contains(document.activeElement)) render(); }).getFun(); };
+    pull();
+    document.addEventListener('visibilitychange', () => { if(!document.hidden) pull(); });
+    window.fwFun = {get data(){ return data; }, render};
   })();
   /* Hourly weather (2026-11-01, Julius): ☁️ tab. Open-Meteo (free, no key), Vallejo/Benicia area,
      next 24 hours. Daily tab (2026-11-04, Julius): next 7 days from the same fetch. Loads when either
@@ -12176,7 +12247,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       box:() => {
         // Center Up (whichever tab is showing) above, Center Down below (2026-11-01).
         const p = document.getElementById('journalPane');
-        const t = document.getElementById(p && (p.dataset.ctab === 'weather' || p.dataset.ctab === 'wxdaily') ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
+        const t = document.getElementById(p && (p.dataset.ctab === 'weather' || p.dataset.ctab === 'wxdaily') ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : p && p.dataset.ctab === 'fun' ? 'funScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
         if(!t || !b) return null;
         const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};

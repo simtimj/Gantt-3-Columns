@@ -420,3 +420,7 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - `Core.html` = pure `TT` (also loaded by `tools/tracker-test.mjs`); `App.html` includes it with `<?!= trackerInclude_('tracker/Core') ?>`. Records `{id, kind, u}` merged last-write-wins; one open entry max (`normalize()` after merges). Full model, milestones, deferred list and integration contracts: `tracker/README.md`.
 - Tests: `node tools/tracker-test.mjs`; smoke builds `tracker-smoke.html` with a fake `trackerSync` and walks the acceptance scenarios (desktop + phone). `check.mjs` now also parses `tracker/`.
 
+
+## Fun for later tab (2026-11-05, Julius)
+
+- Center Up `data-ctab="fun"` (🎮, last tab) shows `#funScroll` (own pane, not the Notes cell). `initFun()` in Index.html: items `{id, t, d, c, u, x?}`; localStorage `fw.fun.v1` first, then `getFun` / `saveFun` (Code.gs, script property `funData`, script lock, merge by id with newest `u`, `x` = deleted tombstone, pruned after 30 days). Pulls on load and on tab return. Smoke: add + save + tick → Done.

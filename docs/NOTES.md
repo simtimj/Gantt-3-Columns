@@ -410,6 +410,7 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - 2026-11-06 Cats = urgency → subject (list view only): `byUrgency(list)` in `draw()` wraps `bySubject` in `section.ce-urg.ce-urg-{1|2|3|none|done}` (header `.ce-urg-h` name + count); done events go to the Done box whatever their urgency. Color via `--ce-u`. Smoke: ticked e1 lands in `.ce-urg-done`.
 
 - 2026-11-06 zoom: BLOCKS label is `span.od-pad-lab` (pointer-events auto; the head itself is none). Holding `#journalPane button[data-ctab]` clicks that tab, then zooms `#journalPane`. `open()` now leaves a spacer for any cell in a flex parent and freezes static siblings' `flex` (important) to their size (History's flex-grow < 1 shrank otherwise); `settle()` restores. Smoke: Blocks zoom keeps History height, 📊 hold → Day Review zoomed.
+- 2026-11-06 (2): `#referencePane button[data-rtab]` → zooms `#referenceScroll` (tabs live in its `.ref-toolbar`). Urgent header: `holdForCreate(head)` removed; `.urg-add-btn` (+) after `.urg-head` opens `openCreateMenu`. Zoom of `#urgentPanel` calls `window.urgEnsureOpen()` first (a folded panel is empty). Smoke: folded Urgent hold → filled zoom, no create menu; + → menu; 📝 hold → Scratch Pad zoomed.
 
 ## Urgent tick = log + archive (2026-11-05, Julius)
 

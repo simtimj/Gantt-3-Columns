@@ -50,7 +50,7 @@ let fails = 0;
 for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]]) {
   const pg = await (await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch })).newPage();
   const errs = [];
-  pg.on('pageerror', e => errs.push(e.message));
+  pg.on('pageerror', e => errs.push(e.message + (process.env.STK ? ' @ ' + (e.stack || '').split('\n').slice(1,4).join(' | ') : '')));
   await pg.goto('file://' + out);
   await pg.waitForTimeout(2000);
   const shot = process.argv.indexOf('--shot');
@@ -358,6 +358,18 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     const tab = document.querySelector('#journalPane button[data-ctab="review"]'), c2 = await hold(tab);
     if (c2) out.push('tab icon ' + c2); else if (!document.querySelector('#journalPane.fw-focus-target') || document.getElementById('journalPane').dataset.ctab !== 'review') out.push('holding 📊 did not open Day Review zoomed');
     await close(); document.querySelector('#journalPane button[data-ctab="notes"]').click(); await wait(100);
+    // Urgent: fold it, hold the numbers → it opens + zooms with its rows, no create menu; + button = create menu.
+    const uh = document.querySelector('.urg-head'); uh.click(); await wait(100);
+    const c3 = await hold(document.querySelector('.urg-head .urg-counts'));
+    const up = document.getElementById('urgentPanel');
+    if (c3) out.push('Urgent numbers ' + c3); else if (!up.classList.contains('fw-focus-target') || !up.querySelector('.urg-row')) out.push('holding the Urgent numbers did not zoom a filled Urgent');
+    if (document.querySelector('.urg-create-menu')) out.push('holding the numbers still opens the create menu');
+    await close();
+    const ab = document.querySelector('.urg-head-row .urg-add-btn'); if (!ab) out.push('no + button in the Urgent header'); else { ab.click(); await wait(50); if (!document.querySelector('.urg-create-menu')) out.push('+ did not open the create menu'); document.querySelector('.urg-create-menu')?.remove(); }
+    // Reference tab icons: hold 📝 → Scratch Pad, zoomed.
+    const c4 = await hold(document.querySelector('#referencePane button[data-rtab="scratch"]'));
+    if (c4) out.push('📝 ' + c4); else if (!document.querySelector('#referenceScroll.fw-focus-target') || document.getElementById('referencePane').dataset.rtab !== 'scratch') out.push('holding 📝 did not open Scratch Pad zoomed');
+    await close(); document.querySelector('#referencePane button[data-rtab="reference"]').click(); await wait(100);
     if (document.querySelector('.fw-focus-target,.fw-focus-spacer')) out.push('zoom did not close cleanly');
     return out;
   });
@@ -466,7 +478,7 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch });
     const pg = await ctx.newPage();
     const errs = [];
-    pg.on('pageerror', e => errs.push(e.message));
+    pg.on('pageerror', e => errs.push(e.message + (process.env.STK ? ' @ ' + (e.stack || '').split('\n').slice(1,4).join(' | ') : '')));
     pg.on('dialog', d => d.accept());
     await pg.goto('file://' + tOut);
     await pg.waitForTimeout(500);

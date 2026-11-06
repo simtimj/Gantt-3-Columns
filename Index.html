@@ -1355,6 +1355,7 @@
     .urg-head{display:flex;align-items:center;}
     .urg-head-row{display:flex;align-items:center;gap:6px;}
     .urg-head-row .urg-head{flex:1;min-width:0;}
+    .urg-head-row .urg-add-btn{flex:0 0 auto;min-width:24px;height:22px;padding:0 6px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;font:inherit;font-weight:700;line-height:1;cursor:pointer;}
     .urg-add{flex:0 0 auto;font-size:11px;padding:1px 7px;}
     .urg-head,.urg-sub{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
     .urg-sub{cursor:context-menu;}
@@ -4594,7 +4595,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function initContextMenu(){
     document.addEventListener('pointerdown',e => { lastPointerType = e.pointerType || 'mouse'; },true);
     // Hold-to-expand labels open the zoomed cell, not the format menu (2026-11-04, Julius).
-    const expandLabel = n => !!n?.closest?.('.ce-head strong,.urg-head,.today-jump,.od-pad-head,[data-nsec="must"],#journalPane button[data-ctab]');
+    const expandLabel = n => !!n?.closest?.('.ce-head strong,.urg-head,.today-jump,.od-pad-head,[data-nsec="must"],#journalPane button[data-ctab],#referencePane button[data-rtab]');
     document.addEventListener('contextmenu',e => {
       if(expandLabel(e.target)){ e.preventDefault(); cancelLongPress(); return; }
       if(urgencyCheckbox(e.target)){ e.preventDefault(); cancelLongPress(); return; }
@@ -7014,6 +7015,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         .withFailureHandler(err => { if(seq === loadSeq) setStatus('Could not load the Scratch Pad: ' + (err && err.message || err)); })
         .withSuccessHandler(res => {
           if(seq !== loadSeq || dirty) return;
+          res = res || {};
           ed.innerHTML = res.html || '';
           base = {c:ed.innerHTML,h:res.h};
           normalizeEditorTasks(ed);
@@ -8020,16 +8022,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
     head.append(counts); // numbers only (Julius 2026-11-03); tap still folds
     head.setAttribute('aria-label','Urgent');
-    head.title = 'Tap to collapse/expand · hold to add a task';
+    head.title = 'Tap to collapse/expand · hold to zoom';
     head.addEventListener('click',() => {
       if(urgCreateSuppress){ urgCreateSuppress = false; return; }
       urgentOpen = !urgentOpen;
       try{ localStorage.setItem('fw.urgentOpen',urgentOpen ? '1' : '0'); }catch(e){}
       renderUrgent();
     });
-    holdForCreate(head,null);
-    // "+ Task" button removed (Julius, 2026-10-27): add lines per level + hold header still create tasks.
-    headRow.append(head);
+    // Create menu moved off the numbers onto a + button (2026-11-06, Julius): holding the numbers now only zooms Urgent.
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button'; addBtn.className = 'urg-add-btn'; addBtn.textContent = '+';
+    addBtn.title = 'Create an Urgent / Soon / Can be later task'; addBtn.setAttribute('aria-label','Create an urgent task');
+    addBtn.addEventListener('click',() => openCreateMenu(addBtn,null));
+    headRow.append(head, addBtn);
     // Put Urgent and its live counts directly below the Reference heading.
     const refHeader = document.querySelector('#referencePane .ref-pane-header');
     const previousHead = refHeader && refHeader.querySelector('.urg-head-row');
@@ -8411,6 +8416,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      "Title: details" makes the title bold.
      --------------------------------------------------------- */
   let urgCreating = 0, urgCreateSuppress = false, urgCreateMenu = null;
+  // Zooming a folded Urgent showed an empty box (2026-11-06, Julius): the zoom opens it first.
+  window.urgEnsureOpen = () => { if(urgentOpen) return; urgentOpen = true; try{ localStorage.setItem('fw.urgentOpen','1'); }catch(e){} renderUrgent(); };
   // A small boxed minus / plus (collapse / expand).
   function pmBox(open){
     const b = document.createElement('span');
@@ -13739,6 +13746,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(node.closest('.od-pad-head'))return document.querySelector('#todayScroll .od-on .plan-pad');
     // Top-middle tab icons (2026-11-06, Julius): hold one → that tab opens, zoomed (tabs stay usable inside).
     const tab=node.closest('#journalPane button[data-ctab]');if(tab)return document.getElementById('journalPane');
+    // Reference tab icons too (📚 Reference, 📝 Scratch Pad): the tabs live inside #referenceScroll.
+    if(node.closest('#referencePane button[data-rtab]'))return document.getElementById('referenceScroll');
     if(node.closest('[data-nsec="must"]'))return document.getElementById('journalScroll');
     return null;
   }
@@ -13746,8 +13755,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(e.button!==0 || focused)return;
     const target=resolve(e.target);if(!target)return;
     startX=e.clientX;startY=e.clientY;clearTimeout(timer);
-    const tab=e.target.closest&&e.target.closest('#journalPane button[data-ctab]');
-    timer=setTimeout(()=>{timer=0;if(tab&&!tab.classList.contains('on'))tab.click();suppressUntil=Date.now()+650;open(target);if(document.activeElement?.id==='refSearch')document.activeElement.blur();},550);
+    const tab=e.target.closest&&e.target.closest('#journalPane button[data-ctab],#referencePane button[data-rtab]');
+    timer=setTimeout(()=>{timer=0;if(tab&&!tab.classList.contains('on'))tab.click();if(target.id==='urgentPanel'&&window.urgEnsureOpen)window.urgEnsureOpen();suppressUntil=Date.now()+650;open(target);if(document.activeElement?.id==='refSearch')document.activeElement.blur();},550);
   },true);
   document.addEventListener('pointermove',e=>{if(timer&&(Math.abs(e.clientX-startX)>12||Math.abs(e.clientY-startY)>12)){clearTimeout(timer);timer=0;}},true);
   ['pointerup','pointercancel'].forEach(name=>document.addEventListener(name,()=>{clearTimeout(timer);timer=0;},true));

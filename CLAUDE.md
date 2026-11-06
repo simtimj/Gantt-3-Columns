@@ -37,6 +37,14 @@
 
 - When Julius sets an urgency or color ("yellow priority", "red", "can be later"…), apply it in **every place the task lives**: Gantt (`New Tasks` row Urgency 1/2/3, or `data-urg` on the line), **and** its Google Calendar event color, plus anything else he names. Mapping: 1 = red = Calendar Tomato `11`; 2 = yellow = Banana `5`; 3 = blue = Blueberry `9`; done = Graphite `8`. The app reads urgency back from the event color (`getMainCalendarEvents`), so a colored event lands in the right Cal Events box.
 
+## Organizing Google Calendar tasks (2026-11-06, Julius: standing rule)
+
+When he asks to organize his calendar tasks:
+- **Numbers = urgency order**: titles `01 | Task name`, fresh list starts at 01, no gaps, lower first. Inserting keeps existing numbers: `00` goes ahead of 01, decimals (`1.5`) go between. Renumber the whole list only when he says reset.
+- **Exact colors**: red = Tomato `11`, orange = Pumpkin (API `6`; check on the first event), yellow = Banana `5`, blue = Blueberry `9`; a named shade wins. Default order red → orange → yellow → blue. (The app maps only 11 / 5 / 9 to urgency today; orange events land unsorted.)
+- **Blocks**: tasks sharing a workflow + color → one event with one number; description = checklist of the original tasks + useful notes. Re-read the block to verify the details saved **before** deleting the old entries.
+- **Scoped**: move / edit only the tasks he names. All-day stays all-day unless he gives a time. New task events get reminders off unless he asks.
+
 ## Done-with-Claude log (2026-10-26, Julius: standing rule)
 
 - **Whenever Julius finishes something through Claude (any project), append a row to the `Done Log` tab of New Gantt Sheet (`1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`) with the Sheets connector; no clone, push or deploy (2026-11-02, Julius).** Columns: Date `YYYY-MM-DD` (**Pacific date**, not UTC: run `TZ=America/Los_Angeles date +%F`; a UTC date put 11/4-night work into 11/5), Project (group header), Title (main point of the work, never the project name again), Details, Done by (`Claude`, `ChatGPT`, or `Julius` for his own work), Type (`New`, `Fix` or `Tweak`, 2026-11-04). One row per finished task. Never edit `Days`, or edit or delete Done Log rows. `donelog.js` is the old route; don't add to it.

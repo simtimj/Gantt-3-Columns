@@ -1968,6 +1968,12 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-group{margin:14px 0 4px;padding-top:7px;border-top:1px solid var(--divider);color:var(--text);font-weight:700;}
 #centerCalendarList .ce-group:first-child{margin-top:2px;padding-top:0;border-top:0;}
 #centerCalendarList .ce-check:disabled{opacity:.5;}
+/* Cats urgency boxes (2026-11-06, Julius): red → yellow → blue → grey (not set) → done. */
+#centerCalendarList .ce-urg{--ce-u:#8a8f98;margin:6px 0 8px;padding:2px 6px 5px;border:1.5px solid color-mix(in srgb,var(--ce-u) 70%,transparent);border-radius:8px;background:color-mix(in srgb,var(--ce-u) 7%,transparent);}
+#centerCalendarList .ce-urg-1{--ce-u:#e5484d;} #centerCalendarList .ce-urg-2{--ce-u:#d99a00;} #centerCalendarList .ce-urg-3{--ce-u:#3b82f6;} #centerCalendarList .ce-urg-done{--ce-u:#5f6368;opacity:.8;}
+#centerCalendarList .ce-urg-h{font-weight:700;font-size:.85em;color:color-mix(in srgb,var(--ce-u) 80%,var(--text,#888));}
+#centerCalendarList .ce-urg-h small{font-weight:400;opacity:.75;}
+#centerCalendarList .ce-urg-h + .ce-cat{margin-top:2px;}
 /* Cal Events subjects + title editing (2026-11-04, Julius): app-side sorting only, nothing goes to Google Calendar except the title. */
 #centerCalendarList .ce-cat{margin:7px 0 2px;font-size:.8em;font-weight:700;color:color-mix(in srgb,var(--ce-cat,var(--muted)) 75%,var(--text,#888));}
 #centerCalendarList .ce-group + .ce-cat,#centerCalendarList .ce-add + .ce-cat{margin-top:2px;}
@@ -8765,6 +8771,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         }).join('');
       };
       const allDayRow = ev => row(ev,'','<span class="ce-event-text ce-title">' + esc(ev.title) + '</span>');
+      /* Cats = urgency first, then subject (2026-11-06, Julius): a colored box per urgency, red → yellow → blue →
+         grey (not set), done last; inside each box the rows sit under their subject. Display only. */
+      const byUrgency = list => [['1','Urgent'],['2','Next'],['3','Later'],['','Not set'],['done','Done']].map(([u,name]) => {
+        const rows = list.filter(ev => u === 'done' ? ev.done : !ev.done && String(ev.urg || '') === u);
+        return rows.length ? '<section class="ce-urg ce-urg-' + (u || 'none') + '"><div class="ce-urg-h">' + name + ' <small>' + rows.length + '</small></div>' + bySubject(rows,allDayRow) + '</section>' : '';
+      }).join('');
       const timedRow = ev => row(ev,' ce-scheduled','<span class="ce-event-text"><span class="ce-time">' + esc(ev.time) + '</span><span class="ce-title">' + esc(ev.title) + '</span></span>');
       const addHead = label => '<div class="ce-group ce-group-add"><span>' + label + '</span><button type="button" class="btn ce-add-btn" data-ce-add aria-label="Add an all-day task">+ Task</button></div>' + (ceAdd.open ? ceAddForm() : '');
       const byCategory = ceSortMode() === 'cat';
@@ -8778,7 +8790,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(grid){ box.innerHTML = ceGridHtml(data, {row, allDayRow, timedRow, bySubject, byCategory, addHead}); return; }
       // Category = every event together under its subject, no times (2026-11-04, Julius). Time = all-day first, then by start.
       box.innerHTML = (byCategory
-        ? addHead('Tasks') + bySubject(allDay.concat(scheduled),allDayRow)
+        ? addHead('Tasks') + byUrgency(allDay.concat(scheduled))
         : addHead('All-Day Tasks') + allDay.map(allDayRow).join('') +
           (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.slice().sort((a,b) => String(a.start).localeCompare(String(b.start))).map(timedRow).join('') : '')) +
         (!data.events.length ? '<div class="ce-empty">' + (q.length ? 'No match for “' + esc(q.join(' ')) + '”.' : 'No events.') + '</div>' : '');

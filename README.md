@@ -49,6 +49,7 @@ Last updated: 2026-11-06
 
 ## 🧪 To be confirmed (2026-11-06)
 
+- **Cal Events Cats = urgency, then category**: in the Cats list, events sit in colored boxes by urgency: **Urgent** (red) → **Next** (yellow) → **Later** (blue) → **Not set** (grey) → **Done** at the bottom. Inside each box they're grouped by category (Coding, Career…). Each box shows its count. Time view and the ⊞ 4-box view are unchanged.
 - **Cal Events search** — a 🔍 Find box on the Cal Events title line. Type part of a title (e.g. "aws") and only matching events show, words in any order; works in the list and the ⊞ 4-box view; Esc or clearing the box shows everything again. Searches the day being shown. On the narrow phone column the "Cal Events" title hides to make room, and Cats / ⊞ step aside while you type.
 - **History detail: three buttons side by side** (▤ Full · ≡ List · – Mini) next to HISTORY instead of one button that cycles. All three stay put; tap one to switch, the current one is filled in.
 

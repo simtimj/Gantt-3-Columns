@@ -407,6 +407,8 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 
 - 2026-11-06 search: `[data-ce-search]` input in `.ce-head` (between title and `.ce-tools`). `draw(full)` filters `full.events` by `ceSearchWords()` (all words in the lowercased title) into a local `data` before list / grid render, so `ceDraw` always redraws from the unfiltered day; an `input` listener calls `ceDraw`; Esc clears + blurs, Enter blurs. Display only. `@container (max-width:260px)`: title hidden, gap 3px, Cats / ⊞ hidden while the box has focus. Smoke: fits header, "sample" keeps e1, "aws cleanup" → No match, Esc restores.
 
+- 2026-11-06 Cats = urgency → subject (list view only): `byUrgency(list)` in `draw()` wraps `bySubject` in `section.ce-urg.ce-urg-{1|2|3|none|done}` (header `.ce-urg-h` name + count); done events go to the Done box whatever their urgency. Color via `--ce-u`. Smoke: ticked e1 lands in `.ce-urg-done`.
+
 ## Urgent tick = log + archive (2026-11-05, Julius)
 
 - `urgItemRow` box click: head row with `urg > 0` or archived → `urgDoneLogArchive(item,index)`; else `toggleDueTask`. Done: tick (toggleDueTask), then if the source editor isn't today's `.day-editor`, append a done copy (`data-ulogof` = source `data-ulog`, `data-at`/`data-dt` = now, `data-cat`) and `tsecArrange` + save; then `setArchived(line,ed,true)`. Untick of an archived done row: untick, remove the copy, unarchive. Done-but-not-archived rows: plain untick.

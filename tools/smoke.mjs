@@ -288,6 +288,8 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     pad.dispatchEvent(new Event('input', { bubbles: true }));
     document.querySelector('[data-ce-grid]').click(); await wait(100);
     if (list.classList.contains('ce-grid')) out.push('☰ did not go back to the list');
+    // Cats list = urgency boxes then subjects (2026-11-06): e1 was ticked above → Done box.
+    if (!list.querySelector('.ce-urg-done .ce-event[data-ce-id="e1"]')) out.push('Cats list: done event not in the Done urgency box');
     // Search box on the Cal Events line (2026-11-06): filters as you type, Esc clears, fits the header.
     const sb = document.querySelector('[data-ce-search]'), head = sb.closest('.ce-head');
     const fits = () => [...head.children].every(c => c.getBoundingClientRect().right <= head.getBoundingClientRect().right + 1) && sb.offsetWidth >= 34;

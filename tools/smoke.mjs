@@ -187,6 +187,26 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if(!sec || !/Watch Severance/.test(sec.textContent)) return ['item not under Shows'];
     const sv = (window.__calls || []).filter(c => c[0] === 'saveFun').pop();
     if(!sv || !(sv[1][0].cats || []).some(c => c.name === 'Shows')) return ['category not saved'];
+    // 2026-11-06: date reads "NOV 5"; hold the checkbox → Move to menu; hold + drag the text onto a category header.
+    const dt = sec.querySelector('.fun-date');
+    if(!dt || !/^[A-Z]{3} \d{1,2}$/.test(dt.textContent)) return ['date not like NOV 5: ' + (dt && dt.textContent)];
+    const sel = document.getElementById('funCat'); sel.value = ''; sel.dispatchEvent(new Event('change'));
+    inp.value = 'Play Hades'; inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(800); // let the save's re-render land first
+    const hades = () => [...document.querySelectorAll('#funList .fun-item')].find(x => /Play Hades/.test(x.textContent));
+    const pt = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 1 }));
+    let cb = hades().querySelector('input'), r = cb.getBoundingClientRect();
+    pt(cb, 'pointerdown', r.left + 3, r.top + 3); await wait(600); pt(cb, 'pointerup', r.left + 3, r.top + 3); cb = hades().querySelector('input'); cb.click(); await wait(50);
+    const menu = document.querySelector('.fun-menu');
+    if(!menu || !/Shows/.test(menu.textContent) || !/Remove/.test(menu.textContent)) return ['checkbox hold: no Move to menu'];
+    if(cb.checked) return ['checkbox hold also ticked it'];
+    menu.remove();
+    const tx = hades().querySelector('.fun-t'); r = tx.getBoundingClientRect();
+    pt(tx, 'pointerdown', r.left + 5, r.top + 5); await wait(650);
+    const hh = document.querySelector('#funList .fun-cat[data-cat] .fun-cat-h').getBoundingClientRect();
+    pt(document, 'pointermove', hh.left + 20, hh.top + hh.height / 2); await wait(30);
+    pt(document, 'pointerup', hh.left + 20, hh.top + hh.height / 2); await wait(100);
+    const sec2 = document.querySelector('#funList .fun-cat[data-cat]');
+    if(!sec2.querySelector('.fun-item') || !/Play Hades/.test(sec2.querySelector('.fun-item').textContent)) return ['drag onto Shows header did not move it to the top of Shows'];
     document.querySelector('[data-ctab="notes"]')?.click(); await wait(100);
     return [];
   });
@@ -323,6 +343,26 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return out;
   });
   zm.forEach(x => errs.push('Zoom: ' + x));
+  // 2026-11-06: hold the BLOCKS word → Blocks zooms and History keeps its height; hold a top-middle tab icon → that tab, zoomed.
+  const zm2 = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+    const hold = async el => { el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, hit = document.elementFromPoint(x, y);
+      if (hit !== el && !el.contains(hit)) return 'covered by ' + (hit && hit.className);
+      const o = { bubbles: true, clientX: x, clientY: y, button: 0 }; hit.dispatchEvent(new PointerEvent('pointerdown', o)); await wait(1300); hit.dispatchEvent(new PointerEvent('pointerup', o)); return ''; };
+    const close = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(900); };
+    const lab = document.querySelector('#todayScroll .od-on > .od-pad-head .od-pad-lab'), top = document.querySelector('#todayScroll .od-on > .od-top');
+    if (lab && top) { const h0 = top.getBoundingClientRect().height, c = await hold(lab);
+      if (c) out.push('BLOCKS label ' + c); else if (!document.querySelector('.plan-pad.fw-focus-target')) out.push('Blocks did not zoom');
+      else if (Math.abs(top.getBoundingClientRect().height - h0) > 2) out.push('History changed height behind zoomed Blocks');
+      await close(); }
+    const tab = document.querySelector('#journalPane button[data-ctab="review"]'), c2 = await hold(tab);
+    if (c2) out.push('tab icon ' + c2); else if (!document.querySelector('#journalPane.fw-focus-target') || document.getElementById('journalPane').dataset.ctab !== 'review') out.push('holding 📊 did not open Day Review zoomed');
+    await close(); document.querySelector('#journalPane button[data-ctab="notes"]').click(); await wait(100);
+    if (document.querySelector('.fw-focus-target,.fw-focus-spacer')) out.push('zoom did not close cleanly');
+    return out;
+  });
+  zm2.forEach(x => errs.push('Zoom: ' + x));
+
   // Block timer MVP (2026-11-05): ▶ on a task starts it + its block, double tap = one tap, tick stops the task,
   // Break / Pause / Resume / correct / Finish, ids saved with the pad, events sent, time from timestamps (lock-proof).
   const tmr = await pg.evaluate(async () => {

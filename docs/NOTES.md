@@ -409,6 +409,8 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 
 - 2026-11-06 Cats = urgency → subject (list view only): `byUrgency(list)` in `draw()` wraps `bySubject` in `section.ce-urg.ce-urg-{1|2|3|none|done}` (header `.ce-urg-h` name + count); done events go to the Done box whatever their urgency. Color via `--ce-u`. Smoke: ticked e1 lands in `.ce-urg-done`.
 
+- 2026-11-06 zoom: BLOCKS label is `span.od-pad-lab` (pointer-events auto; the head itself is none). Holding `#journalPane button[data-ctab]` clicks that tab, then zooms `#journalPane`. `open()` now leaves a spacer for any cell in a flex parent and freezes static siblings' `flex` (important) to their size (History's flex-grow < 1 shrank otherwise); `settle()` restores. Smoke: Blocks zoom keeps History height, 📊 hold → Day Review zoomed.
+
 ## Urgent tick = log + archive (2026-11-05, Julius)
 
 - `urgItemRow` box click: head row with `urg > 0` or archived → `urgDoneLogArchive(item,index)`; else `toggleDueTask`. Done: tick (toggleDueTask), then if the source editor isn't today's `.day-editor`, append a done copy (`data-ulogof` = source `data-ulog`, `data-at`/`data-dt` = now, `data-cat`) and `tsecArrange` + save; then `setArchived(line,ed,true)`. Untick of an archived done row: untick, remove the copy, unarchive. Done-but-not-archived rows: plain untick.
@@ -431,6 +433,7 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 
 - Center Up `data-ctab="fun"` (🌴, last tab) shows `#funScroll` (own pane, not the Notes cell). `initFun()` in Index.html: items `{id, t, d, c, u, x?}`; localStorage `fw.fun.v1` first, then `getFun` / `saveFun` (Code.gs, script property `funData`, script lock, merge by id with newest `u`, `x` = deleted tombstone, pruned after 30 days). Pulls on load and on tab return. Smoke: add + save + tick → Done.
 - Categories (2026-11-05): `data.cats` [{id `g…`, name, c, u, x?}], `item.g`; `saveFun` merges cats like items. `#funCat` select (last pick in localStorage `fw.funCat`, "+" = new via prompt), `.fun-cat` sections (rename = contenteditable name, + = pick for adding, ✕ = tombstone, items fall to No category), hold an item 500 ms → `.fun-menu` Move to. Smoke: new "Shows" + item lands under it + saved.
+- 2026-11-06: hold the CHECKBOX (450 ms) → `moveMenu` (cats, + New, 🗑 Remove = tombstone); hold the TEXT (500 ms) → `startDrag` (fixed `.fun-ghost`, `.fun-drop-b/-a` on items, `.fun-drop-in` on `.fun-cat-h`). `drop()` sets `it.g` and renumbers the target group's `o` (0..n, `u` bumped). Sort key `okey` = `o` else `-c` (new items still land on top). Save / pull re-render skipped while `drag`. `funDate` → "NOV 5". Smoke: date format, checkbox-hold menu (no tick), drag onto Shows header.
 
 ## Urgent add box = real task (2026-11-05, Julius)
 

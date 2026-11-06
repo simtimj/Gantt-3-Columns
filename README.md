@@ -49,6 +49,8 @@ Last updated: 2026-11-06
 
 ## 🧪 To be confirmed (2026-11-06)
 
+- **Hold to zoom: Blocks + tab icons**: hold the **BLOCKS** word and Blocks zooms like History does (History stays the same size behind it). Hold any top-middle tab icon (📋 ☁️ ⭐ 📊 🌴) and that tab opens zoomed. You can still switch tabs inside the zoomed view. Tap outside to close.
+- **Fun tab: drag + checkbox menu + NOV 5 dates**: hold an item's text, then drag it. Drop it on another item to go above or below it (it takes that item's category), or on a category header to go to the top of that category. The order is saved. Hold the checkbox to open a menu: **Move to** a category, **+ New category…**, or **🗑 Remove**. The date added now reads **NOV 5** instead of 11/5.
 - **Cal Events Cats = urgency, then category**: in the Cats list, events sit in colored boxes by urgency: **Urgent** (red) → **Next** (yellow) → **Later** (blue) → **Not set** (grey) → **Done** at the bottom. Inside each box they're grouped by category (Coding, Career…). Each box shows its count. Time view and the ⊞ 4-box view are unchanged.
 - **Cal Events search** — a 🔍 Find box on the Cal Events title line. Type part of a title (e.g. "aws") and only matching events show, words in any order; works in the list and the ⊞ 4-box view; Esc or clearing the box shows everything again. Searches the day being shown. On the narrow phone column the "Cal Events" title hides to make room, and Cats / ⊞ step aside while you type.
 - **History detail: three buttons side by side** (▤ Full · ≡ List · – Mini) next to HISTORY instead of one button that cycles. All three stay put; tap one to switch, the current one is filled in.

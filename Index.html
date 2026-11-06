@@ -601,6 +601,11 @@
     .fun-menu button{text-align:left;border:0;background:transparent;color:inherit;font:inherit;padding:6px 8px;border-radius:5px;cursor:pointer;}
     .fun-menu button.on{background:color-mix(in srgb,var(--divider) 45%,transparent);}
     .fun-item{-webkit-touch-callout:none;}
+    .fun-item input[type=checkbox]{-webkit-user-select:none;user-select:none;}
+    .fun-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 6px 22px rgba(0,0,0,.3);margin:0;}
+    .fun-item.fun-dragging{opacity:.35;}
+    .fun-item.fun-drop-b{box-shadow:0 -3px 0 0 var(--accent,#b47be0);} .fun-item.fun-drop-a{box-shadow:0 3px 0 0 var(--accent,#b47be0);}
+    .fun-cat-h.fun-drop-in{outline:2px solid var(--accent,#b47be0);outline-offset:1px;border-radius:5px;}
     .fun-done-head{margin:10px 0 4px;font-size:.85em;color:var(--muted,#777);cursor:pointer;user-select:none;}
     .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);display:flex;align-items:center;gap:8px;}
     .dr-lv{display:inline-flex;gap:3px;margin-left:auto;}
@@ -1840,6 +1845,8 @@
     #centerDownScroll .ce-tools{position:relative;z-index:6;display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;}
     #centerDownScroll .ce-head [data-ce-sort]{min-width:0;min-height:22px;height:22px;padding:0 6px;font-size:12px;line-height:1;}
     #centerDownScroll .ce-head{border-bottom:2px solid var(--divider);padding-bottom:3px;margin-bottom:3px;}
+    /* Hold the BLOCKS word to zoom (2026-11-06, Julius): the label takes touches, the grip's upper half still drags. */
+    body.one-day #todayScroll .od-on > .od-pad-head .od-pad-lab{pointer-events:auto!important;position:relative;z-index:1;cursor:default;}
     body.one-day #todayScroll .od-on > .od-pad-head button{pointer-events:auto!important;position:relative;z-index:1;cursor:pointer!important;}
     #refSplitBar::before,#notesSplitBar::before,body.one-day #todayScroll .od-on > .od-pad-head::before{pointer-events:auto!important;}
     .column-resizer::after{top:0!important;margin-top:0!important;}
@@ -3026,7 +3033,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       { const top = document.createElement('div'); top.className = 'od-top';
         row.insertBefore(top, row.firstElementChild);
         [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head">Blocks</div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head"><span class="od-pad-lab">Blocks</span></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
       // Blocks MVP: reuse the existing Plan column, checkbox editor, indent/outdent,
@@ -4587,7 +4594,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function initContextMenu(){
     document.addEventListener('pointerdown',e => { lastPointerType = e.pointerType || 'mouse'; },true);
     // Hold-to-expand labels open the zoomed cell, not the format menu (2026-11-04, Julius).
-    const expandLabel = n => !!n?.closest?.('.ce-head strong,.urg-head,.today-jump,.od-pad-head,[data-nsec="must"]');
+    const expandLabel = n => !!n?.closest?.('.ce-head strong,.urg-head,.today-jump,.od-pad-head,[data-nsec="must"],#journalPane button[data-ctab]');
     document.addEventListener('contextmenu',e => {
       if(expandLabel(e.target)){ e.preventDefault(); cancelLongPress(); return; }
       if(urgencyCheckbox(e.target)){ e.preventDefault(); cancelLongPress(); return; }
@@ -7460,6 +7467,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const mergeL = (a,b) => { const by = {}; (a || []).forEach(i => by[i.id] = i); (b || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); return Object.values(by); };
     const merge = srv => { data = {v:1, items:mergeL(data.items, srv && srv.items), cats:mergeL(data.cats, srv && srv.cats)}; };
     const catSel = document.getElementById('funCat');
+    // Date added as "NOV 5" (2026-11-06, Julius: month name, not 11/5).
+    const funDate = ms => { const d = new Date(ms); return d.toLocaleDateString('en-US',{month:'short'}).toUpperCase() + ' ' + d.getDate(); };
+    // Order: dragged items get o (lower = higher up); the rest keep newest first.
+    const okey = i => i.o != null ? i.o : -(i.c || 0);
     const fid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
     const liveCats = () => (data.cats || []).filter(c => !c.x).sort((a,b) => (a.c || 0) - (b.c || 0));
     let lastCat = ''; try{ lastCat = localStorage.getItem('fw.funCat') || ''; }catch(e){}
@@ -7480,7 +7491,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     function save(){
       keep(); clearTimeout(saveT);
       saveT = setTimeout(() => { if(window.google && google.script) google.script.run
-        .withSuccessHandler(d => { merge(d); keep(); if(!list.contains(document.activeElement)) render(); })
+        .withSuccessHandler(d => { merge(d); keep(); if(!drag && !list.contains(document.activeElement)) render(); })
         .withFailureHandler(e => { window.setStatus && setStatus('Fun list not saved: ' + (e && e.message || e)); setTimeout(save, 15000); })
         .saveFun(data); }, 600);
     }
@@ -7488,8 +7499,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       fillSel();
       const cs = liveCats(), catIds = new Set(cs.map(c => c.id));
       const live = data.items.filter(i => !i.x), open = live.filter(i => !i.d), done = live.filter(i => i.d);
-      open.sort((a,b) => (b.c || 0) - (a.c || 0)); done.sort((a,b) => (b.u || 0) - (a.u || 0));
-      const row = i => '<div class="fun-item' + (i.d ? ' done' : '') + '" data-id="' + h(i.id) + '"><input type="checkbox"' + (i.d ? ' checked' : '') + ' aria-label="Done"><div class="fun-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div>' + (i.c ? '<span class="fun-date" title="Added ' + h(new Date(i.c).toLocaleDateString()) + '">' + (new Date(i.c).getMonth() + 1) + '/' + new Date(i.c).getDate() + '</span>' : '') + '<button type="button" class="fun-x" aria-label="Remove" title="Remove">✕</button></div>';
+      open.sort((a,b) => okey(a) - okey(b)); done.sort((a,b) => (b.u || 0) - (a.u || 0));
+      const row = i => '<div class="fun-item' + (i.d ? ' done' : '') + '" data-id="' + h(i.id) + '"><input type="checkbox"' + (i.d ? ' checked' : '') + ' aria-label="Done"><div class="fun-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div>' + (i.c ? '<span class="fun-date" title="Added ' + h(new Date(i.c).toLocaleDateString()) + '">' + funDate(i.c) + '</span>' : '') + '<button type="button" class="fun-x" aria-label="Remove" title="Remove">✕</button></div>';
       // One section per category (order made), then items without one.
       const groups = cs.map(c => ({c, items:open.filter(i => i.g === c.id)})).concat([{c:null, items:open.filter(i => !i.g || !catIds.has(i.g))}]);
       const body = groups.filter(gr => gr.c || gr.items.length).map(gr => gr.c
@@ -7516,28 +7527,70 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       try{ localStorage.setItem('fw.funCat', lastCat); }catch(e){}
       inp.focus();
     });
-    // Hold an item (500 ms) → move it to another category.
-    let holdT = null, held = false, hx = 0, hy = 0;
+    /* Hold (2026-11-06, Julius: like every other task): hold the CHECKBOX → Move to menu (categories, + New, Remove);
+       hold the TEXT → drag it: drop on a task (above / below, takes its category) or on a category header (top of it). */
+    let holdT = null, held = false, hx = 0, hy = 0, drag = null;
     list.addEventListener('pointerdown', e => {
-      const row = e.target.closest('.fun-item'); if(!row || e.target.closest('input,button')) return;
+      const row = e.target.closest('.fun-item'); if(!row || e.target.closest('button') || e.button) return;
+      const box = e.target.matches('input[type=checkbox]');
       held = false; hx = e.clientX; hy = e.clientY; clearTimeout(holdT);
-      holdT = setTimeout(() => { held = true; moveMenu(row.dataset.id, hx, hy); }, 500);
+      holdT = setTimeout(() => { held = true; if(box || row.classList.contains('done')) moveMenu(row.dataset.id, hx, hy); else startDrag(row, hx, hy); }, box ? 450 : 500);
     });
-    list.addEventListener('pointermove', e => { if(Math.abs(e.clientX - hx) > 9 || Math.abs(e.clientY - hy) > 9) clearTimeout(holdT); });
+    list.addEventListener('pointermove', e => { if(!drag && (Math.abs(e.clientX - hx) > 9 || Math.abs(e.clientY - hy) > 9)) clearTimeout(holdT); });
     ['pointerup','pointercancel'].forEach(t => list.addEventListener(t, () => clearTimeout(holdT)));
+    function startDrag(row, x, y){
+      document.activeElement && document.activeElement.blur && document.activeElement.blur();
+      try{ getSelection().removeAllRanges(); }catch(e){}
+      const r = row.getBoundingClientRect(), ghost = row.cloneNode(true);
+      ghost.className = 'fun-item fun-ghost'; ghost.style.cssText = 'width:' + r.width + 'px;left:' + r.left + 'px;top:' + r.top + 'px';
+      document.body.appendChild(ghost); row.classList.add('fun-dragging');
+      drag = {row, id:row.dataset.id, ghost, dx:x - r.left, dy:y - r.top, at:null};
+      navigator.vibrate && navigator.vibrate(15);
+    }
+    const clearMarks = () => list.querySelectorAll('.fun-drop-b,.fun-drop-a,.fun-drop-in').forEach(n => n.classList.remove('fun-drop-b','fun-drop-a','fun-drop-in'));
+    function dragTo(x, y){
+      drag.ghost.style.left = (x - drag.dx) + 'px'; drag.ghost.style.top = (y - drag.dy) + 'px';
+      clearMarks(); drag.at = null;
+      const el = document.elementFromPoint(x, y), t = el && el.closest && el.closest('#funList .fun-item:not(.done):not(.fun-dragging), #funList .fun-cat-h');
+      if(!t) return;
+      if(t.classList.contains('fun-cat-h')){ t.classList.add('fun-drop-in'); drag.at = {head:t.closest('.fun-cat')}; return; }
+      const r = t.getBoundingClientRect(), after = y > r.top + r.height / 2;
+      t.classList.add(after ? 'fun-drop-a' : 'fun-drop-b'); drag.at = {row:t, after};
+    }
+    function drop(){
+      const d = drag; drag = null; clearMarks(); d.ghost.remove(); d.row.classList.remove('fun-dragging');
+      const it = byId(d.id); if(!it || !d.at) return;
+      const now = Date.now(), groupOf = el => el ? (el.dataset.cat || '') : '';
+      let g, ids;
+      if(d.at.head){ g = groupOf(d.at.head); ids = [...d.at.head.querySelectorAll('.fun-item')].map(n => n.dataset.id).filter(x => x !== d.id); ids.unshift(d.id); }
+      else {
+        const sec = d.at.row.closest('.fun-cat'); g = groupOf(sec);
+        ids = [...d.at.row.parentElement.querySelectorAll(':scope > .fun-item:not(.done)')].map(n => n.dataset.id).filter(x => x !== d.id);
+        ids.splice(ids.indexOf(d.at.row.dataset.id) + (d.at.after ? 1 : 0), 0, d.id);
+      }
+      if(g) it.g = g; else delete it.g;
+      ids.forEach((id, k) => { const x = byId(id); if(x && (x.o !== k || x === it)){ x.o = k; x.u = now; } });
+      render(); save();
+    }
+    document.addEventListener('pointermove', e => { if(drag){ e.preventDefault(); dragTo(e.clientX, e.clientY); } }, {passive:false});
+    document.addEventListener('touchmove', e => { if(drag) e.preventDefault(); }, {passive:false});
+    document.addEventListener('pointerup', () => { if(drag) drop(); });
+    document.addEventListener('pointercancel', () => { if(drag){ drag.at = null; drop(); } });
     function moveMenu(id,x,y){
       const it = byId(id); if(!it) return;
       document.activeElement && document.activeElement.blur && document.activeElement.blur();
       document.querySelectorAll('.fun-menu').forEach(m => m.remove());
       const m = document.createElement('div'); m.className = 'fun-menu';
       m.innerHTML = '<div class="fun-menu-h">Move to</div>' + liveCats().map(c => '<button type="button" data-g="' + h(c.id) + '"' + (it.g === c.id ? ' class="on"' : '') + '>' + h(c.name) + '</button>').join('') +
-        '<button type="button" data-g=""' + (!it.g ? ' class="on"' : '') + '>No category</button><button type="button" data-g="+">+ New category…</button>';
+        '<button type="button" data-g=""' + (!it.g ? ' class="on"' : '') + '>No category</button><button type="button" data-g="+">+ New category…</button><button type="button" data-g="x">🗑 Remove</button>';
       document.body.appendChild(m);
       m.style.left = Math.max(8, Math.min(x, innerWidth - m.offsetWidth - 8)) + 'px';
       m.style.top = Math.max(8, Math.min(y, innerHeight - m.offsetHeight - 8)) + 'px';
       m.addEventListener('click', e => {
         const b = e.target.closest('[data-g]'); if(!b) return;
-        let g = b.dataset.g; if(g === '+') g = newCat(); if(g === '+' ) return;
+        let g = b.dataset.g;
+        if(g === 'x'){ it.x = 1; it.u = Date.now(); m.remove(); render(); save(); return; }
+        if(g === '+'){ g = newCat(); if(!g){ m.remove(); return; } }
         if(g) it.g = g; else delete it.g;
         it.u = Date.now(); m.remove(); render(); save();
       });
@@ -7572,7 +7625,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       else if(v !== it.t){ it.t = v; it.u = Date.now(); save(); }
     });
     render();
-    const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(!list.contains(document.activeElement)) render(); }).getFun(); };
+    const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(!drag && !list.contains(document.activeElement)) render(); }).getFun(); };
     pull();
     document.addEventListener('visibilitychange', () => { if(!document.hidden) pull(); });
     window.fwFun = {get data(){ return data; }, render};
@@ -13651,8 +13704,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Section outlines are drawn for the cell's size: redraw them for the zoomed / normal size.
   function repaintSecs(el){ requestAnimationFrame(() => { const ed = el.matches('.day-editor') ? el : el.querySelector('.day-editor'); if(ed && typeof paintDaySecs === 'function') try{ paintDaySecs(ed); }catch(e){} }); }
   // History zoomed out of its row: a same-height spacer keeps Blocks where it was (2026-11-05, Julius).
-  let spacer=null;
-  function settle(el){if(spacer){spacer.remove();spacer=null;}repaintSecs(el);const pad=padOf(el);if(pad)pad.style.removeProperty('flex');backdrop.getAnimations().forEach(a => a.cancel());el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
+  let spacer=null, frozen=[];
+  function settle(el){if(spacer){spacer.remove();spacer=null;}frozen.forEach(([n,f])=>{if(f)n.style.setProperty('flex',f);else n.style.removeProperty('flex');});frozen=[];repaintSecs(el);const pad=padOf(el);if(pad)pad.style.removeProperty('flex');backdrop.getAnimations().forEach(a => a.cancel());el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
   function close(){
     if(!focused)return;
     const el=focused;focused=null;
@@ -13665,7 +13718,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(anim)anim.finish();
     close();if(anim)anim.finish();
     home=el.getBoundingClientRect();
-    const pad=padOf(el);if(pad){pad.style.setProperty('flex','0 0 '+Math.round(pad.getBoundingClientRect().height)+'px');spacer=document.createElement('div');spacer.className='fw-focus-spacer';spacer.style.cssText='flex:0 0 '+Math.round(home.height)+'px;height:'+Math.round(home.height)+'px';el.before(spacer);}
+    const pad=padOf(el);if(pad)pad.style.setProperty('flex','0 0 '+Math.round(pad.getBoundingClientRect().height)+'px');
+    // Any cell in a flex column / row leaves a same-size spacer, so its neighbours don't stretch into the gap (2026-11-06, Julius: Blocks too).
+    const pd=el.parentElement&&getComputedStyle(el.parentElement).display;
+    if(pad||/flex/.test(pd||'')){const row=/row/.test(getComputedStyle(el.parentElement).flexDirection)&&!pad;
+      // Freeze the neighbours at their size too (flex-grow under 1 would shrink them into the freed space).
+      [...el.parentElement.children].forEach(n=>{if(n===el||n===pad||/absolute|fixed/.test(getComputedStyle(n).position))return;const r=n.getBoundingClientRect();frozen.push([n,n.style.getPropertyValue('flex')]);n.style.setProperty('flex','0 0 '+Math.round(row?r.width:r.height)+'px','important');});spacer=document.createElement('div');spacer.className='fw-focus-spacer';spacer.style.cssText=row?'flex:0 0 '+Math.round(home.width)+'px;width:'+Math.round(home.width)+'px':'flex:0 0 '+Math.round(home.height)+'px;height:'+Math.round(home.height)+'px';el.before(spacer);}
     const bg=shownBg(el);if(bg)el.style.setProperty('--fw-focus-bg',bg);
     focused=el;el.classList.add('fw-focus-target');document.body.classList.add('fw-focus-on');
     const a=anim=zoom(el,home,false);
@@ -13679,6 +13737,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // History only (2026-11-04, Julius): zooming the whole pane also stretched Blocks under it.
     if(node.closest('.today-jump'))return (document.body.classList.contains('one-day') && document.querySelector('#todayScroll .od-on > .od-top')) || document.getElementById('todayPane');
     if(node.closest('.od-pad-head'))return document.querySelector('#todayScroll .od-on .plan-pad');
+    // Top-middle tab icons (2026-11-06, Julius): hold one → that tab opens, zoomed (tabs stay usable inside).
+    const tab=node.closest('#journalPane button[data-ctab]');if(tab)return document.getElementById('journalPane');
     if(node.closest('[data-nsec="must"]'))return document.getElementById('journalScroll');
     return null;
   }
@@ -13686,7 +13746,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(e.button!==0 || focused)return;
     const target=resolve(e.target);if(!target)return;
     startX=e.clientX;startY=e.clientY;clearTimeout(timer);
-    timer=setTimeout(()=>{timer=0;suppressUntil=Date.now()+650;open(target);if(document.activeElement?.id==='refSearch')document.activeElement.blur();},550);
+    const tab=e.target.closest&&e.target.closest('#journalPane button[data-ctab]');
+    timer=setTimeout(()=>{timer=0;if(tab&&!tab.classList.contains('on'))tab.click();suppressUntil=Date.now()+650;open(target);if(document.activeElement?.id==='refSearch')document.activeElement.blur();},550);
   },true);
   document.addEventListener('pointermove',e=>{if(timer&&(Math.abs(e.clientX-startX)>12||Math.abs(e.clientY-startY)>12)){clearTimeout(timer);timer=0;}},true);
   ['pointerup','pointercancel'].forEach(name=>document.addEventListener(name,()=>{clearTimeout(timer);timer=0;},true));

@@ -12,6 +12,8 @@ import subprocess
 from zoneinfo import ZoneInfo
 
 BASELINE = "cf417e158509f1ce5942ec01c25155a31bed6962"
+# Logged by hand before the "Done-Log: manual" trailer existed.
+MANUAL = {"6881ec20032ca8292e6592413d4a56b6e382526f"}
 
 
 def git(*args):
@@ -28,6 +30,9 @@ def build_entries():
             continue
         title = git("show", "-s", "--format=%s", sha)
         body = git("show", "-s", "--format=%B", sha).lower()
+        # Already logged by hand with a better title (2026-11-06, Julius: every change showed up twice in History).
+        if "done-log: manual" in body or sha in MANUAL:
+            continue
         by = "ChatGPT" if any(word in body for word in ("chatgpt", "codex", "co-authored-by: openai")) else "Claude" if "co-authored-by: claude" in body else "Julius"
         timestamp = int(git("show", "-s", "--format=%ct", sha))
         date = datetime.datetime.fromtimestamp(timestamp, ZoneInfo("America/Los_Angeles")).date().isoformat()

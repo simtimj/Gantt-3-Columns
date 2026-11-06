@@ -49,6 +49,7 @@ Last updated: 2026-11-06
 
 ## 🧪 To be confirmed (2026-11-06)
 
+- **No more double History lines for Claude's changes**: code pushes are logged to History automatically from the commit. When Claude also writes its own clearer Done Log line, the automatic copy is now skipped, so each change shows once.
 - **Columns and sections shrink all the way, with a pull tab**: you can drag a column line (or a section line like Urgent / Reference, Dailies / Cal Events, History / Blocks) almost to the edge. Near the edge it snaps to a thin strip, so the line is always still on screen and draggable. A tucked strip shows a small pull tab (‹ › for columns, ↕ for sections). Tap it to bring that column or section back. The Reference edge can't be dragged past the window anymore.
 - **Hold to zoom: Blocks + tab icons**: hold the **BLOCKS** word and Blocks zooms like History does (History stays the same size behind it). Hold any top-middle tab icon (📋 ☁️ ⭐ 📊 🌴), or a Reference tab icon (📚 Reference, 📝 Scratch Pad), and that tab opens zoomed. You can still switch tabs inside the zoomed view. Tap outside to close.
 - **Urgent: hold the numbers = zoom, + = create**: holding the red / yellow / blue numbers now zooms the whole Urgent panel (and opens it first if it was folded; before, it showed an empty dark box and also popped the create menu). The create menu (Urgent / Soon / Can be later task) moved to a **+** button to the right of the numbers.

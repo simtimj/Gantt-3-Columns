@@ -1342,6 +1342,8 @@
     .pane-narrow #urgentPanel .urg-meta .urg-date{flex-direction:column;align-items:flex-end;gap:0;}
     .pane-narrow #urgentPanel .urg-meta .urg-date > .ud-rel::before{content:none;}
     .pane-narrow #urgentPanel.wrap .urg-row{display:flow-root;}
+    #urgentPanel .urg-row.urg-adder{display:flex!important;align-items:center;flex-wrap:nowrap;}
+    #urgentPanel .urg-adder > .urg-addbox2{float:none!important;margin:0!important;opacity:.55;cursor:text;}
     .pane-narrow #urgentPanel.wrap .urg-row > .urg-box{float:left;margin:2px 6px -10px 0;}
     .pane-narrow #urgentPanel.wrap .urg-row > .urg-meta{float:right;margin:0 0 0 6px;}
     .pane-narrow #urgentPanel.wrap .urg-row > .urg-text{display:block;}
@@ -8093,6 +8095,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   const urgDraft = {1:'',2:'',3:''};
   let urgAddWant = 0;
+  // After adding from the box, keep typing in the real task line (checkbox, Tab / Shift+Tab indent,
+  // hold menus, Enter = next task) instead of the box (2026-11-05, Julius).
+  function urgFocusMade(made){
+    if(!(made && made.nodeType === 1)) return;
+    const ed = made.parentElement, ok = ed && ownerKey(ed);
+    if(ok){ urgFocusWant = {date:ok.date,pane:ok.pane,index:[...ed.querySelectorAll('.check-line')].indexOf(made)}; urgAddWant = 0; }
+  }
   function urgAdderRow(u){
     const row = document.createElement('form');
     row.className = 'urg-row urg-adder';
@@ -8123,11 +8132,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const was = inp.value;
       urgDraft[u] = '';
       urgAddWant = u; // keep typing in this level after the panel re-renders
-      if(addTaskToBacklog(p.title,p.details,u)) setStatus(URG_NAMES[u] + ' task added to ' + BACKLOG_NAME);
+      const made = addTaskToBacklog(p.title,p.details,u,urgFocusMade);
+      if(made) setStatus(URG_NAMES[u] + ' task added to ' + BACKLOG_NAME);
       else { urgDraft[u] = was; urgAddWant = 0; }
+      urgFocusMade(made);
       renderUrgent();
     });
-    row.append(inp); // dashed box removed: on narrow panes it sat alone on a line above the input as stray red dots (2026-10-31, Julius)
+    // A checkbox in front (2026-11-05, Julius): the new task looks like the others while typing.
+    const ab = document.createElement('span'); ab.className = 'urg-box urg-addbox2'; ab.setAttribute('aria-hidden','true');
+    row.append(ab,inp); // dashed box removed: on narrow panes it sat alone on a line above the input as stray red dots (2026-10-31, Julius)
     return row;
   }
   /* ---------------------------------------------------------
@@ -8230,10 +8243,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Add a task (checkbox line) at the end of today's Today cell.
   function addTaskToToday(title,details,urg){ return addTaskToDay(localToday(),title,details,urg); }
   // Tasks typed straight into Urgent go to the Backlog cell, not today (Julius, 2026-10-28).
-  function addTaskToBacklog(title,details,urg){
+  function addTaskToBacklog(title,details,urg,onMade){
     const cell = backlogCell();
     if(cell) return addTaskToEditor(cell,title,details,urg);
-    withBacklog(c => { addTaskToEditor(c,title,details,urg); renderUrgent(); },
+    withBacklog(c => { const n = addTaskToEditor(c,title,details,urg); if(onMade) onMade(n); renderUrgent(); },
       () => { if(!urgDraft[urg]) urgDraft[urg] = details ? (title ? title + ': ' + details : details) : title; renderUrgent(); });
     return true;
   }
@@ -9359,6 +9372,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           }
         }
         tx.blur(); return;
+      }
+      // Tab / Shift+Tab in an Urgent row = indent / outdent with its subtasks (2026-11-05, Julius).
+      if(type === 'keydown' && e.key === 'Tab' && tx.matches('#urgentPanel .urg-text')){
+        e.preventDefault();
+        const src = dueSource(tx);
+        if(!src || !src.line || !src.line.isConnected) return;
+        if(dueEditTimer){ clearTimeout(dueEditTimer); dueEditTimer = 0; }
+        const ok = ownerKey(src.ed);
+        if(ok) urgFocusWant = {date:ok.date,pane:ok.pane,index:[...src.ed.querySelectorAll('.check-line')].indexOf(src.line)};
+        urgTextKeepEmpty = true; tx.blur(); urgTextKeepEmpty = false;
+        urgIndent(src.line,src.ed,e.shiftKey ? -1 : 1);
+        return;
       }
       // Backspace at the start of an empty Urgent row deletes that task / subtask (Julius, 2026-10-28),
       // like the cells; the caret moves to the end of the row above.

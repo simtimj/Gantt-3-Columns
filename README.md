@@ -49,6 +49,7 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Urgent add box = a real task**: the "Add … task" line has a checkbox in front; Enter makes the task and puts you right in its line (with its checkbox), so Tab / Shift+Tab indent, hold the checkbox or text for the full menu (urgency, + Subtask, Indent, due date…), and Enter makes the next task.
 - **Keep In Mind cells**: each category is a bordered cell and each task (with its subtasks) a smaller cell inside it (the single left line is gone). The ‹ › and 📌 buttons on the line are gone: hold a task's checkbox for 📌 Send to Today, → Make subtask, ← Less indent, ✕ Remove. Backspace on an emptied line removes it right away. + Category makes the category with one task line; + Task only shows on an empty category.
 
 - **History easier to read**: a line and more room between Morn / After / Night; the count buttons (e.g. "8 done −") use a smaller font that matches the rest; in an opened group, the New / Fixes / Tweaks headings are underlined with space between them.

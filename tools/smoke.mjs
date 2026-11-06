@@ -121,6 +121,24 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return out;
   });
   urg.forEach(x => errs.push('Urgent: ' + x));
+  // Urgent add box (2026-11-05): has a checkbox; Enter makes a real row and puts the caret in it; Tab indents it.
+  const uadd = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const form = document.querySelector('#urgentPanel .urg-adder[data-urg="2"]');
+    if(!form) return ['no add box'];
+    if(!form.querySelector('.urg-box')) return ['add box has no checkbox'];
+    const ta = form.querySelector('textarea'); ta.focus(); ta.value = 'Smoke new task';
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(600);
+    const a = document.activeElement;
+    if(!(a && a.matches && a.matches('#urgentPanel .urg-text') && /Smoke new task/.test(a.textContent))) return ['caret not in the new row (' + (a && a.tagName + '.' + a.className) + ') rows=' + [...document.querySelectorAll('#urgentPanel .urg-text')].map(x => x.textContent + ':' + x.contentEditable).join(',') + ' backlog=' + !!backlogCell()];
+    if(!a.parentElement.querySelector('.urg-box')) return ['new row has no checkbox'];
+    a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })); await wait(400);
+    const ln = [...backlogCell().querySelectorAll('.check-line')].find(l => /Smoke new task/.test(l.textContent));
+    if(!ln || ln.dataset.level !== '1') return ['Tab did not indent (level ' + (ln && ln.dataset.level) + ')'];
+    return [];
+  });
+  uadd.forEach(x => errs.push('Urgent add: ' + x));
   // Keep In Mind: converted to Gear > (note, Gloves, Bait); Tab nests a line one deeper and saves.
   const kim = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));

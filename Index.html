@@ -1530,7 +1530,9 @@
     .od-head,.plan-pad{display:none;}
     /* The Today: 70/72 done chip already says it (2026-11-03, Julius). */
     body.one-day #todayScroll .od-on .od-head:not(.od-pad-head){display:none!important;}
-    .fx-cat{border-left:2px solid var(--fx-category-color,#70baff);padding-left:3px;}
+    /* Keep In Mind cells (2026-11-06, Julius): category = a full bordered cell, each task (+ its subtasks) a cell inside. */
+    .fx-cat{border:1.5px solid color-mix(in srgb,var(--fx-category-color,#70baff) 70%,transparent);border-radius:8px;padding:3px 6px 5px;}
+    .fx-cell{border:1px solid color-mix(in srgb,var(--fx-category-color,#70baff) 40%,var(--border,#999));border-radius:6px;padding:2px 6px;margin:4px 0 0;}
     .fx-cat>.fx-ch .fx-name{color:var(--fx-category-color,#70baff);}
 
     /* Reference header (2026-11-03, Julius): just the Urgent numbers, always one line; fitUrgCounts() shrinks them to fit. */
@@ -7055,14 +7057,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (c.color ? ' fx-colored' : '') + (!c.name && items.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '" style="--fx-category-color:' + h(c.color || '#70baff') + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
           '<span class="fx-name" contenteditable="true" data-fx="name" data-fph="Category">' + h(c.name) + '</span>' +
           (c.col && items.length ? '<span class="fx-sub">' + open + ' open</span>' : '') + '</div><div class="fx-body">';
+        // Cells (2026-11-06, Julius): each top line + its subtasks sit in one bordered cell. No ‹ › 📌 on the
+        // line: hold the checkbox for Send to Today / indent. + Task shows only while the category is empty.
+        let cell = false;
         items.forEach(t => {
+          if(!(t.lv > 0) || !cell){ if(cell) out += '</div>'; out += '<div class="fx-cell">'; cell = true; }
           out += '<div class="fx-task' + (t.d ? ' fx-done' : '') + (t.n ? ' fx-note' : '') + '" data-ftid="' + h(t.id) + '" style="--lv:' + (t.lv || 0) + '">' +
             (t.n ? '' : '<input type="checkbox" data-fx="tick"' + (t.d ? ' checked' : '') + '>') +
-            '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="' + (t.lv ? 'Subtask' : 'Task') + '">' + h(t.t) + '</span>' +
-            '<span class="fx-tools"><button type="button" data-fx="out" title="Less indent" aria-label="Less indent">‹</button><button type="button" data-fx="in" title="Indent" aria-label="Indent">›</button>' +
-            (t.n ? '' : '<button type="button" class="fx-send" data-fx="send" title="Send to Today (Plan / think)">📌</button>') + '</span></div>';
+            '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="' + (t.lv ? 'Subtask' : 'Task') + '">' + h(t.t) + '</span></div>';
         });
-        out += '<button type="button" class="fx-add" data-fx="addt">+ Task</button></div></div>';
+        if(cell) out += '</div>';
+        out += (items.length ? '' : '<button type="button" class="fx-add" data-fx="addt">+ Task</button>') + '</div></div>';
       });
       return out + '<button type="button" class="fx-add" data-fx="addh">+ Category</button>';
     }
@@ -7140,6 +7145,25 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       placeUrgPicker(m,x,y);
       urgPicker = m;
     }
+    function showTaskMenu(id,x,y){
+      const r0 = findItem(id); if(!r0) return;
+      hideUrgencyPicker();
+      const m = document.createElement('div'); m.className = 'urg-picker fx-menu';
+      const item = (label,fn) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'urg-goto'; b.textContent = label;
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',() => { hideUrgencyPicker(); const r = findItem(id); if(r) fn(r); });
+        m.appendChild(b);
+      };
+      if(!r0.t.n) item('📌 Send to Today',r => { if(!r.t.t){ setStatus && setStatus('Give the task a name first'); return; } window.tidPlace && window.tidPlace(r.t.id, h(r.t.t), !!r.t.d); });
+      const prev = r0.list[r0.i - 1];
+      if(prev && (r0.t.lv || 0) <= (prev.lv || 0)) item('→ Make subtask',r => edit(() => shift(r.list,r.i,1)));
+      if(r0.t.lv) item('← Less indent',r => edit(() => shift(r.list,r.i,-1)));
+      item('✕ Remove',r => edit(() => { const end = subtreeEnd(r.list,r.i); for(let k = r.i + 1; k < end; k++) r.list[k].lv = Math.max(0,(r.list[k].lv || 0) - 1); r.list.splice(r.i,1); }));
+      document.body.appendChild(m);
+      placeUrgPicker(m,x,y);
+      urgPicker = m;
+    }
     function wire(host){
       // Hold the fold arrow to manage a category/task without extra visible buttons.
       let holdTimer = null, suppressToggle = false, downX = 0, downY = 0;
@@ -7154,7 +7178,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           showFxMenu(id,f,downX,downY);
         },450);
       },true);
-      host.addEventListener('contextmenu',e=>{if(e.target.closest('.fx-tg'))e.preventDefault();},true);
+      host.addEventListener('contextmenu',e=>{if(e.target.closest('.fx-tg,[data-fx="tick"]'))e.preventDefault();},true);
+      // Hold a task's checkbox (2026-11-06, Julius): Send to Today, Indent, Less indent, Remove.
+      let cbTimer = null, cbHeld = false;
+      host.addEventListener('pointerdown', e => {
+        const cb = e.target.closest('[data-fx="tick"]'); if(!cb) return;
+        downX = e.clientX; downY = e.clientY; cbHeld = false; clearTimeout(cbTimer);
+        cbTimer = setTimeout(() => {
+          cbHeld = true;
+          if(navigator.vibrate) try{ navigator.vibrate(15); }catch(err){}
+          showTaskMenu(cb.closest('[data-ftid]').dataset.ftid, downX, downY);
+        },450);
+      },true);
+      host.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-downX)>10||Math.abs(e.clientY-downY)>10)clearTimeout(cbTimer);},true);
+      ['pointerup','pointercancel'].forEach(t=>host.addEventListener(t,()=>clearTimeout(cbTimer),true));
+      host.addEventListener('click', e => { if(cbHeld && e.target.closest('[data-fx="tick"]')){ cbHeld = false; e.preventDefault(); e.stopImmediatePropagation(); } },true);
       host.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-downX)>10||Math.abs(e.clientY-downY)>10)clearTimeout(holdTimer);},true);
       ['pointerup','pointercancel'].forEach(t=>host.addEventListener(t,()=>clearTimeout(holdTimer),true));
       // Enter = new line (first child if it has any), Tab / Shift+Tab = in / out, Backspace on an empty line = remove.
@@ -7171,14 +7209,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         } else if(e.key === 'Tab'){
           stop();
           edit(() => shift(r.list,r.i,e.shiftKey ? -1 : 1),r.t.id);
-        } else if(e.key === 'Backspace' && !tt.textContent){
+        } else if(e.key === 'Backspace' && !readText(tt)){
           stop();
           const prev = r.list[r.i - 1];
-          edit(() => r.list.splice(r.i,1),prev && prev.id);
+          r.t.t = ''; tt.textContent = '';
+          edit(() => { const k = r.list.indexOf(r.t); if(k >= 0) r.list.splice(k,1); },prev && prev.id);
         }
       });
-      // The ‹ › 📌 buttons keep the caret in the line (so they stay shown on a phone).
-      host.addEventListener('pointerdown', e => { if(e.target.closest && e.target.closest('.fx-tools button')) e.preventDefault(); });
       // Keep the Notes editor's own key / tap / drag handlers out of the dashboard.
       ['keydown','keyup','keypress','beforeinput','input','paste','cut','pointerdown','mousedown','touchstart','dragstart','contextmenu'].forEach(t =>
         host.addEventListener(t, e => { e.stopPropagation(); if(t === 'keydown' && e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); e.target.blur && e.target.blur(); } }));
@@ -7188,7 +7225,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const b = e.target.closest('[data-fx]'); if(!b) return;
         const id = b.closest('[data-fid]')?.dataset.fid, f = id ? find(id) : {};
         if(b.dataset.fx === 'tg'){ if(suppressToggle){suppressToggle=false;return;} const o=f.p||f.c; if(o){o.col=!o.col;save();render();} }
-        else if(b.dataset.fx === 'addh'){ const c = {id:uid('c'),name:'',col:false,items:[]}; edit(() => data.cats.push(c),() => focusNew(c.id,'name')); }
+        else if(b.dataset.fx === 'addh'){ const c = {id:uid('c'),name:'',col:false,items:[{id:tid(),t:'',d:0,lv:0}]}; edit(() => data.cats.push(c),() => focusNew(c.id,'name')); }
         else if(b.dataset.fx === 'addt' && f.c){ const n = {id:tid(),t:'',d:0,lv:0}; itemsOf(f.c).push(n); f.c.col = false; edit(() => {},n.id); }
         else if(b.dataset.fx === 'in' || b.dataset.fx === 'out'){
           const r = findItem(b.closest('[data-ftid]').dataset.ftid);

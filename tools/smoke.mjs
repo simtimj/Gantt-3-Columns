@@ -133,7 +133,16 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     const after = rows().join('|');
     const saves = (window.__calls || []).filter(c => c[0] === 'saveFocus');
     const saved = saves.length ? saves[saves.length - 1][1][0].cats[0].items.map(i => i.lv).join('') : '';
-    return after === '0Gear|1~Before Friday|1Gloves|2Bait' && saved === '0112' ? [] : ['Tab nesting: ' + after + ' saved ' + saved];
+    if(!(after === '0Gear|1~Before Friday|1Gloves|2Bait' && saved === '0112')) return ['Tab nesting: ' + after + ' saved ' + saved];
+    // 2026-11-06: one bordered cell per top line, no ‹ › 📌 buttons, Backspace on an emptied subtask removes it.
+    const fx = document.querySelector('.journal-editor[data-date="' + localToday() + '"] .fx');
+    if(fx.querySelector('.fx-tools')) return ['line buttons still shown'];
+    if(fx.querySelectorAll('.fx-cell').length !== 1) return ['cells: ' + fx.querySelectorAll('.fx-cell').length];
+    const b2 = [...fx.querySelectorAll('.fx-tt')].find(x => x.textContent === 'Bait');
+    b2.focus(); b2.innerHTML = '<br>';
+    b2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true })); await wait(900);
+    const gone = rows().join('|');
+    return gone === '0Gear|1~Before Friday|1Gloves' ? [] : ['Backspace remove: ' + gone];
   });
   kim.forEach(x => errs.push('Keep In Mind: ' + x));
   // Fun tab: 🎮 shows its own list; typing + Enter adds a line and saves; ticking moves it to Done.

@@ -49,6 +49,10 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Keep In Mind cells**: each category is a bordered cell and each task (with its subtasks) a smaller cell inside it (the single left line is gone). The ‹ › and 📌 buttons on the line are gone: hold a task's checkbox for 📌 Send to Today, → Make subtask, ← Less indent, ✕ Remove. Backspace on an emptied line removes it right away. + Category makes the category with one task line; + Task only shows on an empty category.
+
+## 🧪 To be confirmed (2026-11-05)
+
 - **History easier to read**: a line and more room between Morn / After / Night; the count buttons (e.g. "8 done −") use a smaller font that matches the rest; in an opened group, the New / Fixes / Tweaks headings are underlined with space between them.
 - **Fun for later tab** (🎮, last tab top middle): a quick list of things you want to do for fun later (e.g. play the Stardew Valley update). Type + Enter adds one, tap text to edit, tick moves it to a folded Done, ✕ removes. Saved to the app (same on phone and laptop), kept on the device too.
 - **Time Tracker (new, separate app)**: open the /dev link with `?app=tracker` at the end. Phone-first Toggl-style tracker with its own sheet ("Time Tracker DB"), nothing shared with Gantt data: blocks with tasks (`Yard: sweep leaves, wash truck, clean garage` makes 3), one-tap ▶ start (starting another stops the last), task timers, Pause / Stop / Resume, Next Block staging, manual (estimated) entries, "still running?" fix after 2 h, Calendar day/week with planned and recurring blocks (tap ▶ to start now, drag ☰ / bottom edge), Day tab with measured vs estimated vs unaccounted and a week summary, search, CSV/JSON export, categories (you choose what's productive), optional break tips. Details, checklist and what's deferred: `tracker/README.md`.

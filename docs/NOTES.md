@@ -372,6 +372,7 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - Rows: `.fx-task` with `--lv` (14px per level), `.fx-tools` (‹ › 📌) shown on focus / hover; tool buttons `preventDefault` on pointerdown so the caret stays. Keys (registered before the generic stopper): Enter = new line after (first child if the line has children; empty line → outdent or blur), Tab / Shift+Tab = `shift()` (subtree moves too, max one deeper than the line above), Backspace on empty = remove. `edit(fn, focus)` commits the current line, blurs anything focused in `.fx` (render skips while focus is inside), changes, saves, redraws, refocuses. Empty line on blur is removed and its children move up a level.
 - Mirrors unchanged: `findTask` / `focusTidToggled` / `focusReconcile` / 📌 `tidPlace` use item ids. Hold menu on a category's fold arrow: Rename, + Add task, Move, Collapse.
 - `tools/smoke.mjs` checks the conversion and a Tab nest (+ saved levels).
+- 2026-11-06: render groups each lv-0 line + its deeper lines into `.fx-cell` (bordered; `.fx-cat` full border, no left line). `.fx-tools` (‹ › 📌) removed; hold the checkbox (450 ms) → `showTaskMenu` (Send to Today / Make subtask / Less indent / Remove; the click after a hold is swallowed). Backspace uses `readText` (empty incl. `<br>`). + Category seeds one empty task; + Task only on an empty category.
 
 ## Fast start + live updates (2026-11-05, Julius: "like Google Sheets, update only what's needed")
 

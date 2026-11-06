@@ -434,3 +434,7 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 
 - `initDayReview`: `drLevel` 0/1/2 (localStorage `fw.drLevel`, default 1) via `.dr-lv` − / + buttons; `closedCats` / `openGroups` now hold headers that differ from the level default and reset on a level change. Group summary = `name: New n · Fixes n · Tweaks n`.
 - Server `getCardCats_` one-time flag `cardCatsMisc1` → `cardCatsMisc_`: removes "vivaldi" from other subjects' words, adds it to MISC (key `misc` or name starting MISC; made grey if missing).
+
+## Done → Dailies matching (2026-11-05, Julius: first version)
+
+- `initDailyMatch()` (Index.html, before initFun): today's open Dailies (`[data-nsec="must"]` up to the next section / table) vs done check-lines in today's `.day-editor` + `.plan-editor`. Score = shared words after stem + `SYN` groups; time words (`WHEN`) or the line's `data-dt` add +0.5 / −0.75; each done line goes to its best daily. Render-only `#dailyMatch` above `#journalScroll` (notes tab only). Tick = clicks the daily's checkbox. localStorage `fw.dailyMatch.v1` {yes, no, used (per day)}. Scans on any checkbox change, every 20 s, and 2.5 s after load. Smoke: "Morning stretch 10 min" → Morning · Stretch.

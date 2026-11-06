@@ -197,6 +197,25 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return a[0] === 0 && b[0] > 0 && b[1] === 0 && c[1] > 0 ? [] : ['levels ' + JSON.stringify([a,b,c])];
   });
   drl.forEach(x => errs.push('Day Review: ' + x));
+  // Done → Dailies match (2026-11-05): a done "Morning stretch 10 min" suggests the "Stretching" daily; Tick ticks it.
+  const dm = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const d = localToday(), jed = document.querySelector('#journalScroll .journal-editor[data-date="' + d + '"]');
+    const head = jed && jed.querySelector(':scope > [data-nsec="must"]');
+    if(!head) return ['no Dailies section'];
+    head.insertAdjacentHTML('afterend','<div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">Stretching</span></div><div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">Read 10 pages</span></div>');
+    const ed = document.querySelector('#todayScroll .day-editor[data-date="' + d + '"]');
+    ed.insertAdjacentHTML('beforeend','<div class="check-line done" data-level="0"><input type="checkbox" checked><span class="check-text">Morning stretch 10 min</span></div>');
+    window.fwDailyMatch.scan(); await wait(50);
+    const sh = window.fwDailyMatch.shown.map(m => m.dt).join('|');
+    if(sh !== 'Morning · Stretch') return ['matches: ' + sh]; // time words pick the Morning daily over Stretching / Before bed
+    document.querySelector('#dailyMatch [data-a="y"]').click(); await wait(100);
+    const cb = [...jed.querySelectorAll('.check-line')].find(l => l.textContent.replace(/\s+/g,' ').trim() === 'Morning · Stretch').querySelector('input');
+    if(!cb.checked) return ['Tick did not tick the daily'];
+    if(!document.getElementById('dailyMatch').hidden) return ['prompt still shown'];
+    return [];
+  });
+  dm.forEach(x => errs.push('Daily match: ' + x));
   // History detail button: List = one line per item (all 50), hidden lines really hidden; Mini = counts only; back to Full.
   const modes = [];
   for (let i = 0; i < 3; i++) {

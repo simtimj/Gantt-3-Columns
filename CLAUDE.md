@@ -98,6 +98,7 @@
 - Fun for later tab (2026-11-05, Julius)
 - Urgent add box = real task (2026-11-05, Julius)
 - Day Review levels + Vivaldi → MISC (2026-11-05, Julius)
+- Done → Dailies matching (2026-11-05, Julius: first version)
 
 ## IT study log (2026-11-04)
 

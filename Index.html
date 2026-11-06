@@ -565,6 +565,14 @@
     #dayReviewScroll{display:none;flex:var(--ns-a,1) 1 0;padding:4px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     #journalPane[data-ctab="review"] #dayReviewScroll{display:block;}
     #journalPane[data-ctab="review"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    /* Done → Dailies matches (2026-11-05, Julius): render-only prompt above the Notes cell. */
+    #dailyMatch{flex:0 0 auto;padding:4px 8px;border-bottom:1px solid var(--divider);font-size:calc(var(--paragraph-size,14px) * .82);line-height:1.3;}
+    #journalPane:not([data-ctab="notes"]) #dailyMatch{display:none!important;}
+    .dm-row{display:flex;align-items:center;gap:6px;padding:2px 0;}
+    .dm-row > span{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
+    .dm-row small{color:var(--muted,#888);}
+    .dm-row button{flex:0 0 auto;font:inherit;font-size:.9em;padding:1px 7px;min-height:22px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+    .dm-row button.dm-yes{border-color:#22c55e;}
     /* Fun for later tab (2026-11-05, Julius): 🎮 its own list, not part of the Notes cell. */
     #funScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     #journalPane[data-ctab="fun"] #funScroll{display:block;}
@@ -2271,6 +2279,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           <button type="button" data-ctab="fun" title="Fun for later" aria-label="Fun for later">🎮</button>
         </span>
       </div>
+      <div id="dailyMatch" hidden></div>
       <div
         class="scroll"
         id="journalScroll">
@@ -7316,6 +7325,95 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       .withFailureHandler(() => { data = {v:1,cats:[]}; render(); }).getFocus();
     else { data = {v:1,cats:[]}; }
     render();
+  })();
+  /* Done → Dailies matches (2026-11-05, Julius: "a task done today should tick its daily habit, just double check").
+     Finished lines today (History / Today cell + Blocks pad) are matched by words to today's open Dailies; each match
+     shows "Stretch — done: Morning stretch 10 min? ✓ Tick / ✕ Not this" above the Notes cell. Tick = clicks the
+     daily's own checkbox (normal save). Answers are kept per device (fw.dailyMatch.v1): "yes" pairs are the start of a
+     learned map, "no" pairs never ask again. Render-only, never saved in a cell. */
+  (function initDailyMatch(){
+    const box = document.getElementById('dailyMatch'); if(!box) return;
+    const KEY = 'fw.dailyMatch.v1';
+    let mem = {yes:{}, no:{}, used:{}};
+    try{ const m = JSON.parse(localStorage.getItem(KEY) || 'null'); if(m && m.yes && m.no) mem = Object.assign({used:{}}, m); }catch(e){}
+    const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(mem)); }catch(e){} };
+    const STOP = new Set('the and for with from into this that min mins minute minutes hour hours daily done take took make sure get got all one two three oz ounces day today before after then also some more less'.split(' '));
+    const WHEN = {morning:'am', morn:'am', wake:'am', breakfast:'am', afternoon:'pm', lunch:'pm', evening:'eve', night:'eve', bed:'eve', bedtime:'eve', dinner:'eve'};
+    const SYN = {exercise:['workout','gym','lift','lifting','exercise','exercises','train','training','pushup','pushups','squat','squats'],
+      stretch:['stretch','stretching','yoga','mobility','pt'], supplement:['supplement','supplements','vitamin','vitamins','pill','pills','creatine','magnesium'],
+      water:['water','hydrate','hydration','drink'], meditate:['meditate','meditation','mindfulness','breathe','breathing'],
+      walk:['walk','walking','walked','steps'], read:['read','reading','book'], journal:['journal','journaling']};
+    const norm = t => String(t || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+    const words = t => norm(t).split(' ').filter(w => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w));
+    const stem = w => w.replace(/(ing|ings|es|s|ed)$/,'').slice(0,6);
+    const syn = w => { const st = stem(w); for(const k in SYN) if(SYN[k].some(x => stem(x) === st)) return k; return st; };
+    const txt = l => ((l.querySelector(':scope > .check-text') || l).textContent || '').replace(/\s+/g,' ').trim().replace(/^\*+/,'');
+    const isDone = l => l.classList.contains('done') || !!(l.querySelector(':scope > input[type=checkbox]') || {}).checked;
+    function dailies(date){
+      const ed = document.querySelector('#journalScroll .journal-editor[data-date="' + date + '"]'); if(!ed) return [];
+      const head = ed.querySelector(':scope > [data-nsec="must"]'); if(!head) return [];
+      const out = [];
+      for(let n = head.nextElementSibling; n && !n.matches('[data-nsec],table'); n = n.nextElementSibling)
+        if(n.matches('.check-line') && txt(n)) out.push(n);
+      return out;
+    }
+    function doneLines(date){
+      const eds = document.querySelectorAll('#todayScroll .day-editor[data-date="' + date + '"], #todayScroll .plan-editor[data-date="' + date + '"]');
+      const out = []; eds.forEach(ed => ed.querySelectorAll('.check-line').forEach(l => { if(isDone(l) && txt(l)) out.push(l); }));
+      return out;
+    }
+    // Time of day: a daily's "Morning · " / "Before bed · " words, a done line's own words or its tick time (data-dt).
+    const whenOf = (t,dt) => { for(const w of norm(t).split(' ')) if(WHEN[w]) return WHEN[w];
+      const m = /^(\d\d):/.exec(dt || ''); if(!m) return ''; const h = +m[1]; return h < 12 ? 'am' : h < 17 ? 'pm' : 'eve'; };
+    let shown = [];
+    function scan(){
+      const date = localToday(), ds = dailies(date);
+      const open = ds.filter(d => !isDone(d)), done = doneLines(date);
+      // Score every (daily, done line) pair; each done line goes to its best daily, each daily shows once.
+      const pairs = [];
+      open.forEach(d => {
+        const dt = txt(d), dk = norm(dt), dw = new Set(words(dt).filter(w => !WHEN[w]).map(syn)), dwhen = whenOf(dt);
+        if(!dw.size) return;
+        done.forEach(l => {
+          const lt = txt(l), pair = dk + '|' + norm(lt);
+          if(mem.no[pair] || mem.used[date + '|' + norm(lt)]) return; // one done line ticks one daily
+          let sc = mem.yes[pair] ? 100 : words(lt).filter(w => dw.has(syn(w))).length;
+          if(!sc) return;
+          const lwhen = whenOf(lt, l.dataset.dt);
+          if(dwhen && lwhen) sc += dwhen === lwhen ? 0.5 : -0.75;
+          if(sc > 0) pairs.push({d, dt, l, lt, pair, sc});
+        });
+      });
+      pairs.sort((a,b) => b.sc - a.sc);
+      const usedD = new Set(), usedL = new Set(), list = [];
+      pairs.forEach(p => { if(usedD.has(p.d) || usedL.has(p.l)) return; usedD.add(p.d); usedL.add(p.l); list.push(p); });
+      list.sort((a,b) => open.indexOf(a.d) - open.indexOf(b.d));
+      shown = list;
+      const h = list.map((m,i) => '<div class="dm-row"><span>✓? <b>' + esc(m.dt) + '</b> <small>— done: ' + esc(m.lt.slice(0,80)) + '</small></span>' +
+        '<button type="button" class="dm-yes" data-dm="' + i + '" data-a="y">✓ Tick</button><button type="button" data-dm="' + i + '" data-a="n">✕ Not this</button></div>').join('');
+      if(box.dataset.h !== h){ box.dataset.h = h; box.innerHTML = h; }
+      box.hidden = !list.length;
+    }
+    box.addEventListener('pointerdown', e => { if(e.target.closest('button')) e.preventDefault(); });
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-dm]'); if(!b) return;
+      const m = shown[+b.dataset.dm]; if(!m) return;
+      if(b.dataset.a === 'y'){
+        mem.yes[m.pair] = Date.now();
+        const today = localToday(); mem.used[today + '|' + norm(m.lt)] = 1;
+        Object.keys(mem.used).forEach(k => { if(k.slice(0,10) < today) delete mem.used[k]; });
+        const cb = m.d.querySelector(':scope > input[type=checkbox]');
+        if(cb && !cb.checked) cb.click();
+        setStatus && setStatus('Daily ticked: ' + m.dt);
+      } else mem.no[m.pair] = Date.now();
+      keep(); scan();
+    });
+    let t = null;
+    const soon = () => { clearTimeout(t); t = setTimeout(scan, 400); };
+    document.addEventListener('change', e => { if(e.target && e.target.matches && e.target.matches('input[type=checkbox]')) soon(); }, true);
+    setInterval(() => { if(!document.hidden) scan(); }, 20000);
+    setTimeout(scan, 2500);
+    window.fwDailyMatch = {scan, get shown(){ return shown; }, mem:() => mem};
   })();
   /* Fun for later (2026-11-05, Julius): 🎮 tab = "I want to do this for fun later" (e.g. play Stardew's update).
      Device first: localStorage fw.fun.v1, then getFun / saveFun (server merges by id, newest u wins). */

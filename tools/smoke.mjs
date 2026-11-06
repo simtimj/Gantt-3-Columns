@@ -178,6 +178,15 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if(!saved || !saved[1][0].items.some(i => i.t === 'Play Stardew update')) return ['not saved'];
     item.closest('.fun-item').querySelector('input').click(); await wait(100);
     if(!/Done 1/.test(document.getElementById('funList').textContent)) return ['tick did not move it to Done'];
+    // Categories: make "Shows" (prompt stubbed), add an item into it → it sits under the Shows header.
+    window.prompt = () => 'Shows';
+    document.querySelector('#funList .fun-newcat').click(); await wait(50);
+    if(document.getElementById('funCat').selectedOptions[0].textContent !== 'Shows') return ['new category not picked'];
+    inp.value = 'Watch Severance'; inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(700);
+    const sec = [...document.querySelectorAll('#funList .fun-cat[data-cat]')].find(x => x.querySelector('.fun-cat-n').textContent === 'Shows');
+    if(!sec || !/Watch Severance/.test(sec.textContent)) return ['item not under Shows'];
+    const sv = (window.__calls || []).filter(c => c[0] === 'saveFun').pop();
+    if(!sv || !(sv[1][0].cats || []).some(c => c.name === 'Shows')) return ['category not saved'];
     document.querySelector('[data-ctab="notes"]')?.click(); await wait(100);
     return [];
   });

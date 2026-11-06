@@ -1338,18 +1338,21 @@ function saveFocus(data) {
 // {v:1, items:[{id, t, d:0|1, u:ms, x?:1}]} in script property funData. saveFun merges by id with the
 // newest u winning (x = deleted tombstone), so two devices never wipe each other's items.
 function getFun() {
-  try { const raw = PropertiesService.getScriptProperties().getProperty('funData'); return raw ? JSON.parse(raw) : { v: 1, items: [] }; }
-  catch (e) { return { v: 1, items: [] }; }
+  try { const raw = PropertiesService.getScriptProperties().getProperty('funData'); return raw ? JSON.parse(raw) : { v: 1, items: [], cats: [] }; }
+  catch (e) { return { v: 1, items: [], cats: [] }; }
 }
 function saveFun(data) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
-    const cur = getFun(), by = {};
-    (cur.items || []).forEach(i => { if (i && i.id) by[i.id] = i; });
-    ((data && data.items) || []).forEach(i => { if (i && i.id && (!by[i.id] || Number(i.u || 0) >= Number(by[i.id].u || 0))) by[i.id] = i; });
-    const week = Date.now() - 30 * 864e5;
-    const items = Object.keys(by).map(k => by[k]).filter(i => !(i.x && Number(i.u || 0) < week));
-    const out = { v: 1, items: items };
+    const cur = getFun(), week = Date.now() - 30 * 864e5;
+    // Items and categories (2026-11-05: cats [{id, name, u, x?}], item.g = category id) merge the same way.
+    const mergeList = (a, b) => {
+      const by = {};
+      (a || []).forEach(i => { if (i && i.id) by[i.id] = i; });
+      (b || []).forEach(i => { if (i && i.id && (!by[i.id] || Number(i.u || 0) >= Number(by[i.id].u || 0))) by[i.id] = i; });
+      return Object.keys(by).map(k => by[k]).filter(i => !(i.x && Number(i.u || 0) < week));
+    };
+    const out = { v: 1, items: mergeList(cur.items, data && data.items), cats: mergeList(cur.cats, data && data.cats) };
     const json = JSON.stringify(out);
     if (json.length > 8500) throw new Error('Fun list too big (' + json.length + ' chars)');
     PropertiesService.getScriptProperties().setProperty('funData', json);

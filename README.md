@@ -49,6 +49,7 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Fun categories**: + Category (top of 🌴 Fun) or "+ New category…" in the picker makes one (Video games, Shows, Movies…). New items go into the category picked next to the add box; each category has its own header (tap the name to rename, + to add to it, ✕ deletes the category but keeps its items). Hold an item to move it to another category. Synced like the list.
 - **Done → Dailies matching (first version)**: when a finished task today (History / Today or Blocks) matches one of today's open Dailies (e.g. "Morning stretch 10 min" → **Morning · Stretch**), a small line shows above the Notes cell: "✓? Morning · Stretch — done: …" with **✓ Tick** and **✕ Not this**. Tick ticks the daily; one done task ticks one daily. Time words (morning, before bed…) or the tick time pick the right one. Common synonyms count (workout = exercise, vitamins = supplements, yoga = stretch…). Your answers are remembered on the device, the start of a learned map.
 - **Day Review − / + levels**: − / + at the top of 📊 steps between categories only → categories with their projects ("Gantt: New 7 · Fixes 3 · Tweaks 11", now with a colon) → everything open. Tapping a header still opens / closes just that one. Remembered on the device.
 - **Vivaldi → MISC**: Vivaldi work counts under the MISC subject (not Code) in Day Review, History and Urgent batches.

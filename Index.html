@@ -586,6 +586,21 @@
     .fun-item.done .fun-t{text-decoration:line-through;color:var(--muted,#888);}
     .fun-item .fun-date{flex:0 0 auto;margin-left:auto;margin-top:2px;font-size:.8em;color:var(--muted,#888);white-space:nowrap;} /* date added, far right (2026-11-05) */
     .fun-item .fun-x{border:0;background:transparent;color:var(--muted,#888);cursor:pointer;padding:0 2px;font-size:.9em;}
+    .fun-add select{flex:0 1 auto;max-width:38%;min-width:0;font:inherit;font-size:.9em;padding:4px 2px;border:1px solid var(--border,#ccc);border-radius:6px;background:var(--panel,transparent);color:inherit;}
+    .fun-head{display:flex;align-items:center;gap:6px;}
+    .fun-newcat{margin-left:auto;font:inherit;font-weight:400;font-size:.95em;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:1px 7px;cursor:pointer;}
+    .fun-cat{margin:8px 0 4px;}
+    .fun-cat-h{display:flex;align-items:center;gap:6px;margin:0 0 4px;font-weight:700;font-size:.9em;border-bottom:1px solid var(--divider);padding-bottom:2px;}
+    .fun-cat-h small{font-weight:400;color:var(--muted,#888);}
+    .fun-cat-n{outline:none;min-width:2em;text-decoration:underline;text-underline-offset:2px;}
+    .fun-cat-h button{border:0;background:transparent;color:var(--muted,#888);cursor:pointer;font:inherit;padding:0 3px;}
+    .fun-cat-h .fun-cat-add{margin-left:auto;font-size:1.1em;}
+    .fun-cat-none .fun-cat-h{color:var(--muted,#888);font-weight:600;}
+    .fun-menu{position:fixed;z-index:9999;display:flex;flex-direction:column;min-width:150px;padding:4px;background:var(--panel,#222);color:var(--text,#eee);border:1px solid var(--border,#555);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:14px;}
+    .fun-menu-h{font-size:.8em;color:var(--muted,#888);padding:2px 6px 4px;}
+    .fun-menu button{text-align:left;border:0;background:transparent;color:inherit;font:inherit;padding:6px 8px;border-radius:5px;cursor:pointer;}
+    .fun-menu button.on{background:color-mix(in srgb,var(--divider) 45%,transparent);}
+    .fun-item{-webkit-touch-callout:none;}
     .fun-done-head{margin:10px 0 4px;font-size:.85em;color:var(--muted,#777);cursor:pointer;user-select:none;}
     .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);display:flex;align-items:center;gap:8px;}
     .dr-lv{display:inline-flex;gap:3px;margin-left:auto;}
@@ -2287,7 +2302,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       </div>
       <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Loading weather…</div></div>
       <div class="scroll" id="dayReviewScroll"></div>
-      <div class="scroll" id="funScroll"><div class="fun-add"><input id="funInput" type="text" placeholder="Something fun… (e.g. Stardew update, a book)" enterkeyhint="done" autocomplete="off"><button type="button" class="btn" id="funAddBtn">+</button></div><div id="funList"><div class="center-placeholder">Loading…</div></div></div>
+      <div class="scroll" id="funScroll"><div class="fun-add"><select id="funCat" aria-label="Category" title="Category for new items"></select><input id="funInput" type="text" placeholder="Something fun… (e.g. Stardew update, a book)" enterkeyhint="done" autocomplete="off"><button type="button" class="btn" id="funAddBtn">+</button></div><div id="funList"><div class="center-placeholder">Loading…</div></div></div>
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
@@ -7423,9 +7438,28 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!list || !inp) return;
     const KEY = 'fw.fun.v1';
     const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    let data = {v:1, items:[]}, saveT = null, doneOpen = false;
-    try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = c; }catch(e){}
-    const merge = srv => { const by = {}; data.items.forEach(i => by[i.id] = i); ((srv && srv.items) || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); data = {v:1, items:Object.values(by)}; };
+    let data = {v:1, items:[], cats:[]}, saveT = null, doneOpen = false;
+    try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = Object.assign({cats:[]}, c); }catch(e){}
+    // Categories (2026-11-05, Julius: video games, shows, movies…): cats [{id, name, u, x?}], item.g = category id.
+    const mergeL = (a,b) => { const by = {}; (a || []).forEach(i => by[i.id] = i); (b || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); return Object.values(by); };
+    const merge = srv => { data = {v:1, items:mergeL(data.items, srv && srv.items), cats:mergeL(data.cats, srv && srv.cats)}; };
+    const catSel = document.getElementById('funCat');
+    const fid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    const liveCats = () => (data.cats || []).filter(c => !c.x).sort((a,b) => (a.c || 0) - (b.c || 0));
+    let lastCat = ''; try{ lastCat = localStorage.getItem('fw.funCat') || ''; }catch(e){}
+    function fillSel(){
+      const cs = liveCats();
+      if(lastCat && !cs.some(c => c.id === lastCat)) lastCat = '';
+      catSel.innerHTML = '<option value="">No category</option>' + cs.map(c => '<option value="' + h(c.id) + '">' + h(c.name) + '</option>').join('') + '<option value="+">+ New category…</option>';
+      catSel.value = lastCat;
+    }
+    function newCat(){
+      const name = (prompt('New category (e.g. Video games, Shows, Movies, Books):') || '').trim().slice(0,40);
+      if(!name) return '';
+      const now = Date.now(), c = {id:fid('g'), name, c:now, u:now};
+      data.cats = data.cats || []; data.cats.push(c); save();
+      return c.id;
+    }
     const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} };
     function save(){
       keep(); clearTimeout(saveT);
@@ -7435,31 +7469,86 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         .saveFun(data); }, 600);
     }
     function render(){
+      fillSel();
+      const cs = liveCats(), catIds = new Set(cs.map(c => c.id));
       const live = data.items.filter(i => !i.x), open = live.filter(i => !i.d), done = live.filter(i => i.d);
       open.sort((a,b) => (b.c || 0) - (a.c || 0)); done.sort((a,b) => (b.u || 0) - (a.u || 0));
       const row = i => '<div class="fun-item' + (i.d ? ' done' : '') + '" data-id="' + h(i.id) + '"><input type="checkbox"' + (i.d ? ' checked' : '') + ' aria-label="Done"><div class="fun-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div>' + (i.c ? '<span class="fun-date" title="Added ' + h(new Date(i.c).toLocaleDateString()) + '">' + (new Date(i.c).getMonth() + 1) + '/' + new Date(i.c).getDate() + '</span>' : '') + '<button type="button" class="fun-x" aria-label="Remove" title="Remove">✕</button></div>';
-      list.innerHTML = '<div class="fun-head">🌴 Fun · ' + open.length + '</div>'
-        + (open.length ? open.map(row).join('') : '<div class="center-placeholder">Nothing yet. When something fun pops into your head while working, drop it here.</div>')
+      // One section per category (order made), then items without one.
+      const groups = cs.map(c => ({c, items:open.filter(i => i.g === c.id)})).concat([{c:null, items:open.filter(i => !i.g || !catIds.has(i.g))}]);
+      const body = groups.filter(gr => gr.c || gr.items.length).map(gr => gr.c
+        ? '<div class="fun-cat" data-cat="' + h(gr.c.id) + '"><div class="fun-cat-h"><span class="fun-cat-n" contenteditable="true" spellcheck="false" title="Tap to rename">' + h(gr.c.name) + '</span><small>' + gr.items.length + '</small><button type="button" class="fun-cat-add" title="Add to ' + h(gr.c.name) + '">+</button><button type="button" class="fun-cat-x" title="Delete category (items stay)">✕</button></div>' + gr.items.map(row).join('') + '</div>'
+        : (cs.length ? '<div class="fun-cat fun-cat-none"><div class="fun-cat-h"><span>No category</span><small>' + gr.items.length + '</small></div>' : '<div>') + gr.items.map(row).join('') + '</div>').join('');
+      list.innerHTML = '<div class="fun-head">🌴 Fun · ' + open.length + '<button type="button" class="fun-newcat" title="New category">+ Category</button></div>'
+        + (open.length || cs.length ? body : '<div class="center-placeholder">Nothing yet. When something fun pops into your head while working, drop it here.</div>')
         + (done.length ? '<div class="fun-done-head" data-fun-done>' + (doneOpen ? '▾' : '▸') + ' Done ' + done.length + '</div>' + (doneOpen ? done.map(row).join('') : '') : '');
     }
     const byId = id => data.items.find(i => i.id === id);
     function add(){
       const t = inp.value.trim(); if(!t) return;
       const now = Date.now();
-      data.items.push({id:'f' + now.toString(36) + Math.random().toString(36).slice(2,5), t, d:0, c:now, u:now});
+      const it = {id:'f' + now.toString(36) + Math.random().toString(36).slice(2,5), t, d:0, c:now, u:now};
+      if(catSel.value && catSel.value !== '+') it.g = catSel.value;
+      data.items.push(it);
       inp.value = ''; render(); save();
     }
     inp.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); add(); } });
     document.getElementById('funAddBtn').addEventListener('click', add);
+    catSel.addEventListener('change', () => {
+      if(catSel.value === '+'){ const id = newCat(); lastCat = id || lastCat; render(); }
+      else lastCat = catSel.value;
+      try{ localStorage.setItem('fw.funCat', lastCat); }catch(e){}
+      inp.focus();
+    });
+    // Hold an item (500 ms) → move it to another category.
+    let holdT = null, held = false, hx = 0, hy = 0;
+    list.addEventListener('pointerdown', e => {
+      const row = e.target.closest('.fun-item'); if(!row || e.target.closest('input,button')) return;
+      held = false; hx = e.clientX; hy = e.clientY; clearTimeout(holdT);
+      holdT = setTimeout(() => { held = true; moveMenu(row.dataset.id, hx, hy); }, 500);
+    });
+    list.addEventListener('pointermove', e => { if(Math.abs(e.clientX - hx) > 9 || Math.abs(e.clientY - hy) > 9) clearTimeout(holdT); });
+    ['pointerup','pointercancel'].forEach(t => list.addEventListener(t, () => clearTimeout(holdT)));
+    function moveMenu(id,x,y){
+      const it = byId(id); if(!it) return;
+      document.activeElement && document.activeElement.blur && document.activeElement.blur();
+      document.querySelectorAll('.fun-menu').forEach(m => m.remove());
+      const m = document.createElement('div'); m.className = 'fun-menu';
+      m.innerHTML = '<div class="fun-menu-h">Move to</div>' + liveCats().map(c => '<button type="button" data-g="' + h(c.id) + '"' + (it.g === c.id ? ' class="on"' : '') + '>' + h(c.name) + '</button>').join('') +
+        '<button type="button" data-g=""' + (!it.g ? ' class="on"' : '') + '>No category</button><button type="button" data-g="+">+ New category…</button>';
+      document.body.appendChild(m);
+      m.style.left = Math.max(8, Math.min(x, innerWidth - m.offsetWidth - 8)) + 'px';
+      m.style.top = Math.max(8, Math.min(y, innerHeight - m.offsetHeight - 8)) + 'px';
+      m.addEventListener('click', e => {
+        const b = e.target.closest('[data-g]'); if(!b) return;
+        let g = b.dataset.g; if(g === '+') g = newCat(); if(g === '+' ) return;
+        if(g) it.g = g; else delete it.g;
+        it.u = Date.now(); m.remove(); render(); save();
+      });
+      setTimeout(() => { const off = e => { if(!m.contains(e.target)){ m.remove(); document.removeEventListener('pointerdown', off, true); } }; document.addEventListener('pointerdown', off, true); }, 0);
+    }
     list.addEventListener('click', e => {
+      if(held){ held = false; e.preventDefault(); return; }
       if(e.target.closest('[data-fun-done]')){ doneOpen = !doneOpen; render(); return; }
+      if(e.target.closest('.fun-newcat')){ const id = newCat(); if(id){ lastCat = id; try{ localStorage.setItem('fw.funCat', id); }catch(err){} } render(); return; }
+      const ch = e.target.closest('.fun-cat[data-cat]');
+      if(ch && e.target.closest('.fun-cat-add')){ lastCat = ch.dataset.cat; try{ localStorage.setItem('fw.funCat', lastCat); }catch(err){} fillSel(); inp.focus(); return; }
+      if(ch && e.target.closest('.fun-cat-x')){
+        const c = (data.cats || []).find(x => x.id === ch.dataset.cat); if(!c) return;
+        if(!confirm('Delete the category "' + c.name + '"? Its items stay, under No category.')) return;
+        c.x = 1; c.u = Date.now(); render(); save(); return;
+      }
       const row = e.target.closest('.fun-item'); if(!row) return;
       const it = byId(row.dataset.id); if(!it) return;
       if(e.target.matches('input[type=checkbox]')){ it.d = e.target.checked ? 1 : 0; it.u = Date.now(); render(); save(); }
       else if(e.target.closest('.fun-x')){ it.x = 1; it.u = Date.now(); render(); save(); }
     });
     list.addEventListener('keydown', e => { if(e.target.closest('.fun-t')){ e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); } } });
+    list.addEventListener('keydown', e => { if(e.target.closest('.fun-cat-n')){ e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); } } });
     list.addEventListener('focusout', e => {
+      const cn = e.target.closest('.fun-cat-n');
+      if(cn){ const c = (data.cats || []).find(x => x.id === cn.closest('[data-cat]').dataset.cat), v = cn.textContent.trim().slice(0,40);
+        if(c && v && v !== c.name){ c.name = v; c.u = Date.now(); save(); render(); } else if(c && !v) cn.textContent = c.name; return; }
       const t = e.target.closest('.fun-t'); if(!t) return;
       const it = byId(t.closest('.fun-item').dataset.id); if(!it) return;
       const v = t.textContent.trim();

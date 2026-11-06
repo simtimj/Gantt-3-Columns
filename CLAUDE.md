@@ -106,6 +106,7 @@ When he asks to organize his calendar tasks:
 - Fun for later tab (2026-11-05, Julius)
 - Urgent add box = real task (2026-11-05, Julius)
 - Day Review levels + Vivaldi → MISC (2026-11-05, Julius)
+- Tuck strips + pull tabs (2026-11-06, Julius)
 - Done → Dailies matching (2026-11-05, Julius: first version)
 
 ## IT study log (2026-11-04)

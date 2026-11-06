@@ -251,6 +251,11 @@ Read only the section you need.
 - `#journalPane` = `#journalScroll` (Plan, flex `--ns-a`) + `#notesSplitBar` + `#reviewScroll` (flex `--ns-b`); wired in `initSplitBars` (`fw.notesSplit`). One-day `--od-hj` follows the smaller `#journalScroll` via the existing ResizeObserver.
 - `renderReview()` (after `updateDash`, debounced 150 ms) reads top-level `.check-line`s of the Today `.day-editor` for `reviewDate()` (one-day `odDate`, else today): Done n/m; Got focus = done grouped by `tsecOf(data-dt)`; At risk = open `data-urg` 1–2 (past day: Slipped = all open); Tomorrow's top 3 = open sorted urg 1→2→3→none. Called from `updateDash`, `odApply`, and every 60 s. Click `.rv-line` → `reviewSrc[i].scrollIntoView`. Render-only, never saved; adds nothing to the Today DOM.
 
+## Tuck strips + pull tabs (2026-11-06, Julius)
+
+- `TUCK` 14px / `TUCK_SNAP` 48px + `tuckFrac(p,lo,hi,size)` (next to `split3`): every line drag (desktop `.column-resizer`, `triDrag`, 2-pane `#mobileSplitResizer`, row-layout cols, `initSplitBars` wire) clamps a pane/half to ≥ TUCK px and snaps to TUCK under TUCK_SNAP. Old 120px / .2–.8 / .12–.88 limits removed (load clamps .003–.997); `updateWorkspaceLayout` tracks use `Math.max(TUCK,…)`. Reference edge resize capped at the window's right edge.
+- `initTucks()` (own `<script>` before the zoom script): scans panes (x) and section halves (y: refTop/referenceScroll, the Center Up tab scroll/centerDownScroll, od-top/plan-pad) on ResizeObserver / pointerup / scroll / 4 s; under 40px → `.fw-tucked` (children hidden) + fixed `.fw-tuck-tab` button. Tap → `window.tuckRestorePane(name)` (split: 1/3 or .5; desktop: ~half of widest neighbour, 200–360px) or `window.splitBarRestore(key)` (alignOne). `window.tuckScan()` forces a scan. Smoke (last per viewport): drag the last column line to the edge → strip + tab → tap → back.
+
 ## Grips + edge-to-edge note cells (2026-10-31, Julius)
 
 - Reference split: `wire` option `minB:30` lets the bottom (`#referenceScroll`, CSS `min-height:30px`) shrink to a 30px strip; load clamp .98 for that bar.

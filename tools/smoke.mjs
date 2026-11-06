@@ -460,6 +460,29 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   await pg.reload(); await pg.waitForTimeout(800);
   const after = await pg.evaluate(() => window.fwTimer && window.fwTimer.events().length);
   if (after !== before) errs.push('Timer: events lost on reload (' + before + ' → ' + after + ')');
+  // Last on purpose: it changes the column widths the earlier checks measure against.
+  // Tuck (2026-11-06): drag the last column line to the right edge → Reference is a thin strip with a pull tab; tap = back.
+  const tk = [];
+  const hp = await pg.evaluate(() => { const hs = [...document.querySelectorAll('.column-resizer')].filter(h => h.offsetParent); if (!hs.length) return null; const r = hs[hs.length - 1].getBoundingClientRect(); return [r.left + r.width / 2, r.top + 30, innerWidth]; });
+  if (hp) {
+    await pg.mouse.move(hp[0], hp[1]); await pg.mouse.down(); await pg.mouse.move(hp[0] + 60, hp[1], { steps: 3 }); await pg.mouse.move(hp[2] - 1, hp[1], { steps: 4 }); await pg.mouse.up();
+    await pg.waitForTimeout(150);
+    const res = await pg.evaluate(async () => {
+      const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      window.tuckScan && tuckScan(); await wait(100);
+      const ref = document.getElementById('referencePane'), w = ref.getBoundingClientRect().width;
+      if (w > 30) out.push('Reference did not tuck: ' + Math.round(w) + 'px');
+      if (ref.getBoundingClientRect().right > innerWidth + 1) out.push('Reference went past the window');
+      const tab = document.querySelector('.fw-tuck-tab');
+      if (!tab) return out.concat('no pull tab on the tucked column');
+      tab.click(); await wait(200);
+      if (ref.getBoundingClientRect().width < 150) out.push('pull tab did not bring Reference back');
+      if (document.querySelector('.fw-tuck-tab')) out.push('pull tab stayed after restore');
+      return out;
+    });
+    tk.push(...res);
+  }
+  tk.forEach(x => errs.push('Tuck: ' + x));
   if (errs.length) { fails += errs.length; console.error('✗ ' + name + ':\n  ' + errs.join('\n  ')); }
   else console.log('✓ ' + name + ': loads with no page errors');
 }

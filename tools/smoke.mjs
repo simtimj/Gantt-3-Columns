@@ -288,6 +288,18 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     pad.dispatchEvent(new Event('input', { bubbles: true }));
     document.querySelector('[data-ce-grid]').click(); await wait(100);
     if (list.classList.contains('ce-grid')) out.push('☰ did not go back to the list');
+    // Search box on the Cal Events line (2026-11-06): filters as you type, Esc clears, fits the header.
+    const sb = document.querySelector('[data-ce-search]'), head = sb.closest('.ce-head');
+    const fits = () => [...head.children].every(c => c.getBoundingClientRect().right <= head.getBoundingClientRect().right + 1) && sb.offsetWidth >= 34;
+    if (!fits()) out.push('search box does not fit the header: ' + JSON.stringify([Math.round(head.getBoundingClientRect().width), [...head.children].map(c => [c.className, Math.round(c.getBoundingClientRect().width), Math.round(c.getBoundingClientRect().right)])]));
+    const typeQ = v => { sb.value = v; sb.dispatchEvent(new Event('input', { bubbles: true })); };
+    typeQ('sample'); await wait(50);
+    if (!list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('search "sample" hid the event');
+    typeQ('aws cleanup'); await wait(50);
+    if (list.querySelector('.ce-event') || !/No match/.test(list.textContent)) out.push('search "aws cleanup" did not filter');
+    sb.focus(); if (!fits()) out.push('search box overflows while typing');
+    sb.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
+    if (sb.value || !list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('Esc did not clear the search');
     return out;
   });
   quad.forEach(x => errs.push('Cal 4-box: ' + x));

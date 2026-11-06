@@ -1975,6 +1975,11 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList [data-ce-editing]{outline:0;cursor:text;-webkit-user-select:text;user-select:text;}
 /* + Task in All-Day Tasks (2026-11-04, Julius). */
 #centerCalendarList .ce-group-add{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+/* Cal Events search (2026-11-06, Julius): a box on the title line filters the events as you type (title words, any order).
+   Narrow phone column (title was already cut to "Ca…"): the title hides so the box fits. */
+#centerDownScroll .ce-head .ce-search{flex:1 1 60px;min-width:44px;width:0;max-width:220px;box-sizing:border-box;height:24px;margin:0;padding:1px 6px;font:inherit;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:inherit;}
+#centerDownScroll .ce-head strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@container (max-width:260px){#centerDownScroll .ce-head{gap:3px;}#centerDownScroll .ce-head strong{display:none;}#centerDownScroll .ce-head .ce-search{min-width:36px;padding:1px 4px;}#centerDownScroll .ce-head:has(.ce-search:focus) :is([data-ce-sort],[data-ce-grid]){display:none;}#centerDownScroll .ce-head .ce-search:focus{max-width:none;}}
 /* Cal Events 4-box view (2026-11-05, Julius): 1 top left → 2 top right → 3 bottom right → 4 bottom left. */
 #centerDownScroll.ce-grid-on{display:flex!important;flex-direction:column;overflow:hidden!important;}
 #centerDownScroll.ce-grid-on > .ce-head{flex:0 0 auto;}
@@ -2313,7 +2318,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
       <div class="scroll notes-review" id="reviewScroll"></div>
       <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
-      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Cats</button><button type="button" class="btn" data-ce-grid aria-label="Switch Cal Events between list and 4 boxes" title="4 boxes: Sort → Urgency → Schedule → Done">⊞</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
+      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><input type="search" class="ce-search" data-ce-search placeholder="🔍 Find" aria-label="Find a Cal Events task" autocomplete="off" enterkeyhint="search"><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Cats</button><button type="button" class="btn" data-ce-grid aria-label="Switch Cal Events between list and 4 boxes" title="4 boxes: Sort → Urgency → Schedule → Done">⊞</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
     <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
     <section
@@ -8720,16 +8725,28 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       setStatus('Could not save that calendar event: ' + (err && err.message || err));
     }).setCalendarEventMeta(d.ceId,Number(d.ceStart),d.ceRec === '1',meta,d.ceCal);
   }
+  // Cal Events search (2026-11-06, Julius): display filter only, nothing saved; Esc clears.
+  function ceSearchWords(){ const i = document.querySelector('[data-ce-search]'); return i ? i.value.toLowerCase().split(/\s+/).filter(Boolean) : []; }
+  document.addEventListener('input', e => { if(e.target.closest && e.target.closest('[data-ce-search]') && ceDraw) ceDraw(); });
+  document.addEventListener('keydown', e => {
+    const i = e.target.closest && e.target.closest('[data-ce-search]');
+    if(!i) return;
+    if(e.key === 'Escape'){ i.value = ''; if(ceDraw) ceDraw(); i.blur(); }
+    if(e.key === 'Enter'){ e.preventDefault(); i.blur(); }
+  }, true);
   function loadCenterCalendar(date, force){
     date = date || window.odDate || state.today;
     const box = document.getElementById('centerCalendarList');
     if(!box || !date) return;
     if(box.querySelector('[data-ce-editing]')) return; // never redraw over a title being typed
     const seq = ++centerCalendarSeq;
-    const draw = data => {
+    const draw = full => {
       if(seq !== centerCalendarSeq || box.querySelector('[data-ce-editing]')) return;
-      ceShownDate = data.date;
-      ceDraw = () => draw(data);
+      ceShownDate = full.date;
+      ceDraw = () => draw(full);
+      let data = full;
+      const q = ceSearchWords();
+      if(q.length) data = Object.assign({}, data, {events: data.events.filter(ev => { const t = String(ev.title || '').toLowerCase(); return q.every(w => t.includes(w)); })});
       const allDay = data.events.filter(ev => ev.allDay).sort((a,b) => Number(a.done) - Number(b.done)), scheduled = data.events.filter(ev => !ev.allDay);
       const checkbox = ev => '<input type="checkbox" class="ce-check"' + (ev.done ? ' checked' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
       // Row carries the event's id + its menu fields (urgency, due, length, subject), like a task line.
@@ -8764,7 +8781,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         ? addHead('Tasks') + bySubject(allDay.concat(scheduled),allDayRow)
         : addHead('All-Day Tasks') + allDay.map(allDayRow).join('') +
           (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.slice().sort((a,b) => String(a.start).localeCompare(String(b.start))).map(timedRow).join('') : '')) +
-        (!data.events.length ? '<div class="ce-empty">No events.</div>' : '');
+        (!data.events.length ? '<div class="ce-empty">' + (q.length ? 'No match for “' + esc(q.join(' ')) + '”.' : 'No events.') + '</div>' : '');
     };
     const cached = centerCalendarCache.get(date);
     if(!force && cached && Date.now() - cached.at < 60000){ draw(cached.data); return; }

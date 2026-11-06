@@ -578,7 +578,10 @@
     .fun-item.done .fun-t{text-decoration:line-through;color:var(--muted,#888);}
     .fun-item .fun-x{border:0;background:transparent;color:var(--muted,#888);cursor:pointer;padding:0 2px;font-size:.9em;}
     .fun-done-head{margin:10px 0 4px;font-size:.85em;color:var(--muted,#777);cursor:pointer;user-select:none;}
-    .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
+    .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);display:flex;align-items:center;gap:8px;}
+    .dr-lv{display:inline-flex;gap:3px;margin-left:auto;}
+    .dr-lv button{font:inherit;font-size:.95em;line-height:1;min-width:22px;height:20px;padding:0 5px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+    .dr-lv button:disabled{opacity:.35;cursor:default;}
     /* Category and group cells, underlined category header (2026-11-04, Julius). */
     .dr-cat{--dr-c:#8a8f98;margin:0 0 8px;padding:3px 7px 5px;border:1px solid color-mix(in srgb,var(--dr-c) 55%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--dr-c) 7%,transparent);}
     .dr-cat[open] > summary{margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid color-mix(in srgb,var(--dr-c) 70%,var(--border));}
@@ -10852,6 +10855,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!box || !pane) return;
     const closedCats = new Set(), openGroups = new Set();
     let timer = null;
+    /* − / + levels (2026-11-05, Julius): 0 = categories only, 1 = categories + their groups
+       ("Gantt: New 7 · Fixes 3 · Tweaks 11"), 2 = everything open. Per device; a tap on a header still opens / closes it. */
+    let drLevel = 1; try{ const v = localStorage.getItem('fw.drLevel'); if(v !== null) drLevel = Math.max(0,Math.min(2,+v || 0)); }catch(e){}
+    const setLevel = lv => {
+      drLevel = Math.max(0,Math.min(2,lv)); try{ localStorage.setItem('fw.drLevel',String(drLevel)); }catch(e){}
+      closedCats.clear(); openGroups.clear(); box.dataset.h = ''; draw();
+    };
     const txt = n => ((n.querySelector(':scope > .check-text') || n).textContent || '').replace(/\s+/g,' ').trim().replace(/^\*/,'');
     const isDone = l => l.classList.contains('done') || !!(l.querySelector(':scope > input[type=checkbox]') || {}).checked;
     // Main point in bold (the line's bold start, else the text before ":"), details muted after it.
@@ -10884,18 +10894,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const date = reviewDate();
       const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
       const {cats,total} = ed ? collect(ed) : {cats:[],total:0};
-      let h = `<div class="dr-head">Day Review · ${total} done</div>`;
+      let h = `<div class="dr-head"><span>Day Review · ${total} done</span><span class="dr-lv"><button type="button" data-drlv="-1" title="Fold one level"${drLevel ? '' : ' disabled'}>−</button><button type="button" data-drlv="1" title="Open one level"${drLevel < 2 ? '' : ' disabled'}>+</button></span></div>`;
       if(!total) h += '<div class="center-placeholder">Nothing done yet.</div>';
       cats.forEach(c => {
         const info = CARD_CAT_BY_KEY[c.key], name = info ? info.name : 'Other';
-        h += `<details class="dr-cat" data-k="${esc(c.key)}" style="--dr-c:${esc(info ? info.color : '#8a8f98')}"${closedCats.has(c.key) ? '' : ' open'}><summary><i style="background:var(--dr-c)"></i>${esc(name)}<b>${c.n}</b></summary>`;
+        h += `<details class="dr-cat" data-k="${esc(c.key)}" style="--dr-c:${esc(info ? info.color : '#8a8f98')}"${drLevel === 0 ? (closedCats.has(c.key) ? ' open' : '') : (closedCats.has(c.key) ? '' : ' open')}><summary><i style="background:var(--dr-c)"></i>${esc(name)}<b>${c.n}</b></summary>`;
         [...c.groups.entries()].sort((a,b) => b[1].length - a[1].length).forEach(([g,list]) => {
           const k = c.key + '|' + g;
           // History log types (2026-11-04): New / Fixes / Tweaks counts in the summary, names under each.
           const htmlOf = new Map(list.map(x => [x.n,x.h]));
           const types = logTypeBuckets(list.map(x => x.n),x => htmlOf.get(x));
           const tc = types ? '<span class="dr-tcount">' + types.filter(t => t.k).map(t => esc(t.name) + ' ' + t.items.length).join(' · ') + '</span>' : '';
-          h += `<details class="dr-group" data-k="${esc(k)}"${openGroups.has(k) ? ' open' : ''}><summary>${esc(g)}${tc}<b>${list.length}</b></summary>` +
+          const gOpen = drLevel === 2 ? !openGroups.has(k) : openGroups.has(k);
+          h += `<details class="dr-group" data-k="${esc(k)}"${gOpen ? ' open' : ''}><summary>${esc(g)}${tc ? ':' : ''}${tc}<b>${list.length}</b></summary>` +
             (types ? types.map(ty => `<div class="dr-type">${esc(ty.name)} · ${ty.items.length}</div>` + ty.items.map(h => `<div class="dr-line">${h}</div>`).join('')).join('')
               : list.map(x => `<div class="dr-line">${x.h}</div>`).join('')) + '</details>';
         });
@@ -10904,11 +10915,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(box.dataset.h !== h){ box.dataset.h = h; const y = box.scrollTop; box.innerHTML = h; box.scrollTop = y; }
     }
     window.renderDayReview = () => { if(!timer) timer = setTimeout(() => { timer = null; draw(); },200); };
-    box.addEventListener('click',e => { const l = e.target.closest && e.target.closest('.dr-line'); if(l) l.classList.toggle('dr-full'); });
+    box.addEventListener('click',e => {
+      const lb = e.target.closest && e.target.closest('[data-drlv]');
+      if(lb){ e.preventDefault(); setLevel(drLevel + Number(lb.dataset.drlv)); return; }
+      const l = e.target.closest && e.target.closest('.dr-line'); if(l) l.classList.toggle('dr-full');
+    });
     box.addEventListener('toggle',e => {
       const d = e.target; if(!d.matches || !d.matches('details')) return;
-      if(d.classList.contains('dr-cat')) closedCats[d.open ? 'delete' : 'add'](d.dataset.k);
-      else openGroups[d.open ? 'add' : 'delete'](d.dataset.k);
+      // Sets hold the headers that differ from the − / + level's default.
+      if(d.classList.contains('dr-cat')) closedCats[(drLevel === 0 ? !d.open : d.open) ? 'delete' : 'add'](d.dataset.k);
+      else openGroups[(drLevel === 2 ? !d.open : d.open) ? 'add' : 'delete'](d.dataset.k);
     },true);
   })();
   /* ===== Title lines (Julius, 2026-10-27: save room) =====

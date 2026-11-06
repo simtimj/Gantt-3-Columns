@@ -49,6 +49,8 @@ Last updated: 2026-11-05
 
 ## 🧪 To be confirmed (2026-11-05)
 
+- **Day Review − / + levels**: − / + at the top of 📊 steps between categories only → categories with their projects ("Gantt: New 7 · Fixes 3 · Tweaks 11", now with a colon) → everything open. Tapping a header still opens / closes just that one. Remembered on the device.
+- **Vivaldi → MISC**: Vivaldi work counts under the MISC subject (not Code) in Day Review, History and Urgent batches.
 - **Urgent add box = a real task**: the "Add … task" line has a checkbox in front; Enter makes the task and puts you right in its line (with its checkbox), so Tab / Shift+Tab indent, hold the checkbox or text for the full menu (urgency, + Subtask, Indent, due date…), and Enter makes the next task.
 - **Keep In Mind cells**: each category is a bordered cell and each task (with its subtasks) a smaller cell inside it (the single left line is gone). The ‹ › and 📌 buttons on the line are gone: hold a task's checkbox for 📌 Send to Today, → Make subtask, ← Less indent, ✕ Remove. Backspace on an emptied line removes it right away. + Category makes the category with one task line; + Task only shows on an empty category.
 

@@ -1228,10 +1228,20 @@ function getCardCats_() {
   if (!all.cardCatsLearn1) { out = cardCatsLearn_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsLearn1', '1'); }
   // 2026-11-04 (Julius): Productivity is silver.
   if (!all.cardCatsSilver1) { out = out.map(c => c.key === 'productivity' ? Object.assign({}, c, { color: '#c0c4cc' }) : c); inboxWrite_('cardCats', out); props.setProperty('cardCatsSilver1', '1'); }
+  // 2026-11-05 (Julius): Vivaldi work goes under MISC (made if missing), not Code.
+  if (!all.cardCatsMisc1) { out = cardCatsMisc_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsMisc1', '1'); }
   const health = cardCatsHealth_(out, !all.cardCatsHealth1);
   if (JSON.stringify(health) !== JSON.stringify(out)) inboxWrite_('cardCats', health);
   if (!all.cardCatsHealth1) props.setProperty('cardCatsHealth1', '1');
   return health;
+}
+function cardCatsMisc_(list) {
+  const words = s => String(s || '').split(',').map(w => w.trim()).filter(Boolean);
+  let out = list.map(c => Object.assign({}, c, { words: words(c.words).filter(w => w.toLowerCase() !== 'vivaldi').join(', ') }));
+  let m = out.find(c => c.key === 'misc' || /^misc/i.test(String(c.name || '')));
+  if (!m) { m = { key: 'misc', name: 'MISC', color: '#9ca3af', words: '' }; out.push(m); }
+  m.words = words(m.words).concat('vivaldi').join(', ');
+  return out;
 }
 function cardCatsLearn_(list) {
   const words = c => String(c.words || '').split(',').map(w => w.trim()).filter(Boolean);

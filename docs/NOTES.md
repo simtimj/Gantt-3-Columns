@@ -429,3 +429,8 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 ## Urgent add box = real task (2026-11-05, Julius)
 
 - `urgAdderRow` shows an inert `.urg-box.urg-addbox2` before the textarea. Submit → `addTaskToBacklog(…, urgFocusMade)` → `urgFocusMade(line)` sets `urgFocusWant` so `renderUrgent` puts the caret in the new real row (also when the Backlog card is made async). Tab / Shift+Tab in `#urgentPanel .urg-text` → `urgIndent` (keeps focus). Smoke: add box checkbox, caret in new row, Tab → level 1.
+
+## Day Review levels + Vivaldi → MISC (2026-11-05, Julius)
+
+- `initDayReview`: `drLevel` 0/1/2 (localStorage `fw.drLevel`, default 1) via `.dr-lv` − / + buttons; `closedCats` / `openGroups` now hold headers that differ from the level default and reset on a level change. Group summary = `name: New n · Fixes n · Tweaks n`.
+- Server `getCardCats_` one-time flag `cardCatsMisc1` → `cardCatsMisc_`: removes "vivaldi" from other subjects' words, adds it to MISC (key `misc` or name starting MISC; made grey if missing).

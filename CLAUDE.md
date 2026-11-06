@@ -97,6 +97,7 @@
 - Time Tracker app (2026-11-05, Julius: separate app in `tracker/`, `?app=tracker`)
 - Fun for later tab (2026-11-05, Julius)
 - Urgent add box = real task (2026-11-05, Julius)
+- Day Review levels + Vivaldi → MISC (2026-11-05, Julius)
 
 ## IT study log (2026-11-04)
 

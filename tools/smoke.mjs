@@ -182,6 +182,21 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return [];
   });
   fun.forEach(x => errs.push('Fun tab: ' + x));
+  // Day Review − / + levels (2026-11-05): categories only → + groups → all open.
+  const drl = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    document.querySelector('[data-ctab="review"]')?.click(); await wait(500);
+    const box = document.getElementById('dayReviewScroll');
+    const minus = () => box.querySelector('[data-drlv="-1"]'), plus = () => box.querySelector('[data-drlv="1"]');
+    if(!minus() || !plus()) return ['no − / + buttons'];
+    if(!box.querySelector('.dr-cat')) { document.querySelector('[data-ctab="notes"]')?.click(); return []; } // nothing done in the sample day
+    minus().click(); minus()?.click(); await wait(50);
+    const st = () => [box.querySelectorAll('.dr-cat[open]').length, box.querySelectorAll('.dr-group[open]').length];
+    const a = st(); plus().click(); await wait(50); const b = st(); plus().click(); await wait(50); const c = st();
+    document.querySelector('[data-ctab="notes"]')?.click();
+    return a[0] === 0 && b[0] > 0 && b[1] === 0 && c[1] > 0 ? [] : ['levels ' + JSON.stringify([a,b,c])];
+  });
+  drl.forEach(x => errs.push('Day Review: ' + x));
   // History detail button: List = one line per item (all 50), hidden lines really hidden; Mini = counts only; back to Full.
   const modes = [];
   for (let i = 0; i < 3; i++) {

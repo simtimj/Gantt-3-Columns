@@ -358,6 +358,7 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - Fold leak fix: `#todayScroll .day-editor .check-line:not([data-tlon]){display:flow-root!important}` (History wrap, 2026-11-04) out-ranked `[data-tlhid]{display:none!important}`, so folded History lines stayed visible. `#todayScroll .day-editor > [data-tlhid][data-tlhid][data-tlhid]` restores it (repeated attribute for specificity).
 - Hold-to-expand: `.today-jump` resolves to `#todayScroll .od-on > .od-top` in one-day view (was `#todayPane`, which zoomed Blocks too); `open()` pins the Blocks pad's flex-basis to its current height while History is out of the row, `settle()` clears it.
 - Load: `readAllDays_()` once in `getWorkspaceData()` → `getUrgentDays_(all)`, `getNotesSeeds_(today, all)` (both still work without it). `syncConfirmCard_` = `confirmCardWork_(true)` dry run without the lock; lock (tryLock 5 s) only to write.
+- 2026-11-06 (Julius): `#histMode` is now a `.hist-modes` span of three fixed `.hist-mode` buttons (`data-hm` full / compact / mini); `histModeButton` sets `aria-pressed` on the current one (filled). Smaller in `.pane-narrow` so all three fit the ~140px phone header.
 - `tools/smoke.mjs` checks a 50-item section in all three modes (List lists ≥ 50 items, no hidden line displayed, nothing wider than the pane).
 
 ## Urgent checkmarks (2026-11-04, Julius via ChatGPT handoff)

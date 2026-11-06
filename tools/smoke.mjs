@@ -227,12 +227,15 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   dm.forEach(x => errs.push('Daily match: ' + x));
   // History detail button: List = one line per item (all 50), hidden lines really hidden; Mini = counts only; back to Full.
   const modes = [];
-  for (let i = 0; i < 3; i++) {
-    await pg.click('#histMode'); await pg.waitForTimeout(250);
+  for (const hm of ['compact', 'mini', 'full']) {
+    await pg.click('#histMode [data-hm="' + hm + '"]'); await pg.waitForTimeout(250);
     modes.push(await pg.evaluate(() => {
       const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]'), top = ed.closest('.od-top') || ed;
       const leak = [...ed.querySelectorAll(':scope > [data-tlhid]')].filter(x => getComputedStyle(x).display !== 'none').length;
       const wide = [...ed.querySelectorAll('.ts-it')].filter(x => x.getBoundingClientRect().right > top.getBoundingClientRect().right + 1).length;
+      const pressed = [...document.querySelectorAll('#histMode .hist-mode[aria-pressed="true"]')].map(b => b.dataset.hm).join();
+      const hdr = document.querySelector('#todayPane .pane-header'), btns = [...document.querySelectorAll('#histMode .hist-mode')];
+      if (pressed !== document.body.dataset.hist || btns.length !== 3 || btns.some(b => !b.offsetWidth || b.getBoundingClientRect().right > hdr.getBoundingClientRect().right + 1)) return { mode: 'buttons: ' + pressed, hdr: hdr.getBoundingClientRect().width, w: btns.map(b => [b.offsetWidth, Math.round(b.getBoundingClientRect().right)]), r: Math.round(hdr.getBoundingClientRect().right), html: hdr.innerText };
       return { mode: document.body.dataset.hist, items: ed.querySelectorAll('.ts-it').length, leak, wide };
     }));
   }

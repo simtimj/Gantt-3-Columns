@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
 
 ## Status key
 
@@ -47,6 +47,10 @@ Last updated: 2026-11-05
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
+## 🧪 To be confirmed (2026-11-06)
+
+- **History detail: three buttons side by side** (▤ Full · ≡ List · – Mini) next to HISTORY instead of one button that cycles. All three stay put; tap one to switch, the current one is filled in.
+
 ## 🧪 To be confirmed (2026-11-05)
 
 - **Fun categories**: + Category (top of 🌴 Fun) or "+ New category…" in the picker makes one (Video games, Shows, Movies…). New items go into the category picked next to the add box; each category has its own header (tap the name to rename, + to add to it, ✕ deletes the category but keeps its items). Hold an item to move it to another category. Synced like the list.
@@ -83,7 +87,7 @@ Last updated: 2026-11-05
 ## 🧪 To be confirmed (2026-11-04)
 
 - **Checkmarks in Urgent**: finished tasks in the Urgent panel now show a ✓ inside their box (white on red / blue, dark on yellow), not just a filled box. Ticking a task in Today now updates Urgent at once (it used to lag about 1.5 s). Ticking in either place still changes the same task.
-- **History detail button (▤ / ≡ / –)** next to HISTORY at the top of the History column. Tap to switch: **▤ Full** (as before; sections fold only when you tap them), **≡ List** (every Morning / Afternoon / Evening folded to one row per project, with every item on its own line), **– Mini** (one short line per project: name + count). Tap a section header to open just that one; in Mini, tap a count to see its list. Remembered on each device; it only changes the view, never your saved History. Older days (Oct 30 – Nov 1 style) and groups sitting outside the time sections fold the same way, and List / Mini hide their blank lines.
+- **History detail buttons (▤ / ≡ / –)** next to HISTORY at the top of the History column (one button each since 2026-11-06). Tap one: **▤ Full** (as before; sections fold only when you tap them), **≡ List** (every Morning / Afternoon / Evening folded to one row per project, with every item on its own line), **– Mini** (one short line per project: name + count). Tap a section header to open just that one; in Mini, tap a count to see its list. Remembered on each device; it only changes the view, never your saved History. Older days (Oct 30 – Nov 1 style) and groups sitting outside the time sections fold the same way, and List / Mini hide their blank lines.
 - **Folded History really folds**: a style added Nov 4 kept every task visible under a folded Morning / Afternoon / Evening, which is why some sections never condensed. Fixed for all modes.
 - **One item per line in folded summaries**: no more single paragraph with "· +20 more"; all items kept, repeats shown once with ×2.
 - **Holding HISTORY no longer stretches Blocks**: hold-to-expand now zooms just the History part; Blocks keeps its height.

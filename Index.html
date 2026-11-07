@@ -2790,7 +2790,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
   }
   // Starter lines for a new day's Make sure you do (Julius, 2026-11-01). Edit here to change the defaults.
-  const MUST_DEFAULTS = ['Hydration 64 oz: T: 0/64 |','On waking · Drink a glass of water','10K steps','Morning · Stretch','Hygiene','Medicine','Supplements','Before bed · Stretch','Read 10+ pages','Meditate'];
+  const MUST_DEFAULTS = ['Hydration 64 oz: T: 0/64 |','On waking · Drink a glass of water','10K steps','Morning · Stretch','Hygiene','Medicine','Supplements','Before bed · Stretch','Read 10+ pages: T: 0/10 |','Meditate'];
   // Drink tokens are the editable source of truth; the displayed total is derived.
   function hydrationDrink(value){
     const m = String(value || '').trim().match(/^(\d+(?:\.\d+)?)\s*(?:oz\s*|ounces?\s*(?:of\s*)?)?(water|coffee|tea|milk|other|w|c|m|o)?$/i);
@@ -2814,6 +2814,48 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function hydrationLine(line){
     return !!line && hydrationText((line.querySelector(':scope > .check-text') || line).textContent) !== null;
+  }
+  /* Pages read (2026-11-07, Julius: count pages for the satisfaction): the "Read 10+ pages" daily keeps a running
+     list like hydration: "Read 10+ pages: T: 17/10 | +7 · +10". Add from the checkbox hold menu (Add pages) or type
+     "+5" after the bar; the total is derived, the daily ticks itself once the goal is reached, and tomorrow starts at 0. */
+  function readingPages(value){
+    const m = String(value || '').trim().match(/^\+?(\d{1,4})\s*(?:p|pg|pgs|pages?)?$/i);
+    const n = m ? Number(m[1]) : 0;
+    return n > 0 && n <= 2000 ? n : null;
+  }
+  function readingText(text,reset){
+    const value = String(text || '').trim();
+    const m = value.match(/^Read\s+(\d{1,4})\+?\s*pages?\s*:?/i);
+    if(!m) return null;
+    const goal = Number(m[1]);
+    if(!goal) return null;
+    if(!reset && !value.includes('|') && value.slice(m[0].length).trim()) return null;
+    const tail = !reset && value.includes('|') ? value.slice(value.indexOf('|') + 1).trim() : '';
+    const tokens = tail ? tail.split(/[·,|\s]+/).map(t => t.trim()).filter(Boolean) : [];
+    const pages = tokens.map(readingPages);
+    if(pages.some(p => p === null)) return null; // never erase an unrecognized note
+    const total = pages.reduce((a,b) => a + b,0);
+    return 'Read ' + goal + '+ pages: T: ' + total + '/' + goal + ' |' + (pages.length ? ' ' + pages.map(p => '+' + p).join(' · ') : '');
+  }
+  function readingLine(line){
+    return !!line && readingText((line.querySelector(':scope > .check-text') || line).textContent) !== null;
+  }
+  function readingTotal(text){ const m = /T:\s*(\d+)\/(\d+)/.exec(text || ''); return m ? {total:+m[1], goal:+m[2]} : null; }
+  function readingAutoTick(line){
+    const t = readingTotal((line.querySelector(':scope > .check-text') || {}).textContent);
+    const cb = line.querySelector(':scope > input[type=checkbox]');
+    if(t && t.total >= t.goal && cb && !cb.checked){ cb.click(); setStatus && setStatus('Reading goal reached: ' + t.total + ' pages'); }
+  }
+  function appendReadingToken(line,value,owner){
+    const n = readingPages(value), text = line && line.querySelector(':scope > .check-text');
+    const current = text && readingText(text.textContent);
+    if(!n || current === null || !text){ setStatus('Type a number of pages, like 7'); return false; }
+    captureBeforeEdit(owner);
+    text.textContent = readingText(current + (/\|\s*$/.test(current) ? ' ' : ' · ') + '+' + n);
+    delete owner.dataset.seededNotes;
+    finishEditorEdit(owner); urgChanged(owner);
+    readingAutoTick(line);
+    return true;
   }
   function dailyHealthCat(text){ return /\bread(?:ing)?\b|\bmeditat/i.test(String(text || '')) ? 'mhealth' : 'health'; }
   function arrangeDailyGroups(ed){
@@ -2881,12 +2923,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const value = text.textContent.trim();
       const water = hydrationText(value);
       if(water !== null) text.textContent = water;
+      const read = readingText(value);
+      if(read !== null) text.textContent = read;
       if(/^stretch$/i.test(value)) text.textContent = 'Morning · Stretch';
     });
     const names = dailySectionLines(ed).map(line => line.textContent.trim().toLowerCase());
     let at = header.nextElementSibling;
     while(at && !at.matches('[data-nsec],table')) at = at.nextElementSibling;
-    [['Read 10+ pages','mhealth',/\bread(?:ing)?\b/],['Meditate','mhealth',/\bmeditat/],
+    [['Read 10+ pages: T: 0/10 |','mhealth',/\bread(?:ing)?\b/],['Meditate','mhealth',/\bmeditat/],
      ['On waking · Drink a glass of water','health',/on waking.*water|water.*on waking/i],
      ['Morning · Stretch','health',/morning.*stretch|stretch.*morning/i],
      ['Before bed · Stretch','health',/(?:before bed|evening).*stretch|stretch.*(?:before bed|evening)/i]].forEach(([title,cat,re]) => {
@@ -2933,6 +2977,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
             ['data-tid','data-cid','data-htid','data-at','data-dt'].forEach(a => line.removeAttribute(a));
             const text = line.querySelector(':scope > .check-text');
             if(text && hydrationLine(line)) text.textContent = hydrationText(text.textContent,true);
+            if(text && readingLine(line)) text.textContent = readingText(text.textContent,true);
           });
           if(kind === 'must') copy.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.removeAttribute('checked'); cb.removeAttribute('data-wired'); });
           if(kind === 'focus') copy.querySelectorAll('table[data-cnote]').forEach(t => t.remove());
@@ -2961,6 +3006,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     finishEditorEdit(owner); urgChanged(owner);
     return true;
   }
+  // Pages list: recalculate the total after typing (e.g. "+5" after the bar), then tick at the goal.
+  document.addEventListener('focusout',e => {
+    const line = e.target.closest && e.target.closest('.journal-editor .check-line');
+    if(!line || !readingLine(line)) return;
+    const text = line.querySelector(':scope > .check-text'), value = readingText(text.textContent);
+    if(value !== null && value !== text.textContent){
+      const owner = line.closest('.journal-editor'); captureBeforeEdit(owner);
+      text.textContent = value; delete owner.dataset.seededNotes;
+      finishEditorEdit(owner); urgChanged(owner);
+      readingAutoTick(line);
+    }
+  });
   // Recalculate after editing a drink list, without moving the caret while typing.
   document.addEventListener('focusout',e => {
     const line = e.target.closest && e.target.closest('.journal-editor .check-line');
@@ -7479,7 +7536,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
     function doneLines(date){
       const eds = document.querySelectorAll('#todayScroll .day-editor[data-date="' + date + '"], #todayScroll .plan-editor[data-date="' + date + '"]');
-      const out = []; eds.forEach(ed => ed.querySelectorAll('.check-line').forEach(l => { if(isDone(l) && txt(l)) out.push(l); }));
+      // Only his own lines (2026-11-07, Julius: Claude's "*…no longer stretches Blocks" was matching Morning · Stretch):
+      // skip AI Done Log lines (text starts with "*") and IT study entries.
+      const ai = l => /^\s*\*/.test(((l.querySelector(':scope > .check-text') || l).textContent || '')) || l.hasAttribute('data-study');
+      const out = []; eds.forEach(ed => ed.querySelectorAll('.check-line').forEach(l => { if(isDone(l) && txt(l) && !ai(l)) out.push(l); }));
       return out;
     }
     // Time of day: a daily's "Morning · " / "Before bed · " words, a done line's own words or its tick time (data-dt).
@@ -10069,6 +10129,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         add.addEventListener('click',submit);
         entry.addEventListener('keydown',e => { if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); submit(); } });
         row.append(entry,add); p.appendChild(row);
+      }
+      if(readingLine(line)){
+        const row = document.createElement('div'); row.className = 'urg-hydration';
+        const entry = document.createElement('input'); entry.type = 'text'; entry.inputMode = 'numeric'; entry.placeholder = 'Pages, e.g. 7';
+        entry.setAttribute('aria-label','Pages read');
+        const add = document.createElement('button'); add.type = 'button'; add.textContent = 'Add pages';
+        const submit = () => { if(appendReadingToken(line,entry.value,owner)) hideUrgencyPicker(); };
+        add.addEventListener('click',submit);
+        entry.addEventListener('keydown',e => { if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); submit(); } });
+        row.append(entry,add); p.appendChild(row);
+        setTimeout(() => { try{ entry.focus(); }catch(err){} },50);
       }
       const repeat = document.createElement('button');
       repeat.type = 'button'; repeat.className = 'urg-goto';

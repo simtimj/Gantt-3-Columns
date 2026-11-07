@@ -49,6 +49,8 @@ Last updated: 2026-11-07
 
 ## 🧪 To be confirmed (2026-11-07)
 
+- **Pages read counter**: the reading daily now keeps a running page list like hydration: **Read 10+ pages: T: 17/10 | +7 · +10**. Hold its checkbox → **Add pages** (type 7, Enter), or type `+5` after the bar yourself. The total updates when you leave the line, the daily ticks itself once you reach the goal, and tomorrow starts at 0.
+- **Dailies match ignores Claude's lines**: suggestions above Dailies now only look at your own ticked lines. Claude / ChatGPT Done Log lines (the ones starting with *) and IT study entries are skipped. Before, "…no longer stretches Blocks" was suggesting Morning · Stretch and "History easier to read" was suggesting Read 10+ pages.
 - **Dailies match: thin ✓ / ✕ column**: the "✓? Morning · Stretch" prompt above Dailies now has a small **✓** (tick it) stacked over **✕** (not this) at the right, about one character wide, so the text gets the rest of the column.
 - **History: short folded lists (3 rows + ⤢)**: when you fold a group in History (e.g. Userscripts), its list shows in a small 3-row box that you scroll up and down inside, instead of one big block. **⤢** in the box's corner shows the whole list, **⤡** shrinks it back to 3 rows. The project lists in folded Morn / After / Night (≡ List mode) work the same way, with ⤢ next to the count. Remembered per device and day; display only, never saved into the day.
 - **✨ New things tab** (top middle, just left of 🌴 Fun): a log of the last times you did something new. Type it, pick the day (defaults to today), Enter or + adds it. Newest first, grouped by month; the header says how long since the last new thing ("last one 3 days ago"). Tap a line to edit, tap its date to change the day, ✕ removes. Saved to the app (same on phone and laptop), kept on the device too. Separate from Fun.
@@ -479,6 +481,7 @@ Last updated: 2026-11-07
 
 ## 📋 To do
 
+- **Pages over time** (Julius 2026-11-07): totals across days, e.g. pages this week / month, maybe per book.
 - **✨ New things: suggestions** (Julius 2026-11-07): ideas for new things to try, to think through next (e.g. per-type goals, "try something from the oldest chip" nudge).
 - **Blocks → today's calendar** (2026-11-04, Julius picked): an arrow on a block sends it to today's calendar as **one event per block**, named after the block, with its tasks in the description. Skip a block that's already on the calendar.
 - **History checkbox hold** (2026-11-04): holding a History checkbox didn't work on Julius's phone; not reproduced yet (which day unknown).

@@ -284,6 +284,17 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     const cb = [...jed.querySelectorAll('.check-line')].find(l => l.textContent.replace(/\s+/g,' ').trim() === 'Morning · Stretch').querySelector('input');
     if(!cb.checked) return ['Tick did not tick the daily'];
     if(!document.getElementById('dailyMatch').hidden) return ['prompt still shown'];
+    // 2026-11-07: Claude's "*" Done Log lines never suggest a daily ("*History easier to read" ≠ Read 10 pages).
+    ed.insertAdjacentHTML('beforeend','<div class="check-line done" data-level="0" data-cid="x1"><input type="checkbox" checked><span class="check-text"><b>*History easier to read</b>: no longer stretches Blocks</span></div>');
+    window.fwDailyMatch.scan(); await wait(50);
+    if(window.fwDailyMatch.shown.length) return ['AI line matched: ' + window.fwDailyMatch.shown.map(m => m.dt).join('|')];
+    // Pages counter: type "| +4 · 7" after the reading daily, leave it → total 11/10 and the daily ticks itself.
+    const rd = [...jed.querySelectorAll('.check-line')].find(l => /^Read 10 pages/.test(l.textContent.trim()));
+    rd.querySelector('.check-text').textContent = 'Read 10 pages | +4 · 7';
+    rd.querySelector('.check-text').dispatchEvent(new FocusEvent('focusout', { bubbles: true })); await wait(100);
+    const rt = rd.querySelector('.check-text').textContent;
+    if(rt !== 'Read 10+ pages: T: 11/10 | +4 · +7') return ['pages total: ' + rt];
+    if(!rd.querySelector('input').checked) return ['reading goal did not tick the daily'];
     return [];
   });
   dm.forEach(x => errs.push('Daily match: ' + x));

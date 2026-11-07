@@ -577,6 +577,20 @@
     #funScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     #journalPane[data-ctab="fun"] #funScroll{display:block;}
     #journalPane[data-ctab="fun"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    /* New things (2026-11-07, Julius): ✨ tab = dated log of the last times he did something new. */
+    #newScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    #journalPane[data-ctab="new"] #newScroll{display:block;}
+    #journalPane[data-ctab="new"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    .nw-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
+    .nw-add{display:flex;gap:6px;margin:0 0 8px;}
+    .nw-add input{min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
+    .nw-add #newInput{flex:1;}
+    .nw-add #newDate{flex:0 0 auto;width:8.6em;font-size:.85em;padding:4px;}
+    .nw-month{margin:8px 0 4px;font-weight:700;font-size:.85em;border-bottom:1px solid var(--divider);padding-bottom:2px;}
+    .nw-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid color-mix(in srgb,#e0b13b 50%,var(--border,#ccc));border-radius:7px;background:color-mix(in srgb,#e0b13b 7%,transparent);}
+    .nw-item .nw-t{flex:1;min-width:0;outline:none;word-break:break-word;}
+    .nw-item .nw-d{flex:0 0 auto;font-size:.8em;color:var(--muted,#888);white-space:nowrap;margin-top:2px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
+    .nw-item .nw-x{border:0;background:transparent;color:var(--muted,#888);cursor:pointer;padding:0 2px;font-size:.9em;}
     .fun-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
     .fun-add{display:flex;gap:6px;margin:0 0 8px;}
     .fun-add input{flex:1;min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
@@ -2321,6 +2335,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           <button type="button" data-ctab="wxdaily" title="Weather (daily)" aria-label="Weather daily"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/><text x="12" y="16.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7.5" font-weight="700" fill="#111">DLY</text></svg></button>
           <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">⭐</button>
           <button type="button" data-ctab="review" title="Day Review" aria-label="Day Review">📊</button>
+          <button type="button" data-ctab="new" title="New things (last time I did something new)" aria-label="New things">✨</button>
           <button type="button" data-ctab="fun" title="Fun" aria-label="Fun">🌴</button>
         </span>
       </div>
@@ -2331,6 +2346,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       </div>
       <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Loading weather…</div></div>
       <div class="scroll" id="dayReviewScroll"></div>
+      <div class="scroll" id="newScroll"><div class="nw-add"><input id="newInput" type="text" placeholder="Something new I did… (e.g. tried a new trail)" enterkeyhint="done" autocomplete="off"><input id="newDate" type="date" aria-label="Date" title="Day you did it"><button type="button" class="btn" id="newAddBtn">+</button></div><div id="newList"><div class="center-placeholder">Loading…</div></div></div>
       <div class="scroll" id="funScroll"><div class="fun-add"><select id="funCat" aria-label="Category" title="Category for new items"></select><input id="funInput" type="text" placeholder="Something fun… (e.g. Stardew update, a book)" enterkeyhint="done" autocomplete="off"><button type="button" class="btn" id="funAddBtn">+</button></div><div id="funList"><div class="center-placeholder">Loading…</div></div></div>
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
@@ -7001,7 +7017,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(window.renderDayReview) renderDayReview();
     };
     let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
-    set(t === 'weather' || t === 'wxdaily' || t === 'focus' || t === 'review' || t === 'fun' ? t : 'notes');
+    set(t === 'weather' || t === 'wxdaily' || t === 'focus' || t === 'review' || t === 'fun' || t === 'new' ? t : 'notes');
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
@@ -7493,6 +7509,83 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     setInterval(() => { if(!document.hidden) scan(); }, 20000);
     setTimeout(scan, 2500);
     window.fwDailyMatch = {scan, get shown(){ return shown; }, mem:() => mem};
+  })();
+  /* New things (2026-11-07, Julius): ✨ tab, left of 🌴 = "last time I did something new". Each line has the day
+     it was done (w, YYYY-MM-DD; defaults to today, tap the date to change it). Newest first, grouped by month;
+     the header says how long since the last new thing. Device first (fw.new.v1), then getNewThings / saveNewThings. */
+  (function initNewThings(){
+    const list = document.getElementById('newList'), inp = document.getElementById('newInput'), dIn = document.getElementById('newDate');
+    if(!list || !inp || !dIn) return;
+    const KEY = 'fw.new.v1';
+    const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const today = () => ymd(new Date());
+    const parse = w => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(w || ''); return m ? new Date(+m[1], m[2] - 1, +m[3]) : new Date(); };
+    const label = w => { const d = parse(w); return d.toLocaleDateString('en-US',{month:'short'}).toUpperCase() + ' ' + d.getDate(); };
+    const ago = w => { const n = Math.round((parse(today()) - parse(w)) / 864e5); return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago'; };
+    let data = {v:1, items:[]}, saveT = null;
+    try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = c; }catch(e){}
+    const merge = srv => { const by = {}; data.items.forEach(i => by[i.id] = i); ((srv && srv.items) || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); data = {v:1, items:Object.values(by)}; };
+    const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} };
+    const idle = () => !list.contains(document.activeElement);
+    function save(){
+      keep(); clearTimeout(saveT);
+      saveT = setTimeout(() => { if(window.google && google.script) google.script.run
+        .withSuccessHandler(d => { merge(d); keep(); if(idle()) render(); })
+        .withFailureHandler(e => { window.setStatus && setStatus('New things not saved: ' + (e && e.message || e)); setTimeout(save, 15000); })
+        .saveNewThings(data); }, 600);
+    }
+    function render(){
+      if(!dIn.value) dIn.value = today();
+      const live = data.items.filter(i => !i.x).sort((a,b) => (b.w || '').localeCompare(a.w || '') || (b.c || 0) - (a.c || 0));
+      let html = '<div class="nw-head">✨ New · ' + live.length + (live.length ? ' · last one ' + ago(live[0].w) : '') + '</div>', month = '';
+      live.forEach(i => {
+        const m = parse(i.w).toLocaleDateString('en-US',{month:'long', year:'numeric'});
+        if(m !== month){ month = m; html += '<div class="nw-month">' + h(m) + '</div>'; }
+        html += '<div class="nw-item" data-id="' + h(i.id) + '"><div class="nw-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div><span class="nw-d" title="' + h(ago(i.w)) + ' · tap to change">' + label(i.w) + '</span><button type="button" class="nw-x" aria-label="Remove" title="Remove">✕</button></div>';
+      });
+      if(!live.length) html += '<div class="center-placeholder">Nothing yet. Did something for the first time? Log it here with the day.</div>';
+      list.innerHTML = html;
+    }
+    const byId = id => data.items.find(i => i.id === id);
+    function add(){
+      const t = inp.value.trim(); if(!t) return;
+      const now = Date.now();
+      data.items.push({id:'n' + now.toString(36) + Math.random().toString(36).slice(2,5), t, w:dIn.value || today(), c:now, u:now});
+      inp.value = ''; dIn.value = today(); render(); save();
+    }
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); add(); } });
+    dIn.addEventListener('keydown', e => e.stopPropagation());
+    document.getElementById('newAddBtn').addEventListener('click', add);
+    function pickDate(it, anchor){
+      // Native date picker on a hidden input next to the date label.
+      const p = document.createElement('input'); p.type = 'date'; p.value = it.w || today();
+      p.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
+      const r = anchor.getBoundingClientRect(); p.style.left = r.left + 'px'; p.style.top = r.bottom + 'px';
+      document.body.appendChild(p);
+      const done = () => { if(p.value && p.value !== it.w){ it.w = p.value; it.u = Date.now(); render(); save(); } p.remove(); };
+      p.addEventListener('change', done); p.addEventListener('blur', () => setTimeout(() => p.remove(), 300));
+      try{ p.showPicker ? p.showPicker() : p.focus(); }catch(e){ p.focus(); }
+    }
+    list.addEventListener('click', e => {
+      const row = e.target.closest('.nw-item'); if(!row) return;
+      const it = byId(row.dataset.id); if(!it) return;
+      if(e.target.closest('.nw-x')){ it.x = 1; it.u = Date.now(); render(); save(); }
+      else if(e.target.closest('.nw-d')) pickDate(it, e.target.closest('.nw-d'));
+    });
+    list.addEventListener('keydown', e => { if(e.target.closest('.nw-t')){ e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); } } });
+    list.addEventListener('focusout', e => {
+      const t = e.target.closest('.nw-t'); if(!t) return;
+      const it = byId(t.closest('.nw-item').dataset.id); if(!it) return;
+      const v = t.textContent.trim();
+      if(!v){ it.x = 1; it.u = Date.now(); save(); render(); }
+      else if(v !== it.t){ it.t = v; it.u = Date.now(); save(); }
+    });
+    render();
+    const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(idle()) render(); }).getNewThings(); };
+    pull();
+    document.addEventListener('visibilitychange', () => { if(!document.hidden){ pull(); if(idle()) render(); } });
+    window.fwNew = {get data(){ return data; }, render};
   })();
   /* Fun for later (2026-11-05, Julius): 🌴 tab = "I want to do this for fun later" (e.g. play Stardew's update).
      Device first: localStorage fw.fun.v1, then getFun / saveFun (server merges by id, newest u wins). */
@@ -12653,7 +12746,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       box:() => {
         // Center Up (whichever tab is showing) above, Center Down below (2026-11-01).
         const p = document.getElementById('journalPane');
-        const t = document.getElementById(p && (p.dataset.ctab === 'weather' || p.dataset.ctab === 'wxdaily') ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : p && p.dataset.ctab === 'fun' ? 'funScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
+        const t = document.getElementById(p && (p.dataset.ctab === 'weather' || p.dataset.ctab === 'wxdaily') ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : p && p.dataset.ctab === 'fun' ? 'funScroll' : p && p.dataset.ctab === 'new' ? 'newScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
         if(!t || !b) return null;
         const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};
@@ -13730,7 +13823,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     ['today','journal','reference'].forEach(n => { const el = document.getElementById(n + 'Pane'); if(el && !el.classList.contains('view-hidden') && !(ws && ws.classList.contains('view-single'))) out.push({el, axis:'x', go:() => window.tuckRestorePane && window.tuckRestorePane(n)}); });
     const bar = (el,key) => el && out.push({el, axis:'y', go:() => window.splitBarRestore && window.splitBarRestore(key)});
     bar(document.getElementById('refTopScroll'),'fw.refSplit'); bar(document.getElementById('referenceScroll'),'fw.refSplit');
-    ['journalScroll','weatherScroll','dayReviewScroll','funScroll'].forEach(id => { const el = document.getElementById(id); if(shown(el)) bar(el,'fw.notesSplit'); });
+    ['journalScroll','weatherScroll','dayReviewScroll','funScroll','newScroll'].forEach(id => { const el = document.getElementById(id); if(shown(el)) bar(el,'fw.notesSplit'); });
     bar(document.getElementById('centerDownScroll'),'fw.notesSplit');
     const od = document.querySelector('body.one-day #todayScroll .od-on');
     if(od){ bar(od.querySelector(':scope > .od-top'),'fw.odSplit'); bar(od.querySelector(':scope > .plan-pad'),'fw.odSplit'); }

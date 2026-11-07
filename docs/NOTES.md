@@ -441,6 +441,10 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - Categories (2026-11-05): `data.cats` [{id `g…`, name, c, u, x?}], `item.g`; `saveFun` merges cats like items. `#funCat` select (last pick in localStorage `fw.funCat`, "+" = new via prompt), `.fun-cat` sections (rename = contenteditable name, + = pick for adding, ✕ = tombstone, items fall to No category), hold an item 500 ms → `.fun-menu` Move to. Smoke: new "Shows" + item lands under it + saved.
 - 2026-11-06: hold the CHECKBOX (450 ms) → `moveMenu` (cats, + New, 🗑 Remove = tombstone); hold the TEXT (500 ms) → `startDrag` (fixed `.fun-ghost`, `.fun-drop-b/-a` on items, `.fun-drop-in` on `.fun-cat-h`). `drop()` sets `it.g` and renumbers the target group's `o` (0..n, `u` bumped). Sort key `okey` = `o` else `-c` (new items still land on top). Save / pull re-render skipped while `drag`. `funDate` → "NOV 5". Smoke: date format, checkbox-hold menu (no tick), drag onto Shows header.
 
+## New things tab (2026-11-07, Julius)
+
+- Center Up `data-ctab="new"` (✨, right before 🌴) shows `#newScroll`. `initNewThings()` in Index.html: items `{id, t, w:'YYYY-MM-DD', c, u, x?}`; localStorage `fw.new.v1`, then `getNewThings` / `saveNewThings` (Code.gs, script property `newData`, same merge-by-id / tombstone rules as Fun). Sorted by `w` desc, month headers, header "last one N days ago". Tap `.nw-d` → hidden native date picker. Smoke: tab order, dated add, month header, save.
+
 ## Urgent add box = real task (2026-11-05, Julius)
 
 - `urgAdderRow` shows an inert `.urg-box.urg-addbox2` before the textarea. Submit → `addTaskToBacklog(…, urgFocusMade)` → `urgFocusMade(line)` sets `urgFocusWant` so `renderUrgent` puts the caret in the new real row (also when the Backlog card is made async). Tab / Shift+Tab in `#urgentPanel .urg-text` → `urgIndent` (keeps focus). Smoke: add box checkbox, caret in new row, Tab → level 1.

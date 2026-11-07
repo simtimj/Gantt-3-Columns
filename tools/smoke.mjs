@@ -211,6 +211,30 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return [];
   });
   fun.forEach(x => errs.push('Fun tab: ' + x));
+  // New things tab (2026-11-07): ✨ sits left of 🌴; add with a date → listed under its month, saved, newest first.
+  const nw = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const tabs = [...document.querySelectorAll('.center-tabs button')].map(b => b.dataset.ctab);
+    if(tabs.indexOf('new') !== tabs.indexOf('fun') - 1) return ['✨ not left of 🌴: ' + tabs.join(',')];
+    document.querySelector('[data-ctab="new"]').click(); await wait(200);
+    const box = document.getElementById('newScroll');
+    if(!box || getComputedStyle(box).display === 'none') return ['tab not shown'];
+    if(getComputedStyle(document.getElementById('journalScroll')).display !== 'none') return ['Notes still shown'];
+    const inp = document.getElementById('newInput'), dt = document.getElementById('newDate');
+    dt.value = '2026-10-03'; inp.value = 'Tried rock climbing';
+    inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(100);
+    inp.value = 'First sushi class'; inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(900);
+    const rows = [...document.querySelectorAll('#newList .nw-item')].map(r => r.querySelector('.nw-t').textContent + '@' + r.querySelector('.nw-d').textContent);
+    if(rows[0] && !/^First sushi class@[A-Z]{3} \d{1,2}$/.test(rows[0])) return ['newest not first: ' + rows.join('|')];
+    if(rows[1] !== 'Tried rock climbing@OCT 3') return ['dated item wrong: ' + rows.join('|')];
+    if(!/October 2026/.test(document.getElementById('newList').textContent)) return ['no month header'];
+    if(!/last one today/.test(document.querySelector('#newList .nw-head').textContent)) return ['header: ' + document.querySelector('#newList .nw-head').textContent];
+    const sv = (window.__calls || []).filter(c => c[0] === 'saveNewThings').pop();
+    if(!sv || !sv[1][0].items.some(i => i.t === 'Tried rock climbing' && i.w === '2026-10-03')) return ['not saved'];
+    document.querySelector('[data-ctab="notes"]').click(); await wait(50);
+    return [];
+  });
+  nw.forEach(x => errs.push('New things tab: ' + x));
   // Day Review − / + levels (2026-11-05): categories only → + groups → all open.
   const drl = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));

@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-06
+Last updated: 2026-11-07
 
 ## Status key
 
@@ -46,6 +46,10 @@ Last updated: 2026-11-06
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-07)
+
+- **✨ New things tab** (top middle, just left of 🌴 Fun): a log of the last times you did something new. Type it, pick the day (defaults to today), Enter or + adds it. Newest first, grouped by month; the header says how long since the last new thing ("last one 3 days ago"). Tap a line to edit, tap its date to change the day, ✕ removes. Saved to the app (same on phone and laptop), kept on the device too. Separate from Fun.
 
 ## 🧪 To be confirmed (2026-11-06)
 

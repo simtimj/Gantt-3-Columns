@@ -1359,6 +1359,25 @@ function saveFun(data) {
     return out;
   } finally { lock.releaseLock(); }
 }
+// New things log (2026-11-07, Julius): ✨ tab left of 🌴 Fun = "last time I did something new".
+// {v:1, items:[{id, t, w:'YYYY-MM-DD' (day it was done), c, u, x?}]} in script property newData; merged like the Fun list.
+function getNewThings() {
+  try { const raw = PropertiesService.getScriptProperties().getProperty('newData'); return raw ? JSON.parse(raw) : { v: 1, items: [] }; }
+  catch (e) { return { v: 1, items: [] }; }
+}
+function saveNewThings(data) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const cur = getNewThings(), old = Date.now() - 30 * 864e5, by = {};
+    (cur.items || []).forEach(i => { if (i && i.id) by[i.id] = i; });
+    ((data && data.items) || []).forEach(i => { if (i && i.id && (!by[i.id] || Number(i.u || 0) >= Number(by[i.id].u || 0))) by[i.id] = i; });
+    const out = { v: 1, items: Object.keys(by).map(k => by[k]).filter(i => !(i.x && Number(i.u || 0) < old)) };
+    const json = JSON.stringify(out);
+    if (json.length > 8500) throw new Error('New things log too big (' + json.length + ' chars)');
+    PropertiesService.getScriptProperties().setProperty('newData', json);
+    return out;
+  } finally { lock.releaseLock(); }
+}
 function getInbox() {
   const done = inboxRead_('inboxDone', []);
   const mine = inboxRead_('inboxItems', []);

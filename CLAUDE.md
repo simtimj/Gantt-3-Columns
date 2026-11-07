@@ -106,6 +106,7 @@ When he asks to organize his calendar tasks:
 - Urgent tick = log + archive (2026-11-05, Julius)
 - Time Tracker app (2026-11-05, Julius: separate app in `tracker/`, `?app=tracker`)
 - Fun for later tab (2026-11-05, Julius)
+- New things tab (2026-11-07, Julius)
 - Urgent add box = real task (2026-11-05, Julius)
 - Day Review levels + Vivaldi → MISC (2026-11-05, Julius)
 - Tuck strips + pull tabs (2026-11-06, Julius)

@@ -276,6 +276,10 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     window.fwDailyMatch.scan(); await wait(50);
     const sh = window.fwDailyMatch.shown.map(m => m.dt).join('|');
     if(sh !== 'Morning · Stretch') return ['matches: ' + sh]; // time words pick the Morning daily over Stretching / Before bed
+    // 2026-11-07: ✓ above ✕, a thin column (≤ 34px) so the text keeps the width.
+    const yb = document.querySelector('#dailyMatch [data-a="y"]'), nb = document.querySelector('#dailyMatch [data-a="n"]');
+    const yr = yb.getBoundingClientRect(), nr = nb.getBoundingClientRect();
+    if(!(nr.top >= yr.bottom - 1) || Math.abs(nr.left - yr.left) > 1 || yr.width > 34) return ['buttons not a thin stack: ' + JSON.stringify([yr.left, yr.top, yr.width, nr.left, nr.top])];
     document.querySelector('#dailyMatch [data-a="y"]').click(); await wait(100);
     const cb = [...jed.querySelectorAll('.check-line')].find(l => l.textContent.replace(/\s+/g,' ').trim() === 'Morning · Stretch').querySelector('input');
     if(!cb.checked) return ['Tick did not tick the daily'];

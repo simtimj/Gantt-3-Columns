@@ -49,6 +49,7 @@ Last updated: 2026-11-07
 
 ## 🧪 To be confirmed (2026-11-07)
 
+- **Dailies match: thin ✓ / ✕ column**: the "✓? Morning · Stretch" prompt above Dailies now has a small **✓** (tick it) stacked over **✕** (not this) at the right, about one character wide, so the text gets the rest of the column.
 - **History: short folded lists (3 rows + ⤢)**: when you fold a group in History (e.g. Userscripts), its list shows in a small 3-row box that you scroll up and down inside, instead of one big block. **⤢** in the box's corner shows the whole list, **⤡** shrinks it back to 3 rows. The project lists in folded Morn / After / Night (≡ List mode) work the same way, with ⤢ next to the count. Remembered per device and day; display only, never saved into the day.
 - **✨ New things tab** (top middle, just left of 🌴 Fun): a log of the last times you did something new. Type it, pick the day (defaults to today), Enter or + adds it. Newest first, grouped by month; the header says how long since the last new thing ("last one 3 days ago"). Tap a line to edit, tap its date to change the day, ✕ removes. Saved to the app (same on phone and laptop), kept on the device too. Separate from Fun.
 - **✨ Days-since line, 14-day goal**: one small muted line at the top: "✨ 4 days since new thing · goal 14 days · 4 logged" ("past 14 days" once it's longer). Goal changed from 7 to 14 days (Julius: 7 was a lot). No colors.

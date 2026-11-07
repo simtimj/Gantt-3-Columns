@@ -460,3 +460,4 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 ## Done → Dailies matching (2026-11-05, Julius: first version)
 
 - `initDailyMatch()` (Index.html, before initFun): today's open Dailies (`[data-nsec="must"]` up to the next section / table) vs done check-lines in today's `.day-editor` + `.plan-editor`. Score = shared words after stem + `SYN` groups; time words (`WHEN`) or the line's `data-dt` add +0.5 / −0.75; each done line goes to its best daily. Render-only `#dailyMatch` above `#journalScroll` (notes tab only). Tick = clicks the daily's checkbox. localStorage `fw.dailyMatch.v1` {yes, no, used (per day)}. Scans on any checkbox change, every 20 s, and 2.5 s after load. Smoke: "Morning stretch 10 min" → Morning · Stretch.
+- 2026-11-07: buttons are `.dm-btns` (column, ✓ over ✕, icon-only with title / aria-label, ~1.9em wide). Smoke: stacked, ≤ 34px.

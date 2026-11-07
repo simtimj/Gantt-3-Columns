@@ -2,6 +2,7 @@
 
 - **Commit as Julius** (so it counts on his GitHub graph): `git -c user.name="Julius Simtim" -c user.email="juliussimtim@gmail.com" commit ...`. Never commit as "Claude <noreply@anthropic.com>"; Claude goes only in a Co-Authored-By trailer.
 - **Ship without asking** (Julius 2026-11-04): every request goes straight to `main` (merge, push, deploy) once checks pass; no "want me to merge?" question.
+- **Build your own ideas** (Julius 2026-11-07): when you see an improvement or have a suggestion, just build and ship it (mention it in one line); he'll correct what he doesn't like.
 - **One topic per conversation** (Julius 2026-11-05, ADHD): when he jumps to a different job or app mid-session, suggest starting a new conversation for it, in one line, before diving in. Keep replies short and skimmable: lead with the answer, a few bullets, no walls of text.
 - Google Apps Script web app (Today / Notes / Reference columns over a Google Sheet). Pushing to `main` runs `clasp push` via `.github/workflows/deploy.yaml`, so keep commits small and working. Julius opens the **/dev test link** (latest pushed code, ~30 s after a push, then tap ↻); the workflow no longer updates a versioned /exec deployment (200-version cap, 2026-10-27). Julius mostly works from his phone.
 - Files: `Code.gs` (server), `Index.html` (all UI), `WeekdayIcons.html` (header icons, base64), `appsscript.json`.

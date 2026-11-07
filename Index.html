@@ -581,13 +581,24 @@
     #newScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     #journalPane[data-ctab="new"] #newScroll{display:block;}
     #journalPane[data-ctab="new"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
-    .nw-add{display:flex;gap:6px;margin:0 0 8px;}
+    .nw-add{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
     .nw-add input{min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
-    .nw-add #newInput{flex:1;}
-    .nw-add #newDate{flex:0 0 auto;width:8.6em;font-size:.85em;padding:4px;}
+    .nw-add #newInput{flex:1 1 100%;order:-1;} /* text on its own line, type / date / + under it (narrow panes) */
+    .nw-add #newDate{flex:1 1 7.5em;min-width:0;font-size:.85em;padding:4px;}
     /* Days-since line (2026-11-07, Julius: a small muted mention, not a cell; no red). */
     .nw-timer{margin:0 0 6px;font-size:.8em;color:var(--muted,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .nw-timer b{font-weight:600;color:var(--text,inherit);}
+    .nw-add select{flex:1 1 6em;min-width:0;font:inherit;font-size:.85em;padding:4px 2px;border:1px solid var(--border,#ccc);border-radius:6px;background:var(--panel,transparent);color:inherit;}
+    .nw-chips{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px;}
+    .nw-chip{font:inherit;font-size:.78em;padding:0 6px;line-height:1.6;border:1px solid var(--divider,#777);border-radius:10px;background:transparent;color:var(--muted,#888);cursor:pointer;}
+    .nw-chip.on{color:inherit;border-color:currentColor;}
+    .nw-view{display:flex;gap:2px;margin:0 0 4px;font-size:.78em;}
+    .nw-view button{font:inherit;border:0;background:transparent;color:var(--muted,#888);padding:0 4px;cursor:pointer;}
+    .nw-view button.on{color:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;}
+    .nw-cat{display:flex;align-items:baseline;gap:6px;}
+    .nw-cat small{font-weight:400;color:var(--muted,#888);}
+    .nw-cat-x{margin-left:auto;border:0;background:transparent;color:var(--muted,#888);cursor:pointer;font:inherit;padding:0 3px;}
+    .nw-item .nw-ic{flex:none;border:0;background:transparent;padding:0;cursor:pointer;font:inherit;line-height:1.3;}
     .nw-month{margin:8px 0 4px;font-weight:700;font-size:.85em;border-bottom:1px solid var(--divider);padding-bottom:2px;}
     .nw-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid color-mix(in srgb,#e0b13b 50%,var(--border,#ccc));border-radius:7px;background:color-mix(in srgb,#e0b13b 7%,transparent);}
     .nw-item .nw-t{flex:1;min-width:0;outline:none;word-break:break-word;}
@@ -2348,7 +2359,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       </div>
       <div class="scroll" id="weatherScroll"><div class="center-placeholder">☁️ Loading weather…</div></div>
       <div class="scroll" id="dayReviewScroll"></div>
-      <div class="scroll" id="newScroll"><div class="nw-add"><input id="newInput" type="text" placeholder="Something new I did… (e.g. tried a new trail)" enterkeyhint="done" autocomplete="off"><input id="newDate" type="date" aria-label="Date" title="Day you did it"><button type="button" class="btn" id="newAddBtn">+</button></div><div id="newList"><div class="center-placeholder">Loading…</div></div></div>
+      <div class="scroll" id="newScroll"><div class="nw-add"><select id="newCat" aria-label="Type" title="Type for new items"></select><input id="newInput" type="text" placeholder="Started… (e.g. Frieren vol. 1)" enterkeyhint="done" autocomplete="off"><input id="newDate" type="date" aria-label="Date" title="Day you did it"><button type="button" class="btn" id="newAddBtn">+</button></div><div id="newList"><div class="center-placeholder">Loading…</div></div></div>
       <div class="scroll" id="funScroll"><div class="fun-add"><select id="funCat" aria-label="Category" title="Category for new items"></select><input id="funInput" type="text" placeholder="Something fun… (e.g. Stardew update, a book)" enterkeyhint="done" autocomplete="off"><button type="button" class="btn" id="funAddBtn">+</button></div><div id="funList"><div class="center-placeholder">Loading…</div></div></div>
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
@@ -7513,31 +7524,38 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     window.fwDailyMatch = {scan, get shown(){ return shown; }, mem:() => mem};
   })();
   /* New things (2026-11-07, Julius): ✨ tab, left of 🌴 = "last time I did something new". Each line has the day
-     it was done (w, YYYY-MM-DD; defaults to today, tap the date to change it). Newest first, grouped by month;
-     the header says how long since the last new thing. Device first (fw.new.v1), then getNewThings / saveNewThings. */
+     it was done (w, YYYY-MM-DD; defaults to today, tap the date to change it) and a type (g: Game, Book, Manga,
+     Light novel…; tap the icon to change it). Top: one muted "N days since new thing" line (goal 14 days), then
+     small per-type "since" chips (longest gap first; tap = pick that type for adding). View: Date (months) or
+     Type (one section per type), remembered per device. Device first (fw.new.v1), then getNewThings / saveNewThings. */
   (function initNewThings(){
-    const list = document.getElementById('newList'), inp = document.getElementById('newInput'), dIn = document.getElementById('newDate');
-    if(!list || !inp || !dIn) return;
+    const list = document.getElementById('newList'), inp = document.getElementById('newInput'), dIn = document.getElementById('newDate'), sel = document.getElementById('newCat');
+    if(!list || !inp || !dIn || !sel) return;
     const KEY = 'fw.new.v1';
     const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     const today = () => ymd(new Date());
     const parse = w => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(w || ''); return m ? new Date(+m[1], m[2] - 1, +m[3]) : new Date(); };
     const label = w => { const d = parse(w); return d.toLocaleDateString('en-US',{month:'short'}).toUpperCase() + ' ' + d.getDate(); };
-    const ago = w => { const n = Math.round((parse(today()) - parse(w)) / 864e5); return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago'; };
-    let data = {v:1, items:[]}, saveT = null;
-    try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = c; }catch(e){}
-    // Guideline (2026-11-07): something new at least every 7 days.
-    const GOAL = 7;
     const since = w => Math.max(0, Math.round((parse(today()) - parse(w)) / 864e5));
-    function timer(last, count){
-      if(!last) return '<div class="nw-timer">✨ No new thing yet · goal: one every ' + GOAL + ' days</div>';
-      const n = since(last.w), over = n > GOAL;
-      return '<div class="nw-timer" title="Last: ' + h(last.t) + '">✨ <b>' + n + (n === 1 ? ' day' : ' days') + '</b> since new thing · ' + (over ? 'past ' : 'goal ') + GOAL + ' days · ' + count + ' logged</div>';
-    }
-    const merge = srv => { const by = {}; data.items.forEach(i => by[i.id] = i); ((srv && srv.items) || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); data = {v:1, items:Object.values(by)}; };
+    const ago = w => { const n = since(w); return n === 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago'; };
+    const short = n => n < 60 ? n + 'd' : n < 730 ? Math.round(n / 30.4) + 'mo' : Math.round(n / 365) + 'y';
+    // Guideline (2026-11-07, Julius: 7 was a lot): something new at least every 14 days, any type.
+    const GOAL = 14;
+    // Starter types: fixed ids + u:1 so every device seeds the same ones and any rename / delete wins.
+    const SEED = [['gGame','🎮','Game'],['gBook','📖','Book'],['gManga','📚','Manga'],['gLN','📘','Light novel'],['gShow','📺','Show'],['gMovie','🎬','Movie'],['gMusic','🎵','Music'],['gPlace','📍','Place'],['gFood','🍜','Food'],['gSkill','🛠️','Skill']];
+    let data = {v:1, items:[], cats:[]}, saveT = null;
+    try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = Object.assign({cats:[]}, c); }catch(e){}
+    const seed = () => { SEED.forEach(([id, e, name], k) => { if(!data.cats.some(c => c.id === id)) data.cats.push({id, e, name, c:k + 1, u:1}); }); };
+    seed();
+    const mergeL = (a,b) => { const by = {}; (a || []).forEach(i => by[i.id] = i); (b || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); return Object.values(by); };
+    const merge = srv => { data = {v:1, items:mergeL(data.items, srv && srv.items), cats:mergeL(data.cats, srv && srv.cats)}; seed(); };
     const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} };
-    const idle = () => !list.contains(document.activeElement);
+    const idle = () => !list.contains(document.activeElement) && !document.querySelector('.nw-menu');
+    let view = 'date', pick = ''; try{ view = localStorage.getItem('fw.newView') || 'date'; pick = localStorage.getItem('fw.newCat') || ''; }catch(e){}
+    const liveCats = () => data.cats.filter(c => !c.x).sort((a,b) => (a.c || 0) - (b.c || 0));
+    const catOf = it => data.cats.find(c => c.id === it.g && !c.x) || null;
+    const icon = c => c ? (c.e || '•') : '✨';
     function save(){
       keep(); clearTimeout(saveT);
       saveT = setTimeout(() => { if(window.google && google.script) google.script.run
@@ -7545,45 +7563,97 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         .withFailureHandler(e => { window.setStatus && setStatus('New things not saved: ' + (e && e.message || e)); setTimeout(save, 15000); })
         .saveNewThings(data); }, 600);
     }
+    function fillSel(){
+      const cs = liveCats();
+      if(pick && !cs.some(c => c.id === pick)) pick = '';
+      sel.innerHTML = '<option value="">✨ Other</option>' + cs.map(c => '<option value="' + h(c.id) + '">' + h(icon(c) + ' ' + c.name) + '</option>').join('') + '<option value="+">+ New type…</option>';
+      sel.value = pick;
+    }
+    function newCat(){
+      const raw = (prompt('New type, with an emoji first if you like (e.g. "🎲 Board game"):') || '').trim().slice(0,40);
+      if(!raw) return '';
+      const m = /^(\p{Extended_Pictographic}️?)\s*(.*)$/u.exec(raw), now = Date.now();
+      const c = {id:'g' + now.toString(36) + Math.random().toString(36).slice(2,5), e:m ? m[1] : '•', name:(m ? m[2] : raw) || raw, c:now, u:now};
+      data.cats.push(c); save(); return c.id;
+    }
+    const setPick = id => { pick = id; try{ localStorage.setItem('fw.newCat', pick); }catch(e){} };
     function render(){
       if(!dIn.value) dIn.value = today();
-      const live = data.items.filter(i => !i.x).sort((a,b) => (b.w || '').localeCompare(a.w || '') || (b.c || 0) - (a.c || 0));
-      // Timer counts from the latest day logged (a future-dated line doesn't count).
-      const last = live.find(i => (i.w || '') <= today());
-      let html = timer(last, live.length), month = '';
-      live.forEach(i => {
-        const m = parse(i.w).toLocaleDateString('en-US',{month:'long', year:'numeric'});
-        if(m !== month){ month = m; html += '<div class="nw-month">' + h(m) + '</div>'; }
-        html += '<div class="nw-item" data-id="' + h(i.id) + '"><div class="nw-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div><span class="nw-d" title="' + h(ago(i.w)) + ' · tap to change">' + label(i.w) + '</span><button type="button" class="nw-x" aria-label="Remove" title="Remove">✕</button></div>';
-      });
-      if(!live.length) html += '<div class="center-placeholder">Nothing yet. Did something for the first time? Log it here with the day.</div>';
+      fillSel();
+      const now = today(), live = data.items.filter(i => !i.x).sort((a,b) => (b.w || '').localeCompare(a.w || '') || (b.c || 0) - (a.c || 0));
+      const past = live.filter(i => (i.w || '') <= now), last = past[0];
+      // 1) one muted line overall
+      let html = !last ? '<div class="nw-timer">✨ No new thing yet · goal: one every ' + GOAL + ' days</div>'
+        : '<div class="nw-timer" title="Last: ' + h(last.t) + '">✨ <b>' + since(last.w) + (since(last.w) === 1 ? ' day' : ' days') + '</b> since new thing · ' + (since(last.w) > GOAL ? 'past ' : 'goal ') + GOAL + ' days · ' + live.length + ' logged</div>';
+      // 2) per-type chips: only types with something logged, longest gap first
+      const lastBy = {}; past.forEach(i => { const k = catOf(i) ? i.g : ''; if(!(k in lastBy)) lastBy[k] = i; });
+      const chips = Object.keys(lastBy).map(k => ({k, c:data.cats.find(c => c.id === k) || null, n:since(lastBy[k].w)})).sort((a,b) => b.n - a.n);
+      if(chips.length) html += '<div class="nw-chips">' + chips.map(x => '<button type="button" class="nw-chip' + (pick === x.k ? ' on' : '') + '" data-pick="' + h(x.k) + '" title="' + h((x.c ? x.c.name : 'Other') + ': last ' + lastBy[x.k].t + ' (' + ago(lastBy[x.k].w) + ')') + '">' + icon(x.c) + ' ' + short(x.n) + '</button>').join('') + '</div>';
+      // 3) view switch
+      html += '<div class="nw-view"><button type="button" data-view="date"' + (view === 'date' ? ' class="on"' : '') + '>By date</button><button type="button" data-view="type"' + (view === 'type' ? ' class="on"' : '') + '>By type</button></div>';
+      const row = i => '<div class="nw-item" data-id="' + h(i.id) + '"><button type="button" class="nw-ic" title="' + h((catOf(i) || {name:'Other'}).name) + ' · tap to change">' + icon(catOf(i)) + '</button><div class="nw-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div><span class="nw-d" title="' + h(ago(i.w)) + ' · tap to change">' + label(i.w) + '</span><button type="button" class="nw-x" aria-label="Remove" title="Remove">✕</button></div>';
+      if(!live.length) html += '<div class="center-placeholder">Nothing yet. Started a new game, book, manga or show? Pick the type, type it in, + — it keeps the day.</div>';
+      else if(view === 'type'){
+        const groups = liveCats().map(c => ({c, items:live.filter(i => i.g === c.id)})).concat([{c:null, items:live.filter(i => !catOf(i))}]).filter(g => g.items.length);
+        groups.sort((a,b) => (b.items[0].w || '').localeCompare(a.items[0].w || '')); // most recent type on top
+        groups.forEach(g => {
+          const lp = g.items.find(i => (i.w || '') <= now);
+          html += '<div class="nw-month nw-cat"' + (g.c ? ' data-cat="' + h(g.c.id) + '"' : '') + '><span>' + icon(g.c) + ' ' + h(g.c ? g.c.name : 'Other') + '</span> <small>' + g.items.length + (lp ? ' · ' + ago(lp.w) : '') + '</small>' + (g.c ? '<button type="button" class="nw-cat-x" title="Delete type (items move to Other)">✕</button>' : '') + '</div>' + g.items.map(row).join('');
+        });
+      } else {
+        let month = '';
+        live.forEach(i => { const m = parse(i.w).toLocaleDateString('en-US',{month:'long', year:'numeric'}); if(m !== month){ month = m; html += '<div class="nw-month">' + h(m) + '</div>'; } html += row(i); });
+      }
       list.innerHTML = html;
     }
     const byId = id => data.items.find(i => i.id === id);
     function add(){
       const t = inp.value.trim(); if(!t) return;
-      const now = Date.now();
-      data.items.push({id:'n' + now.toString(36) + Math.random().toString(36).slice(2,5), t, w:dIn.value || today(), c:now, u:now});
-      inp.value = ''; dIn.value = today(); render(); save();
+      const now = Date.now(), it = {id:'n' + now.toString(36) + Math.random().toString(36).slice(2,5), t, w:dIn.value || today(), c:now, u:now};
+      if(sel.value && sel.value !== '+') it.g = sel.value;
+      data.items.push(it); inp.value = ''; dIn.value = today(); render(); save();
     }
     inp.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); add(); } });
     dIn.addEventListener('keydown', e => e.stopPropagation());
     document.getElementById('newAddBtn').addEventListener('click', add);
+    sel.addEventListener('change', () => { if(sel.value === '+'){ const id = newCat(); setPick(id || pick); render(); } else { setPick(sel.value); render(); } inp.focus(); });
     function pickDate(it, anchor){
-      // Native date picker on a hidden input next to the date label.
       const p = document.createElement('input'); p.type = 'date'; p.value = it.w || today();
       p.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
       const r = anchor.getBoundingClientRect(); p.style.left = r.left + 'px'; p.style.top = r.bottom + 'px';
       document.body.appendChild(p);
-      const done = () => { if(p.value && p.value !== it.w){ it.w = p.value; it.u = Date.now(); render(); save(); } p.remove(); };
-      p.addEventListener('change', done); p.addEventListener('blur', () => setTimeout(() => p.remove(), 300));
+      p.addEventListener('change', () => { if(p.value && p.value !== it.w){ it.w = p.value; it.u = Date.now(); render(); save(); } p.remove(); });
+      p.addEventListener('blur', () => setTimeout(() => p.remove(), 300));
       try{ p.showPicker ? p.showPicker() : p.focus(); }catch(e){ p.focus(); }
     }
+    function typeMenu(it, anchor){
+      document.querySelectorAll('.nw-menu').forEach(m => m.remove());
+      const m = document.createElement('div'); m.className = 'fun-menu nw-menu';
+      m.innerHTML = '<div class="fun-menu-h">Type</div>' + liveCats().map(c => '<button type="button" data-g="' + h(c.id) + '"' + (it.g === c.id ? ' class="on"' : '') + '>' + h(icon(c) + ' ' + c.name) + '</button>').join('') + '<button type="button" data-g="">✨ Other</button><button type="button" data-g="+">+ New type…</button>';
+      document.body.appendChild(m);
+      const r = anchor.getBoundingClientRect();
+      m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + 'px';
+      m.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - m.offsetHeight - 8)) + 'px';
+      m.addEventListener('click', e => {
+        const b = e.target.closest('[data-g]'); if(!b) return;
+        let g = b.dataset.g; if(g === '+'){ g = newCat(); if(!g){ m.remove(); return; } }
+        if(g) it.g = g; else delete it.g;
+        it.u = Date.now(); m.remove(); render(); save();
+      });
+      setTimeout(() => { const off = e => { if(!m.contains(e.target)){ m.remove(); document.removeEventListener('pointerdown', off, true); } }; document.addEventListener('pointerdown', off, true); }, 0);
+    }
     list.addEventListener('click', e => {
+      const v = e.target.closest('[data-view]');
+      if(v){ view = v.dataset.view; try{ localStorage.setItem('fw.newView', view); }catch(err){} render(); return; }
+      const ch = e.target.closest('[data-pick]');
+      if(ch){ setPick(pick === ch.dataset.pick ? '' : ch.dataset.pick); render(); inp.focus(); return; }
+      const cx = e.target.closest('.nw-cat-x');
+      if(cx){ const c = data.cats.find(x => x.id === cx.closest('[data-cat]').dataset.cat); if(c && confirm('Delete the type "' + c.name + '"? Its items stay, under Other.')){ c.x = 1; c.u = Date.now(); render(); save(); } return; }
       const row = e.target.closest('.nw-item'); if(!row) return;
       const it = byId(row.dataset.id); if(!it) return;
       if(e.target.closest('.nw-x')){ it.x = 1; it.u = Date.now(); render(); save(); }
       else if(e.target.closest('.nw-d')) pickDate(it, e.target.closest('.nw-d'));
+      else if(e.target.closest('.nw-ic')) typeMenu(it, e.target.closest('.nw-ic'));
     });
     list.addEventListener('keydown', e => { if(e.target.closest('.nw-t')){ e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); } } });
     list.addEventListener('focusout', e => {

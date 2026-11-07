@@ -50,7 +50,8 @@ Last updated: 2026-11-07
 ## 🧪 To be confirmed (2026-11-07)
 
 - **✨ New things tab** (top middle, just left of 🌴 Fun): a log of the last times you did something new. Type it, pick the day (defaults to today), Enter or + adds it. Newest first, grouped by month; the header says how long since the last new thing ("last one 3 days ago"). Tap a line to edit, tap its date to change the day, ✕ removes. Saved to the app (same on phone and laptop), kept on the device too. Separate from Fun.
-- **✨ Days-since line + 7-day goal**: a small muted one-liner at the top of the ✨ tab: "✨ 3 days since new thing · goal 7 days · 4 logged" (says "past 7 days" once it's been longer; hold / hover shows the last thing). Goal: something new at least every 7 days. No colors (Julius 2026-11-07: subtle, not a cell). Rolls over at midnight.
+- **✨ Days-since line, 14-day goal**: one small muted line at the top: "✨ 4 days since new thing · goal 14 days · 4 logged" ("past 14 days" once it's longer). Goal changed from 7 to 14 days (Julius: 7 was a lot). No colors.
+- **✨ Types + since chips + By date / By type**: each new thing has a type: 🎮 Game, 📖 Book, 📚 Manga, 📘 Light novel, 📺 Show, 🎬 Movie, 🎵 Music, 📍 Place, 🍜 Food, 🛠️ Skill, or ✨ Other. Pick it in the box next to the date; **+ New type…** makes your own (put an emoji first, e.g. "🎲 Board game"). Under the top line, small chips show how long since each type, longest gap first (e.g. 📖 2mo · 🎮 18d · 📚 4d). Tap a chip to pick that type for the next one. **By date** groups by month; **By type** gives each type its own section with "N · x days ago" (✕ on a section deletes the type, its items move to Other). Tap an item's icon to change its type. The add box wraps to two lines in a narrow column.
 
 ## 🧪 To be confirmed (2026-11-06)
 
@@ -476,7 +477,7 @@ Last updated: 2026-11-07
 
 ## 📋 To do
 
-- **✨ New things: suggestions** (Julius 2026-11-07): ideas for new things to try, to think through next.
+- **✨ New things: suggestions** (Julius 2026-11-07): ideas for new things to try, to think through next (e.g. per-type goals, "try something from the oldest chip" nudge).
 - **Blocks → today's calendar** (2026-11-04, Julius picked): an arrow on a block sends it to today's calendar as **one event per block**, named after the block, with its tasks in the description. Skip a block that's already on the calendar.
 - **History checkbox hold** (2026-11-04): holding a History checkbox didn't work on Julius's phone; not reproduced yet (which day unknown).
 - **Recurring blocks** (2026-11-04): a section at the bottom holding reusable blocks, so he can mark one as next, e.g. the usual morning block of stretch and coffee.

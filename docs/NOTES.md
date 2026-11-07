@@ -444,7 +444,8 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 ## New things tab (2026-11-07, Julius)
 
 - Center Up `data-ctab="new"` (✨, right before 🌴) shows `#newScroll`. `initNewThings()` in Index.html: items `{id, t, w:'YYYY-MM-DD', c, u, x?}`; localStorage `fw.new.v1`, then `getNewThings` / `saveNewThings` (Code.gs, script property `newData`, same merge-by-id / tombstone rules as Fun). Sorted by `w` desc, month headers, header "last one N days ago". Tap `.nw-d` → hidden native date picker. Smoke: tab order, dated add, month header, save.
-- Timer (2026-11-07): `.nw-timer` = one small muted line on top (replaced the `.nw-head` count line), days since the latest `w` ≤ today, `GOAL = 7` ("goal" / "past"). No colors, per Julius. Minute tick re-renders when the day changes. Smoke: "0 days since new thing · goal 7 days · 2 logged".
+- Timer (2026-11-07): `.nw-timer` = one small muted line on top, days since the latest `w` ≤ today, `GOAL = 14` (was 7; "goal" / "past"). No colors, per Julius. Minute tick re-renders when the day changes.
+- Types (2026-11-07): `data.cats` [{id, e (emoji), name, c, u, x?}], `item.g`. `SEED` starter types have fixed ids (`gGame`, `gBook`, `gManga`, `gLN`, …) and `u:1`, seeded on every load/merge so devices agree and edits win; `saveNewThings` merges cats like items. `#newCat` select (last pick `fw.newCat`), `.nw-chip` per type with a past item (longest gap first, tap = pick), `.nw-view` By date / By type (`fw.newView`), `.nw-ic` → `typeMenu` (reuses `.fun-menu`). Smoke: 0-days line, 🎮 0d chip, Game section, type menu, cats saved.
 
 ## Urgent add box = real task (2026-11-05, Julius)
 

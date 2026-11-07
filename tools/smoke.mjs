@@ -229,9 +229,22 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if(rows[1] !== 'Tried rock climbing@OCT 3') return ['dated item wrong: ' + rows.join('|')];
     if(!/October 2026/.test(document.getElementById('newList').textContent)) return ['no month header'];
     const tm = document.querySelector('#newList .nw-timer');
-    if(!tm || !/0 days since new thing · goal 7 days · 2 logged/.test(tm.textContent)) return ['timer: ' + (tm && tm.textContent)];
+    if(!tm || !/0 days since new thing · goal 14 days · 2 logged/.test(tm.textContent)) return ['timer: ' + (tm && tm.textContent)];
     const sv = (window.__calls || []).filter(c => c[0] === 'saveNewThings').pop();
     if(!sv || !sv[1][0].items.some(i => i.t === 'Tried rock climbing' && i.w === '2026-10-03')) return ['not saved'];
+    // Types (2026-11-07): pick 🎮 Game, add → chip shows 🎮 0d, By type view has a Game section; tap icon → menu.
+    const sel = document.getElementById('newCat'); sel.value = 'gGame'; sel.dispatchEvent(new Event('change')); await wait(50);
+    inp.value = 'Started Hollow Knight'; inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(800);
+    if(![...document.querySelectorAll('#newList .nw-chip')].some(c => c.textContent === '🎮 0d')) return ['no 🎮 0d chip'];
+    document.querySelector('#newList [data-view="type"]').click(); await wait(50);
+    const gsec = document.querySelector('#newList .nw-cat[data-cat="gGame"]');
+    if(!gsec || !/Game/.test(gsec.textContent) || !/Hollow Knight/.test(gsec.nextElementSibling.textContent)) return ['By type: no Game section'];
+    document.querySelector('#newList .nw-item .nw-ic').click(); await wait(50);
+    if(!/Light novel/.test((document.querySelector('.nw-menu') || {}).textContent || '')) return ['type menu missing'];
+    document.querySelector('.nw-menu').remove();
+    const sv2 = (window.__calls || []).filter(c => c[0] === 'saveNewThings').pop();
+    if(!sv2 || !sv2[1][0].items.some(i => i.g === 'gGame') || !(sv2[1][0].cats || []).some(c => c.id === 'gManga')) return ['types not saved'];
+    document.querySelector('#newList [data-view="date"]').click();
     document.querySelector('[data-ctab="notes"]').click(); await wait(50);
     return [];
   });

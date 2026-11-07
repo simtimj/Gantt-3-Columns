@@ -652,10 +652,11 @@
     .dr-type{margin:4px 0 1px;font-size:.85em;font-weight:600;opacity:.8;} /* History log types (2026-11-04) */
     .dr-tcount{margin-left:6px;font-weight:400;font-size:.85em;opacity:.75;}
     /* Day Review lines as small cells (2026-11-04, Julius): bold main point, muted details, two lines max; tap to show all. */
-    .dr-line{margin:3px 0;padding:2px 6px;border:1px solid var(--border);border-radius:5px;font-size:.9em;line-height:1.25;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;cursor:pointer;}
-    .dr-line.dr-full{display:block;}
-    .dr-line > b{font-weight:700;}
-    .dr-line > span{color:var(--muted,#888);}
+    /* 2026-11-07 (Julius): one column: the title is an underlined header, the details sit under it (2 lines, tap for all). */
+    .dr-line{display:block;margin:3px 0;padding:2px 6px;border:1px solid var(--border);border-radius:5px;font-size:.9em;line-height:1.25;overflow-wrap:anywhere;cursor:pointer;}
+    .dr-line > b{display:block;font-weight:700;text-decoration:underline;text-underline-offset:2px;}
+    .dr-line > span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--muted,#888);}
+    .dr-line.dr-full > span{display:block;}
     .ref-tabs{margin-left:0;flex:0 0 auto;align-self:center;}
     /* Reference toolbar scrolls sideways on narrow columns; search keeps a readable width. */
     .ref-toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
@@ -1862,14 +1863,18 @@
     /* Hourly weather (☁️ tab). */
     .wx-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;font-size:12px;color:var(--muted,#888);}
     .wx-head button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 4px;}
-    .wx-row{display:grid;grid-template-columns:3.4em 1.6em 2.6em 1fr;align-items:center;gap:4px;padding:3px 8px;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--border,#ddd) 60%,transparent);}
+    .wx-row{display:grid;grid-template-columns:4.1em 1.6em 3.8em minmax(0,1fr);align-items:center;gap:4px;padding:3px 8px;white-space:nowrap;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--border,#ddd) 60%,transparent);}
     .wx-row.wx-now{font-weight:700;}
     .wx-row .wx-t{color:var(--muted,#888);font-size:12px;}
     .wx-row .wx-p{color:#1e88e5;font-size:12px;}
     /* Daily rows fit the cell (2026-11-04, Julius): tight columns; a narrow cell drops the date and the 💧. */
     #weatherScroll{container-type:inline-size;}
-    .wx-row.wx-d{grid-template-columns:4.1em 1.4em 3.8em minmax(0,1fr);gap:2px;padding-inline:5px;white-space:nowrap;}
-    @container (max-width:190px){.wx-row.wx-d{grid-template-columns:2.1em 1.3em 3.4em minmax(0,1fr);gap:1px;padding-inline:2px;font-size:12px;}.wx-row.wx-d .wx-t,.wx-row.wx-d .wx-p{font-size:11px;}.wx-d .wx-date,.wx-d .wx-drop{display:none;}}
+    /* Hourly + daily share one grid (2026-11-07, Julius: same styling). Mode buttons like History's; 7 days sits apart. */
+    .wx-modes{display:inline-flex;gap:3px;margin-left:auto;margin-right:4px;}
+    .wx-head .wx-modes button{font:inherit;font-size:11px;line-height:1;padding:2px 6px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+    .wx-head .wx-modes button[aria-pressed="true"]{background:var(--text,#333);color:var(--bg,#fff);border-color:var(--text,#333);}
+    .wx-sec{margin-top:14px;border-top:2px solid var(--divider,#999);padding-top:8px;}
+    @container (max-width:190px){.wx-row{grid-template-columns:2.6em 1.3em 3.4em minmax(0,1fr);gap:1px;padding-inline:2px;font-size:12px;}.wx-row .wx-t,.wx-row .wx-p{font-size:11px;}.wx-d .wx-date,.wx-row .wx-drop{display:none;}.wx-head .wx-modes button{padding:2px 3px;}}
     .wx-row.wx-d .wx-lo{color:var(--muted,#888);}
     .wx-day{padding:6px 8px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#888);}
     #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
@@ -7944,8 +7949,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         .finally(() => { busy = false; });
     }
     // One tab (2026-11-07, Julius): next 24 hours on top, the 7 days under it.
-    const draw = () => { if(data && isWx()) box.innerHTML = head() + hourlyHtml(data, 12) + '<div class="wx-day">7 days</div>' + dailyHtml(data); };
-    const head = () => '<div class="wx-head"><span>' + PLACE + '</span><button type="button" data-wx-retry title="Refresh">↻</button></div>';
+    // Mode (2026-11-07, Julius): Hourly | Daily | Both, remembered per device (fw.wxMode).
+    let mode = 'both'; try{ mode = localStorage.getItem('fw.wxMode') || 'both'; }catch(e){}
+    const draw = () => { if(!data || !isWx()) return;
+      box.innerHTML = head() + (mode !== 'daily' ? hourlyHtml(data, mode === 'both' ? 12 : 24) : '') +
+        (mode !== 'hourly' ? '<div class="wx-day' + (mode === 'both' ? ' wx-sec' : '') + '">7 days</div>' + dailyHtml(data) : ''); };
+    const mb = (m,l) => '<button type="button" data-wx-mode="' + m + '" aria-pressed="' + (mode === m) + '">' + l + '</button>';
+    const head = () => '<div class="wx-head"><span>' + PLACE + '</span><span class="wx-modes">' + mb('hourly','Hourly') + mb('daily','Daily') + mb('both','Both') + '</span><button type="button" data-wx-retry title="Refresh">↻</button></div>';
     function dailyHtml(d){
       const w = d.daily;
       return w.time.map((t,k) => {
@@ -7967,7 +7977,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       }
       return html;
     }
-    box.addEventListener('click', e => { if(e.target.closest('[data-wx-retry]')) load(true); });
+    box.addEventListener('click', e => {
+      const m = e.target.closest('[data-wx-mode]');
+      if(m){ mode = m.dataset.wxMode; try{ localStorage.setItem('fw.wxMode', mode); }catch(err){} draw(); return; }
+      if(e.target.closest('[data-wx-retry]')) load(true);
+    });
     const check = () => { if(isWx()){ draw(); load(false); } };
     new MutationObserver(check).observe(pane, {attributes:true, attributeFilter:['data-ctab']});
     document.addEventListener('visibilitychange', () => { if(!document.hidden) check(); });
@@ -11360,7 +11374,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(!ed) return;
       const lines = [...ed.querySelectorAll('.check-line')];
       const done = lines.filter(l => l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      const txt = 'Today: ' + done + '/' + lines.length + ' done';
+      const txt = 'Today: ' + done + '/' + lines.length + ' ✓'; // ✓ instead of "done" (2026-11-07, Julius: shorter)
       if(ed.dataset.dash !== txt){
         ed.dataset.dash = txt;
         requestAnimationFrame(() => { try{ paintDaySecs(ed); }catch(e){} });
@@ -11454,7 +11468,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(!head){ const i = t.indexOf(':'); if(i > 0 && i <= 70) head = t.slice(0,i); }
       if(!head) return esc(t);
       const rest = t.slice(head.length).replace(/^\s*:\s*/,'');
-      return '<b>' + esc(head) + '</b>' + (rest ? '<span>: ' + esc(rest) + '</span>' : '');
+      return '<b>' + esc(head) + '</b>' + (rest ? '<span>' + esc(rest) + '</span>' : '');
     }
     function collect(ed){
       const cats = new Map(); let group = null, total = 0;
@@ -11476,7 +11490,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const date = reviewDate();
       const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
       const {cats,total} = ed ? collect(ed) : {cats:[],total:0};
-      let h = `<div class="dr-head"><span>Day Review · ${total} done</span><span class="dr-lv"><button type="button" data-drlv="-1" title="Fold one level"${drLevel ? '' : ' disabled'}>−</button><button type="button" data-drlv="1" title="Open one level"${drLevel < 2 ? '' : ' disabled'}>+</button></span></div>`;
+      let h = `<div class="dr-head"><span>Day Review · ${total} ✓</span><span class="dr-lv"><button type="button" data-drlv="-1" title="Fold one level"${drLevel ? '' : ' disabled'}>−</button><button type="button" data-drlv="1" title="Open one level"${drLevel < 2 ? '' : ' disabled'}>+</button></span></div>`;
       if(!total) h += '<div class="center-placeholder">Nothing done yet.</div>';
       cats.forEach(c => {
         const info = CARD_CAT_BY_KEY[c.key], name = info ? info.name : 'Other';
@@ -11820,7 +11834,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
       const types = logTypeBuckets(tasks,histItemLabel);
       const items = histList(lines.filter(x => x.tagName !== 'TABLE' && !x.hasAttribute('data-cgrp') && !(+(x.dataset.level || 0) > 0)).map(histItemLabel));
-      return {name,count:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : lines.length + ' lines',items,
+      return {name,count:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : lines.length + ' lines',items,
         types:types ? types.map(t => ({name:t.name,n:t.items.length,items:histList(t.items)})) : null};
     });
   }
@@ -11886,7 +11900,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const fold = histMode === 'full' ? !!folds[k] : !folds['open:' + k];
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
       if(setAttr(n,'data-tsf',fold ? 'c' : 'o')) changed = true;
-      setAttr(n,'data-tsinfo',tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : cov.length + ' lines');
+      setAttr(n,'data-tsinfo',tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' lines');
       tsecDrawSum(n,fold ? tsecGroups(cov) : null,folds);
       if(fold){
         cov.forEach(x => hide.add(x));
@@ -11967,7 +11981,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const fold = (histForced(n,ed) ? !histIsOpen(ed,histKey(n)) : n.dataset.fold === '1') && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? (done === tasks.length ? done + ' done' : done + '/' + tasks.length + ' done') : cov.length + ' hidden', sum:fold && histMode !== 'mini' ? titleSummary(cov) : ''});
+      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden', sum:fold && histMode !== 'mini' ? titleSummary(cov) : ''});
       if(fold){
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);

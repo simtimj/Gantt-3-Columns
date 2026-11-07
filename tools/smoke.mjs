@@ -166,6 +166,9 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   // Weather (2026-11-07): one ☁️ tab (hourly + daily merged).
   const wxTabs = await pg.evaluate(() => document.querySelectorAll('.center-tabs [data-ctab="weather"], .center-tabs [data-ctab="wxdaily"]').length);
   if (wxTabs !== 1) errs.push('Weather: expected one tab, found ' + wxTabs);
+  // History counts read ✓ instead of "done" (2026-11-07).
+  const doneWord = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll [data-tlinfo],#todayScroll [data-tsinfo]')].map(n => n.dataset.tlinfo || n.dataset.tsinfo).filter(t => / done$/.test(t)));
+  if (doneWord.length) errs.push('History: still says done: ' + doneWord.slice(0,3).join(' | '));
   // Fun tab: 🎮 shows its own list; typing + Enter adds a line and saves; ticking moves it to Done.
   const fun = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));

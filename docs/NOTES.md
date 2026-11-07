@@ -456,6 +456,7 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 
 - `initDayReview`: `drLevel` 0/1/2 (localStorage `fw.drLevel`, default 1) via `.dr-lv` − / + buttons; `closedCats` / `openGroups` now hold headers that differ from the level default and reset on a level change. Group summary = `name: New n · Fixes n · Tweaks n`.
 - Server `getCardCats_` one-time flag `cardCatsMisc1` → `cardCatsMisc_`: removes "vivaldi" from other subjects' words, adds it to MISC (key `misc` or name starting MISC; made grey if missing).
+- 2026-11-07: `summaryHtml(cats,total,date)` = folded `.dr-sum` "📝 In words" above the categories (open state `fw.drSum`). `collect` now tracks each line's `sec` (current `data-tsec` header, else `tsecOf(data-dt)`). AI share = check-text starting with `*`; types via `logTypeOf`; day-before total via `collect(prevEd)` when that day is loaded. Group headers: `.dr-gname` (underlined) + count on one line, `.dr-tcount` wraps under it.
 
 ## Done → Dailies matching (2026-11-05, Julius: first version)
 

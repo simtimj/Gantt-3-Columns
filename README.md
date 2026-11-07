@@ -49,6 +49,7 @@ Last updated: 2026-11-07
 
 ## 🧪 To be confirmed (2026-11-07)
 
+- **Day Review "📝 In words"**: a folded box at the top of 📊 Day Review. Tap it for the day in sentences: how many things you finished, what share was which category ("Mostly Code 37%, then Health 20%…"), the biggest groups with new / fixes / tweaks, totals of new / fixes / tweaks, how many you did yourself vs Claude / ChatGPT, the busiest part of the day, and more / fewer than the day before. Stays open or closed as you left it (per device).
 - **Weather: Hourly / Daily / Both buttons**: in the ☁️ tab's header, **Hourly** shows the next 24 hours, **Daily** the 7 days, **Both** (default) shows 12 hours, then a clear gap and line, then 7 DAYS. Both lists use the same row style and columns. Your pick is remembered on the device.
 - **✓ instead of "done"**: History counts read **8 ✓** / **5/7 ✓** (fold buttons, Morn / After / Night, project rows, "Today: 52/58 ✓") and Day Review's header reads "Day Review · 52 ✓", in every view.
 - **Day Review cells: one column**: each finished line shows its title as an underlined header with the details underneath (2 lines, tap for all), instead of title and details side by side. Group headers too (fixed 2026-11-07): **Userscripts** / **Gantt** is one underlined title line with its count on the right, and **New 1 · Fixes 1 · Tweaks 1** sits on the line under it (before, the name and the counts were two side-by-side columns).

@@ -638,6 +638,11 @@
     .fun-done-head{margin:10px 0 4px;font-size:.85em;color:var(--muted,#777);cursor:pointer;user-select:none;}
     .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);display:flex;align-items:center;gap:8px;}
     .dr-lv{display:inline-flex;gap:3px;margin-left:auto;}
+    .dr-sum{margin:0 0 8px;padding:2px 7px;border:1px dashed var(--divider,#999);border-radius:8px;font-size:.88em;}
+    .dr-sum > summary{cursor:pointer;font-weight:600;color:var(--muted,#777);padding:2px 0;list-style:none;user-select:none;-webkit-user-select:none;}
+    .dr-sum > summary::-webkit-details-marker{display:none;}
+    .dr-sum > summary::before{content:"▸ ";} .dr-sum[open] > summary::before{content:"▾ ";}
+    .dr-sum-body p{margin:3px 0;line-height:1.35;}
     .dr-lv button{font:inherit;font-size:.95em;line-height:1;min-width:22px;height:20px;padding:0 5px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
     .dr-lv button:disabled{opacity:.35;cursor:default;}
     /* Category and group cells, underlined category header (2026-11-04, Julius). */
@@ -11474,8 +11479,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       return '<b>' + esc(head) + '</b>' + (rest ? '<span>' + esc(rest) + '</span>' : '');
     }
     function collect(ed){
-      const cats = new Map(); let group = null, total = 0;
+      const cats = new Map(); let group = null, total = 0, sec = '';
       [...ed.children].forEach(n => {
+        if(n.hasAttribute('data-tsec')){ sec = n.dataset.tsec; group = null; return; }
         if(n.hasAttribute('data-cgrp') || n.dataset.tl === '1'){ group = {name:n.dataset.cgrp && n.dataset.cgrp !== '1' ? n.dataset.cgrp : txt(n),cat:n.dataset.tccat || cardCatFromName(txt(n)) || ''}; return; }
         if(n.matches('[data-sec],[data-nsec]') || isEmptyLine(n)){ group = null; return; }
         if(!n.matches('.check-line') || !isDone(n)) return;
@@ -11484,7 +11490,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(!cats.has(key)) cats.set(key,{key,n:0,groups:new Map()});
         const c = cats.get(key); c.n++; total++;
         if(!c.groups.has(gName)) c.groups.set(gName,[]);
-        c.groups.get(gName).push({t,n,h:drLineHtml(n,t)});
+        c.groups.get(gName).push({t,n,h:drLineHtml(n,t),sec:sec || (n.dataset.dt && typeof tsecOf === 'function' ? tsecOf(n.dataset.dt) : '')});
       });
       return {cats:[...cats.values()].sort((a,b) => b.n - a.n),total};
     }
@@ -11495,6 +11501,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const {cats,total} = ed ? collect(ed) : {cats:[],total:0};
       let h = `<div class="dr-head"><span>Day Review · ${total} ✓</span><span class="dr-lv"><button type="button" data-drlv="-1" title="Fold one level"${drLevel ? '' : ' disabled'}>−</button><button type="button" data-drlv="1" title="Open one level"${drLevel < 2 ? '' : ' disabled'}>+</button></span></div>`;
       if(!total) h += '<div class="center-placeholder">Nothing done yet.</div>';
+      else h += summaryHtml(cats,total,date);
       cats.forEach(c => {
         const info = CARD_CAT_BY_KEY[c.key], name = info ? info.name : 'Other';
         h += `<details class="dr-cat" data-k="${esc(c.key)}" style="--dr-c:${esc(info ? info.color : '#8a8f98')}"${drLevel === 0 ? (closedCats.has(c.key) ? ' open' : '') : (closedCats.has(c.key) ? '' : ' open')}><summary><i style="background:var(--dr-c)"></i>${esc(name)}<b>${c.n}</b></summary>`;
@@ -11513,6 +11520,50 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       });
       if(box.dataset.h !== h){ box.dataset.h = h; const y = box.scrollTop; box.innerHTML = h; box.scrollTop = y; }
     }
+    /* Day in words (2026-11-07, Julius): a folded "In words" box on top: how much, what share was what, the biggest
+       groups, new / fixes / tweaks, you vs AI, the busiest part of the day, and vs the day before. Open state per device. */
+    let sumOpen = false; try{ sumOpen = localStorage.getItem('fw.drSum') === '1'; }catch(e){}
+    const pct = (n,t) => Math.round(n * 100 / t) + '%';
+    const plural = (n,w) => n + ' ' + w + (n === 1 ? '' : 's');
+    function summaryHtml(cats,total,date){
+      const items = []; cats.forEach(c => c.groups.forEach((list,g) => list.forEach(x => items.push(Object.assign({cat:c.key,g},x)))));
+      const name = k => (CARD_CAT_BY_KEY[k] || {name:'Other'}).name;
+      const lines = [];
+      const isToday = date === ((typeof state !== 'undefined' && state && state.today) || localToday());
+      lines.push((isToday ? 'Today you' : 'You') + ' finished <b>' + plural(total,'thing') + '</b>.');
+      // Share by category (top 3)
+      const top = cats.slice(0,3).map(c => '<b>' + esc(name(c.key)) + '</b> ' + pct(c.n,total));
+      if(cats.length === 1) lines.push('All of it was ' + esc(name(cats[0].key)) + '.');
+      else lines.push('Mostly ' + top[0] + (top.length > 1 ? ', then ' + top.slice(1).join(', ') : '') + (cats.length > 3 ? ' (+' + (cats.length - 3) + ' more)' : '') + '.');
+      // Biggest groups with their types
+      const groups = []; cats.forEach(c => c.groups.forEach((list,g) => groups.push({g,list})));
+      groups.sort((a,b) => b.list.length - a.list.length);
+      const gDesc = gr => { const ty = typeof logTypeOf === 'function' ? {new:0,fix:0,tweak:0} : null;
+        if(ty) gr.list.forEach(x => { const k = logTypeOf(x.n); if(k) ty[k]++; });
+        const parts = ty ? [ty.new ? ty.new + ' new' : '', ty.fix ? (ty.fix === 1 ? '1 fix' : ty.fix + ' fixes') : '', ty.tweak ? plural(ty.tweak,'tweak') : ''].filter(Boolean) : [];
+        return '<b>' + esc(gr.g) + '</b> (' + gr.list.length + (parts.length ? ': ' + parts.join(', ') : '') + ')'; };
+      if(groups.length > 1 || groups[0].g !== 'Tasks') lines.push('Biggest: ' + groups.slice(0,2).map(gDesc).join(' and ') + '.');
+      // New / fixes / tweaks overall
+      if(typeof logTypeOf === 'function'){
+        const ty = {new:0,fix:0,tweak:0}; items.forEach(x => { const k = logTypeOf(x.n); if(k) ty[k]++; });
+        if(ty.new + ty.fix + ty.tweak) lines.push('Across everything: ' + plural(ty.new,'new thing') + ', ' + (ty.fix === 1 ? '1 fix' : ty.fix + ' fixes') + ', ' + plural(ty.tweak,'tweak') + '.');
+      }
+      // You vs AI (AI lines start with "*")
+      const ai = items.filter(x => /^\s*\*/.test(((x.n.querySelector(':scope > .check-text') || x.n).textContent || ''))).length;
+      if(ai) lines.push('You did <b>' + (total - ai) + '</b> yourself (' + pct(total - ai,total) + '); Claude / ChatGPT shipped ' + ai + '.');
+      // Busiest part of the day
+      const secN = {morning:0,afternoon:0,evening:0}; items.forEach(x => { if(secN[x.sec] != null) secN[x.sec]++; });
+      const secs = Object.entries(secN).filter(e => e[1]).sort((a,b) => b[1] - a[1]), label = {morning:'morning',afternoon:'afternoon',evening:'night'};
+      if(secs.length > 1) lines.push('Busiest in the <b>' + label[secs[0][0]] + '</b> (' + secs[0][1] + '), then ' + secs.slice(1).map(e => label[e[0]] + ' ' + e[1]).join(', ') + '.');
+      else if(secs.length === 1) lines.push('All of it in the ' + label[secs[0][0]] + '.');
+      // vs the day before (if it's loaded)
+      const pd = new Date(date + 'T12:00:00'); pd.setDate(pd.getDate() - 1);
+      const prevKey = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2,'0') + '-' + String(pd.getDate()).padStart(2,'0');
+      const prevEd = document.querySelector('#todayScroll .day-editor[data-date="' + prevKey + '"]');
+      if(prevEd){ const pt = collect(prevEd).total, d = total - pt;
+        if(pt) lines.push(d > 0 ? d + ' more than the day before (' + pt + ').' : d < 0 ? (-d) + ' fewer than the day before (' + pt + ').' : 'Same as the day before (' + pt + ').'); }
+      return '<details class="dr-sum"' + (sumOpen ? ' open' : '') + '><summary>📝 In words</summary><div class="dr-sum-body">' + lines.map(l => '<p>' + l + '</p>').join('') + '</div></details>';
+    }
     window.renderDayReview = () => { if(!timer) timer = setTimeout(() => { timer = null; draw(); },200); };
     box.addEventListener('click',e => {
       const lb = e.target.closest && e.target.closest('[data-drlv]');
@@ -11521,6 +11572,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
     box.addEventListener('toggle',e => {
       const d = e.target; if(!d.matches || !d.matches('details')) return;
+      if(d.classList.contains('dr-sum')){ sumOpen = d.open; try{ localStorage.setItem('fw.drSum', sumOpen ? '1' : '0'); }catch(err){} return; }
       // Sets hold the headers that differ from the − / + level's default.
       if(d.classList.contains('dr-cat')) closedCats[(drLevel === 0 ? !d.open : d.open) ? 'delete' : 'add'](d.dataset.k);
       else openGroups[(drLevel === 2 ? !d.open : d.open) ? 'add' : 'delete'](d.dataset.k);

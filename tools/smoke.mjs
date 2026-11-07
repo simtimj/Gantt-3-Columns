@@ -177,6 +177,16 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if (!nm || !tc) return ['header parts missing'];
     const a = nm.getBoundingClientRect(), c = tc.getBoundingClientRect();
     const out = c.top >= a.bottom - 1 && Math.abs(c.left - a.left) < 2 ? [] : ['counts beside the name: ' + JSON.stringify([a.left, a.bottom, c.left, c.top])];
+    // Day in words (2026-11-07): folded by default; opens to sentences with the total and a share.
+    const sm = document.querySelector('#dayReviewScroll .dr-sum');
+    if (!sm) out.push('no In words box');
+    else {
+      if (sm.open) out.push('In words open by default');
+      sm.querySelector('summary').click(); await new Promise(r => setTimeout(r, 50));
+      const tx = sm.textContent;
+      if (!/finished \d+ things/.test(tx) || !/\d+%/.test(tx) || !/Userscripts/.test(tx)) out.push('In words text: ' + tx.slice(0, 200));
+      sm.querySelector('summary').click();
+    }
     document.querySelector('[data-ctab="notes"]').click();
     return out;
   });

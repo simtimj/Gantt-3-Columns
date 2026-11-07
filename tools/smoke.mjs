@@ -184,7 +184,9 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
       if (sm.open) out.push('In words open by default');
       sm.querySelector('summary').click(); await new Promise(r => setTimeout(r, 50));
       const tx = sm.textContent;
-      if (!/finished \d+ things/.test(tx) || !/\d+%/.test(tx) || !/Userscripts/.test(tx)) out.push('In words text: ' + tx.slice(0, 200));
+      const hs = [...sm.querySelectorAll('.dr-sum-h')].map(x => x.textContent).join('|');
+      if (!/^\d+ things done/.test(sm.querySelector('.dr-sum-title')?.textContent || '') || !/\d+%/.test(tx) || !/Userscripts/.test(tx)) out.push('In words text: ' + tx.slice(0, 200));
+      if (!/^Share\|Biggest/.test(hs) || /yourself|day before/.test(tx)) out.push('In words headings: ' + hs);
       sm.querySelector('summary').click();
     }
     document.querySelector('[data-ctab="notes"]').click();

@@ -642,7 +642,9 @@
     .dr-sum > summary{cursor:pointer;font-weight:600;color:var(--muted,#777);padding:2px 0;list-style:none;user-select:none;-webkit-user-select:none;}
     .dr-sum > summary::-webkit-details-marker{display:none;}
     .dr-sum > summary::before{content:"▸ ";} .dr-sum[open] > summary::before{content:"▾ ";}
-    .dr-sum-body p{margin:3px 0;line-height:1.35;}
+    .dr-sum-body p{margin:1px 0 4px;line-height:1.35;}
+    .dr-sum-title{margin:3px 0 4px;font-size:1.05em;font-weight:700;}
+    .dr-sum-h{margin-top:4px;font-weight:600;text-decoration:underline;text-underline-offset:2px;}
     .dr-lv button{font:inherit;font-size:.95em;line-height:1;min-width:22px;height:20px;padding:0 5px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
     .dr-lv button:disabled{opacity:.35;cursor:default;}
     /* Category and group cells, underlined category header (2026-11-04, Julius). */
@@ -11531,41 +11533,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     function summaryHtml(cats,total,date){
       const items = []; cats.forEach(c => c.groups.forEach((list,g) => list.forEach(x => items.push(Object.assign({cat:c.key,g},x)))));
       const name = k => (CARD_CAT_BY_KEY[k] || {name:'Other'}).name;
-      const lines = [];
+      // Organized (2026-11-07, Julius): a title line, then underlined headings with their sentence(s) under them.
+      // Dropped: you vs AI and vs-the-day-before (not useful).
       const isToday = date === ((typeof state !== 'undefined' && state && state.today) || localToday());
-      lines.push((isToday ? 'Today you' : 'You') + ' finished <b>' + plural(total,'thing') + '</b>.');
-      // Share by category (top 3)
+      const secs = [];
       const top = cats.slice(0,3).map(c => '<b>' + esc(name(c.key)) + '</b> ' + pct(c.n,total));
-      if(cats.length === 1) lines.push('All of it was ' + esc(name(cats[0].key)) + '.');
-      else lines.push('Mostly ' + top[0] + (top.length > 1 ? ', then ' + top.slice(1).join(', ') : '') + (cats.length > 3 ? ' (+' + (cats.length - 3) + ' more)' : '') + '.');
-      // Biggest groups with their types
+      secs.push(['Share', cats.length === 1 ? 'All of it was ' + esc(name(cats[0].key)) + '.'
+        : 'Mostly ' + top[0] + (top.length > 1 ? ', then ' + top.slice(1).join(', ') : '') + (cats.length > 3 ? ' (+' + (cats.length - 3) + ' more)' : '') + '.']);
       const groups = []; cats.forEach(c => c.groups.forEach((list,g) => groups.push({g,list})));
       groups.sort((a,b) => b.list.length - a.list.length);
       const gDesc = gr => { const ty = typeof logTypeOf === 'function' ? {new:0,fix:0,tweak:0} : null;
         if(ty) gr.list.forEach(x => { const k = logTypeOf(x.n); if(k) ty[k]++; });
         const parts = ty ? [ty.new ? ty.new + ' new' : '', ty.fix ? (ty.fix === 1 ? '1 fix' : ty.fix + ' fixes') : '', ty.tweak ? plural(ty.tweak,'tweak') : ''].filter(Boolean) : [];
         return '<b>' + esc(gr.g) + '</b> (' + gr.list.length + (parts.length ? ': ' + parts.join(', ') : '') + ')'; };
-      if(groups.length > 1 || groups[0].g !== 'Tasks') lines.push('Biggest: ' + groups.slice(0,2).map(gDesc).join(' and ') + '.');
-      // New / fixes / tweaks overall
+      if(groups.length > 1 || groups[0].g !== 'Tasks') secs.push(['Biggest', groups.slice(0,2).map(gDesc).join(' and ') + '.']);
       if(typeof logTypeOf === 'function'){
         const ty = {new:0,fix:0,tweak:0}; items.forEach(x => { const k = logTypeOf(x.n); if(k) ty[k]++; });
-        if(ty.new + ty.fix + ty.tweak) lines.push('Across everything: ' + plural(ty.new,'new thing') + ', ' + (ty.fix === 1 ? '1 fix' : ty.fix + ' fixes') + ', ' + plural(ty.tweak,'tweak') + '.');
+        if(ty.new + ty.fix + ty.tweak) secs.push(['Across everything', plural(ty.new,'new thing') + ', ' + (ty.fix === 1 ? '1 fix' : ty.fix + ' fixes') + ', ' + plural(ty.tweak,'tweak') + '.']);
       }
-      // You vs AI (AI lines start with "*")
-      const ai = items.filter(x => /^\s*\*/.test(((x.n.querySelector(':scope > .check-text') || x.n).textContent || ''))).length;
-      if(ai) lines.push('You did <b>' + (total - ai) + '</b> yourself (' + pct(total - ai,total) + '); Claude / ChatGPT shipped ' + ai + '.');
-      // Busiest part of the day
       const secN = {morning:0,afternoon:0,evening:0}; items.forEach(x => { if(secN[x.sec] != null) secN[x.sec]++; });
-      const secs = Object.entries(secN).filter(e => e[1]).sort((a,b) => b[1] - a[1]), label = {morning:'morning',afternoon:'afternoon',evening:'night'};
-      if(secs.length > 1) lines.push('Busiest in the <b>' + label[secs[0][0]] + '</b> (' + secs[0][1] + '), then ' + secs.slice(1).map(e => label[e[0]] + ' ' + e[1]).join(', ') + '.');
-      else if(secs.length === 1) lines.push('All of it in the ' + label[secs[0][0]] + '.');
-      // vs the day before (if it's loaded)
-      const pd = new Date(date + 'T12:00:00'); pd.setDate(pd.getDate() - 1);
-      const prevKey = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2,'0') + '-' + String(pd.getDate()).padStart(2,'0');
-      const prevEd = document.querySelector('#todayScroll .day-editor[data-date="' + prevKey + '"]');
-      if(prevEd){ const pt = collect(prevEd).total, d = total - pt;
-        if(pt) lines.push(d > 0 ? d + ' more than the day before (' + pt + ').' : d < 0 ? (-d) + ' fewer than the day before (' + pt + ').' : 'Same as the day before (' + pt + ').'); }
-      return '<details class="dr-sum"' + (sumOpen ? ' open' : '') + '><summary>📝 In words</summary><div class="dr-sum-body">' + lines.map(l => '<p>' + l + '</p>').join('') + '</div></details>';
+      const sorted = Object.entries(secN).filter(e => e[1]).sort((a,b) => b[1] - a[1]), label = {morning:'morning',afternoon:'afternoon',evening:'night'};
+      if(sorted.length > 1) secs.push(['When', 'Busiest in the <b>' + label[sorted[0][0]] + '</b> (' + sorted[0][1] + '), then ' + sorted.slice(1).map(e => label[e[0]] + ' ' + e[1]).join(', ') + '.']);
+      else if(sorted.length === 1) secs.push(['When', 'All of it in the ' + label[sorted[0][0]] + '.']);
+      const title = '<div class="dr-sum-title">' + plural(total,'thing') + ' done' + (isToday ? ' today' : '') + '</div>';
+      const body = title + secs.map(([h,t]) => '<div class="dr-sum-h">' + h + '</div><p>' + t + '</p>').join('');
+      return '<details class="dr-sum"' + (sumOpen ? ' open' : '') + '><summary>📝 In words</summary><div class="dr-sum-body">' + body + '</div></details>';
     }
     window.renderDayReview = () => { if(!timer) timer = setTimeout(() => { timer = null; draw(); },200); };
     box.addEventListener('click',e => {

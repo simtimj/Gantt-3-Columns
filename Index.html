@@ -11728,7 +11728,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const hr = ref.getBoundingClientRect(), er = ed.getBoundingClientRect();
     // Boxes sit INSIDE the editor with a small side margin (Julius, 2026-10-27: they melted into the cell edges);
     // the editor gets extra side padding (.editor.sec-painted) so the text stays inside the box.
-    const inset = Math.max(2,Math.round((parseFloat(getComputedStyle(ed).paddingLeft) || 15) / 3));
+    // History (2026-11-07, Julius: no extra room outside the boxes): 1px inside the editor's edge.
+    const inset = ed.closest('#todayScroll') ? 1 : Math.max(2,Math.round((parseFloat(getComputedStyle(ed).paddingLeft) || 15) / 3));
     // The one-day editor sits a few px wider than its host, so keep the box inside the host or its left edge gets clipped.
     const edL = Math.round(er.left - hr.left), edR = Math.round(er.right - hr.left);
     const left = Math.max(1,edL + inset), right = Math.min(ref.clientWidth - 1,edR - inset), width = right - left;
@@ -14098,8 +14099,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .ref-toolbar.hs-l.hs-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
 /* Minimal time sections (2026-11-07, Julius: lines bled past the box's left edge, too much space). Applies to every
    time section (Morn / After / Night) in History: content sits inside the box, lines and group headers packed tight. */
-#todayScroll .day-editor.sec-painted.sec-painted.sec-painted{padding-left:11px!important;padding-right:11px!important;}
-#todayScroll .day-editor > [data-tsec]{margin-top:6px!important;margin-bottom:2px!important;}
+#todayScroll .day-editor.sec-painted.sec-painted.sec-painted{padding-left:7px!important;padding-right:7px!important;margin-left:0!important;margin-right:0!important;}
+/* Less room outside the boxes (2026-11-07): the day row's side padding drops to 2px (boxes sit 1px inside the editor, see paintDaySecs). */
+#todayScroll .day-row.od-on.od-on,#todayScroll .day-row.today.today:has(> .sec-host){padding-left:2px!important;padding-right:2px!important;}
+#todayScroll .day-editor > [data-tsec]{margin-top:4px!important;margin-bottom:2px!important;}
+/* A little space between Morn / After / Night (2026-11-07): gap + the thin line above After and Night. */
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){margin-top:12px!important;padding-top:4px!important;}
+/* One line: icon, label, then the count as a small green cell like the group buttons (51/53 ✓ −). */
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){flex-wrap:nowrap!important;align-items:center;gap:2px;padding-left:2px!important;}
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab):has(> .ts-sum){flex-wrap:wrap!important;} /* the folded list still goes under the line */
+#todayScroll .day-editor > [data-tsec] > .ts-lab{flex:0 1 auto!important;}
+#todayScroll .day-editor > [data-tsec]::before{margin-right:1px!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{content:attr(data-tsinfo)!important;flex:0 0 auto!important;margin-left:2px;padding:0 4px;font-size:10px;font-weight:700;line-height:1.35;letter-spacing:0;text-transform:none;white-space:nowrap!important;color:#1e9e50;border:1px solid #22a55a;border-radius:5px;}
+#todayScroll .day-editor > [data-tsec][data-tsf="c"]:has(> .ts-lab)::after{content:"+\00A0" attr(data-tsinfo)!important;} /* folded: + in front; open: just the count (tap the header to fold) */
+/* Group names (Gantt, Userscripts…): underlined, not bold. */
+#todayScroll .day-editor > [data-cgrp] :is(b,strong){font-weight:400!important;}
 #todayScroll .day-editor > [data-tsec] ~ .check-line{margin-top:1px!important;margin-bottom:1px!important;padding-top:1px!important;padding-bottom:1px!important;}
 #todayScroll .day-editor > [data-tsec] ~ [data-cgrp]{margin-top:4px!important;margin-bottom:0!important;}
 </style>

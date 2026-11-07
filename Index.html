@@ -1997,6 +1997,9 @@ body.fw-focus-on .fw-focus-target{--panel:var(--fw-focus-bg);}
 .fw-tuck-tab.y{width:46px;height:16px;font-size:11px;}
 body.fw-focus-on .fw-tuck-tab{display:none;}
 #fwFocusBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:9000;display:none;}
+.hz-bar{position:fixed;top:calc(5dvh + 6px);right:calc(4vw + 14px);z-index:9003;display:flex;gap:3px;padding:2px;border-radius:7px;background:var(--panel,#fff);box-shadow:0 2px 8px rgba(0,0,0,.25);}
+.hz-bar button{font:inherit;font-size:12px;line-height:1;padding:3px 7px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+.hz-bar button[aria-pressed="true"]{background:var(--text,#333);color:var(--bg,#fff);border-color:var(--text,#333);}
 body.fw-focus-on #fwFocusBackdrop{display:block;}
 /* Zoomed cell on top of everything (2026-11-05): a parent with its own z-index (the day row has z-index:2) capped it, so
    other columns drew over the zoom and its Blocks neighbour showed. While zoomed, its parents drop their z-index. */
@@ -11802,7 +11805,33 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(ed.dataset.date && typeof syncDayHeightStable === 'function') try{ syncDayHeightStable(ed.dataset.date); }catch(e){}
     requestAnimationFrame(() => { if(typeof paintDaySecs === 'function') paintDaySecs(ed); });
   }
+  /* Zoomed History (2026-11-07, Julius): holding HISTORY opens it as the List view with every section and group open
+     (line by line). A small ≡ List / ▤ Full bar floats on top to switch; closing the zoom puts his own mode back.
+     Nothing is saved (mode and opens are render-only while zoomed). */
+  let histZoomAll = false, histZoomPrev = null, histZoomBar = null;
+  function histZoom(on){
+    if(on === !!histZoomBar) return;
+    if(on){
+      histZoomPrev = histMode; histZoomAll = true; histMode = 'compact';
+      histZoomBar = document.createElement('div'); histZoomBar.className = 'hz-bar';
+      histZoomBar.innerHTML = '<button type="button" data-hz="compact" aria-pressed="true">≡ List</button><button type="button" data-hz="full" aria-pressed="false">▤ Full</button>';
+      histZoomBar.addEventListener('pointerdown', e => e.stopPropagation());
+      histZoomBar.addEventListener('click', e => {
+        const b = e.target.closest('[data-hz]'); if(!b) return;
+        e.stopPropagation(); histMode = b.dataset.hz;
+        histZoomBar.querySelectorAll('[data-hz]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+        histModeButton(); document.querySelectorAll('#todayScroll .day-editor').forEach(histRefresh);
+      });
+      document.body.appendChild(histZoomBar);
+    } else {
+      histZoomAll = false; if(histZoomPrev) histMode = histZoomPrev; histZoomPrev = null;
+      histZoomBar.remove(); histZoomBar = null;
+    }
+    histModeButton(); document.querySelectorAll('#todayScroll .day-editor').forEach(histRefresh);
+  }
+  window.histZoom = histZoom;
   function setHistMode(m){
+    if(histZoomBar){ histZoomPrev = m; try{ localStorage.setItem('fw.histMode',m); }catch(e){} } // picked while zoomed: kept for after
     histMode = m;
     try{ localStorage.setItem('fw.histMode',m); }catch(e){}
     histModeButton();
@@ -11822,7 +11851,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return '';
   }
   function histForced(n,ed){ return histMode !== 'full' && !!ed && ed.classList.contains('day-editor') && !!ed.closest('#todayScroll') && !!histKey(n); }
-  function histIsOpen(ed,key){ return !!((tsecFolds()[ed.dataset.date] || {})['open:' + key]); }
+  function histIsOpen(ed,key){ return histZoomAll || !!((tsecFolds()[ed.dataset.date] || {})['open:' + key]); }
   function histToggleOpen(ed,key){
     const all = tsecFolds(), d = ed.dataset.date, day = all[d] = all[d] || {}, k = 'open:' + key;
     if(day[k]) delete day[k]; else day[k] = 1;
@@ -11953,7 +11982,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       }
       const cov = titleCovered(n), tasks = cov.filter(x => x.classList.contains('check-line') && !(+(x.dataset.level || 0) > 0));
       if(!cov.length){ ['data-tsf','data-tsinfo'].forEach(a => n.removeAttribute(a)); tsecDrawSum(n,null,folds); continue; }
-      const fold = histMode === 'full' ? !!folds[k] : !folds['open:' + k];
+      const fold = histMode === 'full' ? !!folds[k] && !histZoomAll : !(histZoomAll || folds['open:' + k]);
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
       if(setAttr(n,'data-tsf',fold ? 'c' : 'o')) changed = true;
       setAttr(n,'data-tsinfo',tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' lines');
@@ -14196,6 +14225,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function close(){
     if(!focused)return;
     const el=focused;focused=null;
+    if(window.histZoom)window.histZoom(false);
     if(anim)anim.cancel();
     const a=anim=zoom(el,home,true);
     if(a)a.onfinish=()=>{settle(el);anim=null;};else settle(el);
@@ -14213,6 +14243,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       [...el.parentElement.children].forEach(n=>{if(n===el||n===pad||/absolute|fixed/.test(getComputedStyle(n).position))return;const r=n.getBoundingClientRect();frozen.push([n,n.style.getPropertyValue('flex')]);n.style.setProperty('flex','0 0 '+Math.round(row?r.width:r.height)+'px','important');});spacer=document.createElement('div');spacer.className='fw-focus-spacer';spacer.style.cssText=row?'flex:0 0 '+Math.round(home.width)+'px;width:'+Math.round(home.width)+'px':'flex:0 0 '+Math.round(home.height)+'px;height:'+Math.round(home.height)+'px';el.before(spacer);}
     const bg=shownBg(el);if(bg)el.style.setProperty('--fw-focus-bg',bg);
     focused=el;el.classList.add('fw-focus-target');document.body.classList.add('fw-focus-on');
+    if((el.classList.contains('od-top')||el.id==='todayPane')&&window.histZoom)window.histZoom(true); // History zoom = List, all open (2026-11-07)
     const a=anim=zoom(el,home,false);
     if(a)a.onfinish=()=>{if(anim===a)anim=null;repaintSecs(el);};else repaintSecs(el);
   }

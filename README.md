@@ -49,6 +49,7 @@ Last updated: 2026-11-07
 
 ## 🧪 To be confirmed (2026-11-07)
 
+- **Zoomed History = everything listed**: hold **HISTORY** and it opens zoomed in the **≡ List** view with every section and group open, line by line. A small **≡ List / ▤ Full** bar at the top right switches to the full view. Closing the zoom puts your normal History mode back. Display only, nothing is saved.
 - **History time headers: full windows only**: Morn / After / Night now read **Morn 6–2**, **After 2–8**, **Night 8–6**: just the full windows, no working hours and no a / p.
 - **Day Review "📝 In words"**: a folded box at the top of 📊 Day Review. Tap it for the day in sentences: how many things you finished, what share was which category ("Mostly Code 37%, then Health 20%…"), the biggest groups with new / fixes / tweaks, totals of new / fixes / tweaks, how many you did yourself vs Claude / ChatGPT, the busiest part of the day, and more / fewer than the day before. Stays open or closed as you left it (per device).
 - **Weather: Hourly / Daily / Both buttons**: in the ☁️ tab's header, **Hourly** shows the next 24 hours, **Daily** the 7 days, **Both** (default) shows 12 hours, then a clear gap and line, then 7 DAYS. Both lists use the same row style and columns. Your pick is remembered on the device.

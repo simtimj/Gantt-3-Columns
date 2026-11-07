@@ -460,8 +460,15 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     const b = t.getBoundingClientRect(), hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
     if (!hit || !t.contains(hit)) out.push('something draws over the zoomed History: ' + (hit && hit.className));
     if (b.width < innerWidth * .85) out.push('zoom narrower than 85% of the window');
+    // 2026-11-07: zoomed History = List with everything open; the ≡ / ▤ bar switches; closing restores the mode.
+    const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]');
+    if (document.body.dataset.hist !== 'compact') out.push('zoom not in List mode: ' + document.body.dataset.hist);
+    if (ed && ed.querySelector(':scope > [data-tsec][data-tsf="c"]')) out.push('a section is still folded in the zoom');
+    const bar = document.querySelector('.hz-bar');
+    if (!bar) out.push('no ≡ / ▤ bar'); else { bar.querySelector('[data-hz="full"]').click(); await wait(100); if (document.body.dataset.hist !== 'full') out.push('▤ Full did not switch'); }
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(900);
     if (document.querySelector('.fw-focus-target') || document.querySelector('.fw-focus-spacer')) out.push('zoom did not close cleanly');
+    if (document.querySelector('.hz-bar') || document.body.dataset.hist !== 'full') out.push('mode not restored after zoom: ' + document.body.dataset.hist);
     return out;
   });
   zm.forEach(x => errs.push('Zoom: ' + x));

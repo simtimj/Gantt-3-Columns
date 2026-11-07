@@ -318,6 +318,12 @@
       user-select:none;
     }
     .day-date{text-decoration:underline;text-underline-offset:3px;}
+    .day-label .day-dash{margin-left:8px;font-size:.62em;font-weight:500;color:var(--muted);white-space:nowrap;letter-spacing:0;text-decoration:none;}
+    .day-label .day-dash:empty{display:none;}
+    /* Narrow: the count drops under the date instead of being cut off (2026-11-07). */
+    #todayScroll .day-label:has(> .day-dash:not(:empty)){display:flex;flex-wrap:wrap;align-items:baseline;white-space:normal!important;row-gap:0;column-gap:8px;}
+    #todayScroll .day-label > .day-dash{margin-left:0;}
+    #todayScroll .day-label .day-date{white-space:nowrap;}
     .day-label .wd-icon{display:inline-block;height:.9em;vertical-align:-.1em;margin-left:9px;background:var(--note-line-adj,currentColor);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;pointer-events:none;user-select:none;-webkit-user-select:none;}
     .day-date .dd-short{display:none;}
     .pane-narrow .day-label{white-space:nowrap;}
@@ -2638,17 +2644,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         "'":'&#39;'
       }[c])
     );
-  function formatDate(s){
-    // "Sunday November 1, 2026" — no comma after the weekday (Julius, 2026-10-29).
+  function formatDate(s,yy){
+    // "Sunday November 1, 2026" — no comma after the weekday (Julius, 2026-10-29). yy: "…, 26" (History, 2026-11-07).
     const d = new Date(s + 'T00:00:00');
     const wk = d.toLocaleDateString('en-US',{weekday:'long'});
     const mon = d.toLocaleDateString('en-US',{month:'long'});
-    return wk + ' ' + mon + ' ' + d.getDate() + ', ' + d.getFullYear();
+    return wk + ' ' + mon + ' ' + d.getDate() + ', ' + (yy ? String(d.getFullYear()).slice(-2) : d.getFullYear());
   }
   // Narrow panes use "Sat Oct 31, 2026" so the date stays on one line (Julius, 2026-10-31).
-  function formatDateShort(s){
+  function formatDateShort(s,yy){
     const d = new Date(s + 'T00:00:00');
-    return d.toLocaleDateString('en-US',{weekday:'short'}) + ' ' + d.toLocaleDateString('en-US',{month:'short'}) + ' ' + d.getDate() + ', ' + d.getFullYear();
+    return d.toLocaleDateString('en-US',{weekday:'short'}) + ' ' + d.toLocaleDateString('en-US',{month:'short'}) + ' ' + d.getDate() + ', ' + (yy ? String(d.getFullYear()).slice(-2) : d.getFullYear());
   }
   // Weekday icon right of the date in Today headers (Julius, 2026-10-31): Sun=sun, Mon=moon,
   // Tue=fire, Wed=water, Thu=wood, Fri=gold, Sat=earth. The PNG (WeekdayIcons.html) is used as a
@@ -3097,7 +3103,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       day.date;
     const label =
       `<div class="day-label">
-        <span class="day-date"><span class="dd-long">${esc(formatDate(day.date))}</span><span class="dd-short">${esc(formatDateShort(day.date))}</span></span>${type === 'day' ? wdIconHtml(day.date) : ''}
+        <span class="day-date"><span class="dd-long">${esc(formatDate(day.date,type === 'day'))}</span><span class="dd-short">${esc(formatDateShort(day.date,type === 'day'))}</span></span>${type === 'day' ? '<span class="day-dash" aria-label="Done today"></span>' : ''}
       </div>`; // today ● dot removed (Julius, 2026-10-31: one-day view, no list)
     const content =
       type === 'day'
@@ -11391,11 +11397,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(!ed) return;
       const lines = [...ed.querySelectorAll('.check-line')];
       const done = lines.filter(l => l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      const txt = 'Today: ' + done + '/' + lines.length + ' ✓'; // ✓ instead of "done" (2026-11-07, Julius: shorter)
-      if(ed.dataset.dash !== txt){
-        ed.dataset.dash = txt;
-        requestAnimationFrame(() => { try{ paintDaySecs(ed); }catch(e){} });
-      }
+      // 2026-11-07 (Julius: save room): on the date line as "52 ✓" (all done) or "52/58 ✓"; no separate "Today:" line.
+      const txt = (done === lines.length ? done : done + '/' + lines.length) + ' ✓';
+      delete ed.dataset.dash;
+      document.querySelectorAll('#todayScroll .day-row .day-dash').forEach(x => { if(x.closest('.day-row').dataset.date !== today) x.textContent = ''; });
+      const slot = document.querySelector('#todayScroll .day-row[data-date="' + CSS.escape(today) + '"] .day-dash');
+      if(slot && slot.textContent !== txt){ slot.textContent = txt; slot.title = done + ' of ' + lines.length + ' done today'; }
     },120);
   }
   document.addEventListener('change',e => { if(e.target && e.target.matches && e.target.matches('#todayScroll input[type=checkbox]')) updateDash(); },true);

@@ -209,6 +209,15 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   // Title-line button never wraps (2026-11-07: "+ 2 hidden" showed as "hidd / en").
   const tlWrap = await pg.evaluate(() => { const n = document.querySelector('#todayScroll [data-tlon]'); if (!n) return ''; const c = getComputedStyle(n, '::before'); return c.whiteSpace === 'nowrap' && c.flexShrink === '0' ? '' : c.whiteSpace + ' shrink ' + c.flexShrink; });
   if (tlWrap) errs.push('Title button can wrap: ' + tlWrap);
+  // History date line (2026-11-07): year as 26, no weekday icon, count "n ✓" / "n/m ✓" on the date line, not cut off.
+  const dl = await pg.evaluate(() => { const row = document.querySelector('#todayScroll .day-row[data-date="' + localToday() + '"]'); if (!row) return ['no today row'];
+    const lab = row.querySelector('.day-label'), d = lab.querySelector('.day-dash'), out = [];
+    if (/20\d\d/.test(lab.querySelector('.day-date').innerText)) out.push('4-digit year: ' + lab.querySelector('.day-date').innerText);
+    if (lab.querySelector('.wd-icon')) out.push('weekday icon still shown');
+    if (!d || !/^\d+(\/\d+)? ✓$/.test(d.textContent)) out.push('count: ' + (d && d.textContent));
+    else if (d.getBoundingClientRect().right > row.getBoundingClientRect().right + 1) out.push('count cut off');
+    return out; });
+  dl.forEach(x => errs.push('History date line: ' + x));
   // History counts read ✓ instead of "done" (2026-11-07).
   const doneWord = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll [data-tlinfo],#todayScroll [data-tsinfo]')].map(n => n.dataset.tlinfo || n.dataset.tsinfo).filter(t => / done$/.test(t)));
   if (doneWord.length) errs.push('History: still says done: ' + doneWord.slice(0,3).join(' | '));

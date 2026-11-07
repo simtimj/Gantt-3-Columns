@@ -11744,7 +11744,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const ml = left + 1 - edL - edPad, mr = edR - right + 1 - edPad;
     ed.style.setProperty('--sec-ml',ml + 'px'); ed.style.setProperty('--sec-mr',mr + 'px');
     ed.style.setProperty('--sec-pl',Math.max(3,-ml) + 'px'); ed.style.setProperty('--sec-pr',Math.max(3,-mr) + 'px');
-    const ys = secs.map(n => Math.round(n.getBoundingClientRect().top - hr.top + sy) - 5);
+    const topPad = ed.closest('#todayScroll') ? 2 : 5; // History: less room above the title (2026-11-07)
+    const ys = secs.map(n => Math.round(n.getBoundingClientRect().top - hr.top + sy) - topPad);
     // A box ends just above the empty gap line before the next section.
     const ends = secs.map((n,i) => {
       const nx = secs[i + 1];
@@ -14128,6 +14129,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 #todayScroll .day-editor > [data-tsec="morning"][data-tsf="o"]{border-bottom:1px solid var(--sec-m-bd)!important;}
 #todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="o"]{border-bottom:1px solid var(--sec-a-bd)!important;}
 #todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]{border-bottom:1px solid var(--sec-e-bd)!important;}
+/* Tighter titles (2026-11-07, Julius): less empty space in the Morn / Aft / Eve title rows. */
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){padding-top:0!important;padding-bottom:1px!important;align-items:center!important;}
+#todayScroll .day-editor > [data-tsec] > .ts-lab{line-height:1.1!important;}
+#todayScroll .day-editor > [data-tsec]::before{margin-top:0!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{line-height:1.2!important;}
+#todayScroll .day-editor > [data-tsec][data-tsec] + :is([data-cgrp],.check-line,[data-tl]){margin-top:2px!important;}
+#todayScroll .day-editor > [data-tsec][data-tsec]{margin-bottom:0!important;}
 /* Group names (Gantt, Userscripts…): underlined, not bold. */
 #todayScroll .day-editor > [data-cgrp] :is(b,strong){font-weight:400!important;}
 #todayScroll .day-editor > [data-tsec] ~ .check-line{margin-top:1px!important;margin-bottom:1px!important;padding-top:1px!important;padding-bottom:1px!important;}

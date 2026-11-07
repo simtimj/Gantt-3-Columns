@@ -193,6 +193,19 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return out;
   });
   drg.forEach(x => errs.push('Day Review group: ' + x));
+  // Time section header lines (2026-11-07): 1px, the section's own color, no line above Aft / Eve.
+  const secLines = await pg.evaluate(async () => {
+    const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]');
+    ed.insertAdjacentHTML('beforeend','<div><br></div><div data-tsec="afternoon" contenteditable="false">Afternoon</div><div class="check-line done" data-level="0" data-dt="15:00"><input type="checkbox" checked><span class="check-text">Aft task</span></div><div><br></div><div data-tsec="evening" contenteditable="false">Evening</div><div class="check-line done" data-level="0" data-dt="21:00"><input type="checkbox" checked><span class="check-text">Eve task</span></div>');
+    refreshTitleLines(ed); await new Promise(r => setTimeout(r, 200));
+    const want = { morning: '227, 189, 67', afternoon: '223, 139, 58', evening: '156, 116, 201' }, out = [];
+    for (const k of Object.keys(want)) { const h = ed.querySelector(':scope > [data-tsec="' + k + '"]'); if (!h) { out.push('no ' + k); continue; }
+      const c = getComputedStyle(h); if (h.dataset.tsf !== 'o') continue;
+      if (c.borderBottomWidth !== '1px' || !c.borderBottomColor.includes(want[k])) out.push(k + ' line: ' + c.borderBottomWidth + ' ' + c.borderBottomColor);
+      if (k !== 'morning' && c.borderTopWidth !== '0px') out.push(k + ' has a line above: ' + c.borderTopWidth); }
+    return out;
+  });
+  secLines.forEach(x => errs.push('Time section lines: ' + x));
   // History counts read ✓ instead of "done" (2026-11-07).
   const doneWord = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll [data-tlinfo],#todayScroll [data-tsinfo]')].map(n => n.dataset.tlinfo || n.dataset.tsinfo).filter(t => / done$/.test(t)));
   if (doneWord.length) errs.push('History: still says done: ' + doneWord.slice(0,3).join(' | '));

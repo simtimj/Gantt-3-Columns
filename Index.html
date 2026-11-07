@@ -14104,6 +14104,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 #todayScroll .day-editor > [data-tsec]::before{margin-right:1px!important;}
 #todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{content:attr(data-tsinfo)!important;flex:0 0 auto!important;margin-left:2px;padding:0 4px;font-size:10px;font-weight:700;line-height:1.35;letter-spacing:0;text-transform:none;white-space:nowrap!important;color:#1e9e50;border:1px solid #22a55a;border-radius:5px;}
 #todayScroll .day-editor > [data-tsec][data-tsf="c"]:has(> .ts-lab)::after{content:"+\00A0" attr(data-tsinfo)!important;} /* folded: + in front; open: just the count (tap the header to fold) */
+/* Header lines (2026-11-07, Julius): the line under each time section's title is 1px in the section's own color
+   (Morn yellow, Aft orange, Eve purple), the same for all three; no extra line above Aft / Eve inside their box. */
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){border-top:0!important;padding-top:1px!important;}
+#todayScroll .day-editor > [data-tsec="morning"][data-tsf="o"]{border-bottom:1px solid var(--sec-m-bd)!important;}
+#todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="o"]{border-bottom:1px solid var(--sec-a-bd)!important;}
+#todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]{border-bottom:1px solid var(--sec-e-bd)!important;}
 /* Group names (Gantt, Userscripts…): underlined, not bold. */
 #todayScroll .day-editor > [data-cgrp] :is(b,strong){font-weight:400!important;}
 #todayScroll .day-editor > [data-tsec] ~ .check-line{margin-top:1px!important;margin-bottom:1px!important;padding-top:1px!important;padding-bottom:1px!important;}

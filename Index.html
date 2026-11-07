@@ -566,14 +566,14 @@
     #journalPane[data-ctab="review"] #dayReviewScroll{display:block;}
     #journalPane[data-ctab="review"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
     /* Done → Dailies matches (2026-11-05, Julius): render-only prompt above the Notes cell. */
-    #dailyMatch{flex:0 0 auto;padding:4px 8px;border-bottom:1px solid var(--divider);font-size:calc(var(--paragraph-size,14px) * .82);line-height:1.3;}
+    #dailyMatch{flex:0 0 auto;padding:1px 6px;border-bottom:1px solid var(--divider);font-size:calc(var(--paragraph-size,14px) * .82);line-height:1.3;}
     #journalPane:not([data-ctab="notes"]) #dailyMatch{display:none!important;}
-    .dm-row{display:flex;align-items:center;gap:6px;padding:2px 0;}
+    .dm-row{display:flex;align-items:center;gap:6px;padding:0;}
     .dm-row > span{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
     .dm-row small{color:var(--muted,#888);}
     /* 2026-11-07 (Julius): ✓ / ✕ stacked in a thin column so the match text gets the width. */
-    .dm-btns{flex:0 0 auto;display:flex;flex-direction:column;gap:2px;}
-    .dm-row button{font:inherit;font-size:.8em;line-height:1;width:1.9em;padding:2px 0;min-height:0;text-align:center;border:1px solid var(--divider,#777);border-radius:4px;background:transparent;color:inherit;cursor:pointer;}
+    .dm-btns{flex:0 0 auto;display:flex;flex-direction:column;gap:1px;}
+    .dm-row button{font:inherit;font-size:.72em;line-height:1;width:1.9em;padding:1px 0;min-height:0;text-align:center;border:1px solid var(--divider,#777);border-radius:4px;background:transparent;color:inherit;cursor:pointer;}
     .dm-row button.dm-yes{border-color:#22c55e;}
     /* Fun for later tab (2026-11-05, Julius): 🌴 its own list, not part of the Notes cell. */
     #funScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
@@ -1726,6 +1726,7 @@
     #centerDownScroll{padding-inline:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--side-k,1));font-family:var(--paragraph-font);font-size:var(--fw-text);line-height:1.18;}
     #centerDownScroll .ce-head{gap:calc(4px * var(--pad-x,1));margin-bottom:calc(3px * var(--pad-y,1));}
     #centerDownScroll .ce-head strong{font:inherit;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #centerDownScroll .ce-head > strong{flex:0 0 auto;} /* 2026-11-07 (Julius): the title stays; the 🔍 box shrinks instead */
     #centerCalendarList{font:inherit;line-height:inherit;}
     #centerCalendarList .ce-date,#centerCalendarList .ce-group,#centerCalendarList .ce-event,#centerCalendarList .ce-time,#centerCalendarList .ce-title{font-family:inherit;font-size:inherit;line-height:inherit;}
     #centerCalendarList .ce-date{margin:calc(2px * var(--pad-y,1)) 0;}
@@ -2037,7 +2038,8 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
    Narrow phone column (title was already cut to "Ca…"): the title hides so the box fits. */
 #centerDownScroll .ce-head .ce-search{flex:1 1 60px;min-width:44px;width:0;max-width:220px;box-sizing:border-box;height:24px;margin:0;padding:1px 6px;font:inherit;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:inherit;}
 #centerDownScroll .ce-head strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-@container (max-width:260px){#centerDownScroll .ce-head{gap:3px;}#centerDownScroll .ce-head strong{display:none;}#centerDownScroll .ce-head .ce-search{min-width:36px;padding:1px 4px;}#centerDownScroll .ce-head:has(.ce-search:focus) :is([data-ce-sort],[data-ce-grid]){display:none;}#centerDownScroll .ce-head .ce-search:focus{max-width:none;}}
+@container (max-width:260px){#centerDownScroll .ce-head{gap:3px;}#centerDownScroll .ce-head strong{font-size:0;}#centerDownScroll .ce-head strong::before{content:"📅";font-size:14px;} /* narrow: a 📅 instead of hiding the title (2026-11-07) */#centerDownScroll .ce-head .ce-search{min-width:36px;padding:1px 4px;}#centerDownScroll .ce-head:has(.ce-search:focus) :is([data-ce-sort],[data-ce-grid]){display:none;}#centerDownScroll .ce-head .ce-search:focus{max-width:none;}}
+@container (max-width:175px){#centerDownScroll .ce-head strong{display:none;}} /* phone-narrow: no room even for 📅 */
 /* Cal Events 4-box view (2026-11-05, Julius): 1 top left → 2 top right → 3 bottom right → 4 bottom left. */
 #centerDownScroll.ce-grid-on{display:flex!important;flex-direction:column;overflow:hidden!important;}
 #centerDownScroll.ce-grid-on > .ce-head{flex:0 0 auto;}
@@ -9136,7 +9138,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(grid){ box.innerHTML = ceGridHtml(data, {row, allDayRow, timedRow, bySubject, byCategory, addHead}); return; }
       // Category = every event together under its subject, no times (2026-11-04, Julius). Time = all-day first, then by start.
       box.innerHTML = (byCategory
-        ? addHead('Tasks') + byUrgency(allDay.concat(scheduled))
+        ? addHead('All events') + byUrgency(allDay.concat(scheduled)) // was "Tasks": read as the section's name (2026-11-07)
         : addHead('All-Day Tasks') + allDay.map(allDayRow).join('') +
           (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.slice().sort((a,b) => String(a.start).localeCompare(String(b.start))).map(timedRow).join('') : '')) +
         (!data.events.length ? '<div class="ce-empty">' + (q.length ? 'No match for “' + esc(q.join(' ')) + '”.' : 'No events.') + '</div>' : '');

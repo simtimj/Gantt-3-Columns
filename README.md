@@ -49,6 +49,7 @@ Last updated: 2026-11-07
 
 ## 🧪 To be confirmed (2026-11-07)
 
+- **Tighter match prompt + clearer Cal Events**: the "✓? Morning · Stretch" prompt above Dailies takes less height (smaller ✓ / ✕, less padding), so Dailies starts right under it. In Cal Events' **Cats** order the first subheading now says **All events** instead of "Tasks" (it read like the section had been renamed). The **Cal Events** title no longer gets squeezed out by the 🔍 box: a mid-width column shows 📅 instead, and only the narrowest phone column hides it.
 - **Pages read counter**: the reading daily now keeps a running page list like hydration: **Read 10+ pages: T: 17/10 | +7 · +10**. Hold its checkbox → **Add pages** (type 7, Enter), or type `+5` after the bar yourself. The total updates when you leave the line, the daily ticks itself once you reach the goal, and tomorrow starts at 0.
 - **Dailies match ignores Claude's lines**: suggestions above Dailies now only look at your own ticked lines. Claude / ChatGPT Done Log lines (the ones starting with *) and IT study entries are skipped. Before, "…no longer stretches Blocks" was suggesting Morning · Stretch and "History easier to read" was suggesting Read 10+ pages.
 - **Dailies match: thin ✓ / ✕ column**: the "✓? Morning · Stretch" prompt above Dailies now has a small **✓** (tick it) stacked over **✕** (not this) at the right, about one character wide, so the text gets the rest of the column.

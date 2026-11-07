@@ -1344,6 +1344,16 @@
     /* Folded summary (2026-10-29): bold starts of the hidden lines, as one condensed block under the title. */
     [data-tlon="c"][data-tlsum]{flex-wrap:wrap;}
     [data-tlon="c"][data-tlsum]:not([data-due-label])::after{content:attr(data-tlsum);order:3;flex:1 0 100%;margin:2px 0 1px;padding:3px 8px;font-size:.84em;font-weight:400;line-height:1.4;font-style:normal;text-decoration:none;color:var(--muted);white-space:normal;border-left:2px solid var(--tc-cat,var(--border));border-radius:0;}
+    [data-tlon="c"][data-tlbox]::after{content:none!important;display:none!important;}
+    /* Short folded lists (2026-11-07): 3 rows, scroll inside, ⤢ shows all. */
+    .tl-sum{order:3;flex:1 0 100%;min-width:0;margin:2px 0 1px;padding:3px 8px;font-size:.84em;font-weight:400;line-height:1.4;font-style:normal;text-decoration:none;color:var(--muted);border-left:2px solid var(--tc-cat,var(--border));box-sizing:border-box;cursor:default;-webkit-user-select:none;user-select:none;}
+    .hx-box{position:relative;}
+    .hx-box > .hx-list,.ts-items.hx-cap{max-height:calc(4.2em + 2px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}
+    .hx-box.hx-open > .hx-list{max-height:none;overflow:visible;}
+    .hx-box > .hx-list{padding-right:1.6em;}
+    .hx-btn{position:absolute;right:2px;bottom:2px;font:inherit;font-size:.95em;line-height:1;padding:1px 4px;border:1px solid var(--divider,#777);border-radius:4px;background:var(--panel,var(--bg,#fff));color:var(--muted,#888);cursor:pointer;}
+    .ts-row{position:relative;}
+    .ts-row > .hx-btn{position:static;margin-left:4px;font-size:.85em;vertical-align:baseline;}
     /* Due group in Notes (2026-10-27): its own box under the Suggested day, collapsible. */
     .due-notes{margin:6px 0;padding:4px 8px 5px;border:1.5px solid var(--note-line-adj,var(--border));border-radius:10px;-webkit-user-select:text;user-select:text;}
     .dn-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.92em;cursor:pointer;-webkit-user-select:none;user-select:none;padding:1px 0;}
@@ -5292,7 +5302,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!el.querySelector('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
-    c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => ['data-tlon','data-tlinfo','data-tlhid','data-tlsum'].forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => { ['data-tlon','data-tlinfo','data-tlhid','data-tlsum','data-tlbox'].forEach(a => n.removeAttribute(a)); n.querySelectorAll(':scope > .tl-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
     c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
@@ -11090,7 +11100,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   })();
 
   const tcLvl = n => Math.max(0,Math.min(6,Math.floor(Number(n.dataset.level) || 0)));
-  const tcText = n => (n.textContent || '').replace(/\s+/g,' ').trim().replace(/^\*/,'');
+  const tcText = n => { let t = n.textContent || ''; const sb = n.querySelector && n.querySelector(':scope > .tl-sum'); if(sb) t = t.replace(sb.textContent,''); return t.replace(/\s+/g,' ').trim().replace(/^\*/,''); };
   // Subject guessing (Julius, 2026-10-27: "stretch" in a Gantt line turned it Health).
   // 1. Explicit tag at the end of the task: "… · Gantt" / "… · Code" (middle dot) wins.
   // 2. A Claude project header (data-cgrp, e.g. "Gantt") decides for every line under it.
@@ -11725,7 +11735,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const map = new Map(); let cur = null;
     const get = name => { if(!map.has(name)) map.set(name,[]); return map.get(name); };
     cov.forEach(x => {
-      if(x.hasAttribute('data-cgrp')){ cur = get((x.dataset.cgrp || x.textContent || '').trim() || 'Other'); return; }
+      if(x.hasAttribute('data-cgrp')){ cur = get((x.dataset.cgrp || tcText(x) || '').trim() || 'Other'); return; }
       const c = typeof CARD_CAT_BY_KEY !== 'undefined' && x.dataset.tccat ? CARD_CAT_BY_KEY[x.dataset.tccat] : null;
       (cur || get(c ? c.name : 'Other')).push(x);
     });
@@ -11741,7 +11751,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function tsecDrawSum(n,rows,folds){
     const k = n.dataset.tsec;
     const shutOf = r => histMode === 'mini' ? !folds['show:' + k + ':' + r.name] : !!folds[k + ':' + r.name];
-    const sig = rows ? JSON.stringify([histMode,rows.map(r => [r.name,r.count,r.items,r.types,shutOf(r)])]) : '';
+    const sig = rows ? JSON.stringify([histMode,rows.map(r => [r.name,r.count,r.items,r.types,shutOf(r),hxIs(n.parentElement || n,'ts:' + k + ':' + r.name)])]) : '';
     if((n.dataset.tssum || '') === sig && !!n.querySelector(':scope > .ts-sum') === !!rows) return;
     n.querySelectorAll(':scope > .ts-sum').forEach(x => x.remove());
     setAttr(n,'data-tssum',sig);
@@ -11754,15 +11764,22 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const shut = shutOf(r);
       b.textContent = r.count + (shut ? ' +' : ' −'); b.title = shut ? 'Show the list' : 'Hide the list';
       row.append(name,b);
+      // Short lists (2026-11-07): 3 rows + scroll; ⤢ next to the count shows the whole list.
+      const hxk = 'ts:' + k + ':' + r.name, hxOpen = hxIs(n.parentElement || n,hxk), nItems = r.types ? r.types.reduce((a,t) => a + t.items.length + 1,0) : r.items.length;
+      if(!shut && nItems > 3){ const xb = hxButton(hxOpen,r.count); xb.dataset.hxk = hxk; row.appendChild(xb); }
       // One item per line (2026-11-04, Julius). Typed lines (New / Fixes / Tweaks) get a heading per type.
       const list = (items,cls) => { const t = document.createElement('div'); t.className = 'ts-items' + (cls ? ' ' + cls : '');
         items.forEach(l => { const it = document.createElement('div'); it.className = 'ts-it'; it.textContent = l; t.appendChild(it); }); return t; };
-      if(r.types && !shut) r.types.forEach(ty => {
-        const t = list(ty.items,'ts-type');
-        const h = document.createElement('b'); h.textContent = ty.name + ' ' + ty.n;
-        t.prepend(h); row.appendChild(t);
-      });
-      else if(r.items.length && !shut) row.appendChild(list(r.items));
+      if(r.types && !shut){
+        const wrap = document.createElement('div'); wrap.className = 'ts-items' + (hxOpen ? '' : ' hx-cap');
+        r.types.forEach(ty => {
+          const t = list(ty.items,'ts-type');
+          const h = document.createElement('b'); h.textContent = ty.name + ' ' + ty.n;
+          t.prepend(h); wrap.appendChild(t);
+        });
+        row.appendChild(wrap);
+      }
+      else if(r.items.length && !shut) row.appendChild(list(r.items,hxOpen ? '' : 'hx-cap'));
       box.appendChild(row);
     });
     n.appendChild(box);
@@ -11804,13 +11821,64 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   document.addEventListener('click',e => {
     const h = e.target && e.target.closest ? e.target.closest('.day-editor > [data-tsf]') : null;
-    if(!h) return;
+    if(!h || e.target.closest('.hx-btn')) return; // ⤢ / ⤡ handled by the short-list listener
     e.preventDefault(); e.stopPropagation();
     window.__tlFoldAt = Date.now();
     const btn = e.target.closest('.ts-count');
     if(btn) tsecToggleList(h,h.parentElement,btn.dataset.proj);
     else tsecToggleFold(h,h.parentElement);
   },true);
+  /* Short folded lists (2026-11-07, Julius: a folded group like Userscripts was one big block). In History, a folded
+     group / section header shows its list in a real 3-row box you can scroll (a ::after can't scroll), with ⤢ to
+     show the whole list and ⤡ to shrink it back. Same for the project lists in folded Morn / After / Night.
+     Render-only: .tl-sum (contenteditable=false) + data-tlbox are stripped in cardCleanHtml; expand state per
+     device and day in localStorage fw.histExpand {date: {key:1}}. */
+  const HX_KEY = 'fw.histExpand';
+  function hxAll(){ try{ return JSON.parse(localStorage.getItem(HX_KEY)) || {}; }catch(e){ return {}; } }
+  function hxIs(ed,k){ const d = hxAll()[ed.dataset.date || '']; return !!(d && d[k]); }
+  function hxToggle(ed,k){
+    const all = hxAll(), d = ed.dataset.date || '', day = all[d] = all[d] || {};
+    if(day[k]) delete day[k]; else day[k] = 1;
+    // keep the last 14 days only
+    Object.keys(all).sort().slice(0,-14).forEach(x => delete all[x]);
+    try{ localStorage.setItem(HX_KEY,JSON.stringify(all)); }catch(e){}
+  }
+  function hxButton(open,count){
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'hx-btn';
+    b.textContent = open ? '⤡' : '⤢'; b.title = open ? 'Show 3 rows' : 'Show all ' + count;
+    return b;
+  }
+  function histSumBoxes(ed,on){
+    const inHist = ed.classList.contains('day-editor') && !!ed.closest('#todayScroll');
+    on.forEach((v,n) => {
+      const old = n.querySelector(':scope > .tl-sum');
+      const want = inHist && v.sum && !n.classList.contains('check-line');
+      if(!want){ if(old) old.remove(); n.removeAttribute('data-tlbox'); return; }
+      const key = 'grp:' + (n.dataset.cgrp || n.dataset.sec || tcText(n)), open = hxIs(ed,key), items = v.sum.split('\n');
+      const sig = (open ? '1' : '0') + v.sum;
+      setAttr(n,'data-tlbox','1');
+      if(old && old.dataset.sig === sig) return;
+      if(old) old.remove();
+      const box = document.createElement('div'); box.className = 'tl-sum hx-box' + (open ? ' hx-open' : ''); box.contentEditable = 'false'; box.dataset.sig = sig; box.dataset.hx = key;
+      const list = document.createElement('div'); list.className = 'hx-list';
+      items.forEach(l => { const it = document.createElement('div'); it.className = 'ts-it'; it.textContent = l.replace(/^• /,''); list.appendChild(it); });
+      box.appendChild(list);
+      if(items.length > 3) box.appendChild(hxButton(open,items.length));
+      n.appendChild(box);
+    });
+  }
+  document.addEventListener('click',e => {
+    const b = e.target && e.target.closest ? e.target.closest('.hx-btn') : null;
+    if(!b) return;
+    e.preventDefault(); e.stopPropagation();
+    const ed = b.closest('.day-editor'), k = b.dataset.hxk || (b.closest('[data-hx]') || {dataset:{}}).dataset.hx;
+    if(!k || !ed) return;
+    hxToggle(ed,k);
+    window.__tlFoldAt = Date.now();
+    refreshTitleLines(ed);
+  },true);
+  // A press on ⤢ / ⤡ or inside the box must not start the title fold or put the caret in the cell.
+  document.addEventListener('pointerdown',e => { if(e.target && e.target.closest && e.target.closest('.hx-btn')){ e.preventDefault(); e.stopPropagation(); } },true);
   function refreshTitleLines(ed){
     let changed = false;
     const hide = new Set(), on = new Map();
@@ -11846,6 +11914,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     for(const n of ed.querySelectorAll(':scope > [data-tlon]')) if(!on.has(n)){ n.removeAttribute('data-tlon'); n.removeAttribute('data-tlinfo'); n.removeAttribute('data-tlsum'); changed = true; }
     for(const n of ed.querySelectorAll(':scope > [data-tlhid]')) if(!hide.has(n)){ n.removeAttribute('data-tlhid'); changed = true; }
     on.forEach((v,n) => { if(setAttr(n,'data-tlon',v.state)) changed = true; setAttr(n,'data-tlinfo',v.info); if(v.sum) setAttr(n,'data-tlsum',v.sum); else n.removeAttribute('data-tlsum'); });
+    histSumBoxes(ed,on);
     hide.forEach(n => { if(setAttr(n,'data-tlhid','1')) changed = true; });
     return changed;
   }
@@ -11913,6 +11982,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       let right = -Infinity;
       t.childNodes.forEach(n => {
         let rr = null;
+        if(n.nodeType === 1 && n.classList.contains('tl-sum')) return;
         if(n.nodeType === 1) rr = n.getBoundingClientRect();
         else if(n.nodeType === 3 && n.textContent.trim()){ const rg = document.createRange(); rg.selectNodeContents(n); rr = rg.getBoundingClientRect(); }
         if(rr && rr.width) right = Math.max(right,rr.right);

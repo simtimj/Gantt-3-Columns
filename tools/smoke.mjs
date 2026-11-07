@@ -297,6 +297,44 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
       return { mode: document.body.dataset.hist, items: ed.querySelectorAll('.ts-it').length, leak, wide };
     }));
   }
+  // Short folded lists (2026-11-07): List mode's folded Morning shows the Gantt list in a 3-row box (scrolls), ⤢ opens all.
+  await pg.click('#histMode [data-hm="compact"]'); await pg.waitForTimeout(250);
+  const hx1 = await pg.evaluate(async () => {
+    const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]');
+    const cap = ed.querySelector('.ts-row .ts-items.hx-cap'), btn = cap && cap.parentElement.querySelector('.hx-btn');
+    if (!cap) return ['List mode: no 3-row box'];
+    const lh = parseFloat(getComputedStyle(cap.querySelector('.ts-it')).lineHeight) || 16;
+    if (cap.clientHeight > lh * 3.6 || cap.scrollHeight <= cap.clientHeight) return ['3-row box size: ' + cap.clientHeight + '/' + cap.scrollHeight + ' lh ' + lh];
+    if (!btn || btn.textContent !== '⤢') return ['no ⤢ button'];
+    btn.click(); await new Promise(r => setTimeout(r, 300));
+    const open = ed.querySelector('.ts-row .ts-items');
+    if (!open || open.classList.contains('hx-cap') || open.clientHeight < lh * 10) return ['⤢ did not open the list'];
+    if (ed.querySelector('[data-tsec="morning"]').dataset.tsf !== 'c') return ['⤢ unfolded the section'];
+    ed.querySelector('.ts-row .hx-btn').click(); await new Promise(r => setTimeout(r, 300));
+    return ed.querySelector('.ts-row .ts-items.hx-cap') ? [] : ['⤡ did not shrink it back'];
+  });
+  hx1.forEach(x => errs.push('History short list: ' + x));
+  await pg.click('#histMode [data-hm="full"]'); await pg.waitForTimeout(250);
+  const hx2 = await pg.evaluate(async () => {
+    const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]');
+    const g = ed.querySelector(':scope > [data-cgrp="Gantt"]');
+    if (!g) return ['no Gantt group'];
+    g.dataset.fold = '1'; refreshTitleLines(ed);
+    const box = g.querySelector(':scope > .tl-sum'), list = box && box.querySelector('.hx-list');
+    if (!box) return ['folded group: no box'];
+    const lh = parseFloat(getComputedStyle(list.firstElementChild).lineHeight) || 16;
+    if (list.clientHeight > lh * 3.6 || list.scrollHeight <= list.clientHeight) return ['group box size: ' + list.clientHeight + '/' + list.scrollHeight];
+    if (getComputedStyle(g, '::after').content !== 'none') return ['old ::after summary still drawn'];
+    box.querySelector('.hx-btn').click(); await new Promise(r => setTimeout(r, 300));
+    const b2 = g.querySelector(':scope > .tl-sum');
+    if (!b2 || !b2.classList.contains('hx-open') || b2.querySelector('.hx-list').clientHeight < lh * 10) return ['group ⤢ did not open'];
+    if (g.dataset.tlon !== 'c') return ['⤢ unfolded the group'];
+    if (typeof cardCleanHtml === 'function' && /tl-sum|data-tlbox/.test(cardCleanHtml(ed))) return ['box leaked into saved HTML'];
+    b2.querySelector('.hx-btn').click(); await new Promise(r => setTimeout(r, 200));
+    delete g.dataset.fold; refreshTitleLines(ed);
+    return g.querySelector('.tl-sum') ? ['box left after unfold'] : [];
+  });
+  hx2.forEach(x => errs.push('History group box: ' + x));
   const [list, mini, full] = modes;
   if (list.mode !== 'compact' || list.items < 50 || list.leak || list.wide) errs.push('History List mode: ' + JSON.stringify(list));
   if (mini.mode !== 'mini' || mini.items || mini.leak) errs.push('History Mini mode: ' + JSON.stringify(mini));

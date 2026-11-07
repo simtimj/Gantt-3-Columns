@@ -581,17 +581,13 @@
     #newScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     #journalPane[data-ctab="new"] #newScroll{display:block;}
     #journalPane[data-ctab="new"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
-    .nw-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
     .nw-add{display:flex;gap:6px;margin:0 0 8px;}
     .nw-add input{min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
     .nw-add #newInput{flex:1;}
     .nw-add #newDate{flex:0 0 auto;width:8.6em;font-size:.85em;padding:4px;}
-    /* Days-since timer (2026-11-07, Julius): big counter on top, colored against the goal (something new every 7 days). */
-    .nw-timer{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;border-radius:9px;border:1px solid var(--nw-c);background:color-mix(in srgb,var(--nw-c) 12%,transparent);}
-    .nw-timer b{font-size:1.9em;line-height:1;color:var(--nw-c);}
-    .nw-timer span{font-weight:600;}
-    .nw-timer small{flex-basis:100%;color:var(--muted,#888);font-size:.8em;}
-    .nw-timer.ok{--nw-c:#22a55a;} .nw-timer.soon{--nw-c:#d4a017;} .nw-timer.over{--nw-c:#e0453a;}
+    /* Days-since line (2026-11-07, Julius: a small muted mention, not a cell; no red). */
+    .nw-timer{margin:0 0 6px;font-size:.8em;color:var(--muted,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .nw-timer b{font-weight:600;color:var(--text,inherit);}
     .nw-month{margin:8px 0 4px;font-weight:700;font-size:.85em;border-bottom:1px solid var(--divider);padding-bottom:2px;}
     .nw-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid color-mix(in srgb,#e0b13b 50%,var(--border,#ccc));border-radius:7px;background:color-mix(in srgb,#e0b13b 7%,transparent);}
     .nw-item .nw-t{flex:1;min-width:0;outline:none;word-break:break-word;}
@@ -7531,14 +7527,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const ago = w => { const n = Math.round((parse(today()) - parse(w)) / 864e5); return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago'; };
     let data = {v:1, items:[]}, saveT = null;
     try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = c; }catch(e){}
-    // Guideline (2026-11-07): something new at least every 7 days. Green ≤ 5 days, yellow 6–7, red after 7.
+    // Guideline (2026-11-07): something new at least every 7 days.
     const GOAL = 7;
     const since = w => Math.max(0, Math.round((parse(today()) - parse(w)) / 864e5));
-    function timer(last){
-      if(!last) return '<div class="nw-timer over"><b>—</b><span>No new thing logged yet</span><small>Goal: something new at least every ' + GOAL + ' days</small></div>';
-      const n = since(last.w), cls = n <= GOAL - 2 ? 'ok' : n <= GOAL ? 'soon' : 'over';
-      const left = GOAL - n, note = n === 0 ? 'Nice — new thing today.' : left > 0 ? left + (left === 1 ? ' day' : ' days') + ' left in your ' + GOAL + '-day window' : (n - GOAL) + (n - GOAL === 1 ? ' day' : ' days') + ' past your ' + GOAL + '-day goal';
-      return '<div class="nw-timer ' + cls + '"><b>' + n + '</b><span>' + (n === 1 ? 'day' : 'days') + ' since new thing</span><small>' + note + ' · last: ' + h(last.t) + '</small></div>';
+    function timer(last, count){
+      if(!last) return '<div class="nw-timer">✨ No new thing yet · goal: one every ' + GOAL + ' days</div>';
+      const n = since(last.w), over = n > GOAL;
+      return '<div class="nw-timer" title="Last: ' + h(last.t) + '">✨ <b>' + n + (n === 1 ? ' day' : ' days') + '</b> since new thing · ' + (over ? 'past ' : 'goal ') + GOAL + ' days · ' + count + ' logged</div>';
     }
     const merge = srv => { const by = {}; data.items.forEach(i => by[i.id] = i); ((srv && srv.items) || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); data = {v:1, items:Object.values(by)}; };
     const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} };
@@ -7555,7 +7550,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const live = data.items.filter(i => !i.x).sort((a,b) => (b.w || '').localeCompare(a.w || '') || (b.c || 0) - (a.c || 0));
       // Timer counts from the latest day logged (a future-dated line doesn't count).
       const last = live.find(i => (i.w || '') <= today());
-      let html = timer(last) + '<div class="nw-head">✨ New · ' + live.length + (live.length ? ' · last one ' + ago(live[0].w) : '') + '</div>', month = '';
+      let html = timer(last, live.length), month = '';
       live.forEach(i => {
         const m = parse(i.w).toLocaleDateString('en-US',{month:'long', year:'numeric'});
         if(m !== month){ month = m; html += '<div class="nw-month">' + h(m) + '</div>'; }

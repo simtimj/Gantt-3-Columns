@@ -50,7 +50,7 @@ Last updated: 2026-11-07
 ## 🧪 To be confirmed (2026-11-07)
 
 - **✨ New things tab** (top middle, just left of 🌴 Fun): a log of the last times you did something new. Type it, pick the day (defaults to today), Enter or + adds it. Newest first, grouped by month; the header says how long since the last new thing ("last one 3 days ago"). Tap a line to edit, tap its date to change the day, ✕ removes. Saved to the app (same on phone and laptop), kept on the device too. Separate from Fun.
-- **✨ Days-since timer + 7-day goal**: top of the ✨ tab shows a big "X days since new thing" counter with the last thing under it. Goal: something new at least every 7 days. Green up to 5 days, yellow at 6–7, red after 7 ("2 days past your 7-day goal"). It rolls over at midnight.
+- **✨ Days-since line + 7-day goal**: a small muted one-liner at the top of the ✨ tab: "✨ 3 days since new thing · goal 7 days · 4 logged" (says "past 7 days" once it's been longer; hold / hover shows the last thing). Goal: something new at least every 7 days. No colors (Julius 2026-11-07: subtle, not a cell). Rolls over at midnight.
 
 ## 🧪 To be confirmed (2026-11-06)
 

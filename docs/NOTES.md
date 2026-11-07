@@ -444,7 +444,7 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 ## New things tab (2026-11-07, Julius)
 
 - Center Up `data-ctab="new"` (✨, right before 🌴) shows `#newScroll`. `initNewThings()` in Index.html: items `{id, t, w:'YYYY-MM-DD', c, u, x?}`; localStorage `fw.new.v1`, then `getNewThings` / `saveNewThings` (Code.gs, script property `newData`, same merge-by-id / tombstone rules as Fun). Sorted by `w` desc, month headers, header "last one N days ago". Tap `.nw-d` → hidden native date picker. Smoke: tab order, dated add, month header, save.
-- Timer (2026-11-07): `.nw-timer` on top, days since the latest `w` ≤ today; `GOAL = 7`, classes ok (≤5) / soon (6–7) / over (>7). Minute tick re-renders when the day changes. Smoke: 0 days + ok.
+- Timer (2026-11-07): `.nw-timer` = one small muted line on top (replaced the `.nw-head` count line), days since the latest `w` ≤ today, `GOAL = 7` ("goal" / "past"). No colors, per Julius. Minute tick re-renders when the day changes. Smoke: "0 days since new thing · goal 7 days · 2 logged".
 
 ## Urgent add box = real task (2026-11-05, Julius)
 

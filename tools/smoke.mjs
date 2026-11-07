@@ -163,6 +163,9 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return gone === '0Gear|1~Before Friday|1Gloves' ? [] : ['Backspace remove: ' + gone];
   });
   kim.forEach(x => errs.push('Keep In Mind: ' + x));
+  // Weather (2026-11-07): one ☁️ tab (hourly + daily merged).
+  const wxTabs = await pg.evaluate(() => document.querySelectorAll('.center-tabs [data-ctab="weather"], .center-tabs [data-ctab="wxdaily"]').length);
+  if (wxTabs !== 1) errs.push('Weather: expected one tab, found ' + wxTabs);
   // Fun tab: 🎮 shows its own list; typing + Enter adds a line and saves; ticking moves it to Done.
   const fun = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));

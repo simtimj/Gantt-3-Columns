@@ -49,6 +49,7 @@ Last updated: 2026-11-07
 
 ## 🧪 To be confirmed (2026-11-07)
 
+- **One ☁️ Weather tab**: the hourly and daily weather tabs are merged into one ☁️ tab: the next 12 hours on top, then **7 DAYS** (high / low / rain) under it, one ↻. If your last open tab was the old daily one, it opens Weather.
 - **Tighter match prompt + clearer Cal Events**: the "✓? Morning · Stretch" prompt above Dailies takes less height (smaller ✓ / ✕, less padding), so Dailies starts right under it. In Cal Events' **Cats** order the first subheading now says **All events** instead of "Tasks" (it read like the section had been renamed). The **Cal Events** title no longer gets squeezed out by the 🔍 box: a mid-width column shows 📅 instead, and only the narrowest phone column hides it.
 - **Pages read counter**: the reading daily now keeps a running page list like hydration: **Read 10+ pages: T: 17/10 | +7 · +10**. Hold its checkbox → **Add pages** (type 7, Enter), or type `+5` after the bar yourself. The total updates when you leave the line, the daily ticks itself once you reach the goal, and tomorrow starts at 0.
 - **Dailies match ignores Claude's lines**: suggestions above Dailies now only look at your own ticked lines. Claude / ChatGPT Done Log lines (the ones starting with *) and IT study entries are skipped. Before, "…no longer stretches Blocks" was suggesting Morning · Stretch and "History easier to read" was suggesting Read 10+ pages.

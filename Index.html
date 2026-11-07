@@ -2358,8 +2358,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         <!-- Center Up tabs (2026-11-01, Julius): small symbols switch what Center Up shows. -->
         <span class="center-tabs" role="tablist">
           <button type="button" data-ctab="notes" class="on" title="Dailies" aria-label="Dailies">📋</button>
-          <button type="button" data-ctab="weather" title="Weather (hourly)" aria-label="Weather hourly"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/><text x="12" y="16.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="8.5" font-weight="700" fill="#111">HR</text></svg></button>
-          <button type="button" data-ctab="wxdaily" title="Weather (daily)" aria-label="Weather daily"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 19a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.6 4.75 4.75 0 0 1 17.5 19Z" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="1"/><text x="12" y="16.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7.5" font-weight="700" fill="#111">DLY</text></svg></button>
+          <button type="button" data-ctab="weather" title="Weather (next 24 h + 7 days)" aria-label="Weather">☁️</button>
           <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">⭐</button>
           <button type="button" data-ctab="review" title="Day Review" aria-label="Day Review">📊</button>
           <button type="button" data-ctab="new" title="New things (last time I did something new)" aria-label="New things">✨</button>
@@ -7101,7 +7100,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(window.renderDayReview) renderDayReview();
     };
     let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
-    set(t === 'weather' || t === 'wxdaily' || t === 'focus' || t === 'review' || t === 'fun' || t === 'new' ? t : 'notes');
+    if(t === 'wxdaily') t = 'weather'; // daily tab merged into Weather (2026-11-07)
+    set(t === 'weather' || t === 'focus' || t === 'review' || t === 'fun' || t === 'new' ? t : 'notes');
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
@@ -7943,28 +7943,29 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         .catch(() => { box.innerHTML = '<div class="center-placeholder">☁️ Weather didn\'t load. <button type="button" class="btn" data-wx-retry>Retry</button></div>'; })
         .finally(() => { busy = false; });
     }
-    const draw = () => { if(data && isWx()) (pane.dataset.ctab === 'wxdaily' ? drawDaily : drawHourly)(data); };
+    // One tab (2026-11-07, Julius): next 24 hours on top, the 7 days under it.
+    const draw = () => { if(data && isWx()) box.innerHTML = head() + hourlyHtml(data, 12) + '<div class="wx-day">7 days</div>' + dailyHtml(data); };
     const head = () => '<div class="wx-head"><span>' + PLACE + '</span><button type="button" data-wx-retry title="Refresh">↻</button></div>';
-    function drawDaily(d){
+    function dailyHtml(d){
       const w = d.daily;
-      box.innerHTML = head() + w.time.map((t,k) => {
+      return w.time.map((t,k) => {
         const [y,m,dd] = t.split('-').map(Number), day = new Date(y,m - 1,dd), p = w.precipitation_probability_max[k];
         return '<div class="wx-row wx-d' + (k ? '' : ' wx-now') + '"><span class="wx-t">' + (k ? day.toLocaleDateString('en-US',{weekday:'short'}) + '<span class="wx-date"> ' + m + '/' + dd + '</span>' : 'Tod<span class="wx-date">ay</span>') + '</span><span>' + icon(w.weather_code[k],1) +
           '</span><span>' + Math.round(w.temperature_2m_max[k]) + '° <span class="wx-lo">' + Math.round(w.temperature_2m_min[k]) + '°</span></span><span class="wx-p">' + (p >= 10 ? '<span class="wx-drop">💧</span>' + p + '%' : '') + '</span></div>';
       }).join('');
     }
-    function drawHourly(d){
+    function hourlyHtml(d, hours){
       const h = d.hourly, now = new Date(), key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + 'T' + String(now.getHours()).padStart(2,'0');
       let i = h.time.findIndex(t => t.slice(0,13) === key); if(i < 0) i = 0;
-      let html = head(), lastDay = h.time[i].slice(0,10);
-      for(let k = i; k < Math.min(i + 24, h.time.length); k++){
+      let html = '', lastDay = h.time[i].slice(0,10);
+      for(let k = i; k < Math.min(i + hours, h.time.length); k++){
         const d = h.time[k].slice(0,10), H = +h.time[k].slice(11,13);
         if(d !== lastDay){ html += '<div class="wx-day">Tomorrow</div>'; lastDay = d; }
         const p = h.precipitation_probability[k];
         html += '<div class="wx-row' + (k === i ? ' wx-now' : '') + '"><span class="wx-t">' + (k === i ? 'Now' : hr(H)) + '</span><span>' + icon(h.weather_code[k], h.is_day[k]) +
           '</span><span>' + Math.round(h.temperature_2m[k]) + '°</span><span class="wx-p">' + (p >= 10 ? '💧' + p + '%' : '') + '</span></div>';
       }
-      box.innerHTML = html;
+      return html;
     }
     box.addEventListener('click', e => { if(e.target.closest('[data-wx-retry]')) load(true); });
     const check = () => { if(isWx()){ draw(); load(false); } };

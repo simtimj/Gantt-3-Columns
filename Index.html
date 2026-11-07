@@ -586,6 +586,12 @@
     .nw-add input{min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
     .nw-add #newInput{flex:1;}
     .nw-add #newDate{flex:0 0 auto;width:8.6em;font-size:.85em;padding:4px;}
+    /* Days-since timer (2026-11-07, Julius): big counter on top, colored against the goal (something new every 7 days). */
+    .nw-timer{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 0 8px;padding:8px 10px;border-radius:9px;border:1px solid var(--nw-c);background:color-mix(in srgb,var(--nw-c) 12%,transparent);}
+    .nw-timer b{font-size:1.9em;line-height:1;color:var(--nw-c);}
+    .nw-timer span{font-weight:600;}
+    .nw-timer small{flex-basis:100%;color:var(--muted,#888);font-size:.8em;}
+    .nw-timer.ok{--nw-c:#22a55a;} .nw-timer.soon{--nw-c:#d4a017;} .nw-timer.over{--nw-c:#e0453a;}
     .nw-month{margin:8px 0 4px;font-weight:700;font-size:.85em;border-bottom:1px solid var(--divider);padding-bottom:2px;}
     .nw-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid color-mix(in srgb,#e0b13b 50%,var(--border,#ccc));border-radius:7px;background:color-mix(in srgb,#e0b13b 7%,transparent);}
     .nw-item .nw-t{flex:1;min-width:0;outline:none;word-break:break-word;}
@@ -7525,6 +7531,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const ago = w => { const n = Math.round((parse(today()) - parse(w)) / 864e5); return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago'; };
     let data = {v:1, items:[]}, saveT = null;
     try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = c; }catch(e){}
+    // Guideline (2026-11-07): something new at least every 7 days. Green ≤ 5 days, yellow 6–7, red after 7.
+    const GOAL = 7;
+    const since = w => Math.max(0, Math.round((parse(today()) - parse(w)) / 864e5));
+    function timer(last){
+      if(!last) return '<div class="nw-timer over"><b>—</b><span>No new thing logged yet</span><small>Goal: something new at least every ' + GOAL + ' days</small></div>';
+      const n = since(last.w), cls = n <= GOAL - 2 ? 'ok' : n <= GOAL ? 'soon' : 'over';
+      const left = GOAL - n, note = n === 0 ? 'Nice — new thing today.' : left > 0 ? left + (left === 1 ? ' day' : ' days') + ' left in your ' + GOAL + '-day window' : (n - GOAL) + (n - GOAL === 1 ? ' day' : ' days') + ' past your ' + GOAL + '-day goal';
+      return '<div class="nw-timer ' + cls + '"><b>' + n + '</b><span>' + (n === 1 ? 'day' : 'days') + ' since new thing</span><small>' + note + ' · last: ' + h(last.t) + '</small></div>';
+    }
     const merge = srv => { const by = {}; data.items.forEach(i => by[i.id] = i); ((srv && srv.items) || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); data = {v:1, items:Object.values(by)}; };
     const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} };
     const idle = () => !list.contains(document.activeElement);
@@ -7538,7 +7553,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     function render(){
       if(!dIn.value) dIn.value = today();
       const live = data.items.filter(i => !i.x).sort((a,b) => (b.w || '').localeCompare(a.w || '') || (b.c || 0) - (a.c || 0));
-      let html = '<div class="nw-head">✨ New · ' + live.length + (live.length ? ' · last one ' + ago(live[0].w) : '') + '</div>', month = '';
+      // Timer counts from the latest day logged (a future-dated line doesn't count).
+      const last = live.find(i => (i.w || '') <= today());
+      let html = timer(last) + '<div class="nw-head">✨ New · ' + live.length + (live.length ? ' · last one ' + ago(live[0].w) : '') + '</div>', month = '';
       live.forEach(i => {
         const m = parse(i.w).toLocaleDateString('en-US',{month:'long', year:'numeric'});
         if(m !== month){ month = m; html += '<div class="nw-month">' + h(m) + '</div>'; }
@@ -7585,6 +7602,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(idle()) render(); }).getNewThings(); };
     pull();
     document.addEventListener('visibilitychange', () => { if(!document.hidden){ pull(); if(idle()) render(); } });
+    let shownDay = today(); setInterval(() => { if(today() !== shownDay && idle()){ shownDay = today(); render(); } }, 60000);
     window.fwNew = {get data(){ return data; }, render};
   })();
   /* Fun for later (2026-11-05, Julius): 🌴 tab = "I want to do this for fun later" (e.g. play Stardew's update).

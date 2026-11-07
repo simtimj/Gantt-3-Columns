@@ -229,6 +229,8 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if(rows[1] !== 'Tried rock climbing@OCT 3') return ['dated item wrong: ' + rows.join('|')];
     if(!/October 2026/.test(document.getElementById('newList').textContent)) return ['no month header'];
     if(!/last one today/.test(document.querySelector('#newList .nw-head').textContent)) return ['header: ' + document.querySelector('#newList .nw-head').textContent];
+    const tm = document.querySelector('#newList .nw-timer');
+    if(!tm || !/^0\s*days since new thing/.test(tm.textContent) || !tm.classList.contains('ok')) return ['timer: ' + (tm && tm.textContent)];
     const sv = (window.__calls || []).filter(c => c[0] === 'saveNewThings').pop();
     if(!sv || !sv[1][0].items.some(i => i.t === 'Tried rock climbing' && i.w === '2026-10-03')) return ['not saved'];
     document.querySelector('[data-ctab="notes"]').click(); await wait(50);

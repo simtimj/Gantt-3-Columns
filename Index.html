@@ -14096,6 +14096,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .ref-toolbar.hs-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);}
   .ref-toolbar.hs-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);}
   .ref-toolbar.hs-l.hs-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
+/* Minimal time sections (2026-11-07, Julius: lines bled past the box's left edge, too much space). Applies to every
+   time section (Morn / After / Night) in History: content sits inside the box, lines and group headers packed tight. */
+#todayScroll .day-editor.sec-painted.sec-painted.sec-painted{padding-left:11px!important;padding-right:11px!important;}
+#todayScroll .day-editor > [data-tsec]{margin-top:6px!important;margin-bottom:2px!important;}
+#todayScroll .day-editor > [data-tsec] ~ .check-line{margin-top:1px!important;margin-bottom:1px!important;padding-top:1px!important;padding-bottom:1px!important;}
+#todayScroll .day-editor > [data-tsec] ~ [data-cgrp]{margin-top:4px!important;margin-bottom:0!important;}
 </style>
 <script>
 /* Header rows slide left / right on the phone (2026-11-04, Julius): the rows already scroll sideways, but a swipe

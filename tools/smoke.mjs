@@ -166,6 +166,21 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   // Weather (2026-11-07): one ☁️ tab (hourly + daily merged).
   const wxTabs = await pg.evaluate(() => document.querySelectorAll('.center-tabs [data-ctab="weather"], .center-tabs [data-ctab="wxdaily"]').length);
   if (wxTabs !== 1) errs.push('Weather: expected one tab, found ' + wxTabs);
+  // Day Review group header (2026-11-07): name + count on one title line, New / Fixes / Tweaks under it (not two columns).
+  const drg = await pg.evaluate(async () => {
+    const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]');
+    ed.insertAdjacentHTML('beforeend','<div data-cgrp="Userscripts"><b><u>Userscripts</u></b></div><div class="check-line done" data-level="0" data-cid="u1" data-ltype="new"><input type="checkbox" checked><span class="check-text"><b>*EH search box</b>: summary</span></div><div class="check-line done" data-level="0" data-cid="u2" data-ltype="fix"><input type="checkbox" checked><span class="check-text"><b>*EH pipe</b>: literal</span></div>');
+    document.querySelector('[data-ctab="review"]').click(); await new Promise(r => setTimeout(r, 600));
+    const g = [...document.querySelectorAll('#dayReviewScroll .dr-group')].find(x => /Userscripts/.test(x.textContent));
+    if (!g) return ['no Userscripts group'];
+    const nm = g.querySelector('summary .dr-gname'), tc = g.querySelector('summary .dr-tcount');
+    if (!nm || !tc) return ['header parts missing'];
+    const a = nm.getBoundingClientRect(), c = tc.getBoundingClientRect();
+    const out = c.top >= a.bottom - 1 && Math.abs(c.left - a.left) < 2 ? [] : ['counts beside the name: ' + JSON.stringify([a.left, a.bottom, c.left, c.top])];
+    document.querySelector('[data-ctab="notes"]').click();
+    return out;
+  });
+  drg.forEach(x => errs.push('Day Review group: ' + x));
   // History counts read ✓ instead of "done" (2026-11-07).
   const doneWord = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll [data-tlinfo],#todayScroll [data-tsinfo]')].map(n => n.dataset.tlinfo || n.dataset.tsinfo).filter(t => / done$/.test(t)));
   if (doneWord.length) errs.push('History: still says done: ' + doneWord.slice(0,3).join(' | '));

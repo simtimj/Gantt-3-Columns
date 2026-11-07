@@ -650,7 +650,10 @@
     .dr-cat summary b,.dr-group summary b{margin-left:auto;font-variant-numeric:tabular-nums;}
     .dr-group{margin:4px 0 0;padding:1px 6px;border:1px solid var(--border);border-radius:6px;}
     .dr-type{margin:4px 0 1px;font-size:.85em;font-weight:600;opacity:.8;} /* History log types (2026-11-04) */
-    .dr-tcount{margin-left:6px;font-weight:400;font-size:.85em;opacity:.75;}
+    /* 2026-11-07 (Julius): group header = one title line (underlined name + count), New / Fixes / Tweaks on the line under it. */
+    .dr-group > summary{flex-wrap:wrap;row-gap:1px;}
+    .dr-gname{flex:1 1 0;min-width:0;font-weight:600;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere;}
+    .dr-tcount{flex:0 0 100%;margin-left:0;font-weight:400;font-size:.85em;opacity:.75;}
     /* Day Review lines as small cells (2026-11-04, Julius): bold main point, muted details, two lines max; tap to show all. */
     /* 2026-11-07 (Julius): one column: the title is an underlined header, the details sit under it (2 lines, tap for all). */
     .dr-line{display:block;margin:3px 0;padding:2px 6px;border:1px solid var(--border);border-radius:5px;font-size:.9em;line-height:1.25;overflow-wrap:anywhere;cursor:pointer;}
@@ -11502,7 +11505,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           const types = logTypeBuckets(list.map(x => x.n),x => htmlOf.get(x));
           const tc = types ? '<span class="dr-tcount">' + types.filter(t => t.k).map(t => esc(t.name) + ' ' + t.items.length).join(' · ') + '</span>' : '';
           const gOpen = drLevel === 2 ? !openGroups.has(k) : openGroups.has(k);
-          h += `<details class="dr-group" data-k="${esc(k)}"${gOpen ? ' open' : ''}><summary>${esc(g)}${tc ? ':' : ''}${tc}<b>${list.length}</b></summary>` +
+          h += `<details class="dr-group" data-k="${esc(k)}"${gOpen ? ' open' : ''}><summary><span class="dr-gname">${esc(g)}</span><b>${list.length}</b>${tc}</summary>` +
             (types ? types.map(ty => `<div class="dr-type">${esc(ty.name)} · ${ty.items.length}</div>` + ty.items.map(h => `<div class="dr-line">${h}</div>`).join('')).join('')
               : list.map(x => `<div class="dr-line">${x.h}</div>`).join('')) + '</details>';
         });

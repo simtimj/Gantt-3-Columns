@@ -385,12 +385,12 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
   if (list.mode !== 'compact' || list.items < 50 || list.leak || list.wide) errs.push('History List mode: ' + JSON.stringify(list));
   if (mini.mode !== 'mini' || mini.items || mini.leak) errs.push('History Mini mode: ' + JSON.stringify(mini));
   if (full.mode !== 'full' || full.leak) errs.push('History Full mode: ' + JSON.stringify(full));
-  // Full time windows (2026-11-05): label "Morn 8–2" + small "(6a–2p)", never saved; 1 am and 9 pm are Night, 7 pm is Afternoon.
+  // Full time windows (2026-11-05): label "Morn 6–2", never saved; 1 am and 9 pm are Night, 7 pm is Afternoon.
   const win = await pg.evaluate(() => {
     const out = [];
     const h = document.querySelector('#todayScroll .day-editor > [data-tsec="morning"]');
     const lab = h && h.querySelector('.ts-lab');
-    if (!lab || !/Morn 8–2/.test(lab.textContent) || !/\(6a–2p\)/.test(lab.querySelector('small')?.textContent || '')) out.push('Morning label: ' + (lab ? lab.textContent : 'missing'));
+    if (!lab || lab.textContent !== 'Morn 6–2') out.push('Morning label: ' + (lab ? lab.textContent : 'missing')); // full window only, no a / p (2026-11-07)
     if (typeof tsecOf === 'function') {
       const got = ['00:30', '05:59', '06:00', '13:59', '14:00', '19:30', '20:00'].map(tsecOf).join(',');
       if (got !== 'evening,evening,morning,morning,afternoon,afternoon,evening') out.push('windows: ' + got);

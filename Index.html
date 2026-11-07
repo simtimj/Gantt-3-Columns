@@ -14136,6 +14136,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 #todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{line-height:1.2!important;}
 #todayScroll .day-editor > [data-tsec][data-tsec] + :is([data-cgrp],.check-line,[data-tl]){margin-top:2px!important;}
 #todayScroll .day-editor > [data-tsec][data-tsec]{margin-bottom:0!important;}
+/* Space between Morn / Aft / Eve boxes (2026-11-07, Julius: ~50px → a small, comfortable gap). The blank line(s) right
+   before a section title are squeezed to 3px (still in the cell, never removed), and the title's top margin is 8px. */
+#todayScroll .day-editor > div:not([data-tsec]):not(.check-line):not([data-cgrp]):not([data-tl]):is(:empty,:has(> br:only-child)):is(:has(+ [data-tsec]),:has(+ div:is(:empty,:has(> br:only-child)) + [data-tsec])){height:3px!important;min-height:0!important;margin:0!important;padding:0!important;font-size:0!important;line-height:0!important;overflow:hidden!important;}
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"])[data-tsec]{margin-top:8px!important;}
 /* Group names (Gantt, Userscripts…): underlined, not bold. */
 #todayScroll .day-editor > [data-cgrp] :is(b,strong){font-weight:400!important;}
 #todayScroll .day-editor > [data-tsec] ~ .check-line{margin-top:1px!important;margin-bottom:1px!important;padding-top:1px!important;padding-bottom:1px!important;}

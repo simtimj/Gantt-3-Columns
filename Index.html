@@ -1434,8 +1434,12 @@
     #urgentPanel .urg-meta .urg-made{margin:0;}
     /* Title lines (sections like Morning): the name keeps its width, the − / + "50 out of
        50 done" label wraps onto more lines instead of crushing the name (Julius, 2026-10-27). */
+    /* 2026-11-07 (Julius: "+ 2 hidden" broke into "hidd / en"): the − / + button stays on one line; the title text wraps instead. */
+    /* Too narrow for both: the button drops under the title (whole), words never break into letters. */
+    [data-tlon]{flex-wrap:wrap;row-gap:2px;}
     [data-tlon] > .check-text,[data-tlon] > b{flex:0 1 auto;min-width:min-content;overflow-wrap:normal;word-break:normal;}
-    [data-tlon]::before{flex:0 12 auto;min-width:2.2em;white-space:normal!important;line-height:1.2!important;}
+    [data-tlon] > .check-text{flex:1 1 60%;} /* stays beside the checkbox, uses the free width; wraps inside */
+    [data-tlon]::before{flex:0 0 auto;min-width:2.2em;white-space:nowrap!important;overflow-wrap:normal!important;line-height:1.2!important;}
     #urgentPanel.wrap .urg-row .urg-box{margin-top:2px;}
     #urgentPanel.wrap .urg-text,#urgentPanel.wrap .urg-subtask{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
     .urg-create-menu{position:fixed;z-index:3002;display:flex;flex-direction:column;min-width:170px;padding:4px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);}

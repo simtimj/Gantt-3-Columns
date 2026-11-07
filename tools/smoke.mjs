@@ -206,6 +206,9 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     return out;
   });
   secLines.forEach(x => errs.push('Time section lines: ' + x));
+  // Title-line button never wraps (2026-11-07: "+ 2 hidden" showed as "hidd / en").
+  const tlWrap = await pg.evaluate(() => { const n = document.querySelector('#todayScroll [data-tlon]'); if (!n) return ''; const c = getComputedStyle(n, '::before'); return c.whiteSpace === 'nowrap' && c.flexShrink === '0' ? '' : c.whiteSpace + ' shrink ' + c.flexShrink; });
+  if (tlWrap) errs.push('Title button can wrap: ' + tlWrap);
   // History counts read ✓ instead of "done" (2026-11-07).
   const doneWord = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll [data-tlinfo],#todayScroll [data-tsinfo]')].map(n => n.dataset.tlinfo || n.dataset.tsinfo).filter(t => / done$/.test(t)));
   if (doneWord.length) errs.push('History: still says done: ' + doneWord.slice(0,3).join(' | '));

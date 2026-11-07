@@ -12169,7 +12169,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(right === -Infinity) right = t.getBoundingClientRect().left;
       meas.textContent = t.dataset.tlon === 'c' ? '+  ' + (t.dataset.tlinfo || '') : '−';
       const w = Math.max(22,meas.getBoundingClientRect().width + 4);
-      return e.clientX >= right - 2 && e.clientX <= right + 6 + w + 6 ? t : null;
+      if(e.clientX >= right - 2 && e.clientX <= right + 6 + w + 6) return t;
+      // Narrow column (2026-11-07): the button wraps onto its own row under the text, at the line's left edge.
+      let textBottom = -Infinity;
+      t.childNodes.forEach(n => { if(n.nodeType === 1 && !n.classList.contains('tl-sum')) textBottom = Math.max(textBottom,n.getBoundingClientRect().bottom); });
+      const lr = t.getBoundingClientRect(), box = t.querySelector(':scope > .tl-sum'), rowEnd = box ? box.getBoundingClientRect().top : lr.bottom;
+      const padL = parseFloat(getComputedStyle(t).paddingLeft) || 0;
+      if(textBottom > -Infinity && e.clientY > textBottom && e.clientY <= rowEnd + 1 && e.clientX <= lr.left + padL + w + 12) return t;
+      return null;
     }
     document.addEventListener('pointerdown',e => {
       if(e.button !== 0 || e.isPrimary === false) return;

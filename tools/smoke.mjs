@@ -218,6 +218,27 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     else if (d.getBoundingClientRect().right > row.getBoundingClientRect().right + 1) out.push('count cut off');
     return out; });
   dl.forEach(x => errs.push('History date line: ' + x));
+  // Fold buttons (2026-11-07: the wrapped "+ hidden" button didn't respond): time section header, group −, title-line button.
+  const folds = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+    const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]');
+    const tap = async (el, x, y) => { const o = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 1, isPrimary: true }, t = document.elementFromPoint(x, y) || el;
+      t.dispatchEvent(new PointerEvent('pointerdown', o)); t.dispatchEvent(new PointerEvent('pointerup', o)); t.dispatchEvent(new MouseEvent('click', o)); await wait(300); };
+    const h = ed.querySelector(':scope > [data-tsec="morning"]'); h.scrollIntoView({ block: 'center' }); await wait(50);
+    let r = h.getBoundingClientRect(), s0 = h.dataset.tsf; await tap(h, r.left + r.width / 2, r.top + 6);
+    if (h.dataset.tsf === s0) out.push('time section header did not fold'); else await tap(h, r.left + r.width / 2, r.top + 6);
+    const st = ed.querySelector('[data-study][data-tlon]');
+    if (st) { st.scrollIntoView({ block: 'center' }); await wait(50);
+      const tx = st.querySelector('.check-text').getBoundingClientRect(), lr = st.getBoundingClientRect(), wrapped = lr.bottom - tx.bottom > 8, b0 = st.dataset.tlon;
+      await tap(st, wrapped ? lr.left + 20 : tx.right + 14, wrapped ? tx.bottom + 6 : tx.top + 8);
+      if (st.dataset.tlon === b0) out.push('title-line button (' + (wrapped ? 'wrapped' : 'beside') + ') did not toggle');
+      else await tap(st, wrapped ? lr.left + 20 : tx.right + 14, wrapped ? tx.bottom + 6 : tx.top + 8); }
+    const g = ed.querySelector(':scope > [data-cgrp="Gantt"]');
+    if (g) { g.scrollIntoView({ block: 'center' }); await wait(50); const br = g.querySelector('b').getBoundingClientRect(), g0 = g.dataset.tlon;
+      await tap(g, br.right + 10, br.top + br.height / 2); if (g.dataset.tlon === g0) out.push('group − did not fold'); else await tap(g, br.right + 10, br.top + br.height / 2); }
+    return out;
+  });
+  folds.forEach(x => errs.push('History folds: ' + x));
   // History counts read ✓ instead of "done" (2026-11-07).
   const doneWord = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll [data-tlinfo],#todayScroll [data-tsinfo]')].map(n => n.dataset.tlinfo || n.dataset.tsinfo).filter(t => / done$/.test(t)));
   if (doneWord.length) errs.push('History: still says done: ' + doneWord.slice(0,3).join(' | '));

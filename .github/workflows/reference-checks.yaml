@@ -6,6 +6,7 @@ on:
       - 'Index.html'
       - 'tools/reference-save-test.mjs'
       - 'tools/focus-save-test.mjs'
+      - 'tools/focus-storage-test.mjs'
       - 'tools/import-read-test.mjs'
       - 'tools/sync-test.mjs'
       - 'tools/deploy-log-test.py'
@@ -27,6 +28,7 @@ jobs:
       - run: node tools/check.mjs
       - run: node tools/reference-save-test.mjs
       - run: node tools/focus-save-test.mjs
+      - run: node tools/focus-storage-test.mjs
       - run: node tools/import-read-test.mjs
       - run: node tools/sync-test.mjs
       - run: python3 tools/deploy-log-test.py

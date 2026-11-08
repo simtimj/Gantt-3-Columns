@@ -2,12 +2,14 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 const clone=v=>JSON.parse(JSON.stringify(v));
 const fixture={v:1,cats:[{id:'c',name:'Work',items:[{id:'a',t:'First',d:0,lv:0},{id:'b',t:'Second',d:0,lv:0}]}]};
-const props={};let locked=false;
-const server=vm.createContext({console,PropertiesService:{getScriptProperties:()=>({getProperties:()=>({...props}),getProperty:k=>props[k]??null,setProperties:p=>Object.assign(props,p),deleteProperty:k=>delete props[k]})},
+const props={};let locked=false,generation=0;
+const server=vm.createContext({console,Utilities:{getUuid:()=> 'test-'+(++generation)},PropertiesService:{getScriptProperties:()=>({getProperties:()=>({...props}),getProperty:k=>props[k]??null,setProperty:(k,v)=>props[k]=v,setProperties:p=>Object.assign(props,p),deleteProperty:k=>delete props[k]})},
   LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},releaseLock(){locked=false;}})}});
 vm.runInContext(fs.readFileSync('Code.gs','utf8'),server);
+server.cellHash_=s=>crypto.createHash('sha256').update(s).digest('hex');
 server.writeFocus_(fixture);
 const mine=clone(fixture),theirs=clone(fixture);
 mine.cats[0].items[0].t='My edit';theirs.cats[0].items[1].d=1;
@@ -32,11 +34,12 @@ assert.ok(deleteEdit.conflicts.length,'delete versus edit requires a decision');
 const resolved=server.saveFocus(opposing,{base:clone(server.getFocus())});
 assert.equal(resolved.data.cats[0].items[0].t,'Conflicting edit');
 assert.equal(locked,false);
-const savedChunk=props.focusData_0;
-props.focusData_0='not json';
+const chunkKey='focusV2_'+JSON.parse(props.focusDataHead).g+'_0';
+const savedChunk=props[chunkKey];
+props[chunkKey]='not json';
 assert.throws(()=>server.getFocus(),/could not be read/);
 assert.equal(locked,false);
-props.focusData_0=savedChunk;
+props[chunkKey]=savedChunk;
 console.log('✓ Focus server: independent edits/additions merge; conflicting edit/deletion stays protected; explicit resolution and legacy-tab guard checked');
 
 const html=fs.readFileSync('Index.html','utf8');

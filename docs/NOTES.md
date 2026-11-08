@@ -544,7 +544,10 @@ Problem (Julius): too many categories and places; organizing the system takes at
 - **Separate fields** (never interchangeable): Subject/category = area · Project = ongoing container · Importance = how much it matters · Urgency = how soon · Hands-Off (HO) = can progress while walking / driving · Big Three = current biggest-return priorities · Status = open / active / completed.
 - **Calendar day**: top = vertically growing list of unscheduled / all-day items; bottom = the day's timeline; long-press + drag an unscheduled item into a time slot; end-of-day review → unfinished work rescheduled or back to backlog; a scheduled task **stays linked** to its project, notes and checklist (no second independent task).
 - **Motivation lives with the task**: a short reason (burden removed / benefit). Time-saving numbers are labelled **estimate** vs **measured**.
-- Not yet decided: ranking rules, rotation behaviour, whether slots take projects / tasks / both, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".
+- **Slots (2026-11-08)**: a Big Three slot holds **either a single task or a project**.
+- **Bubble up (2026-11-08)**: when a Big Three item is done (or a task inside a project in it is done), the next thing underneath moves up automatically — no manual re-sorting. Exact rules: see the open questions being worked through.
+- **Urgency scale idea (2026-11-08, not decided)**: Julius leans toward 0 / 1 / 2 (0 = most urgent, "more weight") instead of 1 / 2 / 3. Touches every place urgency lives (Gantt lines, New Tasks, calendar colors, ChatGPT / Claude rules) — needs a confirmed decision + migration plan before any change.
+- Not yet decided: ranking rules, rotation behaviour, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".
 
 ### What exists today (to build on, not duplicate)
 - Calendar panel Plan box (phase 3a): groups `big` "Big Three" (**per day**, ≤ 3), `stretch` (≤ 3/day), `next`, `backlog`; rows **link** to real items (`tid:`, Keep In Mind id, calendar event) via the `Plan` tab; Schedule / drag onto the timeline creates or moves **one** linked event (`planSchedule`, `planRelink_`). This already satisfies "scheduling doesn't create a second task".

@@ -586,3 +586,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 - **Save-acknowledgement timing without extra save-log calls**: the next existing Speed Log report carries up to 50 recent changed day/Reference save round-trips, with success/conflict/error status and the responding release. Samples contain no task text or task IDs; reporting retries keep stable sample IDs. This is best-effort in-memory telemetry, not a complete audit, and excludes the autosave debounce. Refresh, edit a disposable line, and let a normal sync occur to see `Client.saveTimings`. Live latency targets remain to be agreed after measurement.
 
+
+## 🧪 Initial day read reuse — 2026-11-08
+
+- Initial loading derives the visible day window from the same request-local Days snapshot already used for Urgent and Dailies seeds. This removes the extra date-column and visible-text reads (3 day-data reads to 1), preserves Plan/text hashes and rereads current data on each later request. No cross-request content cache. Actual opening latency remains to be measured.

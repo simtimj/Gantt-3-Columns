@@ -42,6 +42,12 @@ assert.equal(retry.metaConflicts.length,0);
 assert.equal(locked,false);
 const added=server.addReferenceItem('','New card','<h2>New card</h2>');
 assert.ok(sheet.rows.at(-1)[6] > 1000000000000,'new cards retain end-of-list order without relying on an autosave');
+sheet.rows.splice(1,1);
+const rowsBefore = sheet.rows.length;
+assert.equal(save({expectedExisting:true}).deleted,true);
+assert.equal(save({baseHash:null,expectedExisting:true}).deleted,true);
+assert.equal(save({baseHash:null,expectedExisting:false}).deleted,true,'older tabs without the new flag are protected too');
+assert.equal(sheet.rows.length,rowsBefore,'a stale save must not recreate a deleted card');
 console.log('✓ server: untouched fields preserved; text conflict protected; explicit collapse/move, stale move conflict and retry checked');
 
 const html=fs.readFileSync('Index.html','utf8');
@@ -51,7 +57,7 @@ const run={withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(fn
   saveReferenceItem(payload){calls.push({payload,ok:this.ok,fail:this.fail});}};
 const client=vm.createContext({console,google:{script:{run}},document:{querySelector:()=>null},CSS:{escape:s=>s},
   setStatus:s=>statuses.push(s),fwCheckBuild(){},fwReconcileRef(){}});
-vm.runInContext('let refInFlight=0;'+extract('  function refBase(item){','  /* Cell HTML')+extract('  function sendRefItem(item,onOk,onErr){','  /* Newer app version'),client);
+vm.runInContext('let refInFlight=0,fwRefEpoch=0;'+extract('  function refBase(item){','  /* Cell HTML')+extract('  function sendRefItem(item,onOk,onErr){','  /* Newer app version'),client);
 const item={id:'r1',parentId:'',expanded:true,content:'same',ch:'h:same',title:'',sort:1};
 client.refBase(item);
 item.expanded=false;
@@ -81,3 +87,12 @@ assert.equal(calls.length,5,'queued operation drains after a failed request');
 calls[4].ok({id:'r1',ch:'h:same',meta:{parentId:'theirs',expanded:true},metaConflicts:[]});
 assert.equal(item._refSaving,false);
 console.log('✓ client: serialized saves; latest click survives; conflicts do not call success; queue recovers after failure');
+client.sendRefItem(item);
+calls.at(-1).ok({id:'r1',deleted:true});
+assert.equal(item._refDeleted,true);
+const sent = calls.length;
+client.sendRefItem(item);
+assert.equal(calls.length,sent,'deleted draft must not autosave repeatedly');
+assert.match(statuses.at(-1),/copy your text/);
+assert.equal(item.content,'same','deleted-card response keeps the local text');
+console.log('✓ deleted cards: server refuses resurrection; client retains text and stops automatic writes');

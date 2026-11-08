@@ -662,6 +662,56 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     tk.push(...res);
   }
   tk.forEach(x => errs.push('Tuck: ' + x));
+  // Reference deltas must preserve editor nodes and defer authoritative removals during local work.
+  await pg.waitForTimeout(1000);
+  const refSync = await pg.evaluate(async () => {
+    const failures = [], check = (ok,msg) => { if(!ok) failures.push(msg); };
+    document.querySelector('#referencePane button[data-rtab="reference"]')?.click();
+    document.activeElement?.blur?.();
+    const item = (id,content) => ({id,parentId:'',type:'item',title:id,sort:id==='a'?1:2,expanded:true,content,ch:'h-'+id});
+    state.reference = [item('a','<h2>Parent</h2>'),item('b','<h2>Child</h2>')];
+    state.reference.forEach(refBase); state.refManifestHash = 'old'; renderReference();
+    const node = id => document.querySelector('#referenceTree .ref-cell-wrapper[data-id="'+id+'"]');
+    const a = node('a'), b = node('b');
+    const metadata = (id,parentId='',expanded=true) => ({id,parentId,type:'item',title:id,sort:id==='a'?1:2,expanded});
+    fwApplyReferenceSync({ref:{a:{content:'<h2>Renamed parent</h2>',ch:'h-new'},c:{content:'<h2>New card</h2>',ch:'h-c'}},
+      refManifest:{hash:'added',items:[metadata('a','',false),metadata('b','a'),metadata('c')]}});
+    check(node('a')===a && node('b')===b,'existing editor nodes replaced');
+    check(node('b')?.parentElement===a.querySelector(':scope > .ref-children'),'remote nesting not applied');
+    check(!!node('c') && a.classList.contains('ref-collapsed'),'new card or collapse missing');
+    check(a.querySelector('.ref-cell').textContent.includes('Renamed parent'),'remote title/body missing');
+    // Parent deletion with a surviving, reparented child must not discard the child's DOM node.
+    fwApplyReferenceSync({ref:{},refManifest:{hash:'removed',items:[metadata('b')]}});
+    check(!node('a') && !node('c') && node('b')===b && b.parentElement.id==='referenceTree','delete/reparent lost a surviving editor');
+    const ed = b.querySelector(':scope > .ref-cell'); ed.focus();
+    const remove = {ref:{},refManifest:{hash:'empty',items:[]}};
+    fwApplyReferenceSync(remove);
+    check(node('b')===b && state.refManifestHash==='removed','focused edit was removed or acknowledged');
+    ed.blur();
+    state.reference[0]._timer = 123;
+    fwApplyReferenceSync(remove);
+    check(node('b')===b,'pending save was removed');
+    state.reference[0]._timer = 0;
+    state.reference[0]._refDeleted = true;
+    fwApplyReferenceSync(remove);
+    check(node('b')===b && fwUnsaved(),'deleted local draft was discarded or reload guard disabled');
+    delete state.reference[0]._refDeleted;
+    // A response captured before a local mutation must not remove a newly added card.
+    const original = google.script.run; let complete;
+    google.script.run = {withSuccessHandler(fn){complete=fn;return this;},withFailureHandler(){return this;},getSyncState(){}};
+    try { fwSync(false); fwRefEpoch++; complete(remove); }
+    finally { google.script.run = original; }
+    check(node('b')===b && state.refManifestHash==='removed','late response overwrote a newer local action');
+    fwRefStructureStart(); fwApplyReferenceSync(remove);
+    check(node('b')===b,'in-flight structural write was removed'); fwRefStructureEnd();
+    fwApplyReferenceSync(remove);
+    check(state.reference.length===0 && !node('b') && !!document.querySelector('#referenceTree .empty'),'empty authoritative manifest not applied');
+    check(state.refManifestHash==='empty','applied manifest was not acknowledged');
+    const context = fwSpeedContext({rpcMs:12,applyMs:3});
+    check(context.pageBuild==='smoke' && context.w===innerWidth && context.rpcMs===12,'timing page/build context missing');
+    return failures;
+  });
+  refSync.forEach(x => errs.push('Reference sync: ' + x));
   if (errs.length) { fails += errs.length; console.error('✗ ' + name + ':\n  ' + errs.join('\n  ')); }
   else console.log('✓ ' + name + ': loads with no page errors');
 }

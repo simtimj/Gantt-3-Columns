@@ -889,6 +889,10 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       if(m==='calPanelCreateEvent'){ if(S.ops[r.opId])return Object.assign({repeat:true},S.ev[S.ops[r.opId]]);
         const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));S.ops[r.opId]=e.eventId;return e;}
       if(m==='calPanelUpdateEvent'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');if(e.recurring||!e.editable)throw new Error('Repeating events are read-only here');delete S.ev[r.eventId];return put(shape(e));}
+      // Phase 3b: move / resize in place (same id); Graphite (done) is locked; plan links follow the new start.
+      const relink=e=>{const link=e.eventId+'@'+e.startMs;(S.plan||[]).forEach(x=>{if(String(x.event).split('@')[0]===e.eventId)x.event=link;});if(e.tag){S.planEv=S.planEv||{};S.planEv['tid:'+e.tag]=link;}return link;};
+      if(m==='calPanelMoveEvent'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');if(e.recurring||!e.editable)throw new Error('read-only');if(e.colorId==='8')throw new Error('Done events stay where they are');
+        delete S.ev[r.eventId];e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);put(e);relink(e);return Object.assign({},e);}
       if(m==='calPanelDeleteEvent'){const e=S.ev[r.eventId];if(e&&(e.recurring||!e.editable))throw new Error('read-only');delete S.ev[r.eventId];return {ok:true};}
       // Phase 3a plan (same rules as Code.gs: one row per ref, Big / Stretch ≤ 3 per day, Schedule = one all-day event per task).
       S.plan=S.plan||[];const P=S.plan,MAX={big:3,stretch:3,next:50,backlog:500};
@@ -906,7 +910,8 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
         return getPlan(d);}
       if(m==='planSchedule'){const known=(P.find(x=>x.ref===r.ref&&x.event)||{}).event||S.planEv&&S.planEv[r.ref];let e=known&&S.ev[known.split('@')[0]];
         const nx=L.fromISO(r.date).plus({days:1}).toISODate();
-        if(e){e.start=r.date;e.end=nx;e.startMs=ms(r.date);put(e);}else e=put({eventId:'s'+(++S.n),title:r.title,allDay:true,start:r.date,end:nx,startMs:ms(r.date),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,tag:r.ref.slice(4)});
+        const sl=r.start&&r.end,ad=sl?!!r.allDay:true,st=sl?(ad?r.start:iso(r.start)):r.date,en=sl?(ad?r.end:iso(r.end)):nx;if(sl&&(!r.title||en<=st))throw new Error('bad slot');
+        if(e){e.allDay=ad;e.start=st;e.end=en;e.startMs=ms(st);put(e);}else e=put({eventId:'s'+(++S.n),title:r.title,allDay:ad,start:st,end:en,startMs:ms(st),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0,tag:r.ref.slice(4)});
         const link=e.eventId+'@'+e.startMs;S.planEv=S.planEv||{};S.planEv[r.ref]=link;P.filter(x=>x.ref===r.ref).forEach(x=>x.event=link);return {event:link};}
       if(m==='planMoveEvent'){const e=S.ev[r.eventId];if(!e||e.recurring)throw new Error('read-only');const sh=L.fromISO(r.date).diff(L.fromISO(e.start.slice(0,10)),'days').days;
         const mv=x=>e.allDay?L.fromISO(x).plus({days:sh}).toISODate():L.fromISO(x).setZone(Z).plus({days:sh}).toISO({suppressMilliseconds:true});e.start=mv(e.start);e.end=mv(e.end);e.startMs=ms(e.start);put(e);
@@ -917,7 +922,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler')return f=>{bad=f;return p;}; if(m==='withUserObject')return()=>p;
       return(...a)=>{window.__calls.push([m,a]);return setTimeout(()=>{
         if(m==='getCalendarRange'&&window.__calFail){bad&&bad(new Error('Calendar service timed out'));return;}
-        if(/^calPanel/.test(m)&&window.__calFailWrite){bad&&bad(new Error('Service invoked too many times'));return;}
+        if((/^calPanel/.test(m)||m==='planSchedule')&&window.__calFailWrite){bad&&bad(new Error('Service invoked too many times'));return;}
         let res;try{res=window.__calSrv(m,a);}catch(e){bad&&bad(e);return;}
         if(/^calPanel/.test(m)&&window.__calLoseReply){window.__calLoseReply=0;bad&&bad(new Error('NetworkError: connection lost'));return;}
         if(res!==undefined){ok&&ok(res);return;}
@@ -1244,10 +1249,156 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
         return out;
       });
       errs.push(...res3.map(x => 'phase 3a: ' + x));
+      // Phase 3b (2026-11-08): real gestures — mouse on desktop, touch (hold 400 ms, then drag) on the phone.
+      // Move in place (same id), resize, timed ↔ all-day, Graphite / repeating / Events locked, failed save snaps
+      // back, plan rows dropped on the timeline (task length or 30 min; one event per task, moved on a second drop).
+      {
+        const out = [], phone = !!view.isMobile, cdp = phone ? await ctx.newCDPSession(pg) : null;
+        const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })) });
+        const gesture = async (a, b, hold = phone ? 600 : 0) => {
+          const steps = 14;
+          if (phone) {
+            await touch('touchStart', [a]); await pg.waitForTimeout(hold);
+            for (let i = 1; i <= steps; i++) { await touch('touchMove', [{ x: a.x + (b.x - a.x) * i / steps, y: a.y + (b.y - a.y) * i / steps }]); await pg.waitForTimeout(25); }
+            await pg.waitForTimeout(80); await touch('touchEnd', []);
+          } else {
+            await pg.mouse.move(a.x, a.y); await pg.mouse.down(); await pg.waitForTimeout(hold || 30);
+            for (let i = 1; i <= steps; i++) { await pg.mouse.move(a.x + (b.x - a.x) * i / steps, a.y + (b.y - a.y) * i / steps); await pg.waitForTimeout(20); }
+            await pg.waitForTimeout(60); await pg.mouse.up();
+          }
+          await pg.waitForTimeout(400);
+        };
+        const ev = (k) => pg.evaluate(k => { const e = window.__cal.ev[k]; return e ? Object.assign({}, e) : null; }, k);
+        const calls = m => pg.evaluate(m => window.__calls.filter(c => c[0] === m).length, m);
+        const waitIdle = () => pg.waitForFunction(() => !/Saving/.test(document.querySelector('#calPanel [data-cal-state]').textContent), null, { timeout: 4000 }).catch(() => {});
+        // Point helpers (viewport coordinates). Slots / events are scrolled into the middle first.
+        const slotPt = (d, t) => pg.evaluate(([d, t]) => {
+          const lane = document.querySelector('#calPanel .fc-timegrid-slot-lane[data-time="' + t + ':00"]'), col = document.querySelector('#calPanel .fc-timegrid-col[data-date="' + d + '"]');
+          if (!lane || !col) return null;
+          const l = lane.getBoundingClientRect(), c = col.getBoundingClientRect(); return { x: c.left + c.width / 2, y: l.top + 4 };
+        }, [d, t]);
+        const allDayPt = d => pg.evaluate(d => { const c = document.querySelector('#calPanel .fc-daygrid-body .fc-daygrid-day[data-date="' + d + '"]'); if (!c) return null; const r = c.getBoundingClientRect(); return { x: r.left + r.width * 0.6, y: r.top + r.height / 2 }; }, d);
+        const evPt = (title, where = 'top') => pg.evaluate(([t, w]) => {
+          const el = [...document.querySelectorAll('#calPanel .fc-event:not(.fc-event-mirror)')].find(x => x.textContent.includes(t)); if (!el) return null;
+          if (w === 'middle') { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+          if (w === 'resizer') { const z = el.querySelector('.fc-event-resizer-end'); if (!z) return null; const r = z.getBoundingClientRect(); return r.height ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; }
+          const r = el.getBoundingClientRect(); return { x: r.left + Math.min(30, r.width / 2), y: r.top + Math.min(8, r.height / 3), drag: el.classList.contains('fc-event-draggable') };
+        }, [title, where]);
+        // Scroll the timeline so time t sits in the middle (all positions are read after this, never mid-scroll).
+        const center = t => pg.evaluate(t => { const lane = document.querySelector('#calPanel .fc-timegrid-slot-lane[data-time="' + t + ':00"]'); if (!lane) return; const sc = lane.closest('.fc-scroller'), r = sc.getBoundingClientRect(); sc.scrollTop += lane.getBoundingClientRect().top - r.top - r.height / 2; }, t).then(() => pg.waitForTimeout(120));
+        const setup = await pg.evaluate(async () => {
+          const wait = ms => new Promise(r => setTimeout(r, ms));
+          document.querySelector('#toolbar [data-cal-open]').click(); await wait(400);
+          const api = window.fwCalendar.api(); api.changeView('timeGridDay'); api.today(); api.incrementDate({ days: 5 });
+          for (let i = 0; i < 60 && !document.querySelector('#calPanel .fc-timegrid-event'); i++) await wait(50);
+          await wait(300);
+          // Fold the plan so the timeline has room for the event tests (it's unfolded again for the plan-row drops).
+          const plan = document.querySelector('#calPanel .cp-plan'); if (plan && !plan.classList.contains('folded')) document.querySelector('#calPanel [data-plan-act=fold]').click();
+          await wait(200); api.updateSize(); await wait(100);
+          return api.formatIso(api.getDate()).slice(0, 10);
+        });
+        const day = setup;
+        // Locked: done (Graphite), repeating, Events calendar are not draggable; editable ones are.
+        for (const [t, want] of [['Dentist', true], ['Old chore', false], ['Standup', false], ['Gig', false], ['All-day A', true]]) {
+          const p = await evPt(t); if (!p) { out.push(t + ' not on the calendar'); continue; }
+          if (p.drag !== want) out.push(t + (want ? ' is not draggable' : ' is draggable but should be locked'));
+        }
+        // Move: Dentist 9:00 → 10:30, same id, 1 hour kept.
+        await center('10:00');
+        let a = await evPt('Dentist'), b = await slotPt(day, '10:30');
+        if (a && b) {
+          await gesture(a, { x: b.x, y: b.y + 2 }); await waitIdle(); await pg.waitForTimeout(200);
+          const e = await ev('b-' + day);
+          if (!e || !/T10:30/.test(e.start) || !/T11:30/.test(e.end) || e.allDay) out.push('drag did not move Dentist to 10:30–11:30 in place: ' + JSON.stringify(e && [e.start, e.end]));
+          if (await calls('calPanelCreateEvent') > 5 || await calls('calPanelDeleteEvent') > 1) out.push('a move created or deleted events');
+        } else out.push('could not find Dentist or the 10:30 slot');
+        // Resize: bottom edge 11:30 → 12:30 (touch: hold first to select the event, then drag the handle).
+        await center('11:00');
+        if (phone) { const p = await evPt('Dentist', 'middle'); await touch('touchStart', [p]); await pg.waitForTimeout(600);
+          await touch('touchEnd', [p]); await pg.waitForTimeout(300); await pg.evaluate(() => { const d = document.querySelector('#calPanel [data-cal-detail]'); if (!d.hidden) d.querySelector('[data-cal-detail-close]').click(); }); await pg.waitForTimeout(100); }
+        else { const p = await evPt('Dentist'); await pg.mouse.move(p.x, p.y + 10); await pg.waitForTimeout(150); }
+        const rz = await evPt('Dentist', 'resizer'), s1 = await slotPt(day, '11:30'), s2 = await slotPt(day, '12:00');
+        if (!rz || !s1) out.push('no resize handle on Dentist');
+        else {
+          await gesture(rz, { x: rz.x, y: rz.y + 2 * (s2.y - s1.y) }, phone ? 60 : 0); await waitIdle(); await pg.waitForTimeout(200);
+          const e = await ev('b-' + day);
+          if (!e || !/T10:30/.test(e.start) || !/T12:30/.test(e.end)) out.push('resize did not end Dentist at 12:30: ' + JSON.stringify(e && [e.start, e.end]));
+        }
+        // Timed → all-day row.
+        await center('11:00');
+        a = await evPt('Dentist'); b = await allDayPt(day);
+        if (a && b) { await gesture(a, b); await waitIdle(); await pg.waitForTimeout(200);
+          const e = await ev('b-' + day); if (!e || !e.allDay || e.start !== day) out.push('timed → all-day failed: ' + JSON.stringify(e && [e.allDay, e.start, e.end])); }
+        // All-day → 9:00 slot (gets 1 hour).
+        await center('09:00');
+        a = await evPt('All-day A'); b = await slotPt(day, '09:00');
+        if (a && b) { await gesture(a, { x: b.x, y: b.y + 2 }); await waitIdle(); await pg.waitForTimeout(200);
+          const e = await ev('a-' + day); if (!e || e.allDay || !/T09:00/.test(e.start) || !/T10:00/.test(e.end)) out.push('all-day → 9:00 timed failed: ' + JSON.stringify(e && [e.allDay, e.start, e.end])); }
+        // Done (Graphite) can't be dragged: nothing sent, nothing changed.
+        const nMove = await calls('calPanelMoveEvent'), chore0 = await ev('c-' + day);
+        await center('14:30');
+        a = await evPt('Old chore'); b = await slotPt(day, '16:00');
+        if (a && b) { await gesture(a, b); await pg.waitForTimeout(200);
+          const e = await ev('c-' + day); if (await calls('calPanelMoveEvent') !== nMove || !e || e.start !== chore0.start) out.push('a done (Graphite) event moved'); }
+        // Failed save: the event snaps back and a message shows.
+        await pg.evaluate(() => { window.__calFailWrite = 1; });
+        await center('10:00');
+        a = await evPt('All-day A'); b = await slotPt(day, '11:00');
+        if (a && b) { await gesture(a, { x: b.x, y: b.y + 2 });
+          await pg.waitForFunction(() => /put it back/.test(document.querySelector('#calPanel [data-cal-state]').textContent), null, { timeout: 4000 }).catch(() => out.push('no "put it back" message after a failed move'));
+          const e = await ev('a-' + day); if (!/T09:00/.test(e.start)) out.push('failed move changed the event');
+          const shown = await pg.evaluate(() => { const el = [...document.querySelectorAll('#calPanel .fc-timegrid-event:not(.fc-event-mirror)')].find(x => /All-day A/.test(x.textContent)); return el ? el.textContent : ''; });
+          if (!/9:00/.test(shown)) out.push('failed move did not snap back on screen: ' + shown); }
+        await pg.evaluate(() => { window.__calFailWrite = 0; });
+        await pg.waitForTimeout(5300);
+        // Plan rows → timeline: unfold, add a Gantt task to Big Three, drop it on 14:00 → one 30-min event; then onto
+        // the all-day row → the same event, now all-day.
+        const added = await pg.evaluate(async () => {
+          const wait = ms => new Promise(r => setTimeout(r, ms)), panel = document.getElementById('calPanel'), det = panel.querySelector('[data-cal-detail]');
+          if (panel.querySelector('.cp-plan.folded')) panel.querySelector('[data-plan-act=fold]').click();
+          await wait(300); panel.querySelector('[data-plan-act=add]').click(); await wait(100);
+          det.querySelector('[data-plan-act=addgroup][data-g=big]').click();
+          const b = [...det.querySelectorAll('[data-plan-act=pick]')].find(x => x.querySelector('span').textContent === 'Book trip'); if (!b) return 'no Book trip in + Add';
+          b.click(); for (let i = 0; i < 60 && !document.querySelector('#calPanel .cp-pi[data-plan-drag]'); i++) await wait(50);
+          det.querySelector('[data-cal-detail-close]').click(); await wait(100); window.fwCalendar.api().updateSize(); await wait(150);
+          return [...panel.querySelectorAll('.cp-pi[data-plan-drag]')].some(x => /Book trip/.test(x.textContent)) ? '' : 'Book trip row is not draggable';
+        });
+        if (added) out.push(added);
+        else {
+          const rowPt = () => pg.evaluate(() => { const row = [...document.querySelectorAll('#calPanel .cp-pi[data-plan-drag]')].find(x => /Book trip/.test(x.textContent)), el = row && row.querySelector('.cp-ptt'); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + Math.min(40, r.width / 2), y: r.top + r.height / 2 }; });
+          const before = await calls('planSchedule');
+          a = await rowPt(); await center('14:00'); b = await slotPt(day, '14:00'); a = await rowPt();
+          if (!a || !b) out.push('plan row or 14:00 slot not reachable');
+          else {
+            await gesture(a, { x: b.x, y: b.y + 2 }); await waitIdle(); await pg.waitForTimeout(300);
+            const made = await pg.evaluate(() => Object.values(window.__cal.ev).filter(e => e.title === 'Book trip'));
+            if (await calls('planSchedule') !== before + 1) out.push('dropping a plan row sent ' + (await calls('planSchedule') - before) + ' schedule calls');
+            if (made.length !== 1 || made[0].allDay || !/T14:00/.test(made[0].start) || !/T14:30/.test(made[0].end) || made[0].reminders) out.push('plan drop did not make one 14:00–14:30 event (reminders off): ' + JSON.stringify(made.map(e => [e.start, e.end])));
+            const id0 = made[0] && made[0].eventId;
+            a = await rowPt(); b = await allDayPt(day);
+            if (a && b) { await gesture(a, b); await waitIdle(); await pg.waitForTimeout(300);
+              const m2 = await pg.evaluate(() => Object.values(window.__cal.ev).filter(e => e.title === 'Book trip'));
+              if (m2.length !== 1 || m2[0].eventId !== id0 || !m2[0].allDay) out.push('second drop made a duplicate or did not move it to all-day: ' + JSON.stringify(m2.map(e => [e.eventId, e.allDay, e.start])));
+              const link = await pg.evaluate(() => (window.__cal.plan.find(x => /Book trip/.test(x.title) && x.event) || {}).event || '');
+              if (!m2[0] || link !== m2[0].eventId + '@' + m2[0].startMs) out.push('plan row link not updated after the move: ' + link); }
+            // A failed drop says so and creates nothing.
+            await pg.evaluate(() => { window.__calFailWrite = 1; });
+            const n0 = await pg.evaluate(() => Object.keys(window.__cal.ev).length);
+            await center('16:00'); a = await rowPt(); b = await slotPt(day, '16:00');
+            if (a && b) { await gesture(a, { x: b.x, y: b.y + 2 });
+              await pg.waitForFunction(() => /nothing changed/.test(document.querySelector('#calPanel [data-cal-state]').textContent), null, { timeout: 4000 }).catch(() => out.push('no message after a failed plan drop'));
+              if (await pg.evaluate(() => Object.keys(window.__cal.ev).length) !== n0) out.push('failed plan drop changed events'); }
+            await pg.evaluate(() => { window.__calFailWrite = 0; });
+          }
+        }
+        if (await pg.evaluate(() => document.querySelectorAll('#calPanel .fc-event-mirror').length)) out.push('a drag mirror was left behind');
+        await pg.evaluate(() => document.querySelector('#calPanel [data-cal-close]').click()); await pg.waitForTimeout(320);
+        errs.push(...out.map(x => 'phase 3b: ' + x));
+      }
       const shot = process.argv.indexOf('--shot');
       if (shot > 0) { await pg.click('#toolbar [data-cal-open]'); await pg.waitForTimeout(900); await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-calendar-' + name + '.png') }); }
       if (errs.length) { fails += errs.length; console.error('✗ calendar ' + name + ':\n  ' + errs.join('\n  ')); }
-      else console.log('✓ calendar ' + name + ': view (1) + create / edit / delete (2) + daily plan, schedule, move, done sync (3a)');
+      else console.log('✓ calendar ' + name + ': view (1) + create / edit / delete (2) + daily plan, schedule, move, done sync (3a) + drag / resize / plan drops (3b)');
       await ctx.close();
     }
   }

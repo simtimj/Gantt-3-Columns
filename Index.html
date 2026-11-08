@@ -13675,7 +13675,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // {text, done, where} from the first live copy, else from Keep In Mind; null when it isn't loaded.
       info(tid){
         const l = liveLines(tid)[0];
-        if(l){ const t = l.querySelector('.check-text'); return {text:(t ? t.textContent : l.textContent).replace(/\s+/g,' ').trim(), done:isOn(l)}; }
+        if(l){ const t = l.querySelector('.check-text'); return {text:(t ? t.textContent : l.textContent).replace(/\s+/g,' ').trim(), done:isOn(l), dur:Math.round(Number(l.dataset.dur)) || 0}; }
         const f = window.focusFindItem ? window.focusFindItem(tid) : null;
         return f ? {text:f.t, done:!!f.d} : null;
       },
@@ -14688,6 +14688,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-pi.done .cp-ptt{text-decoration:line-through;opacity:.6;}
   #calPanel .cp-pt2{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
   #calPanel .cp-ptt{overflow-wrap:anywhere;}
+  /* Phase 3b: a plan row you can hold and drag onto the timeline (the whole row, since phones snap a touch to the
+     nearest button; taps on its buttons still work). No text selection / callout on the long press. */
+  #calPanel .cp-pi[data-plan-drag]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+  #calPanel .cp-pi[data-plan-drag] .cp-ptt{cursor:grab;}
+  .cp-pi.fc-event-dragging{background:var(--cp-bg,#fff);border:1px solid #888;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:.92;padding:4px 8px;max-width:260px;}
   #calPanel .cp-pm{font-size:11px;color:var(--cp-muted);}
   #calPanel .cp-tg{align-self:flex-start;font:inherit;font-size:12px;color:var(--cp-muted);background:transparent;border:0;padding:0;cursor:pointer;text-align:left;}
   #calPanel .cp-pbtn{display:flex;gap:2px;flex:0 0 auto;}
@@ -14780,7 +14785,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const failed = (r && r.failed) || [];
       ok(evs.map(x => ({ id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
         backgroundColor: x.color, borderColor: x.color, textColor: x.colorId === '5' ? '#202124' : '#fff',
-        classNames: x.done ? ['cp-done'] : [], extendedProps: x })));
+        classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x })));
       partial = failed.length; loadErr = false;
       setTimeout(refreshState, 0);
     }).withFailureHandler(err => {
@@ -14803,7 +14808,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function showDetail(ev){
     const x = ev.extendedProps || {};
     sheetEv = ev;
-    const why = x.editable ? '' : x.recurring ? 'Repeating event — read-only here, edit it in Google Calendar.' : 'Not on your main calendar — read-only here.';
+    const why = x.editable ? (x.done ? 'Done — stays where it is.' : 'Hold and drag to move it; drag its bottom edge to change the length.') : x.recurring ? 'Repeating event — read-only here, edit it in Google Calendar.' : 'Not on your main calendar — read-only here.';
     detail.innerHTML = '<div class="cp-dt"><span class="cp-dot" style="background:' + esc(x.color) + '"></span><span>' + esc(ev.title) + '</span></div>' +
       '<div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
       '<div class="cp-dm">' + esc(x.cal || '') + (x.recurring ? ' · repeats' : '') + (x.done ? ' · done' : '') + '</div>' +
@@ -14820,7 +14825,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // save the range is refetched; nothing is drawn from local guesses.
   const L = () => luxon.DateTime;
   const newOp = () => 'op' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-  function flash(msg){ flashUntil = Date.now() + 2500; setState('ok', msg); setTimeout(() => { flashUntil = 0; refreshState(); }, 2600); }
+  // One timer per message: an older flash's timer never clears a newer message (e.g. a save error right after "Moved ✓").
+  let flashTok = 0;
+  function flash(msg){ const k = ++flashTok; flashUntil = Date.now() + 2500; setState('ok', msg); setTimeout(() => { if(k !== flashTok) return; flashUntil = 0; refreshState(); }, 2600); }
   // f = {allDay, sd, st, ed, et} in Los Angeles wall time; ed is the LAST day (inclusive) for all-day events.
   function openForm(f, ev){
     sheetEv = ev || null; pending = false; detail.dataset.pid = '';
@@ -14965,7 +14972,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(!items.length) h += '<div class="cp-pe">' + (g === 'big' ? 'Pick up to 3 essentials for ' + esc(fmtDay(planDay)) + ' — + Add' : g === 'stretch' ? 'Optional, after the essentials' : g === 'next' ? 'About 5 ready tasks, ranked' : 'Everything else worth keeping') + '</div>';
         items.forEach((it, i) => {
           const v = planView(it);
-          h += '<div class="cp-pi' + (v.done ? ' done' : '') + '" data-pid="' + esc(it.id) + '">' +
+          h += '<div class="cp-pi' + (v.done ? ' done' : '') + '" data-pid="' + esc(it.id) + '"' + (planDraggable(it, v) ? ' data-plan-drag title="Hold and drag onto the calendar"' : '') + '>' +
             '<input type="checkbox" data-plan-done' + (v.done ? ' checked' : '') + (v.canTick ? '' : ' disabled title="Not loaded here — tick it in its list"') + ' aria-label="Done">' +
             '<div class="cp-pt2"><span class="cp-ptt">' + (g === 'big' || g === 'next' ? '<b>' + (i + 1) + '.</b> ' : '') + esc(v.title || '(untitled)') + '</span>' +
             (v.meta ? '<span class="cp-pm">' + esc(v.meta) + '</span>' : '') +
@@ -15127,6 +15134,82 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         .setCalendarEventDone(planData.cal, ev.eventId, ev.startMs, on);
     } else setTimeout(renderPlan, 400);
   });
+  // ---- Phase 3b: drag / resize. Moves go through calPanelMoveEvent (in place, same id); a failed save puts the event back.
+  let moveBusy = false, planDrag = null;
+  const wall = d => d.toFormat("yyyy-MM-dd'T'HH:mm");
+  function moveFail(msg){ const k = ++flashTok; flashUntil = Date.now() + 5000; setState('error', msg); setTimeout(() => { if(k !== flashTok) return; flashUntil = 0; refreshState(); }, 5100); }
+  // FullCalendar's own hit test on the all-day row is flaky while a timed event is dragged into it (the row resizes
+  // under the finger). So when a drag of a timed event ends over an all-day cell without a drop, it's done here.
+  let dropSeen = false;
+  const ptOf = e => { const t = e && (e.changedTouches && e.changedTouches[0] || e.touches && e.touches[0]) || e; return t && t.clientX != null ? {x: t.clientX, y: t.clientY} : null; };
+  function allDayCellAt(p){
+    if(!p) return null;
+    const hit = document.elementsFromPoint(p.x, p.y).map(el => el.closest && el.closest('.fc-daygrid-body .fc-daygrid-day[data-date]')).find(Boolean);
+    return hit && mount.contains(hit) ? hit : null;
+  }
+  function dragStopped(info){
+    const ev = info.event, p = ptOf(info.jsEvent);
+    setTimeout(() => {
+      if(dropSeen || ev.allDay) return;
+      const cell = allDayCellAt(p), x = ev.extendedProps || {};
+      if(!cell || moveBusy || !x.editable || x.done) return;
+      const d = cell.dataset.date;
+      moveBusy = true; detail.hidden = true; sheetEv = null; setState('loading', 'Saving…');
+      google.script.run.withSuccessHandler(() => { moveBusy = false; flash('Moved ✓'); cal.refetchEvents(); loadPlan(true); })
+        .withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save the move — put it back. ' + errText(err)); cal.refetchEvents(); })
+        .calPanelMoveEvent({eventId: x.eventId, startMs: x.startMs, allDay: true, start: d, end: L().fromISO(d, {zone: TZ}).plus({days: 1}).toISODate()});
+    }, 30);
+  }
+  // LA wall-time request for an event / slot: all-day 'yyyy-MM-dd' (end exclusive), timed 'yyyy-MM-ddTHH:mm'.
+  function slotReq(allDay, startStr, endStr, minutes){
+    if(allDay){ const s = startStr.slice(0, 10), e = endStr ? endStr.slice(0, 10) : L().fromISO(s, {zone: TZ}).plus({days: 1}).toISODate(); return {allDay: true, start: s, end: e > s ? e : L().fromISO(s, {zone: TZ}).plus({days: 1}).toISODate()}; }
+    const a = L().fromISO(startStr).setZone(TZ), b = endStr ? L().fromISO(endStr).setZone(TZ) : a.plus({minutes: minutes || 60});
+    return {allDay: false, start: wall(a), end: wall(b > a ? b : a.plus({minutes: minutes || 60}))};
+  }
+  function moveEvent(info){
+    const ev = info.event, x = ev.extendedProps || {};
+    if(moveBusy || !x.editable || x.done){ info.revert(); return; }
+    moveBusy = true; detail.hidden = true; sheetEv = null;
+    const req = Object.assign({eventId: x.eventId, startMs: x.startMs}, slotReq(ev.allDay, ev.startStr, ev.endStr, 60));
+    setState('loading', 'Saving…');
+    google.script.run.withSuccessHandler(res => {
+      moveBusy = false; flash('Moved ✓'); loadPlan(true);
+      // Google's answer updates this event in place (no full refetch), so a touch-selected event keeps its resize
+      // handle for the next step. Views / ↻ / reopening refetch as usual.
+      if(res && res.eventId){
+        ['eventId','startMs','start','end','allDay','color','colorId','done','editable','recurring'].forEach(k => { if(res[k] !== undefined) ev.setExtendedProp(k, res[k]); });
+        const s2 = String(res.start || ''), same = res.allDay ? ev.allDay && ev.startStr.slice(0, 10) === s2 : !ev.allDay && L().fromISO(s2).toMillis() === ev.start.valueOf();
+        if(!same) cal.refetchEvents();
+      } else cal.refetchEvents();
+    }).withFailureHandler(err => {
+      moveBusy = false; info.revert(); moveFail('Couldn’t save the move — put it back. ' + errText(err));
+    }).calPanelMoveEvent(req);
+  }
+  // A plan row can go on the timeline when it's a Gantt task (Schedule) or a movable event, and not done.
+  function planDraggable(it, v){
+    if(v.done) return false;
+    if(it.ref.indexOf('tid:') === 0) return true;
+    const e = it.ev && !it.ev.gone ? it.ev : null;
+    return !!(e && !e.recurring && !e.done);
+  }
+  function planMinutes(it){
+    if(it.ref.indexOf('tid:') === 0){ const inf = window.fwTasks ? window.fwTasks.info(it.ref.slice(4)) : null; return (inf && inf.dur) || 30; }
+    const fe = cal && it.ev ? cal.getEvents().find(e => (e.extendedProps || {}).eventId === it.ev.eventId) : null;
+    return fe && !fe.allDay && fe.end ? Math.max(15, Math.round((fe.end - fe.start) / 60000)) : 60;
+  }
+  function dropPlan(info){
+    const r = info.draggedEl && info.draggedEl.closest('[data-pid]'), it = r && planById(r.dataset.pid);
+    if(!it) return;
+    if(moveBusy || planBusy){ moveFail('Still saving — try again in a moment.'); return; }
+    const v = planView(it), slot = slotReq(info.allDay, info.dateStr, '', planMinutes(it));
+    const isTid = it.ref.indexOf('tid:') === 0, ev = it.ev && !it.ev.gone ? it.ev : null;
+    if(!isTid && !(ev && !ev.recurring && !ev.done)) return;
+    moveBusy = true; setState('loading', 'Saving…');
+    const done = () => { moveBusy = false; flash((isTid && !ev ? 'Scheduled' : 'Moved') + ' ✓'); cal.refetchEvents(); loadPlan(true); };
+    const fail = err => { moveBusy = false; moveFail('Couldn’t save — nothing changed. ' + errText(err)); cal.refetchEvents(); };
+    if(isTid) google.script.run.withSuccessHandler(done).withFailureHandler(fail).planSchedule(Object.assign({ref: it.ref, title: v.title}, slot));
+    else google.script.run.withSuccessHandler(done).withFailureHandler(fail).calPanelMoveEvent(Object.assign({eventId: ev.eventId, startMs: ev.startMs}, slot));
+  }
   function build(){
     const phone = window.matchMedia('(max-width:720px)').matches;
     const saved = lsGet('fw.calView');
@@ -15137,7 +15220,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek' },
       buttonText: { today: 'Today', day: 'Day', week: 'Week' },
       height: '100%', nowIndicator: true, scrollTime: '07:00:00', slotMinTime: '00:00:00', slotMaxTime: '24:00:00',
-      allDaySlot: true, dayMaxEvents: false, editable: false, eventStartEditable: false, eventDurationEditable: false,
+      allDaySlot: true, dayMaxEvents: false,
+      // Phase 3b: hold + drag (touch) or drag (mouse) moves an event, its bottom edge resizes it; timed ↔ all-day both
+      // ways. Per event `editable` = main calendar, not repeating, not done (Graphite stays put). Plan rows drop in too.
+      editable: true, eventStartEditable: true, eventDurationEditable: true, eventResizableFromStart: false,
+      eventLongPressDelay: 400, snapDuration: '00:15:00', defaultTimedEventDuration: '01:00:00', defaultAllDayEventDuration: {days: 1},
+      eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag]',
+      eventDragStart: () => { dropSeen = false; }, eventDragStop: dragStopped,
+      eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: moveEvent, drop: dropPlan,
       // Phase 2: drag (desktop) or hold + drag (touch) on empty grid → New event form. Moving / resizing events is phase 3.
       selectable: true, selectMirror: true, selectLongPressDelay: 400, unselectAuto: true,
       select: info => { if(!pending) openForm(formFromRange(info.allDay, info.startStr, info.endStr)); cal.unselect(); },
@@ -15150,6 +15240,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       datesSet: info => { viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
+    // Plan rows → timeline: hold a row's title (touch) or drag it (mouse). create:false = nothing is drawn locally;
+    // Google answers and the range is refetched.
+    if(FullCalendar.Draggable && planBody) planDrag = new FullCalendar.Draggable(planBody, {
+      itemSelector: '[data-plan-drag]', longPressDelay: 400, minDistance: 5,
+      eventData: el => { const r = el.closest('[data-pid]'), it = r && planById(r.dataset.pid); return {title: it ? planView(it).title : '', duration: {minutes: it ? planMinutes(it) : 30}, create: false}; }
+    });
   }
   function start(){
     if(cal){ cal.updateSize(); cal.refetchEvents(); loadPlan(true); return; }
@@ -15175,7 +15271,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
   }
   function retry(){ if(cal){ cal.refetchEvents(); loadPlan(true); } else start(); }
-  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, api: () => cal };
+  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');
@@ -15205,7 +15301,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!detail.hidden){ detail.hidden = true; sheetEv = null; } else close();
   }, true);
   // Swipes / holds inside the panel never reach the workspace's own swipe and hold-to-zoom handlers.
-  ['touchstart','touchmove','pointerdown','keydown','keyup','input'].forEach(n => panel.addEventListener(n, e => e.stopPropagation(), {passive: true}));
+  // touchmove is let through (like pointermove): FullCalendar cancels page scrolling during a touch drag from a
+  // window listener (phase 3b). The workspace never saw the touchstart, so its swipe handlers stay idle.
+  ['touchstart','pointerdown','keydown','keyup','input'].forEach(n => panel.addEventListener(n, e => e.stopPropagation(), {passive: true}));
   window.addEventListener('resize', () => { if(cal && isOpen()) cal.updateSize(); });
 })();
 </script>

@@ -1523,6 +1523,18 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         return out;
       });
       errs.push(...res4.map(x => 'Big Three strip: ' + x));
+      // Resizable calendar (2026-11-08): drag the left edge → narrower, saved, restored after reload (desktop + phone).
+      {
+        await pg.evaluate(() => window.fwCalendar.open()); await pg.waitForTimeout(400);
+        const g = await pg.evaluate(() => { const r = document.querySelector('#calPanel [data-cal-resize]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, w: document.getElementById('calPanel').getBoundingClientRect().width }; });
+        await pg.mouse.move(g.x, g.y); await pg.mouse.down(); await pg.mouse.move(g.x + 200, g.y, { steps: 6 }); await pg.mouse.up();
+        const w1 = await pg.evaluate(() => document.getElementById('calPanel').getBoundingClientRect().width);
+        if (Math.abs(w1 - Math.max(280, g.w - 200)) > 12) errs.push('resize: drag did not narrow the calendar (' + g.w + ' → ' + w1 + ')');
+        await pg.reload(); await pg.waitForTimeout(2500);
+        const w2 = await pg.evaluate(() => document.getElementById('calPanel').getBoundingClientRect().width);
+        if (Math.abs(w2 - w1) > 3) errs.push('resize: width not restored after reload (' + w1 + ' → ' + w2 + ')');
+      }
+
       if (shot > 0) { await pg.click('#toolbar [data-cal-open]'); await pg.waitForTimeout(900); await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-calendar-' + name + '.png') }); }
       if (errs.length) { fails += errs.length; console.error('✗ calendar ' + name + ':\n  ' + errs.join('\n  ')); }
       else console.log('✓ calendar ' + name + ': view (1) + create / edit / delete (2) + daily plan, schedule, move, done sync (3a) + drag / resize / plan drops (3b)');

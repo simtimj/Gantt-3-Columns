@@ -14790,6 +14790,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   body.cal-open #calPanel{transform:none;visibility:visible;transition:transform .24s ease,visibility 0s;}
   body.cal-open #calPanelBackdrop{opacity:1;pointer-events:auto;}
   @media (max-width:720px){ #calPanel{width:100vw;border-left:0;} }
+  /* Resizable width (2026-11-08, Julius): drag the left edge; saved per device (fw.calWidth), phone too (default full width). */
+  #calPanel .cp-resize{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:ew-resize;z-index:20;touch-action:none;}
+  #calPanel .cp-resize::after{content:"";position:absolute;left:3px;top:50%;width:4px;height:44px;margin-top:-22px;border-radius:2px;background:var(--cp-line,#ccc);opacity:.9;}
+  #calPanel .cp-resize:hover::after,#calPanel.cp-resizing .cp-resize::after{background:var(--cp-blue,#1a73e8);}
+  #calPanel.cp-resizing{transition:none;user-select:none;}
+  @media (max-width:720px){ #calPanel .cp-resize{left:0;width:16px;} #calPanel .cp-resize::after{left:4px;} }
   #calPanel .cp-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--cp-line);flex:0 0 auto;}
   #calPanel .cp-head strong{font-size:16px;flex:1;}
   #calPanel .cp-head button{font:inherit;color:inherit;background:var(--cp-soft);border:1px solid var(--cp-line);border-radius:8px;min-height:36px;min-width:40px;padding:0 10px;cursor:pointer;}
@@ -15020,6 +15026,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 </style>
 <div id="calPanelBackdrop" aria-hidden="true"></div>
 <aside id="calPanel" role="dialog" aria-modal="true" aria-label="Calendar" aria-hidden="true">
+  <div class="cp-resize" data-cal-resize title="Drag to resize the calendar (double-click: default size)" aria-hidden="true"></div>
   <div class="cp-head">
     <strong>📅 Calendar</strong>
     <button type="button" class="cp-new" data-cal-new title="New event on your main calendar (or hold / drag on the grid)" aria-label="New event"><span class="cp-plus">+</span> New</button>
@@ -15044,6 +15051,29 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     'https://cdn.jsdelivr.net/npm/@fullcalendar/luxon3@6.1.15/index.global.min.js'];
   const panel = document.getElementById('calPanel'), backdrop = document.getElementById('calPanelBackdrop');
   const mount = document.getElementById('calMount'), stateEl = panel.querySelector('[data-cal-state]'), detail = panel.querySelector('[data-cal-detail]');
+  // Resizable width: drag the left edge (mouse or touch); saved per device. Double-click = default size.
+  (function(){
+    const grip = panel.querySelector('[data-cal-resize]'), KEY = 'fw.calWidth';
+    const clamp = w => Math.max(Math.min(280, window.innerWidth), Math.min(window.innerWidth, Math.round(w)));
+    const apply = w => { panel.style.width = w ? clamp(w) + 'px' : ''; };
+    const fit = () => { try { const c = window.fwCalendar && window.fwCalendar.api(); if(c) c.updateSize(); } catch (e) {} };
+    let saved = 0; try { saved = Number(localStorage.getItem(KEY)) || 0; } catch (e) {}
+    if(saved) apply(saved);
+    window.addEventListener('resize', () => { if(saved) apply(saved); });
+    if(!grip) return;
+    grip.addEventListener('pointerdown', e => {
+      e.preventDefault(); grip.setPointerCapture(e.pointerId); panel.classList.add('cp-resizing');
+      const move = ev => { apply(window.innerWidth - ev.clientX); fit(); };
+      const up = () => {
+        grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up);
+        panel.classList.remove('cp-resizing');
+        saved = panel.getBoundingClientRect().width; try { localStorage.setItem(KEY, String(Math.round(saved))); } catch (e) {}
+        fit();
+      };
+      grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+    });
+    grip.addEventListener('dblclick', () => { saved = 0; try { localStorage.removeItem(KEY); } catch (e) {} apply(0); setTimeout(fit, 50); });
+  })();
   let cal = null, libsPromise = null, lastFocus = null, loadSeq = 0, partial = 0, loadErr = false, busy = false;
   let sheetEv = null, pending = false, flashUntil = 0, viewStart = '', viewEnd = '';
   // Empty / partial note for the dates on screen (also after Day ↔ Week switches served from FullCalendar's cache).

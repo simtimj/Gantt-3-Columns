@@ -949,15 +949,16 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         delete S.ev[r.eventId];e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);put(e);relink(e);return Object.assign({},e);}
       if(m==='calPanelDeleteEvent'){const e=S.ev[r.eventId];if(e&&(e.recurring||!e.editable))throw new Error('read-only');delete S.ev[r.eventId];return {ok:true};}
       // Phase 3a plan (same rules as Code.gs: one row per ref, Big / Stretch ≤ 3 per day, Schedule = one all-day event per task).
-      S.plan=S.plan||[];const P=S.plan,MAX={big:3,stretch:3,next:50,backlog:500};
+      S.plan=S.plan||[];const P=S.plan,MAX={big:3,stretch:3,next:500,backlog:500},DATED={stretch:1};
       const evInfo=link=>{const mm=String(link||'').match(/^(.+)@([0-9]+)$/);if(!mm)return null;const e=S.ev[mm[1]];if(!e)return {eventId:mm[1],startMs:+mm[2],gone:true};
         return {eventId:e.eventId,startMs:e.startMs,title:e.title,done:e.colorId==='8',date:e.start.slice(0,10),allDay:e.allDay,recurring:!!e.recurring,time:e.allDay?'':L.fromISO(e.start).setZone(Z).toFormat('h:mm a')};};
-      const getPlan=d=>({date:d,cal:'main',items:P.filter(x=>x.group==='next'||x.group==='backlog'||x.date===d).map(x=>Object.assign({},x,{ev:x.event?evInfo(x.event):null})).sort((a,b)=>a.rank-b.rank)});
+      const getPlan=d=>({date:d,cal:'main',items:P.filter(x=>!DATED[x.group]||x.date===d).map(x=>Object.assign({},x,{ev:x.event?evInfo(x.event):null})).sort((a,b)=>a.rank-b.rank)});
       if(m==='getPlan')return getPlan(a[0]);
-      if(m==='planSave'){const d=r.date,inG=(g,ex)=>P.filter(x=>x.group===g&&(MAX[g]>3||x.date===d)&&x!==ex);
-        if(r.type==='upsert'){const it=r.item,g=it.group;let x=P.find(y=>y.ref===it.ref&&(y.group==='next'||y.group==='backlog'||y.date===d));
-          if(inG(g,x).length>=MAX[g])throw new Error('full');if(!x){x={id:'p'+(++S.n),ref:it.ref};P.push(x);}const mv=x.group!==g;x.group=g;x.date=MAX[g]<=3?d:'';x.title=it.title||x.title;
+      if(m==='planSave'){const d=r.date,inG=(g,ex)=>P.filter(x=>x.group===g&&(!DATED[g]||x.date===d)&&x!==ex);
+        if(r.type==='upsert'){const it=r.item,g=it.group;let x=P.find(y=>y.ref===it.ref&&(!DATED[y.group]||y.date===d));
+          if(inG(g,x).length>=MAX[g])throw new Error('full');if(!x){x={id:'p'+(++S.n),ref:it.ref};P.push(x);}const mv=x.group!==g;x.group=g;x.date=DATED[g]?d:'';x.title=it.title||x.title;
           if(it.event)x.event=it.event;if(mv||!x.rank)x.rank=inG(g,x).reduce((mx,y)=>Math.max(mx,y.rank),0)+1;}
+        else if(r.type==='moveup'){const dn=P.findIndex(y=>y.id===r.doneId&&y.group==='big');if(dn>=0)P.splice(dn,1);const up=P.find(y=>y.id===r.upId&&y.group==='next');if(!up)throw new Error('gone');up.group='big';up.date='';up.rank=inG('big',up).reduce((mx,y)=>Math.max(mx,y.rank),0)+1;}
         else if(r.type==='remove'){const i=P.findIndex(y=>y.id===r.id);if(i>=0)P.splice(i,1);}
         else if(r.type==='order'){r.ids.forEach((id,i)=>{const x=P.find(y=>y.id===id);if(x)x.rank=i+1;});}
         else if(r.type==='target'){P.find(y=>y.id===r.id).target=r.target;}
@@ -1229,6 +1230,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         const day = api.formatIso(api.getDate()).slice(0, 10);
         await until(() => calls('getPlan').some(c => c[1][0] === day));
         if (!/Pick up to 3/.test(panel.querySelector('[data-plan-group=big]').textContent)) out.push('empty Big Three has no hint');
+        if (panel.querySelector('[data-plan-group=stretch]')) out.push('Stretch is tabled but still shown');
         // + Add lists every source.
         panel.querySelector('[data-plan-act=add]').click(); await wait(80);
         const listText = det.textContent;
@@ -1240,16 +1242,16 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         await pick('Pay rent', 'big');
         await pick('Fix bike', 'big');
         await pick('Gloves', 'next');
-        await pick('Dentist', 'stretch');
+        await pick('Dentist', 'next');
         det.querySelector('[data-cal-detail-close]').click(); await wait(60);
         const tid = todayLine() && todayLine().dataset.tid;
         if (!tid || !/^m-/.test(tid)) out.push('planned Gantt line got no task id');
         if (document.querySelectorAll('#todayScroll .day-editor .check-line').length !== nLines) out.push('planning copied a line into Today');
         const r1 = rows().find(x => x.ref === 'tid:' + tid);
-        if (!r1 || r1.group !== 'big' || r1.date !== day) out.push('Plan row for Pay rent wrong: ' + JSON.stringify(r1));
+        if (!r1 || r1.group !== 'big' || r1.date) out.push('Plan row for Pay rent wrong (Big Three is standing, no date): ' + JSON.stringify(r1));
         if (!rows().some(x => x.ref === 'tid:m-a' && x.group === 'next' && !x.date)) out.push('Keep In Mind item not linked by its id in Next Up');
-        if (!rows().some(x => /^cal:b-/.test(x.ref) && x.group === 'stretch')) out.push('event not linked as cal: ref in Stretch');
-        if (groupOf('Pay rent') !== 'big' || groupOf('Gloves') !== 'next' || groupOf('Dentist') !== 'stretch') out.push('plan groups drawn wrong');
+        if (!rows().some(x => /^cal:b-/.test(x.ref) && x.group === 'next')) out.push('event not linked as cal: ref in the Waiting list');
+        if (groupOf('Pay rent') !== 'big' || groupOf('Gloves') !== 'next' || groupOf('Dentist') !== 'next') out.push('plan groups drawn wrong');
         // Adding the same task again moves it, never a second row.
         panel.querySelector('[data-plan-act=add]').click(); await wait(60);
         await pick('Gloves', 'backlog');
@@ -1475,6 +1477,52 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         errs.push(...out.map(x => 'phase 3b: ' + x));
       }
       const shot = process.argv.indexOf('--shot');
+      // Big Three strip (2026-11-08): standing list at the top of Today; hold-menu add, ★ on a card, bubble-up confirm.
+      const res4 = await pg.evaluate(async () => {
+        const out = [], wait = ms => new Promise(r => setTimeout(r, ms));
+        const until = async (f, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (f()) return true; await wait(50); } return false; };
+        const S = window.__cal, strip = document.getElementById('b3Strip'), rows = () => (S.plan || []);
+        if (!window.fwBig) return ['no Big Three strip API'];
+        window.fwBig.load();
+        if (!await until(() => !strip.hidden)) return ['strip never showed'];
+        const big = rows().filter(x => x.group === 'big');
+        if (strip.querySelectorAll('.b3-r').length !== big.length) out.push('strip rows ' + strip.querySelectorAll('.b3-r').length + ' ≠ Big Three rows ' + big.length);
+        if (strip.closest('#todayPane') == null || strip.nextElementSibling.id !== 'todayScroll') out.push('strip not at the top of Today');
+        // Clear the Big Three, then add through the hold menu (right-click a task's checkbox).
+        for (const x of big) { window.fwBig.remove(x.ref); await until(() => !rows().some(y => y.id === x.id)); await wait(30); }
+        const line = [...document.querySelectorAll('#todayScroll .day-editor .check-line')].find(l => l.textContent.trim() === 'Walk dog');
+        if (!line) return out.concat('no Walk dog line');
+        line.querySelector('input').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 50, clientY: 50 }));
+        await wait(80);
+        const b3 = [...document.querySelectorAll('.urg-picker .urg-b3row button')].find(b => /Big Three/.test(b.textContent));
+        if (!b3) return out.concat('hold menu has no ★ Big Three');
+        b3.click();
+        if (!await until(() => line.dataset.tid && rows().some(x => x.ref === 'tid:' + line.dataset.tid && x.group === 'big' && !x.date))) out.push('hold menu did not add a standing Big Three row');
+        await until(() => [...strip.querySelectorAll('.b3-t')].some(t => t.textContent === 'Walk dog'));
+        if (document.querySelectorAll('#todayScroll .check-line').length && [...document.querySelectorAll('#todayScroll .check-line')].filter(l => l.textContent.trim() === 'Walk dog').length !== 1) out.push('adding copied the task');
+        // ★ on a Reference card → project row.
+        const card = [...document.querySelectorAll('#referenceTree .ref-cell-wrapper')].find(w => /Undated Tasks/.test(w.textContent));
+        card.querySelector(':scope > [data-b3]').click();
+        if (!await until(() => rows().some(x => x.ref === 'card:r-und' && x.group === 'big'))) out.push('★ on a card did not add a project');
+        await until(() => strip.textContent.includes('📁'));
+        // Waiting list + bubble up: tick Walk dog in the strip → "Move up" → ✓ moves the waiting item into the slot.
+        const wl = rows().filter(x => x.group === 'next').sort((a, b) => a.rank - b.rank)[0];
+        if (!wl) out.push('no waiting item to move up');
+        const cb = [...strip.querySelectorAll('.b3-r')].find(r => /Walk dog/.test(r.textContent))?.querySelector('[data-b3-done]');
+        if (!cb) return out.concat('strip task has no checkbox');
+        cb.click();
+        if (!line.querySelector('input').checked) out.push('strip tick did not tick the real task');
+        if (wl) {
+          if (!await until(() => strip.querySelector('.b3-up'))) out.push('no move-up suggestion after finishing a Big Three task');
+          else {
+            strip.querySelector('[data-b3-act=up]').click();
+            if (!await until(() => rows().some(x => x.id === wl.id && x.group === 'big') && !rows().some(x => x.ref === 'tid:' + line.dataset.tid))) out.push('move up did not swap: ' + JSON.stringify(rows()));
+          }
+        }
+        if (strip.getBoundingClientRect().height > 140) out.push('strip too tall: ' + strip.getBoundingClientRect().height);
+        return out;
+      });
+      errs.push(...res4.map(x => 'Big Three strip: ' + x));
       if (shot > 0) { await pg.click('#toolbar [data-cal-open]'); await pg.waitForTimeout(900); await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-calendar-' + name + '.png') }); }
       if (errs.length) { fails += errs.length; console.error('✗ calendar ' + name + ':\n  ' + errs.join('\n  ')); }
       else console.log('✓ calendar ' + name + ': view (1) + create / edit / delete (2) + daily plan, schedule, move, done sync (3a) + drag / resize / plan drops (3b)');

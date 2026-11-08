@@ -610,6 +610,12 @@ Three things only; everything else is a **view**, not a place:
 - **Suggested meanings** for the unclear labels: "main focus" = the Big Three (drop the separate term); pinned = display position of a Reference card only (no planning meaning); Keep In Mind = reference notes with no action (or retire it).
 - Line markup idea (for later): reuse `data-urg`, `data-cat`; add `data-ho` (Hands-Off), `data-imp` (importance), `data-next` (Next Move); Why = a note line under the task.
 
+### Built: ★ Big Three strip (2026-11-08)
+- Plan tab groups: `big` = **standing** Big Three (no date, max 3), `next` = **Waiting list** (no cap, ranked), `backlog`; `stretch` still read but not offered (`PLAN_DATED_ = {stretch}` is the only dated group). Refs: `tid:` task, `cal:` event, **`card:<Reference id>`** project. New `planSave` type `moveup` {doneId, upId}.
+- Strip: `#b3Strip` between the Today header and `#todayScroll`; module = last `<script>` before `</body>` (`window.fwBig` load / add / remove / toggle / groupOf, `window.fwCardInfo(id)` → title + urgency ceiling). Loads `getPlan(today)` ~1.8 s after start, re-reads on visibility after 5 min, re-renders on any checkbox change. Finished Big Three task + non-empty Waiting list → "Move up" suggestion (✓ = moveup, ✕ = dismiss for the session).
+- Adding: hold-menu row `.urg-b3row` in `showUrgencyPicker` (uses `fwTasks.ensureTid`); ★ button `.ref-b3` on Reference cards. Calendar Plan box uses the same groups (`PLAN_G` big / next / backlog); its saves refresh the strip and vice versa (`fwCalendar.plan()`).
+- Smoke: calendar section "Big Three strip" (hold-menu add, ★ project, strip tick → real task, move-up swap, height).
+
 ### Smallest first build (once confirmed)
 1. Project card template + "update existing container" rule for Claude / ChatGPT.
 2. Plan box: standing Big Three row (links to project cards, shows Why + Next Moves); day groups renamed.

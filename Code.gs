@@ -2775,7 +2775,11 @@ function calPanelDeleteEvent(req) {
    ========================================================= */
 const PLAN_SHEET = 'Plan';
 const PLAN_HEAD = ['Id', 'Date', 'Group', 'Rank', 'Ref', 'Title', 'Target', 'Event', 'Updated'];
-const PLAN_GROUPS = { big: 3, stretch: 3, next: 50, backlog: 500 };
+const PLAN_GROUPS = { big: 3, stretch: 3, next: 500, backlog: 500 };
+/* Big Three / Biggest Return (2026-11-08, Julius): 'big' is now a STANDING list (no date, the same every day, max 3);
+   'next' is shown as the Waiting list (ranked, no cap); 'stretch' is tabled (still read, not offered). Refs may also be
+   'card:<Reference id>' = a project. Only 'stretch' keeps a date. */
+const PLAN_DATED_ = { stretch: true };
 function planSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(PLAN_SHEET);
@@ -2823,7 +2827,7 @@ function planEventInfo_(s) {
 function getPlan(date) {
   const d = String(date || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error('Invalid plan date');
-  const items = planRead_(planSheet_()).filter(x => x.group === 'next' || x.group === 'backlog' || x.date === d);
+  const items = planRead_(planSheet_()).filter(x => !PLAN_DATED_[x.group] || x.date === d);
   items.forEach(x => { delete x.row; x.ev = x.event ? planEventInfo_(x.event) : null; });
   items.sort((a, b) => a.rank - b.rank);
   return { date: d, cal: EVENT_CALENDARS[0], items: items };
@@ -2837,23 +2841,33 @@ function planSave(op) {
   lock.waitLock(20000);
   try {
     const sh = planSheet_(), rows = planRead_(sh);
-    const inGroup = (g, except) => rows.filter(x => x.group === g && (PLAN_GROUPS[g] > 3 || x.date === d) && x !== except);
+    const inGroup = (g, except) => rows.filter(x => x.group === g && (!PLAN_DATED_[g] || x.date === d) && x !== except);
     if (o.type === 'upsert') {
       const it = o.item || {}, g = String(it.group || '');
       if (PLAN_GROUPS[g] === undefined) throw new Error('Unknown plan group');
       const ref = String(it.ref || '');
-      if (!/^(tid:m-[\w-]{2,60}|tid:[\w-]{2,60}|cal:[^\s]{3,200})$/.test(ref)) throw new Error('Unknown task link');
+      if (!/^(tid:m-[\w-]{2,60}|tid:[\w-]{2,60}|cal:[^\s]{3,200}|card:[\w-]{1,80})$/.test(ref)) throw new Error('Unknown task link');
       // Same task already planned (for this day, or undated) → move it; never a second row.
-      let x = rows.find(r => r.ref === ref && (r.group === 'next' || r.group === 'backlog' || r.date === d));
+      let x = rows.find(r => r.ref === ref && (!PLAN_DATED_[r.group] || r.date === d));
       if (inGroup(g, x).length >= PLAN_GROUPS[g]) throw new Error((g === 'big' ? 'Big Three' : 'Stretch') + ' is full (3) — remove one first');
       if (!x) x = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ref: ref };
       const moved = x.group !== g;
-      x.group = g; x.date = PLAN_GROUPS[g] <= 3 ? d : '';
+      x.group = g; x.date = PLAN_DATED_[g] ? d : '';
       x.title = String(it.title || x.title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
       if (it.target !== undefined) x.target = String(it.target || '').replace(/\s+/g, ' ').trim().slice(0, 200);
       if (it.event && planEventParts_(it.event)) x.event = String(it.event);
       if (moved || !x.rank) x.rank = inGroup(g, x).reduce((m, r) => Math.max(m, r.rank), 0) + 1;
       planWrite_(sh, x);
+    } else if (o.type === 'moveup') {
+      // Bubble up (confirmed by Julius): the finished Big Three item leaves; the chosen waiting item takes the slot.
+      const done = rows.find(r => r.id === String(o.doneId || '') && r.group === 'big');
+      const up = rows.find(r => r.id === String(o.upId || '') && r.group === 'next');
+      if (!up) throw new Error('That waiting item is gone — tap ↻');
+      if (done) { sh.deleteRow(done.row); rows.forEach(r => { if (r.row > done.row) r.row--; }); rows.splice(rows.indexOf(done), 1); }
+      if (inGroup('big', up).length >= 3) throw new Error('Big Three is full (3) — remove one first');
+      up.group = 'big'; up.date = '';
+      up.rank = inGroup('big', up).reduce((m, r) => Math.max(m, r.rank), 0) + 1;
+      planWrite_(sh, up);
     } else if (o.type === 'remove') {
       const x = rows.find(r => r.id === String(o.id || ''));
       if (x) sh.deleteRow(x.row);

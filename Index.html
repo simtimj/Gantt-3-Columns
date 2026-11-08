@@ -763,6 +763,9 @@
     /* Pin (2026-11-04, Julius): faint until pinned; pinned cards get a soft accent tint. */
     .ref-pin{position:absolute;right:2px;top:calc(6px * var(--pad-y,1) * var(--ref-pad-y,1));border:0;background:transparent;padding:2px 3px;font-size:12px;line-height:1;cursor:pointer;z-index:4;opacity:.22;filter:grayscale(1);}
     .ref-pinned > .ref-pin{opacity:1;filter:none;}
+    .ref-b3{position:absolute;right:20px;top:calc(5px * var(--pad-y,1) * var(--ref-pad-y,1));border:0;background:transparent;padding:2px 3px;font-size:12px;line-height:1;cursor:pointer;z-index:4;opacity:.22;color:#d99a00;}
+    .ref-b3.on{opacity:1;}
+    .ref-cell-wrapper:hover:not(:has(.ref-children .ref-cell-wrapper:hover)) > .ref-b3,.ref-cell-wrapper:has(> .ref-cell:focus) > .ref-b3{right:90px;}
     .ref-cell-wrapper:hover:not(:has(.ref-children .ref-cell-wrapper:hover)) > .ref-pin,.ref-cell-wrapper:has(> .ref-cell:focus) > .ref-pin{right:72px;} /* clear of Delete */
     #referenceTree .ref-cell-wrapper.ref-pinned{background:color-mix(in srgb,var(--accent,#1a73e8) 7%,transparent);}
     .ref-cell-wrapper > .ref-cell > :first-child{padding-right:20px;}
@@ -2378,6 +2381,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         <span id="histMode" class="hist-modes" role="group" aria-label="History detail"><button type="button" class="hist-mode" data-hm="full" title="History detail: Full" aria-label="History detail: Full">▤</button><button type="button" class="hist-mode" data-hm="compact" title="History detail: List" aria-label="History detail: List">≡</button><button type="button" class="hist-mode" data-hm="mini" title="History detail: Mini" aria-label="History detail: Mini">–</button></span>
         <span id="focusStatus" class="focus-status">Loading…</span>
       </div>
+      <div id="b3Strip" class="b3-strip" aria-label="Big Three" hidden></div>
       <div
         class="scroll"
         id="todayScroll">
@@ -6344,6 +6348,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       `<button class="ref-disclosure" type="button" data-toggle title="Expand/collapse reference cell">${item.expanded === false ? '▸' : '▾'}</button>
       <button class="ref-drag" type="button" aria-label="Drag to reorder reference cell" title="Drag to reorder">⠿</button>
       <button class="ref-pin" type="button" data-pin aria-label="Pin to top" title="Pin to top">📌</button>
+      <button class="ref-b3" type="button" data-b3 aria-label="Big Three / Waiting list" title="Add this project to the Big Three (or the Waiting list when full); tap again to take it out">★</button>
       <div
         class="ref-cell"
         contenteditable="true"
@@ -6369,6 +6374,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     wireCodeBlocks(ed);
     wireEditorHistory(ed);
     ed.addEventListener('blur',() => setTimeout(applyReferenceSort,0));
+    // ★ (2026-11-08): this card as a project in the Big Three / Waiting list (window.fwBig, Plan tab, ref card:<id>).
+    wrap.querySelector(':scope > [data-b3]').addEventListener('click',e => {
+      e.preventDefault(); e.stopPropagation();
+      if(window.fwBig) window.fwBig.toggle('card:' + item.id, (window.fwCardInfo && window.fwCardInfo(String(item.id)).title) || item.title || 'Project');
+    });
     // 📌 pins the card to the top of Reference, synced through the server.
     wrap.querySelector(':scope > [data-pin]').addEventListener('click',e => {
       e.preventDefault(); e.stopPropagation();
@@ -10550,6 +10560,26 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         finishEditorEdit(owner); urgChanged(owner); hideUrgencyPicker();
       });
       p.appendChild(repeat);
+    }
+    // Big Three / Waiting list (2026-11-08): link this task (by its tid) into the standing lists; never a copy.
+    if(!isCal && owner && window.fwBig && window.fwTasks){
+      const row = document.createElement('div'); row.className = 'urg-b3row';
+      const tidNow = line.dataset.tid || '', where = tidNow ? window.fwBig.groupOf('tid:' + tidNow) : '';
+      [['big','★ Big Three'],['next','⏳ Waiting list']].forEach(([g,label]) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'urg-goto' + (where === g ? ' on' : '');
+        b.textContent = where === g ? label + ' ✓' : label;
+        b.title = where === g ? 'Already there — tap to take it out' : 'Add to the ' + (g === 'big' ? 'Big Three' : 'Waiting list');
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',() => {
+          const tx = line.querySelector(':scope > .check-text') || line.querySelector('.check-text');
+          const tid = window.fwTasks.ensureTid({line, tid: line.dataset.tid || ''});
+          if(!tid){ setStatus('Could not link this task'); return; }
+          if(where === g) window.fwBig.remove('tid:' + tid); else window.fwBig.add('tid:' + tid, (tx ? tx.textContent : line.textContent).replace(/\s+/g,' ').trim(), g);
+          hideUrgencyPicker();
+        });
+        row.appendChild(b);
+      });
+      p.appendChild(row);
     }
     // Urgency shows as 0 / 1 / 2 (Julius 2026-11-08); stored values stay 1 / 2 / 3 underneath.
     [[1,'0'],[2,'1'],[3,'2'],[0,'✕']].forEach(([u,label]) => {
@@ -15296,8 +15326,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Sheet's Plan tab (getPlan / planSave in Code.gs) and LINK to tasks: 'tid:<id>' (Gantt line, Undated Tasks,
   // Keep In Mind — window.fwTasks) or 'cal:<eventId>'. Nothing is copied; titles / done come from the live task.
   const planEl = panel.querySelector('[data-cal-plan]'), planBody = panel.querySelector('[data-plan-body]');
-  const PLAN_G = [['big','Big Three',3],['stretch','Stretch',3],['next','Next Up',0],['backlog','Backlog',0]];
-  const PLAN_NAME = {big:'Big Three', stretch:'Stretch', next:'Next Up', backlog:'Backlog'};
+  // 2026-11-08 (Big Three / Biggest Return): Big Three is standing (same every day), Next Up is shown as the Waiting list,
+  // Stretch is tabled (rows still read, not offered). Projects (card:<id>) come from the ★ on a Reference card.
+  const PLAN_G = [['big','Big Three',3],['next','Waiting list',0],['backlog','Backlog',0]];
+  const PLAN_NAME = {big:'Big Three', stretch:'Stretch', next:'Waiting list', backlog:'Backlog'};
   let planDay = '', planData = null, planBusy = false, planErr = '', planSeq = 0, addGroup = 'big';
   const planFolded = () => lsGet('fw.calPlanFold') === '1';
   const bkOpen = () => lsGet('fw.calPlanBk') === '1';
@@ -15320,6 +15352,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function planView(it){
     const ev = it.ev && !it.ev.gone ? it.ev : null;
     let title = it.title, done = false, meta = '', canTick = true;
+    if(it.ref.indexOf('card:') === 0){
+      const c = window.fwCardInfo ? window.fwCardInfo(it.ref.slice(5)) : {title:''};
+      return {title: c.title || title, done: false, meta: 'project', canTick: false};
+    }
     if(it.ref.indexOf('tid:') === 0){
       const inf = window.fwTasks ? window.fwTasks.info(it.ref.slice(4)) : null;
       if(inf){ title = inf.text || title; done = inf.done; } else if(!ev){ canTick = false; meta = 'not loaded'; }
@@ -15348,7 +15384,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       h += '<div class="cp-pg" data-plan-group="' + g + '"><div class="cp-pgh">' + (g === 'backlog' ? '<button type="button" class="cp-pgt" data-plan-act="bkfold">' + (open ? '▾ ' : '▸ ') + name + '</button>' : '<span class="cp-pgt">' + name + '</span>') +
         '<span class="cp-pgn">' + items.length + (max ? '/' + max : '') + '</span></div>';
       if(open){
-        if(!items.length) h += '<div class="cp-pe">' + (g === 'big' ? 'Pick up to 3 essentials for ' + esc(fmtDay(planDay)) + ' — + Add' : g === 'stretch' ? 'Optional, after the essentials' : g === 'next' ? 'About 5 ready tasks, ranked' : 'Everything else worth keeping') + '</div>';
+        if(!items.length) h += '<div class="cp-pe">' + (g === 'big' ? 'Pick up to 3 — your standing Big Three, the same every day — + Add' : g === 'stretch' ? 'Optional, after the essentials' : g === 'next' ? 'Ranked; the top one moves up when a Big Three item is done' : 'Everything else worth keeping') + '</div>';
         items.forEach((it, i) => {
           const v = planView(it);
           h += '<div class="cp-pi' + (v.done ? ' done' : '') + '" data-pid="' + esc(it.id) + '"' + (planDraggable(it, v) ? ' data-plan-drag title="Hold and drag onto the calendar"' : '') + '>' +
@@ -15371,6 +15407,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       planBusy = false; planEl.classList.remove('busy');
       if(r && r.items){ planData = r; planErr = ''; }
       renderPlan(); if(done) done(r);
+      if(window.fwBig) window.fwBig.load();
     }).withFailureHandler(err => {
       planBusy = false; planEl.classList.remove('busy');
       planErr = 'Not saved: ' + errText(err); renderPlan();
@@ -15673,7 +15710,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
   }
   function retry(){ if(cal){ refetchFresh(); loadPlan(true); } else start(); }
-  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, api: () => cal, planDrag: () => planDrag };
+  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');
@@ -15707,6 +15744,153 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // window listener (phase 3b). The workspace never saw the touchstart, so its swipe handlers stay idle.
   ['touchstart','pointerdown','keydown','keyup','input'].forEach(n => panel.addEventListener(n, e => e.stopPropagation(), {passive: true}));
   window.addEventListener('resize', () => { if(cal && isOpen()) cal.updateSize(); });
+})();
+</script>
+<!-- Big Three strip (2026-11-08, Julius: "Big Three / Biggest Return"). A thin standing list at the top of Today:
+     up to 3 links (a Gantt task by tid, or a project = Reference card) from the Plan tab group 'big' (no date, same
+     every day), plus the Waiting list ('next', ranked). Nothing is copied. When a Big Three task is ticked done the strip
+     suggests the top waiting item; Julius confirms (✓) or dismisses (✕). Bubbling is silent otherwise.
+     Adding: hold a task's checkbox → ★ Big Three / ⏳ Waiting list; ★ on a Reference card adds the card as a project.
+     Server: getPlan / planSave (types upsert / remove / moveup) in Code.gs. Design: docs/NOTES.md → "Planning model". -->
+<style>
+  #b3Strip{flex:0 0 auto;padding:2px 6px 3px;border-bottom:1px solid var(--divider,#ccc);font-size:.86em;line-height:1.3;}
+  #b3Strip[hidden]{display:none;}
+  #b3Strip .b3-r{display:flex;align-items:center;gap:6px;min-height:22px;cursor:pointer;border-radius:5px;padding:0 2px;}
+  #b3Strip .b3-r:hover{background:color-mix(in srgb,var(--accent,#1a73e8) 8%,transparent);}
+  #b3Strip .b3-n{flex:0 0 auto;font-weight:700;color:#d99a00;min-width:1.6em;}
+  #b3Strip .b3-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #b3Strip .b3-r.done .b3-t{text-decoration:line-through;opacity:.6;}
+  #b3Strip .b3-k{flex:0 0 auto;font-size:.8em;color:var(--muted,#888);}
+  #b3Strip .b3-dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:transparent;}
+  #b3Strip .b3-dot.u1{background:#e5484d;} #b3Strip .b3-dot.u2{background:#d99a00;} #b3Strip .b3-dot.u3{background:#3b82f6;}
+  #b3Strip input[type=checkbox]{flex:0 0 auto;margin:0;width:14px;height:14px;}
+  #b3Strip .b3-e{color:var(--muted,#888);font-style:italic;}
+  #b3Strip .b3-up{display:flex;align-items:center;gap:6px;margin:2px 0 1px;padding:2px 6px;border-radius:6px;background:color-mix(in srgb,#d99a00 12%,transparent);}
+  #b3Strip .b3-up span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #b3Strip .b3-up button{font:inherit;border:1px solid var(--divider,#ccc);background:transparent;color:inherit;border-radius:999px;min-width:30px;min-height:24px;cursor:pointer;}
+  #b3Strip .b3-wait{font-size:.8em;color:var(--muted,#888);padding-left:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #todayPane.pane-narrow #b3Strip{padding:2px 3px;}
+  #todayPane.pane-narrow #b3Strip .b3-r{gap:3px;}
+  .b3-flash{outline:2px solid #d99a00!important;outline-offset:2px;transition:outline-color .6s;}
+  .urg-b3row{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;}
+  .urg-b3row .urg-goto.on{font-weight:700;}
+</style>
+<script>
+(function(){
+  const strip = document.getElementById('b3Strip');
+  if(!strip) return;
+  const today = () => { try { return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles'}).format(new Date()); } catch(e){ return new Date().toISOString().slice(0,10); } };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const say = m => { if(typeof setStatus === 'function') setStatus(m); };
+  let data = null, busy = false, dismissed = new Set(), loadedAt = 0;
+  // A Reference card as a project: its title + urgency ceiling (most urgent open line; stored 1 = red).
+  window.fwCardInfo = function(id){
+    const w = document.querySelector('#referenceTree .ref-cell-wrapper[data-id="' + CSS.escape(id) + '"]');
+    if(!w) return {title:'', urg:0, el:null};
+    const cell = w.querySelector(':scope > .ref-cell');
+    const h = cell && cell.querySelector('h1,h2,h3,[data-title]');
+    const title = ((h ? h.textContent : (cell ? cell.textContent : '')) || '').replace(/\s+/g,' ').trim().slice(0,120);
+    let urg = 0;
+    if(cell) cell.querySelectorAll('.check-line[data-urg]').forEach(l => {
+      const u = Number(l.dataset.urg), on = l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked;
+      if(!on && u >= 1 && u <= 3 && (!urg || u < urg)) urg = u;
+    });
+    return {title, urg, el:w};
+  };
+  const liveLine = tid => document.querySelector('#todayScroll .check-line[data-tid="' + CSS.escape(tid) + '"], #journalScroll .check-line[data-tid="' + CSS.escape(tid) + '"], #referenceTree .check-line[data-tid="' + CSS.escape(tid) + '"]');
+  function view(it){
+    if(it.ref.indexOf('card:') === 0){
+      const c = window.fwCardInfo(it.ref.slice(5));
+      return {title: c.title || it.title || 'Project', urg: c.urg, kind: 'project', done: false, tick: false};
+    }
+    if(it.ref.indexOf('tid:') === 0){
+      const tid = it.ref.slice(4), inf = window.fwTasks ? window.fwTasks.info(tid) : null, l = liveLine(tid);
+      return {title: (inf && inf.text) || it.title || '(task)', urg: l ? Number(l.dataset.urg) || 0 : 0, kind: 'task', done: !!(inf && inf.done), tick: !!inf};
+    }
+    return {title: it.title || '(event)', urg: 0, kind: 'event', done: !!(it.ev && it.ev.done), tick: false};
+  }
+  const group = g => ((data && data.items) || []).filter(x => x.group === g).sort((a,b) => a.rank - b.rank);
+  function render(){
+    const big = group('big'), wait = group('next');
+    if(!data){ strip.hidden = true; return; }
+    strip.hidden = false;
+    let h = '';
+    if(!big.length) h = '<div class="b3-e" title="Hold a task’s checkbox → ★ Big Three, or tap ★ on a Reference card">★ Big Three — hold a task’s checkbox → ★ Big Three</div>';
+    big.forEach((it, i) => {
+      const v = view(it);
+      h += '<div class="b3-r' + (v.done ? ' done' : '') + '" data-b3-ref="' + esc(it.ref) + '" data-b3-id="' + esc(it.id) + '" title="Tap to jump to it">' +
+        (v.tick ? '<input type="checkbox" data-b3-done' + (v.done ? ' checked' : '') + ' aria-label="Done">' : '') +
+        '<span class="b3-n">★' + (i + 1) + '</span><span class="b3-t">' + esc(v.title) + '</span>' +
+        '<span class="b3-dot' + (v.urg ? ' u' + v.urg : '') + '"></span>' + (v.kind === 'project' ? '<span class="b3-k" title="Project (Reference card)">📁</span>' : '') + '</div>';
+    });
+    // Bubble up: a finished Big Three item → suggest the top of the Waiting list (confirm ✓ / dismiss ✕).
+    const fin = big.find(it => view(it).done && !dismissed.has(it.id));
+    if(fin && wait.length){
+      const up = wait[0];
+      h += '<div class="b3-up" data-b3-fin="' + esc(fin.id) + '" data-b3-upid="' + esc(up.id) + '"><span>Move up: ' + esc(view(up).title) + '?</span>' +
+        '<button type="button" data-b3-act="up" aria-label="Move it up">✓</button><button type="button" data-b3-act="dismiss" aria-label="Not now">✕</button></div>';
+    }
+    if(wait.length) h += '<div class="b3-wait">⏳ Waiting: ' + wait.length + ' · next: ' + esc(view(wait[0]).title) + '</div>';
+    if(strip.innerHTML !== h) strip.innerHTML = h;
+    document.querySelectorAll('#referenceTree .ref-cell-wrapper > .ref-b3').forEach(b => {
+      const id = b.parentElement.dataset.id, g = groupOf('card:' + id);
+      b.classList.toggle('on', !!g); b.title = g ? 'In the ' + (g === 'big' ? 'Big Three' : 'Waiting list') + ' — tap to take it out' : 'Add this project to the Big Three (or the Waiting list when full)';
+    });
+  }
+  function groupOf(ref){ const x = ((data && data.items) || []).find(it => it.ref === ref && (it.group === 'big' || it.group === 'next')); return x ? x.group : ''; }
+  function load(){
+    if(!(window.google && google.script && google.script.run)) return;
+    google.script.run.withSuccessHandler(r => { if(r && Array.isArray(r.items)){ data = r; loadedAt = Date.now(); render(); } })
+      .withFailureHandler(() => {}).getPlan(today());
+  }
+  function op(o, okMsg){
+    if(busy || !(window.google && google.script && google.script.run)) return;
+    busy = true;
+    google.script.run.withSuccessHandler(r => {
+      busy = false; if(r && Array.isArray(r.items)) data = r; render(); if(okMsg) say(okMsg);
+      if(window.fwCalendar && window.fwCalendar.isOpen() && window.fwCalendar.plan) window.fwCalendar.plan();
+    }).withFailureHandler(err => { busy = false; say('Not saved: ' + ((err && err.message) || err)); }).planSave(Object.assign({date: today()}, o));
+  }
+  function add(ref, title, g){
+    if(!data){ say('Big Three is still loading — try again in a moment'); load(); return; }
+    let target = g || 'big';
+    if(target === 'big' && group('big').filter(x => x.ref !== ref).length >= 3){ target = 'next'; say('Big Three is full — added to the Waiting list'); }
+    op({type: 'upsert', item: {group: target, ref, title}}, target === 'big' ? 'Added to the Big Three ★' : (g === 'next' ? 'Added to the Waiting list ⏳' : ''));
+  }
+  function remove(ref){
+    const x = ((data && data.items) || []).find(it => it.ref === ref && (it.group === 'big' || it.group === 'next'));
+    if(x) op({type: 'remove', id: x.id}, 'Taken out of the ' + (x.group === 'big' ? 'Big Three' : 'Waiting list'));
+  }
+  window.fwBig = {
+    load, render, add, remove, groupOf,
+    toggle(ref, title){ if(groupOf(ref)) remove(ref); else add(ref, title, 'big'); },
+    data: () => data
+  };
+  strip.addEventListener('click', e => {
+    const act = e.target.closest('[data-b3-act]');
+    if(act){
+      const box = act.closest('.b3-up');
+      if(act.dataset.b3Act === 'up') op({type: 'moveup', doneId: box.dataset.b3Fin, upId: box.dataset.b3Upid}, 'Moved up ★');
+      else { dismissed.add(box.dataset.b3Fin); render(); }
+      return;
+    }
+    const cb = e.target.closest('[data-b3-done]'), row = e.target.closest('[data-b3-ref]');
+    if(!row) return;
+    const ref = row.dataset.b3Ref;
+    if(cb){ if(ref.indexOf('tid:') === 0 && window.fwTasks){ window.fwTasks.setDone(ref.slice(4), cb.checked); setTimeout(render, 150); } return; }
+    // Tap → jump to the task / project card.
+    let el = null;
+    if(ref.indexOf('tid:') === 0) el = liveLine(ref.slice(4));
+    else if(ref.indexOf('card:') === 0) el = window.fwCardInfo(ref.slice(5)).el;
+    if(!el){ say('Not loaded on this screen'); return; }
+    el.scrollIntoView({block: 'center', behavior: 'smooth'});
+    el.classList.add('b3-flash'); setTimeout(() => el.classList.remove('b3-flash'), 1400);
+  });
+  // Keep ticks in step: any checkbox change re-reads done states (cheap; no server call).
+  let t = 0;
+  document.addEventListener('change', e => { if(e.target && e.target.type === 'checkbox' && !strip.contains(e.target)){ clearTimeout(t); t = setTimeout(render, 200); } }, true);
+  document.addEventListener('visibilitychange', () => { if(!document.hidden && Date.now() - loadedAt > 5 * 60000) load(); });
+  setTimeout(load, 1800);
 })();
 </script>
 </body>

@@ -55,7 +55,7 @@ const extract=(start,end)=>html.slice(html.indexOf(start),html.indexOf(end,html.
 const calls=[],statuses=[];
 const run={withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(fn){this.fail=fn;return this;},
   saveReferenceItem(payload){calls.push({payload,ok:this.ok,fail:this.fail});}};
-const client=vm.createContext({console,google:{script:{run}},document:{querySelector:()=>null},CSS:{escape:s=>s},
+const client=vm.createContext({console,window:{},fwDraftPrepareRef(){},fwDraftCaptureRef(){return null;},google:{script:{run}},document:{querySelector:()=>null},CSS:{escape:s=>s},
   setStatus:s=>statuses.push(s),fwCheckBuild(){},fwReconcileRef(){}});
 vm.runInContext('let refInFlight=0,fwRefEpoch=0;'+extract('  function refBase(item){','  /* Cell HTML')+extract('  function sendRefItem(item,onOk,onErr){','  /* Newer app version'),client);
 const item={id:'r1',parentId:'',expanded:true,content:'same',ch:'h:same',title:'',sort:1};

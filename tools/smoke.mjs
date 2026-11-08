@@ -41,6 +41,7 @@ const stub = `<script>window.google={script:{run:new Proxy({},{get(t,k){let ok=n
   return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='runImports'||m==='getSyncState'?${JSON.stringify(imported)}:m==='getFocus'?${JSON.stringify(focus)}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
 let html = fs.readFileSync('Index.html', 'utf8')
   .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
+  .replace("<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>", fs.readFileSync('Drafts.html', 'utf8'))
   .replace('<?!= initialData ?>', JSON.stringify(data)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')
   .replace('<head>', '<head>' + stub);
 const out = path.join(os.tmpdir(), 'gantt-smoke.html');
@@ -715,6 +716,57 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   if (errs.length) { fails += errs.length; console.error('✗ ' + name + ':\n  ' + errs.join('\n  ')); }
   else console.log('✓ ' + name + ': loads with no page errors');
 }
+// Recovery after an actual page close/reopen, using the same local storage and changed server fixtures.
+if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}],['phone',{width:412,height:915,isMobile:true,hasTouch:true}]]){
+  const ctx=await b.newContext({viewport:{width:view.width,height:view.height},isMobile:view.isMobile,hasTouch:view.hasTouch});
+  await ctx.addInitScript(()=>{window.__draftFail=false;window.confirm=()=>true;});
+  const errors=[],file=path.join(os.tmpdir(),'gantt-recovery-smoke.html');
+  const draftStub=`<script>window.google={script:{run:new Proxy({},{get(t,k){let ok,bad;const p=new Proxy({},{get(_,m){
+    if(m==='withSuccessHandler')return f=>{ok=f;return p;};if(m==='withFailureHandler')return f=>{bad=f;return p;};
+    return(...a)=>{(window.__calls||=[]).push([m,a]);setTimeout(()=>{
+      if(window.__draftFail && (m==='saveDay'||m==='saveReferenceItem')){bad&&bad(new Error('offline test'));return;}
+      ok&&ok(m==='saveDay'?{th:'accepted-t',jh:'accepted-j',build:'smoke'}:m==='saveReferenceItem'?{id:a[0].id,ch:'accepted-r',meta:{parentId:'',expanded:true},metaConflicts:[],build:'smoke'}:m==='getFocus'?{v:1,cats:[]}:m==='getMainCalendarEvents'?{date:a[0],events:[]}:m==='getSyncState'||m==='runImports'?{build:'smoke',days:{},ref:{}}:null);
+    },15);};}});return p[k];}})}};</script>`;
+  function draftPage(changed=false,empty=false){
+    const d={today,inbox:[],cardCats:[],notesSeeds:{},urgent:[],refPins:[],timing:{total:1,steps:{},fast:false},
+      days:[{date:today,tasks:'<p>'+(changed?'Other device day':'Original day')+'</p>',journal:'',th:changed?'h1':'h0',jh:'j0'}],
+      reference:empty?[]:[{id:'recover-ref',parentId:'',type:'item',title:'Reference',sort:1,expanded:true,content:'<h2>Reference</h2><p>'+(changed?'Other device ref':'Original ref')+'</p>',ch:changed?'r1':'r0'}]};
+    fs.writeFileSync(file,fs.readFileSync('Index.html','utf8')
+      .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>",fs.readFileSync('WeekdayIcons.html','utf8'))
+      .replace("<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>",fs.readFileSync('Drafts.html','utf8'))
+      .replace('<?!= initialData ?>',JSON.stringify(d)).replace(/<\?= appUrl \?>/g,'https://script.google.com/macros/s/recovery-smoke/dev').replace('<?= build ?>','smoke').replace('<head>','<head>'+draftStub));
+  }
+  const open=async()=>{const pg=await ctx.newPage();pg.on('pageerror',e=>errors.push(e.message));await pg.goto('file://'+file);await pg.waitForTimeout(2200);return pg;};
+  try{
+    draftPage();let pg=await open();
+    await pg.evaluate(date=>{
+      window.__draftFail=true;
+      const day=document.querySelector('#todayScroll .day-editor[data-date="'+date+'"]');day.innerHTML='<p>Recovered day edit</p>';day.dispatchEvent(new Event('input',{bubbles:true}));
+      const ref=document.querySelector('#referenceTree .ref-cell-wrapper[data-id="recover-ref"] > .ref-cell');ref.innerHTML='<h2>Reference</h2><p>Recovered ref edit</p>';ref.dispatchEvent(new Event('input',{bubbles:true}));
+    },today);
+    await pg.waitForTimeout(1000);await pg.close();
+    draftPage(true);pg=await open();
+    if(!await pg.evaluate(()=>fwDrafts.list().some(e=>e.kind==='day') && fwDrafts.list().some(e=>e.kind==='ref')))throw Error('unsent day/ref copies not found after reopen');
+    if(!await pg.evaluate(()=>document.querySelector('#todayScroll .day-editor').textContent.includes('Other device day') && !document.querySelector('#todayScroll .day-editor').textContent.includes('Recovered day edit')))throw Error('recovery changed server content before review');
+    await pg.locator('#fwDraftNotice button').click();await pg.locator('dialog [data-draft-kind="day"] button').first().click();
+    await pg.waitForTimeout(1100);
+    if(!await pg.evaluate(()=>{const t=document.querySelector('#todayScroll .day-editor').textContent;return t.includes('Recovered day edit')&&t.includes('Other device day');}))throw Error('day recovery lost draft or remote text');
+    await pg.waitForFunction(()=>!fwUnsaved());
+    await pg.locator('#fwDraftNotice button').click();await pg.locator('dialog [data-draft-kind="ref"] button').first().click();await pg.waitForTimeout(1100);
+    if(!await pg.evaluate(()=>{const t=document.querySelector('#referenceTree .ref-cell').textContent;return t.includes('Recovered ref edit')&&t.includes('Other device ref');}))throw Error('Reference recovery lost draft or remote text');
+    await pg.waitForFunction(()=>!fwUnsaved() && fwDrafts.list().length===0);
+    await pg.evaluate(()=>fwDrafts.put('ref','deleted-ref',{base:{c:'<h2>Deleted</h2>',h:'old'},content:'<h2>Deleted recovery</h2><p>Keep this text</p>'},'Deleted Reference'));
+    await pg.close();draftPage(true,true);pg=await open();
+    const count=await pg.evaluate(()=>(window.__calls||[]).filter(c=>c[0]==='addReferenceItem').length);
+    await pg.locator('#fwDraftNotice button').click();await pg.locator('dialog [data-draft-kind="ref"] button').first().click();
+    if(!await pg.evaluate(()=>fwDrafts.list().some(e=>e.id==='deleted-ref')))throw Error('deleted Reference recovery was discarded');
+    if(await pg.evaluate(()=>(window.__calls||[]).filter(c=>c[0]==='addReferenceItem').length)!==count)throw Error('deleted Reference was recreated automatically');
+    await pg.locator('dialog [data-draft-kind="ref"] button').nth(1).click();
+    if(!await pg.evaluate(()=>fwDrafts.list().length===0))throw Error('explicit discard did not remove the selected copy');
+  }catch(e){errors.push(e.message);}
+  if(errors.length){fails+=errors.length;console.error('✗ drafts '+name+': '+errors.join(' | '));}else console.log('✓ drafts '+name+': closed-page recovery, remote merge, reviewed saves and deleted-card retention');
+  await ctx.close();
+}
 // Time Tracker (2026-11-05): tracker/App.html with Core inlined and an in-page fake trackerSync (last write wins,
 // like tracker/Server.gs). Walks the acceptance scenarios on desktop and phone. Core logic: tools/tracker-test.mjs.
 {
@@ -932,6 +984,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     calData.reference.push({ id: 'r-und', parentId: '', type: 'item', title: 'Undated Tasks', content: '<h2>Undated Tasks</h2>' + line('Fix bike'), expanded: true, sort: 2 });
     const cHtml = fs.readFileSync('Index.html', 'utf8')
       .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
+      .replace("<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>", fs.readFileSync('Drafts.html', 'utf8'))
       .replace('<?!= initialData ?>', JSON.stringify(calData)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')
       .replace('<head>', '<head>' + calStub.replace('<script>', '<script>window.__focus=' + JSON.stringify(focus) + ';'));
     const cOut = path.join(os.tmpdir(), 'gantt-cal-smoke.html');

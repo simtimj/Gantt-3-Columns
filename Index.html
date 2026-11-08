@@ -2496,6 +2496,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <button class="btn" type="button" tabindex="-1" data-ctx="title" title="Make this line a title: − / + folds the lines under it, down to the next empty line">▤ Title</button>
 </div>
 <?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>
+<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>
 <script>
   /* Filled in by Apps Script (Code.gs doGet), so the first screen needs no
      extra server request. If it is missing, the page loads the data itself. */
@@ -2738,6 +2739,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     { const placeAi = () => typeof tsecPlaceAi === 'function' ? tsecPlaceAi() : setTimeout(placeAi,100); setTimeout(placeAi,0); } // lives in a later <script>
     renderReference();
     applyReferenceCollapseState();
+    fwDraftInit();
     if(window.scratchShow) window.scratchShow();
     initUrgentSource(data.urgent);
     setInbox(data.inbox);
@@ -5219,12 +5221,110 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* =========================================================
      DAY SAVING
      ========================================================= */
+  let fwDraftStarted=false;
+  function fwDraftCaptureDay(date){
+    if(!window.fwDrafts || !fwDraftStarted)return null;
+    const base=fwDayBase(date),info=daySaveState.get(date),prior=fwDrafts.peek('day',date)?.payload,fields={};
+    for(const col of ['tasks','journal']){
+      const ed=dayEditorFor(date,col);if(!ed)continue;
+      const mine=cardCleanHtml(ed),sent=info?.sent;
+      let from={...base[col]};
+      if(prior?.fields?.[col]?.sourceHash===base[col].h)from={...prior.fields[col].base};
+      const changed=col==='tasks'?sent?.ct:sent?.cj;
+      if(info?.inFlight && changed && mine!==sent[col])from={t:sent[col],h:null};
+      if(mine!==from.t || prior?.fields?.[col])fields[col]={base:from,mine,sourceHash:base[col].h};
+    }
+    if(!Object.keys(fields).length)return null;
+    return fwDrafts.put('day',date,{fields},'Day '+date);
+  }
+  function fwDraftCaptureRef(item){
+    if(!window.fwDrafts || !fwDraftStarted)return null;
+    const b=refBase(item),prior=fwDrafts.peek('ref',String(item.id))?.payload;
+    let base={...b};
+    if(prior?.sourceHash===b.h)base={...prior.base};
+    if(item._refSaving && item._refSent?.contentChanged && item.content!==item._refSent.content)base={c:item._refSent.content,h:null};
+    if(item.content===base.c && !prior && !item._refDeleted)return null;
+    return fwDrafts.put('ref',String(item.id),{base,sourceHash:b.h,content:item.content || ''},'Reference: '+referenceTitle(item).slice(0,100));
+  }
+  function fwDraftPrepareDay(date){
+    const fields=window.fwDrafts?.peek('day',date)?.payload?.fields,b=fwDayBase(date);
+    for(const col of ['tasks','journal'])if(fields?.[col]?.sourceHash===b[col].h)b[col].t=fields[col].base.t;
+  }
+  function fwDraftPrepareRef(item){
+    const p=window.fwDrafts?.peek('ref',String(item.id))?.payload,b=refBase(item);
+    if(p && p.sourceHash===b.h)b.c=p.base.c;
+  }
+  function fwDraftInit(){
+    if(fwDraftStarted || !window.fwDrafts)return;fwDraftStarted=true;
+    const notice=document.createElement('div');notice.id='fwDraftNotice';
+    notice.style.cssText='position:fixed;bottom:44px;right:8px;z-index:99998;background:var(--bg,#fff);color:var(--text,#111);border:1px solid #888;border-radius:8px;padding:8px;max-width:min(420px,calc(100vw - 16px));font-size:12px;display:none';
+    const text=document.createElement('span'),review=document.createElement('button');review.className='btn tiny';review.textContent='Review';review.onclick=fwDraftReview;notice.append(text,review);document.body.append(notice);
+    const update=()=>{const n=fwDrafts.list().length,problem=fwDrafts.problem();text.textContent=problem || (n+' unsaved '+(n===1?'copy':'copies')+' from this device. ');notice.style.display=n||problem?'':'none';};
+    fwDrafts.subscribe(update);fwDrafts.init(document.querySelector('.refresh-btn')?.getAttribute('href') || location.href);update();
+    const capture=()=>{for(const [date,info] of daySaveState)if(info.pending||info.inFlight)fwDraftCaptureDay(date);
+      (state.reference||[]).forEach(item=>{if(item._timer||item._refSaving||item._refDeleted)fwDraftCaptureRef(item);});};
+    window.addEventListener('pagehide',capture);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')capture();});
+  }
+  function fwDraftPreview(entry){
+    const p=entry.payload,html=entry.kind==='ref'?p.content:Object.entries(p.fields||{}).map(([k,f])=>k+':\n'+f.mine).join('\n\n');
+    return String(html || '').replace(/<br\b[^>]*>/gi,'\n').replace(/<\/(?:div|p|h[1-6]|li)>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  }
+  function fwDraftReview(){
+    const dialog=document.createElement('dialog');dialog.style.cssText='width:min(640px,90vw);max-height:80vh;overflow:auto;border:1px solid #888;border-radius:10px;background:var(--bg,#fff);color:var(--text,#111)';
+    const heading=document.createElement('h3');heading.textContent='Unsaved device copies';dialog.append(heading);
+    for(const entry of fwDrafts.list()){
+      const row=document.createElement('div');row.dataset.draftKind=entry.kind;row.style.cssText='border-top:1px solid #aaa;padding:10px 0';
+      const label=document.createElement('p');label.textContent=entry.label+' · '+new Date(entry.at).toLocaleString();row.append(label);
+      const preview=document.createElement('textarea');preview.readOnly=true;preview.value=fwDraftPreview(entry);preview.style.cssText='width:100%;height:110px;box-sizing:border-box';row.append(preview);
+      const restore=document.createElement('button');restore.className='btn';restore.textContent='Restore';
+      restore.onclick=async()=>{restore.disabled=true;try{if(await fwDraftRestore(entry)){dialog.close();dialog.remove();}}catch(e){setStatus('Recovery kept: '+e.message);}finally{restore.disabled=false;}};
+      const discard=document.createElement('button');discard.className='btn';discard.textContent='Discard';discard.onclick=()=>{if(confirm('Discard this saved device copy?') && fwDrafts.discard(entry))row.remove();};
+      row.append(restore,discard);dialog.append(row);
+    }
+    const download=document.createElement('button');download.className='btn';download.textContent='Download copies';download.onclick=()=>{
+      const url=URL.createObjectURL(new Blob([fwDrafts.exportData()],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='gantt-recovery-copies.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    };
+    const close=document.createElement('button');close.className='btn';close.textContent='Close';close.onclick=()=>dialog.close();dialog.append(download,close);dialog.onclose=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
+  }
+  async function fwDraftRestore(entry){
+    if(fwUnsaved()){setStatus('Finish saving current edits before restoring a copy');return false;}
+    if(entry.kind==='day'){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(entry.id))throw Error('Invalid day');
+      if(!state.days.some(d=>d.date===entry.id)){
+        const rows=await new Promise((ok,bad)=>google.script.run.withSuccessHandler(ok).withFailureHandler(bad).getDaysRange(entry.id,entry.id));
+        if(fwUnsaved()){setStatus('Finish saving current edits before restoring a copy');return false;}
+        const row=rows.find(d=>d.date===entry.id)||{date:entry.id,tasks:'',journal:'',th:null,jh:null};mergeDays([row]);fwSetDayBase(row,true);renderDays();
+      }
+      const pending=[];let conflict=false;
+      for(const col of ['tasks','journal']){
+        const f=entry.payload.fields?.[col];if(!f)continue;
+        if(typeof f.mine!=='string' || typeof f.base?.t!=='string')throw Error('Unreadable copy');
+        const ed=dayEditorFor(entry.id,col);if(!ed)throw Error('Open this day before restoring it');
+        const m=fwMerge3(fwBlocks(f.base.t),fwBlocks(f.mine),fwBlocks(cardCleanHtml(ed)));conflict ||= m.conflict;pending.push([ed,m.blocks.join('')]);
+      }
+      if(!pending.length)throw Error('No saved text');
+      if(conflict && !confirm('These lines also changed elsewhere. Restore both versions for review?'))return false;
+      if(!fwDrafts.adopt(entry))throw Error('Could not keep a recovery copy; download it first');
+      pending.forEach(([ed,html])=>replaceEditorHtml(ed,html));scheduleDaySave(entry.id);
+    }else if(entry.kind==='ref'){
+      const item=state.reference.find(it=>String(it.id)===entry.id),p=entry.payload;
+      if(!item){setStatus('This card was deleted. Copy its preview or download it before adding a new card.');return false;}
+      if(typeof p.content!=='string' || typeof p.base?.c!=='string')throw Error('Unreadable copy');
+      const cell=document.querySelector('#referenceTree .ref-cell-wrapper[data-id="'+CSS.escape(entry.id)+'"] > .ref-cell');if(!cell)throw Error('Open Reference before restoring');
+      const m=fwMerge3(fwBlocks(p.base.c),fwBlocks(p.content),fwBlocks(cardCleanHtml(cell)));
+      if(m.conflict && !confirm('These lines also changed elsewhere. Restore both versions for review?'))return false;
+      if(!fwDrafts.adopt(entry))throw Error('Could not keep a recovery copy; download it first');
+      replaceEditorHtml(cell,m.blocks.join(''));saveRefFromDom(item.id);
+    }else throw Error('Unknown copy type');
+    setStatus('Recovered device copy — saving');return true;
+  }
   function scheduleDaySave(date){
     if(!date) return;
     clearTimeout(saveTimers[date]);
     const info=daySaveState.get(date)||{inFlight:false,pending:false};
     info.pending=true;
     daySaveState.set(date,info);
+    fwDraftCaptureDay(date);
     setStatus('Unsaved…');
     saveTimers[date]=setTimeout(()=>saveDay(date),700);
   }
@@ -5429,10 +5529,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     /* Safe save (2026-10-29): send the version each column started from; the server only writes a
        column that hasn't changed elsewhere, and sends back anything that did so it can be merged. */
     const b=fwDayBase(date);
+    fwDraftPrepareDay(date);
     const opts={th:b.tasks.h,jh:b.journal.h,ct:!!t&&tasks!==b.tasks.t,cj:!!j&&journal!==b.journal.t};
+    info.sent={tasks,journal,ct:opts.ct,cj:opts.cj};
+    const draft=fwDraftCaptureDay(date);
     google.script.run
       .withSuccessHandler(res=>{
         info.inFlight=false;
+        info.sent=null;
         let note='';
         if(res && typeof res==='object'){
           fwCheckBuild(res.build);
@@ -5440,6 +5544,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           if(opts.cj && !res.conflictJ) b.journal={t:journal,h:res.jh};
           if(res.tasks!==undefined) note=fwReconcileDay(date,'tasks',res.tasks,res.th)||note;
           if(res.journal!==undefined) note=fwReconcileDay(date,'journal',res.journal,res.jh)||note;
+          if(!res.conflictT && !res.conflictJ) window.fwDrafts?.ack(draft);
         }
         if(info.pending){
           saveDay(date);
@@ -5657,12 +5762,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     fwRefEpoch++;
     const next = () => {
       item._refSaving = false;
+      item._refSent = null;
       const queued = item._refQueue || [];
       item._refQueue = [];
       if(queued.length) sendRefItem(item,
         id => queued.forEach(cb => { if(cb.onOk) cb.onOk(id); }),
         err => { queued.forEach(cb => { if(cb.onErr) cb.onErr(err); }); setStatus('Save error: ' + err.message); });
     };
+    fwDraftPrepareRef(item);
     const b = refBase(item);
     const meta = {parentId:String(item.parentId || ''),expanded:item.expanded !== false};
     const metaChanges = {};
@@ -5674,6 +5781,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     };
     // Cell made in this tab: no server hash yet, so let the server check against the text it was made with (2026-10-31).
     if(!b.h) payload.baseText = b.c;
+    item._refSent = {content:payload.content,contentChanged:payload.contentChanged};
+    const draft = fwDraftCaptureRef(item);
     refInFlight++;
     google.script.run
       .withSuccessHandler(res => {
@@ -5683,6 +5792,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           fwCheckBuild(res.build);
           if(res.deleted){
             item._refDeleted = true;
+            fwDraftCaptureRef(item);
             item._refQueue = [];
             setStatus('Card deleted elsewhere — your text is kept here; copy it or remove this local card before refreshing');
             return;
@@ -5703,7 +5813,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           }
           if(payload.contentChanged && !res.conflict) item._b = {c:payload.content || '',h:res.ch};
           else if(!payload.contentChanged && res.content === undefined) item._b.h = res.ch;
-          if(res.content !== undefined){ fwReconcileRef(item,res.content,res.ch); return; }
+          if(res.content !== undefined){ fwReconcileRef(item,res.content,res.ch); if(!res.conflict && !res.metaConflicts?.length) window.fwDrafts?.ack(draft); return; }
+          if(!res.conflict && !res.metaConflicts?.length) window.fwDrafts?.ack(draft);
         }
         if(res && res.metaConflicts && res.metaConflicts.length){
           setStatus('Reference changed elsewhere — refresh to check its location/open state');
@@ -6338,6 +6449,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const refCell = wrap.querySelector(':scope > .ref-cell');
     refCell?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
     item.content = writeReferenceMetadata(refCell ? cardCleanHtml(refCell) : '',Date.now());
+    fwDraftCaptureRef(item);
     if(refCell && isBacklogItem(item)) noteUrgentDay('backlog',refCell.innerHTML,true,'backlog');
     clearTimeout(
       item._timer

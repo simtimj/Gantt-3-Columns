@@ -1,0 +1,61 @@
+<script>
+// Per-page writers never share a draft key. The next page can review all unfinished copies.
+// Only exact acknowledgements clear a draft; normal saves and newer server data remain authoritative.
+window.fwDrafts = (() => {
+  let prefix='',owner='',storage=null,problem='',historical=new Set();
+  const current=new Map(),listeners=new Set();
+  const unique=()=>window.crypto?.randomUUID?.() || Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+  const notify=()=>listeners.forEach(fn=>{try{fn();}catch(e){}});
+  const fail=e=>{if(!problem){problem='This browser could not keep a recovery copy. Keep this page open until it says Saved.';notify();}};
+  const parse=(key,raw)=>{
+    const e=JSON.parse(raw);
+    if(!e || e.v!==1 || !['day','ref'].includes(e.kind) || typeof e.id!=='string' || !e.payload || typeof e.payload!=='object' || typeof e.rev!=='string') throw Error('Invalid recovery copy');
+    return {...e,key};
+  };
+  function init(scope){
+    prefix='fw.workspace.drafts.v1:'+encodeURIComponent(String(scope).split('?')[0].replace(/\/(dev|exec)$/,''))+':';
+    owner=unique(); historical=new Set();current.clear();problem='';
+    try{storage=window.localStorage;for(let i=0;i<storage.length;i++){const k=storage.key(i);if(k?.startsWith(prefix))historical.add(k);}}
+    catch(e){storage=null;fail(e);}
+    notify();
+  }
+  const keyFor=(kind,id)=>prefix+owner+':'+kind+':'+encodeURIComponent(id);
+  function put(kind,id,payload,label){
+    const key=keyFor(kind,id),previous=current.get(key);
+    if(previous && !previous.volatile && previous.label===String(label||id) && JSON.stringify(previous.payload)===JSON.stringify(payload))return {key,rev:previous.rev};
+    const entry={v:1,kind,id:String(id),payload,label:String(label||id),at:Date.now(),rev:unique()};
+    const raw=JSON.stringify(entry);current.set(key,{...JSON.parse(raw),key});
+    try{if(!storage)throw Error('Storage unavailable');storage.setItem(key,raw);return {key,rev:entry.rev};}
+    catch(e){current.get(key).volatile=true;fail(e);return {key,rev:entry.rev,volatile:true};}
+  }
+  function ack(token){
+    if(!token || current.get(token.key)?.rev!==token.rev)return false;
+    try{if(!storage)throw Error('Storage unavailable');storage.removeItem(token.key);current.delete(token.key);return true;}
+    catch(e){fail(e);return false;}
+  }
+  function list(){
+    const result=[];
+    for(const key of historical){try{const raw=storage?.getItem(key);if(raw)result.push(parse(key,raw));else historical.delete(key);}catch(e){fail(e);}}
+    return result.sort((a,b)=>b.at-a.at);
+  }
+  function discard(entry){
+    try{const raw=storage?.getItem(entry.key);if(!raw)return true;if(parse(entry.key,raw).rev!==entry.rev)return false;
+      storage.removeItem(entry.key);historical.delete(entry.key);notify();return true;
+    }catch(e){fail(e);return false;}
+  }
+  function adopt(entry){
+    const token=put(entry.kind,entry.id,entry.payload,entry.label);
+    if(token.volatile)return null;
+    // New durable copy exists before removing the selected old revision.
+    discard(entry);return token;
+  }
+  function exportData(){
+    const raw={};try{if(storage)for(let i=0;i<storage.length;i++){const k=storage.key(i);if(k?.startsWith(prefix))raw[k]=storage.getItem(k);}}catch(e){fail(e);}
+    current.forEach((v,k)=>{raw[k]=JSON.stringify(v);});
+    return JSON.stringify({v:1,copies:raw},null,2);
+  }
+  window.addEventListener('storage',e=>{if(e.key && historical.has(e.key))notify();});
+  return {init,put,ack,list,adopt,discard,exportData,peek:(kind,id)=>current.get(keyFor(kind,id)),
+    problem:()=>problem,subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn);}};
+})();
+</script>

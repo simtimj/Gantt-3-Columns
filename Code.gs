@@ -1365,18 +1365,39 @@ function saveCardCats(list) {
 // App items keep those fields on the item itself. arch = 'YYYY-MM-DD' archived day.
 // Focus Tracking dashboard (2026-11-01, Julius: phase 1). One JSON blob in script properties:
 // {v:1, cats:[{id,name,col, projects:[{id,title,why,col}]}]}. Render-only in the Notes cell, never in cell HTML.
-// Phase 2 (2026-11-01): projects carry tasks [{id:'m-…' (= data-tid), t, d:0|1}], so the JSON is split
-// into 8k chunks focusData_0..n-1 with the count in focusDataN (one property maxes out at ~9 KB).
+// Legacy numbered chunks remain readable. New saves stage UTF-8-bounded chunks under a unique
+// generation, verify them, then publish one head property. An interrupted staging write leaves
+// the previous complete list selected; leftover generations are cleaned on the next save.
+function focusGenerationText_(all, head) {
+  const fail = () => { throw new Error('Focus data could not be read; the saved list was not changed.'); };
+  if (!head || head.v !== 2 || !/^[a-zA-Z0-9-]{1,80}$/.test(head.g || '') ||
+      !Number.isInteger(head.n) || head.n < 1 || head.n > 200 || !Number.isInteger(head.len) || typeof head.h !== 'string') fail();
+  let raw = '';
+  for (let i = 0; i < head.n; i++) {
+    const part = all['focusV2_' + head.g + '_' + i];
+    if (typeof part !== 'string') fail();
+    raw += part;
+  }
+  if (raw.length !== head.len || cellHash_(raw) !== head.h) fail();
+  return raw;
+}
 function readFocus_() {
   const sp = PropertiesService.getScriptProperties(), all = sp.getProperties();
   let raw = '';
-  const n = Number(all.focusDataN || 0);
-  if (n > 0) { for (let i = 0; i < n; i++) {
-    if(typeof all['focusData_' + i] !== 'string') throw new Error('Focus data is incomplete; the saved list was not changed.');
-    raw += all['focusData_' + i];
-  } }
-  else raw = all.focusData || '';
   try {
+    if (all.focusDataHead !== undefined) raw = focusGenerationText_(all, JSON.parse(all.focusDataHead));
+    else {
+      const n = Number(all.focusDataN || 0);
+      if (!Number.isInteger(n) || n < 0 || n > 200) throw new Error('Invalid Focus chunk count');
+      if (all.focusDataN !== undefined && !String(all.focusDataN).trim()) throw new Error('Missing Focus chunk count');
+      if (!n && !all.focusData && Object.keys(all).some(k => /^focusData_\d+$/.test(k))) throw new Error('Uncounted Focus chunks');
+      if (n > 0) { for (let i = 0; i < n; i++) {
+        if(typeof all['focusData_' + i] !== 'string') throw new Error('Incomplete Focus data');
+        raw += all['focusData_' + i];
+      } }
+      else raw = all.focusData || '';
+      if (n && !raw) throw new Error('Empty Focus chunks');
+    }
     const data = raw ? JSON.parse(raw) : { v: 1, cats: [] };
     if(!data || !Array.isArray(data.cats)) throw new Error('Invalid Focus list');
     return data;
@@ -1448,13 +1469,42 @@ function writeFocus_(data) {
   const json = JSON.stringify(data || { v: 1, cats: [] });
   if (json.length > 200000) throw new Error('Focus data too big (' + json.length + ' chars)');
   const sp = PropertiesService.getScriptProperties();
-  const oldN = Number(sp.getProperty('focusDataN') || 0), props = {};
-  let n = 0;
-  for (let i = 0; i < json.length; i += 8000) props['focusData_' + (n++)] = json.slice(i, i + 8000);
-  props.focusDataN = String(n);
-  sp.setProperties(props);
-  for (let i = n; i < oldN; i++) sp.deleteProperty('focusData_' + i);
-  if (sp.getProperty('focusData') != null) sp.deleteProperty('focusData'); // phase-1 single property
+  const prior = sp.getProperties(), oldHeadRaw = prior.focusDataHead === undefined ? null : prior.focusDataHead;
+  const oldHead = oldHeadRaw === null ? null : JSON.parse(oldHeadRaw);
+  if (oldHeadRaw !== null) focusGenerationText_(prior,oldHead);
+  const generation = Utilities.getUuid(), prefix = 'focusV2_' + generation + '_';
+  if (Object.keys(prior).some(k => k.indexOf(prefix) === 0)) throw new Error('Focus save generation already exists; retry.');
+  // Reclaim interrupted or post-commit leftovers, never the selected generation.
+  const oldPrefix = oldHead ? 'focusV2_' + oldHead.g + '_' : '';
+  Object.keys(prior).filter(k => k.indexOf('focusV2_') === 0 && (!oldPrefix || k.indexOf(oldPrefix) !== 0))
+    .forEach(k => { try { sp.deleteProperty(k); } catch (e) {} });
+  const props = {}, parts = []; let part = '', bytes = 0;
+  for (const character of json) {
+    const code = character.codePointAt(0), size = code < 128 ? 1 : code < 2048 ? 2 : code < 65536 ? 3 : 4;
+    if (bytes + size > 8000) { parts.push(part); part = ''; bytes = 0; }
+    part += character; bytes += size;
+  }
+  if (part) parts.push(part);
+  parts.forEach((value,i) => { props[prefix + i] = value; });
+  const head = {v:2,g:generation,n:parts.length,len:json.length,h:cellHash_(json)}, headRaw = JSON.stringify(head);
+  try {
+    sp.setProperties(props);
+    const staged = sp.getProperties();
+    if ((staged.focusDataHead === undefined ? null : staged.focusDataHead) !== oldHeadRaw) throw new Error('Focus changed during staging');
+    if (focusGenerationText_(staged,head) !== json) throw new Error('Focus staging verification failed');
+    sp.setProperty('focusDataHead',headRaw);
+    if (sp.getProperty('focusDataHead') !== headRaw) throw new Error('Focus commit was not confirmed');
+  } catch (e) {
+    // A service can apply a write and then report an error. Check before deleting staged chunks.
+    let observed;
+    try { observed = sp.getProperty('focusDataHead'); } catch (readError) {}
+    if (observed === headRaw) return true;
+    if (observed !== undefined) Object.keys(props).forEach(k => { try { sp.deleteProperty(k); } catch (cleanupError) {} });
+    throw new Error('Focus save could not be confirmed; your draft is kept. Retry. ' + String(e.message || e).slice(0,200));
+  }
+  // Cleanup is after commit and best effort: a cleanup error must not turn a saved edit into a failure.
+  Object.keys(prior).filter(k => k.indexOf('focusV2_') === 0 || /^focusData_\d+$/.test(k) || k === 'focusDataN' || k === 'focusData')
+    .forEach(k => { if (k.indexOf(prefix) !== 0) try { sp.deleteProperty(k); } catch (e) {} });
   return true;
 }
 // Fun list (2026-11-05, Julius): "things I want to do for fun later" (🎮 tab, Center Up).

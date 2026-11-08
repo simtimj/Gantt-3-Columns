@@ -1022,7 +1022,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             const timed = [...panel.querySelectorAll('.fc-timegrid-event')].find(x => /Dentist/.test(x.textContent));
             if (!timed) out.push('timed event missing: ' + evText());
             else {
-              if (!/9:00/.test(timed.textContent)) out.push('timed event not at 9:00 Los Angeles time: ' + timed.textContent);
+              if (!/(^|[^\d:])9(:00)?\s?am/i.test(timed.textContent)) out.push('timed event not at 9:00 Los Angeles time: ' + timed.textContent);
               if (getComputedStyle(timed).backgroundColor !== 'rgb(213, 0, 0)') out.push('timed event lost its color: ' + getComputedStyle(timed).backgroundColor);
             }
             const allDay = [...panel.querySelectorAll('.fc-daygrid-event')].find(x => /All-day A/.test(x.textContent));
@@ -1033,7 +1033,9 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             }
             if (!panel.querySelector('.cp-done')) out.push('done (Graphite) event not marked');
             if (!panel.querySelector('.fc-timeGridDay-button') || !panel.querySelector('.fc-timeGridWeek-button') || !panel.querySelector('.fc-today-button') || !panel.querySelector('.fc-prev-button') || !panel.querySelector('.fc-next-button')) out.push('Day / Week / Today / prev / next missing');
-            const title = panel.querySelector('.fc-toolbar-title').textContent;
+            // Google look (2026-11-08): the week title is only the month, so compare the view's first day.
+            const viewDay = () => window.fwCalendar.api().view.activeStart.toISOString();
+            const title = viewDay();
             // Cache (2026-11-08): the week before / after came with the first read, so stepping a day or a week is
             // drawn at once from the cache with no new server call.
             if (!phone) panel.querySelector('.fc-timeGridDay-button').click();
@@ -1048,9 +1050,9 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (!phone) panel.querySelector('.fc-timeGridWeek-button').click();
             await wait(50);
             panel.querySelector('.fc-next-button').click(); await wait(150);
-            if (panel.querySelector('.fc-toolbar-title').textContent === title) out.push('next did not move');
+            if (viewDay() === title) out.push('next did not move');
             panel.querySelector('.fc-today-button').click(); await wait(150);
-            if (panel.querySelector('.fc-toolbar-title').textContent !== title) out.push('Today did not come back');
+            if (viewDay() !== title) out.push('Today did not come back');
             panel.querySelector('.fc-timeGridWeek-button').click(); await wait(200);
             if (panel.querySelectorAll('.fc-col-header-cell').length !== 7) out.push('week view is not 7 days');
             panel.querySelector('.fc-timeGridDay-button').click(); await wait(200);
@@ -1126,7 +1128,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         if (!await until(() => evEl('Test lunch'))) out.push('created event not shown after save');
         if (calls('calPanelCreateEvent').length !== 1 || byTitle('Test lunch').length !== 1) out.push('double tap made ' + calls('calPanelCreateEvent').length + ' requests / ' + byTitle('Test lunch').length + ' events');
         if (!det.hidden) out.push('form stayed open after a good save');
-        if (!/11:00/.test((evEl('Test lunch') || {}).textContent || '')) out.push('created event not at 11:00');
+        if (!/(^|[^\d:])11(:00)?\s?am/i.test((evEl('Test lunch') || {}).textContent || '')) out.push('created event not at 11:00');
         // Lost reply: the server made it, the app saw an error → Retry save with the same opId → still one event.
         window.__calLoseReply = 1;
         panel.querySelector('[data-cal-new]').click(); await wait(60);
@@ -1425,7 +1427,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           await pg.waitForFunction(() => /put it back/.test(document.querySelector('#calPanel [data-cal-state]').textContent), null, { timeout: 4000 }).catch(() => out.push('no "put it back" message after a failed move'));
           const e = await ev('a-' + day); if (!/T09:00/.test(e.start)) out.push('failed move changed the event');
           const shown = await pg.evaluate(() => { const el = [...document.querySelectorAll('#calPanel .fc-timegrid-event:not(.fc-event-mirror)')].find(x => /All-day A/.test(x.textContent)); return el ? el.textContent : ''; });
-          if (!/9:00/.test(shown)) out.push('failed move did not snap back on screen: ' + shown); }
+          if (!/(^|[^\d:])9(:00)?\s?am/i.test(shown)) out.push('failed move did not snap back on screen: ' + shown); }
         await pg.evaluate(() => { window.__calFailWrite = 0; });
         await pg.waitForTimeout(5300);
         // Plan rows → timeline: unfold, add a Gantt task to Big Three, drop it on 14:00 → one 30-min event; then onto

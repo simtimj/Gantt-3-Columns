@@ -15170,7 +15170,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const ev = info.event, x = ev.extendedProps || {};
     if(moveBusy || !x.editable || x.done){ info.revert(); return; }
     moveBusy = true; detail.hidden = true; sheetEv = null;
-    const req = Object.assign({eventId: x.eventId, startMs: x.startMs}, slotReq(ev.allDay, ev.startStr, ev.endStr, 60));
+    // An all-day event dropped on a time slot gets 15 min (Julius 2026-11-08).
+    const req = Object.assign({eventId: x.eventId, startMs: x.startMs}, slotReq(ev.allDay, ev.startStr, ev.endStr, 15));
     setState('loading', 'Saving…');
     google.script.run.withSuccessHandler(res => {
       moveBusy = false; flash('Moved ✓'); loadPlan(true);
@@ -15195,7 +15196,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function planMinutes(it){
     if(it.ref.indexOf('tid:') === 0){ const inf = window.fwTasks ? window.fwTasks.info(it.ref.slice(4)) : null; return (inf && inf.dur) || 30; }
     const fe = cal && it.ev ? cal.getEvents().find(e => (e.extendedProps || {}).eventId === it.ev.eventId) : null;
-    return fe && !fe.allDay && fe.end ? Math.max(15, Math.round((fe.end - fe.start) / 60000)) : 60;
+    return fe && !fe.allDay && fe.end ? Math.max(15, Math.round((fe.end - fe.start) / 60000)) : 15;
   }
   function dropPlan(info){
     const r = info.draggedEl && info.draggedEl.closest('[data-pid]'), it = r && planById(r.dataset.pid);
@@ -15224,7 +15225,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Phase 3b: hold + drag (touch) or drag (mouse) moves an event, its bottom edge resizes it; timed ↔ all-day both
       // ways. Per event `editable` = main calendar, not repeating, not done (Graphite stays put). Plan rows drop in too.
       editable: true, eventStartEditable: true, eventDurationEditable: true, eventResizableFromStart: false,
-      eventLongPressDelay: 400, snapDuration: '00:15:00', defaultTimedEventDuration: '01:00:00', defaultAllDayEventDuration: {days: 1},
+      eventLongPressDelay: 400, snapDuration: '00:15:00', defaultTimedEventDuration: '00:15:00', defaultAllDayEventDuration: {days: 1},
       eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag]',
       eventDragStart: () => { dropSeen = false; }, eventDragStop: dragStopped,
       eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: moveEvent, drop: dropPlan,

@@ -1329,11 +1329,11 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
         a = await evPt('Dentist'); b = await allDayPt(day);
         if (a && b) { await gesture(a, b); await waitIdle(); await pg.waitForTimeout(200);
           const e = await ev('b-' + day); if (!e || !e.allDay || e.start !== day) out.push('timed → all-day failed: ' + JSON.stringify(e && [e.allDay, e.start, e.end])); }
-        // All-day → 9:00 slot (gets 1 hour).
+        // All-day → 9:00 slot (gets 15 min).
         await center('09:00');
         a = await evPt('All-day A'); b = await slotPt(day, '09:00');
         if (a && b) { await gesture(a, { x: b.x, y: b.y + 2 }); await waitIdle(); await pg.waitForTimeout(200);
-          const e = await ev('a-' + day); if (!e || e.allDay || !/T09:00/.test(e.start) || !/T10:00/.test(e.end)) out.push('all-day → 9:00 timed failed: ' + JSON.stringify(e && [e.allDay, e.start, e.end])); }
+          const e = await ev('a-' + day); if (!e || e.allDay || !/T09:00/.test(e.start) || !/T09:15/.test(e.end)) out.push('all-day → 9:00–9:15 timed failed: ' + JSON.stringify(e && [e.allDay, e.start, e.end])); }
         // Done (Graphite) can't be dragged: nothing sent, nothing changed.
         const nMove = await calls('calPanelMoveEvent'), chore0 = await ev('c-' + day);
         await center('14:30');

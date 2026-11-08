@@ -14,14 +14,14 @@ const sheet = { rows:[[],row], getLastRow(){return this.rows.length;},
   };}, appendRow(v){this.rows.push(v);}
 };
 let locked=false;
-const server=vm.createContext({console,Utilities:{getUuid:()=> 'new-id'},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},releaseLock(){locked=false;}})}});
+const server=vm.createContext({console,FW_DEPLOY_BUILD:'save-release-test',Utilities:{getUuid:()=> 'new-id'},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},releaseLock(){locked=false;}})}});
 vm.runInContext(src,server);
 server.getOrCreateSheet_=()=>sheet;
 server.cellHash_=s=>'h:'+s;
 server.appBuild_=()=> 'test';
 server.backupCell_=()=>{};
 const save=(extra={})=>server.saveReferenceItem({id:'r1',parentId:'stale-parent',type:'stale-type',title:'Old title',content:'same',expanded:false,sort:1,fwSync:1,baseHash:'h:same',contentChanged:false,...extra});
-save();
+assert.equal(save().release,'save-release-test','save reply identifies the responding deployment');
 assert.deepEqual(row,['r1','new-parent','item','New title','same',true,9000]);
 save({content:'edited',contentChanged:true});
 assert.deepEqual(row,['r1','new-parent','item','New title','edited',true,9000]);
@@ -44,7 +44,7 @@ const added=server.addReferenceItem('','New card','<h2>New card</h2>');
 assert.ok(sheet.rows.at(-1)[6] > 1000000000000,'new cards retain end-of-list order without relying on an autosave');
 sheet.rows.splice(1,1);
 const rowsBefore = sheet.rows.length;
-assert.equal(save({expectedExisting:true}).deleted,true);
+const deletedReply=save({expectedExisting:true});assert.equal(deletedReply.deleted,true);assert.equal(deletedReply.release,'save-release-test');
 assert.equal(save({baseHash:null,expectedExisting:true}).deleted,true);
 assert.equal(save({baseHash:null,expectedExisting:false}).deleted,true,'older tabs without the new flag are protected too');
 assert.equal(sheet.rows.length,rowsBefore,'a stale save must not recreate a deleted card');
@@ -55,7 +55,7 @@ const extract=(start,end)=>html.slice(html.indexOf(start),html.indexOf(end,html.
 const calls=[],statuses=[];
 const run={withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(fn){this.fail=fn;return this;},
   saveReferenceItem(payload){calls.push({payload,ok:this.ok,fail:this.fail});}};
-const client=vm.createContext({console,window:{},fwDraftPrepareRef(){},fwDraftCaptureRef(){return null;},google:{script:{run}},document:{querySelector:()=>null},CSS:{escape:s=>s},
+const client=vm.createContext({console,window:{},performance:{now:()=>0},fwObserveSave(){},fwDraftPrepareRef(){},fwDraftCaptureRef(){return null;},google:{script:{run}},document:{querySelector:()=>null},CSS:{escape:s=>s},
   setStatus:s=>statuses.push(s),fwCheckBuild(){},fwReconcileRef(){}});
 vm.runInContext('let refInFlight=0,fwRefEpoch=0;'+extract('  function refBase(item){','  /* Cell HTML')+extract('  function sendRefItem(item,onOk,onErr){','  /* Newer app version'),client);
 const item={id:'r1',parentId:'',expanded:true,content:'same',ch:'h:same',title:'',sort:1};

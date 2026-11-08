@@ -579,3 +579,8 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 - (+ Block / + Task / Activate buttons removed 2026-11-05) 🧪 **Next Block activation (2026-11-04):** Select a `Next Block` or `Next Block 2` title, press **Activate**, confirm retaining nested subtasks (Cancel safely aborts activation), then optionally enter a time range. Blank time produces `Block`; a supplied range produces `Block 9:00–10:30`. Cancelling the time prompt leaves the placeholder unchanged. Clearing subtasks is deferred to avoid accidental deletion during the experimental release.
 
+
+
+## 🧪 To be confirmed (2026-11-08) — save timing
+
+- **Save-acknowledgement timing without extra save-log calls**: the next existing Speed Log report carries up to 50 recent changed day/Reference save round-trips, with success/conflict/error status and the responding release. Samples contain no task text or task IDs; reporting retries keep stable sample IDs. This is best-effort in-memory telemetry, not a complete audit, and excludes the autosave debounce. Refresh, edit a disposable line, and let a normal sync occur to see `Client.saveTimings`. Live latency targets remain to be agreed after measurement.

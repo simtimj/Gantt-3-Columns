@@ -54,7 +54,7 @@ console.log('✓ drafts: reload/adoption, exact acknowledgements, page/app isola
 for(const initialRemote of ['sent','original']){
  const p=page(),c=p.c,date='2026-11-08',hash=s=>crypto.createHash('md5').update(s).digest('hex');
  const base={tasks:{t:'original',h:hash('original')},journal:{t:'',h:'j0'}},ed={html:'original',querySelectorAll:()=>[]};
- c.state={days:[{date,tasks:'original',journal:''}]};c.daySaveState=new Map([[date,{inFlight:true,pending:true,sent:{tasks:'sent',journal:'',ct:true,cj:false}}]]);c.saveTimers={};
+ c.state={days:[{date,tasks:'original',journal:''}]};c.daySaveState=new Map([[date,{inFlight:true,pending:true,sent:{tasks:'sent',journal:'',ct:true,cj:false}}]]);c.saveTimers={};c.performance={now:()=>0};c.fwObserveSave=()=>{};
  c.document={querySelector:q=>q.includes('#todayScroll')?ed:null};c.CSS={escape:s=>s};c.fwDayBase=()=>base;c.dayEditorFor=(_,col)=>col==='tasks'?ed:null;c.cardCleanHtml=e=>e.html;
  c.setStatus=()=>{};c.noteUrgentDay=()=>{};c.fwCheckBuild=()=>{};c.clearTimeout=()=>{};c.setTimeout=()=>1;c.requestAnimationFrame=()=>{};c.replaceEditorHtml=(e,h)=>e.html=h;
  const extract=(start,end)=>html.slice(html.indexOf(start),html.indexOf(end,html.indexOf(start)));

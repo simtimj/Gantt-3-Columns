@@ -2345,13 +2345,32 @@ function getCalendarEvents() {
   return { today: today, events: out, archive: archive };
 }
 
-/* Calendar panel, phase 1 (2026-11-08, Julius): READ-ONLY range for the 📅 Calendar slide-out (FullCalendar).
+/* Calendar panel, phase 1 (2026-11-08, Julius): read-only range for the 📅 Calendar slide-out (FullCalendar).
    Never writes: no archive pass (unlike getCalendarEvents), no color sync. Same calendars as Cal Events.
    Dates are yyyy-MM-dd in the script zone (America/Los_Angeles); end is exclusive. All-day events come back as
    plain dates (end exclusive, like Google), timed events as ISO with offset. color = the event's own color, else
    its calendar's color. Phase 2+ plans: docs/NOTES.md → "Calendar panel (FullCalendar)". */
 const CAL_PANEL_COLORS_ = { '1': '#7986cb', '2': '#33b679', '3': '#8e24aa', '4': '#e67c73', '5': '#f6bf26', '6': '#f4511e',
   '7': '#039be5', '8': '#616161', '9': '#3f51b5', '10': '#0b8043', '11': '#d50000' };
+// One event in the panel's shape. editable = main calendar and not repeating (phase 2: repeating stay read-only).
+function calPanelEventOut_(ev, calId, calName, calColor, tz) {
+  const allDay = ev.isAllDayEvent();
+  let colorId = '';
+  try { colorId = String(ev.getColor() || ''); } catch (err) { colorId = ''; }
+  let link = '';
+  try { link = 'https://www.google.com/calendar/event?eid=' + Utilities.base64EncodeWebSafe(ev.getId().split('@')[0] + ' ' + calId).replace(/=+$/, ''); } catch (err) { link = ''; }
+  const st = allDay ? ev.getAllDayStartDate() : ev.getStartTime(), en = allDay ? ev.getAllDayEndDate() : ev.getEndTime();
+  const fmt = allDay ? 'yyyy-MM-dd' : "yyyy-MM-dd'T'HH:mm:ssXXX";
+  const recurring = ev.isRecurringEvent();
+  return {
+    id: ev.getId() + '|' + st.getTime(), eventId: ev.getId(), startMs: st.getTime(), calId: calId, cal: calName,
+    title: ev.getTitle() || '(no title)', allDay: allDay,
+    start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
+    color: CAL_PANEL_COLORS_[colorId] || calColor, colorId: colorId, done: colorId === '8',
+    location: ev.getLocation() || '', recurring: recurring, link: link,
+    editable: calId === EVENT_CALENDARS[0] && !recurring
+  };
+}
 function getCalendarRange(startDate, endDate) {
   const s = String(startDate || ''), e = String(endDate || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !/^\d{4}-\d{2}-\d{2}$/.test(e) || e <= s) throw new Error('Invalid calendar range');
@@ -2364,24 +2383,84 @@ function getCalendarRange(startDate, endDate) {
     if (!cal) { failed.push(id); return; }
     const calName = cal.getName(), calColor = String(cal.getColor() || '#039be5');
     calendars.push({ id: id, name: calName, color: calColor });
-    cal.getEvents(from, to).forEach(ev => {
-      const allDay = ev.isAllDayEvent();
-      let colorId = '';
-      try { colorId = String(ev.getColor() || ''); } catch (err) { colorId = ''; }
-      let link = '';
-      try { link = 'https://www.google.com/calendar/event?eid=' + Utilities.base64EncodeWebSafe(ev.getId().split('@')[0] + ' ' + id).replace(/=+$/, ''); } catch (err) { link = ''; }
-      const st = allDay ? ev.getAllDayStartDate() : ev.getStartTime(), en = allDay ? ev.getAllDayEndDate() : ev.getEndTime();
-      const fmt = allDay ? 'yyyy-MM-dd' : "yyyy-MM-dd'T'HH:mm:ssXXX";
-      out.push({
-        id: ev.getId() + '|' + st.getTime(), eventId: ev.getId(), calId: id, cal: calName,
-        title: ev.getTitle() || '(no title)', allDay: allDay,
-        start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
-        color: CAL_PANEL_COLORS_[colorId] || calColor, colorId: colorId, done: colorId === '8',
-        location: ev.getLocation() || '', recurring: ev.isRecurringEvent(), link: link
-      });
-    });
+    cal.getEvents(from, to).forEach(ev => out.push(calPanelEventOut_(ev, id, calName, calColor, tz)));
   });
   return { start: s, end: e, tz: tz, events: out, calendars: calendars, failed: failed };
+}
+
+/* Calendar panel, phase 2 (2026-11-08, Julius): create / edit / delete on the MAIN calendar only; repeating events
+   stay read-only (edit those in Google Calendar). Edits change the event in place, so its id never changes.
+   Duplicate guard: each form save carries an opId; a retry or double tap with the same opId returns the first result
+   (script cache, 6 h) instead of creating again. New events get reminders off. Times are America/Los_Angeles wall
+   time: all-day 'yyyy-MM-dd' (end exclusive, like Google), timed 'yyyy-MM-ddTHH:mm'. */
+function calPanelMain_() {
+  const cal = CalendarApp.getCalendarById(EVENT_CALENDARS[0]);
+  if (!cal) throw new Error('Main calendar is unavailable');
+  return cal;
+}
+function calPanelWhen_(req) {
+  const r = req || {}, allDay = !!r.allDay, s = String(r.start || ''), e = String(r.end || '');
+  const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (!title) throw new Error('Title is empty');
+  if (allDay) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !/^\d{4}-\d{2}-\d{2}$/.test(e)) throw new Error('Invalid date');
+    const a = parseDate_(s), b = parseDate_(e);
+    if (b <= a) throw new Error('End date is before the start date');
+    if (b - a > 366 * DAY_MS) throw new Error('Event is longer than a year');
+    return { title: title, allDay: true, start: a, end: b, oneDay: addDaysToDateString_(s, 1) === e };
+  }
+  const re = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/, ms = s.match(re), me = e.match(re);
+  if (!ms || !me) throw new Error('Invalid time');
+  const a = new Date(+ms[1], +ms[2] - 1, +ms[3], +ms[4], +ms[5]), b = new Date(+me[1], +me[2] - 1, +me[3], +me[4], +me[5]);
+  if (b <= a) throw new Error('End time is before the start time');
+  if (b - a > 31 * DAY_MS) throw new Error('Event is longer than a month');
+  return { title: title, allDay: false, start: a, end: b };
+}
+function calPanelOut_(ev) {
+  const cal = calPanelMain_();
+  return calPanelEventOut_(ev, EVENT_CALENDARS[0], cal.getName(), String(cal.getColor() || '#039be5'), Session.getScriptTimeZone());
+}
+function calPanelEditable_(eventId, startMs) {
+  if (!eventId) throw new Error('Missing event id');
+  const ev = calEventAt_(EVENT_CALENDARS[0], String(eventId), Number(startMs));
+  if (ev.isRecurringEvent()) throw new Error('Repeating events are read-only here — edit them in Google Calendar');
+  return ev;
+}
+function calPanelCreateEvent(req) {
+  const w = calPanelWhen_(req), opId = String((req && req.opId) || '').replace(/[^\w-]/g, '').slice(0, 60);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const cache = CacheService.getScriptCache(), key = opId ? 'calOp:' + opId : '';
+    const done = key && cache.get(key);
+    if (done) {
+      const d = JSON.parse(done);
+      try { return Object.assign(calPanelOut_(calEventAt_(EVENT_CALENDARS[0], d.eventId, d.startMs)), { repeat: true }); }
+      catch (e) { return { eventId: d.eventId, startMs: d.startMs, repeat: true }; }
+    }
+    const cal = calPanelMain_();
+    const ev = w.allDay ? (w.oneDay ? cal.createAllDayEvent(w.title, w.start) : cal.createAllDayEvent(w.title, w.start, w.end))
+      : cal.createEvent(w.title, w.start, w.end);
+    try { ev.removeAllReminders(); } catch (e) { console.error(e); }
+    const out = calPanelOut_(ev);
+    if (key) cache.put(key, JSON.stringify({ eventId: out.eventId, startMs: out.startMs }), 21600);
+    return out;
+  } finally { lock.releaseLock(); }
+}
+function calPanelUpdateEvent(req) {
+  const w = calPanelWhen_(req), ev = calPanelEditable_(req.eventId, req.startMs);
+  if (ev.getTitle() !== w.title) ev.setTitle(w.title);
+  if (w.allDay) { if (w.oneDay) ev.setAllDayDate(w.start); else ev.setAllDayDates(w.start, w.end); }
+  else ev.setTime(w.start, w.end);
+  return calPanelOut_(ev);
+}
+function calPanelDeleteEvent(req) {
+  const r = req || {};
+  let ev;
+  try { ev = calPanelEditable_(r.eventId, r.startMs); }
+  catch (e) { if (/not found/i.test(e.message)) return { ok: true, gone: true }; throw e; } // already deleted: nothing to do
+  ev.deleteEvent();
+  return { ok: true };
 }
 
 // One event by id + start time, so the right day of a repeating event is the one found.

@@ -1995,22 +1995,40 @@ function confirmCardHtml_(rows) {
 
 function syncConfirmCard_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss.getSheetByName('To Confirm')) return; // nothing until the tab exists
+  const sheet = ss.getSheetByName('To Confirm');
+  if (!sheet) return; // nothing until the tab exists
+  const sources = { sheet:sheet, ref:getOrCreateSheet_('Reference', REF_HEADERS) };
   // Fast path (2026-11-04): most loads change nothing, so check without taking the script lock.
-  if (!confirmCardWork_(true)) return;
+  if (!confirmCardWork_(true,sources)) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return; // next load retries
-  try { confirmCardWork_(false); } finally { lock.releaseLock(); }
+  try { confirmCardWork_(false,sources); } finally { lock.releaseLock(); }
+}
+
+// Cache only a row hint, never source rows or HTML. Validate the identity and read the live
+// content together; direct Sheet edits, moved/deleted rows and cache failures remain visible.
+function readConfirmCard_(ref) {
+  const key = 'confirm-card-row:v1'; let cache = null, hint = 0;
+  try { cache = CacheService.getScriptCache(); hint = Number(cache.get(key)); } catch (e) {}
+  if (Number.isInteger(hint) && hint >= 2) {
+    try {
+      const values = ref.getRange(hint,1,1,5).getValues()[0];
+      if (String(values[0] || '') === CONFIRM_CARD_ID) return {row:hint,content:String(values[4] || '')};
+    } catch (e) {} // a deleted row can also put the hint outside the sheet bounds
+  }
+  const row = referenceRowMap_(ref).get(CONFIRM_CARD_ID) || 0;
+  const content = row ? String(ref.getRange(row,5).getValue() || '') : '';
+  try { if (cache) { if (row) cache.put(key,String(row),3600); else cache.remove(key); } } catch (e) {}
+  return {row:row,content:content};
 }
 
 // dryRun: true → only report whether a write is needed.
-function confirmCardWork_(dryRun) {
+function confirmCardWork_(dryRun,sources) {
   {
-    const sheet = getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
-    const ref = getOrCreateSheet_('Reference', REF_HEADERS);
+    const sheet = sources ? sources.sheet : getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
+    const ref = sources ? sources.ref : getOrCreateSheet_('Reference', REF_HEADERS);
     let rows = confirmRows_(sheet);
-    const cardRow = referenceRowMap_(ref).get(CONFIRM_CARD_ID);
-    const cur = cardRow ? String(ref.getRange(cardRow, 5).getValue() || '') : '';
+    const card = readConfirmCard_(ref), cardRow = card.row, cur = card.content;
     // Ticked lines → Status works.
     const ticked = new Set();
     (cur.match(/<div\b[^>]*\bdata-kid="[^"]+"[^>]*>/g) || []).forEach(tag => {
@@ -2606,18 +2624,6 @@ function calPanelUpdateEvent(req) {
   if (ev.getTitle() !== w.title) ev.setTitle(w.title);
   if (w.allDay) { if (w.oneDay) ev.setAllDayDate(w.start); else ev.setAllDayDates(w.start, w.end); }
   else ev.setTime(w.start, w.end);
-  planRelinkLocked_(ev);
-  return calPanelOut_(ev);
-}
-/* Phase 3b (2026-11-08, Julius): drag / resize in the panel. Moves the event in place (same id, color, title,
-   reminders); timed ↔ all-day both ways. Done (Graphite) events are locked to their spot. Plan links follow. */
-function calPanelMoveEvent(req) {
-  const r = req || {}, ev = calPanelEditable_(r.eventId, r.startMs);
-  if (String(ev.getColor() || '') === '8') throw new Error('Done events stay where they are');
-  const w = calPanelWhen_(Object.assign({}, r, { title: ev.getTitle() || 'Event' }));
-  if (w.allDay) { if (w.oneDay) ev.setAllDayDate(w.start); else ev.setAllDayDates(w.start, w.end); }
-  else ev.setTime(w.start, w.end);
-  planRelinkLocked_(ev);
   return calPanelOut_(ev);
 }
 function calPanelDeleteEvent(req) {
@@ -2737,15 +2743,11 @@ function planSave(op) {
   return getPlan(d);
 }
 // Schedule… a Gantt task: one all-day event per task (main calendar, reminders off, tagged with the tid). Again → move it.
-// Phase 3b: with r.start / r.end (+ r.allDay) it schedules at that slot (a plan row dropped on the timeline):
-// all-day 'yyyy-MM-dd' (end exclusive) or timed 'yyyy-MM-ddTHH:mm'. The task's existing event moves there in place.
 function planSchedule(req) {
-  const r = req || {}, ref = String(r.ref || ''), slot = !!(r.start && r.end);
-  const date = slot ? String(r.start).slice(0, 10) : String(r.date || '');
+  const r = req || {}, date = String(r.date || ''), ref = String(r.ref || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Pick a date');
   if (!/^tid:[\w-]{2,64}$/.test(ref)) throw new Error('Only Gantt tasks can be scheduled this way');
   const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 300) || 'Task';
-  const w = slot ? calPanelWhen_({ title: title, allDay: !!r.allDay, start: r.start, end: r.end }) : null;
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -2754,39 +2756,18 @@ function planSchedule(req) {
     let ev = null, moved = false;
     const p = planEventParts_(known);
     if (p) { try { ev = calEventAt_(EVENT_CALENDARS[0], p.eventId, p.startMs); } catch (e) { ev = null; } }
-    if (ev && !ev.isRecurringEvent()) {
-      if (w) { if (w.allDay) { if (w.oneDay) ev.setAllDayDate(w.start); else ev.setAllDayDates(w.start, w.end); } else ev.setTime(w.start, w.end); }
-      else planMoveEv_(ev, date);
-      moved = true;
-    } else {
-      const cal = calPanelMain_();
-      ev = !w ? cal.createAllDayEvent(title, parseDate_(date))
-        : w.allDay ? (w.oneDay ? cal.createAllDayEvent(title, w.start) : cal.createAllDayEvent(title, w.start, w.end))
-        : cal.createEvent(title, w.start, w.end);
+    if (ev && !ev.isRecurringEvent()) { planMoveEv_(ev, date); moved = true; }
+    else {
+      ev = calPanelMain_().createAllDayEvent(title, parseDate_(date));
       try { ev.removeAllReminders(); } catch (e) { console.error(e); }
       try { ev.setTag('ganttTid', ref.slice(4)); } catch (e) { console.error(e); }
     }
-    const link = planRelink_(sh, ev);
+    const st = (ev.isAllDayEvent() ? ev.getAllDayStartDate() : ev.getStartTime()).getTime();
+    const link = ev.getId() + '@' + st;
     props.setProperty(key, link);
-    rows.filter(x => x.ref === ref && x.event !== link).forEach(x => { x.event = link; planWrite_(sh, x); });
+    rows.filter(x => x.ref === ref).forEach(x => { x.event = link; planWrite_(sh, x); });
     return { event: link, moved: moved, date: date };
   } finally { lock.releaseLock(); }
-}
-// After an event moves, every plan row (and the Schedule property) pointing at it gets its new eventId@startMs,
-// so later lookups (calEventAt_ searches near startMs) keep finding it and Schedule never makes a second event.
-function planRelink_(sh, ev) {
-  const st = (ev.isAllDayEvent() ? ev.getAllDayStartDate() : ev.getStartTime()).getTime(), id = ev.getId(), link = id + '@' + st;
-  planRead_(sh).forEach(x => { const p = planEventParts_(x.event); if (p && p.eventId === id && x.event !== link) { x.event = link; planWrite_(sh, x); } });
-  let tid = ''; try { tid = ev.getTag('ganttTid') || ''; } catch (e) { tid = ''; }
-  if (tid) PropertiesService.getScriptProperties().setProperty('planEv:' + tid.slice(0, 66), link);
-  return link;
-}
-function planRelinkLocked_(ev) {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(PLAN_SHEET);
-  if (!sh) return;
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try { planRelink_(sh, ev); } catch (e) { console.error(e); } finally { lock.releaseLock(); }
 }
 // Move an event to another day, keeping its length (all-day) or its clock times (timed).
 function planMoveEv_(ev, date) {
@@ -2809,9 +2790,14 @@ function planMoveEvent(req) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Pick a date');
   const ev = calPanelEditable_(r.eventId, r.startMs);
   planMoveEv_(ev, date);
+  const st = (ev.isAllDayEvent() ? ev.getAllDayStartDate() : ev.getStartTime()).getTime(), link = ev.getId() + '@' + st;
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
-  try { return { event: planRelink_(planSheet_(), ev), date: date }; } finally { lock.releaseLock(); }
+  try {
+    const sh = planSheet_();
+    planRead_(sh).filter(x => planEventParts_(x.event) && planEventParts_(x.event).eventId === ev.getId()).forEach(x => { x.event = link; planWrite_(sh, x); });
+  } finally { lock.releaseLock(); }
+  return { event: link, date: date };
 }
 
 // One event by id + start time, so the right day of a repeating event is the one found.

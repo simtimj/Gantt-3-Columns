@@ -19,6 +19,7 @@ This is a code inventory and migration design, not a live referential-integrity 
 | Calendar display cache | Browser `fw.calCache.v1` and in-memory event/day maps | A derived last-known view, not a new event owner. Background reads refresh Google data; write paths request fresh data or apply the returned event shape |
 | Calendar daily plan | `Plan`: `Id, Date, Group, Rank, Ref, Title, Target, Event, Updated` | `planSave`; `Ref` is `tid:<taskId>` or `cal:<eventId>`. `Id` identifies the plan placement, not a new task. Big/Stretch are dated; Next/Backlog are undated |
 | AI task intake | `New Tasks`: Date, Title, Urgency, Due, Minutes, Subtasks, Added | `sheetTaskRows_` creates `s-` + hash(raw date + title); `applyClaudeTasks_` records applied IDs. This is append-oriented intake, not a general task-edit API |
+| Gantt implementation work register | Live `Open Tasks`: Task ID, Task, Status, Priority, Owner, Next action, Last updated, Source/location, Related link, Notes | Existing AI/project register with its own work-item IDs. Central Data Hub routes Gantt implementation work here. No direct consumer of this tab was found in the inspected app source; it is not the `New Tasks` intake |
 | AI completion intake | `Done Log`: Date, Project, Title, Details, Done by, Type | `sheetDoneRows_` hashes date/project/title/details into `s-…`; imported `data-cid` preserves provenance. The rolling intake window is 30 days |
 | Study session | `Study Sessions`: explicit session ID and date/time/result fields | `syncStudyLog_` aggregates History by date + daypart, while Study Review is derived by topic. Session identity differs from the aggregate `data-study` key |
 | Embedded timer activity | `Timer Log`: unique `Op`, Date, At, Action, Block, Item, Name, Value, Device | `saveTimerEvents` deduplicates operation IDs; block/item identity comes from timer IDs (`data-tmr`), not automatically `data-tid`. Totals are derived by event replay |
@@ -69,3 +70,9 @@ Keep `Urgency` (red/yellow/blue), selected daily `Plan.Group` (Big Three/Stretch
 Use typed identity keys (task versus completion versus plan placement versus timer operation), even where existing string prefixes happen to match. Preserve legacy strings as aliases rather than globally renumbering them.
 
 Live coverage counts, canonical-owner decisions for mirrored tasks, correction semantics and a tested migration rollback remain open. Separate hosting or a new database is not a prerequisite for this pilot.
+
+## Existing project register — live workbook check
+
+The live workbook already has an `Open Tasks` register, and the current Central Data Hub directs Gantt UI/storage/sync implementation work to it. Reconcile that register before proposing another master table. Its work-item ID, a Reference check-line's task ID, and a project/container ID are different roles; record explicit parent/child/alias relationships only after reviewing their meaning. The same title or overlapping subject does not prove two records are duplicates.
+
+The pilot above keeps Reference task content authoritative while using the existing work register for project ownership and next actions. This documents current boundaries; it does not make the register a new automatic app task feed or migrate its statuses.

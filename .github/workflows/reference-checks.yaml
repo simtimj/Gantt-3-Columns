@@ -1,10 +1,11 @@
-name: Reference save checks
+name: Workspace save checks
 on:
   pull_request:
     paths:
       - 'Code.gs'
       - 'Index.html'
       - 'tools/reference-save-test.mjs'
+      - 'tools/focus-save-test.mjs'
       - '.github/workflows/reference-checks.yaml'
   workflow_dispatch:
 permissions:
@@ -12,6 +13,7 @@ permissions:
 jobs:
   reference:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,6 +21,7 @@ jobs:
           node-version: 20
       - run: node tools/check.mjs
       - run: node tools/reference-save-test.mjs
+      - run: node tools/focus-save-test.mjs
       - run: npm install --no-save playwright@1.62.1
       - run: npx playwright install --with-deps chromium
       - run: node tools/smoke.mjs

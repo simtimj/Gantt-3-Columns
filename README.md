@@ -604,3 +604,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Done Log live row hint — 2026-11-08
 
 - Routine Done Log imports validate a cached row hint by reading the live date and Today text together (warm unchanged lookup: 2 reads to 1). Moved/deleted rows, invalid hints and cache failures fall back to the normal lookup. No history text is cached, and work requiring the script lock still rereads current data under lock. Actual import latency remains to be measured.
+
+## 🧪 Lighter unchanged study imports — 2026-11-08
+
+- An unchanged Study Sessions import reads raw values once and skips the redundant displayed-values read (2 reads to 1). Changed input is reread after acquiring the script lock; another importer already processing the same input causes no repeated output writes. A correction appended before lock acquisition is processed from the latest rows with the existing last-ID-wins behavior. History, review output and Logged acknowledgements retain their current format. Actual latency improvement remains to be measured.

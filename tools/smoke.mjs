@@ -1034,6 +1034,19 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (!panel.querySelector('.cp-done')) out.push('done (Graphite) event not marked');
             if (!panel.querySelector('.fc-timeGridDay-button') || !panel.querySelector('.fc-timeGridWeek-button') || !panel.querySelector('.fc-today-button') || !panel.querySelector('.fc-prev-button') || !panel.querySelector('.fc-next-button')) out.push('Day / Week / Today / prev / next missing');
             const title = panel.querySelector('.fc-toolbar-title').textContent;
+            // Cache (2026-11-08): the week before / after came with the first read, so stepping a day or a week is
+            // drawn at once from the cache with no new server call.
+            if (!phone) panel.querySelector('.fc-timeGridDay-button').click();
+            const nCalls = window.__calls.filter(c => c[0] === 'getCalendarRange').length;
+            for (const k of ['next', 'next', 'prev', 'prev', 'prev']) {
+              panel.querySelector('.fc-' + k + '-button').click(); await wait(0);
+              if (!/Dentist/.test(evText())) { out.push('stepping ' + k + ': events not drawn at once from the cache'); break; }
+            }
+            // Crossing into another week may warm the week beyond it in the background (one call), never block on it.
+            if (window.__calls.filter(c => c[0] === 'getCalendarRange').length > nCalls + 1) out.push('stepping days nearby asked the server again: ' + JSON.stringify(window.__calls.filter(c => c[0] === 'getCalendarRange').map(c => c[1])));
+            panel.querySelector('.fc-today-button').click();
+            if (!phone) panel.querySelector('.fc-timeGridWeek-button').click();
+            await wait(50);
             panel.querySelector('.fc-next-button').click(); await wait(150);
             if (panel.querySelector('.fc-toolbar-title').textContent === title) out.push('next did not move');
             panel.querySelector('.fc-today-button').click(); await wait(150);
@@ -1060,7 +1073,11 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         }
         if (document.querySelectorAll('#calPanel').length !== 1 || document.querySelectorAll('#calPanel .fc-view-harness').length !== 1 || document.querySelectorAll('#calPanel .fc-header-toolbar').length !== 1) out.push('duplicate panels or calendars after reopening');
         // Error → Retry
+        // Cache (2026-11-08): reopening while Google fails still shows the cached days (no error, no blank); a fresh
+        // read (↻) that fails shows the error + Retry.
         window.__calFail = 1; btn.click();
+        if (!await until(() => visible() && panel.querySelector('.fc-timegrid-event'), 1500)) out.push('reopen with Google failing: cached events not shown');
+        panel.querySelector('[data-cal-refresh]').click();
         if (!await until(() => /Couldn.t load events/.test(panel.querySelector('[data-cal-state]').textContent))) out.push('no error state when loading fails');
         window.__calFail = 0; const r = panel.querySelector('[data-cal-retry]');
         if (!r) out.push('no Retry button'); else { r.click(); if (!await until(() => panel.querySelector('[data-cal-state]').hidden && panel.querySelector('.fc-timegrid-event'))) out.push('Retry did not reload events'); }

@@ -741,7 +741,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
     draftPage();let pg=await open();
     await pg.evaluate(date=>{
       window.__draftFail=true;
-      const day=document.querySelector('#todayScroll .day-editor[data-date="'+date+'"]');day.innerHTML='<p>Recovered day edit</p>';day.dispatchEvent(new Event('input',{bubbles:true}));
+      const day=document.querySelector('#todayScroll .day-editor[data-date="'+date+'"]');day.innerHTML='<p>Recovered day edit</p><div class="check-line" data-level="0"><input type="checkbox" data-wired="1"><span class="check-text">Recovered checkbox</span></div>';day.dispatchEvent(new Event('input',{bubbles:true}));
       const ref=document.querySelector('#referenceTree .ref-cell-wrapper[data-id="recover-ref"] > .ref-cell');ref.innerHTML='<h2>Reference</h2><p>Recovered ref edit</p>';ref.dispatchEvent(new Event('input',{bubbles:true}));
     },today);
     await pg.waitForTimeout(1000);await pg.close();
@@ -751,6 +751,8 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
     await pg.locator('#fwDraftNotice button').click();await pg.locator('dialog [data-draft-kind="day"] button').first().click();
     await pg.waitForTimeout(1100);
     if(!await pg.evaluate(()=>{const t=document.querySelector('#todayScroll .day-editor').textContent;return t.includes('Recovered day edit')&&t.includes('Other device day');}))throw Error('day recovery lost draft or remote text');
+    await pg.waitForFunction(()=>!fwUnsaved());
+    if(!await pg.evaluate(()=>{const line=[...document.querySelectorAll('#todayScroll .day-editor .check-line')].find(l=>l.textContent.includes('Recovered checkbox'));const cb=line?.querySelector('input');if(!cb)return false;cb.click();return cb.checked && line.classList.contains('done');}))throw Error('restored checkbox was not wired');
     await pg.waitForFunction(()=>!fwUnsaved());
     await pg.locator('#fwDraftNotice button').click();await pg.locator('dialog [data-draft-kind="ref"] button').first().click();await pg.waitForTimeout(1100);
     if(!await pg.evaluate(()=>{const t=document.querySelector('#referenceTree .ref-cell').textContent;return t.includes('Recovered ref edit')&&t.includes('Other device ref');}))throw Error('Reference recovery lost draft or remote text');

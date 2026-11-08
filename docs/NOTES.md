@@ -575,6 +575,17 @@ Problem (Julius): too many categories and places; organizing the system takes at
   - **Lead Tasks refill**: start with automatic bubbling (next open checklist line moves up), keep a Load button, tune later.
   - Finished Lead Tasks stay **ticked for the rest of the day**.
   - Work order: **finish this planning model first**, then the task → calendar pipeline, then app cleanup.
+- **Round 5 answers (2026-11-08)**:
+  - **Why** is optional (space matters).
+  - A project has **three views**: **big** (hold → zoom, everything), **semi**, and **minimal** (just what needs to happen: project → Lead Tasks with their indented subtasks). Spacing tuned after a first build.
+  - **Importance** = a **star** (favorite) with a star count (more stars = matters more).
+  - **Hands-Off** = a small icon instead of "HO:" in the title (icon to pick).
+  - **Status** open / active / done: **set by hand**.
+  - **AI updates** go straight into the project's card, but only in its detail (big / focus) view so they never crowd the screen. No "(ChatGPT)" signatures.
+  - **Big Three shows** in the calendar's Plan box **and** as a small strip at the top of the Today column (try it, then adjust).
+  - **End-of-day review includes Big Three items** too (a second look doesn't hurt).
+  - Still open: when the review appears (set time / after an hour / on tap); whether a single-task Big Three item can hold a small checklist.
+  - Work order: **B urgency 0/1/2 switch → A task → calendar pipeline → C app cleanup**.
 - **New threads (2026-11-08, not designed yet)**: (1) **App cleanup** — hide irrelevant things, better grouping / sorting of the many panels and tabs; (2) **Task → calendar pipeline** — how tasks (Lead Tasks, urgent, scheduled) flow into the calendar's unscheduled list and timeline and back.
 - Not yet decided: ranking rules, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".
 

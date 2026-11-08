@@ -547,7 +547,20 @@ Problem (Julius): too many categories and places; organizing the system takes at
 - **Slots (2026-11-08)**: a Big Three slot holds **either a single task or a project**.
 - **Bubble up (2026-11-08)**: when a Big Three item is done (or a task inside a project in it is done), the next thing underneath moves up automatically — no manual re-sorting. Exact rules: see the open questions being worked through.
 - **Urgency scale idea (2026-11-08, not decided)**: Julius leans toward 0 / 1 / 2 (0 = most urgent, "more weight") instead of 1 / 2 / 3. Touches every place urgency lives (Gantt lines, New Tasks, calendar colors, ChatGPT / Claude rules) — needs a confirmed decision + migration plan before any change.
-- Not yet decided: ranking rules, rotation behaviour, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".
+- **Ranking + rotation answers (2026-11-08)**:
+  - Under the Big Three: **one ranked waiting list** (not a line per slot); the app **suggests** what moves up next and Julius **confirms**.
+  - A project keeps its slot when one of its tasks is done (the project is the thing to finish unless he says otherwise). It leaves only when **fully done** or when Julius **moves it out by hand** (to Keep In Mind).
+  - Order of the waiting list: Claude / ChatGPT propose it by Biggest Return, Julius corrects or drags, and rules get added over time as he explains his choices.
+  - Red (most urgent) work does **not** jump into the Big Three; it lands **right under it** (top of the waiting area).
+  - The Big Three is the **same every day**; unfinished items carry over.
+  - Bubbling up is **silent** (no notifications).
+  - A project's few highlighted next tasks are loaded by a button ("load up next": app proposes the top open lines, he confirms). Name still open (not "Next Moves").
+  - The Big Three's highlighted tasks appear in the calendar's unscheduled list **automatically**.
+  - A short regular **keep / swap / drop check-in** per slot: yes; cadence to settle (see suggestion in chat: weekly).
+- **Stretch**: tabled — hidden for now, may come back.
+- **Keep In Mind**: kept. It holds focus areas worth seeing without acting, and is where items moved out of the Big Three go; may live in Reference.
+- **Urgency 0 / 1 / 2**: wanted, **0 = red** (most urgent). Needs a migration plan across Gantt lines, New Tasks, calendar colors and AI rules, confirmed before building.
+- Not yet decided: ranking rules, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".
 
 ### What exists today (to build on, not duplicate)
 - Calendar panel Plan box (phase 3a): groups `big` "Big Three" (**per day**, ≤ 3), `stretch` (≤ 3/day), `next`, `backlog`; rows **link** to real items (`tid:`, Keep In Mind id, calendar event) via the `Plan` tab; Schedule / drag onto the timeline creates or moves **one** linked event (`planSchedule`, `planRelink_`). This already satisfies "scheduling doesn't create a second task".

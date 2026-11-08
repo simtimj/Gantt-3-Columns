@@ -73,19 +73,25 @@ function doGet(e) {
    ========================================================= */
 
 // Full setup. Safe to run by hand from the editor at any time.
-function setupWorkspace() {
+function setupWorkspace(opts) {
   const days = getOrCreateSheet_('Days', DAYS_HEADERS);
   const reference = getOrCreateSheet_('Reference', REF_HEADERS);
 
   // Keep a reasonable amount of stored date coverage.
   ensureDayRange_(days, 730, 365);
 
-  days.setFrozenRows(1);
-  reference.setFrozenRows(1);
-  days.getRange('A:A').setNumberFormat('yyyy-mm-dd');
-
-  PropertiesService.getScriptProperties()
-    .setProperty('lastSetupDate', todayString_());
+  const props = PropertiesService.getScriptProperties();
+  // Routine date maintenance must not reformat the entire date column daily.
+  // Include tab IDs so replacing either tab invalidates this one-time hint.
+  const formatVersion = '1:' + days.getSheetId() + ':' + reference.getSheetId();
+  if (!(opts && opts.daily) || props.getProperty('workspaceFormatVersion') !== formatVersion) {
+    days.setFrozenRows(1);
+    reference.setFrozenRows(1);
+    days.getRange('A:A').setNumberFormat('yyyy-mm-dd');
+    // Publish only after all format operations succeed; failed setup retries.
+    props.setProperty('workspaceFormatVersion', formatVersion);
+  }
+  props.setProperty('lastSetupDate', todayString_());
 
   return true;
 }
@@ -113,7 +119,7 @@ function ensureSetup_() {
       props.getProperty('lastSetupDate') !== today;
 
     if (stillNeeded) {
-      setupWorkspace();
+      setupWorkspace({ daily: true });
     }
   } finally {
     lock.releaseLock();
@@ -1158,7 +1164,7 @@ function ensureDayRange_(sheet, pastDays, futureDays) {
         2,
         1,
         sheet.getLastRow() - 1,
-        3
+        sheet.getMaxColumns() // Keep Plan and every other column attached to its date.
       )
       .sort({
         column: 1,

@@ -2501,6 +2501,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      extra server request. If it is missing, the page loads the data itself. */
   window.__FW_INITIAL__ = <?!= initialData ?>;
   window.__FW_BUILD__ = '<?= build ?>';
+  window.__FW_RELEASE__ = window.__FW_INITIAL__?.timing?.release || '';
 </script>
 <script>
   /* =========================================================
@@ -2749,13 +2750,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
   }
   // Speed timing (2026-11-04): sent after drawing, so it can't slow the load. See logSpeed in Code.gs.
+  function fwSpeedContext(extra){
+    return Object.assign({pageBuild:window.__FW_BUILD__ || '',pageRelease:window.__FW_RELEASE__ || '',
+      w:window.innerWidth,visibility:document.visibilityState},extra || {});
+  }
   function fwSpeedLog(kind,timing,t0){
     if(!timing) return;
     const render = Math.round(performance.now() - t0);
     setTimeout(() => {
       const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
-      const client = { render: render, frameFirstByte: Math.round(nav.responseStart || 0), frameDone: Math.round(nav.responseEnd || 0),
-        dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()), w: window.innerWidth };
+      const client = fwSpeedContext({ render: render, drawEnd:Math.round(t0 + render), frameFirstByte: Math.round(nav.responseStart || 0), frameDone: Math.round(nav.responseEnd || 0),
+        dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()) });
       setStatus('Ready · server ' + (timing.total / 1000).toFixed(1) + 's · draw ' + (render / 1000).toFixed(1) + 's');
       google.script.run.withFailureHandler(() => {}).logSpeed(kind,timing,client);
     },1500);
@@ -5466,6 +5471,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   let fwLastSync = 0;
   let fwSyncBusy = false;
   let refInFlight = 0;
+  let fwRefEpoch = 0;
+  let fwRefStructurePending = 0;
   function fwSetDayBase(d, force){
     if(!d || !d.date || d.th === undefined) return;
     if(!force && dayBase.has(d.date)) return;
@@ -5641,11 +5648,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   /* Every Reference save goes through here (text, open/close, moves). */
   function sendRefItem(item,onOk,onErr){
+    if(item._refDeleted){ setStatus('Card deleted elsewhere — copy your text or remove this local card before refreshing'); return; }
     if(item._refSaving){
       (item._refQueue || (item._refQueue = [])).push({onOk,onErr});
       return;
     }
     item._refSaving = true;
+    fwRefEpoch++;
     const next = () => {
       item._refSaving = false;
       const queued = item._refQueue || [];
@@ -5661,7 +5670,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const payload = {
       id:item.id, parentId:item.parentId, type:item.type, title:item.title, content:item.content,
       expanded:item.expanded, sort:item.sort,
-      fwSync:1, baseHash:b.h, contentChanged:(item.content || '') !== b.c, metaChanges
+      fwSync:1, expectedExisting:true, baseHash:b.h, contentChanged:(item.content || '') !== b.c, metaChanges
     };
     // Cell made in this tab: no server hash yet, so let the server check against the text it was made with (2026-10-31).
     if(!b.h) payload.baseText = b.c;
@@ -5672,6 +5681,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         try {
         if(res && typeof res === 'object'){
           fwCheckBuild(res.build);
+          if(res.deleted){
+            item._refDeleted = true;
+            item._refQueue = [];
+            setStatus('Card deleted elsewhere — your text is kept here; copy it or remove this local card before refreshing');
+            return;
+          }
           if(res.meta){
             Object.keys(meta).forEach(key => {
               if(!Object.prototype.hasOwnProperty.call(res.meta,key)) return;
@@ -5718,10 +5733,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.body.appendChild(bar);
   }
   function fwUnsaved(){
+    if(fwRefStructurePending) return true;
     if(window.odPadUnsaved && odPadUnsaved()) return true;
     for(const [date,info] of daySaveState) if(info.inFlight || info.pending) return true;
     if(refInFlight > 0) return true;
-    return (state.reference || []).some(it => it._timer);
+    return (state.reference || []).some(it => it._timer || it._refDeleted);
   }
   function fwFlushAll(){
     if(window.odPadFlush) odPadFlush();
@@ -5749,6 +5765,61 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(a) fwGuardReload(e,a);
   },true);
   /* Pull what changed elsewhere. Cells with a save waiting or in flight are skipped (that save merges). */
+  function fwRefStructureStart(){ fwRefEpoch++; fwRefStructurePending++; state.refManifestHash = ''; }
+  function fwRefStructureEnd(){ fwRefEpoch++; fwRefStructurePending = Math.max(0,fwRefStructurePending - 1); }
+  function fwApplyReferenceSync(out){
+    // Defer the whole Reference snapshot while editing/saving/dragging. Do not acknowledge it,
+    // so the next ordinary sync retries without spinning extra requests in the background.
+    if(refInFlight || fwRefStructurePending || document.querySelector('#referenceTree .ref-dragging') ||
+      document.activeElement?.closest?.('#referenceTree .ref-cell') ||
+      (state.reference || []).some(it => it._timer || it._refSaving || it._refDeleted || (it._b && it.content !== it._b.c))) return '';
+    const manifest = out.refManifest;
+    if(manifest && (!Array.isArray(manifest.items) || manifest.items.some(m =>
+      !(state.reference || []).some(it => String(it.id) === String(m.id)) && !out.ref?.[m.id]))) return '';
+    let note = '';
+    Object.keys(out.ref || {}).forEach(id => {
+      const item = (state.reference || []).find(it => String(it.id) === String(id));
+      if(item) note = fwReconcileRef(item,out.ref[id].content,out.ref[id].ch) || note;
+    });
+    if(!manifest) return note;
+    const tree = document.getElementById('referenceTree');
+    const nodes = new Map([...tree.querySelectorAll('.ref-cell-wrapper')].map(n => [String(n.dataset.id),n]));
+    const byId = new Map((state.reference || []).map(it => [String(it.id),it]));
+    const ids = new Set(manifest.items.map(m => String(m.id)));
+    state.reference = manifest.items.map(meta => {
+      let item = byId.get(String(meta.id));
+      if(!item){ item = {...meta,...out.ref[meta.id]}; refBase(item); }
+      else Object.assign(item,meta);
+      item._mb = {parentId:String(item.parentId || ''),expanded:item.expanded !== false};
+      return item;
+    });
+    nodes.forEach((node,id) => { if(!ids.has(id)) node.remove(); });
+    tree.querySelector(':scope > .empty')?.remove();
+    // Reuse existing editor nodes (and their undo history); only new cards get new editors.
+    const items = sortedReferenceItems(), children = new Map();
+    items.forEach(item => {
+      let pid = String(item.parentId || '');
+      const seen = new Set([String(item.id)]);
+      for(let p = pid; ids.has(p); p = String(byId.get(p)?.parentId || manifest.items.find(m => String(m.id) === p)?.parentId || '')){
+        if(seen.has(p)){ pid = ''; break; } seen.add(p);
+      }
+      if(!ids.has(pid)) pid = '';
+      if(!children.has(pid)) children.set(pid,[]);
+      children.get(pid).push(item);
+    });
+    const attached = new Set();
+    const attach = (pid,container) => (children.get(pid) || []).forEach(item => {
+      const id = String(item.id); if(attached.has(id)) return; attached.add(id);
+      const node = nodes.get(id) || createReferenceCell(item,container);
+      container.appendChild(node);
+      attach(id,node.querySelector(':scope > .ref-children'));
+    });
+    attach('',tree);
+    if(!items.length) renderReference();
+    applyReferenceCollapseState(); filterReference();
+    state.refManifestHash = manifest.hash;
+    return note || 'Synced Reference changes from elsewhere';
+  }
   // withImports (2026-11-05): runImports() first writes the Done Log / AI tasks / To Confirm / study log into the
   // sheet, then returns the same diff as getSyncState. Light syncs skip the imports.
   let fwLastImport = 0;
@@ -5756,16 +5827,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(fwSyncBusy || !state.days || !state.days.length) return;
     withImports = withImports === true;
     if(withImports) fwLastImport = Date.now();
-    const req = {days:{},ref:{}};
+    const req = {days:{},ref:{},refSync:2,refManifestHash:state.refManifestHash || ''};
+    const refEpoch = fwRefEpoch;
     state.days.forEach(d => {
       const b = dayBase.get(d.date);
       if(b && b.tasks.h) req.days[d.date] = {th:b.tasks.h,jh:b.journal.h};
       if(window.odPadHash){ const ph = odPadHash(d.date); if(ph !== undefined && req.days[d.date]) req.days[d.date].ph = ph; }
     });
-    (state.reference || []).forEach(it => { const b = refBase(it); if(b.h) req.ref[it.id] = b.h; });
+    (state.reference || []).forEach(it => { const b = refBase(it); req.ref[it.id] = b.h; });
     fwSyncBusy = true;
+    const rpcStarted = performance.now();
     google.script.run
       .withSuccessHandler(out => {
+        const rpcMs = Math.round(performance.now() - rpcStarted), applyStarted = performance.now();
         fwSyncBusy = false;
         fwLastSync = Date.now();
         if(!out) return;
@@ -5779,17 +5853,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           if(e.tasks !== undefined) note = fwReconcileDay(date,'tasks',e.tasks,e.th) || note;
           if(e.journal !== undefined) note = fwReconcileDay(date,'journal',e.journal,e.jh) || note;
         });
-        Object.keys(out.ref || {}).forEach(id => {
-          const it = (state.reference || []).find(x => String(x.id) === String(id));
-          if(!it || it._timer || refInFlight) return;
-          note = fwReconcileRef(it,out.ref[id].content,out.ref[id].ch) || note;
-        });
+        if(refEpoch === fwRefEpoch) note = fwApplyReferenceSync(out) || note;
         if(note) setStatus(note);
         if(Array.isArray(out.inbox)) try{ setInbox(out.inbox); }catch(e){}
         if(retry) setTimeout(() => fwSync(false),2500);
         // New AI tasks arrive with data-ai-new: sort them into today's time sections.
         if(Object.keys(out.days || {}).length && typeof tsecPlaceAi === 'function') setTimeout(() => { try{ tsecPlaceAi(); }catch(e){} },0);
-        if(out.timing) google.script.run.withFailureHandler(() => {}).logSpeed(withImports ? 'imports' : 'sync',out.timing,{});
+        if(out.timing) google.script.run.withFailureHandler(() => {}).logSpeed(withImports ? 'imports' : 'sync',out.timing,
+          fwSpeedContext({rpcMs,applyMs:Math.round(performance.now() - applyStarted)}));
       })
       .withFailureHandler(() => { fwSyncBusy = false; })
       [withImports ? 'runImports' : 'getSyncState'](req);
@@ -6299,8 +6370,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
   }
   function addReferenceCell(afterId){
+    fwRefStructureStart();
     google.script.run
       .withSuccessHandler(id => {
+        fwRefStructureEnd();
         const item = {
           id:id,
           parentId:'',
@@ -6330,6 +6403,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           ed;
         placeEnd(ed);
       })
+      .withFailureHandler(err => { fwRefStructureEnd(); setStatus('Could not add card: ' + err.message); })
       .addReferenceItem(
         '',
         '',
@@ -6379,6 +6453,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
             ev.target.textContent = 'Restoring…';
             google.script.run
               .withSuccessHandler(reference => {
+                fwRefEpoch++;
+                state.refManifestHash = '';
                 state.reference = reference;
                 state.reference.forEach(refBase);
                 renderReference();
@@ -6407,8 +6483,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const kids = (function count(pid){ return (state.reference || []).filter(x => String(x.parentId) === String(pid)).reduce((n,x) => n + 1 + count(x.id),0); })(id);
     if(!confirm('Delete "' + name + '"' + (kids ? ' and the ' + kids + ' cell' + (kids === 1 ? '' : 's') + ' inside it' : '')
       + '?\n\nIt goes to the Archive, so you can restore it.')) return;
+    fwRefStructureStart();
     google.script.run
       .withSuccessHandler(() => {
+        fwRefStructureEnd();
         const gone = new Set([String(id)]);
         let more = true;
         while(more){
@@ -6418,6 +6496,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         state.reference = state.reference.filter(x => !gone.has(String(x.id)));
         renderReference();
       })
+      .withFailureHandler(err => { fwRefStructureEnd(); setStatus('Could not delete card: ' + err.message); })
       .deleteReferenceItem(id);
   }
   /* =========================================================
@@ -6440,6 +6519,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
   }
   function toggleReferenceCollapse(){
+    fwRefStructureStart();
     referenceCollapsed = !referenceCollapsed;
     localStorage.setItem(REF_COLLAPSE_STORAGE_KEY, referenceCollapsed ? '1' : '0');
     const expanded = !referenceCollapsed;
@@ -6448,10 +6528,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       item.expanded = expanded;
     });
     google.script.run
-      .withSuccessHandler(() => (state.reference || []).forEach(item => {
+      .withSuccessHandler(() => { fwRefStructureEnd(); (state.reference || []).forEach(item => {
         if(item.expanded === expanded) item._mb.expanded = expanded;
-      }))
-      .withFailureHandler(err => setStatus('Save error: ' + err.message))
+      }); })
+      .withFailureHandler(err => { fwRefStructureEnd(); setStatus('Save error: ' + err.message); })
       .saveReferenceExpanded(expanded);
     applyReferenceCollapseState();
     setStatus(referenceCollapsed ? 'Reference collapsed' : 'Reference expanded');
@@ -7089,10 +7169,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(it) it.sort=entry.sort; // Pending text saves keep running.
       });
       setStatus(d.into?'Moved inside — saving…':'Saving reference order…');
-      const saveOrder=()=>google.script.run
-        .withSuccessHandler(()=>setStatus('Saved'))
-        .withFailureHandler(err=>setStatus('Order save error: '+err.message))
-        .saveReferenceOrder(order);
+      const saveOrder=()=>{ fwRefStructureStart(); google.script.run
+        .withSuccessHandler(()=>{ fwRefStructureEnd(); setStatus('Saved'); })
+        .withFailureHandler(err=>{ fwRefStructureEnd(); setStatus('Order save error: '+err.message); })
+        .saveReferenceOrder(order); };
       if(parentChanged){
         sendRefItem(item,saveOrder,err=>setStatus('Move save error: '+err.message));
       }else saveOrder();

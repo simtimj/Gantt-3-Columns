@@ -7,6 +7,10 @@ on:
       - 'tools/reference-save-test.mjs'
       - 'tools/focus-save-test.mjs'
       - 'tools/import-read-test.mjs'
+      - 'tools/sync-test.mjs'
+      - 'tools/deploy-log-test.py'
+      - 'tools/smoke.mjs'
+      - '.github/scripts/build_deploy_log.py'
       - '.github/workflows/reference-checks.yaml'
   workflow_dispatch:
 permissions:
@@ -24,6 +28,8 @@ jobs:
       - run: node tools/reference-save-test.mjs
       - run: node tools/focus-save-test.mjs
       - run: node tools/import-read-test.mjs
+      - run: node tools/sync-test.mjs
+      - run: python3 tools/deploy-log-test.py
       - run: npm install --no-save playwright@1.62.1
       - run: npx playwright install --with-deps chromium
       - run: node tools/smoke.mjs

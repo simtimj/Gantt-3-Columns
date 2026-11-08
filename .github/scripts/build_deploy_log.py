@@ -42,4 +42,4 @@ def build_entries():
 
 
 if __name__ == "__main__":
-    pathlib.Path("DeployLog.gs").write_text("// Generated during deployment; do not edit.\nconst FW_DEPLOY_LOG = " + json.dumps(build_entries(), ensure_ascii=True) + ";\n")
+    pathlib.Path("DeployLog.gs").write_text("// Generated during deployment; do not edit.\nconst FW_DEPLOY_BUILD = " + json.dumps(git("rev-parse", "HEAD")) + ";\nconst FW_DEPLOY_LOG = " + json.dumps(build_entries(), ensure_ascii=True) + ";\n")

@@ -49,6 +49,8 @@ function doGet(e) {
     try { initial.timing.steps.prevPageBuild = Number(CacheService.getScriptCache().get('speedPageMs')) || 0; } catch (e) {}
   }
 
+  template.build = appBuild_(true);
+  if (initial && initial.timing) initial.timing.build = template.build;
   template.initialData = JSON.stringify(initial)
     .replace(/</g, '\\u003c')
     .replace(/\u2028/g, '\\u2028')
@@ -56,7 +58,6 @@ function doGet(e) {
 
   // Refresh button target: the app's own URL, opened in the top window.
   try { template.appUrl = ScriptApp.getService().getUrl(); } catch (err) { template.appUrl = ''; }
-  template.build = appBuild_(true);
 
   const page = template.evaluate()
     .setTitle('Focus Workspace')
@@ -146,6 +147,7 @@ function runImports(req) {
   const out = syncDiff_(req || {}, t);
   try { out.inbox = getInbox(); } catch (e) { console.error(e); } t.mark('inbox');
   out.timing = t.done();
+  out.timing.build = out.build;
   return out;
 }
 
@@ -174,6 +176,7 @@ function getWorkspaceData(opts) {
   return {
     days: days,
     reference: reference,
+    refManifestHash: referenceManifest_(reference).hash,
     urgent: urgent,
     inbox: inbox,
     cardCats: cardCats,
@@ -187,19 +190,21 @@ function getWorkspaceData(opts) {
 /* Speed timing (2026-11-04, Julius: measure, then fix). Each load's server steps + the browser's numbers go to
    the "Speed Log" tab, sent by the page after it has drawn, so logging never slows the load. Last 300 rows kept. */
 const SPEED_HEADERS = ['When', 'Kind', 'Total ms', 'Steps', 'Client', 'KB'];
+function deployedBuild_() { return typeof FW_DEPLOY_BUILD === 'string' ? FW_DEPLOY_BUILD : ''; }
 function speedTimer_() {
   const start = Date.now(), steps = {};
   let last = start;
   return {
     mark: name => { const n = Date.now(); steps[name] = n - last; last = n; },
-    done: () => ({ total: Date.now() - start, steps: steps })
+    done: () => ({ total: Date.now() - start, steps: steps, release:deployedBuild_() })
   };
 }
 function logSpeed(kind, timing, client) {
   const sheet = getOrCreateSheet_('Speed Log', SPEED_HEADERS);
   const t = timing || {};
+  const context = Object.assign({}, client || {}, { schema:2, serverRelease:String(t.release || ''), serverBuild:String(t.build || '') });
   sheet.appendRow([new Date(), String(kind || ''), Number(t.total) || 0, JSON.stringify(t.steps || {}),
-    JSON.stringify(client || {}), JSON.stringify(t.kb || {})]);
+    JSON.stringify(context), JSON.stringify(t.kb || {})]);
   const last = sheet.getLastRow();
   if (last > 320) sheet.deleteRows(2, last - 301);
 }
@@ -506,18 +511,31 @@ function backupCell_(where, col, reason, content, throttle) {
 // elsewhere since the app loaded it. req = { days: { date: {th, jh} }, ref: { id: ch } }
 function getSyncState(req) {
   const t = speedTimer_();
-  try { moveScheduleToNotes_(); } catch (e) { console.error(e); } t.mark('schedule');
-  const out = syncDiff_(req || {}, t);
+  req = req || {};
+  let snapshot = null;
+  try {
+    const dates = Object.keys(req.days || {}).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const today = todayString_(), end = addDaysToDateString_(today, 7);
+    // One request-local read serves the schedule check and the visible-date diff.
+    // Never cache across requests: direct Sheet edits must remain visible.
+    if (!dates.length || (dates[0] <= end && dates[dates.length - 1] >= today)) {
+      snapshot = getDaysRange_(dates.length && dates[0] < today ? dates[0] : today,
+        dates.length && dates[dates.length - 1] > end ? dates[dates.length - 1] : end);
+      if (moveScheduleToNotes_(snapshot.filter(d => d.date >= today && d.date <= end))) snapshot = null;
+    } else moveScheduleToNotes_(); // disjoint historical views must not pull in the gap between ranges
+  } catch (e) { snapshot = null; console.error(e); } t.mark('schedule');
+  const out = syncDiff_(req, t, snapshot);
   out.timing = t.done();
+  out.timing.build = out.build;
   return out;
 }
 
 // Cells whose hash differs from what the page has (days by date, Reference cards by id).
-function syncDiff_(req, t) {
+function syncDiff_(req, t, daysSnapshot) {
   const out = { build: appBuild_(), days: {}, ref: {} }; t.mark('build');
   const dates = Object.keys(req.days || {}).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
   if (dates.length) {
-    getDaysRange_(dates[0], dates[dates.length - 1]).forEach(d => {
+    (daysSnapshot || getDaysRange_(dates[0], dates[dates.length - 1])).forEach(d => {
       const want = req.days[d.date];
       if (!want) return;
       const e = { th: d.th, jh: d.jh, ph: d.ph };
@@ -529,13 +547,24 @@ function syncDiff_(req, t) {
   }
   t.mark('days');
   const refWant = req.ref || {};
-  if (Object.keys(refWant).length) {
-    getReference_().forEach(r => {
-      if (Object.prototype.hasOwnProperty.call(refWant, r.id) && refWant[r.id] !== r.ch) out.ref[r.id] = { content: r.content, ch: r.ch };
+  if (req.refSync === 2 || Object.keys(refWant).length) {
+    const reference = getReference_();
+    reference.forEach(r => {
+      const known = Object.prototype.hasOwnProperty.call(refWant, r.id);
+      if ((known && refWant[r.id] !== r.ch) || (!known && req.refSync === 2)) out.ref[r.id] = { content: r.content, ch: r.ch };
     });
+    if (req.refSync === 2) {
+      const manifest = referenceManifest_(reference);
+      if (req.refManifestHash !== manifest.hash) out.refManifest = manifest;
+    }
   }
   t.mark('reference');
   return out;
+}
+
+function referenceManifest_(items) {
+  const meta = items.map(r => ({ id:r.id, parentId:r.parentId, type:r.type, title:r.title, expanded:r.expanded, sort:r.sort }));
+  return { hash:cellHash_(JSON.stringify(meta)), items:meta };
 }
 
 
@@ -546,12 +575,12 @@ function syncDiff_(req, t) {
    New time-block lines added later join the same cell. */
 const SCHED_RE_ = /^\s*\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?\s*[–—-]\s*\d{1,2}:\d{2}\s*(?:[ap]\.?m\.?)?\s*·/i;
 
-function moveScheduleToNotes_() {
+function moveScheduleToNotes_(snapshot) {
   const today = todayString_();
-  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const days = getDaysRange_(today, addDaysToDateString_(today, 7));
+  const days = snapshot || getDaysRange_(today, addDaysToDateString_(today, 7));
   const todo = days.filter(d => d.tasks.indexOf('·') >= 0 && splitSchedule_(d.tasks).lines.length);
   if (!todo.length) return false;
+  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -758,6 +787,9 @@ function saveReferenceItem(item) {
     const sync = !!item.fwSync;
     let content = String(item.content || '');
     let res = sync ? { id: id, build: appBuild_() } : null;
+
+    // A stale tab must not recreate a card deleted on another device.
+    if (!row && sync && (item.expectedExisting || item.baseHash)) return { id:id, deleted:true, build:res.build };
 
     if (row) {
       const currentRow = sheet.getRange(row, 1, 1, 7).getValues()[0];

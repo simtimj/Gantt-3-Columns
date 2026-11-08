@@ -585,3 +585,4 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 To be confirmed (2026-11-08) — save timing
 
 - **Save-acknowledgement timing without extra save-log calls**: the next existing Speed Log report carries up to 50 recent changed day/Reference save round-trips, with success/conflict/error status and the responding release. Samples contain no task text or task IDs; reporting retries keep stable sample IDs. This is best-effort in-memory telemetry, not a complete audit, and excludes the autosave debounce. Refresh, edit a disposable line, and let a normal sync occur to see `Client.saveTimings`. Live latency targets remain to be agreed after measurement.
+

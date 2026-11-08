@@ -50,6 +50,10 @@ Last updated: 2026-11-08
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
+## 🧪 To be confirmed (2026-11-08)
+
+- **📅 Daily plan in the Calendar panel (phase 3a)**: a foldable **Plan** box sits above the calendar timeline for the day shown: **Big Three** (up to 3, ranked, each with an optional 🎯 target), **Stretch** (up to 3), **Next Up** (ranked, about 5) and **Backlog** (folded). **+ Add** lists your open Urgent tasks, Undated Tasks, Keep In Mind items and that day's events; pick a group, tap a task. Tap an event → **Plan:** buttons do the same. Rows **link** to the real task (nothing is copied): ticking a plan row ticks the task where it lives (and vice versa), ticking an event turns it Graphite. ▲▼ reorder, **⋯** → move to another group, **Schedule…** (a Gantt task becomes one all-day event on your main calendar, no reminder; scheduling again moves that same event), **Move to date** (events keep their id and time), **Remove from plan**. Stored in the new **Plan** tab of the Gantt Sheet, so ChatGPT can read / fill your Big Three. Drag and resize come later (3b).
+
 ## 🧪 To be confirmed (2026-11-07)
 
 - **Focus / Keep In Mind safe saves**: independent changes on two devices merge; contradictory edits show a choice instead of overwriting. Pending saves stay as device drafts and retry after failure/reload; earlier conflict drafts can be recovered. A failed load shows Retry instead of an editable empty list. Check on phone/laptop: edit different tasks, then the same task, and test reload with a pending edit. Regression checks: `node tools/focus-save-test.mjs`.
@@ -499,7 +503,7 @@ Last updated: 2026-11-08
 
 ## 📋 To do
 
-- **📅 Calendar phase 3–5** (Julius 2026-11-08): daily planning list (Big Three / Stretch / Next Up / Backlog) → timer hand-off → review. Plan in `docs/NOTES.md` → "Calendar panel (FullCalendar)"; one phase at a time, each checked before the next.
+- **📅 Calendar phase 3b–5** (Julius 2026-11-08): touch drag / resize (3b) (Big Three / Stretch / Next Up / Backlog) → timer hand-off → review. Plan in `docs/NOTES.md` → "Calendar panel (FullCalendar)"; one phase at a time, each checked before the next.
 
 - **Pages over time** (Julius 2026-11-07): totals across days, e.g. pages this week / month, maybe per book.
 - **✨ New things: suggestions** (Julius 2026-11-07): ideas for new things to try, to think through next (e.g. per-type goals, "try something from the oldest chip" nudge).

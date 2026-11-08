@@ -824,7 +824,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     // Switches: __calFail (reads fail), __calEmpty (reads return nothing), __calFailWrite (writes fail),
     // __calLoseReply (write succeeds on the "server" but the reply is lost, like a dropped connection).
     const calStub = `<script>window.__calls=[];window.__cal={ev:{},seeded:{},ops:{},n:0};
-    window.__calSrv=function(m,a){const S=window.__cal,L=luxon.DateTime,Z='America/Los_Angeles',iso=x=>L.fromISO(x,{zone:Z}).toISO({suppressMilliseconds:true});
+    window.__calSrv=function(m,a){if(m==='getFocus')return window.__focus;if(!window.luxon)return undefined;const S=window.__cal,L=luxon.DateTime,Z='America/Los_Angeles',iso=x=>L.fromISO(x,{zone:Z}).toISO({suppressMilliseconds:true});
       const put=e=>{e.id=e.eventId+'|'+e.startMs;S.ev[e.eventId]=e;return e;},ms=(x,ad)=>L.fromISO(x,{zone:Z}).toMillis();
       if(m==='getCalendarRange'){
         for(let d=a[0];d<a[1];d=L.fromISO(d).plus({days:1}).toISODate()){ if(S.seeded[d])continue; S.seeded[d]=1;
@@ -840,6 +840,28 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
         const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));S.ops[r.opId]=e.eventId;return e;}
       if(m==='calPanelUpdateEvent'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');if(e.recurring||!e.editable)throw new Error('Repeating events are read-only here');delete S.ev[r.eventId];return put(shape(e));}
       if(m==='calPanelDeleteEvent'){const e=S.ev[r.eventId];if(e&&(e.recurring||!e.editable))throw new Error('read-only');delete S.ev[r.eventId];return {ok:true};}
+      // Phase 3a plan (same rules as Code.gs: one row per ref, Big / Stretch ≤ 3 per day, Schedule = one all-day event per task).
+      S.plan=S.plan||[];const P=S.plan,MAX={big:3,stretch:3,next:50,backlog:500};
+      const evInfo=link=>{const mm=String(link||'').match(/^(.+)@([0-9]+)$/);if(!mm)return null;const e=S.ev[mm[1]];if(!e)return {eventId:mm[1],startMs:+mm[2],gone:true};
+        return {eventId:e.eventId,startMs:e.startMs,title:e.title,done:e.colorId==='8',date:e.start.slice(0,10),allDay:e.allDay,recurring:!!e.recurring,time:e.allDay?'':L.fromISO(e.start).setZone(Z).toFormat('h:mm a')};};
+      const getPlan=d=>({date:d,cal:'main',items:P.filter(x=>x.group==='next'||x.group==='backlog'||x.date===d).map(x=>Object.assign({},x,{ev:x.event?evInfo(x.event):null})).sort((a,b)=>a.rank-b.rank)});
+      if(m==='getPlan')return getPlan(a[0]);
+      if(m==='planSave'){const d=r.date,inG=(g,ex)=>P.filter(x=>x.group===g&&(MAX[g]>3||x.date===d)&&x!==ex);
+        if(r.type==='upsert'){const it=r.item,g=it.group;let x=P.find(y=>y.ref===it.ref&&(y.group==='next'||y.group==='backlog'||y.date===d));
+          if(inG(g,x).length>=MAX[g])throw new Error('full');if(!x){x={id:'p'+(++S.n),ref:it.ref};P.push(x);}const mv=x.group!==g;x.group=g;x.date=MAX[g]<=3?d:'';x.title=it.title||x.title;
+          if(it.event)x.event=it.event;if(mv||!x.rank)x.rank=inG(g,x).reduce((mx,y)=>Math.max(mx,y.rank),0)+1;}
+        else if(r.type==='remove'){const i=P.findIndex(y=>y.id===r.id);if(i>=0)P.splice(i,1);}
+        else if(r.type==='order'){r.ids.forEach((id,i)=>{const x=P.find(y=>y.id===id);if(x)x.rank=i+1;});}
+        else if(r.type==='target'){P.find(y=>y.id===r.id).target=r.target;}
+        return getPlan(d);}
+      if(m==='planSchedule'){const known=(P.find(x=>x.ref===r.ref&&x.event)||{}).event||S.planEv&&S.planEv[r.ref];let e=known&&S.ev[known.split('@')[0]];
+        const nx=L.fromISO(r.date).plus({days:1}).toISODate();
+        if(e){e.start=r.date;e.end=nx;e.startMs=ms(r.date);put(e);}else e=put({eventId:'s'+(++S.n),title:r.title,allDay:true,start:r.date,end:nx,startMs:ms(r.date),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,tag:r.ref.slice(4)});
+        const link=e.eventId+'@'+e.startMs;S.planEv=S.planEv||{};S.planEv[r.ref]=link;P.filter(x=>x.ref===r.ref).forEach(x=>x.event=link);return {event:link};}
+      if(m==='planMoveEvent'){const e=S.ev[r.eventId];if(!e||e.recurring)throw new Error('read-only');const sh=L.fromISO(r.date).diff(L.fromISO(e.start.slice(0,10)),'days').days;
+        const mv=x=>e.allDay?L.fromISO(x).plus({days:sh}).toISODate():L.fromISO(x).setZone(Z).plus({days:sh}).toISO({suppressMilliseconds:true});e.start=mv(e.start);e.end=mv(e.end);e.startMs=ms(e.start);put(e);
+        const link=e.eventId+'@'+e.startMs;P.forEach(x=>{if(String(x.event).split('@')[0]===e.eventId)x.event=link;});return {event:link};}
+      if(m==='setCalendarEventDone'){const e=S.ev[a[1]];if(!e)throw new Error('Event not found');if(a[3]){e.prev=e.colorId;e.colorId='8';e.done=true;}else{e.colorId=e.prev||'';e.done=false;}return {done:!!a[3]};}
       return undefined;};
     window.google={script:{run:new Proxy({},{get(t,k){let ok=null,bad=null;const p=new Proxy({},{get(_,m){
       if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler')return f=>{bad=f;return p;}; if(m==='withUserObject')return()=>p;
@@ -850,10 +872,13 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
         if(/^calPanel/.test(m)&&window.__calLoseReply){window.__calLoseReply=0;bad&&bad(new Error('NetworkError: connection lost'));return;}
         if(res!==undefined){ok&&ok(res);return;}
         ok&&ok(m==='runImports'||m==='getSyncState'?{build:'smoke',ref:{},inbox:[],days:{}}:m==='getMainCalendarEvents'?{date:a[0],events:[]}:null);},15);};}});return p[k];}})}};</script>`;
+    // Phase 3a: an Undated Tasks card (plus the Keep In Mind items from `focus`) so + Add has every source.
+    const calData = JSON.parse(JSON.stringify(data));
+    calData.reference.push({ id: 'r-und', parentId: '', type: 'item', title: 'Undated Tasks', content: '<h2>Undated Tasks</h2>' + line('Fix bike'), expanded: true, sort: 2 });
     const cHtml = fs.readFileSync('Index.html', 'utf8')
       .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
-      .replace('<?!= initialData ?>', JSON.stringify(data)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')
-      .replace('<head>', '<head>' + calStub);
+      .replace('<?!= initialData ?>', JSON.stringify(calData)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')
+      .replace('<head>', '<head>' + calStub.replace('<script>', '<script>window.__focus=' + JSON.stringify(focus) + ';'));
     const cOut = path.join(os.tmpdir(), 'gantt-cal-smoke.html');
     fs.writeFileSync(cOut, cHtml);
     const libs = { 'luxon@3.4.4/build/global/luxon.min.js': 'luxon/build/global/luxon.min.js',
@@ -1053,10 +1078,126 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
         return out;
       });
       errs.push(...res2.map(x => 'phase 2: ' + x));
+      // Phase 3a (2026-11-08): daily plan — link (never copy) Urgent / Undated / Keep In Mind / events, limits,
+      // rank, target, done sync both ways, Schedule = one all-day event, Move to date keeps the id, remove.
+      const res3 = await pg.evaluate(async () => {
+        const out = [], wait = ms => new Promise(r => setTimeout(r, ms));
+        const until = async (f, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (f()) return true; await wait(40); } return false; };
+        const panel = document.getElementById('calPanel'), det = panel.querySelector('[data-cal-detail]'), S = window.__cal;
+        const calls = m => window.__calls.filter(c => c[0] === m);
+        const planRow = t => [...panel.querySelectorAll('.cp-pi')].find(x => x.querySelector('.cp-ptt').textContent.includes(t));
+        const groupOf = t => { const r = planRow(t); return r && r.closest('[data-plan-group]').dataset.planGroup; };
+        const rows = () => S.plan || [];
+        const pick = async (text, g) => {
+          det.querySelector('[data-plan-act=addgroup][data-g=' + g + ']').click();
+          const b = [...det.querySelectorAll('[data-plan-act=pick]')].find(x => x.querySelector('span').textContent === text);
+          if (!b) { out.push('+ Add list has no "' + text + '"'); return; }
+          b.click(); await until(() => planRow(text)); await wait(60);
+        };
+        document.querySelector('#toolbar [data-cal-open]').click();
+        if (!await until(() => panel.querySelector('[data-plan-group=big]'))) return ['plan section never loaded: ' + panel.querySelector('[data-plan-body]').textContent];
+        const api = window.fwCalendar.api(); api.changeView('timeGridDay'); api.today(); await wait(300);
+        const day = api.formatIso(api.getDate()).slice(0, 10);
+        await until(() => calls('getPlan').some(c => c[1][0] === day));
+        if (!/Pick up to 3/.test(panel.querySelector('[data-plan-group=big]').textContent)) out.push('empty Big Three has no hint');
+        // + Add lists every source.
+        panel.querySelector('[data-plan-act=add]').click(); await wait(80);
+        const listText = det.textContent;
+        for (const [src, t] of [['Urgent', 'Pay rent'], ['Undated Tasks', 'Fix bike'], ['Keep In Mind', 'Gloves'], ['Events this day', 'Dentist']])
+          if (!listText.includes(src) || !listText.includes(t)) out.push('+ Add misses ' + src + ' / ' + t);
+        if (/Bait/.test(listText)) out.push('+ Add lists a finished Keep In Mind item');
+        const todayLine = () => [...document.querySelectorAll('#todayScroll .day-editor .check-line')].find(l => l.textContent.trim() === 'Pay rent');
+        const nLines = document.querySelectorAll('#todayScroll .day-editor .check-line').length;
+        await pick('Pay rent', 'big');
+        await pick('Fix bike', 'big');
+        await pick('Gloves', 'next');
+        await pick('Dentist', 'stretch');
+        det.querySelector('[data-cal-detail-close]').click(); await wait(60);
+        const tid = todayLine() && todayLine().dataset.tid;
+        if (!tid || !/^m-/.test(tid)) out.push('planned Gantt line got no task id');
+        if (document.querySelectorAll('#todayScroll .day-editor .check-line').length !== nLines) out.push('planning copied a line into Today');
+        const r1 = rows().find(x => x.ref === 'tid:' + tid);
+        if (!r1 || r1.group !== 'big' || r1.date !== day) out.push('Plan row for Pay rent wrong: ' + JSON.stringify(r1));
+        if (!rows().some(x => x.ref === 'tid:m-a' && x.group === 'next' && !x.date)) out.push('Keep In Mind item not linked by its id in Next Up');
+        if (!rows().some(x => /^cal:b-/.test(x.ref) && x.group === 'stretch')) out.push('event not linked as cal: ref in Stretch');
+        if (groupOf('Pay rent') !== 'big' || groupOf('Gloves') !== 'next' || groupOf('Dentist') !== 'stretch') out.push('plan groups drawn wrong');
+        // Adding the same task again moves it, never a second row.
+        panel.querySelector('[data-plan-act=add]').click(); await wait(60);
+        await pick('Gloves', 'backlog');
+        det.querySelector('[data-cal-detail-close]').click(); await wait(60);
+        if (rows().filter(x => x.ref === 'tid:m-a').length !== 1 || rows().find(x => x.ref === 'tid:m-a').group !== 'backlog') out.push('re-adding made a duplicate or did not move');
+        // Big Three holds 3: a 4th is refused without a server call.
+        panel.querySelector('[data-plan-act=add]').click(); await wait(60);
+        await pick('Book trip', 'big');
+        const nSave = calls('planSave').length;
+        det.querySelector('[data-plan-act=addgroup][data-g=big]').click();
+        const ev4 = [...det.querySelectorAll('[data-plan-act=pick]')].find(x => /Old chore|Standup|All-day A/.test(x.textContent));
+        if (ev4) { ev4.click(); await wait(100); }
+        det.querySelector('[data-cal-detail-close]').click(); await wait(60);
+        if (calls('planSave').length !== nSave || rows().filter(x => x.group === 'big').length !== 3) out.push('Big Three took a 4th item');
+        if (!/full/.test(panel.querySelector('[data-plan-body]').textContent)) out.push('no "full" message for a 4th Big Three item');
+        // Rank: ▼ on #1 swaps it with #2.
+        planRow('Pay rent').querySelector('[data-plan-act=down]').click();
+        await until(() => calls('planSave').some(c => c[1][0].type === 'order'));
+        await wait(100);
+        const order = [...panel.querySelectorAll('[data-plan-group=big] .cp-ptt')].map(x => x.textContent);
+        if (!/Fix bike/.test(order[0]) || !/Pay rent/.test(order[1])) out.push('reorder did not swap: ' + order.join(' | '));
+        // Target on a Big Three item.
+        planRow('Fix bike').querySelector('[data-plan-act=target]').click(); await wait(60);
+        det.querySelector('[data-plan-target-in]').value = 'tires pumped';
+        det.querySelector('[data-plan-act=tsave]').click();
+        await until(() => /🎯 tires pumped/.test(planRow('Fix bike')?.textContent || ''));
+        if (!/🎯 tires pumped/.test(planRow('Fix bike')?.textContent || '')) out.push('target not saved / shown');
+        // Done from the plan ticks the real Gantt line (and back).
+        const cb = planRow('Pay rent').querySelector('[data-plan-done]');
+        cb.click(); await wait(200);
+        if (!todayLine() || !todayLine().querySelector('input').checked) out.push('plan tick did not tick the Today line');
+        todayLine().querySelector('input').click(); await wait(500);
+        if (planRow('Pay rent').querySelector('[data-plan-done]').checked) out.push('unticking in Today did not untick the plan row');
+        // A Keep In Mind item ticks its item.
+        panel.querySelector('[data-plan-act=bkfold]').click(); await wait(60);
+        const kb = planRow('Gloves')?.querySelector('[data-plan-done]');
+        if (!kb) out.push('Backlog did not open'); else { kb.click(); await wait(150); if (!(window.focusFindItem('m-a') || {}).d) out.push('plan tick did not finish the Keep In Mind item'); }
+        // Schedule… a Gantt task → one all-day event, again → moved (same event).
+        planRow('Fix bike').querySelector('[data-plan-act=more]').click(); await wait(60);
+        det.querySelector('[data-plan-date]').value = day; det.querySelector('[data-plan-act=sched]').click();
+        await until(() => det.hidden && /📅/.test(planRow('Fix bike')?.textContent || ''));
+        const sch = Object.values(S.ev).filter(e => e.title === 'Fix bike');
+        if (sch.length !== 1 || !sch[0].allDay || sch[0].start !== day || !sch[0].tag) out.push('Schedule did not make one tagged all-day event: ' + JSON.stringify(sch));
+        const later = luxon.DateTime.fromISO(day).plus({ days: 2 }).toISODate();
+        planRow('Fix bike').querySelector('[data-plan-act=more]').click(); await wait(60);
+        det.querySelector('[data-plan-date]').value = later; det.querySelector('[data-plan-act=sched]').click();
+        await until(() => det.hidden); await wait(200);
+        const sch2 = Object.values(S.ev).filter(e => e.title === 'Fix bike');
+        if (sch2.length !== 1 || sch2[0].eventId !== sch[0].eventId || sch2[0].start !== later) out.push('rescheduling made a second event or did not move it');
+        // Tick an event in the plan → Graphite; Move to date keeps its id.
+        const dRow = planRow('Dentist'), did = rows().find(x => /^cal:b-/.test(x.ref)).ref.slice(4);
+        dRow.querySelector('[data-plan-done]').click();
+        await until(() => calls('setCalendarEventDone').length);
+        await wait(150);
+        if (S.ev[did].colorId !== '8') out.push('ticking an event in the plan did not make it Graphite');
+        planRow('Dentist').querySelector('[data-plan-act=more]').click(); await wait(60);
+        det.querySelector('[data-plan-date]').value = later; det.querySelector('[data-plan-act=move]').click();
+        await until(() => det.hidden); await wait(200);
+        if (!S.ev[did] || S.ev[did].start.slice(0, 10) !== later || !/09:00/.test(S.ev[did].start)) out.push('Move to date lost the event, its id or its time: ' + JSON.stringify(S.ev[did]));
+        // Remove from plan → row gone, task untouched.
+        planRow('Fix bike').querySelector('[data-plan-act=more]').click(); await wait(60);
+        det.querySelector('[data-plan-act=remove]').click(); await until(() => !planRow('Fix bike'));
+        if (rows().some(x => x.ref === 'tid:' + (backlogCell()?.querySelector('.check-line')?.dataset.tid || 'x'))) out.push('remove left the row');
+        if (!backlogCell() || !/Fix bike/.test(backlogCell().textContent)) out.push('remove touched the task itself');
+        // Fold persists; nothing on the calendar was created besides the Schedule event.
+        panel.querySelector('[data-plan-act=fold]').click(); await wait(60);
+        if (!panel.querySelector('.cp-plan.folded') || panel.querySelector('.cp-pi')) out.push('plan did not fold');
+        panel.querySelector('[data-plan-act=fold]').click(); await wait(60);
+        if (calls('calPanelCreateEvent').length > 5) out.push('planning created calendar events through the event form');
+        panel.querySelector('[data-cal-close]').click(); await wait(320);
+        return out;
+      });
+      errs.push(...res3.map(x => 'phase 3a: ' + x));
       const shot = process.argv.indexOf('--shot');
       if (shot > 0) { await pg.click('#toolbar [data-cal-open]'); await pg.waitForTimeout(900); await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-calendar-' + name + '.png') }); }
       if (errs.length) { fails += errs.length; console.error('✗ calendar ' + name + ':\n  ' + errs.join('\n  ')); }
-      else console.log('✓ calendar ' + name + ': view (phase 1) + create / edit / delete, no duplicates, failures (phase 2)');
+      else console.log('✓ calendar ' + name + ': view (1) + create / edit / delete (2) + daily plan, schedule, move, done sync (3a)');
       await ctx.close();
     }
   }

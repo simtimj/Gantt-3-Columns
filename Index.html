@@ -7630,6 +7630,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(typeof focusId === 'function') focusId(); else if(focusId) focusTask(focusId);
     }
     // A copy ticked / unticked elsewhere (Today, Plan / think, Reference) → the focus task follows.
+    // Daily plan (2026-11-08): open items for the 📅 plan's + Add list, and a lookup by id.
+    window.focusOpenItems = () => !data ? [] : data.cats.flatMap(c => itemsOf(c).filter(t => !t.n && !t.d && String(t.t || '').trim()).map(t => ({id:t.id, t:String(t.t).replace(/\s+/g,' ').trim(), cat:c.name})));
+    window.focusFindItem = id => { const t = data ? findTask(id) : null; return t ? {t:t.t, d:t.d} : null; };
     window.focusTidToggled = (id,on) => {
       if(!data) return;
       const t = findTask(id); if(!t || !!t.d === on) return;
@@ -13546,6 +13549,57 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // Focus Tracking phase 2 (2026-11-01): focus tasks live in focusData, not in a cell, so they
     // reach their copies through these. Focus is the source of the task's title.
     window.tidAnyOn = tid => copies(tid,null).some(isOn);
+    /* Daily plan bridge (Calendar panel phase 3a, 2026-11-08): the 📅 panel links plan rows to tasks by tid, never
+       copies them. candidates() = open tasks in loaded lists (Urgent lines in day / Plan / Notes cells, Undated Tasks,
+       Keep In Mind); ensureTid() gives a line a tid the first time it's planned (saved like a mirror); setDone() ticks
+       the task the normal way (one real checkbox change → time sections, mirrors, Keep In Mind, Urgent, save). */
+    const PRI = l => { const o = ownerOf(l); return !o ? 9 : o.classList.contains('day-editor') ? 0 : o.classList.contains('plan-editor') ? 1 : isBacklogCell(o) ? 2 : o.classList.contains('journal-editor') ? 3 : 4; };
+    const liveLines = tid => [...document.querySelectorAll('.check-line[data-tid=' + q(tid) + ']')].filter(l => ownerOf(l) && l.closest('#todayScroll,#journalScroll,#referenceTree')).sort((a,b) => PRI(a) - PRI(b));
+    window.fwTasks = {
+      candidates(){
+        const out = [], seen = new Set(), text = l => (typeof lineText === 'function' ? lineText(l) : l.textContent).replace(/\s+/g,' ').trim();
+        const add = (src,where,l) => {
+          if(!l || seen.has(l) || isOn(l) || l.dataset.arch || l.dataset.htid) return;
+          const t = text(l); if(!t) return;
+          if(l.dataset.tid){ if(seen.has('t:' + l.dataset.tid)) return; seen.add('t:' + l.dataset.tid); }
+          seen.add(l); out.push({src, where, text:t, tid:l.dataset.tid || '', line:l, urg:Number(l.dataset.urg) || 0});
+        };
+        const back = typeof backlogCell === 'function' ? backlogCell() : null;
+        document.querySelectorAll('#todayScroll .day-editor,#todayScroll .plan-editor,#journalScroll .journal-editor').forEach(ed =>
+          ed.querySelectorAll('.check-line[data-urg]').forEach(l => { if(/^[123]$/.test(l.dataset.urg) && ownerOf(l) === ed) add('urgent', ed.dataset.date ? (typeof shortDate === 'function' ? shortDate(ed.dataset.date) : ed.dataset.date) : '', l); }));
+        if(back) back.querySelectorAll('.check-line').forEach(l => { if((Number(l.dataset.level) || 0) === 0 || /^[123]$/.test(l.dataset.urg || '')) add(/^[123]$/.test(l.dataset.urg || '') ? 'urgent' : 'undated', 'Undated', l); });
+        (window.focusOpenItems ? window.focusOpenItems() : []).forEach(t => {
+          if(seen.has('t:' + t.id)) return; seen.add('t:' + t.id);
+          out.push({src:'kim', where:t.cat, text:t.t, tid:t.id, line:null, urg:0});
+        });
+        return out;
+      },
+      ensureTid(c){
+        if(c.tid) return c.tid;
+        const l = c.line, o = ownerOf(l); if(!l || !o) return '';
+        const tid = newTid();
+        edit(o,() => { l.dataset.tid = tid; });
+        c.tid = tid;
+        return tid;
+      },
+      // {text, done, where} from the first live copy, else from Keep In Mind; null when it isn't loaded.
+      info(tid){
+        const l = liveLines(tid)[0];
+        if(l){ const t = l.querySelector('.check-text'); return {text:(t ? t.textContent : l.textContent).replace(/\s+/g,' ').trim(), done:isOn(l)}; }
+        const f = window.focusFindItem ? window.focusFindItem(tid) : null;
+        return f ? {text:f.t, done:!!f.d} : null;
+      },
+      setDone(tid,on){
+        const l = liveLines(tid)[0];
+        if(l){
+          const b = boxOf(l); if(!b) return false;
+          if(b.checked !== on){ b.checked = on; b.dispatchEvent(new Event('change',{bubbles:true})); }
+          return true;
+        }
+        if(window.focusFindItem && window.focusFindItem(tid)){ window.focusTidToggled(tid,on); return true; }
+        return false;
+      }
+    };
     window.tidSet = function(tid,on,html){
       if(syncing || !tid) return;
       syncing = true;
@@ -14456,7 +14510,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 })();
 </script>
 <!-- 📅 Calendar panel (2026-11-08, Julius): FullCalendar slide-out from the right. Phase 1 read-only view; phase 2 adds
-     create / edit / delete on the main calendar (repeating events stay read-only).
+     create / edit / delete on the main calendar (repeating events stay read-only); phase 3a adds the daily plan
+     (Big Three / Stretch / Next Up / Backlog) above the timeline, stored in the Sheet's Plan tab.
      Google Calendar stays the source of truth; server side is getCalendarRange() (Code.gs, never writes).
      FullCalendar + luxon load from jsDelivr on the first open only, so app start-up is unchanged.
      Later phases (editing, daily planning, timer, review): docs/NOTES.md → "Calendar panel (FullCalendar)". -->
@@ -14522,6 +14577,49 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-detail .cp-da button:disabled{opacity:.6;cursor:default;}
   #calPanel .cp-da .cp-sp{flex:1;}
   #calPanel .cp-note{font-size:12px;color:var(--cp-muted);margin-top:6px;}
+  /* Phase 3a: daily plan above the timeline. */
+  #calPanel .cp-plan{flex:0 0 auto;max-height:42%;overflow:auto;border:1px solid var(--cp-line);border-radius:10px;margin-bottom:6px;background:var(--cp-bg);}
+  #calPanel .cp-plan.busy{opacity:.75;}
+  #calPanel .cp-ph{display:flex;align-items:center;gap:6px;padding:4px 6px;position:sticky;top:0;background:var(--cp-bg);z-index:1;border-bottom:1px solid var(--cp-line);}
+  #calPanel .cp-plan.folded .cp-ph{border-bottom:0;}
+  #calPanel .cp-plan.folded .cp-parr{display:inline-block;transform:rotate(-90deg);}
+  #calPanel .cp-ph button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer;min-height:32px;padding:0 6px;}
+  #calPanel .cp-pfold{font-weight:600;flex:1;text-align:left;}
+  #calPanel .cp-pcnt{font-size:12px;color:var(--cp-muted);}
+  #calPanel .cp-ph .cp-padd{border:1px solid var(--cp-line);border-radius:8px;background:var(--cp-soft);}
+  #calPanel .cp-pbody{padding:2px 6px 6px;}
+  #calPanel .cp-pg{margin-top:4px;}
+  #calPanel .cp-pgh{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--cp-muted);text-transform:uppercase;letter-spacing:.03em;padding:2px 0;}
+  #calPanel .cp-pgh button{font:inherit;color:inherit;background:transparent;border:0;padding:0;cursor:pointer;text-transform:uppercase;letter-spacing:.03em;}
+  #calPanel .cp-pg[data-plan-group=big] .cp-pgt{color:var(--cp-text);font-weight:700;}
+  #calPanel .cp-pe{font-size:12px;color:var(--cp-muted);padding:2px 0 4px;font-style:italic;}
+  #calPanel .cp-pi{display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-top:1px solid var(--cp-soft);}
+  #calPanel .cp-pi input[type=checkbox]{width:18px;height:18px;margin:2px 0 0;flex:0 0 auto;}
+  #calPanel .cp-pi.done .cp-ptt{text-decoration:line-through;opacity:.6;}
+  #calPanel .cp-pt2{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  #calPanel .cp-ptt{overflow-wrap:anywhere;}
+  #calPanel .cp-pm{font-size:11px;color:var(--cp-muted);}
+  #calPanel .cp-tg{align-self:flex-start;font:inherit;font-size:12px;color:var(--cp-muted);background:transparent;border:0;padding:0;cursor:pointer;text-align:left;}
+  #calPanel .cp-pbtn{display:flex;gap:2px;flex:0 0 auto;}
+  #calPanel .cp-pbtn button{font:inherit;font-size:12px;color:inherit;background:var(--cp-soft);border:1px solid var(--cp-line);border-radius:6px;min-width:28px;min-height:28px;padding:0;cursor:pointer;}
+  #calPanel .cp-pbtn button:disabled{opacity:.35;cursor:default;}
+  #calPanel .cp-pmsg{font-size:12px;color:var(--cp-muted);padding:4px 0;}
+  #calPanel .cp-pmsg.err{color:#c5221f;}
+  #calPanel .cp-pmsg button{font:inherit;font-size:12px;border:1px solid currentColor;border-radius:6px;background:transparent;color:inherit;padding:2px 8px;cursor:pointer;}
+  #calPanel .cp-seg{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0;}
+  #calPanel .cp-detail .cp-seg button{font:inherit;font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--cp-line);background:var(--cp-soft);color:inherit;cursor:pointer;}
+  #calPanel .cp-detail .cp-seg button.on{background:#1a73e8;border-color:#1a73e8;color:#fff;}
+  #calPanel .cp-psearch{font:inherit;font-size:16px;width:100%;box-sizing:border-box;color:var(--cp-text);background:var(--cp-bg);border:1px solid var(--cp-line);border-radius:8px;padding:6px 8px;min-height:38px;margin:4px 0;}
+  #calPanel .cp-plist{max-height:min(46vh,360px);overflow:auto;display:flex;flex-direction:column;}
+  #calPanel .cp-pls{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--cp-muted);margin:8px 0 2px;}
+  #calPanel .cp-detail .cp-pc{display:flex;flex-direction:column;align-items:flex-start;text-align:left;font:inherit;font-size:14px;color:inherit;background:transparent;border:0;border-top:1px solid var(--cp-soft);padding:7px 2px;cursor:pointer;}
+  #calPanel .cp-detail .cp-pc small{color:var(--cp-muted);font-size:11px;}
+  #calPanel .cp-row2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  #calPanel .cp-row2 > span{font-size:13px;color:var(--cp-muted);}
+  #calPanel .cp-row2 input[type=date]{font:inherit;font-size:16px;color:var(--cp-text);background:var(--cp-bg);border:1px solid var(--cp-line);border-radius:8px;padding:5px 8px;min-height:36px;}
+  #calPanel .cp-detail .cp-row2 button{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid #1a73e8;background:#1a73e8;color:#fff;cursor:pointer;}
+  #calPanel .cp-detail .cp-plan-ev{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:8px;font-size:12px;color:var(--cp-muted);}
+  #calPanel .cp-detail .cp-plan-ev button{font:inherit;font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--cp-line);background:var(--cp-soft);color:var(--cp-text);cursor:pointer;}
 </style>
 <div id="calPanelBackdrop" aria-hidden="true"></div>
 <aside id="calPanel" role="dialog" aria-modal="true" aria-label="Calendar" aria-hidden="true">
@@ -14533,6 +14631,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   </div>
   <div class="cp-state" data-cal-state hidden></div>
   <div class="cp-body">
+    <section class="cp-plan" data-cal-plan aria-label="Daily plan">
+      <div class="cp-ph"><button type="button" class="cp-pfold" data-plan-act="fold" title="Fold / open the plan"><span class="cp-parr">▾</span> Plan · <span data-plan-day></span></button><span class="cp-pcnt" data-plan-count></span><button type="button" class="cp-padd" data-plan-act="add">+ Add</button></div>
+      <div class="cp-pbody" data-plan-body></div>
+    </section>
     <div id="calMount"></div>
     <div class="cp-detail" data-cal-detail hidden></div>
   </div>
@@ -14619,7 +14721,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       '<div class="cp-da">' + (x.editable ? '<button type="button" class="cp-primary" data-cal-edit>Edit</button><button type="button" class="cp-danger" data-cal-del>Delete</button>' : '') +
       (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener">Google Calendar</a>' : '') +
       '<span class="cp-sp"></span><button type="button" data-cal-detail-close>Close</button></div>' +
+      (x.editable && planData ? '<div class="cp-plan-ev">Plan:' + PLAN_G.map(([g, n]) => '<button type="button" data-plan-act="evplan" data-g="' + g + '">' + n + '</button>').join('') + '</div>' : '') +
       (why ? '<div class="cp-note">' + esc(why) + '</div>' : '');
+    detail.dataset.pid = '';
     detail.hidden = false;
   }
   // ---- Phase 2: create / edit / delete (main calendar, non-repeating). Google Calendar stays the truth: after every
@@ -14629,7 +14733,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function flash(msg){ flashUntil = Date.now() + 2500; setState('ok', msg); setTimeout(() => { flashUntil = 0; refreshState(); }, 2600); }
   // f = {allDay, sd, st, ed, et} in Los Angeles wall time; ed is the LAST day (inclusive) for all-day events.
   function openForm(f, ev){
-    sheetEv = ev || null; pending = false;
+    sheetEv = ev || null; pending = false; detail.dataset.pid = '';
     const x = ev ? ev.extendedProps : null;
     detail.innerHTML = '<form class="cp-form' + (f.allDay ? ' allday' : '') + '" data-cal-form data-op="' + newOp() + '" novalidate>' +
       '<div class="cp-dt">' + (x ? 'Edit event' : 'New event') + '<span style="font-weight:400;color:var(--cp-muted);font-size:12px;margin-left:auto">Main calendar</span></div>' +
@@ -14688,7 +14792,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     google.script.run.withSuccessHandler(() => {
       pending = false;
       if(detail.contains(form)){ detail.hidden = true; sheetEv = null; }
-      flash(x ? 'Saved ✓' : 'Added ✓'); cal.refetchEvents();
+      flash(x ? 'Saved ✓' : 'Added ✓'); cal.refetchEvents(); loadPlan(true);
     }).withFailureHandler(err => {
       pending = false; btn.disabled = false; btn.textContent = 'Retry save';
       errEl.textContent = 'Not saved: ' + errText(err) + '. Your text is still here — tap Retry save.';
@@ -14706,12 +14810,233 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const x = sheetEv.extendedProps, errEl = detail.querySelector('[data-cal-ferr]');
     pending = true; btn.disabled = true; btn.textContent = 'Deleting…';
     google.script.run.withSuccessHandler(() => {
-      pending = false; detail.hidden = true; sheetEv = null; flash('Deleted ✓'); cal.refetchEvents();
+      pending = false; detail.hidden = true; sheetEv = null; flash('Deleted ✓'); cal.refetchEvents(); loadPlan(true);
     }).withFailureHandler(err => {
       pending = false; btn.disabled = false; btn.textContent = 'Retry delete';
       if(errEl) errEl.textContent = 'Not deleted: ' + errText(err) + '.';
     }).calPanelDeleteEvent({eventId: x.eventId, startMs: x.startMs});
   }
+  // ---- Phase 3a: daily plan (Big Three / Stretch for the day shown, Next Up / Backlog undated). Rows live in the
+  // Sheet's Plan tab (getPlan / planSave in Code.gs) and LINK to tasks: 'tid:<id>' (Gantt line, Undated Tasks,
+  // Keep In Mind — window.fwTasks) or 'cal:<eventId>'. Nothing is copied; titles / done come from the live task.
+  const planEl = panel.querySelector('[data-cal-plan]'), planBody = panel.querySelector('[data-plan-body]');
+  const PLAN_G = [['big','Big Three',3],['stretch','Stretch',3],['next','Next Up',0],['backlog','Backlog',0]];
+  const PLAN_NAME = {big:'Big Three', stretch:'Stretch', next:'Next Up', backlog:'Backlog'};
+  let planDay = '', planData = null, planBusy = false, planErr = '', planSeq = 0, addGroup = 'big';
+  const planFolded = () => lsGet('fw.calPlanFold') === '1';
+  const bkOpen = () => lsGet('fw.calPlanBk') === '1';
+  const fmtDay = d => { try { return L().fromISO(d, {zone: TZ}).toFormat('EEE MMM d'); } catch (e) { return d; } };
+  function pickPlanDay(){
+    const today = L().now().setZone(TZ).toISODate();
+    return cal && cal.view.type === 'timeGridDay' ? viewStart : (today >= viewStart && today < viewEnd ? today : viewStart);
+  }
+  function loadPlan(force){
+    const d = pickPlanDay();
+    if(!d || (!force && d === planDay && planData)) { renderPlan(); return; }
+    planDay = d; const seq = ++planSeq;
+    if(!planData || planData.date !== d) planData = null;
+    planErr = ''; renderPlan();
+    google.script.run.withSuccessHandler(r => { if(seq !== planSeq) return; planData = r; planErr = ''; renderPlan(); })
+      .withFailureHandler(err => { if(seq !== planSeq) return; planErr = 'Couldn’t load the plan: ' + errText(err); renderPlan(); })
+      .getPlan(d);
+  }
+  // Live view of a plan row: title, done, where / when.
+  function planView(it){
+    const ev = it.ev && !it.ev.gone ? it.ev : null;
+    let title = it.title, done = false, meta = '', canTick = true;
+    if(it.ref.indexOf('tid:') === 0){
+      const inf = window.fwTasks ? window.fwTasks.info(it.ref.slice(4)) : null;
+      if(inf){ title = inf.text || title; done = inf.done; } else if(!ev){ canTick = false; meta = 'not loaded'; }
+      if(ev){ done = done || ev.done; meta = '📅 ' + fmtDay(ev.date); }
+    } else {
+      if(ev){ title = ev.title || title; done = ev.done; meta = (ev.date === planDay ? '' : '📅 ' + fmtDay(ev.date) + ' ') + (ev.allDay ? 'all day' : ev.time); }
+      else { meta = 'event deleted'; canTick = false; }
+    }
+    if(it.ev && it.ev.gone && it.ref.indexOf('tid:') === 0) meta = (meta ? meta + ' · ' : '') + 'event gone';
+    return {title, done, meta: meta.trim(), canTick};
+  }
+  function planItems(g){ return ((planData && planData.items) || []).filter(x => x.group === g).sort((a,b) => a.rank - b.rank); }
+  function renderPlan(){
+    if(!planEl) return;
+    const folded = planFolded();
+    planEl.classList.toggle('folded', folded);
+    const all = (planData && planData.items) || [];
+    panel.querySelector('[data-plan-day]').textContent = planDay ? fmtDay(planDay) : '';
+    const nb = planItems('big').length, ns = planItems('stretch').length;
+    panel.querySelector('[data-plan-count]').textContent = planData ? 'Big ' + nb + '/3' + (ns ? ' · Stretch ' + ns : '') : '';
+    if(folded){ planBody.innerHTML = ''; return; }
+    let h = planErr ? '<div class="cp-pmsg err">' + esc(planErr) + ' <button type="button" data-plan-act="retry">Retry</button></div>' : '';
+    if(!planData){ planBody.innerHTML = h || '<div class="cp-pmsg">Loading plan…</div>'; return; }
+    PLAN_G.forEach(([g, name, max]) => {
+      const items = planItems(g), open = g !== 'backlog' || bkOpen();
+      h += '<div class="cp-pg" data-plan-group="' + g + '"><div class="cp-pgh">' + (g === 'backlog' ? '<button type="button" class="cp-pgt" data-plan-act="bkfold">' + (open ? '▾ ' : '▸ ') + name + '</button>' : '<span class="cp-pgt">' + name + '</span>') +
+        '<span class="cp-pgn">' + items.length + (max ? '/' + max : '') + '</span></div>';
+      if(open){
+        if(!items.length) h += '<div class="cp-pe">' + (g === 'big' ? 'Pick up to 3 essentials for ' + esc(fmtDay(planDay)) + ' — + Add' : g === 'stretch' ? 'Optional, after the essentials' : g === 'next' ? 'About 5 ready tasks, ranked' : 'Everything else worth keeping') + '</div>';
+        items.forEach((it, i) => {
+          const v = planView(it);
+          h += '<div class="cp-pi' + (v.done ? ' done' : '') + '" data-pid="' + esc(it.id) + '">' +
+            '<input type="checkbox" data-plan-done' + (v.done ? ' checked' : '') + (v.canTick ? '' : ' disabled title="Not loaded here — tick it in its list"') + ' aria-label="Done">' +
+            '<div class="cp-pt2"><span class="cp-ptt">' + (g === 'big' || g === 'next' ? '<b>' + (i + 1) + '.</b> ' : '') + esc(v.title || '(untitled)') + '</span>' +
+            (v.meta ? '<span class="cp-pm">' + esc(v.meta) + '</span>' : '') +
+            (g === 'big' ? '<button type="button" class="cp-tg" data-plan-act="target">' + (it.target ? '🎯 ' + esc(it.target) : '+ target') + '</button>' : '') + '</div>' +
+            '<span class="cp-pbtn"><button type="button" data-plan-act="up" aria-label="Move up"' + (i ? '' : ' disabled') + '>▲</button><button type="button" data-plan-act="down" aria-label="Move down"' + (i < items.length - 1 ? '' : ' disabled') + '>▼</button><button type="button" data-plan-act="more" aria-label="More">⋯</button></span></div>';
+        });
+      }
+      h += '</div>';
+    });
+    planBody.innerHTML = h;
+    void all;
+  }
+  function planOp(op, done){
+    if(planBusy) return;
+    planBusy = true; planEl.classList.add('busy');
+    google.script.run.withSuccessHandler(r => {
+      planBusy = false; planEl.classList.remove('busy');
+      if(r && r.items){ planData = r; planErr = ''; }
+      renderPlan(); if(done) done(r);
+    }).withFailureHandler(err => {
+      planBusy = false; planEl.classList.remove('busy');
+      planErr = 'Not saved: ' + errText(err); renderPlan();
+    }).planSave(Object.assign({date: planDay}, op));
+  }
+  const planById = id => ((planData && planData.items) || []).find(x => x.id === id);
+  function planAdd(c, group, after){
+    const full = PLAN_G.find(x => x[0] === group)[2];
+    const at = planItems(group).filter(x => x.ref !== c.ref);
+    if(full && at.length >= full){ planErr = PLAN_NAME[group] + ' is full (3) — remove one first'; renderPlan(); return; }
+    planOp({type: 'upsert', item: {group, ref: c.ref, title: c.text, event: c.event || ''}}, () => { flash('Added to ' + PLAN_NAME[group] + ' ✓'); if(after) after(); });
+  }
+  // + Add: open tasks from Urgent / Undated Tasks / Keep In Mind / this day's events, plus a group choice.
+  function planCandidates(){
+    const out = [];
+    (window.fwTasks ? window.fwTasks.candidates() : []).forEach(c => out.push({src: c.src, where: c.where, text: c.text, ref: c.tid ? 'tid:' + c.tid : '', raw: c}));
+    if(cal) cal.getEvents().forEach(ev => {
+      const x = ev.extendedProps || {};
+      if(!x.editable || x.done || String(x.start).slice(0, 10) !== planDay) return;
+      out.push({src: 'cal', where: x.allDay ? 'all day' : fmtWhen(ev).split(' · ').slice(-1)[0], text: ev.title, ref: 'cal:' + x.eventId, event: x.eventId + '@' + x.startMs});
+    });
+    return out;
+  }
+  let candCache = [];
+  function openAdd(){
+    if(!planData) return;
+    if(planItems('big').length >= 3 && addGroup === 'big') addGroup = 'next';
+    candCache = planCandidates();
+    detail.innerHTML = '<div class="cp-dt">Add to plan<span style="font-weight:400;color:var(--cp-muted);font-size:12px;margin-left:auto">' + esc(fmtDay(planDay)) + '</span></div>' +
+      '<div class="cp-seg">' + PLAN_G.map(([g, n]) => '<button type="button" data-plan-act="addgroup" data-g="' + g + '"' + (g === addGroup ? ' class="on"' : '') + '>' + n + '</button>').join('') + '</div>' +
+      '<input type="search" class="cp-psearch" data-plan-search placeholder="Find a task…" autocomplete="off" enterkeyhint="search">' +
+      '<div class="cp-plist" data-plan-list></div><div class="cp-ferr" data-cal-ferr></div>' +
+      '<div class="cp-da"><span class="cp-sp"></span><button type="button" data-cal-detail-close>Done</button></div>';
+    detail.hidden = false;
+    renderCands('');
+  }
+  function renderCands(qs){
+    const list = detail.querySelector('[data-plan-list]'); if(!list) return;
+    const q2 = qs.trim().toLowerCase(), planned = {};
+    ((planData && planData.items) || []).forEach(x => { planned[x.ref] = x.group; });
+    const SRC = [['urgent','Urgent'],['undated','Undated Tasks'],['kim','Keep In Mind'],['cal','Events this day']];
+    let h = '';
+    SRC.forEach(([src, name]) => {
+      const rows = candCache.map((c, i) => [c, i]).filter(([c]) => c.src === src && (!q2 || c.text.toLowerCase().indexOf(q2) >= 0));
+      if(!rows.length) return;
+      h += '<div class="cp-pls">' + name + '</div>' + rows.slice(0, 60).map(([c, i]) =>
+        '<button type="button" class="cp-pc" data-plan-act="pick" data-i="' + i + '"><span>' + esc(c.text) + '</span><small>' + esc(c.where || '') + (planned[c.ref] ? ' · ✓ ' + PLAN_NAME[planned[c.ref]] : '') + '</small></button>').join('');
+    });
+    list.innerHTML = h || '<div class="cp-pe">' + (q2 ? 'Nothing matches.' : 'No open tasks in the loaded lists.') + '</div>';
+  }
+  function openMore(it){
+    const v = planView(it), isTid = it.ref.indexOf('tid:') === 0, ev = it.ev && !it.ev.gone ? it.ev : null;
+    const canMove = !isTid && ev && !ev.recurring;
+    detail.innerHTML = '<div class="cp-dt">' + esc(v.title || '(untitled)') + '</div>' + (v.meta ? '<div class="cp-dm">' + esc(v.meta) + '</div>' : '') +
+      '<div class="cp-dm" style="margin-top:8px">Move to</div><div class="cp-seg">' + PLAN_G.map(([g, n]) => '<button type="button" data-plan-act="group" data-g="' + g + '"' + (g === it.group ? ' class="on" disabled' : '') + '>' + n + '</button>').join('') + '</div>' +
+      (isTid ? '<div class="cp-row2"><span>' + (ev ? 'Reschedule' : 'Schedule') + '</span><input type="date" data-plan-date value="' + esc(ev ? ev.date : planDay) + '"><button type="button" class="cp-primary" data-plan-act="sched">' + (ev ? 'Move' : 'Schedule') + '</button></div><div class="cp-note">All day on your main calendar, no reminder. One event per task.</div>' : '') +
+      (canMove ? '<div class="cp-row2"><span>Move to date</span><input type="date" data-plan-date value="' + esc(ev.date) + '"><button type="button" class="cp-primary" data-plan-act="move">Move</button></div>' : '') +
+      (!isTid && ev && ev.recurring ? '<div class="cp-note">Repeating event — move it in Google Calendar.</div>' : '') +
+      '<div class="cp-ferr" data-cal-ferr></div>' +
+      '<div class="cp-da"><button type="button" class="cp-danger" data-plan-act="remove">Remove from plan</button><span class="cp-sp"></span><button type="button" data-cal-detail-close>Close</button></div>';
+    detail.dataset.pid = it.id;
+    detail.hidden = false;
+  }
+  function sheetErr(msg){ const e = detail.querySelector('[data-cal-ferr]'); if(e) e.textContent = msg; }
+  function planServer(fn, arg, btn, okMsg){
+    if(planBusy) return;
+    planBusy = true; if(btn){ btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = '…'; }
+    google.script.run.withSuccessHandler(() => {
+      planBusy = false; detail.hidden = true; flash(okMsg); loadPlan(true); if(cal) cal.refetchEvents();
+    }).withFailureHandler(err => {
+      planBusy = false; if(btn){ btn.disabled = false; btn.textContent = btn.dataset.t || 'Retry'; }
+      sheetErr(errText(err) + '. Tap again to retry.');
+    })[fn](arg);
+  }
+  panel.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-plan-act]');
+    if(!t) return;
+    e.preventDefault();
+    const act = t.dataset.planAct, row = t.closest('[data-pid]'), it = row ? planById(row.dataset.pid) : (detail.dataset.pid ? planById(detail.dataset.pid) : null);
+    if(act === 'fold'){ lsSet('fw.calPlanFold', planFolded() ? '0' : '1'); renderPlan(); if(cal) setTimeout(() => cal.updateSize(), 0); return; }
+    if(act === 'bkfold'){ lsSet('fw.calPlanBk', bkOpen() ? '0' : '1'); renderPlan(); return; }
+    if(act === 'retry'){ loadPlan(true); return; }
+    if(act === 'add'){ if(planFolded()){ lsSet('fw.calPlanFold', '0'); renderPlan(); } detail.dataset.pid = ''; openAdd(); return; }
+    if(act === 'addgroup'){ addGroup = t.dataset.g; detail.querySelectorAll('[data-plan-act=addgroup]').forEach(b => b.classList.toggle('on', b === t)); return; }
+    if(act === 'pick'){
+      const c = candCache[Number(t.dataset.i)]; if(!c) return;
+      if(!c.ref && c.raw){ const tid = window.fwTasks.ensureTid(c.raw); if(!tid){ sheetErr('Couldn’t link that task.'); return; } c.ref = 'tid:' + tid; }
+      planAdd(c, addGroup, () => { const s = detail.querySelector('[data-plan-search]'); if(s) renderCands(s.value); });
+      return;
+    }
+    if(act === 'evplan'){
+      const ev = sheetEv, x = ev && ev.extendedProps; if(!x || !planData) return;
+      planAdd({ref: 'cal:' + x.eventId, text: ev.title, event: x.eventId + '@' + x.startMs}, t.dataset.g, () => { detail.hidden = true; });
+      return;
+    }
+    if(!it) return;
+    if(act === 'up' || act === 'down'){
+      const items = planItems(it.group), i = items.indexOf(it), j = act === 'up' ? i - 1 : i + 1;
+      if(j < 0 || j >= items.length) return;
+      [items[i], items[j]] = [items[j], items[i]];
+      items.forEach((x, k) => { x.rank = k + 1; }); renderPlan();
+      planOp({type: 'order', group: it.group, ids: items.map(x => x.id)});
+      return;
+    }
+    if(act === 'more'){ openMore(it); return; }
+    if(act === 'target'){
+      detail.dataset.pid = it.id;
+      detail.innerHTML = '<div class="cp-dt">Target</div><div class="cp-dm">' + esc(planView(it).title) + '</div>' +
+        '<input type="text" class="cp-psearch" data-plan-target-in maxlength="200" placeholder="What counts as done or enough progress" value="' + esc(it.target || '') + '" enterkeyhint="done">' +
+        '<div class="cp-ferr" data-cal-ferr></div><div class="cp-da"><button type="button" class="cp-primary" data-plan-act="tsave">Save</button><span class="cp-sp"></span><button type="button" data-cal-detail-close>Cancel</button></div>';
+      detail.hidden = false;
+      const inp = detail.querySelector('[data-plan-target-in]'); setTimeout(() => { try { inp.focus(); inp.select(); } catch (er) {} }, 30);
+      return;
+    }
+    if(act === 'tsave'){ const v = (detail.querySelector('[data-plan-target-in]') || {}).value || ''; planOp({type: 'target', id: it.id, target: v}, () => { detail.hidden = true; }); return; }
+    if(act === 'group'){ const g = t.dataset.g; planAdd({ref: it.ref, text: it.title, event: it.event}, g, () => { detail.hidden = true; }); return; }
+    if(act === 'remove'){ planOp({type: 'remove', id: it.id}, () => { detail.hidden = true; flash('Removed from plan'); }); return; }
+    if(act === 'sched' || act === 'move'){
+      const d = (detail.querySelector('[data-plan-date]') || {}).value || '';
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ sheetErr('Pick a date.'); return; }
+      if(act === 'sched') planServer('planSchedule', {ref: it.ref, title: planView(it).title, date: d}, t, 'Scheduled for ' + fmtDay(d) + ' ✓');
+      else planServer('planMoveEvent', {eventId: it.ev.eventId, startMs: it.ev.startMs, date: d}, t, 'Moved to ' + fmtDay(d) + ' ✓');
+    }
+  });
+  panel.addEventListener('keydown', e => { if(e.key === 'Enter' && e.target.matches('[data-plan-target-in]')){ e.preventDefault(); const b = detail.querySelector('[data-plan-act=tsave]'); if(b) b.click(); } });
+  panel.addEventListener('input', e => { if(e.target.matches('[data-plan-search]')) renderCands(e.target.value); });
+  panel.addEventListener('change', e => {
+    if(!e.target.matches('[data-plan-done]')) return;
+    const row = e.target.closest('[data-pid]'), it = row && planById(row.dataset.pid), on = e.target.checked;
+    if(!it) return;
+    const ev = it.ev && !it.ev.gone ? it.ev : null;
+    let ok = true;
+    if(it.ref.indexOf('tid:') === 0) ok = window.fwTasks ? window.fwTasks.setDone(it.ref.slice(4), on) : false;
+    if(!ok && !ev){ e.target.checked = !on; planErr = 'Not loaded here — tick it in its list'; renderPlan(); return; }
+    row.classList.toggle('done', on);
+    // Graphite = done on the calendar (the existing rule): the event a row points at follows the tick.
+    if(ev && !!ev.done !== on && planData && planData.cal){
+      google.script.run.withSuccessHandler(() => { ev.done = on; if(cal) cal.refetchEvents(); renderPlan(); })
+        .withFailureHandler(err => { planErr = 'Calendar not updated: ' + errText(err); renderPlan(); })
+        .setCalendarEventDone(planData.cal, ev.eventId, ev.startMs, on);
+    } else setTimeout(renderPlan, 400);
+  });
   function build(){
     const phone = window.matchMedia('(max-width:720px)').matches;
     const saved = lsGet('fw.calView');
@@ -14732,12 +15057,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; if(Date.now() >= flashUntil) setState('loading', 'Loading events…'); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault(); if(!pending) showDetail(info.event); },
-      datesSet: info => { viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); }
+      datesSet: info => { viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
   }
   function start(){
-    if(cal){ cal.updateSize(); cal.refetchEvents(); return; }
+    if(cal){ cal.updateSize(); cal.refetchEvents(); loadPlan(true); return; }
     setState('loading', 'Loading calendar…');
     loadLibs().then(() => { if(!cal){ build(); } })
       .catch(e => setState('error', 'Couldn’t load the calendar: ' + e.message));
@@ -14759,7 +15084,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.querySelectorAll('[data-cal-open]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
   }
-  function retry(){ if(cal) cal.refetchEvents(); else start(); }
+  function retry(){ if(cal){ cal.refetchEvents(); loadPlan(true); } else start(); }
   window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, api: () => cal };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {

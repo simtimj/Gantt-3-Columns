@@ -52,6 +52,8 @@ Last updated: 2026-11-08
 
 ## 🧪 To be confirmed (2026-11-07)
 
+- **Focus / Keep In Mind safe saves**: independent changes on two devices merge; contradictory edits show a choice instead of overwriting. Pending saves stay as device drafts and retry after failure/reload; earlier conflict drafts can be recovered. A failed load shows Retry instead of an editable empty list. Check on phone/laptop: edit different tasks, then the same task, and test reload with a pending edit. Regression checks: `node tools/focus-save-test.mjs`.
+
 - **Reference saves preserve other changes**: typing or folding a card no longer rewrites its title, order or parent from a stale snapshot. Parent/open-state changes are explicit, saves for the same card are queued, and conflicting moves show a refresh/check message. Check on two devices: reorder a card on one, then edit/fold it on the other; the new order and text should remain. Automated regressions: `node tools/reference-save-test.mjs`.
 - **History date line: shorter + count on it**: the date reads **Saturday November 7, 26** (phone: **Sat Nov 7, 26**), the weekday icon is gone, and the done count sits right after it on the same line: **52 ✓** when everything's done, **52/58 ✓** otherwise (the separate "Today: 52/58 ✓" line is gone). In a very narrow column the count drops just under the date.
 - **Fold button never splits**: a title line's − / + button (e.g. **+ 2 hidden** on the IT study line) stays on one line. The title text wraps beside it instead, and in a very narrow column the whole button drops under the text. Before, it broke into "hidd / en". Fixed the same day: when the button sat under the text on a narrow column, tapping it did nothing; it folds / opens again.

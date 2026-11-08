@@ -14889,24 +14889,131 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       .catch(e => { libsPromise = null; throw e; });
     return libsPromise;
   }
+  // ---- Event cache (2026-11-08, Julius: "have this week already cached"). Days already read show at once; Google
+  // is asked for the week before / this / after in one call and re-read quietly in the background when the copy is
+  // over a minute old (redrawn only if something changed). After any save, refetchFresh() reads Google again before
+  // drawing, so edits are never drawn from guesses. A copy around today is kept on the device, so even the first open
+  // after a reload shows the last known events immediately, and the app warms it up a few seconds after start-up.
+  const CACHE_KEY = 'fw.calCache.v1', FRESH_MS = 60000;
+  const evById = new Map(), dayAt = new Map(); // id → server event; 'yyyy-MM-dd' → when that day was read from Google
+  let cacheFailed = 0, forceNext = false, bgBusy = false, gen = 0, saveTimer = 0;
+  const addDays = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  const weekOf = d => addDays(d, -new Date(d + 'T12:00:00Z').getUTCDay());
+  const daysIn = (s, e) => { const out = []; for(let d = s; d < e && out.length < 400; d = addDays(d, 1)) out.push(d); return out; };
+  const todayLA = () => { try { return new Intl.DateTimeFormat('en-CA', {timeZone: TZ}).format(new Date()); } catch (e) { return new Date().toISOString().slice(0, 10); } };
+  // Week before through week after the dates asked for (≤ 21 days for Day / Week views; server cap is 62).
+  const windowFor = (s, e) => [addDays(weekOf(s), -7), addDays(weekOf(addDays(e, -1)), 14)];
+  // An event's days as [first, end) in LA dates (server sends LA wall time; a timed end at midnight ends the day before).
+  function evSpan(x){
+    const a = String(x.start || '').slice(0, 10);
+    if(x.allDay) return [a, String(x.end || '').slice(0, 10) || addDays(a, 1)];
+    const end = String(x.end || x.start || ''), d = end.slice(0, 10);
+    return [a, /T00:00(:00)?/.test(end) && d > a ? d : addDays(d, 1)];
+  }
+  const overlaps = (x, s, e) => { const [a, b] = evSpan(x); return a < e && b > s; };
+  const covered = (s, e) => daysIn(s, e).every(d => dayAt.has(d));
+  const fresh = (s, e) => { const t = Date.now() - FRESH_MS; return daysIn(s, e).every(d => (dayAt.get(d) || 0) >= t); };
+  function cacheApply(r, s, e, at){
+    if(!r || !Array.isArray(r.events)) return false;
+    for(const [id, x] of evById) if(overlaps(x, s, e)) evById.delete(id);
+    r.events.forEach(x => { if(x && x.id) evById.set(x.id, x); });
+    daysIn(s, e).forEach(d => dayAt.set(d, at || Date.now()));
+    cacheFailed = (r.failed || []).length;
+    clearTimeout(saveTimer); saveTimer = setTimeout(cacheSave, 400);
+    return true;
+  }
+  const cacheGet = (s, e) => [...evById.values()].filter(x => overlaps(x, s, e));
+  const sig = list => list.map(x => JSON.stringify(x)).sort().join('\n');
+  function cacheSave(){
+    const t = todayLA(), s = addDays(t, -14), e = addDays(t, 35), days = {};
+    daysIn(s, e).forEach(d => { if(dayAt.has(d)) days[d] = dayAt.get(d); });
+    lsSet(CACHE_KEY, JSON.stringify({ v: 1, days, events: cacheGet(s, e) }));
+  }
+  (function cacheLoad(){
+    try {
+      const c = JSON.parse(lsGet(CACHE_KEY) || 'null'), old = Date.now() - 7 * 864e5;
+      if(!c || c.v !== 1 || !c.days || !Array.isArray(c.events)) return;
+      Object.keys(c.days).forEach(d => { if(c.days[d] > old) dayAt.set(d, c.days[d]); });
+      c.events.forEach(x => { if(x && x.id && dayAt.has(String(x.start || '').slice(0, 10))) evById.set(x.id, x); });
+    } catch (e) {}
+  })();
+  const toFc = x => ({ id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
+    backgroundColor: x.color, borderColor: x.color, textColor: x.colorId === '5' ? '#202124' : '#fff',
+    classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x });
+  const canRun = () => !!(window.google && google.script && google.script.run);
+  // Quiet re-read of the window around [s, e). Redraws only when the dates on screen changed, and never under an
+  // open card / form, a drag or a save (the cache is updated either way, so the next view uses the new copy).
+  function bgRefresh(s, e){
+    if(bgBusy || !canRun()) return;
+    const [ws, we] = windowFor(s, e), g = gen, at = Date.now();
+    bgBusy = true;
+    google.script.run.withSuccessHandler(r => {
+      bgBusy = false;
+      if(g !== gen) return; // a save happened meanwhile: its own fresh read wins
+      const vs = viewStart, ve = viewEnd, before = vs ? sig(cacheGet(vs, ve)) : '';
+      if(!cacheApply(r, ws, we, at) || !cal || !vs) return;
+      if(sig(cacheGet(vs, ve)) !== before) redrawWhenSafe(0);
+    }).withFailureHandler(() => { bgBusy = false; }).getCalendarRange(ws, we);
+  }
+  function redrawWhenSafe(n){
+    if(!cal || !isOpen() || n > 40) return;
+    const safe = !busy && !pending && !moveBusy && detail.hidden && !mount.querySelector('.fc-event-mirror,.fc-event-dragging,.fc-event-resizing');
+    if(safe) cal.refetchEvents(); else setTimeout(() => redrawWhenSafe(n + 1), 1500);
+  }
+  // After a save / ↻ / Retry: read the dates on screen from Google before drawing; every other cached day is marked
+  // old so it is shown and then re-checked when you go there.
+  function refetchFresh(){
+    gen++;
+    for(const d of dayAt.keys()) dayAt.set(d, 0);
+    forceNext = true;
+    if(cal) cal.refetchEvents();
+  }
+  // A save answered with the event's new shape and drawn in place: keep the cached copy in step.
+  function cacheReplace(oldId, x){
+    gen++;
+    evById.delete(oldId);
+    if(x && x.id) evById.set(x.id, x);
+    clearTimeout(saveTimer); saveTimer = setTimeout(cacheSave, 400);
+  }
   function fetchRange(info, ok, fail){
-    const seq = ++loadSeq, s = info.startStr.slice(0, 10), e = info.endStr.slice(0, 10);
-    if(!(window.google && google.script && google.script.run)){ fail(new Error('Not connected to the server')); return; }
+    const s = info.startStr.slice(0, 10), e = info.endStr.slice(0, 10);
+    if(!forceNext && covered(s, e)){
+      ok(cacheGet(s, e).map(toFc));
+      partial = cacheFailed; loadErr = false;
+      setTimeout(refreshState, 0);
+      const [ws, we] = windowFor(s, e);
+      if(!fresh(ws, we)) bgRefresh(s, e);
+      return;
+    }
+    const force = forceNext; forceNext = false;
+    const seq = ++loadSeq, g = gen, at = Date.now();
+    // First read of these dates: take the whole window at once. Forced: only the dates on screen (quicker), then
+    // the window around them in the background.
+    const [ws, we] = force ? [s, e] : windowFor(s, e);
+    if(!canRun()){ fail(new Error('Not connected to the server')); return; }
     google.script.run.withSuccessHandler(r => {
       if(seq !== loadSeq) return;
-      const evs = (r && r.events) || [];
-      const failed = (r && r.failed) || [];
-      ok(evs.map(x => ({ id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
-        backgroundColor: x.color, borderColor: x.color, textColor: x.colorId === '5' ? '#202124' : '#fff',
-        classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x })));
-      partial = failed.length; loadErr = false;
+      if(g === gen) cacheApply(r, ws, we, at);
+      else cacheApply(r, ws, we, 0);
+      ok(((r && r.events) || []).filter(x => overlaps(x, s, e)).map(toFc));
+      partial = ((r && r.failed) || []).length; loadErr = false;
       setTimeout(refreshState, 0);
+      if(force) setTimeout(() => bgRefresh(s, e), 300);
     }).withFailureHandler(err => {
       if(seq !== loadSeq) return;
       loadErr = true;
       fail(err instanceof Error ? err : new Error(String((err && err.message) || err || 'Unknown error')));
-    }).getCalendarRange(s, e);
+    }).getCalendarRange(ws, we);
   }
+  // Warm-up a few seconds after the app starts (when the device is idle): this week ± 1 into the cache, and the
+  // calendar code into the browser, so the first 📅 open doesn't wait for either. Skipped if the copy is fresh.
+  function warmUp(){
+    if(cal || !canRun()) return;
+    const t = todayLA(), [ws, we] = windowFor(t, addDays(t, 1));
+    if(!fresh(ws, we)) bgRefresh(t, addDays(t, 1));
+    setTimeout(() => { if(!cal) loadLibs().catch(() => {}); }, 1500);
+  }
+  setTimeout(() => (window.requestIdleCallback ? requestIdleCallback(warmUp, {timeout: 5000}) : warmUp()), 6000);
   function fmtWhen(ev){
     const x = ev.extendedProps || {};
     const L = window.luxon && luxon.DateTime;
@@ -15002,7 +15109,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     google.script.run.withSuccessHandler(() => {
       pending = false;
       if(detail.contains(form)){ detail.hidden = true; sheetEv = null; }
-      flash(x ? 'Saved ✓' : 'Added ✓'); cal.refetchEvents(); loadPlan(true);
+      flash(x ? 'Saved ✓' : 'Added ✓'); refetchFresh(); loadPlan(true);
     }).withFailureHandler(err => {
       pending = false; btn.disabled = false; btn.textContent = 'Retry save';
       errEl.textContent = 'Not saved: ' + errText(err) + '. Your text is still here — tap Retry save.';
@@ -15020,7 +15127,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const x = sheetEv.extendedProps, errEl = detail.querySelector('[data-cal-ferr]');
     pending = true; btn.disabled = true; btn.textContent = 'Deleting…';
     google.script.run.withSuccessHandler(() => {
-      pending = false; detail.hidden = true; sheetEv = null; flash('Deleted ✓'); cal.refetchEvents(); loadPlan(true);
+      pending = false; detail.hidden = true; sheetEv = null; flash('Deleted ✓'); refetchFresh(); loadPlan(true);
     }).withFailureHandler(err => {
       pending = false; btn.disabled = false; btn.textContent = 'Retry delete';
       if(errEl) errEl.textContent = 'Not deleted: ' + errText(err) + '.';
@@ -15173,7 +15280,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(planBusy) return;
     planBusy = true; if(btn){ btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = '…'; }
     google.script.run.withSuccessHandler(() => {
-      planBusy = false; detail.hidden = true; flash(okMsg); loadPlan(true); if(cal) cal.refetchEvents();
+      planBusy = false; detail.hidden = true; flash(okMsg); loadPlan(true); refetchFresh();
     }).withFailureHandler(err => {
       planBusy = false; if(btn){ btn.disabled = false; btn.textContent = btn.dataset.t || 'Retry'; }
       sheetErr(errText(err) + '. Tap again to retry.');
@@ -15242,7 +15349,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     row.classList.toggle('done', on);
     // Graphite = done on the calendar (the existing rule): the event a row points at follows the tick.
     if(ev && !!ev.done !== on && planData && planData.cal){
-      google.script.run.withSuccessHandler(() => { ev.done = on; if(cal) cal.refetchEvents(); renderPlan(); })
+      google.script.run.withSuccessHandler(() => { ev.done = on; refetchFresh(); renderPlan(); })
         .withFailureHandler(err => { planErr = 'Calendar not updated: ' + errText(err); renderPlan(); })
         .setCalendarEventDone(planData.cal, ev.eventId, ev.startMs, on);
     } else setTimeout(renderPlan, 400);
@@ -15268,8 +15375,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(!cell || moveBusy || !x.editable || x.done) return;
       const d = cell.dataset.date;
       moveBusy = true; detail.hidden = true; sheetEv = null; setState('loading', 'Saving…');
-      google.script.run.withSuccessHandler(() => { moveBusy = false; flash('Moved ✓'); cal.refetchEvents(); loadPlan(true); })
-        .withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save the move — put it back. ' + errText(err)); cal.refetchEvents(); })
+      google.script.run.withSuccessHandler(() => { moveBusy = false; flash('Moved ✓'); refetchFresh(); loadPlan(true); })
+        .withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save the move — put it back. ' + errText(err)); refetchFresh(); })
         .calPanelMoveEvent({eventId: x.eventId, startMs: x.startMs, allDay: true, start: d, end: L().fromISO(d, {zone: TZ}).plus({days: 1}).toISODate()});
     }, 30);
   }
@@ -15293,8 +15400,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(res && res.eventId){
         ['eventId','startMs','start','end','allDay','color','colorId','done','editable','recurring'].forEach(k => { if(res[k] !== undefined) ev.setExtendedProp(k, res[k]); });
         const s2 = String(res.start || ''), same = res.allDay ? ev.allDay && ev.startStr.slice(0, 10) === s2 : !ev.allDay && L().fromISO(s2).toMillis() === ev.start.valueOf();
-        if(!same) cal.refetchEvents();
-      } else cal.refetchEvents();
+        if(!same) refetchFresh(); else cacheReplace(ev.id, res);
+      } else refetchFresh();
     }).withFailureHandler(err => {
       moveBusy = false; info.revert(); moveFail('Couldn’t save the move — put it back. ' + errText(err));
     }).calPanelMoveEvent(req);
@@ -15319,8 +15426,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const isTid = it.ref.indexOf('tid:') === 0, ev = it.ev && !it.ev.gone ? it.ev : null;
     if(!isTid && !(ev && !ev.recurring && !ev.done)) return;
     moveBusy = true; setState('loading', 'Saving…');
-    const done = () => { moveBusy = false; flash((isTid && !ev ? 'Scheduled' : 'Moved') + ' ✓'); cal.refetchEvents(); loadPlan(true); };
-    const fail = err => { moveBusy = false; moveFail('Couldn’t save — nothing changed. ' + errText(err)); cal.refetchEvents(); };
+    const done = () => { moveBusy = false; flash((isTid && !ev ? 'Scheduled' : 'Moved') + ' ✓'); refetchFresh(); loadPlan(true); };
+    const fail = err => { moveBusy = false; moveFail('Couldn’t save — nothing changed. ' + errText(err)); refetchFresh(); };
     if(isTid) google.script.run.withSuccessHandler(done).withFailureHandler(fail).planSchedule(Object.assign({ref: it.ref, title: v.title}, slot));
     else google.script.run.withSuccessHandler(done).withFailureHandler(fail).calPanelMoveEvent(Object.assign({eventId: ev.eventId, startMs: ev.startMs}, slot));
   }
@@ -15348,7 +15455,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       dayHeaderFormat: phone ? { weekday: 'short', day: 'numeric' } : { weekday: 'short', month: 'numeric', day: 'numeric' },
       events: fetchRange,
-      loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; if(Date.now() >= flashUntil) setState('loading', 'Loading events…'); } else setTimeout(refreshState, 0); },
+      // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
+      loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault(); if(!pending) showDetail(info.event); },
       datesSet: info => { viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(() => loadPlan(false), 0); }
@@ -15384,7 +15492,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.querySelectorAll('[data-cal-open]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
   }
-  function retry(){ if(cal){ cal.refetchEvents(); loadPlan(true); } else start(); }
+  function retry(){ if(cal){ refetchFresh(); loadPlan(true); } else start(); }
   window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {

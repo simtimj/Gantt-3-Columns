@@ -1396,10 +1396,15 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         if (a && b) { await gesture(a, b); await pg.waitForTimeout(200);
           const e = await ev('c-' + day); if (await calls('calPanelMoveEvent') !== nMove || !e || e.start !== chore0.start) out.push('a done (Graphite) event moved'); }
         // Failed save: the event snaps back and a message shows.
+        // A long touch on the locked event above can open its details instead of dragging it.
+        // Close that overlay before targeting the next event, and prove a write was attempted.
+        await pg.evaluate(() => { const detail=document.querySelector('#calPanel [data-cal-detail]');if(!detail.hidden)detail.querySelector('[data-cal-detail-close]').click(); });
+        await pg.waitForTimeout(100);
         await pg.evaluate(() => { window.__calFailWrite = 1; });
         await center('10:00');
         a = await evPt('All-day A'); b = await slotPt(day, '11:00');
-        if (a && b) { await gesture(a, { x: b.x, y: b.y + 2 });
+        if (a && b) { const attempts=await calls('calPanelMoveEvent');await gesture(a, { x: b.x, y: b.y + 2 });
+          if(await calls('calPanelMoveEvent')===attempts)out.push('failed-move gesture sent no write');
           await pg.waitForFunction(() => /put it back/.test(document.querySelector('#calPanel [data-cal-state]').textContent), null, { timeout: 4000 }).catch(() => out.push('no "put it back" message after a failed move'));
           const e = await ev('a-' + day); if (!/T09:00/.test(e.start)) out.push('failed move changed the event');
           const shown = await pg.evaluate(() => { const el = [...document.querySelectorAll('#calPanel .fc-timegrid-event:not(.fc-event-mirror)')].find(x => /All-day A/.test(x.textContent)); return el ? el.textContent : ''; });

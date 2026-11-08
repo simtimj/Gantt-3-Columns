@@ -2003,6 +2003,25 @@
     #mobileSplitResizer[data-dir="row"]::before,#mobileSplitResizerThird[data-dir="row"]::before{
       left:50%!important;right:auto!important;width:46px!important;margin-left:-23px!important;
     }
+    /* Grips = 3 small dots ON the line, centered on it (2026-11-08, Julius: "no extra material, right in the middle").
+       Same hit areas, now also centered. */
+    .column-resizer::after,#mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{
+      width:5px!important;height:19px!important;top:50%!important;border-radius:0!important;
+      background:radial-gradient(circle,var(--grip-day,#6b7280) 1.6px,transparent 2px) center/5px 6.5px repeat-y!important;
+    }
+    #refSplitBar::after,#notesSplitBar::after,body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{
+      width:19px!important;height:5px!important;border-radius:0!important;
+      background:radial-gradient(circle,var(--grip-day,#6b7280) 1.6px,transparent 2px) center/6.5px 5px repeat-x!important;
+    }
+    .column-resizer::before,#mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{top:50%!important;}
+    html .column-resizer:is(.dragging,:active)::after,html :is(#mobileSplitResizer,#mobileSplitResizerThird)[data-dir="col"]:active::after{
+      background:radial-gradient(circle,#3b82f6 1.8px,transparent 2.2px) center/5px 6.5px repeat-y!important;
+    }
+    html body.split-dragging :is(#refSplitBar,#notesSplitBar)::after,html body.split-dragging.one-day #todayScroll .od-on > .od-pad-head::after,
+    html :is(#mobileSplitResizer,#mobileSplitResizerThird)[data-dir="row"]:active::after{
+      background:radial-gradient(circle,#3b82f6 1.8px,transparent 2.2px) center/6.5px 5px repeat-x!important;
+    }
 
 /* Floating Focus View: retain the live editor DOM and its autosave listeners. */
 /* Held-open cell (2026-11-04, Julius): same color as the cell it came from (set when it opens), a light dim behind it, a smaller window. */
@@ -14792,8 +14811,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   @media (max-width:720px){ #calPanel{width:100vw;border-left:0;} }
   /* Resizable width (2026-11-08, Julius): drag the left edge; saved per device (fw.calWidth), phone too (default full width). */
   #calPanel .cp-resize{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:ew-resize;z-index:20;touch-action:none;}
-  #calPanel .cp-resize::after{content:"";position:absolute;left:3px;top:50%;width:4px;height:44px;margin-top:-22px;border-radius:2px;background:var(--cp-line,#ccc);opacity:.9;}
-  #calPanel .cp-resize:hover::after,#calPanel.cp-resizing .cp-resize::after{background:var(--cp-blue,#1a73e8);}
+  #calPanel .cp-resize::after{content:"";position:absolute;left:3px;top:50%;width:4px;height:18px;margin-top:-9px;background:radial-gradient(circle,var(--cp-muted,#888) 1.5px,transparent 1.9px) center/4px 6px repeat-y;}
+  #calPanel .cp-resize:hover::after,#calPanel.cp-resizing .cp-resize::after{background:radial-gradient(circle,var(--cp-blue,#1a73e8) 1.6px,transparent 2px) center/4px 6px repeat-y;}
   #calPanel.cp-resizing{transition:none;user-select:none;}
   @media (max-width:720px){ #calPanel .cp-resize{left:0;width:16px;} #calPanel .cp-resize::after{left:4px;} }
   #calPanel .cp-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--cp-line);flex:0 0 auto;}
@@ -15017,6 +15036,37 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-pi input[type=checkbox]{accent-color:var(--cp-blue);}
   #calPanel .cp-pbtn button{background:transparent;border:0;border-radius:50%;color:var(--cp-muted);}
   #calPanel .cp-pbtn button:hover:not(:disabled){background:var(--cp-hover);}
+  /* Plan hidden until the toolbar's Plan button opens it; Day view puts the date in the top-left corner. */
+  #calPanel .cp-plan.folded{display:none;}
+  #calPanel .fc-timeGridDay-view .fc-scrollgrid-section-header{display:none;}
+  #calPanel .fc .fc-timegrid-axis-cushion:has(.cp-corner){padding:2px 0;max-width:none;}
+  #calPanel .cp-corner{display:flex;flex-direction:column;align-items:center;line-height:1.1;}
+  #calPanel .cp-corner .cp-dh-w{font-size:10px;font-weight:500;letter-spacing:.6px;color:var(--cp-muted);}
+  #calPanel .cp-corner .cp-dh-n{font-size:17px;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;color:var(--cp-text);}
+  #calPanel .cp-corner.cp-today .cp-dh-w{color:var(--cp-blue);}
+  #calPanel .cp-corner.cp-today .cp-dh-n{background:var(--cp-blue);color:#fff;}
+  html[data-theme=dark] #calPanel .cp-corner.cp-today .cp-dh-n{color:var(--cp-blue-text);}
+  #calPanel .fc .fc-cpRefresh-button,#calPanel .fc .fc-cpClose-button{width:36px;padding:0;border-radius:50%!important;color:var(--cp-muted);font-size:17px;}
+  #calPanel .fc .fc-cpPlan-button{border:1px solid var(--cp-line);border-radius:999px!important;padding:0 12px;margin-right:4px;}
+  #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:8px 4px 6px 8px;}
+  #calPanel .fc .fc-cpClose-button:focus,#calPanel .fc .fc-cpRefresh-button:focus{outline:0;box-shadow:none;}
+  #calPanel .fc .fc-cpView-button{display:none;align-items:center;}
+  /* Week header: smaller date circles to save height. */
+  #calPanel .fc .fc-col-header-cell-cushion{padding:2px 0 4px;}
+  #calPanel .fc-timeGridWeek-view .cp-dh-n{font-size:18px;width:32px;height:32px;line-height:32px;}
+  @media (max-width:720px){
+    #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:6px 2px 4px 6px;gap:2px;}
+    #calPanel .fc .fc-toolbar-title{font-size:15px;margin-left:2px;flex:0 0 auto;overflow:visible;}
+    #calPanel .fc .fc-toolbar-chunk:first-child{flex:0 0 auto;}
+    #calPanel .fc .fc-toolbar-chunk:last-child{flex:0 1 auto;min-width:0;}
+    #calPanel .fc .fc-toolbar-chunk:last-child .fc-button-group{display:none;}
+    #calPanel .fc .fc-cpView-button{display:inline-flex;border:1px solid var(--cp-line);border-radius:999px!important;padding:0 7px;margin-right:0;}
+    #calPanel .fc .fc-today-button{padding:0 9px;margin-right:0;}
+    #calPanel .fc .fc-prev-button,#calPanel .fc .fc-next-button{width:26px;}
+    #calPanel .fc .fc-cpPlan-button{padding:0 7px;margin-right:0;}
+    #calPanel .fc .fc-timeGridDay-button,#calPanel .fc .fc-timeGridWeek-button{padding:0 8px;}
+    #calPanel .fc .fc-cpRefresh-button,#calPanel .fc .fc-cpClose-button{width:28px;}
+  }
   @media (max-width:720px){
     #calPanel .cp-head{padding-left:12px;}
     #calPanel .fc .fc-toolbar-title{font-size:17px;margin-left:4px;}
@@ -15029,7 +15079,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div class="cp-resize" data-cal-resize title="Drag to resize the calendar (double-click: default size)" aria-hidden="true"></div>
   <div class="cp-head">
     <strong>📅 Calendar</strong>
-    <button type="button" class="cp-new" data-cal-new title="New event on your main calendar (or hold / drag on the grid)" aria-label="New event"><span class="cp-plus">+</span> New</button>
     <button type="button" class="cp-refresh" data-cal-refresh title="Reload events from Google Calendar" aria-label="Reload events">↻</button>
     <button type="button" class="cp-close" data-cal-close title="Close (Esc) and go back to the Gantt" aria-label="Close calendar">✕</button>
   </div>
@@ -15361,7 +15410,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const PLAN_G = [['big','Big Three',3],['next','Waiting list',0],['backlog','Backlog',0]];
   const PLAN_NAME = {big:'Big Three', stretch:'Stretch', next:'Waiting list', backlog:'Backlog'};
   let planDay = '', planData = null, planBusy = false, planErr = '', planSeq = 0, addGroup = 'big';
-  const planFolded = () => lsGet('fw.calPlanFold') === '1';
+  const planFolded = () => lsGet('fw.calPlanFold') !== '0'; // hidden until the toolbar's Plan button opens it (2026-11-08)
   const bkOpen = () => lsGet('fw.calPlanBk') === '1';
   const fmtDay = d => { try { return L().fromISO(d, {zone: TZ}).toFormat('EEE MMM d'); } catch (e) { return d; } };
   function pickPlanDay(){
@@ -15402,6 +15451,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!planEl) return;
     const folded = planFolded();
     planEl.classList.toggle('folded', folded);
+    const pb = panel.querySelector('.fc-cpPlan-button'); if(pb){ pb.classList.toggle('fc-button-active', !folded); pb.setAttribute('aria-pressed', String(!folded)); }
     const all = (planData && planData.items) || [];
     panel.querySelector('[data-plan-day]').textContent = planDay ? fmtDay(planDay) : '';
     const nb = planItems('big').length, ns = planItems('stretch').length;
@@ -15665,13 +15715,28 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       timeZone: TZ,
       initialView: saved === 'timeGridDay' || saved === 'timeGridWeek' ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
       // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
-      headerToolbar: { left: 'today prev,next title', center: '', right: 'timeGridDay,timeGridWeek' },
-      buttonText: { today: 'Today', day: 'Day', week: 'Week' },
+      // One toolbar line (2026-11-08, Julius): Today · date · ‹ › … Plan · Day|Week · ↻ · ✕. The old header row and
+      // + New are gone (hold / drag on the grid or the all-day row makes a new event).
+      headerToolbar: { left: 'today title prev,next', center: '', right: 'cpPlan timeGridDay,timeGridWeek cpView cpRefresh cpClose' },
+      customButtons: {
+        cpPlan: { text: 'Plan', hint: 'Show / hide the plan (Big Three, Waiting list)', click: () => { lsSet('fw.calPlanFold', planFolded() ? '0' : '1'); renderPlan(); setTimeout(() => cal && cal.updateSize(), 0); } },
+        // Phones: one Day ⇄ Week toggle instead of the two-button pill (saves a button's width on the single line).
+        cpView: { text: 'Week', hint: 'Switch Day / Week', click: () => cal.changeView(cal.view.type === 'timeGridDay' ? 'timeGridWeek' : 'timeGridDay') },
+        cpRefresh: { text: '↻', hint: 'Reload events from Google Calendar', click: () => {} }, // handled by the [data-cal-refresh] listener
+        cpClose: { text: '✕', hint: 'Close (Esc) and go back to the Gantt', click: () => {} } // handled by [data-cal-close]
+      },
+      buttonText: { today: 'Today', day: 'Day', week: phone ? 'Wk' : 'Week' },
       buttonIcons: { prev: 'chevron-left', next: 'chevron-right' },
       titleFormat: { month: 'long', year: 'numeric' },
       views: { timeGridDay: { titleFormat: phone ? { month: 'short', day: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' } } },
       titleRangeSeparator: ' – ',
       allDayText: '',
+      // Day view: the weekday + date sit in the top-left corner (above the time labels), no separate header row.
+      allDayContent: a => {
+        if(!a.view || a.view.type !== 'timeGridDay') return '';
+        const D = luxon.DateTime.fromJSDate(a.view.currentStart, {zone: 'UTC'}), t = luxon.DateTime.now().setZone(TZ).toISODate() === D.toISODate();
+        return { html: '<span class="cp-corner' + (t ? ' cp-today' : '') + '"><span class="cp-dh-w">' + D.toFormat('ccc').toUpperCase() + '</span><span class="cp-dh-n">' + D.day + '</span></span>' };
+      },
       slotLabelContent: a => String(a.text || '').replace(/^(\d+)(?::00)?\s*([ap])m?$/i, (m, h, ap) => h + ' ' + ap.toUpperCase() + 'M'),
       slotLabelFormat: { hour: 'numeric', meridiem: 'short' },
       eventTimeFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
@@ -15706,9 +15771,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault(); if(!pending) showDetail(info.event); },
-      datesSet: info => { viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(() => loadPlan(false), 0); }
+      datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
+    // Toolbar buttons take over the old header's jobs; the header (only needed while the calendar loads) goes.
+    const tb = b => panel.querySelector('.fc-' + b + '-button');
+    if(tb('cpClose')){ tb('cpClose').setAttribute('data-cal-close', ''); tb('cpClose').setAttribute('aria-label', 'Close calendar'); }
+    if(tb('cpRefresh')){ tb('cpRefresh').setAttribute('data-cal-refresh', ''); tb('cpRefresh').setAttribute('aria-label', 'Reload events'); }
+    const head = panel.querySelector('.cp-head'); if(head) head.remove();
+    renderPlan();
     // Plan rows → timeline: hold a row's title (touch) or drag it (mouse). create:false = nothing is drawn locally;
     // Google answers and the range is refetched.
     if(FullCalendar.Draggable && planBody) planDrag = new FullCalendar.Draggable(planBody, {
@@ -15740,7 +15811,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
   }
   function retry(){ if(cal){ refetchFresh(); loadPlan(true); } else start(); }
-  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, api: () => cal, planDrag: () => planDrag };
+  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

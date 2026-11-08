@@ -1029,7 +1029,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             const allDay = [...panel.querySelectorAll('.fc-daygrid-event')].find(x => /All-day A/.test(x.textContent));
             if (!allDay) out.push('all-day event not in the all-day row');
             else {
-              const col = panel.querySelector('.fc-col-header-cell').getBoundingClientRect().width;
+              const col = panel.querySelector('.fc-timegrid-col:not(.fc-timegrid-axis)').getBoundingClientRect().width;
               if (allDay.getBoundingClientRect().width > col * 1.3) out.push('one-day all-day event spans more than its day');
             }
             if (!panel.querySelector('.cp-done')) out.push('done (Graphite) event not marked');
@@ -1117,7 +1117,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         api.changeView('timeGridDay'); await wait(200);
         const day = api.formatIso(api.getDate()).slice(0, 10);
         // Validation: empty title → message, no server call.
-        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        window.fwCalendar.newEvent(); await wait(60);
         if (!form()) return ['+ New opened no form'];
         if (document.activeElement !== form().elements.title) out.push('title box not focused on + New');
         form().querySelector('[data-cal-save]').click(); await wait(60);
@@ -1132,7 +1132,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         if (!/(^|[^\d:])11(:00)?\s?am/i.test((evEl('Test lunch') || {}).textContent || '')) out.push('created event not at 11:00');
         // Lost reply: the server made it, the app saw an error → Retry save with the same opId → still one event.
         window.__calLoseReply = 1;
-        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        window.fwCalendar.newEvent(); await wait(60);
         set('title', 'Lost reply'); set('sd', day); set('ed', day); set('st', '16:00'); set('et', '17:00');
         form().querySelector('[data-cal-save]').click();
         if (!await until(() => /Not saved/.test(det.querySelector('[data-cal-ferr]')?.textContent || ''))) out.push('no save-failure message');
@@ -1144,7 +1144,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         if (byTitle('Lost reply').length !== 1) out.push('retry after a lost reply made ' + byTitle('Lost reply').length + ' events');
         // Plain failure → message, nothing created, then success.
         window.__calFailWrite = 1;
-        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        window.fwCalendar.newEvent(); await wait(60);
         set('title', 'Fails first'); set('sd', day); set('ed', day); set('st', '18:00'); set('et', '18:30');
         form().querySelector('[data-cal-save]').click();
         await until(() => /Not saved/.test(det.querySelector('[data-cal-ferr]')?.textContent || ''));
@@ -1193,11 +1193,11 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         }
         if (calls('calPanelUpdateEvent').some(c => /^[rg]-/.test(c[1][0].eventId))) out.push('a read-only event was sent for update');
         // Esc closes the form, not the panel.
-        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        window.fwCalendar.newEvent(); await wait(60);
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(60);
         if (!det.hidden || !document.body.classList.contains('cal-open')) out.push('Esc on the form did not just close the form');
         // Typing in the form never reaches the workspace's own key shortcuts.
-        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        window.fwCalendar.newEvent(); await wait(60);
         let leaked = 0; const spy = () => leaked++; document.addEventListener('keydown', spy);
         form().elements.title.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
         document.removeEventListener('keydown', spy);
@@ -1225,6 +1225,10 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           b.click(); await until(() => planRow(text)); await wait(60);
         };
         document.querySelector('#toolbar [data-cal-open]').click();
+        // Plan is hidden until the toolbar's Plan button opens it (2026-11-08).
+        await until(() => panel.querySelector('.fc-cpPlan-button'));
+        if (!panel.querySelector('.cp-plan.folded')) out.push('plan not hidden by default');
+        panel.querySelector('.fc-cpPlan-button').click(); await wait(60);
         if (!await until(() => panel.querySelector('[data-plan-group=big]'))) return ['plan section never loaded: ' + panel.querySelector('[data-plan-body]').textContent];
         const api = window.fwCalendar.api(); api.changeView('timeGridDay'); api.today(); await wait(300);
         const day = api.formatIso(api.getDate()).slice(0, 10);

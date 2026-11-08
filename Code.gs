@@ -760,7 +760,8 @@ function saveReferenceItem(item) {
     let res = sync ? { id: id, build: appBuild_() } : null;
 
     if (row) {
-      const cur = String(sheet.getRange(row, 5).getValue() || '');
+      const currentRow = sheet.getRange(row, 1, 1, 7).getValues()[0];
+      const cur = String(currentRow[4] || '');
       if (sync) {
         const c = syncCol_(cur, content, item.baseHash || null, !!item.contentChanged, 'Reference ' + id, 'Content', item.baseText);
         content = c.value;
@@ -769,7 +770,28 @@ function saveReferenceItem(item) {
       } else if (cur && cur !== content) {
         backupCell_('Reference ' + id, 'Content', 'old app tab', cur, true);
       }
-      sheet.getRange(row, 1, 1, 7).setValues([
+      if (sync) {
+        // Content autosaves must never write stale title/order/parent/collapse snapshots.
+        // Only explicit metadata edits participate, with a per-field base value.
+        if (content !== cur) sheet.getRange(row, 5).setValue(content);
+        const fields = { parentId: 2, expanded: 6 };
+        res.meta = {};
+        res.metaConflicts = [];
+        Object.keys(fields).forEach(key => {
+          const range = sheet.getRange(row, fields[key]);
+          const normalize = v => key === 'expanded' ? v !== false : String(v || '');
+          let current = normalize(currentRow[fields[key] - 1]);
+          const change = item.metaChanges && item.metaChanges[key];
+          if (change && Object.prototype.hasOwnProperty.call(change, 'before') && Object.prototype.hasOwnProperty.call(change, 'after')) {
+            const before = normalize(change.before), after = normalize(change.after);
+            if (current === before || current === after) {
+              if (current !== after) range.setValue(after);
+              current = after;
+            } else res.metaConflicts.push(key);
+          }
+          res.meta[key] = current;
+        });
+      } else sheet.getRange(row, 1, 1, 7).setValues([
         [
           id,
           item.parentId || '',
@@ -2622,6 +2644,7 @@ function saveLookSnapshot(slot, json, ua) {
   sh.getRange(row, 1, 1, 4).setValues([[slot, dev, new Date(), String(json).slice(0, 45000)]]);
   return true;
 }
+
 
 
 

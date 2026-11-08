@@ -1,0 +1,24 @@
+name: Reference save checks
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'Index.html'
+      - 'tools/reference-save-test.mjs'
+      - '.github/workflows/reference-checks.yaml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node tools/check.mjs
+      - run: node tools/reference-save-test.mjs
+      - run: npm install --no-save playwright@1.62.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/smoke.mjs

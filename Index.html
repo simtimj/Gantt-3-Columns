@@ -5475,6 +5475,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function refBase(item){
     if(!item._b) item._b = {c:item.content || '',h:item.ch || null};
+    if(!item._mb) item._mb = {parentId:String(item.parentId || ''),expanded:item.expanded !== false};
     return item._b;
   }
   /* Cell HTML → list of top-level lines in one normal form, so the server's copy, the loaded copy and
@@ -5638,11 +5639,27 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   /* Every Reference save goes through here (text, open/close, moves). */
   function sendRefItem(item,onOk,onErr){
+    if(item._refSaving){
+      (item._refQueue || (item._refQueue = [])).push({onOk,onErr});
+      return;
+    }
+    item._refSaving = true;
+    const next = () => {
+      item._refSaving = false;
+      const queued = item._refQueue || [];
+      item._refQueue = [];
+      if(queued.length) sendRefItem(item,
+        id => queued.forEach(cb => { if(cb.onOk) cb.onOk(id); }),
+        err => { queued.forEach(cb => { if(cb.onErr) cb.onErr(err); }); setStatus('Save error: ' + err.message); });
+    };
     const b = refBase(item);
+    const meta = {parentId:String(item.parentId || ''),expanded:item.expanded !== false};
+    const metaChanges = {};
+    Object.keys(meta).forEach(key => { if(meta[key] !== item._mb[key]) metaChanges[key] = {before:item._mb[key],after:meta[key]}; });
     const payload = {
       id:item.id, parentId:item.parentId, type:item.type, title:item.title, content:item.content,
       expanded:item.expanded, sort:item.sort,
-      fwSync:1, baseHash:b.h, contentChanged:(item.content || '') !== b.c
+      fwSync:1, baseHash:b.h, contentChanged:(item.content || '') !== b.c, metaChanges
     };
     // Cell made in this tab: no server hash yet, so let the server check against the text it was made with (2026-10-31).
     if(!b.h) payload.baseText = b.c;
@@ -5650,17 +5667,38 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     google.script.run
       .withSuccessHandler(res => {
         refInFlight--;
+        try {
         if(res && typeof res === 'object'){
           fwCheckBuild(res.build);
+          if(res.meta){
+            Object.keys(meta).forEach(key => {
+              if(!Object.prototype.hasOwnProperty.call(res.meta,key)) return;
+              item._mb[key] = res.meta[key];
+              // A newer local click remains pending; an older acknowledgement cannot undo it.
+              if(item[key] === meta[key] || (key === 'parentId' && String(item[key] || '') === meta[key])) item[key] = res.meta[key];
+            });
+            const wrap = document.querySelector(`#referenceTree .ref-cell-wrapper[data-id="${CSS.escape(String(item.id))}"]`);
+            if(wrap){
+              wrap.classList.toggle('ref-collapsed',item.expanded === false);
+              const toggle = wrap.querySelector(':scope > [data-toggle]');
+              if(toggle) toggle.textContent = item.expanded === false ? '▸' : '▾';
+            }
+          }
           if(payload.contentChanged && !res.conflict) item._b = {c:payload.content || '',h:res.ch};
           else if(!payload.contentChanged && res.content === undefined) item._b.h = res.ch;
           if(res.content !== undefined){ fwReconcileRef(item,res.content,res.ch); return; }
         }
+        if(res && res.metaConflicts && res.metaConflicts.length){
+          setStatus('Reference changed elsewhere — refresh to check its location/open state');
+          return;
+        }
         if(onOk) onOk(res && res.id || res);
+        } finally { next(); }
       })
       .withFailureHandler(err => {
         refInFlight--;
-        if(onErr) onErr(err); else setStatus('Save error: ' + err.message);
+        try { if(onErr) onErr(err); else setStatus('Save error: ' + err.message); }
+        finally { next(); }
       })
       .saveReferenceItem(payload);
   }
@@ -6271,6 +6309,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           sort:Date.now()
         };
         item._b = {c:item.content,h:null}; // base = what the server holds (2026-10-31)
+        refBase(item);
         state.reference.push(
           item
         );
@@ -6401,12 +6440,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function toggleReferenceCollapse(){
     referenceCollapsed = !referenceCollapsed;
     localStorage.setItem(REF_COLLAPSE_STORAGE_KEY, referenceCollapsed ? '1' : '0');
+    const expanded = !referenceCollapsed;
     (state.reference || []).forEach(item => {
-      item.expanded = !referenceCollapsed;
+      refBase(item);
+      item.expanded = expanded;
     });
     google.script.run
+      .withSuccessHandler(() => (state.reference || []).forEach(item => {
+        if(item.expanded === expanded) item._mb.expanded = expanded;
+      }))
       .withFailureHandler(err => setStatus('Save error: ' + err.message))
-      .saveReferenceExpanded(!referenceCollapsed);
+      .saveReferenceExpanded(expanded);
     applyReferenceCollapseState();
     setStatus(referenceCollapsed ? 'Reference collapsed' : 'Reference expanded');
   }
@@ -8102,6 +8146,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     google.script.run.withSuccessHandler(id => {
       const item = {id,parentId:'',type:'item',title:BACKLOG_NAME,content:'<h2>' + BACKLOG_NAME + '</h2>',expanded:true,sort:Date.now()};
       item._b = {c:item.content,h:null}; // base = what the server holds; without it the first save was dropped and the cell reverted (2026-10-31)
+      refBase(item);
       state.reference.push(item);
       document.querySelector('#referenceTree > .empty')?.remove();
       createReferenceCell(item);
@@ -14327,6 +14372,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 </script>
 </body>
 </html>
+
 
 
 

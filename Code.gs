@@ -2535,6 +2535,171 @@ function calPanelDeleteEvent(req) {
   return { ok: true };
 }
 
+/* =========================================================
+   DAILY PLAN (Calendar panel phase 3a, 2026-11-08, Julius)
+   Big Three / Stretch (for one day) + Next Up / Backlog (undated) in the Sheet's `Plan` tab, so ChatGPT can read and
+   fill it too ("What should I do today?"). Rows LINK to tasks, never copy them:
+     Ref = 'tid:<data-tid>' (a Gantt line / Undated Tasks / Keep In Mind item, same ids as Task mirrors)
+         or 'cal:<eventId>' (a Google Calendar event).
+     Event = '<eventId>@<startMs>' of the event the row points at (cal refs) or the one made by Schedule (tid refs).
+   Columns: Id | Date | Group | Rank | Ref | Title | Target | Event | Updated. Date only for big / stretch.
+   One row per Ref (adding again moves it). Big Three and Stretch hold at most 3 each per day.
+   Schedule makes ONE all-day event per task on the main calendar (reminders off); again = move that event.
+   ========================================================= */
+const PLAN_SHEET = 'Plan';
+const PLAN_HEAD = ['Id', 'Date', 'Group', 'Rank', 'Ref', 'Title', 'Target', 'Event', 'Updated'];
+const PLAN_GROUPS = { big: 3, stretch: 3, next: 50, backlog: 500 };
+function planSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(PLAN_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(PLAN_SHEET);
+    sh.getRange(1, 1, 1, PLAN_HEAD.length).setValues([PLAN_HEAD]).setFontWeight('bold');
+    sh.getRange('A:I').setNumberFormat('@'); // dates and ids stay text
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function planRead_(sh) {
+  const n = sh.getLastRow() - 1;
+  if (n < 1) return [];
+  const tz = Session.getScriptTimeZone();
+  return sh.getRange(2, 1, n, PLAN_HEAD.length).getValues().map((r, i) => ({
+    row: i + 2, id: String(r[0] || ''),
+    date: r[1] instanceof Date ? Utilities.formatDate(r[1], tz, 'yyyy-MM-dd') : String(r[1] || '').trim(),
+    group: String(r[2] || '').trim().toLowerCase(), rank: Number(r[3]) || 0, ref: String(r[4] || '').trim(),
+    title: String(r[5] || ''), target: String(r[6] || ''), event: String(r[7] || ''), updated: String(r[8] || '')
+  })).filter(x => x.ref && PLAN_GROUPS[x.group] !== undefined);
+}
+function planWrite_(sh, x) {
+  const vals = [[x.id, x.date || '', x.group, String(x.rank || 0), x.ref, x.title || '', x.target || '', x.event || '',
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm")]];
+  if (x.row) sh.getRange(x.row, 1, 1, PLAN_HEAD.length).setValues(vals);
+  else { sh.appendRow(vals[0]); x.row = sh.getLastRow(); }
+}
+function planEventParts_(s) {
+  const m = String(s || '').match(/^(.+)@(\d+)$/);
+  return m ? { eventId: m[1], startMs: Number(m[2]) } : null;
+}
+// Live state of the event a row points at: title, done (Graphite), date. Missing → gone: true.
+function planEventInfo_(s) {
+  const p = planEventParts_(s);
+  if (!p) return null;
+  try {
+    const ev = calEventAt_(EVENT_CALENDARS[0], p.eventId, p.startMs), tz = Session.getScriptTimeZone();
+    const allDay = ev.isAllDayEvent(), st = allDay ? ev.getAllDayStartDate() : ev.getStartTime();
+    return { eventId: p.eventId, startMs: st.getTime(), title: ev.getTitle() || '', done: String(ev.getColor() || '') === '8',
+      date: Utilities.formatDate(st, tz, 'yyyy-MM-dd'), allDay: allDay, recurring: ev.isRecurringEvent(),
+      time: allDay ? '' : Utilities.formatDate(st, tz, 'h:mm a') };
+  } catch (e) { return { eventId: p.eventId, startMs: p.startMs, gone: true }; }
+}
+function getPlan(date) {
+  const d = String(date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error('Invalid plan date');
+  const items = planRead_(planSheet_()).filter(x => x.group === 'next' || x.group === 'backlog' || x.date === d);
+  items.forEach(x => { delete x.row; x.ev = x.event ? planEventInfo_(x.event) : null; });
+  items.sort((a, b) => a.rank - b.rank);
+  return { date: d, cal: EVENT_CALENDARS[0], items: items };
+}
+// op = {type:'upsert', date, item:{id?, group, ref, title, target?, event?}} | {type:'remove', date, id}
+//    | {type:'order', date, group, ids:[...]} | {type:'target', date, id, target}
+function planSave(op) {
+  const o = op || {}, d = String(o.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error('Invalid plan date');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = planSheet_(), rows = planRead_(sh);
+    const inGroup = (g, except) => rows.filter(x => x.group === g && (PLAN_GROUPS[g] > 3 || x.date === d) && x !== except);
+    if (o.type === 'upsert') {
+      const it = o.item || {}, g = String(it.group || '');
+      if (PLAN_GROUPS[g] === undefined) throw new Error('Unknown plan group');
+      const ref = String(it.ref || '');
+      if (!/^(tid:m-[\w-]{2,60}|tid:[\w-]{2,60}|cal:[^\s]{3,200})$/.test(ref)) throw new Error('Unknown task link');
+      // Same task already planned (for this day, or undated) → move it; never a second row.
+      let x = rows.find(r => r.ref === ref && (r.group === 'next' || r.group === 'backlog' || r.date === d));
+      if (inGroup(g, x).length >= PLAN_GROUPS[g]) throw new Error((g === 'big' ? 'Big Three' : 'Stretch') + ' is full (3) — remove one first');
+      if (!x) x = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ref: ref };
+      const moved = x.group !== g;
+      x.group = g; x.date = PLAN_GROUPS[g] <= 3 ? d : '';
+      x.title = String(it.title || x.title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+      if (it.target !== undefined) x.target = String(it.target || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      if (it.event && planEventParts_(it.event)) x.event = String(it.event);
+      if (moved || !x.rank) x.rank = inGroup(g, x).reduce((m, r) => Math.max(m, r.rank), 0) + 1;
+      planWrite_(sh, x);
+    } else if (o.type === 'remove') {
+      const x = rows.find(r => r.id === String(o.id || ''));
+      if (x) sh.deleteRow(x.row);
+    } else if (o.type === 'order') {
+      const ids = (o.ids || []).map(String);
+      ids.forEach((id, i) => { const x = rows.find(r => r.id === id && r.group === o.group); if (x && x.rank !== i + 1) { x.rank = i + 1; planWrite_(sh, x); } });
+    } else if (o.type === 'target') {
+      const x = rows.find(r => r.id === String(o.id || ''));
+      if (!x) throw new Error('Plan item not found — tap ↻');
+      x.target = String(o.target || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      planWrite_(sh, x);
+    } else throw new Error('Unknown plan change');
+  } finally { lock.releaseLock(); }
+  return getPlan(d);
+}
+// Schedule… a Gantt task: one all-day event per task (main calendar, reminders off, tagged with the tid). Again → move it.
+function planSchedule(req) {
+  const r = req || {}, date = String(r.date || ''), ref = String(r.ref || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Pick a date');
+  if (!/^tid:[\w-]{2,64}$/.test(ref)) throw new Error('Only Gantt tasks can be scheduled this way');
+  const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 300) || 'Task';
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = planSheet_(), rows = planRead_(sh), props = PropertiesService.getScriptProperties(), key = 'planEv:' + ref.slice(4, 70);
+    const known = (rows.find(x => x.ref === ref && x.event) || {}).event || props.getProperty(key) || '';
+    let ev = null, moved = false;
+    const p = planEventParts_(known);
+    if (p) { try { ev = calEventAt_(EVENT_CALENDARS[0], p.eventId, p.startMs); } catch (e) { ev = null; } }
+    if (ev && !ev.isRecurringEvent()) { planMoveEv_(ev, date); moved = true; }
+    else {
+      ev = calPanelMain_().createAllDayEvent(title, parseDate_(date));
+      try { ev.removeAllReminders(); } catch (e) { console.error(e); }
+      try { ev.setTag('ganttTid', ref.slice(4)); } catch (e) { console.error(e); }
+    }
+    const st = (ev.isAllDayEvent() ? ev.getAllDayStartDate() : ev.getStartTime()).getTime();
+    const link = ev.getId() + '@' + st;
+    props.setProperty(key, link);
+    rows.filter(x => x.ref === ref).forEach(x => { x.event = link; planWrite_(sh, x); });
+    return { event: link, moved: moved, date: date };
+  } finally { lock.releaseLock(); }
+}
+// Move an event to another day, keeping its length (all-day) or its clock times (timed).
+function planMoveEv_(ev, date) {
+  const tz = Session.getScriptTimeZone();
+  if (ev.isAllDayEvent()) {
+    const s = ev.getAllDayStartDate(), e = ev.getAllDayEndDate(), days = Math.max(1, Math.round((e - s) / DAY_MS));
+    if (days === 1) ev.setAllDayDate(parseDate_(date));
+    else ev.setAllDayDates(parseDate_(date), parseDate_(addDaysToDateString_(date, days)));
+  } else {
+    const s = ev.getStartTime(), e = ev.getEndTime();
+    const shift = Math.round((parseDate_(date) - parseDate_(Utilities.formatDate(s, tz, 'yyyy-MM-dd'))) / DAY_MS);
+    const ns = new Date(s), ne = new Date(e);
+    ns.setDate(ns.getDate() + shift); ne.setDate(ne.getDate() + shift); // calendar days, so DST keeps the clock time
+    ev.setTime(ns, ne);
+  }
+}
+// Move to date… for an event in the plan (main calendar, not repeating). Keeps the event id.
+function planMoveEvent(req) {
+  const r = req || {}, date = String(r.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Pick a date');
+  const ev = calPanelEditable_(r.eventId, r.startMs);
+  planMoveEv_(ev, date);
+  const st = (ev.isAllDayEvent() ? ev.getAllDayStartDate() : ev.getStartTime()).getTime(), link = ev.getId() + '@' + st;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = planSheet_();
+    planRead_(sh).filter(x => planEventParts_(x.event) && planEventParts_(x.event).eventId === ev.getId()).forEach(x => { x.event = link; planWrite_(sh, x); });
+  } finally { lock.releaseLock(); }
+  return { event: link, date: date };
+}
+
 // One event by id + start time, so the right day of a repeating event is the one found.
 function calEventAt_(calId, eventId, start) {
   const cal = CalendarApp.getCalendarById(calId);

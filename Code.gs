@@ -387,7 +387,7 @@ function saveDay(dateString, tasks, journal, opts) {
       if (row) sheet.getRange(row, 2, 1, 2).setValues([[t.value, j.value]]);
       else sheet.appendRow([parseDate_(dateString), t.value, j.value]);
     }
-    const res = { th: cellHash_(t.value), jh: cellHash_(j.value), conflictT: !!t.conflict, conflictJ: !!j.conflict, build: appBuild_() };
+    const res = { th: cellHash_(t.value), jh: cellHash_(j.value), conflictT: !!t.conflict, conflictJ: !!j.conflict, build: appBuild_(), release:deployedBuild_() };
     if (t.sendBack) res.tasks = t.value;
     if (j.sendBack) res.journal = j.value;
     return res;
@@ -786,10 +786,10 @@ function saveReferenceItem(item) {
     const row = referenceRowMap_(sheet).get(id);
     const sync = !!item.fwSync;
     let content = String(item.content || '');
-    let res = sync ? { id: id, build: appBuild_() } : null;
+    let res = sync ? { id: id, build: appBuild_(), release:deployedBuild_() } : null;
 
     // A stale tab must not recreate a card deleted on another device.
-    if (!row && sync && (item.id || item.expectedExisting || item.baseHash)) return { id:id, deleted:true, build:res.build };
+    if (!row && sync && (item.id || item.expectedExisting || item.baseHash)) return { id:id, deleted:true, build:res.build, release:res.release };
 
     if (row) {
       const currentRow = sheet.getRange(row, 1, 1, 7).getValues()[0];

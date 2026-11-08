@@ -2752,6 +2752,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
   }
   // Speed timing (2026-11-04): sent after drawing, so it can't slow the load. See logSpeed in Code.gs.
+  let fwSaveSamples=[],fwSaveSampleSeq=0;
+  const fwSaveSampleSession=window.crypto?.randomUUID?.() || Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+  function fwObserveSave(kind,started,reply,error){
+    const status=error?'error':reply?.deleted?'deleted':reply?.conflict||reply?.conflictT||reply?.conflictJ||reply?.metaConflicts?.length?'conflict':reply&&typeof reply==='object'?'ok':'unknown';
+    fwSaveSamples.push({sampleId:fwSaveSampleSession+'-'+(++fwSaveSampleSeq),kind,rpcMs:Math.max(0,Math.round(performance.now()-started)),status,
+      serverRelease:String(reply?.release || ''),serverBuild:String(reply?.build || '')});
+    if(fwSaveSamples.length>50)fwSaveSamples.splice(0,fwSaveSamples.length-50);
+  }
+  function fwSendSpeed(kind,timing,client){
+    const batch=fwSaveSamples.slice(),sent=new Set(batch.map(s=>s.sampleId));
+    google.script.run.withSuccessHandler(()=>{fwSaveSamples=fwSaveSamples.filter(s=>!sent.has(s.sampleId));})
+      .withFailureHandler(()=>{}).logSpeed(kind,timing,{...client,saveTimings:batch});
+  }
   function fwSpeedContext(extra){
     return Object.assign({pageBuild:window.__FW_BUILD__ || '',pageRelease:window.__FW_RELEASE__ || '',
       w:window.innerWidth,visibility:document.visibilityState},extra || {});
@@ -2764,7 +2777,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const client = fwSpeedContext({ render: render, drawEnd:Math.round(t0 + render), frameFirstByte: Math.round(nav.responseStart || 0), frameDone: Math.round(nav.responseEnd || 0),
         dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()) });
       setStatus('Ready · server ' + (timing.total / 1000).toFixed(1) + 's · draw ' + (render / 1000).toFixed(1) + 's');
-      google.script.run.withFailureHandler(() => {}).logSpeed(kind,timing,client);
+      fwSendSpeed(kind,timing,client);
     },1500);
   }
   function loadWorkspace(){
@@ -5534,8 +5547,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const opts={th:b.tasks.h,jh:b.journal.h,ct:!!t&&tasks!==b.tasks.t,cj:!!j&&journal!==b.journal.t};
     info.sent={tasks,journal,ct:opts.ct,cj:opts.cj};
     const draft=fwDraftCaptureDay(date);
+    const saveStarted=performance.now();
     google.script.run
       .withSuccessHandler(res=>{
+        if(opts.ct || opts.cj)fwObserveSave('day',saveStarted,res);
         info.inFlight=false;
         info.sent=null;
         let note='';
@@ -5554,6 +5569,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         }
       })
       .withFailureHandler(e=>{
+        if(opts.ct || opts.cj)fwObserveSave('day',saveStarted,null,e);
         info.inFlight=false;
         setStatus('Save error: '+e.message+' — retrying');
         // Never drop an edit: keep it pending and try again (offline, timeouts, lock waits).
@@ -5784,9 +5800,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!b.h) payload.baseText = b.c;
     item._refSent = {content:payload.content,contentChanged:payload.contentChanged};
     const draft = fwDraftCaptureRef(item);
+    const saveStarted = performance.now();
     refInFlight++;
     google.script.run
       .withSuccessHandler(res => {
+        if(payload.contentChanged || Object.keys(metaChanges).length)fwObserveSave('reference',saveStarted,res);
         refInFlight--;
         try {
         if(res && typeof res === 'object'){
@@ -5825,6 +5843,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         } finally { next(); }
       })
       .withFailureHandler(err => {
+        if(payload.contentChanged || Object.keys(metaChanges).length)fwObserveSave('reference',saveStarted,null,err);
         refInFlight--;
         try { if(onErr) onErr(err); else setStatus('Save error: ' + err.message); }
         finally { next(); }
@@ -5981,7 +6000,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(retry) setTimeout(() => fwSync(false),2500);
         // New AI tasks arrive with data-ai-new: sort them into today's time sections.
         if(Object.keys(out.days || {}).length && typeof tsecPlaceAi === 'function') setTimeout(() => { try{ tsecPlaceAi(); }catch(e){} },0);
-        if(out.timing) google.script.run.withFailureHandler(() => {}).logSpeed(withImports ? 'imports' : 'sync',out.timing,
+        if(out.timing) fwSendSpeed(withImports ? 'imports' : 'sync',out.timing,
           fwSpeedContext({rpcMs,applyMs:Math.round(performance.now() - applyStarted)}));
       })
       .withFailureHandler(() => { fwSyncBusy = false; })

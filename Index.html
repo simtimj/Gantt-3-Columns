@@ -2244,6 +2244,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div id="focusControls">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn theme-toggle" type="button" aria-label="Light / dark">☾</button>
+    <button class="btn cal-open-btn" type="button" data-cal-open aria-haspopup="dialog" aria-expanded="false" title="Calendar (Google Calendar, read-only for now)">📅 Calendar</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
@@ -2350,6 +2351,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div id="toolbar">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn theme-toggle" type="button" id="themeToggle" aria-label="Light / dark">☾</button>
+    <button class="btn cal-open-btn" type="button" data-cal-open aria-haspopup="dialog" aria-expanded="false" title="Calendar (Google Calendar, read-only for now)">📅 Calendar</button>
     <span class="od-nav"><button class="btn tiny" type="button" id="odUp" title="Previous day" aria-label="Previous day">▲</button><button class="btn tiny" type="button" id="odDown" title="Next day" aria-label="Next day">▼</button></span>
     <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <div class="view-menu" data-view-menu>
@@ -14323,6 +14325,213 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   backdrop.addEventListener('click',close);
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&focused){e.preventDefault();close();}});
   window.addEventListener('popstate',close);
+})();
+</script>
+<!-- 📅 Calendar panel, phase 1 (2026-11-08, Julius): read-only FullCalendar slide-out from the right.
+     Google Calendar stays the source of truth; server side is getCalendarRange() (Code.gs, never writes).
+     FullCalendar + luxon load from jsDelivr on the first open only, so app start-up is unchanged.
+     Later phases (editing, daily planning, timer, review): docs/NOTES.md → "Calendar panel (FullCalendar)". -->
+<style>
+  #calPanelBackdrop{position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .2s;}
+  #calPanel{--cp-bg:#fff;--cp-text:#202124;--cp-muted:#5f6368;--cp-line:#dadce0;--cp-soft:#f1f3f4;
+    position:fixed;top:0;right:0;bottom:0;z-index:4001;width:min(880px,72vw);max-width:100vw;display:flex;flex-direction:column;
+    background:var(--cp-bg);color:var(--cp-text);border-left:1px solid var(--cp-line);box-shadow:-8px 0 28px rgba(0,0,0,.18);
+    transform:translateX(105%);visibility:hidden;transition:transform .24s ease,visibility 0s linear .24s;
+    padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);font-size:14px;}
+  html[data-theme=dark] #calPanel{--cp-bg:#161616;--cp-text:#e8eaed;--cp-muted:#9aa0a6;--cp-line:#3c4043;--cp-soft:#232323;}
+  body.cal-open #calPanel{transform:none;visibility:visible;transition:transform .24s ease,visibility 0s;}
+  body.cal-open #calPanelBackdrop{opacity:1;pointer-events:auto;}
+  @media (max-width:720px){ #calPanel{width:100vw;border-left:0;} }
+  #calPanel .cp-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--cp-line);flex:0 0 auto;}
+  #calPanel .cp-head strong{font-size:16px;flex:1;}
+  #calPanel .cp-head button{font:inherit;color:inherit;background:var(--cp-soft);border:1px solid var(--cp-line);border-radius:8px;min-height:36px;min-width:40px;padding:0 10px;cursor:pointer;}
+  #calPanel .cp-close{font-size:15px;font-weight:600;}
+  #calPanel .cp-state{flex:0 0 auto;padding:6px 12px;font-size:13px;color:var(--cp-muted);border-bottom:1px solid var(--cp-line);display:flex;align-items:center;gap:8px;}
+  #calPanel .cp-state[hidden]{display:none;}
+  #calPanel .cp-state.err{color:#c5221f;background:rgba(217,48,37,.08);}
+  #calPanel .cp-state button{font:inherit;padding:4px 12px;border-radius:8px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;}
+  #calPanel .cp-body{flex:1 1 auto;min-height:0;position:relative;padding:6px 8px 8px;display:flex;flex-direction:column;}
+  #calPanel #calMount{flex:1 1 auto;min-height:0;}
+  #calPanel .cp-detail{position:absolute;left:10px;right:10px;bottom:10px;z-index:10;background:var(--cp-bg);color:var(--cp-text);border:1px solid var(--cp-line);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:12px 14px;}
+  #calPanel .cp-detail[hidden]{display:none;}
+  #calPanel .cp-detail .cp-dt{font-weight:600;font-size:15px;display:flex;gap:8px;align-items:flex-start;}
+  #calPanel .cp-detail .cp-dot{flex:0 0 12px;height:12px;border-radius:50%;margin-top:4px;}
+  #calPanel .cp-detail .cp-dm{color:var(--cp-muted);font-size:13px;margin-top:4px;}
+  #calPanel .cp-detail .cp-da{display:flex;gap:8px;margin-top:10px;}
+  #calPanel .cp-detail .cp-da a,#calPanel .cp-detail .cp-da button{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--cp-line);background:var(--cp-soft);color:inherit;text-decoration:none;cursor:pointer;}
+  /* FullCalendar look: follows the app's light / dark theme. */
+  #calPanel .fc{--fc-page-bg-color:var(--cp-bg);--fc-neutral-bg-color:var(--cp-soft);--fc-border-color:var(--cp-line);
+    --fc-today-bg-color:rgba(26,115,232,.07);--fc-now-indicator-color:#ea4335;--fc-button-bg-color:var(--cp-soft);--fc-button-border-color:var(--cp-line);
+    --fc-button-text-color:var(--cp-text);--fc-button-hover-bg-color:var(--cp-line);--fc-button-hover-border-color:var(--cp-line);
+    --fc-button-active-bg-color:#1a73e8;--fc-button-active-border-color:#1a73e8;font-size:13px;height:100%;}
+  #calPanel .fc .fc-button-primary:not(:disabled).fc-button-active{color:#fff;}
+  #calPanel .fc .fc-toolbar{gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+  #calPanel .fc .fc-toolbar-title{font-size:16px;}
+  #calPanel .fc .fc-button{padding:.35em .7em;font-size:13px;min-height:34px;}
+  #calPanel .fc .fc-event{cursor:pointer;}
+  #calPanel .fc .cp-done .fc-event-title{text-decoration:line-through;opacity:.8;}
+  #calPanel .fc .fc-timegrid-axis-cushion,#calPanel .fc .fc-timegrid-slot-label-cushion{color:var(--cp-muted);}
+  #calPanel .fc .fc-col-header-cell-cushion{color:var(--cp-text);}
+  .btn.cal-open-btn{white-space:nowrap;}
+</style>
+<div id="calPanelBackdrop" aria-hidden="true"></div>
+<aside id="calPanel" role="dialog" aria-modal="true" aria-label="Calendar" aria-hidden="true">
+  <div class="cp-head">
+    <strong>📅 Calendar</strong>
+    <button type="button" class="cp-refresh" data-cal-refresh title="Reload events from Google Calendar" aria-label="Reload events">↻</button>
+    <button type="button" class="cp-close" data-cal-close title="Close (Esc) and go back to the Gantt" aria-label="Close calendar">✕ Close</button>
+  </div>
+  <div class="cp-state" data-cal-state hidden></div>
+  <div class="cp-body">
+    <div id="calMount"></div>
+    <div class="cp-detail" data-cal-detail hidden></div>
+  </div>
+</aside>
+<script>
+(function(){
+  const TZ = 'America/Los_Angeles';
+  const LIBS = ['https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js',
+    'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js',
+    'https://cdn.jsdelivr.net/npm/@fullcalendar/luxon3@6.1.15/index.global.min.js'];
+  const panel = document.getElementById('calPanel'), backdrop = document.getElementById('calPanelBackdrop');
+  const mount = document.getElementById('calMount'), stateEl = panel.querySelector('[data-cal-state]'), detail = panel.querySelector('[data-cal-detail]');
+  let cal = null, libsPromise = null, lastFocus = null, loadSeq = 0, partial = 0, loadErr = false, busy = false;
+  // Empty / partial note for the dates on screen (also after Day ↔ Week switches served from FullCalendar's cache).
+  function refreshState(){
+    if(!cal || busy || loadErr) return;
+    const v = cal.view, a = v.activeStart.valueOf(), b = v.activeEnd.valueOf();
+    const n = cal.getEvents().filter(e => e.start && e.start.valueOf() < b && (e.end ? e.end.valueOf() : e.start.valueOf() + 1) > a).length;
+    if(partial) setState('error', partial + ' calendar(s) could not be read — some events may be missing.');
+    else if(!n) setState('empty', 'No events on these dates.');
+    else setState(null);
+  }
+  const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const isOpen = () => document.body.classList.contains('cal-open');
+
+  function setState(kind, msg){
+    if(!kind){ stateEl.hidden = true; stateEl.className = 'cp-state'; stateEl.innerHTML = ''; return; }
+    stateEl.hidden = false; stateEl.className = 'cp-state' + (kind === 'error' ? ' err' : '');
+    stateEl.innerHTML = '<span>' + esc(msg) + '</span>' + (kind === 'error' ? '<button type="button" data-cal-retry>Retry</button>' : '');
+  }
+  function loadScript(src){
+    return new Promise((res, rej) => {
+      const s = document.createElement('script'); s.src = src; s.async = false;
+      s.onload = res; s.onerror = () => { s.remove(); rej(new Error('Could not load ' + src.split('/npm/')[1])); };
+      document.head.appendChild(s);
+    });
+  }
+  function loadLibs(){
+    if(window.FullCalendar && window.FullCalendar.Calendar && window.FullCalendar.Luxon3) return Promise.resolve();
+    if(!libsPromise) libsPromise = LIBS.reduce((p, src) => p.then(() => loadScript(src)), Promise.resolve())
+      .catch(e => { libsPromise = null; throw e; });
+    return libsPromise;
+  }
+  function fetchRange(info, ok, fail){
+    const seq = ++loadSeq, s = info.startStr.slice(0, 10), e = info.endStr.slice(0, 10);
+    if(!(window.google && google.script && google.script.run)){ fail(new Error('Not connected to the server')); return; }
+    google.script.run.withSuccessHandler(r => {
+      if(seq !== loadSeq) return;
+      const evs = (r && r.events) || [];
+      const failed = (r && r.failed) || [];
+      ok(evs.map(x => ({ id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
+        backgroundColor: x.color, borderColor: x.color, textColor: x.colorId === '5' ? '#202124' : '#fff',
+        classNames: x.done ? ['cp-done'] : [], extendedProps: x })));
+      partial = failed.length; loadErr = false;
+      setTimeout(refreshState, 0);
+    }).withFailureHandler(err => {
+      if(seq !== loadSeq) return;
+      loadErr = true;
+      fail(err instanceof Error ? err : new Error(String((err && err.message) || err || 'Unknown error')));
+    }).getCalendarRange(s, e);
+  }
+  function fmtWhen(ev){
+    const x = ev.extendedProps || {};
+    const L = window.luxon && luxon.DateTime;
+    if(!L) return '';
+    if(ev.allDay){
+      const a = L.fromISO(x.start, {zone: TZ}), b = L.fromISO(x.end, {zone: TZ}).minus({days: 1});
+      return 'All day · ' + a.toFormat('EEE MMM d') + (b > a ? ' – ' + b.toFormat('EEE MMM d') : '');
+    }
+    const a = L.fromISO(x.start).setZone(TZ), b = L.fromISO(x.end).setZone(TZ);
+    return a.toFormat('EEE MMM d · h:mm a') + ' – ' + (a.hasSame(b, 'day') ? b.toFormat('h:mm a') : b.toFormat('EEE MMM d h:mm a'));
+  }
+  function showDetail(ev){
+    const x = ev.extendedProps || {};
+    detail.innerHTML = '<div class="cp-dt"><span class="cp-dot" style="background:' + esc(x.color) + '"></span><span>' + esc(ev.title) + '</span></div>' +
+      '<div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
+      '<div class="cp-dm">' + esc(x.cal || '') + (x.recurring ? ' · repeats' : '') + (x.done ? ' · done' : '') + '</div>' +
+      (x.location ? '<div class="cp-dm">📍 ' + esc(x.location) + '</div>' : '') +
+      '<div class="cp-da">' + (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener">Open in Google Calendar</a>' : '') +
+      '<button type="button" data-cal-detail-close>Close</button></div>';
+    detail.hidden = false;
+  }
+  function build(){
+    const phone = window.matchMedia('(max-width:720px)').matches;
+    const saved = lsGet('fw.calView');
+    cal = new FullCalendar.Calendar(mount, {
+      // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
+      timeZone: TZ,
+      initialView: saved === 'timeGridDay' || saved === 'timeGridWeek' ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
+      headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek' },
+      buttonText: { today: 'Today', day: 'Day', week: 'Week' },
+      height: '100%', nowIndicator: true, scrollTime: '07:00:00', slotMinTime: '00:00:00', slotMaxTime: '24:00:00',
+      allDaySlot: true, dayMaxEvents: false, editable: false, selectable: false, eventStartEditable: false, eventDurationEditable: false,
+      firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
+      dayHeaderFormat: phone ? { weekday: 'short', day: 'numeric' } : { weekday: 'short', month: 'numeric', day: 'numeric' },
+      events: fetchRange,
+      loading: b => { busy = b; if(b){ detail.hidden = true; setState('loading', 'Loading events…'); } else setTimeout(refreshState, 0); },
+      eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
+      eventClick: info => { info.jsEvent.preventDefault(); showDetail(info.event); },
+      datesSet: info => { lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); }
+    });
+    cal.render();
+  }
+  function start(){
+    if(cal){ cal.updateSize(); cal.refetchEvents(); return; }
+    setState('loading', 'Loading calendar…');
+    loadLibs().then(() => { if(!cal){ build(); } })
+      .catch(e => setState('error', 'Couldn’t load the calendar: ' + e.message));
+  }
+  function open(){
+    if(isOpen()) return;
+    lastFocus = document.activeElement;
+    document.body.classList.add('cal-open');
+    panel.setAttribute('aria-hidden', 'false');
+    document.querySelectorAll('[data-cal-open]').forEach(b => b.setAttribute('aria-expanded', 'true'));
+    start();
+    setTimeout(() => { const c = panel.querySelector('[data-cal-close]'); if(c && isOpen()) c.focus({preventScroll: true}); }, 60);
+  }
+  function close(){
+    if(!isOpen()) return;
+    document.body.classList.remove('cal-open');
+    panel.setAttribute('aria-hidden', 'true');
+    detail.hidden = true;
+    document.querySelectorAll('[data-cal-open]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
+  }
+  function retry(){ if(cal) cal.refetchEvents(); else start(); }
+  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry };
+  // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close]');
+    if(!t) return;
+    e.preventDefault();
+    if(t.hasAttribute('data-cal-open')) window.fwCalendar.toggle();
+    else if(t.hasAttribute('data-cal-close')) close();
+    else if(t.hasAttribute('data-cal-detail-close')) detail.hidden = true;
+    else retry();
+  });
+  backdrop.addEventListener('click', close);
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape' || !isOpen()) return;
+    e.preventDefault(); e.stopPropagation();
+    if(!detail.hidden) detail.hidden = true; else close();
+  }, true);
+  // Swipes / holds inside the panel never reach the workspace's own swipe and hold-to-zoom handlers.
+  ['touchstart','touchmove','pointerdown'].forEach(n => panel.addEventListener(n, e => e.stopPropagation(), {passive: true}));
+  window.addEventListener('resize', () => { if(cal && isOpen()) cal.updateSize(); });
 })();
 </script>
 </body>

@@ -45,9 +45,11 @@ let html = fs.readFileSync('Index.html', 'utf8')
   .replace('<head>', '<head>' + stub);
 const out = path.join(os.tmpdir(), 'gantt-smoke.html');
 fs.writeFileSync(out, html);
+// SMOKE_ONLY=main|tracker|calendar runs just that part (2026-11-08); unset = everything.
+const only = part => !process.env.SMOKE_ONLY || process.env.SMOKE_ONLY.split(',').includes(part);
 const b = await chromium.launch();
 let fails = 0;
-for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]]) {
+for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
   const pg = await (await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch })).newPage();
   const errs = [];
   pg.on('pageerror', e => errs.push(e.message + (process.env.STK ? ' @ ' + (e.stack || '').split('\n').slice(1,4).join(' | ') : '')));
@@ -674,7 +676,7 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     .replace("<?!= trackerInclude_('tracker/Core') ?>", fs.readFileSync('tracker/Core.html', 'utf8')).replace('<head>', '<head>' + ttStub);
   const tOut = path.join(os.tmpdir(), 'tracker-smoke.html');
   fs.writeFileSync(tOut, tHtml);
-  for (const [name, view] of [['desktop', { width: 1200, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]]) {
+  for (const [name, view] of (only('tracker') ? [['desktop', { width: 1200, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
     const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch });
     const pg = await ctx.newPage();
     const errs = [];
@@ -791,6 +793,137 @@ for (const [name, view] of [['desktop', { width: 1300, height: 900 }], ['phone',
     if (errs.length) { fails += errs.length; console.error('✗ tracker ' + name + ':\n  ' + errs.join('\n  ')); }
     else console.log('✓ tracker ' + name + ': acceptance walk-through passes');
     await ctx.close();
+  }
+}
+// 📅 Calendar panel, phase 1 (2026-11-08): read-only FullCalendar slide-out. FullCalendar + luxon come from jsDelivr in
+// the app; here they're served from a local npm copy (FC_DIR, or installed once into the temp dir) so the test runs
+// offline. The device is set to New York on purpose: times must still show in America/Los_Angeles.
+{
+  const { execSync } = await import('child_process');
+  let fcDir = process.env.FC_DIR || path.join(os.tmpdir(), 'fc-smoke', 'node_modules');
+  const need = ['fullcalendar/index.global.min.js', '@fullcalendar/luxon3/index.global.min.js', 'luxon/build/global/luxon.min.js'];
+  if (!need.every(f => fs.existsSync(path.join(fcDir, f)))) {
+    try {
+      const d = path.join(os.tmpdir(), 'fc-smoke'); fs.mkdirSync(d, { recursive: true });
+      execSync('npm i --silent --no-audit --no-fund --prefix "' + d + '" fullcalendar@6.1.15 @fullcalendar/luxon3@6.1.15 luxon@3.4.4', { stdio: 'ignore' });
+      fcDir = path.join(d, 'node_modules');
+    } catch (e) { /* falls through to the skip below */ }
+  }
+  if (!need.every(f => fs.existsSync(path.join(fcDir, f)))) console.log('… calendar panel: skipped (FullCalendar not installable offline)');
+  else {
+    const calStub = `<script>window.__calls=[];window.google={script:{run:new Proxy({},{get(t,k){let ok=null,bad=null;const p=new Proxy({},{get(_,m){
+      if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler')return f=>{bad=f;return p;}; if(m==='withUserObject')return()=>p;
+      return(...a)=>{window.__calls.push([m,a]);return setTimeout(()=>{
+        if(m==='getCalendarRange'){ if(window.__calFail){bad&&bad(new Error('Calendar service timed out'));return;}
+          const L=luxon.DateTime,Z='America/Los_Angeles';
+          const ev=[];for(let d=a[0];d<a[1]&&!window.__calEmpty;d=L.fromISO(d).plus({days:1}).toISODate()){const t=(h,mi)=>L.fromISO(d+'T'+h+':'+mi,{zone:Z}).toISO({suppressMilliseconds:true});
+            ev.push({id:'a|'+d,title:'All-day A',allDay:true,start:d,end:L.fromISO(d).plus({days:1}).toISODate(),color:'#3f51b5',colorId:'9',cal:'Main'},
+            {id:'b|'+d,title:'Dentist',allDay:false,start:t('09','00'),end:t('10','00'),color:'#d50000',colorId:'11',cal:'Main',location:'Main St'},
+            {id:'c|'+d,title:'Old chore',allDay:false,start:t('13','00'),end:t('13','30'),color:'#616161',colorId:'8',done:true,cal:'Main'});}
+          ok&&ok({start:a[0],end:a[1],events:ev,failed:[]});return;}
+        ok&&ok(m==='runImports'||m==='getSyncState'?{build:'smoke',ref:{},inbox:[],days:{}}:m==='getMainCalendarEvents'?{date:a[0],events:[]}:null);},15);};}});return p[k];}})}};</script>`;
+    const cHtml = fs.readFileSync('Index.html', 'utf8')
+      .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
+      .replace('<?!= initialData ?>', JSON.stringify(data)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')
+      .replace('<head>', '<head>' + calStub);
+    const cOut = path.join(os.tmpdir(), 'gantt-cal-smoke.html');
+    fs.writeFileSync(cOut, cHtml);
+    const libs = { 'luxon@3.4.4/build/global/luxon.min.js': 'luxon/build/global/luxon.min.js',
+      'fullcalendar@6.1.15/index.global.min.js': 'fullcalendar/index.global.min.js',
+      '@fullcalendar/luxon3@6.1.15/index.global.min.js': '@fullcalendar/luxon3/index.global.min.js' };
+    for (const [name, view] of (only('calendar') ? [['desktop', { width: 1300, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
+      const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/New_York' });
+      await ctx.route('https://cdn.jsdelivr.net/npm/**', r => {
+        const k = Object.keys(libs).find(x => r.request().url().endsWith(x));
+        return k ? r.fulfill({ path: path.join(fcDir, libs[k]), contentType: 'application/javascript' }) : r.abort();
+      });
+      const pg = await ctx.newPage();
+      const errs = [];
+      pg.on('pageerror', e => errs.push(e.message));
+      await pg.goto('file://' + cOut);
+      await pg.waitForTimeout(5000); // let the app's own start-up (imports, live refresh) settle before snapshotting
+      const res = await pg.evaluate(async (phone) => {
+        const out = [], wait = ms => new Promise(r => setTimeout(r, ms));
+        const until = async (f, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (f()) return true; await wait(50); } return false; };
+        const panel = document.getElementById('calPanel'), tb = document.getElementById('toolbar');
+        const btn = tb.querySelector('[data-cal-open]');
+        if (!btn) return ['no Calendar button in the top header'];
+        const before = [...tb.querySelectorAll('button,a')].map(x => x.textContent.trim()).join('|');
+        const ws = [...document.querySelectorAll('#todayScroll .day-editor, #todayScroll .plan-editor')].map(x => x.innerHTML).join('');
+        const visible = () => { const r = panel.getBoundingClientRect(); return getComputedStyle(panel).visibility === 'visible' && r.left >= -1 && r.right <= innerWidth + 1; };
+        const evText = () => [...panel.querySelectorAll('.fc-event')].map(x => x.textContent).join(' / ');
+        for (let i = 0; i < 3; i++) {
+          btn.click();
+          if (!await until(() => visible() && panel.querySelector('.fc-timegrid-event'))) { out.push('open #' + (i + 1) + ': panel or events not shown (' + (panel.querySelector('[data-cal-state]').textContent || 'no state') + ')'); break; }
+          if (i === 0) {
+            const timed = [...panel.querySelectorAll('.fc-timegrid-event')].find(x => /Dentist/.test(x.textContent));
+            if (!timed) out.push('timed event missing: ' + evText());
+            else {
+              if (!/9:00/.test(timed.textContent)) out.push('timed event not at 9:00 Los Angeles time: ' + timed.textContent);
+              if (getComputedStyle(timed).backgroundColor !== 'rgb(213, 0, 0)') out.push('timed event lost its color: ' + getComputedStyle(timed).backgroundColor);
+            }
+            const allDay = [...panel.querySelectorAll('.fc-daygrid-event')].find(x => /All-day A/.test(x.textContent));
+            if (!allDay) out.push('all-day event not in the all-day row');
+            else {
+              const col = panel.querySelector('.fc-col-header-cell').getBoundingClientRect().width;
+              if (allDay.getBoundingClientRect().width > col * 1.3) out.push('one-day all-day event spans more than its day');
+            }
+            if (!panel.querySelector('.cp-done')) out.push('done (Graphite) event not marked');
+            if (!panel.querySelector('.fc-timeGridDay-button') || !panel.querySelector('.fc-timeGridWeek-button') || !panel.querySelector('.fc-today-button') || !panel.querySelector('.fc-prev-button') || !panel.querySelector('.fc-next-button')) out.push('Day / Week / Today / prev / next missing');
+            const title = panel.querySelector('.fc-toolbar-title').textContent;
+            panel.querySelector('.fc-next-button').click(); await wait(150);
+            if (panel.querySelector('.fc-toolbar-title').textContent === title) out.push('next did not move');
+            panel.querySelector('.fc-today-button').click(); await wait(150);
+            if (panel.querySelector('.fc-toolbar-title').textContent !== title) out.push('Today did not come back');
+            panel.querySelector('.fc-timeGridWeek-button').click(); await wait(200);
+            if (panel.querySelectorAll('.fc-col-header-cell').length !== 7) out.push('week view is not 7 days');
+            panel.querySelector('.fc-timeGridDay-button').click(); await wait(200);
+            if (panel.querySelectorAll('.fc-col-header-cell').length !== 1) out.push('day view is not 1 day');
+            await until(() => panel.querySelector('.fc-timegrid-event'));
+            // Tap an event → detail card; read-only (no edit controls).
+            panel.querySelector('.fc-timegrid-event').click(); await wait(80);
+            const det = panel.querySelector('[data-cal-detail]');
+            if (det.hidden) out.push('tapping an event shows no detail');
+            const close = panel.querySelector('[data-cal-close]').getBoundingClientRect();
+            if (close.top < 0 || close.right > innerWidth + 1 || close.height < 30) out.push('close button not reachable');
+            if (phone && Math.abs(panel.getBoundingClientRect().width - innerWidth) > 2) out.push('phone panel not full width');
+            if (document.documentElement.scrollWidth > innerWidth + 1) out.push('page scrolls sideways with the panel open');
+          }
+          if (i === 1) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          else if (i === 2) document.getElementById('calPanelBackdrop').click();
+          else panel.querySelector('[data-cal-close]').click();
+          await wait(320);
+          if (document.body.classList.contains('cal-open') || getComputedStyle(panel).visibility !== 'hidden') out.push('close #' + (i + 1) + ' did not close the panel');
+        }
+        if (document.querySelectorAll('#calPanel').length !== 1 || document.querySelectorAll('#calPanel .fc-view-harness').length !== 1 || document.querySelectorAll('#calPanel .fc-header-toolbar').length !== 1) out.push('duplicate panels or calendars after reopening');
+        // Error → Retry
+        window.__calFail = 1; btn.click();
+        if (!await until(() => /Couldn.t load events/.test(panel.querySelector('[data-cal-state]').textContent))) out.push('no error state when loading fails');
+        window.__calFail = 0; const r = panel.querySelector('[data-cal-retry]');
+        if (!r) out.push('no Retry button'); else { r.click(); if (!await until(() => panel.querySelector('[data-cal-state]').hidden && panel.querySelector('.fc-timegrid-event'))) out.push('Retry did not reload events'); }
+        // Empty
+        window.__calEmpty = 1; panel.querySelector('[data-cal-refresh]').click();
+        if (!await until(() => /No events/.test(panel.querySelector('[data-cal-state]').textContent))) out.push('no empty state');
+        window.__calEmpty = 0;
+        panel.querySelector('[data-cal-close]').click(); await wait(320);
+        // Workspace + header unchanged; Options still opens; only reads went to the server.
+        if ([...document.querySelectorAll('#todayScroll .day-editor, #todayScroll .plan-editor')].map(x => x.innerHTML).join('') !== ws) out.push('Gantt workspace changed while the calendar was open');
+        if ([...tb.querySelectorAll('button,a')].map(x => x.textContent.trim()).join('|') !== before) out.push('header buttons changed');
+        tb.querySelector('[data-layout="scale"]').click(); await wait(100);
+        if (document.getElementById('typeSettings').classList.contains('hidden')) out.push('Options button stopped working');
+        document.getElementById('closeTypeSettings').click();
+        const writes = window.__calls.filter(c => /Calendar/i.test(c[0]) && c[0] !== 'getCalendarRange' && c[0] !== 'getMainCalendarEvents').map(c => c[0]);
+        if (writes.length) out.push('calendar write calls: ' + writes.join(', '));
+        if (!window.__calls.some(c => c[0] === 'getCalendarRange')) out.push('getCalendarRange never called');
+        return out;
+      }, !!view.isMobile);
+      errs.push(...res);
+      const shot = process.argv.indexOf('--shot');
+      if (shot > 0) { await pg.click('#toolbar [data-cal-open]'); await pg.waitForTimeout(900); await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-calendar-' + name + '.png') }); }
+      if (errs.length) { fails += errs.length; console.error('✗ calendar ' + name + ':\n  ' + errs.join('\n  ')); }
+      else console.log('✓ calendar ' + name + ': opens / closes, events, views, errors + retry');
+      await ctx.close();
+    }
   }
 }
 await b.close();

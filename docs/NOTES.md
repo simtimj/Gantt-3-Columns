@@ -466,3 +466,22 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - 2026-11-07: `doneLines` skips AI lines (check-text starts with `*`) and `data-study` entries.
 - Pages counter (2026-11-07): `readingText` / `readingLine` / `readingPages` / `appendReadingToken` / `readingAutoTick` next to the hydration helpers; format `Read N+ pages: T: total/N | +a · +b`. Hooked into upgradeDailies, carry-forward reset, a focusout recalc, and the daily checkbox hold menu (Add pages). Smoke: "+4 · 7" → 11/10 + auto tick; a `*` line suggests nothing.
 - 2026-11-07: buttons are `.dm-btns` (column, ✓ over ✕, icon-only with title / aria-label, ~1.9em wide). Smoke: stacked, ≤ 34px.
+
+## Calendar panel (FullCalendar) (2026-11-08, Julius: phased plan)
+
+Design context: New Gantt Sheet → Reference → **Calendar Planning View**; priority-system plan in **Central Data Hub**. Google Calendar is the source of truth. One phase per change, each checked by Julius (To Confirm row) before the next.
+
+**Phase 1 — read-only MVP (shipped 2026-11-08)**
+- Header button `[data-cal-open]` in `#toolbar` and `#focusControls` (after ☾). Panel markup / CSS / JS is one block just before `</body>` in Index.html (`#calPanel`, `#calPanelBackdrop`, `window.fwCalendar` = open / close / toggle / isOpen / refresh). It sits outside `#app`, so it never touches the workspace DOM; touch / pointer events stop at the panel so column swipe and hold-to-zoom don't fire under it.
+- Libraries load on the first open only (jsDelivr, pinned): `luxon@3.4.4`, `fullcalendar@6.1.15` (Standard bundle), `@fullcalendar/luxon3@6.1.15` (needed for a real named time zone). Load failure → error + Retry (re-attempts the scripts).
+- `timeZone: 'America/Los_Angeles'`, Day (default on phone) / Week (default on desktop), last view in `localStorage fw.calView`. `editable` / `selectable` off.
+- Server: `getCalendarRange(start, end)` in Code.gs (yyyy-MM-dd, end exclusive, ≤ 62 days). Same `EVENT_CALENDARS` as Cal Events. All-day → plain dates (end exclusive, from `getAllDayEndDate`); timed → ISO with offset. `color` = event color id via `CAL_PANEL_COLORS_` else calendar color; `done` = Graphite `8`. **Read-only**: unlike `getCalendarEvents` it runs no archive pass. Event id = `eventId|startMs` (unique per occurrence).
+- Smoke (`tools/smoke.mjs`, "Calendar panel" block): serves the libs from a local npm copy (`FC_DIR` or auto-installed to the temp dir), device zone New York to prove LA display, checks open/close ×3 (button, Esc, backdrop), no duplicates, timed 9:00 + color, all-day one-day width, Graphite mark, Day / Week / Today / prev / next, detail card, error → Retry, empty state, workspace + header unchanged, Options still works, no calendar write calls.
+
+**Phase 2 — basic editing (not built)**: create / edit / delete timed and all-day events from the panel. Keep event ids (edit in place via `calEventAt_`-style lookup, never delete + recreate), guard against double submits (disable Save while pending, client op id), show save failures inline with Retry, confirm before delete, new events with reminders off (`removeAllReminders()`). Respect the urgency color mapping (1 Tomato 11 / 2 Banana 5 / 3 Blueberry 9 / done Graphite 8). Verify each change in Google Calendar.
+
+**Phase 3 — daily planning (not built)**: expandable list above the timeline. Commitment groups: **Big Three / Non-negotiables** (≤ 3, ranked), **Stretch** (optional today), **Next Up** (~5 ranked, ready), **Backlog**. Project categories stay a separate axis from these groups. Use existing task identities (Today `.check-line` / `data-tid`, Cal Events ids), no copies. First: click-to-schedule and **Move to date**; touch drag / resize is a separate checkable step. Graphite completion behavior unchanged.
+
+**Phase 4 — timer (not built)**: tap a task / event card → into the existing block timer (Timer.gs / Blocks). "Append washing dishes" adds to the current block; "Do this later…" goes to a pending inbox. **Open question for Julius before building**: does Append switch the running timer to the new item, or only add it? Actual effort stays separate from planned duration and from done.
+
+**Phase 5 — review (not built)**: workday-aware deferral history, progress targets, recurring blocks, night-before planning. **Define first**: which days are workdays and the rollover rules (when an unfinished item counts as deferred).

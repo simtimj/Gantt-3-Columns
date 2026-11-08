@@ -2323,6 +2323,45 @@ function getCalendarEvents() {
   return { today: today, events: out, archive: archive };
 }
 
+/* Calendar panel, phase 1 (2026-11-08, Julius): READ-ONLY range for the 📅 Calendar slide-out (FullCalendar).
+   Never writes: no archive pass (unlike getCalendarEvents), no color sync. Same calendars as Cal Events.
+   Dates are yyyy-MM-dd in the script zone (America/Los_Angeles); end is exclusive. All-day events come back as
+   plain dates (end exclusive, like Google), timed events as ISO with offset. color = the event's own color, else
+   its calendar's color. Phase 2+ plans: docs/NOTES.md → "Calendar panel (FullCalendar)". */
+const CAL_PANEL_COLORS_ = { '1': '#7986cb', '2': '#33b679', '3': '#8e24aa', '4': '#e67c73', '5': '#f6bf26', '6': '#f4511e',
+  '7': '#039be5', '8': '#616161', '9': '#3f51b5', '10': '#0b8043', '11': '#d50000' };
+function getCalendarRange(startDate, endDate) {
+  const s = String(startDate || ''), e = String(endDate || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !/^\d{4}-\d{2}-\d{2}$/.test(e) || e <= s) throw new Error('Invalid calendar range');
+  const from = parseDate_(s), to = parseDate_(e);
+  if (to - from > 62 * DAY_MS) throw new Error('Calendar range too long');
+  const tz = Session.getScriptTimeZone(), out = [], calendars = [], failed = [];
+  EVENT_CALENDARS.forEach(id => {
+    let cal = null;
+    try { cal = CalendarApp.getCalendarById(id); } catch (err) { cal = null; }
+    if (!cal) { failed.push(id); return; }
+    const calName = cal.getName(), calColor = String(cal.getColor() || '#039be5');
+    calendars.push({ id: id, name: calName, color: calColor });
+    cal.getEvents(from, to).forEach(ev => {
+      const allDay = ev.isAllDayEvent();
+      let colorId = '';
+      try { colorId = String(ev.getColor() || ''); } catch (err) { colorId = ''; }
+      let link = '';
+      try { link = 'https://www.google.com/calendar/event?eid=' + Utilities.base64EncodeWebSafe(ev.getId().split('@')[0] + ' ' + id).replace(/=+$/, ''); } catch (err) { link = ''; }
+      const st = allDay ? ev.getAllDayStartDate() : ev.getStartTime(), en = allDay ? ev.getAllDayEndDate() : ev.getEndTime();
+      const fmt = allDay ? 'yyyy-MM-dd' : "yyyy-MM-dd'T'HH:mm:ssXXX";
+      out.push({
+        id: ev.getId() + '|' + st.getTime(), eventId: ev.getId(), calId: id, cal: calName,
+        title: ev.getTitle() || '(no title)', allDay: allDay,
+        start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
+        color: CAL_PANEL_COLORS_[colorId] || calColor, colorId: colorId, done: colorId === '8',
+        location: ev.getLocation() || '', recurring: ev.isRecurringEvent(), link: link
+      });
+    });
+  });
+  return { start: s, end: e, tz: tz, events: out, calendars: calendars, failed: failed };
+}
+
 // One event by id + start time, so the right day of a repeating event is the one found.
 function calEventAt_(calId, eventId, start) {
   const cal = CalendarApp.getCalendarById(calId);

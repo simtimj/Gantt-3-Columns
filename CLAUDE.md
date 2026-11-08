@@ -113,6 +113,7 @@ When he asks to organize his calendar tasks:
 - Day Review levels + Vivaldi → MISC (2026-11-05, Julius)
 - Tuck strips + pull tabs (2026-11-06, Julius)
 - Done → Dailies matching (2026-11-05, Julius: first version)
+- Calendar panel (FullCalendar) (2026-11-08, Julius: phased plan)
 
 ## IT study log (2026-11-04)
 

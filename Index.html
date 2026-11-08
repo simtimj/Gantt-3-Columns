@@ -14858,14 +14858,142 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-detail .cp-row2 button{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid #1a73e8;background:#1a73e8;color:#fff;cursor:pointer;}
   #calPanel .cp-detail .cp-plan-ev{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:8px;font-size:12px;color:var(--cp-muted);}
   #calPanel .cp-detail .cp-plan-ev button{font:inherit;font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--cp-line);background:var(--cp-soft);color:var(--cp-text);cursor:pointer;}
+  /* ===== Google Calendar look (2026-11-08, Julius: "as close as Google Calendar, style and feel"). Overrides only;
+     behaviour unchanged. Light + dark tokens follow Google's current palette. ===== */
+  #calPanel{--cp-bg:#fff;--cp-text:#1f1f1f;--cp-muted:#70757a;--cp-line:#dde3ea;--cp-soft:#f0f4f9;--cp-hover:rgba(68,71,70,.08);
+    --cp-blue:#0b57d0;--cp-blue-soft:#d3e3fd;--cp-blue-text:#041e49;--cp-shadow:0 1px 3px rgba(60,64,67,.3),0 4px 8px 3px rgba(60,64,67,.15);
+    font-family:'Google Sans',Roboto,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;}
+  html[data-theme=dark] #calPanel{--cp-bg:#1f1f1f;--cp-text:#e3e3e3;--cp-muted:#9aa0a6;--cp-line:#444746;--cp-soft:#282a2c;--cp-hover:rgba(227,227,227,.08);
+    --cp-blue:#a8c7fa;--cp-blue-soft:#004a77;--cp-blue-text:#062e6f;--cp-shadow:0 1px 3px rgba(0,0,0,.5),0 4px 8px 3px rgba(0,0,0,.3);}
+  #calPanel button{-webkit-tap-highlight-color:transparent;}
+  #calPanel .cp-head button:focus{outline:0;}
+  #calPanel .cp-head button:focus-visible{outline:0;background:var(--cp-hover);}
+  /* Header: title + flat round icon buttons; "+ New" is a Create-style pill. */
+  #calPanel .cp-head{border-bottom:0;padding:8px 8px 4px 16px;gap:6px;}
+  #calPanel .cp-head strong{font-size:20px;font-weight:400;letter-spacing:0;}
+  #calPanel .cp-head button{background:transparent;border:0;border-radius:999px;min-width:40px;min-height:40px;font-size:15px;color:var(--cp-muted);transition:background .15s;}
+  #calPanel .cp-head button:hover,#calPanel .cp-head button:active{background:var(--cp-hover);}
+  #calPanel .cp-head .cp-close{font-size:20px;font-weight:400;width:40px;padding:0;}
+  #calPanel .cp-head .cp-refresh{font-size:18px;width:40px;padding:0;}
+  #calPanel .cp-head .cp-new{background:var(--cp-bg);color:var(--cp-text);box-shadow:var(--cp-shadow);padding:0 18px 0 12px;font-weight:500;margin-right:4px;}
+  #calPanel .cp-head .cp-new:hover{background:var(--cp-soft);}
+  #calPanel .cp-plus{font-size:22px;font-weight:300;line-height:0;vertical-align:-2px;margin-right:4px;color:var(--cp-blue);}
+  /* Status: a soft rounded strip instead of a full-width banner. */
+  #calPanel .cp-state{border:0;margin:0 12px 4px;border-radius:8px;padding:6px 12px;background:var(--cp-soft);}
+  #calPanel .cp-state.err{background:rgba(217,48,37,.1);}
+  #calPanel .cp-state button{border-radius:999px;}
+  #calPanel .cp-body{padding:0 8px 8px 4px;}
+  /* Toolbar: [Today] ‹ › Month … [Day|Week]. */
+  #calPanel .fc{font-size:12px;--fc-border-color:var(--cp-line);--fc-today-bg-color:transparent;--fc-now-indicator-color:#ea4335;--fc-page-bg-color:var(--cp-bg);--fc-neutral-bg-color:var(--cp-bg);}
+  #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:2px 4px 8px 8px;gap:4px;flex-wrap:nowrap;}
+  #calPanel .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;min-width:0;}
+  #calPanel .fc .fc-toolbar-chunk:first-child{flex:1 1 auto;}
+  #calPanel .fc .fc-toolbar-title{font-size:20px;font-weight:400;margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #calPanel .fc .fc-button{background:transparent;border:0;color:var(--cp-text);box-shadow:none!important;font-size:14px;font-weight:500;text-transform:none;min-height:36px;transition:background .15s;}
+  #calPanel .fc .fc-button:hover{background:var(--cp-hover);color:var(--cp-text);}
+  #calPanel .fc .fc-button:focus-visible{outline:2px solid var(--cp-blue);outline-offset:1px;}
+  #calPanel .fc .fc-today-button{border:1px solid var(--cp-line);border-radius:999px;padding:0 16px;margin-right:6px;opacity:1;}
+  #calPanel .fc .fc-today-button:disabled{opacity:1;color:var(--cp-text);}
+  #calPanel .fc .fc-prev-button,#calPanel .fc .fc-next-button{width:36px;height:36px;padding:0;border-radius:50%!important;color:var(--cp-muted);}
+  #calPanel .fc .fc-button-group{gap:0;}
+  #calPanel .fc .fc-toolbar-chunk:last-child .fc-button-group{border:1px solid var(--cp-line);border-radius:999px;overflow:hidden;}
+  #calPanel .fc .fc-timeGridDay-button,#calPanel .fc .fc-timeGridWeek-button{border-radius:0!important;padding:0 14px;font-size:13px;}
+  #calPanel .fc .fc-button-primary:not(:disabled).fc-button-active{background:var(--cp-blue-soft);color:var(--cp-blue-text);}
+  html[data-theme=dark] #calPanel .fc .fc-button-primary:not(:disabled).fc-button-active{color:#d3e3fd;}
+  /* Grid: no box, faint hour lines only, small grey "1 PM" labels sitting on the line. */
+  #calPanel .fc .fc-scrollgrid{border:0;}
+  #calPanel .fc .fc-scrollgrid td:last-of-type,#calPanel .fc .fc-scrollgrid th:last-of-type{border-right:0;}
+  #calPanel .fc-theme-standard td,#calPanel .fc-theme-standard th{border-color:var(--cp-line);}
+  #calPanel .fc .fc-col-header-cell{border-left:0;border-right:0;border-top:0;}
+  #calPanel .fc .fc-timegrid-slot{height:24px;border-bottom:0;}
+  #calPanel .fc .fc-timegrid-slot-minor{border-top:0;}
+  #calPanel .fc .fc-timegrid-slot-label{border:0;vertical-align:top;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion{font-size:10px;color:var(--cp-muted);position:relative;top:-7px;padding:0 8px 0 4px;background:var(--cp-bg);}
+  #calPanel .fc .fc-timegrid-axis{border:0;}
+  #calPanel .fc .fc-timegrid-axis-cushion{font-size:10px;color:var(--cp-muted);}
+  #calPanel .fc .fc-timegrid-col{border-left:1px solid var(--cp-line);}
+  #calPanel .fc .fc-timegrid-divider{display:none;}
+  #calPanel .fc .fc-daygrid-body,#calPanel .fc .fc-timegrid-body{border-top:0;}
+  #calPanel .fc .fc-scrollgrid-section-header > th,#calPanel .fc .fc-scrollgrid-section-header td{border-bottom:0;}
+  #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:1px solid var(--cp-line);box-shadow:0 2px 3px -2px rgba(60,64,67,.25);}
+  /* Day header: small weekday over a big number; today's number in a blue circle. */
+  #calPanel .fc .fc-col-header-cell-cushion{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0 6px;text-decoration:none;color:var(--cp-muted);}
+  #calPanel .cp-dh-w{font-size:11px;font-weight:500;letter-spacing:.8px;}
+  #calPanel .cp-dh-n{font-size:22px;font-weight:400;color:var(--cp-text);width:40px;height:40px;line-height:40px;text-align:center;border-radius:50%;transition:background .15s;}
+  #calPanel .fc .fc-col-header-cell-cushion:hover .cp-dh-n{background:var(--cp-hover);}
+  #calPanel .fc .fc-day-today .cp-dh-w{color:var(--cp-blue);}
+  #calPanel .fc .fc-day-today .cp-dh-n{background:var(--cp-blue);color:#fff;}
+  html[data-theme=dark] #calPanel .fc .fc-day-today .cp-dh-n{color:var(--cp-blue-text);}
+  #calPanel .fc .fc-day-past .cp-dh-n{color:var(--cp-muted);}
+  /* Events: rounded, title first (500), time under it, thin page-colored gap between overlaps. */
+  #calPanel .fc .fc-event{border:0;border-radius:4px;box-shadow:none;}
+  #calPanel .fc .fc-timegrid-col-events{margin:0 10px 0 1px;}
+  #calPanel .fc .fc-timegrid-event-harness-inset .fc-timegrid-event{box-shadow:0 0 0 1px var(--cp-bg);}
+  #calPanel .fc .fc-timegrid-event .fc-event-main{padding:2px 6px;}
+  #calPanel .fc .fc-daygrid-event{margin:1px 10px 1px 2px!important;padding:1px 0;}
+  #calPanel .fc .fc-daygrid-event .fc-event-main{padding:1px 6px;}
+  #calPanel .cp-ev{line-height:1.25;overflow:hidden;font-size:12px;}
+  #calPanel .cp-ev-t{font-weight:500;overflow:hidden;text-overflow:ellipsis;}
+  #calPanel .cp-ev-m{opacity:.9;font-size:11.5px;}
+  #calPanel .cp-ev-1{white-space:nowrap;text-overflow:ellipsis;}
+  #calPanel .fc .cp-tiny .fc-event-main{padding:0 6px;}
+  #calPanel .fc .cp-tiny .cp-ev{font-size:10.5px;line-height:1.05;}
+  #calPanel .fc .cp-tiny .cp-ev-m{font-size:10px;}
+  #calPanel .fc .fc-toolbar-chunk:last-child{flex:0 0 auto;}
+  #calPanel .fc .cp-done .cp-ev-t{text-decoration:line-through;}
+  #calPanel .fc .cp-done{opacity:.75;}
+  #calPanel .fc .fc-event:hover{filter:brightness(.96);}
+  #calPanel .fc .fc-event.fc-event-dragging,#calPanel .fc .fc-event-mirror{box-shadow:var(--cp-shadow)!important;}
+  /* Now: red line with a dot on the left. */
+  #calPanel .fc .fc-timegrid-now-indicator-line{border-width:2px 0 0;border-color:#ea4335;}
+  #calPanel .fc .fc-timegrid-now-indicator-line::before{content:"";position:absolute;left:-6px;top:-7px;width:12px;height:12px;border-radius:50%;background:#ea4335;}
+  #calPanel .fc .fc-timegrid-now-indicator-arrow{display:none;}
+  /* Selection while dragging out a new event. */
+  #calPanel .fc .fc-highlight{background:var(--cp-blue-soft);opacity:.6;border-radius:4px;}
+  /* Event card / form: a Google-style floating sheet (no border, soft shadow, pill buttons). */
+  #calPanel .cp-detail{border:0;border-radius:16px;box-shadow:var(--cp-shadow);padding:16px 18px;}
+  #calPanel .cp-detail .cp-dt{font-size:20px;font-weight:400;gap:14px;line-height:1.3;}
+  #calPanel .cp-detail .cp-dot{flex:0 0 14px;height:14px;border-radius:4px;margin-top:6px;}
+  #calPanel .cp-detail .cp-dm{font-size:14px;margin-top:4px;padding-left:28px;}
+  #calPanel .cp-detail .cp-note{padding-left:28px;}
+  #calPanel .cp-detail .cp-da{gap:6px;margin-top:14px;flex-wrap:wrap;}
+  #calPanel .cp-detail .cp-da a,#calPanel .cp-detail .cp-da button{border:0;background:transparent;border-radius:999px;padding:8px 14px;font-size:14px;font-weight:500;color:var(--cp-blue);}
+  #calPanel .cp-detail .cp-da a:hover,#calPanel .cp-detail .cp-da button:hover{background:var(--cp-hover);}
+  #calPanel .cp-detail .cp-da .cp-primary{background:var(--cp-blue);color:#fff;}
+  html[data-theme=dark] #calPanel .cp-detail .cp-da .cp-primary{color:var(--cp-blue-text);}
+  #calPanel .cp-detail .cp-da .cp-danger{color:#c5221f;}
+  #calPanel .cp-detail .cp-da .cp-danger.cp-primary{background:#c5221f;color:#fff;}
+  #calPanel .cp-form input[type=text]{border:0;border-bottom:1px solid var(--cp-line);border-radius:0;font-size:20px;padding:6px 2px;}
+  #calPanel .cp-form input[type=text]:focus{outline:0;border-bottom:2px solid var(--cp-blue);}
+  #calPanel .cp-form input[type=date],#calPanel .cp-form input[type=time]{border:0;background:var(--cp-soft);border-radius:6px;}
+  #calPanel .cp-detail .cp-seg button,#calPanel .cp-detail .cp-plan-ev button{border:1px solid var(--cp-line);background:transparent;}
+  #calPanel .cp-detail .cp-seg button.on{background:var(--cp-blue-soft);border-color:var(--cp-blue-soft);color:var(--cp-blue-text);}
+  html[data-theme=dark] #calPanel .cp-detail .cp-seg button.on{color:#d3e3fd;}
+  /* Plan box: flatter, quieter, same features. */
+  #calPanel .cp-plan{border:0;border-radius:12px;background:var(--cp-soft);margin:0 4px 8px 8px;}
+  #calPanel .cp-ph{background:var(--cp-soft);border-bottom:0;padding:4px 6px 2px;}
+  #calPanel .cp-pfold{font-weight:500;}
+  #calPanel .cp-ph .cp-padd{border:0;background:transparent;color:var(--cp-blue);font-weight:500;border-radius:999px;padding:0 12px;}
+  #calPanel .cp-ph .cp-padd:hover{background:var(--cp-hover);}
+  #calPanel .cp-pgh{font-size:11px;font-weight:500;letter-spacing:.6px;}
+  #calPanel .cp-pi{border-top:0;padding:3px 0;}
+  #calPanel .cp-pi input[type=checkbox]{accent-color:var(--cp-blue);}
+  #calPanel .cp-pbtn button{background:transparent;border:0;border-radius:50%;color:var(--cp-muted);}
+  #calPanel .cp-pbtn button:hover:not(:disabled){background:var(--cp-hover);}
+  @media (max-width:720px){
+    #calPanel .cp-head{padding-left:12px;}
+    #calPanel .fc .fc-toolbar-title{font-size:17px;margin-left:4px;}
+    #calPanel .fc .fc-today-button{padding:0 12px;margin-right:2px;}
+    #calPanel .fc .fc-timeGridDay-button,#calPanel .fc .fc-timeGridWeek-button{padding:0 10px;}
+  }
 </style>
 <div id="calPanelBackdrop" aria-hidden="true"></div>
 <aside id="calPanel" role="dialog" aria-modal="true" aria-label="Calendar" aria-hidden="true">
   <div class="cp-head">
     <strong>📅 Calendar</strong>
-    <button type="button" class="cp-new" data-cal-new title="New event on your main calendar (or hold / drag on the grid)" aria-label="New event">+ New</button>
+    <button type="button" class="cp-new" data-cal-new title="New event on your main calendar (or hold / drag on the grid)" aria-label="New event"><span class="cp-plus">+</span> New</button>
     <button type="button" class="cp-refresh" data-cal-refresh title="Reload events from Google Calendar" aria-label="Reload events">↻</button>
-    <button type="button" class="cp-close" data-cal-close title="Close (Esc) and go back to the Gantt" aria-label="Close calendar">✕ Close</button>
+    <button type="button" class="cp-close" data-cal-close title="Close (Esc) and go back to the Gantt" aria-label="Close calendar">✕</button>
   </div>
   <div class="cp-state" data-cal-state hidden></div>
   <div class="cp-body">
@@ -15468,8 +15596,30 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
       timeZone: TZ,
       initialView: saved === 'timeGridDay' || saved === 'timeGridWeek' ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
-      headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek' },
+      // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
+      headerToolbar: { left: 'today prev,next title', center: '', right: 'timeGridDay,timeGridWeek' },
       buttonText: { today: 'Today', day: 'Day', week: 'Week' },
+      buttonIcons: { prev: 'chevron-left', next: 'chevron-right' },
+      titleFormat: { month: 'long', year: 'numeric' },
+      views: { timeGridDay: { titleFormat: phone ? { month: 'short', day: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' } } },
+      titleRangeSeparator: ' – ',
+      allDayText: '',
+      slotLabelContent: a => String(a.text || '').replace(/^(\d+)(?::00)?\s*([ap])m?$/i, (m, h, ap) => h + ' ' + ap.toUpperCase() + 'M'),
+      slotLabelFormat: { hour: 'numeric', meridiem: 'short' },
+      eventTimeFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
+      defaultRangeSeparator: ' – ',
+      // Header: small weekday over a big date number; today's number in a blue circle.
+      dayHeaderContent: a => { const L = luxon.DateTime.fromJSDate(a.date, {zone: 'UTC'});
+        return { html: '<span class="cp-dh-w">' + L.toFormat('ccc').toUpperCase() + '</span><span class="cp-dh-n">' + L.day + '</span>' }; },
+      // Event: title first (bold), time under it, like Google.
+      eventClassNames: a => (!a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 20 * 60000) ? ['cp-tiny'] : [],
+      eventContent: a => {
+        const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : esc(a.timeText || '');
+        const short = !a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 30 * 60000;
+        return { html: a.event.allDay ? '<div class="cp-ev"><span class="cp-ev-t">' + t + '</span></div>'
+          : short ? '<div class="cp-ev cp-ev-1"><span class="cp-ev-t">' + t + '</span><span class="cp-ev-m">, ' + tm + '</span></div>'
+          : '<div class="cp-ev"><div class="cp-ev-t">' + t + '</div><div class="cp-ev-m">' + tm + '</div></div>' };
+      },
       height: '100%', nowIndicator: true, scrollTime: '07:00:00', slotMinTime: '00:00:00', slotMaxTime: '24:00:00',
       allDaySlot: true, dayMaxEvents: false,
       // Phase 3b: hold + drag (touch) or drag (mouse) moves an event, its bottom edge resizes it; timed ↔ all-day both
@@ -15483,7 +15633,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       selectable: true, selectMirror: true, selectLongPressDelay: 400, unselectAuto: true,
       select: info => { if(!pending) openForm(formFromRange(info.allDay, info.startStr, info.endStr)); cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
-      dayHeaderFormat: phone ? { weekday: 'short', day: 'numeric' } : { weekday: 'short', month: 'numeric', day: 'numeric' },
       events: fetchRange,
       // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
       loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },

@@ -4,6 +4,8 @@ Google Apps Script web app: a three-column daily workspace — **Today / Tasks**
 
 Last updated: 2026-11-08
 
+Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md).
+
 ## Status key
 
 - ✅ **Working** — in use and confirmed
@@ -52,6 +54,7 @@ Last updated: 2026-11-08
 
 ## 🧪 To be confirmed (2026-11-08)
 
+- **📅 Calendar looks like Google Calendar**: rounded **Today** button, round ‹ › arrows, the month as the title ("November 2026"; Day view shows the date), and a **Day | Week** pill. No boxed table: faint hour lines and small grey **1 PM** labels. Day headers show a small weekday over a big date, with today's date in a blue circle. Events are rounded with the title first and the time under it (**9am – 10am**); short ones fit on one line. A red now-line with a dot. A **+ New** pill, round ↻ / ✕, a floating event card, a flatter Plan box, and matching dark mode. Style only: everything works the same.
 - **Done count on every day + today marker**: every day's date line in History now shows its count (**8 ✓** / **5/7 ✓**), not just today's; days with no tasks show nothing. Today's date is drawn in its day color (no extra space).
 - **📅 Calendar loads faster (cached days)**: days you've seen, plus the week before and after, show **instantly** when you step ‹ › or switch Day / Week; Google is re-checked quietly in the background and the view only changes if something did. The last copy is kept on the device, so even the first 📅 open after a reload shows events right away, and the app warms it up a few seconds after it starts. After any save (add / edit / move / delete / tick) it still reads Google before drawing. The server read of Google Calendar is also quicker (one Calendar API call per calendar instead of many small ones; falls back to the old way if that's unavailable).
 - **Recover unsent day / Reference text**: edits get a device-local recovery copy before autosave. After reopening, **Review** offers unfinished copies without changing the server. **Restore** merges with the current text; conflicting lines ask whether to keep both for review. Copies clear only after their matching save succeeds. Deleted Reference cards remain previewable/downloadable and are not recreated. Storage failures show a warning and keep export available. Covers day Tasks/Notes and Reference text; browser storage can be unavailable or cleared, and these copies do not sync across devices. Phone check pending; see `docs/NOTES.md` → "Workspace text recovery".
@@ -582,3 +585,4 @@ Last updated: 2026-11-08
 ## 🧪 To be confirmed (2026-11-08) — save timing
 
 - **Save-acknowledgement timing without extra save-log calls**: the next existing Speed Log report carries up to 50 recent changed day/Reference save round-trips, with success/conflict/error status and the responding release. Samples contain no task text or task IDs; reporting retries keep stable sample IDs. This is best-effort in-memory telemetry, not a complete audit, and excludes the autosave debounce. Refresh, edit a disposable line, and let a normal sync occur to see `Client.saveTimings`. Live latency targets remain to be agreed after measurement.
+

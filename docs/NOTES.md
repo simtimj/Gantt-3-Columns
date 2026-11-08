@@ -508,6 +508,11 @@ Design context: New Gantt Sheet → Reference → **Calendar Planning View**; pr
 - Server: `getCalendarRange` tries `calPanelRangeApi_` first (Calendar advanced service v3, enabled in appsscript.json; one `Events.list` per calendar with `fields`, same output shape; calendar name / color cached 6 h). Any error → CalendarApp path, API skipped for 30 min (`calApiOff`). Response carries `via` (`api` / `app`) and `ms`.
 - Smoke: stepping days near today draws at once with ≤ 1 background call; reopening while reads fail still shows cached events; ↻ while failing shows the error + Retry.
 
+**Google Calendar look (2026-11-08, Julius: "as close as Google Calendar, style and feel")**
+- CSS: one override block at the end of the `#calPanel` styles ("Google Calendar look"); tokens `--cp-*` incl. `--cp-blue` / `--cp-blue-soft` / `--cp-shadow`, dark under `html[data-theme=dark]`. System font stack (Google Sans → Roboto → SF); no web font loaded.
+- FullCalendar options: toolbar `today prev,next title | Day,Week`, `titleFormat` month + year (Day view: date; phone `MMM d`), `slotLabelContent` → "1 PM", `eventTimeFormat` omitZeroMinute + `defaultRangeSeparator ' – '`, `dayHeaderContent` (`.cp-dh-w` weekday + `.cp-dh-n` number, today circled), `eventContent` (title then time; ≤ 30 min on one line), `eventClassNames` `cp-tiny` for ≤ 20 min, `allDayText ''`.
+- Smoke compares the view's first day (not the title) for ‹ › / Today, and matches times as "9am" / "9:00".
+
 **Phase 4 — timer (not built)**: tap a task / event card → into the existing block timer (Timer.gs / Blocks). "Append washing dishes" adds to the current block; "Do this later…" goes to a pending inbox. **Open question for Julius before building**: does Append switch the running timer to the new item, or only add it? Actual effort stays separate from planned duration and from done.
 
 **Phase 5 — review (not built)**: workday-aware deferral history, progress targets, recurring blocks, night-before planning. **Define first**: which days are workdays and the rollover rules (when an unfinished item counts as deferred).

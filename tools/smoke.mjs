@@ -737,8 +737,16 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     if (s.run) errs.push('stop at… left it running');
     // Manual (estimated) entry
     await pg.click('[data-a="manualSheet"]:not([data-id])');
+    // End before the synthetic 3-hour timer. Using the current rounded minute can
+    // overlap the real entries made earlier in this test when a minute rolls over.
+    const manual = await pg.evaluate(() => {
+      const t = Date.now() - 4 * 3600e3, d = new Date(t);
+      return {date:ttApp.TT.dateOf(t),end:String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0')};
+    });
+    await pg.fill('#mDate', manual.date); await pg.fill('#mEnd', manual.end);
     await pg.fill('#mTitle', 'Researching Android browsers'); await pg.fill('#mStart', '');
     await pg.fill('#mDur', '30m'); await pg.click('[data-a="saveManual"]'); await pg.waitForTimeout(80);
+    if (await pg.isVisible('#mTitle')) throw new Error('Manual fixture rejected: ' + await pg.textContent('#err'));
     s = await S();
     if (s.manual !== 1) errs.push('manual entry not saved: ' + await pg.textContent('#err').catch(() => ''));
     // Calendar: plan tomorrow, start it now; the plan keeps its time
@@ -1055,3 +1063,4 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
 }
 await b.close();
 process.exit(fails ? 1 : 0);
+

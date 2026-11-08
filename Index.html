@@ -7273,13 +7273,57 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      saveFocus (script property focusData), not the Notes cell. Phases 2–5 (tasks with data-tid, drag,
      priority/progress, temporary urgency, expand) come later. */
   (function initFocus(){
-    let data = null, saveT = null;
+    let data = null, base = null, saveT = null, saving = false, pending = false, conflict = null, loadError = false;
+    const DRAFT = 'fw.focus.draft.v1', RECOVERY = 'fw.focus.recovery.v1';
+    const copy = v => JSON.parse(JSON.stringify(v));
+    const valid = v => v && Array.isArray(v.cats);
+    const draft = () => { try { return JSON.parse(localStorage.getItem(DRAFT) || 'null'); } catch(e){ return null; } };
+    const recovery = () => { try { const a = JSON.parse(localStorage.getItem(RECOVERY) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } };
+    function keepDraft(){
+      try { localStorage.setItem(DRAFT,JSON.stringify({base,data})); return true; }
+      catch(e){ setStatus('Focus draft could not be kept on this device — keep the app open until saved'); return false; }
+    }
+    function retainConflict(){
+      try {
+        const old = recovery(); old.push({at:Date.now(),base,data,shared:conflict && conflict.data});
+        localStorage.setItem(RECOVERY,JSON.stringify(old.slice(-3))); return true;
+      } catch(e){ setStatus('Focus recovery copy could not be kept — keep this list open'); return false; }
+    }
     const wired = new WeakSet();
     const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
     const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     function save(){
+      pending = true;
+      if(base) keepDraft();
       clearTimeout(saveT);
-      saveT = setTimeout(() => { if(window.google && google.script) google.script.run.withFailureHandler(e => setStatus && setStatus('Focus not saved: ' + (e && e.message || e))).saveFocus(data); }, 700);
+      if(!conflict) saveT = setTimeout(send,700);
+    }
+    function send(){
+      if(saving || !pending || !base || conflict || !(window.google && google.script)) return;
+      saving = true; pending = false;
+      const sent = copy(data), before = copy(base);
+      google.script.run.withSuccessHandler(r => {
+        saving = false;
+        if(r && r.conflict){
+          conflict = r; pending = true;
+          const retained = retainConflict(), stored = keepDraft(); render();
+          setStatus(retained && stored ? 'Focus changed elsewhere — both versions kept; choose which list to use' : 'Focus conflict — keep this app open; device storage could not retain both versions');
+          return;
+        }
+        const changed = JSON.stringify(data) !== JSON.stringify(sent);
+        if(changed){
+          // New typing is based on the sent snapshot; the next merge also brings in remote additions.
+          base = sent; pending = true; keepDraft(); saveT = setTimeout(send,0);
+        } else {
+          data = valid(r && r.data) ? r.data : sent; base = copy(data); pending = false;
+          try { localStorage.removeItem(DRAFT); } catch(e){}
+          render(); setStatus('Focus saved');
+        }
+      }).withFailureHandler(e => {
+        saving = false; pending = true; const stored = keepDraft();
+        setStatus('Focus not saved: ' + (e && e.message || e) + (stored ? ' — draft kept, retrying' : ' — keep this app open, retrying'));
+        saveT = setTimeout(send,5000);
+      }).saveFocus(sent,{base:before});
     }
     function find(id){ for(const c of data.cats) if(c.id === id) return {c}; return {}; }
     /* Free list under each category (2026-11-05, Julius: "a category, then just tasks and subtasks, nested how I
@@ -7318,7 +7362,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       for(let k = i; k < end; k++) list[k].lv = Math.max(0,Math.min(8,(list[k].lv || 0) + d));
     }
     function html(){
-      let out = '';
+      let out = conflict ? '<div class="fx-sub" role="status">This list changed on another device. Your draft is kept here. <button type="button" data-fx="shared">Use shared list</button> <button type="button" data-fx="mine">Replace shared list with mine</button></div>' : '';
       data.cats.forEach(c => {
         const items = itemsOf(c), open = items.filter(t => !t.n && !t.d).length;
         out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (c.color ? ' fx-colored' : '') + (!c.name && items.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '" style="--fx-category-color:' + h(c.color || '#70baff') + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
@@ -7336,11 +7380,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(cell) out += '</div>';
         out += (items.length ? '' : '<button type="button" class="fx-add" data-fx="addt">+ Task</button>') + '</div></div>';
       });
-      return out + '<button type="button" class="fx-add" data-fx="addh">+ Category</button>';
+      return out + '<button type="button" class="fx-add" data-fx="addh">+ Category</button>' +
+        (recovery().length ? '<button type="button" class="fx-add" data-fx="recover">Recover earlier device draft</button>' : '');
     }
     function render(){
       document.querySelectorAll('.journal-editor .fx[data-render-due]').forEach(host => {
-        if(!data){ host.innerHTML = '<span class="fx-sub">Loading focus…</span>'; return; }
+        if(!data){
+          host.innerHTML = loadError ? '<span class="fx-sub">Focus could not load. <button type="button" data-fx="reload">Retry</button></span>' : '<span class="fx-sub">Loading focus…</span>';
+          if(loadError) host.querySelector('[data-fx="reload"]').onclick = load;
+          return;
+        }
         if(host.contains(document.activeElement)) return; // don't redraw while typing
         host.innerHTML = html();
         if(!wired.has(host)){ wire(host); wired.add(host); }
@@ -7490,6 +7539,25 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       host.addEventListener('click', e => {
         e.stopPropagation();
         const b = e.target.closest('[data-fx]'); if(!b) return;
+        if(b.dataset.fx === 'recover'){
+          const saved = recovery().slice(-1)[0];
+          if(saved && valid(saved.data) && valid(saved.base)){
+            if(!retainConflict()) return;
+            data = copy(saved.data); base = copy(saved.base); conflict = null;
+            save(); render();
+          }
+          return;
+        }
+        if(conflict && (b.dataset.fx === 'shared' || b.dataset.fx === 'mine')){
+          if(!retainConflict()) return;
+          const shared = copy(conflict.data); conflict = null;
+          if(b.dataset.fx === 'shared'){
+            data = shared; base = copy(shared); pending = false;
+            try { localStorage.removeItem(DRAFT); } catch(err){}
+            render(); setStatus('Using shared Focus list — earlier draft kept on this device');
+          } else { base = shared; save(); render(); }
+          return;
+        }
         const id = b.closest('[data-fid]')?.dataset.fid, f = id ? find(id) : {};
         if(b.dataset.fx === 'tg'){ if(suppressToggle){suppressToggle=false;return;} const o=f.p||f.c; if(o){o.col=!o.col;save();render();} }
         else if(b.dataset.fx === 'addh'){ const c = {id:uid('c'),name:'',col:false,items:[{id:tid(),t:'',d:0,lv:0}]}; edit(() => data.cats.push(c),() => focusNew(c.id,'name')); }
@@ -7574,9 +7642,24 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       data.cats.forEach(c => itemsOf(c).forEach(t => { if(!t.n && !t.d && anyOn(t.id)){ t.d = 1; ch = true; } }));
       if(ch){ save(); render(); }
     };
-    if(window.google && google.script) google.script.run.withSuccessHandler(d => { data = (d && Array.isArray(d.cats)) ? d : {v:1,cats:[]}; if(migrate(data)) save(); render(); window.tidAnyOn && window.focusReconcile(window.tidAnyOn); })
-      .withFailureHandler(() => { data = {v:1,cats:[]}; render(); }).getFocus();
-    else { data = {v:1,cats:[]}; }
+    function load(){
+      loadError = false;
+      if(window.google && google.script) google.script.run.withSuccessHandler(d => {
+        const stored = draft();
+        data = valid(d) ? d : {v:1,cats:[]}; base = copy(data);
+        if(stored && valid(stored.data) && valid(stored.base)){ data = stored.data; base = stored.base; pending = true; }
+        if(migrate(data) || pending) save();
+        render(); window.tidAnyOn && window.focusReconcile(window.tidAnyOn);
+      }).withFailureHandler(() => {
+        loadError = true;
+        // A failed load is not a new empty list and must never be saved as one.
+        const stored = draft();
+        if(stored && valid(stored.data) && valid(stored.base)){ data = stored.data; base = stored.base; save(); }
+        render();
+      }).getFocus();
+      else { data = {v:1,cats:[]}; base = copy(data); }
+    }
+    load();
     render();
   })();
   /* Done → Dailies matches (2026-11-05, Julius: "a task done today should tick its daily habit, just double check").
@@ -14713,6 +14796,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 </script>
 </body>
 </html>
+
 
 
 

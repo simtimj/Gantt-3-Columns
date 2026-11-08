@@ -1335,15 +1335,84 @@ function saveCardCats(list) {
 // {v:1, cats:[{id,name,col, projects:[{id,title,why,col}]}]}. Render-only in the Notes cell, never in cell HTML.
 // Phase 2 (2026-11-01): projects carry tasks [{id:'m-…' (= data-tid), t, d:0|1}], so the JSON is split
 // into 8k chunks focusData_0..n-1 with the count in focusDataN (one property maxes out at ~9 KB).
-function getFocus() {
+function readFocus_() {
   const sp = PropertiesService.getScriptProperties(), all = sp.getProperties();
   let raw = '';
   const n = Number(all.focusDataN || 0);
-  if (n > 0) { for (let i = 0; i < n; i++) raw += all['focusData_' + i] || ''; }
+  if (n > 0) { for (let i = 0; i < n; i++) {
+    if(typeof all['focusData_' + i] !== 'string') throw new Error('Focus data is incomplete; the saved list was not changed.');
+    raw += all['focusData_' + i];
+  } }
   else raw = all.focusData || '';
-  try { return raw ? JSON.parse(raw) : { v: 1, cats: [] }; } catch (e) { return { v: 1, cats: [] }; }
+  try {
+    const data = raw ? JSON.parse(raw) : { v: 1, cats: [] };
+    if(!data || !Array.isArray(data.cats)) throw new Error('Invalid Focus list');
+    return data;
+  } catch (e) { throw new Error('Focus data could not be read; the saved list was not changed.'); }
 }
-function saveFocus(data) {
+function getFocus() {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try { return readFocus_(); } finally { lock.releaseLock(); }
+}
+
+// Three-way merge: independent records/fields survive; contradictory edits are never guessed.
+function mergeFocus_(base, mine, theirs) {
+  const conflicts = [];
+  const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+  const object = v => v && typeof v === 'object' && !Array.isArray(v);
+  function merge(b,m,t,path) {
+    if(same(m,b)) return t;
+    if(same(t,b) || same(m,t)) return m;
+    if(object(b) && object(m) && object(t)) {
+      const out = {};
+      [...new Set(Object.keys(b).concat(Object.keys(m),Object.keys(t)))].forEach(k => {
+        const v = merge(b[k],m[k],t[k],path + '.' + k);
+        if(v !== undefined) out[k] = v;
+      });
+      return out;
+    }
+    const records = a => Array.isArray(a) && a.every(x => object(x) && typeof x.id === 'string') && new Set(a.map(x => x.id)).size === a.length;
+    if(records(b) && records(m) && records(t)) {
+      const maps = [b,m,t].map(a => new Map(a.map(x => [x.id,x]))), out = new Map();
+      [...new Set(b.concat(m,t).map(x => x.id))].forEach(id => {
+        const v = merge(maps[0].get(id),maps[1].get(id),maps[2].get(id),path + '[' + id + ']');
+        if(v !== undefined) out.set(id,v);
+      });
+      const common = b.map(x => x.id).filter(id => maps[1].has(id) && maps[2].has(id) && out.has(id));
+      const order = a => a.map(x => x.id).filter(id => common.indexOf(id) >= 0);
+      const mo = order(m), to = order(t), mc = !same(mo,common), tc = !same(to,common);
+      if(mc && tc && !same(mo,to)) conflicts.push(path + '.order');
+      const primary = tc ? t : m, secondary = tc ? m : t;
+      const ids = primary.map(x => x.id).filter(id => out.has(id));
+      // Keep insertions near their next surviving neighbour, rather than losing their position.
+      secondary.forEach((x,i) => {
+        if(!out.has(x.id) || ids.indexOf(x.id) >= 0) return;
+        const next = secondary.slice(i+1).find(n => ids.indexOf(n.id) >= 0);
+        ids.splice(next ? ids.indexOf(next.id) : ids.length,0,x.id);
+      });
+      return ids.map(id => out.get(id));
+    }
+    conflicts.push(path);
+    return t;
+  }
+  return {data:merge(base,mine,theirs,'focus'),conflicts:conflicts};
+}
+
+function saveFocus(data, opts) {
+  if(!data || !Array.isArray(data.cats) || (opts && opts.base && !Array.isArray(opts.base.cats))) throw new Error('Invalid Focus list');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const current = readFocus_();
+    if(JSON.stringify(data) === JSON.stringify(current)) return {data:current};
+    if(!opts || !opts.base) throw new Error('Reload the app before saving Focus; this older tab cannot safely merge changes.');
+    const result = mergeFocus_(opts.base,data,current);
+    if(result.conflicts.length) return {conflict:true,data:current,fields:result.conflicts};
+    writeFocus_(result.data);
+    return {data:result.data};
+  } finally { lock.releaseLock(); }
+}
+
+function writeFocus_(data) {
   const json = JSON.stringify(data || { v: 1, cats: [] });
   if (json.length > 200000) throw new Error('Focus data too big (' + json.length + ' chars)');
   const sp = PropertiesService.getScriptProperties();
@@ -2762,6 +2831,7 @@ function saveLookSnapshot(slot, json, ua) {
   sh.getRange(row, 1, 1, 4).setValues([[slot, dev, new Date(), String(json).slice(0, 45000)]]);
   return true;
 }
+
 
 
 

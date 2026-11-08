@@ -114,6 +114,7 @@ When he asks to organize his calendar tasks:
 - Tuck strips + pull tabs (2026-11-06, Julius)
 - Done → Dailies matching (2026-11-05, Julius: first version)
 - Calendar panel (FullCalendar) (2026-11-08, Julius: phased plan)
+- Planning model: Big Three / Biggest Return + living project containers (2026-11-08, Julius: PLANNING ONLY)
 
 ## IT study log (2026-11-04)
 

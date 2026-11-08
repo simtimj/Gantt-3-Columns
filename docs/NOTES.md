@@ -532,3 +532,37 @@ Design context: New Gantt Sheet → Reference → **Calendar Planning View**; pr
 - Changed day Tasks/Notes and Reference text/metadata RPCs append anonymous timing samples to a bounded memory buffer (latest 50). Each sample carries a per-page unique sample ID, kind, browser round-trip milliseconds, outcome, and response release/page-build identity; no task text, dates or record IDs are included.
 - Samples ride the existing load/sync/import `logSpeed` requests. No logging request is added per save. A report acknowledgement removes only its submitted samples; failed reports retain IDs so analysis can deduplicate an applied report whose acknowledgement was lost.
 - Measurements exclude the 700 ms debounce and DOM apply work, include bridge/network/callback latency, and are best effort. Closing the page or overflowing the bounded buffer can lose samples. Offline/error samples have unknown server identity. This buffer is separate from durable edit recovery and is not a complete activity audit. Plan/Scratch/calendar/timer latency needs separate measurement before claiming all-module performance coverage.
+
+## Planning model: Big Three / Biggest Return + living project containers (2026-11-08, Julius: PLANNING ONLY — not built)
+
+Problem (Julius): too many categories and places; organizing the system takes attention. Goal: consolidate, keep useful context, make choosing what to do easier. Intake tasks: `New Tasks` rows "HO: Clean up and consolidate categories", "HO: Design living project containers and rotating Big Three", "HO: Plan reduction in recreational cannabis use" (all undated).
+
+### Confirmed decisions
+- **Name: Big Three / Biggest Return.** "Big Three" = nickname; "Biggest Return" = how items are chosen: the work that gives the most time, energy and attention back toward his goals (less recurring work, mental burden, friction). Replaces "Highest ROI". Plain everyday words; no abbreviations, vague labels or jargon.
+- Big Three **rotates** as priorities change. Being in the Big Three is **separate from urgency**: a chosen project can hold urgent and non-urgent tasks.
+- **Living project containers**: one place per project for notes, suggestions, decisions, checklist and tasks. When an existing task / project is discussed, **update its container** — no duplicates, no useful info left only in chat.
+- **Separate fields** (never interchangeable): Subject/category = area · Project = ongoing container · Importance = how much it matters · Urgency = how soon · Hands-Off (HO) = can progress while walking / driving · Big Three = current biggest-return priorities · Status = open / active / completed.
+- **Calendar day**: top = vertically growing list of unscheduled / all-day items; bottom = the day's timeline; long-press + drag an unscheduled item into a time slot; end-of-day review → unfinished work rescheduled or back to backlog; a scheduled task **stays linked** to its project, notes and checklist (no second independent task).
+- **Motivation lives with the task**: a short reason (burden removed / benefit). Time-saving numbers are labelled **estimate** vs **measured**.
+- Not yet decided: ranking rules, rotation behaviour, whether slots take projects / tasks / both, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".
+
+### What exists today (to build on, not duplicate)
+- Calendar panel Plan box (phase 3a): groups `big` "Big Three" (**per day**, ≤ 3), `stretch` (≤ 3/day), `next`, `backlog`; rows **link** to real items (`tid:`, Keep In Mind id, calendar event) via the `Plan` tab; Schedule / drag onto the timeline creates or moves **one** linked event (`planSchedule`, `planRelink_`). This already satisfies "scheduling doesn't create a second task".
+- Reference cards: title + rich body + checklists + stable id + pin → already a container shape.
+- Keep In Mind tab: categories → nested free lists (overlaps with projects).
+- Undated Tasks card (loose tasks with no date); Urgent panel (a view over `data-urg` lines); subjects = `data-cat` (code, career, study, work, health, life, fun); all-day events in the calendar's all-day row.
+
+### Suggested structure (SUGGESTION — needs Julius's OK)
+Three things only; everything else is a **view**, not a place:
+1. **Project = one Reference card** (container). Fixed short template, top to bottom: **Why** (one-line Biggest Return reason, estimate/measured labelled) · **Next Moves** (up to 3 highlighted lines of the checklist — a mark on existing lines, not a nested list) · **Checklist** (flat; at most one subtask level) · **Notes & decisions** (dated lines, newest first) · `🔒 DB`. Card-level fields: subject, importance, status. Each task line keeps its own urgency and HO mark.
+2. **Big Three = up to 3 links to projects** (a standing list, not per day), shown at the top of the Plan box with each project's Why and Next Moves. Rotating one out just unlinks it; the card stays (status open). Whether a lone task may take a slot: open question (suggest: allowed, but it's treated as a one-line project).
+3. **Day = the calendar panel**: top "Unscheduled" list = all-day events + Next Moves of the Big Three + anything picked from Undated Tasks / Urgent; bottom = timeline. Drag into a slot → linked event (existing mechanism). End-of-day review: each unfinished item → Tomorrow / pick a date / Back (to its project, or Undated Tasks if it has none).
+- **Views, never copies**: Urgent (by urgency), Hands-Off (HO mark), Big Three (links), subject filters.
+- **Consolidation suggestions** (input to the category cleanup task): retire the day-level "Big Three"/"Stretch" naming in the Plan box (the day list becomes "Today" + Next Up + Backlog) so "Big Three" has one meaning; Keep In Mind categories become project cards or subject-tagged notes; Undated Tasks stays the single backlog for loose tasks; subjects stay a small broad set.
+- **Suggested meanings** for the unclear labels: "main focus" = the Big Three (drop the separate term); pinned = display position of a Reference card only (no planning meaning); Keep In Mind = reference notes with no action (or retire it).
+- Line markup idea (for later): reuse `data-urg`, `data-cat`; add `data-ho` (Hands-Off), `data-imp` (importance), `data-next` (Next Move); Why = a note line under the task.
+
+### Smallest first build (once confirmed)
+1. Project card template + "update existing container" rule for Claude / ChatGPT.
+2. Plan box: standing Big Three row (links to project cards, shows Why + Next Moves); day groups renamed.
+3. Calendar: Unscheduled list above the timeline (drag in, already linked) + end-of-day review.

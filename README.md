@@ -516,6 +516,8 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 📋 To do
 
+- **Big Three / Biggest Return + living project containers** (planned 2026-11-08, not built): one card per project (why, next moves, flat checklist, notes & decisions), a rotating Big Three that links to projects (separate from urgency), and a calendar day with an Unscheduled list on top of the timeline plus an end-of-day review. Design and open questions: `docs/NOTES.md` → "Planning model".
+
 - **📅 Calendar phase 3b–5** (Julius 2026-11-08): touch drag / resize (3b) (Big Three / Stretch / Next Up / Backlog) → timer hand-off → review. Plan in `docs/NOTES.md` → "Calendar panel (FullCalendar)"; one phase at a time, each checked before the next.
 
 - **Pages over time** (Julius 2026-11-07): totals across days, e.g. pages this week / month, maybe per book.

@@ -318,6 +318,8 @@
       user-select:none;
     }
     .day-date{text-decoration:underline;text-underline-offset:3px;}
+    /* Today marker (2026-11-08, Julius: "save room"): today's date text takes the day's color, no extra space. */
+    #todayScroll .day-row.today .day-date{color:var(--today-border-adj,var(--accent));}
     .day-label .day-dash{margin-left:8px;font-size:.62em;font-weight:500;color:var(--muted);white-space:nowrap;letter-spacing:0;text-decoration:none;}
     .day-label .day-dash:empty{display:none;}
     /* Narrow: the count drops under the date instead of being cut off (2026-11-07). */
@@ -11749,18 +11751,27 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       document.querySelectorAll('.dash-chip').forEach(c => c.remove());
       if(typeof renderReview === 'function') renderReview();
       document.querySelectorAll('.editor[data-dash]').forEach(e => { if(e !== ed) delete e.dataset.dash; });
-      if(!ed) return;
-      const lines = [...ed.querySelectorAll('.check-line')];
-      const done = lines.filter(l => l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      // 2026-11-07 (Julius: save room): on the date line as "52 ✓" (all done) or "52/58 ✓"; no separate "Today:" line.
-      const txt = (done === lines.length ? done : done + '/' + lines.length) + ' ✓';
-      delete ed.dataset.dash;
-      document.querySelectorAll('#todayScroll .day-row .day-dash').forEach(x => { if(x.closest('.day-row').dataset.date !== today) x.textContent = ''; });
-      const slot = document.querySelector('#todayScroll .day-row[data-date="' + CSS.escape(today) + '"] .day-dash');
-      if(slot && slot.textContent !== txt){ slot.textContent = txt; slot.title = done + ' of ' + lines.length + ' done today'; }
+      // 2026-11-08 (Julius): every loaded day shows its count on the date line, not just today ("8 ✓" / "5/7 ✓";
+      // nothing on a day with no tasks).
+      document.querySelectorAll('#todayScroll .day-row[data-date] .day-dash').forEach(slot => {
+        const d = slot.closest('.day-row').dataset.date;
+        const e = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(d)}"]`);
+        const lines = e ? [...e.querySelectorAll('.check-line')] : [];
+        const done = lines.filter(l => l.classList.contains('done') || (l.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
+        const txt = lines.length ? (done === lines.length ? done : done + '/' + lines.length) + ' ✓' : '';
+        if(slot.textContent !== txt){ slot.textContent = txt; slot.title = lines.length ? done + ' of ' + lines.length + ' done' + (d === today ? ' today' : '') : ''; }
+      });
+      if(ed) delete ed.dataset.dash;
     },120);
   }
   document.addEventListener('change',e => { if(e.target && e.target.matches && e.target.matches('#todayScroll input[type=checkbox]')) updateDash(); },true);
+  // Days loaded later (scrolling back a week) get their counts too.
+  (function(){
+    const box = document.getElementById('todayScroll');
+    if(!box || !window.MutationObserver) return;
+    new MutationObserver(recs => { if(recs.some(r => [...r.addedNodes].some(n => n.nodeType === 1 && (n.matches('.day-row') || n.querySelector && n.querySelector('.day-row'))))) updateDash(); })
+      .observe(box, {childList: true, subtree: true});
+  })();
   /* ===== Review (Notes bottom half, 2026-10-31, Julius: option A) =====
      Live wrap-up of the day shown in Today (one-day date, else today), rebuilt
      whenever updateDash runs (edits, ticks) and on day change. Reads top-level

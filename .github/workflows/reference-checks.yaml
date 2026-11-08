@@ -4,6 +4,8 @@ on:
     paths:
       - 'Code.gs'
       - 'Index.html'
+      - 'Drafts.html'
+      - 'tools/draft-test.mjs'
       - 'tools/reference-save-test.mjs'
       - 'tools/focus-save-test.mjs'
       - 'tools/focus-storage-test.mjs'
@@ -27,6 +29,7 @@ jobs:
         with:
           node-version: 20
       - run: node tools/check.mjs
+      - run: node tools/draft-test.mjs
       - run: node tools/reference-save-test.mjs
       - run: node tools/focus-save-test.mjs
       - run: node tools/focus-storage-test.mjs

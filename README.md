@@ -516,6 +516,8 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 📋 To do
 
+- **Big Three / Biggest Return + living project containers** (planned 2026-11-08, not built): one card per project (why, next moves, flat checklist, notes & decisions), a rotating Big Three that links to projects (separate from urgency), and a calendar day with an Unscheduled list on top of the timeline plus an end-of-day review. Design and open questions: `docs/NOTES.md` → "Planning model".
+
 - **📅 Calendar phase 3b–5** (Julius 2026-11-08): touch drag / resize (3b) (Big Three / Stretch / Next Up / Backlog) → timer hand-off → review. Plan in `docs/NOTES.md` → "Calendar panel (FullCalendar)"; one phase at a time, each checked before the next.
 
 - **Pages over time** (Julius 2026-11-07): totals across days, e.g. pages this week / month, maybe per book.
@@ -590,6 +592,10 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Initial day read reuse — 2026-11-08
 
 - Initial loading derives the visible day window from the same request-local Days snapshot already used for Urgent and Dailies seeds. This removes the extra date-column and visible-text reads (3 day-data reads to 1), preserves Plan/text hashes and rereads current data on each later request. No cross-request content cache. Actual opening latency remains to be measured.
+
+## 🧪 Daily setup efficiency — 2026-11-08
+
+- Automatic daily date maintenance reuses a versioned formatting hint tied to the Days and Reference tab IDs, avoiding whole-column formatting on every new day. Manual `setupWorkspace()` still repairs formatting; replacement tabs invalidate the hint, and failed formatting retries. Missing-date insertion sorts complete rows so Plan and extra fields stay with their dates. No historical reassignment is attempted. Actual cold-start latency remains to be measured.
 
 ## 🧪 Done Log live row hint — 2026-11-08
 

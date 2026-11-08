@@ -584,7 +584,10 @@ Problem (Julius): too many categories and places; organizing the system takes at
   - **AI updates** go straight into the project's card, but only in its detail (big / focus) view so they never crowd the screen. No "(ChatGPT)" signatures.
   - **Big Three shows** in the calendar's Plan box **and** as a small strip at the top of the Today column (try it, then adjust).
   - **End-of-day review includes Big Three items** too (a second look doesn't hurt).
-  - Still open: when the review appears (set time / after an hour / on tap); whether a single-task Big Three item can hold a small checklist.
+  - **Hands-Off icon: 🚶** (replaces "HO:" in titles).
+  - **End-of-day review** appears when he opens the app **after 7 PM**, with gentle reminders now and then if skipped; he does it when he can.
+  - A **single-task Big Three item can hold a small checklist**; turning it into a project is a **manual** "promote to project" choice, never automatic.
+  - **B approved (2026-11-08)**: urgency shows as 0 / 1 / 2 everywhere; stored values stay 1 / 2 / 3 underneath (translated on read / save, no data rewrite); New Tasks rows converted to 0 / 1 / 2 and parsed that way from then on; CLAUDE.md + Central Data Hub rules updated; calendar colors unchanged (0 Tomato, 1 Banana, 2 Blueberry).
   - Work order: **B urgency 0/1/2 switch → A task → calendar pipeline → C app cleanup**.
 - **New threads (2026-11-08, not designed yet)**: (1) **App cleanup** — hide irrelevant things, better grouping / sorting of the many panels and tabs; (2) **Task → calendar pipeline** — how tasks (Lead Tasks, urgent, scheduled) flow into the calendar's unscheduled list and timeline and back.
 - Not yet decided: ranking rules, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".

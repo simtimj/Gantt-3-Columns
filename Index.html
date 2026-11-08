@@ -5781,7 +5781,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const item = (state.reference || []).find(it => String(it.id) === String(id));
       if(item) note = fwReconcileRef(item,out.ref[id].content,out.ref[id].ch) || note;
     });
-    if(!manifest) return note;
+    if(!manifest){
+      if(Object.keys(out.ref || {}).length){ applyReferenceSort(); filterReference(); }
+      return note;
+    }
     const tree = document.getElementById('referenceTree');
     const nodes = new Map([...tree.querySelectorAll('.ref-cell-wrapper')].map(n => [String(n.dataset.id),n]));
     const byId = new Map((state.reference || []).map(it => [String(it.id),it]));
@@ -5789,7 +5792,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     state.reference = manifest.items.map(meta => {
       let item = byId.get(String(meta.id));
       if(!item){ item = {...meta,...out.ref[meta.id]}; refBase(item); }
-      else Object.assign(item,meta);
+      else {
+        const oldTitle = item.title;
+        Object.assign(item,meta);
+        if(!item.content && oldTitle !== item.title){
+          const cell = nodes.get(String(item.id))?.querySelector(':scope > .ref-cell');
+          if(cell){ replaceEditorHtml(cell,storedToHtml(stripReferenceMetadata(item.title || ''))); ensureReferenceTitle(cell); }
+        }
+      }
       item._mb = {parentId:String(item.parentId || ''),expanded:item.expanded !== false};
       return item;
     });

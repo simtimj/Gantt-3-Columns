@@ -789,7 +789,7 @@ function saveReferenceItem(item) {
     let res = sync ? { id: id, build: appBuild_() } : null;
 
     // A stale tab must not recreate a card deleted on another device.
-    if (!row && sync && (item.expectedExisting || item.baseHash)) return { id:id, deleted:true, build:res.build };
+    if (!row && sync && (item.id || item.expectedExisting || item.baseHash)) return { id:id, deleted:true, build:res.build };
 
     if (row) {
       const currentRow = sheet.getRange(row, 1, 1, 7).getValues()[0];

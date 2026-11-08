@@ -46,6 +46,7 @@ sheet.rows.splice(1,1);
 const rowsBefore = sheet.rows.length;
 assert.equal(save({expectedExisting:true}).deleted,true);
 assert.equal(save({baseHash:null,expectedExisting:true}).deleted,true);
+assert.equal(save({baseHash:null,expectedExisting:false}).deleted,true,'older tabs without the new flag are protected too');
 assert.equal(sheet.rows.length,rowsBefore,'a stale save must not recreate a deleted card');
 console.log('✓ server: untouched fields preserved; text conflict protected; explicit collapse/move, stale move conflict and retry checked');
 

@@ -137,10 +137,10 @@ function ensureSetup_() {
    which runs them and returns only the cells that changed, merged in place by the same code as fwSync. */
 function runImportSteps_(t) {
   try { applyDeployedCodeLog_(); } catch (e) { console.error(e); } t.mark('deployLog');
-  try { applyClaudeDone_(); } catch (e) { console.error(e); } t.mark('done');
+  try { applyClaudeDone_(t); } catch (e) { console.error(e); } t.mark('done');
   try { applyClaudeNotes_(); } catch (e) { console.error(e); } t.mark('notes');
   try { applyClaudeTasks_(); } catch (e) { console.error(e); } t.mark('tasks');
-  try { syncConfirmCard_(); } catch (e) { console.error(e); } t.mark('confirm');
+  try { syncConfirmCard_(t); } catch (e) { console.error(e); } t.mark('confirm');
   try { syncStudyLog_(); } catch (e) { console.error(e); } t.mark('study');
   try { moveScheduleToNotes_(); } catch (e) { console.error(e); } t.mark('schedule');
   try { fixUrgentBold_(); } catch (e) { console.error(e); } t.mark('fixBold');
@@ -203,8 +203,17 @@ function speedTimer_() {
   let last = start;
   return {
     mark: name => { const n = Date.now(); steps[name] = n - last; last = n; },
+    // Nested durations overlap their parent mark; do not add them to parent totals.
+    measure: (name, work) => {
+      const begin = Date.now();
+      try { return work(); } finally { steps[name] = (steps[name] || 0) + Date.now() - begin; }
+    },
     done: () => ({ total: Date.now() - start, steps: steps, release:deployedBuild_() })
   };
+}
+// Optional instrumentation: preserve direct callers and old test timers without measure().
+function speedPart_(timer, name, work) {
+  return timer && typeof timer.measure === 'function' ? timer.measure(name, work) : work();
 }
 function logSpeed(kind, timing, client) {
   const sheet = getOrCreateSheet_('Speed Log', SPEED_HEADERS);
@@ -1996,14 +2005,15 @@ function applyDeployedCodeLog_() {
 const CONFIRM_HEADERS = ['Date', 'Project', 'Change', 'How to check', 'Status', 'Checked on'];
 const CONFIRM_CARD_ID = 'p-to-confirm';
 
-function confirmRows_(sheet) {
-  return sheet.getDataRange().getValues().slice(1).map((r, i) => {
+function confirmRows_(sheet, timer, phase) {
+  const rows = speedPart_(timer, phase + '.sourceRead', () => sheet.getDataRange().getValues());
+  return speedPart_(timer, phase + '.rows', () => rows.slice(1).map((r, i) => {
     const date = intakeDate_(r[0]);
     const project = String(r[1] || '').trim() || 'Other';
     const change = String(r[2] || '').trim();
     return { row: i + 2, id: 'k-' + cellHash_([date, project, change].join('|')), date, project, change,
       how: String(r[3] || '').trim(), status: String(r[4] || '').trim().toLowerCase() };
-  }).filter(x => x.change);
+  }).filter(x => x.change));
 }
 
 function confirmCardHtml_(rows) {
@@ -2025,16 +2035,16 @@ function confirmCardHtml_(rows) {
   return html;
 }
 
-function syncConfirmCard_() {
+function syncConfirmCard_(timer) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('To Confirm');
   if (!sheet) return; // nothing until the tab exists
   const sources = { sheet:sheet, ref:getOrCreateSheet_('Reference', REF_HEADERS) };
   // Fast path (2026-11-04): most loads change nothing, so check without taking the script lock.
-  if (!confirmCardWork_(true,sources)) return;
+  if (!confirmCardWork_(true,sources,timer)) return;
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return; // next load retries
-  try { confirmCardWork_(false,sources); } finally { lock.releaseLock(); }
+  if (!speedPart_(timer, 'confirm.lock', () => lock.tryLock(5000))) return; // next load retries
+  try { speedPart_(timer, 'confirm.reconcile', () => confirmCardWork_(false,sources,timer)); } finally { lock.releaseLock(); }
 }
 
 // Cache only a row hint, never source rows or HTML. Validate the identity and read the live
@@ -2055,12 +2065,13 @@ function readConfirmCard_(ref) {
 }
 
 // dryRun: true → only report whether a write is needed.
-function confirmCardWork_(dryRun,sources) {
+function confirmCardWork_(dryRun,sources,timer) {
   {
+    const phase = dryRun ? 'confirm.check' : 'confirm.write';
     const sheet = sources ? sources.sheet : getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
     const ref = sources ? sources.ref : getOrCreateSheet_('Reference', REF_HEADERS);
-    let rows = confirmRows_(sheet);
-    const card = readConfirmCard_(ref), cardRow = card.row, cur = card.content;
+    let rows = confirmRows_(sheet,timer,phase);
+    const card = speedPart_(timer, phase + '.cardRead', () => readConfirmCard_(ref)), cardRow = card.row, cur = card.content;
     // Ticked lines → Status works.
     const ticked = new Set();
     (cur.match(/<div\b[^>]*\bdata-kid="[^"]+"[^>]*>/g) || []).forEach(tag => {
@@ -2069,7 +2080,7 @@ function confirmCardWork_(dryRun,sources) {
     });
     if (dryRun) {
       const pending = rows.some(x => ticked.has(x.id) && x.status !== 'works');
-      return pending || !cardRow || cur.replace(/<!--fw-modified:\d+-->/, '') !== confirmCardHtml_(rows);
+      return pending || !cardRow || cur.replace(/<!--fw-modified:\d+-->/, '') !== speedPart_(timer, phase + '.render', () => confirmCardHtml_(rows));
     }
     const today = todayString_();
     rows.forEach(x => {
@@ -2078,7 +2089,7 @@ function confirmCardWork_(dryRun,sources) {
         x.status = 'works';
       }
     });
-    const html = confirmCardHtml_(rows);
+    const html = speedPart_(timer, phase + '.render', () => confirmCardHtml_(rows));
     if (cur.replace(/<!--fw-modified:\d+-->/, '') === html) return;
     if (cardRow) {
       if (cur) backupCell_('Reference ' + CONFIRM_CARD_ID, 'Content', 'To Confirm sync', cur, true);
@@ -2107,13 +2118,13 @@ function intakeTime_(value) {
   return String(h).padStart(2, '0') + ':' + m[2];
 }
 
-function sheetDoneRows_() {
+function sheetDoneRows_(timer) {
   const sheet = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
   // Use the intake snapshot for the header too: no separate header read on every import.
-  const rows = sheet.getDataRange().getValues();
+  const rows = speedPart_(timer, 'done.sourceRead', () => sheet.getDataRange().getValues());
   if (rows[0][5] !== 'Type') sheet.getRange(1, 6).setValue('Type'); // tab made before this column
   const oldest = addDaysToDateString_(todayString_(), -DONE_LOG_DAYS);
-  return rows.slice(1).map(r => {
+  return speedPart_(timer, 'done.rows', () => rows.slice(1).map(r => {
     const date = intakeDate_(r[0]);
     const project = String(r[1] || '').trim();
     const title = String(r[2] || '').trim();
@@ -2123,7 +2134,7 @@ function sheetDoneRows_() {
       mine: /^(julius|me)$/i.test(String(r[4] || '').trim()),
       type: normLogType_(r[5]), // not in the id, so adding a type never re-adds a line
     };
-  }).filter(x => x.title && x.date >= oldest);
+  }).filter(x => x.title && x.date >= oldest));
 }
 
 function sheetTaskRows_(appliedIds) {
@@ -2170,9 +2181,9 @@ function readDoneToday_(sheet, date) {
   return {row:row,content:content};
 }
 
-function applyClaudeDone_() {
+function applyClaudeDone_(timer) {
   let list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
-  try { list = list.concat(sheetDoneRows_()); } catch (e) { console.error(e); }
+  try { list = list.concat(sheetDoneRows_(timer)); } catch (e) { console.error(e); }
   if (!list.length) return;
   const props = PropertiesService.getScriptProperties();
   let applied = [];
@@ -2186,12 +2197,14 @@ function applyClaudeDone_() {
   const secFix = props.getProperty('claudeDoneSec') !== '1';
   // Cheap check (one cell read): does today's cell hold done lines in a window that hasn't started yet?
   const daysSheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const todaySnapshot = readDoneToday_(daysSheet, todayString_());
-  const needFix = !!todaySnapshot.row && doneFutureLines_(todaySnapshot.content).moved.length > 0;
+  const needFix = speedPart_(timer, 'done.todayCheck', () => {
+    const todaySnapshot = readDoneToday_(daysSheet, todayString_());
+    return !!todaySnapshot.row && doneFutureLines_(todaySnapshot.content).moved.length > 0;
+  });
   if (!fresh.length && !migrate && !secFix && !needFix) return;
   const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  speedPart_(timer, 'done.lock', () => lock.waitLock(10000));
+  try { speedPart_(timer, 'done.reconcile', () => {
     const sheet = daysSheet;
     const byDate = {};
     fresh.forEach(x => { const d = doneTargetDate_(x.date); (byDate[d] = byDate[d] || []).push(x); });
@@ -2236,7 +2249,7 @@ function applyClaudeDone_() {
     props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));
     props.setProperty('claudeDoneGrouped', '2');
     props.setProperty('claudeDoneSec', '1');
-  } finally { lock.releaseLock(); }
+  }); } finally { lock.releaseLock(); }
 }
 
 

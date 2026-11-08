@@ -96,3 +96,12 @@ for (const [name, fn, header, width] of [
   assert.deepEqual(old.writes, [[1,width,header]]);
 }
 console.log('✓ import reads: Done Log 1, New Tasks 1 when applied / 2 when pending; identities, backdated appends, urgency scale, times and legacy headers preserved');
+// The real Done Log source emits numeric substeps and retains the single-read budget.
+sheets.set('Done Log',done);
+done.reads.length=0;
+const importTimer=ctx.speedTimer_();
+const profiled=plain(ctx.sheetDoneRows_(importTimer));
+assert.deepEqual(profiled,plain(ctx.sheetDoneRows_()));
+assert.deepEqual(done.reads,['values','values']);
+assert.equal(typeof importTimer.done().steps['done.sourceRead'],'number');
+assert.equal(typeof importTimer.done().steps['done.rows'],'number');

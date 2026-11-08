@@ -16,6 +16,9 @@ Last updated: 2026-11-08
 
 ## ✅ Working
 
+- **📅 Calendar: add / edit / delete events (phase 2)** (confirmed 2026-11-08): in the 📅 Calendar panel, **+ New** (or drag on the grid; on the phone hold, then drag) opens a small form: title, All day, start / end. **Save** puts it on your **main calendar** with reminders off. Tap an event → **Edit** (title, times, all-day on / off; the same event is changed, never copied) or **Delete** (asks first). Save is blocked while saving and a retry can't make a second copy; if a save fails the form stays open with your text and a **Retry save** button. **Repeating events and the Events calendar are read-only** (edit those in Google Calendar). Moving / resizing by drag is phase 3.
+- **📅 Calendar panel (phase 1)** (confirmed 2026-11-08): a **📅 Calendar** button in the top header (next to ☾) slides a calendar in from the right (full screen on the phone). It shows your Google Calendar (main + Events calendars) in **Day** / **Week** views with **‹ › Today**, timed and all-day events in their own colors, Graphite (done) ones struck through, always in Pacific time. Tap an event for its time, calendar and an **Open in Google Calendar** link. Loading / no events / error + **Retry** messages, ↻ reloads. **✕ Close**, Esc or tapping outside goes back to the Gantt exactly as it was. Nothing is written to the calendar yet. Later phases (editing, daily planning, timer, review) are planned in `docs/NOTES.md` → "Calendar panel (FullCalendar)".
+
 **Layout**
 - Three columns: Today / Tasks, Notes, Reference. Columns are resizable (drag the divider), with **Fit** and **Reset sizes** buttons.
 - **Cols** menu: show/hide columns, single-pane focus view, and **Split** (two panes stacked, on desktop or Mobile mode; a repeated pane is a read-only mirror).
@@ -46,11 +49,6 @@ Last updated: 2026-11-08
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
-
-## 🧪 To be confirmed (2026-11-08)
-
-- **📅 Calendar: add / edit / delete events (phase 2)**: in the 📅 Calendar panel, **+ New** (or drag on the grid; on the phone hold, then drag) opens a small form: title, All day, start / end. **Save** puts it on your **main calendar** with reminders off. Tap an event → **Edit** (title, times, all-day on / off; the same event is changed, never copied) or **Delete** (asks first). Save is blocked while saving and a retry can't make a second copy; if a save fails the form stays open with your text and a **Retry save** button. **Repeating events and the Events calendar are read-only** (edit those in Google Calendar). Moving / resizing by drag is phase 3.
-- **📅 Calendar panel (phase 1, read-only)**: a **📅 Calendar** button in the top header (next to ☾) slides a calendar in from the right (full screen on the phone). It shows your Google Calendar (main + Events calendars) in **Day** / **Week** views with **‹ › Today**, timed and all-day events in their own colors, Graphite (done) ones struck through, always in Pacific time. Tap an event for its time, calendar and an **Open in Google Calendar** link. Loading / no events / error + **Retry** messages, ↻ reloads. **✕ Close**, Esc or tapping outside goes back to the Gantt exactly as it was. Nothing is written to the calendar yet. Later phases (editing, daily planning, timer, review) are planned in `docs/NOTES.md` → "Calendar panel (FullCalendar)".
 
 ## 🧪 To be confirmed (2026-11-07)
 

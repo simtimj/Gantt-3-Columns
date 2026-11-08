@@ -1339,9 +1339,16 @@ function readFocus_() {
   const sp = PropertiesService.getScriptProperties(), all = sp.getProperties();
   let raw = '';
   const n = Number(all.focusDataN || 0);
-  if (n > 0) { for (let i = 0; i < n; i++) raw += all['focusData_' + i] || ''; }
+  if (n > 0) { for (let i = 0; i < n; i++) {
+    if(typeof all['focusData_' + i] !== 'string') throw new Error('Focus data is incomplete; the saved list was not changed.');
+    raw += all['focusData_' + i];
+  } }
   else raw = all.focusData || '';
-  try { return raw ? JSON.parse(raw) : { v: 1, cats: [] }; } catch (e) { return { v: 1, cats: [] }; }
+  try {
+    const data = raw ? JSON.parse(raw) : { v: 1, cats: [] };
+    if(!data || !Array.isArray(data.cats)) throw new Error('Invalid Focus list');
+    return data;
+  } catch (e) { throw new Error('Focus data could not be read; the saved list was not changed.'); }
 }
 function getFocus() {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);

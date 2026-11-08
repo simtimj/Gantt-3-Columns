@@ -32,6 +32,11 @@ assert.ok(deleteEdit.conflicts.length,'delete versus edit requires a decision');
 const resolved=server.saveFocus(opposing,{base:clone(server.getFocus())});
 assert.equal(resolved.data.cats[0].items[0].t,'Conflicting edit');
 assert.equal(locked,false);
+const savedChunk=props.focusData_0;
+props.focusData_0='not json';
+assert.throws(()=>server.getFocus(),/could not be read/);
+assert.equal(locked,false);
+props.focusData_0=savedChunk;
 console.log('✓ Focus server: independent edits/additions merge; conflicting edit/deletion stays protected; explicit resolution and legacy-tab guard checked');
 
 const html=fs.readFileSync('Index.html','utf8');

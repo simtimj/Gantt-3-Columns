@@ -2244,7 +2244,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div id="focusControls">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn theme-toggle" type="button" aria-label="Light / dark">☾</button>
-    <button class="btn cal-open-btn" type="button" data-cal-open aria-haspopup="dialog" aria-expanded="false" title="Calendar (Google Calendar, read-only for now)">📅 Calendar</button>
+    <button class="btn cal-open-btn" type="button" data-cal-open aria-haspopup="dialog" aria-expanded="false" title="Calendar (Google Calendar)">📅 Calendar</button>
     <div class="view-menu" data-view-menu>
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
@@ -2351,7 +2351,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div id="toolbar">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn theme-toggle" type="button" id="themeToggle" aria-label="Light / dark">☾</button>
-    <button class="btn cal-open-btn" type="button" data-cal-open aria-haspopup="dialog" aria-expanded="false" title="Calendar (Google Calendar, read-only for now)">📅 Calendar</button>
+    <button class="btn cal-open-btn" type="button" data-cal-open aria-haspopup="dialog" aria-expanded="false" title="Calendar (Google Calendar)">📅 Calendar</button>
     <span class="od-nav"><button class="btn tiny" type="button" id="odUp" title="Previous day" aria-label="Previous day">▲</button><button class="btn tiny" type="button" id="odDown" title="Next day" aria-label="Next day">▼</button></span>
     <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <div class="view-menu" data-view-menu>
@@ -14327,7 +14327,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   window.addEventListener('popstate',close);
 })();
 </script>
-<!-- 📅 Calendar panel, phase 1 (2026-11-08, Julius): read-only FullCalendar slide-out from the right.
+<!-- 📅 Calendar panel (2026-11-08, Julius): FullCalendar slide-out from the right. Phase 1 read-only view; phase 2 adds
+     create / edit / delete on the main calendar (repeating events stay read-only).
      Google Calendar stays the source of truth; server side is getCalendarRange() (Code.gs, never writes).
      FullCalendar + luxon load from jsDelivr on the first open only, so app start-up is unchanged.
      Later phases (editing, daily planning, timer, review): docs/NOTES.md → "Calendar panel (FullCalendar)". -->
@@ -14373,11 +14374,32 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-axis-cushion,#calPanel .fc .fc-timegrid-slot-label-cushion{color:var(--cp-muted);}
   #calPanel .fc .fc-col-header-cell-cushion{color:var(--cp-text);}
   .btn.cal-open-btn{white-space:nowrap;}
+  /* Phase 2: event form + delete confirm (same bottom sheet as the detail card). */
+  #calPanel .cp-state.ok{color:#188038;background:rgba(24,128,56,.08);}
+  #calPanel .cp-detail{max-height:calc(100% - 20px);overflow:auto;}
+  #calPanel .cp-form{display:flex;flex-direction:column;gap:8px;}
+  #calPanel .cp-form .cp-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  #calPanel .cp-form .cp-row > span{min-width:42px;color:var(--cp-muted);font-size:13px;}
+  #calPanel .cp-form input[type=text],#calPanel .cp-form input[type=date],#calPanel .cp-form input[type=time]{font:inherit;font-size:16px;color:var(--cp-text);background:var(--cp-bg);border:1px solid var(--cp-line);border-radius:8px;padding:6px 8px;min-height:38px;box-sizing:border-box;}
+  #calPanel .cp-form input[type=text]{width:100%;}
+  #calPanel .cp-form input[type=date]{flex:1 1 140px;min-width:0;}
+  #calPanel .cp-form input[type=time]{flex:0 1 120px;min-width:0;}
+  #calPanel .cp-form.allday input[type=time]{display:none;}
+  #calPanel .cp-form label.cp-chk{display:flex;align-items:center;gap:6px;font-size:14px;}
+  #calPanel .cp-ferr{color:#c5221f;font-size:13px;}
+  #calPanel .cp-ferr:empty{display:none;}
+  #calPanel .cp-detail .cp-da .cp-primary{background:#1a73e8;border-color:#1a73e8;color:#fff;}
+  #calPanel .cp-detail .cp-da .cp-danger{color:#c5221f;border-color:rgba(197,34,31,.5);}
+  #calPanel .cp-detail .cp-da .cp-danger.cp-primary{background:#c5221f;border-color:#c5221f;color:#fff;}
+  #calPanel .cp-detail .cp-da button:disabled{opacity:.6;cursor:default;}
+  #calPanel .cp-da .cp-sp{flex:1;}
+  #calPanel .cp-note{font-size:12px;color:var(--cp-muted);margin-top:6px;}
 </style>
 <div id="calPanelBackdrop" aria-hidden="true"></div>
 <aside id="calPanel" role="dialog" aria-modal="true" aria-label="Calendar" aria-hidden="true">
   <div class="cp-head">
     <strong>📅 Calendar</strong>
+    <button type="button" class="cp-new" data-cal-new title="New event on your main calendar (or hold / drag on the grid)" aria-label="New event">+ New</button>
     <button type="button" class="cp-refresh" data-cal-refresh title="Reload events from Google Calendar" aria-label="Reload events">↻</button>
     <button type="button" class="cp-close" data-cal-close title="Close (Esc) and go back to the Gantt" aria-label="Close calendar">✕ Close</button>
   </div>
@@ -14396,9 +14418,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const panel = document.getElementById('calPanel'), backdrop = document.getElementById('calPanelBackdrop');
   const mount = document.getElementById('calMount'), stateEl = panel.querySelector('[data-cal-state]'), detail = panel.querySelector('[data-cal-detail]');
   let cal = null, libsPromise = null, lastFocus = null, loadSeq = 0, partial = 0, loadErr = false, busy = false;
+  let sheetEv = null, pending = false, flashUntil = 0, viewStart = '', viewEnd = '';
   // Empty / partial note for the dates on screen (also after Day ↔ Week switches served from FullCalendar's cache).
   function refreshState(){
-    if(!cal || busy || loadErr) return;
+    if(!cal || busy || loadErr || Date.now() < flashUntil) return;
     const v = cal.view, a = v.activeStart.valueOf(), b = v.activeEnd.valueOf();
     const n = cal.getEvents().filter(e => e.start && e.start.valueOf() < b && (e.end ? e.end.valueOf() : e.start.valueOf() + 1) > a).length;
     if(partial) setState('error', partial + ' calendar(s) could not be read — some events may be missing.');
@@ -14412,7 +14435,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 
   function setState(kind, msg){
     if(!kind){ stateEl.hidden = true; stateEl.className = 'cp-state'; stateEl.innerHTML = ''; return; }
-    stateEl.hidden = false; stateEl.className = 'cp-state' + (kind === 'error' ? ' err' : '');
+    stateEl.hidden = false; stateEl.className = 'cp-state' + (kind === 'error' ? ' err' : kind === 'ok' ? ' ok' : '');
     stateEl.innerHTML = '<span>' + esc(msg) + '</span>' + (kind === 'error' ? '<button type="button" data-cal-retry>Retry</button>' : '');
   }
   function loadScript(src){
@@ -14459,13 +14482,107 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function showDetail(ev){
     const x = ev.extendedProps || {};
+    sheetEv = ev;
+    const why = x.editable ? '' : x.recurring ? 'Repeating event — read-only here, edit it in Google Calendar.' : 'Not on your main calendar — read-only here.';
     detail.innerHTML = '<div class="cp-dt"><span class="cp-dot" style="background:' + esc(x.color) + '"></span><span>' + esc(ev.title) + '</span></div>' +
       '<div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
       '<div class="cp-dm">' + esc(x.cal || '') + (x.recurring ? ' · repeats' : '') + (x.done ? ' · done' : '') + '</div>' +
       (x.location ? '<div class="cp-dm">📍 ' + esc(x.location) + '</div>' : '') +
-      '<div class="cp-da">' + (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener">Open in Google Calendar</a>' : '') +
-      '<button type="button" data-cal-detail-close>Close</button></div>';
+      '<div class="cp-da">' + (x.editable ? '<button type="button" class="cp-primary" data-cal-edit>Edit</button><button type="button" class="cp-danger" data-cal-del>Delete</button>' : '') +
+      (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener">Google Calendar</a>' : '') +
+      '<span class="cp-sp"></span><button type="button" data-cal-detail-close>Close</button></div>' +
+      (why ? '<div class="cp-note">' + esc(why) + '</div>' : '');
     detail.hidden = false;
+  }
+  // ---- Phase 2: create / edit / delete (main calendar, non-repeating). Google Calendar stays the truth: after every
+  // save the range is refetched; nothing is drawn from local guesses.
+  const L = () => luxon.DateTime;
+  const newOp = () => 'op' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  function flash(msg){ flashUntil = Date.now() + 2500; setState('ok', msg); setTimeout(() => { flashUntil = 0; refreshState(); }, 2600); }
+  // f = {allDay, sd, st, ed, et} in Los Angeles wall time; ed is the LAST day (inclusive) for all-day events.
+  function openForm(f, ev){
+    sheetEv = ev || null; pending = false;
+    const x = ev ? ev.extendedProps : null;
+    detail.innerHTML = '<form class="cp-form' + (f.allDay ? ' allday' : '') + '" data-cal-form data-op="' + newOp() + '" novalidate>' +
+      '<div class="cp-dt">' + (x ? 'Edit event' : 'New event') + '<span style="font-weight:400;color:var(--cp-muted);font-size:12px;margin-left:auto">Main calendar</span></div>' +
+      '<input type="text" name="title" placeholder="Title" maxlength="300" autocomplete="off" enterkeyhint="done" value="' + esc(x ? ev.title : '') + '">' +
+      '<label class="cp-chk"><input type="checkbox" name="allDay"' + (f.allDay ? ' checked' : '') + '> All day</label>' +
+      '<div class="cp-row"><span>Start</span><input type="date" name="sd" value="' + f.sd + '"><input type="time" name="st" step="300" value="' + f.st + '"></div>' +
+      '<div class="cp-row"><span>End</span><input type="date" name="ed" value="' + f.ed + '"><input type="time" name="et" step="300" value="' + f.et + '"></div>' +
+      '<div class="cp-ferr" data-cal-ferr></div>' +
+      '<div class="cp-da"><button type="submit" class="cp-primary" data-cal-save>Save</button>' +
+      (x ? '<button type="button" class="cp-danger" data-cal-del>Delete</button>' : '') +
+      '<span class="cp-sp"></span><button type="button" data-cal-detail-close>Cancel</button></div>' +
+      (x ? '' : '<div class="cp-note">Reminders off.</div>') + '</form>';
+    detail.hidden = false;
+    const t = detail.querySelector('input[name=title]');
+    setTimeout(() => { try { t.focus({preventScroll: true}); if(t.value) t.select(); } catch (e) {} }, 30);
+  }
+  function formFromRange(allDay, startStr, endStr){
+    const a = L().fromISO(startStr, {zone: TZ}).setZone(TZ);
+    let b = endStr ? L().fromISO(endStr, {zone: TZ}).setZone(TZ) : null;
+    if(allDay){ const last = b ? b.minus({days: 1}) : a; return {allDay: true, sd: a.toISODate(), ed: (last < a ? a : last).toISODate(), st: '09:00', et: '10:00'}; }
+    if(!b || b.diff(a, 'minutes').minutes <= 30) b = a.plus({hours: 1}); // a tap / single slot = 1 hour
+    return {allDay: false, sd: a.toISODate(), st: a.toFormat('HH:mm'), ed: b.toISODate(), et: b.toFormat('HH:mm')};
+  }
+  function newEvent(){
+    // Next whole hour today when today is on screen, else the same hour on the first day shown (view dates from datesSet).
+    const now = L().now().setZone(TZ), today = now.toISODate();
+    const day = today >= viewStart && today < viewEnd ? now : L().fromISO(viewStart + 'T' + now.toFormat('HH:mm'), {zone: TZ});
+    const st = day.startOf('hour').plus({hours: 1});
+    openForm(formFromRange(false, st.toISO(), st.plus({hours: 1}).toISO()));
+  }
+  function editEvent(ev){
+    const x = ev.extendedProps;
+    openForm(formFromRange(!!x.allDay, x.start, x.end), ev);
+  }
+  function readForm(form){
+    const g = n => form.elements[n], allDay = g('allDay').checked, title = g('title').value.replace(/\s+/g, ' ').trim();
+    const sd = g('sd').value, ed = g('ed').value || sd, st = g('st').value, et = g('et').value;
+    if(!title) return {err: 'Add a title.'};
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(sd) || !/^\d{4}-\d{2}-\d{2}$/.test(ed)) return {err: 'Pick a start and end date.'};
+    if(allDay){
+      if(ed < sd) return {err: 'End date is before the start date.'};
+      return {title, allDay: true, start: sd, end: L().fromISO(ed, {zone: TZ}).plus({days: 1}).toISODate()};
+    }
+    if(!/^\d{2}:\d{2}$/.test(st) || !/^\d{2}:\d{2}$/.test(et)) return {err: 'Pick a start and end time.'};
+    if(ed + 'T' + et <= sd + 'T' + st) return {err: 'End is before the start.'};
+    return {title, allDay: false, start: sd + 'T' + st, end: ed + 'T' + et};
+  }
+  const errText = err => String((err && err.message) || err || 'Unknown error').replace(/^Exception:\s*/, '');
+  function save(form){
+    if(pending) return; // double tap / Enter + click: one request only
+    const r = readForm(form), errEl = form.querySelector('[data-cal-ferr]'), btn = form.querySelector('[data-cal-save]');
+    if(r.err){ errEl.textContent = r.err; return; }
+    const x = sheetEv && sheetEv.extendedProps, req = Object.assign({opId: form.dataset.op}, r);
+    if(x){ req.eventId = x.eventId; req.startMs = x.startMs; }
+    pending = true; btn.disabled = true; btn.textContent = 'Saving…'; errEl.textContent = '';
+    google.script.run.withSuccessHandler(() => {
+      pending = false;
+      if(detail.contains(form)){ detail.hidden = true; sheetEv = null; }
+      flash(x ? 'Saved ✓' : 'Added ✓'); cal.refetchEvents();
+    }).withFailureHandler(err => {
+      pending = false; btn.disabled = false; btn.textContent = 'Retry save';
+      errEl.textContent = 'Not saved: ' + errText(err) + '. Your text is still here — tap Retry save.';
+    })[x ? 'calPanelUpdateEvent' : 'calPanelCreateEvent'](req);
+  }
+  function askDelete(ev){
+    sheetEv = ev; pending = false;
+    detail.innerHTML = '<div class="cp-dt">Delete “' + esc(ev.title) + '”?</div><div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
+      '<div class="cp-dm">It is removed from Google Calendar.</div><div class="cp-ferr" data-cal-ferr></div>' +
+      '<div class="cp-da"><button type="button" class="cp-danger cp-primary" data-cal-del-yes>Delete</button><span class="cp-sp"></span><button type="button" data-cal-detail-close>Cancel</button></div>';
+    detail.hidden = false;
+  }
+  function doDelete(btn){
+    if(pending || !sheetEv) return;
+    const x = sheetEv.extendedProps, errEl = detail.querySelector('[data-cal-ferr]');
+    pending = true; btn.disabled = true; btn.textContent = 'Deleting…';
+    google.script.run.withSuccessHandler(() => {
+      pending = false; detail.hidden = true; sheetEv = null; flash('Deleted ✓'); cal.refetchEvents();
+    }).withFailureHandler(err => {
+      pending = false; btn.disabled = false; btn.textContent = 'Retry delete';
+      if(errEl) errEl.textContent = 'Not deleted: ' + errText(err) + '.';
+    }).calPanelDeleteEvent({eventId: x.eventId, startMs: x.startMs});
   }
   function build(){
     const phone = window.matchMedia('(max-width:720px)').matches;
@@ -14477,14 +14594,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek' },
       buttonText: { today: 'Today', day: 'Day', week: 'Week' },
       height: '100%', nowIndicator: true, scrollTime: '07:00:00', slotMinTime: '00:00:00', slotMaxTime: '24:00:00',
-      allDaySlot: true, dayMaxEvents: false, editable: false, selectable: false, eventStartEditable: false, eventDurationEditable: false,
+      allDaySlot: true, dayMaxEvents: false, editable: false, eventStartEditable: false, eventDurationEditable: false,
+      // Phase 2: drag (desktop) or hold + drag (touch) on empty grid → New event form. Moving / resizing events is phase 3.
+      selectable: true, selectMirror: true, selectLongPressDelay: 400, unselectAuto: true,
+      select: info => { if(!pending) openForm(formFromRange(info.allDay, info.startStr, info.endStr)); cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       dayHeaderFormat: phone ? { weekday: 'short', day: 'numeric' } : { weekday: 'short', month: 'numeric', day: 'numeric' },
       events: fetchRange,
-      loading: b => { busy = b; if(b){ detail.hidden = true; setState('loading', 'Loading events…'); } else setTimeout(refreshState, 0); },
+      loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; if(Date.now() >= flashUntil) setState('loading', 'Loading events…'); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
-      eventClick: info => { info.jsEvent.preventDefault(); showDetail(info.event); },
-      datesSet: info => { lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); }
+      eventClick: info => { info.jsEvent.preventDefault(); if(!pending) showDetail(info.event); },
+      datesSet: info => { viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); }
     });
     cal.render();
   }
@@ -14507,30 +14627,42 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!isOpen()) return;
     document.body.classList.remove('cal-open');
     panel.setAttribute('aria-hidden', 'true');
-    detail.hidden = true;
+    if(!pending){ detail.hidden = true; sheetEv = null; }
     document.querySelectorAll('[data-cal-open]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
   }
   function retry(){ if(cal) cal.refetchEvents(); else start(); }
-  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry };
+  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, api: () => cal };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
-    const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close]');
+    const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');
     if(!t) return;
     e.preventDefault();
     if(t.hasAttribute('data-cal-open')) window.fwCalendar.toggle();
     else if(t.hasAttribute('data-cal-close')) close();
-    else if(t.hasAttribute('data-cal-detail-close')) detail.hidden = true;
+    else if(t.hasAttribute('data-cal-detail-close')){ if(!pending){ detail.hidden = true; sheetEv = null; } }
+    else if(t.hasAttribute('data-cal-new')){ if(cal && !pending) newEvent(); }
+    else if(t.hasAttribute('data-cal-edit')){ if(sheetEv) editEvent(sheetEv); }
+    else if(t.hasAttribute('data-cal-del')){ if(sheetEv && !pending) askDelete(sheetEv); }
+    else if(t.hasAttribute('data-cal-del-yes')) doDelete(t);
     else retry();
+  });
+  detail.addEventListener('submit', e => { e.preventDefault(); if(e.target.matches('[data-cal-form]')) save(e.target); });
+  detail.addEventListener('change', e => {
+    const f = e.target.form;
+    if(!f || !f.matches('[data-cal-form]')) return;
+    if(e.target.name === 'allDay') f.classList.toggle('allday', e.target.checked);
+    if(e.target.name === 'sd' && f.elements.ed.value < e.target.value) f.elements.ed.value = e.target.value;
   });
   backdrop.addEventListener('click', close);
   document.addEventListener('keydown', e => {
     if(e.key !== 'Escape' || !isOpen()) return;
     e.preventDefault(); e.stopPropagation();
-    if(!detail.hidden) detail.hidden = true; else close();
+    if(pending) return;
+    if(!detail.hidden){ detail.hidden = true; sheetEv = null; } else close();
   }, true);
   // Swipes / holds inside the panel never reach the workspace's own swipe and hold-to-zoom handlers.
-  ['touchstart','touchmove','pointerdown'].forEach(n => panel.addEventListener(n, e => e.stopPropagation(), {passive: true}));
+  ['touchstart','touchmove','pointerdown','keydown','keyup','input'].forEach(n => panel.addEventListener(n, e => e.stopPropagation(), {passive: true}));
   window.addEventListener('resize', () => { if(cal && isOpen()) cal.updateSize(); });
 })();
 </script>

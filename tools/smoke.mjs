@@ -811,16 +811,36 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   }
   if (!need.every(f => fs.existsSync(path.join(fcDir, f)))) console.log('… calendar panel: skipped (FullCalendar not installable offline)');
   else {
-    const calStub = `<script>window.__calls=[];window.google={script:{run:new Proxy({},{get(t,k){let ok=null,bad=null;const p=new Proxy({},{get(_,m){
+    // Fake main + Events calendars in the page (phase 2): events are seeded per day the first time a range asks for
+    // it, then create / update / delete change them like Code.gs does (opId guard, repeating + Events read-only).
+    // Switches: __calFail (reads fail), __calEmpty (reads return nothing), __calFailWrite (writes fail),
+    // __calLoseReply (write succeeds on the "server" but the reply is lost, like a dropped connection).
+    const calStub = `<script>window.__calls=[];window.__cal={ev:{},seeded:{},ops:{},n:0};
+    window.__calSrv=function(m,a){const S=window.__cal,L=luxon.DateTime,Z='America/Los_Angeles',iso=x=>L.fromISO(x,{zone:Z}).toISO({suppressMilliseconds:true});
+      const put=e=>{e.id=e.eventId+'|'+e.startMs;S.ev[e.eventId]=e;return e;},ms=(x,ad)=>L.fromISO(x,{zone:Z}).toMillis();
+      if(m==='getCalendarRange'){
+        for(let d=a[0];d<a[1];d=L.fromISO(d).plus({days:1}).toISODate()){ if(S.seeded[d])continue; S.seeded[d]=1;
+          const t=(h,mi)=>iso(d+'T'+h+':'+mi),nx=L.fromISO(d).plus({days:1}).toISODate();
+          put({eventId:'a-'+d,title:'All-day A',allDay:true,start:d,end:nx,startMs:ms(d),color:'#3f51b5',colorId:'9',cal:'Main',calId:'main',editable:true});
+          put({eventId:'b-'+d,title:'Dentist',allDay:false,start:t('09','00'),end:t('10','00'),startMs:ms(t('09','00')),color:'#d50000',colorId:'11',cal:'Main',calId:'main',location:'Main St',editable:true});
+          put({eventId:'c-'+d,title:'Old chore',allDay:false,start:t('13','00'),end:t('13','30'),startMs:ms(t('13','00')),color:'#616161',colorId:'8',done:true,cal:'Main',calId:'main',editable:true});
+          put({eventId:'r-'+d,title:'Standup',allDay:false,start:t('15','00'),end:t('15','15'),startMs:ms(t('15','00')),color:'#039be5',colorId:'',cal:'Main',calId:'main',recurring:true,editable:false});
+          put({eventId:'g-'+d,title:'Gig',allDay:false,start:t('19','00'),end:t('21','00'),startMs:ms(t('19','00')),color:'#33b679',colorId:'',cal:'Events',calId:'events',editable:false});}
+        return {start:a[0],end:a[1],events:window.__calEmpty?[]:Object.values(S.ev).filter(e=>e.start.slice(0,10)<a[1]&&(e.allDay?e.end:e.end.slice(0,10))>=a[0]).map(e=>Object.assign({},e)),failed:[]};}
+      const r=a[0]||{},shape=e=>{e.title=r.title;e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);return e;};
+      if(m==='calPanelCreateEvent'){ if(S.ops[r.opId])return Object.assign({repeat:true},S.ev[S.ops[r.opId]]);
+        const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));S.ops[r.opId]=e.eventId;return e;}
+      if(m==='calPanelUpdateEvent'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');if(e.recurring||!e.editable)throw new Error('Repeating events are read-only here');delete S.ev[r.eventId];return put(shape(e));}
+      if(m==='calPanelDeleteEvent'){const e=S.ev[r.eventId];if(e&&(e.recurring||!e.editable))throw new Error('read-only');delete S.ev[r.eventId];return {ok:true};}
+      return undefined;};
+    window.google={script:{run:new Proxy({},{get(t,k){let ok=null,bad=null;const p=new Proxy({},{get(_,m){
       if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler')return f=>{bad=f;return p;}; if(m==='withUserObject')return()=>p;
       return(...a)=>{window.__calls.push([m,a]);return setTimeout(()=>{
-        if(m==='getCalendarRange'){ if(window.__calFail){bad&&bad(new Error('Calendar service timed out'));return;}
-          const L=luxon.DateTime,Z='America/Los_Angeles';
-          const ev=[];for(let d=a[0];d<a[1]&&!window.__calEmpty;d=L.fromISO(d).plus({days:1}).toISODate()){const t=(h,mi)=>L.fromISO(d+'T'+h+':'+mi,{zone:Z}).toISO({suppressMilliseconds:true});
-            ev.push({id:'a|'+d,title:'All-day A',allDay:true,start:d,end:L.fromISO(d).plus({days:1}).toISODate(),color:'#3f51b5',colorId:'9',cal:'Main'},
-            {id:'b|'+d,title:'Dentist',allDay:false,start:t('09','00'),end:t('10','00'),color:'#d50000',colorId:'11',cal:'Main',location:'Main St'},
-            {id:'c|'+d,title:'Old chore',allDay:false,start:t('13','00'),end:t('13','30'),color:'#616161',colorId:'8',done:true,cal:'Main'});}
-          ok&&ok({start:a[0],end:a[1],events:ev,failed:[]});return;}
+        if(m==='getCalendarRange'&&window.__calFail){bad&&bad(new Error('Calendar service timed out'));return;}
+        if(/^calPanel/.test(m)&&window.__calFailWrite){bad&&bad(new Error('Service invoked too many times'));return;}
+        let res;try{res=window.__calSrv(m,a);}catch(e){bad&&bad(e);return;}
+        if(/^calPanel/.test(m)&&window.__calLoseReply){window.__calLoseReply=0;bad&&bad(new Error('NetworkError: connection lost'));return;}
+        if(res!==undefined){ok&&ok(res);return;}
         ok&&ok(m==='runImports'||m==='getSyncState'?{build:'smoke',ref:{},inbox:[],days:{}}:m==='getMainCalendarEvents'?{date:a[0],events:[]}:null);},15);};}});return p[k];}})}};</script>`;
     const cHtml = fs.readFileSync('Index.html', 'utf8')
       .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
@@ -918,10 +938,117 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
         return out;
       }, !!view.isMobile);
       errs.push(...res);
+      // Phase 2 (2026-11-08): create / edit / delete on the main calendar, duplicates, failures, read-only repeats.
+      const res2 = await pg.evaluate(async () => {
+        const out = [], wait = ms => new Promise(r => setTimeout(r, ms));
+        const until = async (f, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (f()) return true; await wait(40); } return false; };
+        const panel = document.getElementById('calPanel'), det = panel.querySelector('[data-cal-detail]'), S = window.__cal;
+        const calls = m => window.__calls.filter(c => c[0] === m);
+        const evEl = t => [...panel.querySelectorAll('.fc-event')].find(x => x.textContent.includes(t));
+        const byTitle = t => Object.values(S.ev).filter(e => e.title === t);
+        const form = () => det.querySelector('[data-cal-form]');
+        const set = (n, v) => { const el = form().elements[n]; if (el.type === 'checkbox') el.checked = v; else el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
+        document.querySelector('#toolbar [data-cal-open]').click();
+        await until(() => panel.querySelector('.fc-timegrid-event'));
+        const api = window.fwCalendar.api();
+        api.changeView('timeGridDay'); await wait(200);
+        const day = api.formatIso(api.getDate()).slice(0, 10);
+        // Validation: empty title → message, no server call.
+        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        if (!form()) return ['+ New opened no form'];
+        if (document.activeElement !== form().elements.title) out.push('title box not focused on + New');
+        form().querySelector('[data-cal-save]').click(); await wait(60);
+        if (!/title/i.test(det.querySelector('[data-cal-ferr]').textContent) || calls('calPanelCreateEvent').length) out.push('empty title was not blocked');
+        // Create a timed event; double tap Save → one request, one event.
+        set('title', 'Test lunch'); set('sd', day); set('ed', day); set('st', '11:00'); set('et', '12:00');
+        const save = form().querySelector('[data-cal-save]'); save.click(); save.click();
+        form().dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        if (!await until(() => evEl('Test lunch'))) out.push('created event not shown after save');
+        if (calls('calPanelCreateEvent').length !== 1 || byTitle('Test lunch').length !== 1) out.push('double tap made ' + calls('calPanelCreateEvent').length + ' requests / ' + byTitle('Test lunch').length + ' events');
+        if (!det.hidden) out.push('form stayed open after a good save');
+        if (!/11:00/.test((evEl('Test lunch') || {}).textContent || '')) out.push('created event not at 11:00');
+        // Lost reply: the server made it, the app saw an error → Retry save with the same opId → still one event.
+        window.__calLoseReply = 1;
+        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        set('title', 'Lost reply'); set('sd', day); set('ed', day); set('st', '16:00'); set('et', '17:00');
+        form().querySelector('[data-cal-save]').click();
+        if (!await until(() => /Not saved/.test(det.querySelector('[data-cal-ferr]')?.textContent || ''))) out.push('no save-failure message');
+        if (!form() || form().elements.title.value !== 'Lost reply') out.push('failed save lost the typed text');
+        const rb = form() && form().querySelector('[data-cal-save]');
+        if (!rb || rb.disabled || !/Retry/.test(rb.textContent)) out.push('no Retry save button after failure');
+        else { rb.click(); await until(() => det.hidden); }
+        await until(() => evEl('Lost reply'));
+        if (byTitle('Lost reply').length !== 1) out.push('retry after a lost reply made ' + byTitle('Lost reply').length + ' events');
+        // Plain failure → message, nothing created, then success.
+        window.__calFailWrite = 1;
+        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        set('title', 'Fails first'); set('sd', day); set('ed', day); set('st', '18:00'); set('et', '18:30');
+        form().querySelector('[data-cal-save]').click();
+        await until(() => /Not saved/.test(det.querySelector('[data-cal-ferr]')?.textContent || ''));
+        if (byTitle('Fails first').length) out.push('failed save still created an event');
+        window.__calFailWrite = 0; form().querySelector('[data-cal-save]').click();
+        await until(() => det.hidden && evEl('Fails first'));
+        if (byTitle('Fails first').length !== 1) out.push('save after failure: ' + byTitle('Fails first').length + ' events');
+        // Edit: same event id, new title, switched to all-day.
+        const id0 = byTitle('Test lunch')[0].eventId;
+        const nCreate = calls('calPanelCreateEvent').length;
+        evEl('Test lunch').click(); await wait(60);
+        const eb = det.querySelector('[data-cal-edit]');
+        if (!eb) out.push('no Edit on a main-calendar event');
+        else {
+          eb.click(); await wait(60);
+          if (form().elements.title.value !== 'Test lunch' || form().elements.st.value !== '11:00') out.push('edit form not prefilled');
+          set('title', 'Lunch moved'); set('allDay', true);
+          if (!form().classList.contains('allday')) out.push('all-day box did not hide the times');
+          form().querySelector('[data-cal-save]').click();
+          await until(() => det.hidden && evEl('Lunch moved'));
+          const e = byTitle('Lunch moved')[0];
+          if (!e || e.eventId !== id0) out.push('edit changed the event id (or lost it)');
+          else if (!e.allDay || e.start !== day) out.push('edit did not make it an all-day event on ' + day + ': ' + e.start);
+          if (!panel.querySelector('.fc-daygrid-event') || ![...panel.querySelectorAll('.fc-daygrid-event')].some(x => /Lunch moved/.test(x.textContent))) out.push('edited all-day event not in the all-day row');
+          if (calls('calPanelCreateEvent').length !== nCreate || calls('calPanelUpdateEvent').length !== 1) out.push('edit did not update in place (create calls ' + (calls('calPanelCreateEvent').length - nCreate) + ', updates ' + calls('calPanelUpdateEvent').length + ')');
+        }
+        // Delete: asks first; Cancel keeps it; Delete removes it.
+        evEl('Lunch moved').click(); await wait(60);
+        det.querySelector('[data-cal-del]').click(); await wait(60);
+        if (!det.querySelector('[data-cal-del-yes]')) out.push('delete did not ask to confirm');
+        det.querySelector('[data-cal-detail-close]').click(); await wait(60);
+        if (calls('calPanelDeleteEvent').length || !byTitle('Lunch moved').length) out.push('Cancel still deleted');
+        evEl('Lunch moved').click(); await wait(60);
+        det.querySelector('[data-cal-del]').click(); await wait(60);
+        det.querySelector('[data-cal-del-yes]').click();
+        await until(() => det.hidden && !evEl('Lunch moved'));
+        if (byTitle('Lunch moved').length || evEl('Lunch moved')) out.push('deleted event still there');
+        if (calls('calPanelDeleteEvent').length !== 1) out.push('delete sent ' + calls('calPanelDeleteEvent').length + ' requests');
+        // Read-only: a repeating event and an Events-calendar event have no Edit / Delete.
+        for (const t of ['Standup', 'Gig']) {
+          const el = evEl(t); if (!el) { out.push(t + ' not shown'); continue; }
+          el.click(); await wait(60);
+          if (det.querySelector('[data-cal-edit],[data-cal-del]')) out.push(t + ' is editable but should be read-only');
+          if (!/read-only/.test(det.textContent)) out.push(t + ' has no read-only note');
+          det.querySelector('[data-cal-detail-close]').click(); await wait(40);
+        }
+        if (calls('calPanelUpdateEvent').some(c => /^[rg]-/.test(c[1][0].eventId))) out.push('a read-only event was sent for update');
+        // Esc closes the form, not the panel.
+        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(60);
+        if (!det.hidden || !document.body.classList.contains('cal-open')) out.push('Esc on the form did not just close the form');
+        // Typing in the form never reaches the workspace's own key shortcuts.
+        panel.querySelector('[data-cal-new]').click(); await wait(60);
+        let leaked = 0; const spy = () => leaked++; document.addEventListener('keydown', spy);
+        form().elements.title.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+        document.removeEventListener('keydown', spy);
+        if (leaked) out.push('typing in the form reached the workspace key handlers');
+        det.querySelector('[data-cal-detail-close]').click();
+        if (Object.values(S.ev).some(e => e.reminders)) out.push('new event has reminders on');
+        panel.querySelector('[data-cal-close]').click(); await wait(320);
+        return out;
+      });
+      errs.push(...res2.map(x => 'phase 2: ' + x));
       const shot = process.argv.indexOf('--shot');
       if (shot > 0) { await pg.click('#toolbar [data-cal-open]'); await pg.waitForTimeout(900); await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-calendar-' + name + '.png') }); }
       if (errs.length) { fails += errs.length; console.error('✗ calendar ' + name + ':\n  ' + errs.join('\n  ')); }
-      else console.log('✓ calendar ' + name + ': opens / closes, events, views, errors + retry');
+      else console.log('✓ calendar ' + name + ': view (phase 1) + create / edit / delete, no duplicates, failures (phase 2)');
       await ctx.close();
     }
   }

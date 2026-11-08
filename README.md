@@ -4,6 +4,8 @@ Google Apps Script web app: a three-column daily workspace — **Today / Tasks**
 
 Last updated: 2026-11-08
 
+Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md).
+
 ## Status key
 
 - ✅ **Working** — in use and confirmed

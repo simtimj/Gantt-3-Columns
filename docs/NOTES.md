@@ -560,6 +560,13 @@ Problem (Julius): too many categories and places; organizing the system takes at
 - **Stretch**: tabled — hidden for now, may come back.
 - **Keep In Mind**: kept. It holds focus areas worth seeing without acting, and is where items moved out of the Big Three go; may live in Reference.
 - **Urgency 0 / 1 / 2**: wanted, **0 = red** (most urgent). Needs a migration plan across Gantt lines, New Tasks, calendar colors and AI rules, confirmed before building.
+- **Round 3 answers (2026-11-08)**:
+  - The highlighted tasks inside a project are called **Lead Tasks** (always up to 3; button to load / refill them).
+  - Check-in: the app **prompts** for it, **Monday morning**. Rhythm: weekly or every two weeks (he likes it tight) plus a **monthly** deeper look; exact rhythm to settle once it's in use.
+  - Urgent items under the Big Three also go to the calendar's unscheduled list **automatically**.
+  - Waiting list: **no cap** for now (revisit during cleanup).
+  - Urgency naming still open: he likes 0 = red but is weighing "urgency 1 / 2 / 3" or short labels (U1/U2 sound like words). Note: "no urgency" can simply be blank (lines already store none as no attribute), so 0 = red does not force a new "none" marker.
+- **New threads (2026-11-08, not designed yet)**: (1) **App cleanup** — hide irrelevant things, better grouping / sorting of the many panels and tabs; (2) **Task → calendar pipeline** — how tasks (Lead Tasks, urgent, scheduled) flow into the calendar's unscheduled list and timeline and back.
 - Not yet decided: ranking rules, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".
 
 ### What exists today (to build on, not duplicate)

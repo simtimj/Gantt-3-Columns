@@ -53,6 +53,7 @@ Last updated: 2026-11-08
 
 ## 🧪 To be confirmed (2026-11-07)
 
+- **Reference saves preserve other changes**: typing or folding a card no longer rewrites its title, order or parent from a stale snapshot. Parent/open-state changes are explicit, saves for the same card are queued, and conflicting moves show a refresh/check message. Check on two devices: reorder a card on one, then edit/fold it on the other; the new order and text should remain. Automated regressions: `node tools/reference-save-test.mjs`.
 - **History date line: shorter + count on it**: the date reads **Saturday November 7, 26** (phone: **Sat Nov 7, 26**), the weekday icon is gone, and the done count sits right after it on the same line: **52 ✓** when everything's done, **52/58 ✓** otherwise (the separate "Today: 52/58 ✓" line is gone). In a very narrow column the count drops just under the date.
 - **Fold button never splits**: a title line's − / + button (e.g. **+ 2 hidden** on the IT study line) stays on one line. The title text wraps beside it instead, and in a very narrow column the whole button drops under the text. Before, it broke into "hidd / en". Fixed the same day: when the button sat under the text on a narrow column, tapping it did nothing; it folds / opens again.
 - **Time sections renamed Morn / Aft / Eve**: History's time headers now read **Morn 6–2**, **Aft 2–8**, **Eve 8–6** (were Morn / After / Night). Nothing else changed. The line under each title is now 1px in the section's own color (Morn yellow, Aft orange, Eve purple), the same thickness for all three; the extra line that sat inside the Aft / Eve boxes above their titles is gone. Title rows are tighter too: less room above each title inside its box (2px), a slimmer title row, and 2px between the title line and the first group. The empty band between the Morn / Aft / Eve boxes shrank from ~50px to a small gap (~9px): the blank line(s) right before a section title are squeezed to 3px on screen (still there in the cell, nothing deleted).
@@ -560,3 +561,4 @@ Last updated: 2026-11-08
 
 
 - (+ Block / + Task / Activate buttons removed 2026-11-05) 🧪 **Next Block activation (2026-11-04):** Select a `Next Block` or `Next Block 2` title, press **Activate**, confirm retaining nested subtasks (Cancel safely aborts activation), then optionally enter a time range. Blank time produces `Block`; a supplied range produces `Block 9:00–10:30`. Cancelling the time prompt leaves the placeholder unchanged. Clearing subtasks is deferred to avoid accidental deletion during the experimental release.
+

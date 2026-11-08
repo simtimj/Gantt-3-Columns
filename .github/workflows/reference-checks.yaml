@@ -8,6 +8,7 @@ on:
       - 'tools/focus-save-test.mjs'
       - 'tools/focus-storage-test.mjs'
       - 'tools/import-read-test.mjs'
+      - 'tools/confirm-read-test.mjs'
       - 'tools/sync-test.mjs'
       - 'tools/deploy-log-test.py'
       - 'tools/smoke.mjs'
@@ -30,6 +31,7 @@ jobs:
       - run: node tools/focus-save-test.mjs
       - run: node tools/focus-storage-test.mjs
       - run: node tools/import-read-test.mjs
+      - run: node tools/confirm-read-test.mjs
       - run: node tools/sync-test.mjs
       - run: python3 tools/deploy-log-test.py
       - run: npm install --no-save playwright@1.62.1

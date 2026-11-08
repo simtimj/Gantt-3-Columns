@@ -1995,22 +1995,40 @@ function confirmCardHtml_(rows) {
 
 function syncConfirmCard_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss.getSheetByName('To Confirm')) return; // nothing until the tab exists
+  const sheet = ss.getSheetByName('To Confirm');
+  if (!sheet) return; // nothing until the tab exists
+  const sources = { sheet:sheet, ref:getOrCreateSheet_('Reference', REF_HEADERS) };
   // Fast path (2026-11-04): most loads change nothing, so check without taking the script lock.
-  if (!confirmCardWork_(true)) return;
+  if (!confirmCardWork_(true,sources)) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return; // next load retries
-  try { confirmCardWork_(false); } finally { lock.releaseLock(); }
+  try { confirmCardWork_(false,sources); } finally { lock.releaseLock(); }
+}
+
+// Cache only a row hint, never source rows or HTML. Validate the identity and read the live
+// content together; direct Sheet edits, moved/deleted rows and cache failures remain visible.
+function readConfirmCard_(ref) {
+  const key = 'confirm-card-row:v1'; let cache = null, hint = 0;
+  try { cache = CacheService.getScriptCache(); hint = Number(cache.get(key)); } catch (e) {}
+  if (Number.isInteger(hint) && hint >= 2) {
+    try {
+      const values = ref.getRange(hint,1,1,5).getValues()[0];
+      if (String(values[0] || '') === CONFIRM_CARD_ID) return {row:hint,content:String(values[4] || '')};
+    } catch (e) {} // a deleted row can also put the hint outside the sheet bounds
+  }
+  const row = referenceRowMap_(ref).get(CONFIRM_CARD_ID) || 0;
+  const content = row ? String(ref.getRange(row,5).getValue() || '') : '';
+  try { if (cache) { if (row) cache.put(key,String(row),3600); else cache.remove(key); } } catch (e) {}
+  return {row:row,content:content};
 }
 
 // dryRun: true → only report whether a write is needed.
-function confirmCardWork_(dryRun) {
+function confirmCardWork_(dryRun,sources) {
   {
-    const sheet = getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
-    const ref = getOrCreateSheet_('Reference', REF_HEADERS);
+    const sheet = sources ? sources.sheet : getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
+    const ref = sources ? sources.ref : getOrCreateSheet_('Reference', REF_HEADERS);
     let rows = confirmRows_(sheet);
-    const cardRow = referenceRowMap_(ref).get(CONFIRM_CARD_ID);
-    const cur = cardRow ? String(ref.getRange(cardRow, 5).getValue() || '') : '';
+    const card = readConfirmCard_(ref), cardRow = card.row, cur = card.content;
     // Ticked lines → Status works.
     const ticked = new Set();
     (cur.match(/<div\b[^>]*\bdata-kid="[^"]+"[^>]*>/g) || []).forEach(tag => {

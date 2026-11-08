@@ -566,6 +566,15 @@ Problem (Julius): too many categories and places; organizing the system takes at
   - Urgent items under the Big Three also go to the calendar's unscheduled list **automatically**.
   - Waiting list: **no cap** for now (revisit during cleanup).
   - Urgency naming still open: he likes 0 = red but is weighing "urgency 1 / 2 / 3" or short labels (U1/U2 sound like words). Note: "no urgency" can simply be blank (lines already store none as no attribute), so 0 = red does not force a new "none" marker.
+- **Round 4 answers (2026-11-08)**:
+  - **Urgency is 0 / 1 / 2** ("urgency 0" = red, 1 = yellow, 2 = blue; blank = none). **Confirmed.** All existing tasks convert automatically (1→0, 2→1, 3→2) everywhere (Gantt lines, New Tasks, calendar color mapping, AI rules) — to be built as one migration.
+  - A project's urgency is the **ceiling** for its tasks: a red project can hold red, yellow and blue tasks (e.g. Crabbing: bait + tires red, others lower).
+  - Moving something out of the Big Three happens from the checkbox **hold menu**: pick where it goes (Keep In Mind, waiting list, a project) and its urgency; it then auto-sorts there.
+  - **Keep In Mind** stays the middle-top tab as it is; needs a styling pass.
+  - **Monday check-in card**: 3 slots with keep / swap / drop, top of the waiting list, items stuck in a slot 2+ weeks, last week's finished items. **Stays until done** (he'll say if it nags).
+  - **Lead Tasks refill**: start with automatic bubbling (next open checklist line moves up), keep a Load button, tune later.
+  - Finished Lead Tasks stay **ticked for the rest of the day**.
+  - Work order: **finish this planning model first**, then the task → calendar pipeline, then app cleanup.
 - **New threads (2026-11-08, not designed yet)**: (1) **App cleanup** — hide irrelevant things, better grouping / sorting of the many panels and tabs; (2) **Task → calendar pipeline** — how tasks (Lead Tasks, urgent, scheduled) flow into the calendar's unscheduled list and timeline and back.
 - Not yet decided: ranking rules, the name "Next Moves", a Big Three inside each project, and the meanings of Keep In Mind, pinned/locked and "main focus".
 

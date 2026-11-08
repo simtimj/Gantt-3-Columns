@@ -4,8 +4,6 @@ Google Apps Script web app: a three-column daily workspace — **Today / Tasks**
 
 Last updated: 2026-11-08
 
-Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md).
-
 ## Status key
 
 - ✅ **Working** — in use and confirmed
@@ -43,7 +41,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 - Notes **+ Template** inserts the Reference cell titled "Journal Template" into the selected Notes day.
 
 **Urgency** (like TickTick)
-- Hold a checkbox (or right-click it) → pick 0 red (Urgent) / 1 yellow (Soon) / 2 blue (Can be later) / none, and optionally a due date. (Urgency reads 0 / 1 / 2 since 2026-11-08.)
+- Hold a checkbox (or right-click it) → pick 1 red (Urgent) / 2 yellow (Soon) / 3 blue (Can be later) / none, and optionally a due date.
 - Urgent panel at the top of Reference lists every urgent task from every day, grouped 1/2/3, with its subtasks underneath. Tap a task to jump to it in Today. Panel is collapsible.
 
 **Reference**
@@ -54,8 +52,6 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 🧪 To be confirmed (2026-11-08)
 
-- **Urgency reads 0 / 1 / 2**: urgency now shows as **0** (red, Urgent), **1** (yellow, Soon), **2** (blue, Can be later) everywhere: the checkbox hold menu, the Urgent panel headers and the Cal Events urgency buttons. Colors are unchanged and nothing saved was rewritten (the app still stores the old numbers underneath). The **New Tasks** tab reads 0 / 1 / 2 once its Urgency header says "Urgency 0-2"; words like Urgent / Soon / Later work too ("Later" rows used to come in with no color).
-- **📅 Calendar looks like Google Calendar**: rounded **Today** button, round ‹ › arrows, the month as the title ("November 2026"; Day view shows the date), and a **Day | Week** pill. No boxed table: faint hour lines and small grey **1 PM** labels. Day headers show a small weekday over a big date, with today's date in a blue circle. Events are rounded with the title first and the time under it (**9am – 10am**); short ones fit on one line. A red now-line with a dot. A **+ New** pill, round ↻ / ✕, a floating event card, a flatter Plan box, and matching dark mode. Style only: everything works the same.
 - **Done count on every day + today marker**: every day's date line in History now shows its count (**8 ✓** / **5/7 ✓**), not just today's; days with no tasks show nothing. Today's date is drawn in its day color (no extra space).
 - **📅 Calendar loads faster (cached days)**: days you've seen, plus the week before and after, show **instantly** when you step ‹ › or switch Day / Week; Google is re-checked quietly in the background and the view only changes if something did. The last copy is kept on the device, so even the first 📅 open after a reload shows events right away, and the app warms it up a few seconds after it starts. After any save (add / edit / move / delete / tick) it still reads Google before drawing. The server read of Google Calendar is also quicker (one Calendar API call per calendar instead of many small ones; falls back to the old way if that's unavailable).
 - **Recover unsent day / Reference text**: edits get a device-local recovery copy before autosave. After reopening, **Review** offers unfinished copies without changing the server. **Restore** merges with the current text; conflicting lines ask whether to keep both for review. Copies clear only after their matching save succeeds. Deleted Reference cards remain previewable/downloadable and are not recreated. Storage failures show a warning and keep export available. Covers day Tasks/Notes and Reference text; browser storage can be unavailable or cleared, and these copies do not sync across devices. Phone check pending; see `docs/NOTES.md` → "Workspace text recovery".
@@ -160,7 +156,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
 - **Scratch Pad is a full editor**: **+ Task**, `[]` + Space, the checkbox hold menu and task cells all work there, same as Blocks.
-- **Cal urgency color**: setting urgency in Cal Events colors the Google Calendar event: 0 red, 1 yellow, 2 blue, none = default. Done events stay Graphite until unticked.
+- **Cal urgency color**: setting urgency in Cal Events colors the Google Calendar event: 1 red, 2 yellow, 3 blue, none = default. Done events stay Graphite until unticked.
 - **Cal Events order button**: next to refresh, switches between **Category** (all events together under their subject, no times) and **Time** (all-day first, then scheduled by start). Remembered per device.
 - **Cal + Task color**: new events get no color from the app, so you set urgency yourself.
 - **Urgent spacing**: the empty band above Urgent is gone.
@@ -517,11 +513,6 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 📋 To do
 
-- **App cleanup** (wanted 2026-11-08): hide what isn't used, better grouping and sorting of the many panels / tabs.
-- **Task → calendar pipeline** (wanted 2026-11-08): how Lead Tasks, urgent items and scheduled tasks flow into the calendar and back, without duplicates.
-
-- **Big Three / Biggest Return + living project containers** (planned 2026-11-08, not built): one card per project (why, next moves, flat checklist, notes & decisions), a rotating Big Three that links to projects (separate from urgency), and a calendar day with an Unscheduled list on top of the timeline plus an end-of-day review. Design and open questions: `docs/NOTES.md` → "Planning model".
-
 - **📅 Calendar phase 3b–5** (Julius 2026-11-08): touch drag / resize (3b) (Big Three / Stretch / Next Up / Backlog) → timer hand-off → review. Plan in `docs/NOTES.md` → "Calendar panel (FullCalendar)"; one phase at a time, each checked before the next.
 
 - **Pages over time** (Julius 2026-11-07): totals across days, e.g. pages this week / month, maybe per book.
@@ -592,15 +583,6 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 - **Save-acknowledgement timing without extra save-log calls**: the next existing Speed Log report carries up to 50 recent changed day/Reference save round-trips, with success/conflict/error status and the responding release. Samples contain no task text or task IDs; reporting retries keep stable sample IDs. This is best-effort in-memory telemetry, not a complete audit, and excludes the autosave debounce. Refresh, edit a disposable line, and let a normal sync occur to see `Client.saveTimings`. Live latency targets remain to be agreed after measurement.
 
+## 🧪 Lighter unchanged study imports — 2026-11-08
 
-## 🧪 Initial day read reuse — 2026-11-08
-
-- Initial loading derives the visible day window from the same request-local Days snapshot already used for Urgent and Dailies seeds. This removes the extra date-column and visible-text reads (3 day-data reads to 1), preserves Plan/text hashes and rereads current data on each later request. No cross-request content cache. Actual opening latency remains to be measured.
-
-## 🧪 Daily setup efficiency — 2026-11-08
-
-- Automatic daily date maintenance reuses a versioned formatting hint tied to the Days and Reference tab IDs, avoiding whole-column formatting on every new day. Manual `setupWorkspace()` still repairs formatting; replacement tabs invalidate the hint, and failed formatting retries. Missing-date insertion sorts complete rows so Plan and extra fields stay with their dates. No historical reassignment is attempted. Actual cold-start latency remains to be measured.
-
-## 🧪 Done Log live row hint — 2026-11-08
-
-- Routine Done Log imports validate a cached row hint by reading the live date and Today text together (warm unchanged lookup: 2 reads to 1). Moved/deleted rows, invalid hints and cache failures fall back to the normal lookup. No history text is cached, and work requiring the script lock still rereads current data under lock. Actual import latency remains to be measured.
+- An unchanged Study Sessions import reads raw values once and skips the redundant displayed-values read (2 reads to 1). Changed input is reread after acquiring the script lock; another importer already processing the same input causes no repeated output writes. A correction appended before lock acquisition is processed from the latest rows with the existing last-ID-wins behavior. History, review output and Logged acknowledgements retain their current format. Actual latency improvement remains to be measured.

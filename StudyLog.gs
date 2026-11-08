@@ -256,15 +256,21 @@ function syncStudyLog_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(STUDY_TAB);
   if (!sheet || sheet.getLastRow() < 2) return;
-  const range = sheet.getRange(1, 1, sheet.getLastRow(), STUDY_HEADERS.length);
-  const values = range.getValues();
-  const display = range.getDisplayValues();
+  let range = sheet.getRange(1, 1, sheet.getLastRow(), STUDY_HEADERS.length);
+  let values = range.getValues();
   const props = PropertiesService.getScriptProperties();
-  const sig = cellHash_(todayString_() + JSON.stringify(values.map(r => r.slice(0, 12))));
+  let sig = cellHash_(todayString_() + JSON.stringify(values.map(r => r.slice(0, 12))));
   if (props.getProperty('studySig') === sig) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return; // next load retries
   try {
+    // The fast path needs only raw values. On change, reread under the lock:
+    // another importer or an appended/corrected session may have arrived.
+    range = sheet.getRange(1, 1, sheet.getLastRow(), STUDY_HEADERS.length);
+    values = range.getValues();
+    sig = cellHash_(todayString_() + JSON.stringify(values.map(r => r.slice(0, 12))));
+    if (props.getProperty('studySig') === sig) return;
+    const display = range.getDisplayValues();
     if (String(values[0][12] || '') !== 'Logged') sheet.getRange(1, 13).setValue('Logged');
     const today = todayString_();
     const segs = studySegments_(values, display);

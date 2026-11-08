@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'Code.gs'
+      - 'StudyLog.gs'
       - 'Index.html'
       - 'Drafts.html'
       - 'tools/draft-test.mjs'
@@ -16,6 +17,7 @@ on:
       - 'tools/setup-test.mjs'
       - 'tools/initial-read-test.mjs'
       - 'tools/done-read-test.mjs'
+      - 'tools/study-read-test.mjs'
       - 'tools/deploy-log-test.py'
       - 'tools/smoke.mjs'
       - '.github/scripts/build_deploy_log.py'
@@ -44,6 +46,7 @@ jobs:
       - run: node tools/setup-test.mjs
       - run: node tools/initial-read-test.mjs
       - run: node tools/done-read-test.mjs
+      - run: node tools/study-read-test.mjs
       - run: python3 tools/deploy-log-test.py
       - run: npm install --no-save playwright@1.62.1
       - run: npx playwright install --with-deps chromium

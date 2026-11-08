@@ -1,6 +1,8 @@
 # Gantt data ownership and identity map
 
-Date: 2026-11-08. Source snapshot: `03d48dda78a41e9bc39123480befd6e9e02d24f5` (including workspace recovery and the Calendar cache).
+Date: 2026-11-08. Original inventory snapshot: `03d48dda78a41e9bc39123480befd6e9e02d24f5` (including workspace recovery and the Calendar cache).
+Current read/save behavior and resumption rules: [efficiency operating guide and handoff](EFFICIENCY_HANDOFF.md). The original inventory remains the basis for the owner table; later targeted optimizations have not migrated these stores.
+
 This is a code inventory and migration design, not a live referential-integrity audit or an implemented migration. Keep Apps Script/Sheets. Do not infer deletion from a task that is absent from the currently loaded DOM.
 
 ## Current owners
@@ -18,7 +20,7 @@ This is a code inventory and migration design, not a live referential-integrity 
 | Calendar appointment | Google Calendar; calendar ID, event ID and occurrence start matter | Calendar API writers own timing/color. The app's event references often encode `eventId@startMs`; a move must refresh those links |
 | Calendar display cache | Browser `fw.calCache.v1` and in-memory event/day maps | A derived last-known view, not a new event owner. Background reads refresh Google data; write paths request fresh data or apply the returned event shape |
 | Calendar daily plan | `Plan`: `Id, Date, Group, Rank, Ref, Title, Target, Event, Updated` | `planSave`; `Ref` is `tid:<taskId>` or `cal:<eventId>`. `Id` identifies the plan placement, not a new task. Big/Stretch are dated; Next/Backlog are undated |
-| AI task intake | `New Tasks`: Date, Title, Urgency, Due, Minutes, Subtasks, Added | `sheetTaskRows_` creates `s-` + hash(raw date + title); `applyClaudeTasks_` records applied IDs. This is append-oriented intake, not a general task-edit API |
+| AI task intake | `New Tasks`: Date, Title, Urgency, Due, Minutes, Subtasks, Added | `sheetTaskRows_` creates `s-` + hash(raw date + title); `applyClaudeTasks_` records applied IDs. This is append-oriented intake, not a general task-edit API. Visible urgency 0/1/2 uses header `Urgency 0-2`; stored HTML remains 1/2/3 |
 | Gantt implementation work register | Live `Open Tasks`: Task ID, Task, Status, Priority, Owner, Next action, Last updated, Source/location, Related link, Notes | Existing AI/project register with its own work-item IDs. Central Data Hub routes Gantt implementation work here. No direct consumer of this tab was found in the inspected app source; it is not the `New Tasks` intake |
 | AI completion intake | `Done Log`: Date, Project, Title, Details, Done by, Type | `sheetDoneRows_` hashes date/project/title/details into `s-…`; imported `data-cid` preserves provenance. The rolling intake window is 30 days |
 | Study session | `Study Sessions`: explicit session ID and date/time/result fields | `syncStudyLog_` aggregates History by date + daypart, while Study Review is derived by topic. Session identity differs from the aggregate `data-study` key |
@@ -76,3 +78,7 @@ Live coverage counts, canonical-owner decisions for mirrored tasks, correction s
 The live workbook already has an `Open Tasks` register, and the current Central Data Hub directs Gantt UI/storage/sync implementation work to it. Reconcile that register before proposing another master table. Its work-item ID, a Reference check-line's task ID, and a project/container ID are different roles; record explicit parent/child/alias relationships only after reviewing their meaning. The same title or overlapping subject does not prove two records are duplicates.
 
 The pilot above keeps Reference task content authoritative while using the existing work register for project ownership and next actions. This documents current boundaries; it does not make the register a new automatic app task feed or migrate its statuses.
+
+## Read-only pilot status — 2026-11-08
+
+The first live slice inspected the existing efficiency Reference project and the implementation register: ten distinct efficiency-task IDs were found in that Reference section, with no duplicates within the slice. The existing mapping work item remains In Progress. Calendar/Plan/timer associations, other owner locations, global uniqueness and canonical-owner decisions remain unverified. No schema, write ownership or task identity was migrated.

@@ -4,7 +4,7 @@ Google Apps Script web app: a three-column daily workspace — **Today / Tasks**
 
 Last updated: 2026-11-08
 
-Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md).
+Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
 ## Status key
 
@@ -608,3 +608,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Lighter unchanged study imports — 2026-11-08
 
 - An unchanged Study Sessions import reads raw values once and skips the redundant displayed-values read (2 reads to 1). Changed input is reread after acquiring the script lock; another importer already processing the same input causes no repeated output writes. A correction appended before lock acquisition is processed from the latest rows with the existing last-ID-wins behavior. History, review output and Logged acknowledgements retain their current format. Actual latency improvement remains to be measured.
+
+## 🧪 Lighter applied-task imports — 2026-11-08
+
+- New Tasks intake still checks every raw row, including backdated appends and changed title/date identities. When all IDs are already applied, it skips the displayed-time read (2 reads to 1). Pending rows retain their original displayed Added times and legacy/current urgency interpretation. Default full intake reads remain available; this is not a general task-edit API. Actual latency improvement remains to be measured.

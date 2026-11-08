@@ -2126,23 +2126,30 @@ function sheetDoneRows_() {
   }).filter(x => x.title && x.date >= oldest);
 }
 
-function sheetTaskRows_() {
+function sheetTaskRows_(appliedIds) {
   const sheet = getOrCreateSheet_('New Tasks', NEW_TASKS_HEADERS);
   const range = sheet.getDataRange();
   const rows = range.getValues();
   if (rows[0][6] !== 'Added') sheet.getRange(1, 7).setValue('Added'); // tab made before this column
-  const shown = range.getDisplayValues(); // as displayed: a time cell's raw value is an 1899 date
   const newScale = /0\s*-\s*2/.test(String(rows[0][2] || ''));
-  return rows.slice(1).map((r, i) => {
+  // Every raw row is still checked, including backdated appends and title/date
+  // changes. Displayed times are only needed for tasks not already applied.
+  const pending = rows.slice(1).map((r, i) => {
     const raw = intakeDate_(r[0]);
     const date = /^(backlog|undated)$/i.test(raw) ? 'backlog' : raw;
     const title = String(r[1] || '').trim();
+    return { r:r, i:i, date:date, title:title, id:'s-' + cellHash_([raw, title].join('|')) };
+  }).filter(x => x.title && (!appliedIds || !appliedIds.has(x.id)));
+  if (!pending.length) return [];
+  const shown = range.getDisplayValues(); // time cells have raw 1899 dates
+  return pending.map(x => {
+    const r = x.r;
     return {
-      id: 's-' + cellHash_([raw, title].join('|')), date, title, urg: intakeUrg_(r[2], newScale), due: intakeDate_(r[3]), dur: Number(r[4]),
+      id:x.id, date:x.date, title:x.title, urg: intakeUrg_(r[2], newScale), due: intakeDate_(r[3]), dur: Number(r[4]),
       subtasks: String(r[5] || '').split('|').map(t => t.trim()).filter(Boolean),
-      added: intakeTime_(shown[i + 1][6]),
+      added: intakeTime_(shown[x.i + 1][6]),
     };
-  }).filter(x => x.title);
+  });
 }
 
 // A row hint only: read the live date and content together on every import.
@@ -2306,11 +2313,11 @@ function noteBlockFlatHtml_(item) {
 /* Open tasks from Claude (2026-10-27, Julius): CLAUDE_TASKS in tasks.js → open check-lines (with urgency
    and subtasks) appended once to that day's Today cell. data-tid marks the head line. */
 function applyClaudeTasks_() {
-  let list = (typeof CLAUDE_TASKS !== 'undefined' && Array.isArray(CLAUDE_TASKS)) ? CLAUDE_TASKS : [];
-  try { list = list.concat(sheetTaskRows_()); } catch (e) { console.error(e); }
   const props = PropertiesService.getScriptProperties();
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeTasksApplied') || '[]'); } catch (e) { applied = []; }
+  let list = (typeof CLAUDE_TASKS !== 'undefined' && Array.isArray(CLAUDE_TASKS)) ? CLAUDE_TASKS : [];
+  try { list = list.concat(sheetTaskRows_(new Set(applied))); } catch (e) { console.error(e); }
   // date: 'backlog' (Julius, 2026-10-29) puts the task in the Reference "Backlog" cell instead of a day,
   // so it shows in Urgent without landing in Today. Skipped (retried later) until that cell exists.
   const fresh = list.filter(x => x && x.id && x.title && (/^\d{4}-\d{2}-\d{2}$/.test(x.date || '') || x.date === 'backlog') && applied.indexOf(String(x.id)) < 0);

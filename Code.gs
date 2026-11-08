@@ -1977,9 +1977,11 @@ function intakeTime_(value) {
 
 function sheetDoneRows_() {
   const sheet = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
-  if (sheet.getRange(1, 6).getValue() !== 'Type') sheet.getRange(1, 6).setValue('Type'); // tab made before this column
+  // Use the intake snapshot for the header too: no separate header read on every import.
+  const rows = sheet.getDataRange().getValues();
+  if (rows[0][5] !== 'Type') sheet.getRange(1, 6).setValue('Type'); // tab made before this column
   const oldest = addDaysToDateString_(todayString_(), -DONE_LOG_DAYS);
-  return sheet.getDataRange().getValues().slice(1).map(r => {
+  return rows.slice(1).map(r => {
     const date = intakeDate_(r[0]);
     const project = String(r[1] || '').trim();
     const title = String(r[2] || '').trim();
@@ -1994,10 +1996,11 @@ function sheetDoneRows_() {
 
 function sheetTaskRows_() {
   const sheet = getOrCreateSheet_('New Tasks', NEW_TASKS_HEADERS);
-  if (sheet.getRange(1, 7).getValue() !== 'Added') sheet.getRange(1, 7).setValue('Added'); // tab made before this column
   const range = sheet.getDataRange();
+  const rows = range.getValues();
+  if (rows[0][6] !== 'Added') sheet.getRange(1, 7).setValue('Added'); // tab made before this column
   const shown = range.getDisplayValues(); // as displayed: a time cell's raw value is an 1899 date
-  return range.getValues().slice(1).map((r, i) => {
+  return rows.slice(1).map((r, i) => {
     const raw = intakeDate_(r[0]);
     const date = /^(backlog|undated)$/i.test(raw) ? 'backlog' : raw;
     const title = String(r[1] || '').trim();
@@ -2996,6 +2999,7 @@ function saveLookSnapshot(slot, json, ua) {
   sh.getRange(row, 1, 1, 4).setValues([[slot, dev, new Date(), String(json).slice(0, 45000)]]);
   return true;
 }
+
 
 
 

@@ -61,9 +61,32 @@ assert.deepEqual(items[0], {id:'s-undated|Paddle grips',date:'backlog',title:'Pa
 assert.equal(items[1].added, '08:05');
 assert.deepEqual(tasks.reads, ['values','display']);
 assert.deepEqual(tasks.writes, []);
+const known = new Set(items.map(x => x.id));
+tasks.reads.length = 0;
+assert.deepEqual(plain(ctx.sheetTaskRows_(known)), []);
+assert.deepEqual(tasks.reads, ['values'], 'already applied intake needs no display read');
+tasks.reads.length = 0;
+const pending = plain(ctx.sheetTaskRows_(new Set([items[0].id])));
+assert.deepEqual(pending,[items[1]], 'pending times retain original row indexes');
+assert.deepEqual(tasks.reads,['values','display']);
+// Exercise the real unchanged importer: it must pass the applied IDs through.
+ctx.PropertiesService = {getScriptProperties:()=>({getProperty:()=>JSON.stringify([...known])})};
+tasks.reads.length = 0;
+ctx.applyClaudeTasks_();
+assert.deepEqual(tasks.reads,['values']);
+assert.deepEqual(tasks.writes,[]);
+// Current visible 0/1/2 scale is translated to stored 1/2/3 without changing IDs.
+tasks.rows[0][2]='Urgency 0-2';tasks.rows[1][2]=0;tasks.rows[2][2]=2;
+const scaled=plain(ctx.sheetTaskRows_());
+assert.equal(scaled[0].urg,1);assert.equal(scaled[1].urg,3);
+assert.equal(scaled[0].id,items[0].id);
 tasks.rows[1][1] = 'Updated task'; tasks.display[1][6] = '9:45 AM';
 assert.equal(ctx.sheetTaskRows_()[0].title, 'Updated task');
 assert.equal(ctx.sheetTaskRows_()[0].added, '09:45');
+assert.equal(ctx.sheetTaskRows_(known)[0].title,'Updated task','title change remains visible');
+tasks.rows.push(['2026-10-20','Backdated task',1,'',10,'','08:20']);
+tasks.display.push(['2026-10-20','Backdated task',1,'',10,'','08:20']);
+assert.equal(ctx.sheetTaskRows_(known).at(-1).title,'Backdated task','no row cursor hides old-date appends');
 // Legacy tabs gain their missing headers; header-only tabs still return an empty list.
 for (const [name, fn, header, width] of [
   ['Done Log','sheetDoneRows_','Type',6], ['New Tasks','sheetTaskRows_','Added',7]
@@ -72,4 +95,4 @@ for (const [name, fn, header, width] of [
   assert.deepEqual(plain(ctx[fn]()), []);
   assert.deepEqual(old.writes, [[1,width,header]]);
 }
-console.log('✓ import reads: Done Log 1, New Tasks 2 (was 2 + 3); identities, corrections, cutoff, displayed times and legacy headers preserved');
+console.log('✓ import reads: Done Log 1, New Tasks 1 when applied / 2 when pending; identities, backdated appends, urgency scale, times and legacy headers preserved');

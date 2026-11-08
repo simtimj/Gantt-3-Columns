@@ -14,7 +14,7 @@ const sheet = { rows:[[],row], getLastRow(){return this.rows.length;},
   };}, appendRow(v){this.rows.push(v);}
 };
 let locked=false;
-const server=vm.createContext({console,LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},releaseLock(){locked=false;}})}});
+const server=vm.createContext({console,Utilities:{getUuid:()=> 'new-id'},LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},releaseLock(){locked=false;}})}});
 vm.runInContext(src,server);
 server.getOrCreateSheet_=()=>sheet;
 server.cellHash_=s=>'h:'+s;
@@ -40,6 +40,8 @@ assert.equal(row[1],'destination');
 const retry=save({baseHash:'h:edited',metaChanges:{parentId:{before:'new-parent',after:'destination'}}});
 assert.equal(retry.metaConflicts.length,0);
 assert.equal(locked,false);
+const added=server.addReferenceItem('','New card','<h2>New card</h2>');
+assert.ok(sheet.rows.at(-1)[6] > 1000000000000,'new cards retain end-of-list order without relying on an autosave');
 console.log('✓ server: untouched fields preserved; text conflict protected; explicit collapse/move, stale move conflict and retry checked');
 
 const html=fs.readFileSync('Index.html','utf8');

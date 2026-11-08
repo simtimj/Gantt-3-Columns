@@ -877,7 +877,7 @@ function addReferenceItem(parentId, title, content) {
     title || '',
     content || '',
     true,
-    sheet.getLastRow()
+    Date.now() // New cards start at the end, matching the client; autosaves no longer rewrite Sort.
   ]);
 
   return id;

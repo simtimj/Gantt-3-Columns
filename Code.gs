@@ -2548,7 +2548,12 @@ function getCalendarRange(startDate, endDate) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !/^\d{4}-\d{2}-\d{2}$/.test(e) || e <= s) throw new Error('Invalid calendar range');
   const from = parseDate_(s), to = parseDate_(e);
   if (to - from > 62 * DAY_MS) throw new Error('Calendar range too long');
-  const tz = Session.getScriptTimeZone(), out = [], calendars = [], failed = [];
+  const t0 = Date.now(), tz = Session.getScriptTimeZone();
+  // Fast path (2026-11-08, Julius: "make the days load faster"): one Calendar API call per calendar returns every
+  // field at once, instead of CalendarApp's per-event getters. Same output shape; any failure → CalendarApp below.
+  const fast = calPanelRangeApi_(from, to, tz);
+  if (fast) return Object.assign(fast, { start: s, end: e, tz: tz, via: 'api', ms: Date.now() - t0 });
+  const out = [], calendars = [], failed = [];
   EVENT_CALENDARS.forEach(id => {
     let cal = null;
     try { cal = CalendarApp.getCalendarById(id); } catch (err) { cal = null; }
@@ -2557,7 +2562,59 @@ function getCalendarRange(startDate, endDate) {
     calendars.push({ id: id, name: calName, color: calColor });
     cal.getEvents(from, to).forEach(ev => out.push(calPanelEventOut_(ev, id, calName, calColor, tz)));
   });
-  return { start: s, end: e, tz: tz, events: out, calendars: calendars, failed: failed };
+  return { start: s, end: e, tz: tz, events: out, calendars: calendars, failed: failed, via: 'app', ms: Date.now() - t0 };
+}
+// Calendar advanced service (appsscript.json → enabledAdvancedServices). Returns null when it's missing or fails, so
+// the caller falls back to CalendarApp; a failure is remembered for 30 min so the fallback doesn't pay for it each time.
+// Ids / startMs match calPanelEventOut_: eventId = iCalUID (CalendarApp's getId), all-day startMs = local midnight.
+function calPanelRangeApi_(from, to, tz) {
+  if (typeof Calendar === 'undefined' || !Calendar.Events) return null;
+  const cache = CacheService.getScriptCache();
+  if (cache.get('calApiOff')) return null;
+  try {
+    const out = [], calendars = [];
+    EVENT_CALENDARS.forEach(id => {
+      let meta = null;
+      try { meta = JSON.parse(cache.get('calMeta:' + id) || 'null'); } catch (err) { meta = null; }
+      if (!meta) {
+        const c = CalendarApp.getCalendarById(id);
+        if (!c) throw new Error('Calendar not found: ' + id);
+        meta = { name: c.getName(), color: String(c.getColor() || '#039be5') };
+        cache.put('calMeta:' + id, JSON.stringify(meta), 21600);
+      }
+      calendars.push({ id: id, name: meta.name, color: meta.color });
+      let token = null;
+      do {
+        const q = { timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: true, maxResults: 2500,
+          fields: 'nextPageToken,items(id,iCalUID,status,summary,start,end,colorId,location,recurringEventId,htmlLink)' };
+        if (token) q.pageToken = token;
+        const r = Calendar.Events.list(id, q);
+        (r.items || []).forEach(it => {
+          if (it.status === 'cancelled' || !it.start || !it.end) return;
+          const allDay = !!it.start.date;
+          const st = allDay ? parseDate_(it.start.date) : new Date(it.start.dateTime);
+          const en = allDay ? parseDate_(it.end.date) : new Date(it.end.dateTime);
+          const colorId = String(it.colorId || ''), recurring = !!it.recurringEventId;
+          const eventId = it.iCalUID || (it.id + '@google.com');
+          const fmt = allDay ? 'yyyy-MM-dd' : "yyyy-MM-dd'T'HH:mm:ssXXX";
+          out.push({
+            id: eventId + '|' + st.getTime(), eventId: eventId, startMs: st.getTime(), calId: id, cal: meta.name,
+            title: it.summary || '(no title)', allDay: allDay,
+            start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
+            color: CAL_PANEL_COLORS_[colorId] || meta.color, colorId: colorId, done: colorId === '8',
+            location: it.location || '', recurring: recurring, link: it.htmlLink || '',
+            editable: id === EVENT_CALENDARS[0] && !recurring
+          });
+        });
+        token = r.nextPageToken;
+      } while (token);
+    });
+    return { events: out, calendars: calendars, failed: [] };
+  } catch (err) {
+    console.error('calPanelRangeApi_ → CalendarApp fallback: ' + err);
+    cache.put('calApiOff', '1', 1800);
+    return null;
+  }
 }
 
 /* Calendar panel, phase 2 (2026-11-08, Julius): create / edit / delete on the MAIN calendar only; repeating events

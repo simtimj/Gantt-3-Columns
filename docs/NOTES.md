@@ -587,6 +587,8 @@ Problem (Julius): too many categories and places; organizing the system takes at
   - **Hands-Off icon: 🚶** (replaces "HO:" in titles).
   - **End-of-day review** appears when he opens the app **after 7 PM**, with gentle reminders now and then if skipped; he does it when he can.
   - A **single-task Big Three item can hold a small checklist**; turning it into a project is a **manual** "promote to project" choice, never automatic.
+  - **Reviews**: morning = a super quick rundown of the plan; nightly = quick recap (what happened, what could improve) **and the setup for tomorrow's planning**. Weekly Monday check-in stays.
+  - **Stars**: only **one star per project** (marks its single most important task / group; may simply be the top one) — a visual mark, not another ranking system.
   - **B approved (2026-11-08)**: urgency shows as 0 / 1 / 2 everywhere; stored values stay 1 / 2 / 3 underneath (translated on read / save, no data rewrite); New Tasks rows converted to 0 / 1 / 2 and parsed that way from then on; CLAUDE.md + Central Data Hub rules updated; calendar colors unchanged (0 Tomato, 1 Banana, 2 Blueberry).
   - Work order: **B urgency 0/1/2 switch → A task → calendar pipeline → C app cleanup**.
 - **New threads (2026-11-08, not designed yet)**: (1) **App cleanup** — hide irrelevant things, better grouping / sorting of the many panels and tabs; (2) **Task → calendar pipeline** — how tasks (Lead Tasks, urgent, scheduled) flow into the calendar's unscheduled list and timeline and back.

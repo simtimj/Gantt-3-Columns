@@ -8738,7 +8738,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const sub = document.createElement('div');
       sub.className = 'urg-sub';
       if(u){
-        sub.textContent = u + ' · ' + URG_NAMES[u];
+        sub.textContent = (u - 1) + ' · ' + URG_NAMES[u];
         sub.title = 'Hold (or right-click) to make a ' + URG_NAMES[u] + ' task';
         holdForCreate(sub,u);
       } else {
@@ -9427,7 +9427,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // when there's room, else on the line below (2026-11-05, Julius: save room).
     const text = (ev, extra) => '<span class="ce-event-text">' + (ev.allDay ? '' : '<span class="ce-time">' + esc(ev.time) + '</span>') + '<span class="ce-title">' + esc(ev.title) + '</span>' + (extra || '') + '</span>';
     const r = (ev, extra) => f.row(ev, ev.allDay ? '' : ' ce-scheduled', text(ev, extra));
-    const urgBtns = '<span class="ce-q-act">' + [1,2,3].map(n => '<button type="button" class="ce-q-u u' + n + '" data-ce-urg="' + n + '" aria-label="Urgency ' + n + '">' + n + '</button>').join('') + '</span>';
+    const urgBtns = '<span class="ce-q-act">' + [1,2,3].map(n => '<button type="button" class="ce-q-u u' + n + '" data-ce-urg="' + n + '" aria-label="Urgency ' + (n - 1) + '">' + (n - 1) + '</button>').join('') + '</span>';
     const go = '<span class="ce-q-act"><button type="button" class="ce-q-go" data-ce-sched title="Copy into today’s Blocks">→ 🧱</button></span>';
     const box1 = f.byCategory ? f.bySubject(q[1], ev => r(ev, urgBtns)) : q[1].slice().sort(byStart).map(ev => r(ev, urgBtns)).join('');
     const box2 = q[2].slice().sort((a,b) => (+a.urg - +b.urg) || byStart(a,b)).map(ev => r(ev, go)).join('');
@@ -9962,7 +9962,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       return b;
     };
     if(!it.arch){
-      [1,2,3].forEach(u => btn(String(u),'urg-pick',u + ' · ' + URG_NAMES[u] + ' — goes in today',() => inboxToToday(it,u),u));
+      [1,2,3].forEach(u => btn(String(u - 1),'urg-pick',(u - 1) + ' · ' + URG_NAMES[u] + ' — goes in today',() => inboxToToday(it,u),u));
       const dueRow = document.createElement('div'); dueRow.className = 'urg-due-row';
       const chip = document.createElement('button');
       chip.type = 'button'; chip.className = 'urg-due-chip'; chip.textContent = '📅 Due date';
@@ -10551,13 +10551,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       });
       p.appendChild(repeat);
     }
-    [[1,'1'],[2,'2'],[3,'3'],[0,'✕']].forEach(([u,label]) => {
+    // Urgency shows as 0 / 1 / 2 (Julius 2026-11-08); stored values stay 1 / 2 / 3 underneath.
+    [[1,'0'],[2,'1'],[3,'2'],[0,'✕']].forEach(([u,label]) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'urg-pick' + (String(u) === (line.dataset.urg || '0') ? ' on' : '');
       b.dataset.urg = u;
       b.textContent = label;
-      b.title = u ? u + ' · ' + URG_NAMES[u] : 'No urgency';
+      b.title = u ? (u - 1) + ' · ' + URG_NAMES[u] : 'No urgency';
       b.addEventListener('pointerdown',e => e.preventDefault());
       b.addEventListener('click',() => {
         // Subtasks follow their task's urgency (Julius, 2026-10-26).

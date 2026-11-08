@@ -1933,7 +1933,21 @@ function removeDaySections_() {
    applies each new one once. The id comes from the row's text, so an exact
    repeat is added once and a line he deletes stays deleted. */
 const DONE_LOG_HEADERS = ['Date', 'Project', 'Title', 'Details', 'Done by', 'Type'];
-const NEW_TASKS_HEADERS = ['Date', 'Title', 'Urgency', 'Due', 'Minutes', 'Subtasks', 'Added'];
+const NEW_TASKS_HEADERS = ['Date', 'Title', 'Urgency 0-2', 'Due', 'Minutes', 'Subtasks', 'Added'];
+/* Urgency scale (2026-11-08, Julius): people and AIs write 0 / 1 / 2 (0 = red, 1 = yellow, 2 = blue, blank = none);
+   inside the app the stored value stays 1 / 2 / 3. The New Tasks column switches to the new scale only when its header
+   reads "Urgency 0-2", so rows written before the switch keep their old meaning. Words work on both scales. */
+function intakeUrg_(v, newScale) {
+  const t = String(v == null ? '' : v).trim().toLowerCase();
+  if (!t) return 0;
+  if (/^(urgent|now|red|must)/.test(t)) return 1;
+  if (/^(soon|next|yellow)/.test(t)) return 2;
+  if (/^(later|can be later|blue)/.test(t)) return 3;
+  const n = Number(t);
+  if (!isFinite(n)) return 0;
+  if (newScale) return n === 0 ? 1 : n === 1 ? 2 : n === 2 ? 3 : 0;
+  return [1, 2, 3].indexOf(n) >= 0 ? n : 0;
+}
 const DONE_LOG_DAYS = 30; // older rows are ignored, so the applied-id list can't age out
 
 // Deployment generates this manifest from main's code changes. Import once on app
@@ -2118,12 +2132,13 @@ function sheetTaskRows_() {
   const rows = range.getValues();
   if (rows[0][6] !== 'Added') sheet.getRange(1, 7).setValue('Added'); // tab made before this column
   const shown = range.getDisplayValues(); // as displayed: a time cell's raw value is an 1899 date
+  const newScale = /0\s*-\s*2/.test(String(rows[0][2] || ''));
   return rows.slice(1).map((r, i) => {
     const raw = intakeDate_(r[0]);
     const date = /^(backlog|undated)$/i.test(raw) ? 'backlog' : raw;
     const title = String(r[1] || '').trim();
     return {
-      id: 's-' + cellHash_([raw, title].join('|')), date, title, urg: Number(r[2]), due: intakeDate_(r[3]), dur: Number(r[4]),
+      id: 's-' + cellHash_([raw, title].join('|')), date, title, urg: intakeUrg_(r[2], newScale), due: intakeDate_(r[3]), dur: Number(r[4]),
       subtasks: String(r[5] || '').split('|').map(t => t.trim()).filter(Boolean),
       added: intakeTime_(shown[i + 1][6]),
     };

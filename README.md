@@ -43,7 +43,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 - Notes **+ Template** inserts the Reference cell titled "Journal Template" into the selected Notes day.
 
 **Urgency** (like TickTick)
-- Hold a checkbox (or right-click it) → pick 1 red (Urgent) / 2 yellow (Soon) / 3 blue (Can be later) / none, and optionally a due date.
+- Hold a checkbox (or right-click it) → pick 0 red (Urgent) / 1 yellow (Soon) / 2 blue (Can be later) / none, and optionally a due date. (Urgency reads 0 / 1 / 2 since 2026-11-08.)
 - Urgent panel at the top of Reference lists every urgent task from every day, grouped 1/2/3, with its subtasks underneath. Tap a task to jump to it in Today. Panel is collapsible.
 
 **Reference**
@@ -54,6 +54,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 🧪 To be confirmed (2026-11-08)
 
+- **Urgency reads 0 / 1 / 2**: urgency now shows as **0** (red, Urgent), **1** (yellow, Soon), **2** (blue, Can be later) everywhere: the checkbox hold menu, the Urgent panel headers and the Cal Events urgency buttons. Colors are unchanged and nothing saved was rewritten (the app still stores the old numbers underneath). The **New Tasks** tab reads 0 / 1 / 2 once its Urgency header says "Urgency 0-2"; words like Urgent / Soon / Later work too ("Later" rows used to come in with no color).
 - **📅 Calendar looks like Google Calendar**: rounded **Today** button, round ‹ › arrows, the month as the title ("November 2026"; Day view shows the date), and a **Day | Week** pill. No boxed table: faint hour lines and small grey **1 PM** labels. Day headers show a small weekday over a big date, with today's date in a blue circle. Events are rounded with the title first and the time under it (**9am – 10am**); short ones fit on one line. A red now-line with a dot. A **+ New** pill, round ↻ / ✕, a floating event card, a flatter Plan box, and matching dark mode. Style only: everything works the same.
 - **Done count on every day + today marker**: every day's date line in History now shows its count (**8 ✓** / **5/7 ✓**), not just today's; days with no tasks show nothing. Today's date is drawn in its day color (no extra space).
 - **📅 Calendar loads faster (cached days)**: days you've seen, plus the week before and after, show **instantly** when you step ‹ › or switch Day / Week; Google is re-checked quietly in the background and the view only changes if something did. The last copy is kept on the device, so even the first 📅 open after a reload shows events right away, and the app warms it up a few seconds after it starts. After any save (add / edit / move / delete / tick) it still reads Google before drawing. The server read of Google Calendar is also quicker (one Calendar API call per calendar instead of many small ones; falls back to the old way if that's unavailable).
@@ -159,7 +160,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 - **Dailies Options button**: smaller and kept inside the DAILIES header lines.
 - **Task subject color**: new **Whole card, subtle** choice in Options; Cal Events now follow this setting too (checkbox, whole card, subtle or border).
 - **Scratch Pad is a full editor**: **+ Task**, `[]` + Space, the checkbox hold menu and task cells all work there, same as Blocks.
-- **Cal urgency color**: setting urgency in Cal Events colors the Google Calendar event: 1 red, 2 yellow, 3 blue, none = default. Done events stay Graphite until unticked.
+- **Cal urgency color**: setting urgency in Cal Events colors the Google Calendar event: 0 red, 1 yellow, 2 blue, none = default. Done events stay Graphite until unticked.
 - **Cal Events order button**: next to refresh, switches between **Category** (all events together under their subject, no times) and **Time** (all-day first, then scheduled by start). Remembered per device.
 - **Cal + Task color**: new events get no color from the app, so you set urgency yourself.
 - **Urgent spacing**: the empty band above Urgent is gone.

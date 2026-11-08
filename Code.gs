@@ -170,7 +170,8 @@ function getWorkspaceData(opts) {
 
   const days = getDaysRange_(
     addDaysToDateString_(today, -INITIAL_PAST_DAYS),
-    addDaysToDateString_(today, INITIAL_FUTURE_DAYS)
+    addDaysToDateString_(today, INITIAL_FUTURE_DAYS),
+    allDays
   ); t.mark('days');
   const reference = getReference_(); t.mark('reference');
   const urgent = getUrgentDays_(allDays); t.mark('urgent');
@@ -271,7 +272,18 @@ function getDaysRange(startDate, endDate) {
 }
 
 
-function getDaysRange_(startDate, endDate) {
+function getDaysRange_(startDate, endDate, snapshot) {
+  // Initial loading has already read these exact rows for seeds and Urgent.
+  // Reuse only that request's snapshot; later calls still read current data.
+  if (snapshot && Array.isArray(snapshot.rows)) {
+    return snapshot.rows.map(row => ({ row: row, date: formatDate_(row[0]) }))
+      .filter(x => x.date && x.date >= startDate && x.date <= endDate)
+      .map(x => {
+        const row = x.row, plan = snapshot.width >= 4 ? String(row[3] || '') : '';
+        return { date:x.date, tasks:String(row[1] || ''), journal:String(row[2] || ''), plan:plan,
+          th:cellHash_(row[1]), jh:cellHash_(row[2]), ph:cellHash_(plan) };
+      }).sort((a,b) => a.date.localeCompare(b.date));
+  }
   const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
   const lastRow = sheet.getLastRow();
 

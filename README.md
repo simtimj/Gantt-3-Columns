@@ -592,3 +592,11 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Initial day read reuse — 2026-11-08
 
 - Initial loading derives the visible day window from the same request-local Days snapshot already used for Urgent and Dailies seeds. This removes the extra date-column and visible-text reads (3 day-data reads to 1), preserves Plan/text hashes and rereads current data on each later request. No cross-request content cache. Actual opening latency remains to be measured.
+
+## 🧪 Daily setup efficiency — 2026-11-08
+
+- Automatic daily date maintenance reuses a versioned formatting hint tied to the Days and Reference tab IDs, avoiding whole-column formatting on every new day. Manual `setupWorkspace()` still repairs formatting; replacement tabs invalidate the hint, and failed formatting retries. Missing-date insertion sorts complete rows so Plan and extra fields stay with their dates. No historical reassignment is attempted. Actual cold-start latency remains to be measured.
+
+## 🧪 Done Log live row hint — 2026-11-08
+
+- Routine Done Log imports validate a cached row hint by reading the live date and Today text together (warm unchanged lookup: 2 reads to 1). Moved/deleted rows, invalid hints and cache failures fall back to the normal lookup. No history text is cached, and work requiring the script lock still rereads current data under lock. Actual import latency remains to be measured.

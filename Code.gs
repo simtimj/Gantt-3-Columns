@@ -2130,6 +2130,24 @@ function sheetTaskRows_() {
   }).filter(x => x.title);
 }
 
+// A row hint only: read the live date and content together on every import.
+// Moved/deleted rows and cache failures fall back to the normal date lookup.
+function readDoneToday_(sheet, date) {
+  const key = 'done-today-row:v1:' + date;
+  let cache = null, hint = 0;
+  try { cache = CacheService.getScriptCache(); hint = Number(cache.get(key)); } catch (e) {}
+  if (Number.isInteger(hint) && hint >= 2) {
+    try {
+      const values = sheet.getRange(hint,1,1,2).getValues()[0];
+      if (formatDate_(values[0]) === date) return {row:hint,content:String(values[1] || '')};
+    } catch (e) {}
+  }
+  const row = findDayRow_(sheet,date);
+  const content = row ? String(sheet.getRange(row,2).getValue() || '') : '';
+  try { if (cache) { if (row) cache.put(key,String(row),3600); else cache.remove(key); } } catch (e) {}
+  return {row:row,content:content};
+}
+
 function applyClaudeDone_() {
   let list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
   try { list = list.concat(sheetDoneRows_()); } catch (e) { console.error(e); }
@@ -2146,8 +2164,8 @@ function applyClaudeDone_() {
   const secFix = props.getProperty('claudeDoneSec') !== '1';
   // Cheap check (one cell read): does today's cell hold done lines in a window that hasn't started yet?
   const daysSheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const tRow0 = findDayRow_(daysSheet, todayString_());
-  const needFix = !!tRow0 && doneFutureLines_(String(daysSheet.getRange(tRow0, 2).getValue() || '')).moved.length > 0;
+  const todaySnapshot = readDoneToday_(daysSheet, todayString_());
+  const needFix = !!todaySnapshot.row && doneFutureLines_(todaySnapshot.content).moved.length > 0;
   if (!fresh.length && !migrate && !secFix && !needFix) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);

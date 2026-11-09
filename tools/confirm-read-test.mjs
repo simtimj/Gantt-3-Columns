@@ -64,3 +64,16 @@ f=fixture();f.intake.rows.push(['2026-11-07','Gantt','New item','Try it','',''])
 f.ctx.syncConfirmCard_();assert.equal(f.writes.length,0);f.faults.busy=false;f.ctx.syncConfirmCard_();assert.ok(f.ref.rows[1][4].includes('New item'));
 f=fixture();f.sheets.delete('To Confirm');f.ctx.syncConfirmCard_();assert.equal(f.stats.lookups,1);assert.equal(f.reads.length,0);assert.equal(f.writes.length,0);
 console.log('✓ To Confirm: warm unchanged refresh = 2 data reads / 2 Sheet lookups; live edits, moved/deleted rows, invalid hints, cache failure, creation races and locked rereads preserved');
+// Instrument the real unchanged and changed paths without changing service budgets.
+f=fixture();f.ctx.syncConfirmCard_();f.reset();
+let profile=f.ctx.speedTimer_();f.ctx.syncConfirmCard_(profile);
+assert.equal(f.reads.length,2);assert.equal(f.writes.length,0);
+for(const key of ['confirm.check.sourceRead','confirm.check.rows','confirm.check.cardRead','confirm.check.render'])
+  assert.equal(typeof profile.done().steps[key],'number',key);
+assert.equal(profile.done().steps['confirm.lock'],undefined,'no lock on the unchanged path');
+f.intake.rows[1][4]='works';f.reset();profile=f.ctx.speedTimer_();f.ctx.syncConfirmCard_(profile);
+assert.equal(f.reads.length,4,'changed source and card reread under lock');
+assert.equal(typeof profile.done().steps['confirm.lock'],'number');
+for(const key of ['confirm.write.sourceRead','confirm.write.rows','confirm.write.cardRead','confirm.write.render','confirm.reconcile'])
+  assert.equal(typeof profile.done().steps[key],'number',key);
+assert.ok(!f.ref.rows[1][4].includes('data-kid='));assert.equal(f.stats.released,true);

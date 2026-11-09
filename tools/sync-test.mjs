@@ -73,3 +73,31 @@ assert.equal(context.pageRelease,'old-tab');assert.equal(context.rpcMs,90);asser
 server.logSpeed('sync',{total:1},{});
 assert.equal(JSON.parse(logged[1][4]).serverRelease,'','legacy timing remains unknown, never relabeled as current');
 console.log('✓ sync: add/delete/metadata deltas, unchanged and legacy clients; one shared day read; reread after write/failure; response-specific timing builds');
+// Nested import timings must retain return/throw behavior and parent wall time.
+let clock = 100;
+const timingServer = vm.createContext({console:{error(){}},Date:{now:()=>clock}});
+vm.runInContext(source,timingServer);
+const profile = timingServer.speedTimer_(), sentinel = {};
+assert.equal(timingServer.speedPart_(null,'unused',()=>sentinel),sentinel);
+assert.equal(timingServer.speedPart_({mark(){}},'unused',()=>sentinel),sentinel);
+assert.equal(profile.measure('done.rows',()=>{clock+=7;return sentinel;}),sentinel);
+const failure = Error('source read failed');
+assert.throws(()=>profile.measure('done.rows',()=>{clock+=3;throw failure;}),e=>e===failure);
+clock+=5;profile.mark('done');
+assert.equal(profile.done().steps['done.rows'],10,'repeated substeps accumulate, including errors');
+assert.equal(profile.done().steps.done,15,'substeps do not advance the parent mark');
+assert.equal(profile.done().total,15);
+// The real import orchestrator forwards the same timer, records an import
+// failure and continues the remaining stages. Only fixed numeric keys escape.
+const seen=[];
+for(const name of ['applyDeployedCodeLog_','applyClaudeNotes_','applyClaudeTasks_',
+  'syncStudyLog_','moveScheduleToNotes_','fixUrgentBold_','removeDaySections_']) timingServer[name]=()=>seen.push(name);
+timingServer.applyClaudeDone_=t=>{assert.equal(t,profile);t.measure('done.sourceRead',()=>{clock+=11;throw failure;});};
+timingServer.syncConfirmCard_=t=>{assert.equal(t,profile);t.measure('confirm.check.sourceRead',()=>{clock+=4;});};
+timingServer.runImportSteps_(profile);
+const parts=profile.done().steps;
+assert.equal(parts['done.sourceRead'],11);assert.equal(parts.done,11);
+assert.equal(parts['confirm.check.sourceRead'],4);assert.equal(parts.confirm,4);
+assert.ok(seen.includes('removeDaySections_'),'later imports run after a failed source read');
+assert.ok(Object.values(parts).every(v=>typeof v==='number'));
+console.log('✓ nested import timing: parent totals, accumulated/error stages, unchanged return/throw and import continuation');

@@ -616,3 +616,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Lighter applied-task imports — 2026-11-08
 
 - New Tasks intake still checks every raw row, including backdated appends and changed title/date identities. When all IDs are already applied, it skips the displayed-time read (2 reads to 1). Pending rows retain their original displayed Added times and legacy/current urgency interpretation. Default full intake reads remain available; this is not a general task-edit API. Actual latency improvement remains to be measured.
+
+## 🧪 Import stage timings — 2026-11-08
+
+- Existing Speed Log reports now break Done Log and confirmation work into source reads, row processing, current-day/card checks, lock waits and reconciliation. These numeric substeps overlap their parent `done`/`confirm` totals; do not sum parents and children. No new logging requests or task content are added. Refresh /dev and allow a normal import to produce the first live breakdown. This measures bottlenecks; it does not establish a speed improvement.

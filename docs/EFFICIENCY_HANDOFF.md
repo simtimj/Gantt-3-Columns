@@ -60,6 +60,8 @@ Speed Log separates release/page identity, server work, browser RPC and immediat
 
 Run `node tools/check.mjs` and `node tools/smoke.mjs`; CI includes save/conflict/recovery, setup, sync, intake and study fixtures plus desktop/phone browser smoke. Browser Google services are mocked. Actual phone, close/reopen and cross-device confirmation remain separate. Every shipped feature gets a To Confirm row; main code pushes auto-log, while manually logged/docs-only work uses `Done-Log: manual` to prevent duplication.
 
+Import substeps in `Steps` now distinguish `done.sourceRead`, `done.rows`, `done.todayCheck`, `done.lock`, `done.reconcile`, and `confirm.check` / `confirm.write` source-read, rows, card-read and render stages plus `confirm.lock` / `confirm.reconcile`. These overlap their parent totals (and confirmation write stages overlap reconciliation); never sum parent and child durations. The same existing report carries them, with no new service reads or logging RPCs. Live post-deployment breakdowns still need to accumulate.
+
 ## Resume order and final deliverable
 
 1. Gather matched page/server timings after a real `/dev` reload; distinguish cold/daily setup, warm loading, imports and save acknowledgements.

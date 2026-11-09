@@ -105,3 +105,44 @@ assert.deepEqual(profiled,plain(ctx.sheetDoneRows_()));
 assert.deepEqual(done.reads,['values','values']);
 assert.equal(typeof importTimer.done().steps['done.sourceRead'],'number');
 assert.equal(typeof importTimer.done().steps['done.rows'],'number');
+
+// Repeated Date cells reuse normalization only within one freshly read source.
+// Exercise both real intake functions with distinct Date objects, mixed text
+// dates, timestamp changes, timezone changes between reads and normalization errors.
+let dateCalls=0,zone='America/Los_Angeles';
+ctx.formatDate_=value=>{
+  dateCalls++;
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'})
+    .formatToParts(value).map(x=>[x.type,x.value]));
+  return p.year+'-'+p.month+'-'+p.day;
+};
+const repeated=sheet([['Date','Project','Title','Details','Done by','Type'],
+  ...Array.from({length:200},(_,i)=>[new Date('2026-11-08T07:00:00Z'),'Gantt','Item '+i,'','ChatGPT','Fix']),
+  [new Date('2026-11-08T12:00:00Z'),'Gantt','Different timestamp','','ChatGPT','Fix'],
+  ['2026-11-07','Gantt','Text date','','ChatGPT','Fix']]);
+sheets.set('Done Log',repeated);
+dateCalls=0;let normalized=plain(ctx.sheetDoneRows_());
+assert.equal(dateCalls,2,'one formatting call per distinct Date timestamp');
+assert.equal(normalized[0].date,'2026-11-07');
+assert.equal(normalized[200].date,'2026-11-08');assert.equal(normalized[201].date,'2026-11-07');
+assert.deepEqual(repeated.reads,['values']);assert.deepEqual(repeated.writes,[]);
+const beforeId=normalized[0].id;zone='UTC';dateCalls=0;normalized=plain(ctx.sheetDoneRows_());
+assert.equal(dateCalls,2,'new source call has a fresh formatter');
+assert.equal(normalized[0].date,'2026-11-08');assert.notEqual(normalized[0].id,beforeId);
+repeated.rows[1][0].setTime(Date.parse('2026-11-09T00:00:00Z'));
+dateCalls=0;normalized=plain(ctx.sheetDoneRows_());assert.equal(dateCalls,3);assert.equal(normalized[0].date,'2026-11-09');
+const confirms=sheet([['Date','Project','Change','How to check','Status','Checked on'],
+  ...Array.from({length:200},(_,i)=>[new Date('2026-11-08T07:00:00Z'),'Gantt','Check '+i,'Try it','','']),
+  ['undated','Gantt','Text date','Try it','','']]);
+zone='America/Los_Angeles';dateCalls=0;const confirmItems=plain(ctx.confirmRows_(confirms));
+assert.equal(dateCalls,1);assert.equal(confirmItems[0].date,'2026-11-07');
+assert.equal(confirmItems[200].date,'undated');assert.equal(confirms.reads.length,1);assert.equal(confirms.writes.length,0);
+confirms.rows[1][0]=new Date('2026-11-09T08:00:00Z');dateCalls=0;
+assert.equal(ctx.confirmRows_(confirms)[0].date,'2026-11-09');assert.equal(dateCalls,2,'changed dates are never hidden');
+const formatter=ctx.intakeDateFormatter_();let attempts=0;
+ctx.formatDate_=()=>{if(++attempts===1)throw Error('date service failed');return 'recovered';};
+assert.throws(()=>formatter(new Date(0)),/date service failed/);
+assert.equal(formatter(new Date(0)),'recovered','failed normalization is not cached');
+assert.equal(formatter(new Date(0)),'recovered');assert.equal(attempts,2);
+assert.equal(formatter('  undated  '),'undated');assert.equal(formatter(0),'');
+console.log('✓ intake dates: per-snapshot timestamp reuse; fresh reads/timezone/date edits, mixed values, original IDs/outputs and normalization errors preserved');

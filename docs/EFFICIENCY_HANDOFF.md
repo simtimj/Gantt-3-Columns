@@ -43,6 +43,7 @@ These are targeted service-read counts, not percentages of total runtime.
 | Already-applied New Tasks intake | One raw read; skip displayed times only after checking every raw row's ID |
 | Warm unchanged Done Log Today lookup | Two reads to one validated date/content row read |
 | Warm unchanged confirmation refresh | Three data reads/lookups to two |
+| Done Log / confirmation date normalization | Reuse identical Date timestamps only within each fresh source read; locked rereads use a new formatter |
 | Unchanged study intake | Two reads to one; changed rows reread under lock before processing |
 | Daily setup | Reuse a formatting-version hint tied to tab IDs; manual setup still repairs formatting |
 
@@ -61,7 +62,7 @@ Row hints never cache editable history text. Stale, deleted, invalid or unavaila
 
 Historical mixed-build server medians: initial data **1.278s**, sync **1.124s**, imports **4.004s**. A small matched page/server session on an earlier build measured **1.145s / 0.925s / 4.331s** (2/4/3 samples). It predates the latest optimizations; no post-change overall speedup is established.
 
-Speed Log separates release/page identity, server work, browser RPC and immediate application. Save acknowledgements piggyback on existing reports; no extra per-save logging RPC. Samples are bounded, best-effort, exclude debounce and can be lost on close. Missing telemetry does not prove inactivity. A server-only sample from an old page is not a controlled comparison.
+Speed Log separates release/page identity, server work, browser RPC and immediate application. Save acknowledgements piggyback on existing reports; no extra per-save logging RPC. Browser reports carry a page-scoped `reportId` generated once per submission, so analysis can deduplicate an applied report that is transported again. Different measurements get different IDs; save `sampleId` remains separate. Older records lack exact report identity. No extra reporting request is added. Samples are bounded, best-effort, exclude debounce and can be lost on close. Missing telemetry does not prove inactivity. A server-only sample from an old page is not a controlled comparison.
 
 Run `node tools/check.mjs` and `node tools/smoke.mjs`; CI includes save/conflict/recovery, setup, sync, intake and study fixtures plus desktop/phone browser smoke. Browser Google services are mocked. Actual phone, close/reopen and cross-device confirmation remain separate. Every shipped feature gets a To Confirm row; main code pushes auto-log, while manually logged/docs-only work uses `Done-Log: manual` to prevent duplication.
 

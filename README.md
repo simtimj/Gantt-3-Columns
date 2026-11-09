@@ -632,3 +632,11 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Bounded confirmation card — 2026-11-08
 
 - The derived To Confirm card now stays below 48,000 characters. Small queues retain full instructions; larger queues show shorter instruction previews while every full source row stays in the To Confirm tab. If even titles cannot fit, whole check-lines are shown with an explicit remaining-count notice. Checkbox IDs and status acknowledgement stay unchanged. Regression tests cover an oversized queue, Unicode/HTML safety, ticks/direct edits and convergence to the normal two-read, no-lock/no-write refresh. Actual import timing and phone confirmation remain pending.
+
+## 🧪 Reuse repeated intake date formatting — 2026-11-08
+
+- Done Log and To Confirm format identical Date timestamps once within each fresh source read. A locked reread creates its own formatter; source rows, IDs and content are never cached across requests. Text dates retain existing normalization. Regression checks cover distinct Date objects, timestamps, timezone changes between reads, direct edits, identities and formatter failures. This reduces repeated date-format work; actual import-time improvement still needs live measurement.
+
+## 🧪 Identifiable speed reports — 2026-11-08
+
+- Each submitted browser timing measurement now carries a page-scoped `reportId`, alongside the existing build/viewport context. A transport retry keeps the same submitted ID, allowing later analysis to identify repeated log writes without guessing from identical timings. Different measurements retain different IDs; save acknowledgement `sampleId` values remain separate. No additional logging request is added. Old records lack this field and cannot be retroactively deduplicated with certainty.

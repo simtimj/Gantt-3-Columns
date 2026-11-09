@@ -2020,8 +2020,9 @@ const CONFIRM_CARD_ID = 'p-to-confirm';
 
 function confirmRows_(sheet, timer, phase) {
   const rows = speedPart_(timer, phase + '.sourceRead', () => sheet.getDataRange().getValues());
+  const dateOf = intakeDateFormatter_();
   return speedPart_(timer, phase + '.rows', () => rows.slice(1).map((r, i) => {
-    const date = intakeDate_(r[0]);
+    const date = dateOf(r[0]);
     const project = String(r[1] || '').trim() || 'Other';
     const change = String(r[2] || '').trim();
     return { row: i + 2, id: 'k-' + cellHash_([date, project, change].join('|')), date, project, change,
@@ -2154,6 +2155,18 @@ function intakeDate_(value) {
   return value instanceof Date ? formatDate_(value) : String(value || '').trim();
 }
 
+// A fresh formatter per source read, including the locked reread. Reuse only
+// pure date normalization for identical timestamps, never rows, IDs or content.
+function intakeDateFormatter_() {
+  const dates = new Map();
+  return value => {
+    if (!(value instanceof Date)) return intakeDate_(value);
+    const time = value.getTime();
+    if (!dates.has(time)) dates.set(time,intakeDate_(value));
+    return dates.get(time);
+  };
+}
+
 // Added column (2026-11-02, Julius): the time the AI added the row, as 'HH:MM' (24 h) or '2:30 PM'. '' if unreadable.
 function intakeTime_(value) {
   const m = String(value || '').trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])?\.?(?:m\.?)?$/i);
@@ -2170,8 +2183,9 @@ function sheetDoneRows_(timer) {
   const rows = speedPart_(timer, 'done.sourceRead', () => sheet.getDataRange().getValues());
   if (rows[0][5] !== 'Type') sheet.getRange(1, 6).setValue('Type'); // tab made before this column
   const oldest = addDaysToDateString_(todayString_(), -DONE_LOG_DAYS);
+  const dateOf = intakeDateFormatter_();
   return speedPart_(timer, 'done.rows', () => rows.slice(1).map(r => {
-    const date = intakeDate_(r[0]);
+    const date = dateOf(r[0]);
     const project = String(r[1] || '').trim();
     const title = String(r[2] || '').trim();
     const details = String(r[3] || '').trim();

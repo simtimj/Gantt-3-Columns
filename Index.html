@@ -2777,7 +2777,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
   }
   // Speed timing (2026-11-04): sent after drawing, so it can't slow the load. See logSpeed in Code.gs.
-  let fwSaveSamples=[],fwSaveSampleSeq=0;
+  let fwSaveSamples=[],fwSaveSampleSeq=0,fwSpeedReportSeq=0;
   const fwSaveSampleSession=window.crypto?.randomUUID?.() || Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
   function fwObserveSave(kind,started,reply,error){
     const status=error?'error':reply?.deleted?'deleted':reply?.conflict||reply?.conflictT||reply?.conflictJ||reply?.metaConflicts?.length?'conflict':reply&&typeof reply==='object'?'ok':'unknown';
@@ -2787,8 +2787,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function fwSendSpeed(kind,timing,client){
     const batch=fwSaveSamples.slice(),sent=new Set(batch.map(s=>s.sampleId));
+    // Created once per submitted measurement; transport retries carry the same ID.
+    const reportId=fwSaveSampleSession+'-report-'+(++fwSpeedReportSeq);
     google.script.run.withSuccessHandler(()=>{fwSaveSamples=fwSaveSamples.filter(s=>!sent.has(s.sampleId));})
-      .withFailureHandler(()=>{}).logSpeed(kind,timing,{...client,saveTimings:batch});
+      .withFailureHandler(()=>{}).logSpeed(kind,timing,{...client,reportId,saveTimings:batch});
   }
   function fwSpeedContext(extra){
     return Object.assign({pageBuild:window.__FW_BUILD__ || '',pageRelease:window.__FW_RELEASE__ || '',

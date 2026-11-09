@@ -15162,7 +15162,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // over a minute old (redrawn only if something changed). After any save, refetchFresh() reads Google again before
   // drawing, so edits are never drawn from guesses. A copy around today is kept on the device, so even the first open
   // after a reload shows the last known events immediately, and the app warms it up a few seconds after start-up.
-  const CACHE_KEY = 'fw.calCache.v1', FRESH_MS = 60000;
+  // Days stay cached for 15 min before a quiet re-check (2026-11-08, Julius: "cache them, don't re-read every day").
+  // ↻ always re-reads; a save re-reads only the dates on screen.
+  const CACHE_KEY = 'fw.calCache.v1', FRESH_MS = 15 * 60000;
   const evById = new Map(), dayAt = new Map(); // id → server event; 'yyyy-MM-dd' → when that day was read from Google
   let cacheFailed = 0, forceNext = false, bgBusy = false, gen = 0, saveTimer = 0;
   const addDays = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
@@ -15228,11 +15230,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const safe = !busy && !pending && !moveBusy && detail.hidden && !mount.querySelector('.fc-event-mirror,.fc-event-dragging,.fc-event-resizing');
     if(safe) cal.refetchEvents(); else setTimeout(() => redrawWhenSafe(n + 1), 1500);
   }
-  // After a save / ↻ / Retry: read the dates on screen from Google before drawing; every other cached day is marked
-  // old so it is shown and then re-checked when you go there.
+  // After a save / ↻ / Retry: read the dates on screen from Google before drawing (only those days are marked old;
+  // the rest of the cache stays as is until its 15-minute freshness runs out).
   function refetchFresh(){
     gen++;
-    for(const d of dayAt.keys()) dayAt.set(d, 0);
+    if(viewStart && viewEnd) daysIn(viewStart, viewEnd).forEach(d => { if(dayAt.has(d)) dayAt.set(d, 0); });
+    else for(const d of dayAt.keys()) dayAt.set(d, 0);
     forceNext = true;
     if(cal) cal.refetchEvents();
   }

@@ -521,7 +521,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 📋 To do
 
-- **App cleanup** (wanted 2026-11-08): hide what isn't used, better grouping and sorting of the many panels / tabs.
+- **App cleanup** (wanted 2026-11-08): hide what isn't used, better grouping and sorting of the many panels / tabs First candidate: the **Cal Events** panel (center bottom), now covered by the 📅 calendar; decide what takes its spot.
 - **Task → calendar pipeline** (wanted 2026-11-08): how Lead Tasks, urgent items and scheduled tasks flow into the calendar and back, without duplicates.
 
 - **Big Three / Biggest Return + living project containers** (planned 2026-11-08; first piece = ★ Big Three strip, see 🧪): one card per project (why, next moves, flat checklist, notes & decisions), a rotating Big Three that links to projects (separate from urgency), and a calendar day with an Unscheduled list on top of the timeline plus an end-of-day review. Design and open questions: `docs/NOTES.md` → "Planning model".

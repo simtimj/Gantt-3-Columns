@@ -647,3 +647,8 @@ Three things only; everything else is a **view**, not a place:
 5. **Urgent panel vs Big Three**: keep both (urgency ≠ priority), but make empty "Add … task" lines appear only on tap / hover to save 3 lines.
 6. **Reference**: old / done cards move to Arc automatically after N days untouched (asked, not assumed); pinned cards stay.
 7. **Phone**: same changes apply; the toolbar savings matter most there.
+
+### Cleanup answers (2026-11-09)
+- **Build**: (1) Fit + Reset sizes into the Cols menu, ☾ into Options — but **▲ ▼ stay where they are** (not moved to History); (3) merge ✨ New things + 🌴 Fun into one tab (name TBD — not "Life"/"Fun"; it's about making it easier to get into fun / recharging) and Weather → a chip; (4) History ▤ ≡ – buttons replaced by **tapping the day's date line** (cycles Full → List → Mini); Julius also wants the same on Morn / Aft / Eve headers (conflicts with their current fold-on-tap — to settle); (5) Urgent's empty "Add … task" lines only on tap / hover.
+- **Wait**: (2) the Cal Events spot waits for Today (pipeline A).
+- **Reference (6)**: never move or delete automatically — **suggest only** ("you haven't touched this in a long time — move it?"). Idea: an **Active** reference area plus a **Less active** area that loads later / stays out of the way unless asked (could speed up start-up with a large library). Threshold to suggest.

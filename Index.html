@@ -184,6 +184,8 @@
     .view-menu-row input{margin:0;}
     .view-menu-row .btn{padding:3px 7px;font-size:11px;}
     .view-menu-popup[hidden]{display:none;}
+    /* Cleanup (2026-11-09): Fit / Reset sizes moved into the Cols menu, Light / dark into Options. */
+    :is(#toolbar,#focusControls) > :is([data-layout="fit"],[data-layout="reset-columns"],.theme-toggle){display:none!important;}
     body.focus-mode #toolbar{display:none;}
     body.focus-mode #focusControls{display:flex;}
     #todayScroll{scrollbar-width:none!important;}
@@ -568,6 +570,7 @@
     .center-tabs{display:inline-flex;gap:2px;margin-left:-6px;}
     .center-tabs button:is([data-ctab="weather"],[data-ctab="wxdaily"]){opacity:.9;}
     .center-tabs button{border:0;background:transparent;font-size:12px;line-height:1;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .center-tabs button.wx-chip{width:auto;padding:0 4px;font-size:11px;white-space:nowrap;opacity:.85;}
     .center-tabs button.on{opacity:1;background:color-mix(in srgb,var(--divider) 45%,transparent);}
     /* Reference tabs + daily Scratch Pad (2026-11-03, Julius). */
     #dayReviewScroll{display:none;flex:var(--ns-a,1) 1 0;padding:4px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
@@ -586,6 +589,8 @@
     /* Fun for later tab (2026-11-05, Julius): 🌴 its own list, not part of the Notes cell. */
     #funScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
     #journalPane[data-ctab="fun"] #funScroll{display:block;}
+    /* Cleanup (2026-11-09): New things lives in the Fun tab too — a short box on top, Fun below. */
+    #journalPane[data-ctab="fun"] #newScroll{display:block;flex:0 1 auto;max-height:42%;border-bottom:2px solid var(--divider);}
     #journalPane[data-ctab="fun"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
     /* New things (2026-11-07, Julius): ✨ tab = dated log of the last times he did something new. */
     #newScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
@@ -1418,6 +1423,9 @@
     .urg-head-row .urg-head{flex:1;min-width:0;}
     .urg-head-row .urg-add-btn{flex:0 0 auto;min-width:24px;height:22px;padding:0 6px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;font:inherit;font-weight:700;line-height:1;cursor:pointer;}
     .urg-add{flex:0 0 auto;font-size:11px;padding:1px 7px;}
+    /* Empty add lines only on hover / focus / after tapping the level heading (cleanup 2026-11-09). */
+    #urgentPanel .urg-group:not(:hover):not(:focus-within):not(.show-add) > .urg-row.urg-adder{display:none!important;}
+    .urg-group > .urg-sub{cursor:pointer;}
     .urg-head,.urg-sub{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
     .urg-sub{cursor:context-menu;}
     .urg-empty{font-size:12px;color:var(--muted);padding:4px 0 2px;}
@@ -2157,7 +2165,8 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayPane.pane-narrow .hl-log{display:none;}
 #todayPane .pane-header .today-jump{white-space:nowrap;}
 /* 2026-11-06 (Julius): three fixed buttons side by side instead of one cycling button; the current one is filled. */
-#todayPane .hist-modes{display:inline-flex;gap:3px;margin-left:4px;flex:0 0 auto;}
+#todayPane .hist-modes{display:none!important;} /* cleanup 2026-11-09: tap the day's date to cycle */
+#todayScroll .day-label .day-date{cursor:pointer;}
 #todayPane.pane-narrow .hist-modes{gap:1px;margin-left:3px;}
 #todayPane.pane-narrow .hist-mode{min-width:17px;padding:2px 2px;font-size:.8em;}
 #todayPane .hist-mode[aria-pressed="true"]{background:var(--divider,#777);color:var(--bg,#fff);}
@@ -2281,6 +2290,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div id="typeSettings" class="type-settings hidden" role="dialog" aria-label="Scale, padding and fonts">
     <div class="ts-head"><strong>Options</strong><button class="btn tiny" id="closeTypeSettings" type="button">Close</button></div>
     <div class="ts-body">
+    <!-- Light / dark moved here from the top toolbar (cleanup 2026-11-09). -->
+    <div class="ts-row"><span class="ts-label">Light / dark</span><button class="btn tiny theme-toggle" type="button" aria-label="Light / dark">☾</button></div>
     <div class="ts-row ts-looks">
       <span class="ts-label" title="Save or load all look settings (colors, sliders, theme, fonts, padding) on this device">Saved looks</span>
       <select id="lookSlot" aria-label="Saved look"><option value="light">Light</option><option value="dark">Dark</option><option value="custom">Custom</option></select>
@@ -2416,8 +2427,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           <button type="button" data-ctab="weather" title="Weather (next 24 h + 7 days)" aria-label="Weather">☁️</button>
           <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">⭐</button>
           <button type="button" data-ctab="review" title="Day Review" aria-label="Day Review">📊</button>
-          <button type="button" data-ctab="new" title="New things (last time I did something new)" aria-label="New things">✨</button>
-          <button type="button" data-ctab="fun" title="Fun" aria-label="Fun">🌴</button>
+          <button type="button" data-ctab="fun" title="Fun + New things" aria-label="Fun and New things">🌴</button>
         </span>
       </div>
       <div id="dailyMatch" hidden></div>
@@ -7014,7 +7024,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const rows = VIEW_PANES.map(name =>
       `<div class="view-menu-row"><label><input type="checkbox" data-pane-toggle="${name}">${PANE_LABELS[name]}</label><button class="btn" type="button" data-pane-solo="${name}">Solo</button></div>`
     ).join('');
-    return rows +
+    // Fit / Reset sizes live here now (cleanup 2026-11-09); they press the hidden toolbar buttons.
+    return `<div class="view-menu-actions"><button class="btn" type="button" data-menu-layout="fit" title="Fit columns to the window">Fit columns</button><button class="btn" type="button" data-menu-layout="reset-columns" title="Reset column sizes">Reset sizes</button></div>` + rows +
       `<div class="view-menu-section">
         <div class="view-menu-heading">Split <span class="split-state" data-split-state></span></div>
         <label class="split-field"><span data-split-label="first">First</span><select class="top-select" data-split="first">${paneOptions(false)}</select></label>
@@ -7069,6 +7080,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         else next.delete(input.dataset.paneToggle);
         if(isSplitActive()) setSplit(false);
         applyWorkspaceView([...next]);
+      }));
+      popup.querySelectorAll('[data-menu-layout]').forEach(b => b.addEventListener('click',()=>{
+        const real = menu.parentElement.querySelector('[data-layout="' + b.dataset.menuLayout + '"]') || document.querySelector('[data-layout="' + b.dataset.menuLayout + '"]');
+        closeColumnsMenus(); if(real) real.click();
       }));
       menu.querySelectorAll('[data-pane-solo]').forEach(button=>button.addEventListener('click',()=>{
         if(isSplitActive()) setSplit(false);
@@ -7430,7 +7445,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     };
     let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
     if(t === 'wxdaily') t = 'weather'; // daily tab merged into Weather (2026-11-07)
-    set(t === 'weather' || t === 'focus' || t === 'review' || t === 'fun' || t === 'new' ? t : 'notes');
+    if(t === 'new') t = 'fun'; // New things merged into the Fun tab (cleanup 2026-11-09)
+    set(t === 'weather' || t === 'focus' || t === 'review' || t === 'fun' ? t : 'notes');
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });
@@ -8354,7 +8370,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         '&hourly=temperature_2m,precipitation_probability,weather_code,is_day' +
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
         '&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=7')
-        .then(r => r.json()).then(d => { at = Date.now(); data = d; draw(); })
+        .then(r => r.json()).then(d => { at = Date.now(); data = d; chip(); if(isWx()) draw(); })
         .catch(() => { box.innerHTML = '<div class="center-placeholder">☁️ Weather didn\'t load. <button type="button" class="btn" data-wx-retry>Retry</button></div>'; })
         .finally(() => { busy = false; });
     }
@@ -8392,7 +8408,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(m){ mode = m.dataset.wxMode; try{ localStorage.setItem('fw.wxMode', mode); }catch(err){} draw(); return; }
       if(e.target.closest('[data-wx-retry]')) load(true);
     });
-    const check = () => { if(isWx()){ draw(); load(false); } };
+    // Weather chip (cleanup 2026-11-09): the ☁️ tab button shows the current icon + temperature (e.g. "☀️ 64°");
+    // tap it for the full view. Fetched once at start-up and at most every 30 min.
+    function chip(){
+      const b = pane.querySelector('.center-tabs button[data-ctab="weather"]'), h = data && data.hourly;
+      if(!b || !h || !h.time) return;
+      const now = new Date(), key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + 'T' + String(now.getHours()).padStart(2,'0');
+      let i = h.time.findIndex(t => t.slice(0,13) === key); if(i < 0) i = 0;
+      const t = Math.round(h.temperature_2m[i]);
+      if(!isFinite(t)) return;
+      b.textContent = icon(h.weather_code[i], h.is_day[i]) + ' ' + t + '°';
+      b.classList.add('wx-chip'); b.title = 'Weather in ' + PLACE + ' now: ' + t + '° · tap for the next 24 h + 7 days';
+    }
+    setTimeout(() => load(false), 4000);
+    setInterval(() => { if(!document.hidden){ load(false); chip(); } }, 10 * 60 * 1000);
+    const check = () => { if(isWx()){ draw(); load(false); } else chip(); };
     new MutationObserver(check).observe(pane, {attributes:true, attributeFilter:['data-ctab']});
     document.addEventListener('visibilitychange', () => { if(!document.hidden) check(); });
     check();
@@ -8757,6 +8787,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     else panel.appendChild(headRow);
     fitUrgCounts();
     if(!urgentOpen) return;
+    window.__urgAddOpen = window.__urgAddOpen || new Set(); const urgAddOpen = window.__urgAddOpen;
     [1,2,3,0].forEach(u => {
       const group = items.filter(x => x.urg === u)
         .sort((a,b) => (a.soon ? 0 : 1) - (b.soon ? 0 : 1) || (a.soon || '').localeCompare(b.soon || ''));
@@ -8777,6 +8808,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         sub.title = 'Tasks with a due date but no urgency, soonest first';
       }
       wrap.appendChild(sub);
+      // Cleanup (2026-11-09): the empty "Add … task" line shows only on hover / when the box has focus, or after a tap
+      // on its heading (phones). Remembered for this session.
+      if(urgAddOpen.has(u)) wrap.classList.add('show-add');
+      sub.addEventListener('click', e => {
+        if(e.target.closest('button,input,a')) return;
+        const on = !wrap.classList.contains('show-add');
+        wrap.classList.toggle('show-add', on);
+        if(on){ urgAddOpen.add(u); const inp = wrap.querySelector('.urg-adder textarea'); if(inp) setTimeout(() => { try { inp.focus({preventScroll: true}); } catch (err) {} }, 0); }
+        else urgAddOpen.delete(u);
+      });
       const addItem = item => {
         wrap.appendChild(urgItemRow(item,u,item.index,item.html,item.text,0,item.done,true));
         // Subtasks: real checkbox rows like their task, indented under it
@@ -8811,6 +8852,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(focusAdd){
       const inp = panel.querySelector(`.urg-adder[data-urg="${focusAdd}"] textarea`);
       if(inp){
+        const grp = inp.closest('.urg-group'); if(grp) grp.classList.add('show-add'); // stays visible while you keep typing
         try{ inp.focus({preventScroll:true}); }catch(e){ inp.focus(); }
         const n = caret == null ? inp.value.length : Math.min(caret,inp.value.length);
         try{ inp.setSelectionRange(n,n); }catch(e){}
@@ -12267,6 +12309,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(HIST_MODES.indexOf(b.dataset.hm) >= 0 && b.dataset.hm !== histMode) setHistMode(b.dataset.hm);
   },true);
   histModeButton();
+  // Cleanup (2026-11-09, Julius): the ▤ ≡ – buttons are hidden; tapping a day's date line in History cycles
+  // Full → List → Mini instead. A short status says which one you're in.
+  document.addEventListener('click',e => {
+    const d = e.target && e.target.closest ? e.target.closest('#todayScroll .day-label .day-date') : null;
+    if(!d) return;
+    e.preventDefault();
+    const next = HIST_MODES[(HIST_MODES.indexOf(histMode) + 1) % HIST_MODES.length];
+    setHistMode(next);
+    if(typeof setStatus === 'function') setStatus('History: ' + ({full:'Full', compact:'List', mini:'Mini'})[next] + ' · tap the date again to switch');
+  });
   // Old-style day sections (data-sec) and project groups (data-cgrp) follow the mode too.
   function histKey(n){
     if(n.dataset.sec) return 'sec:' + n.dataset.sec;

@@ -296,11 +296,13 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   // New things tab (2026-11-07): ✨ sits left of 🌴; add with a date → listed under its month, saved, newest first.
   const nw = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
+    // Cleanup (2026-11-09): New things lives in the 🌴 tab now (box on top, Fun below); no ✨ button.
     const tabs = [...document.querySelectorAll('.center-tabs button')].map(b => b.dataset.ctab);
-    if(tabs.indexOf('new') !== tabs.indexOf('fun') - 1) return ['✨ not left of 🌴: ' + tabs.join(',')];
-    document.querySelector('[data-ctab="new"]').click(); await wait(200);
+    if(tabs.includes('new')) return ['✨ tab still there: ' + tabs.join(',')];
+    document.querySelector('[data-ctab="fun"]').click(); await wait(200);
     const box = document.getElementById('newScroll');
-    if(!box || getComputedStyle(box).display === 'none') return ['tab not shown'];
+    if(!box || getComputedStyle(box).display === 'none') return ['New things not shown in the 🌴 tab'];
+    if(getComputedStyle(document.getElementById('funScroll')).display === 'none') return ['Fun hidden in the 🌴 tab'];
     if(getComputedStyle(document.getElementById('journalScroll')).display !== 'none') return ['Notes still shown'];
     const inp = document.getElementById('newInput'), dt = document.getElementById('newDate');
     dt.value = '2026-10-03'; inp.value = 'Tried rock climbing';
@@ -381,21 +383,20 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   });
   dm.forEach(x => errs.push('Daily match: ' + x));
   // History detail button: List = one line per item (all 50), hidden lines really hidden; Mini = counts only; back to Full.
+  // Cleanup (2026-11-09): the ▤ ≡ – buttons are hidden; tapping a day's date cycles Full → List → Mini.
+  const setHM = async hm => { for (let i = 0; i < 3 && await pg.evaluate(() => document.body.dataset.hist) !== hm; i++) { await pg.evaluate(() => document.querySelector('#todayScroll .day-row[data-date="' + localToday() + '"] .day-label .day-date').click()); await pg.waitForTimeout(250); } };
   const modes = [];
   for (const hm of ['compact', 'mini', 'full']) {
-    await pg.click('#histMode [data-hm="' + hm + '"]'); await pg.waitForTimeout(250);
+    await setHM(hm);
     modes.push(await pg.evaluate(() => {
       const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]'), top = ed.closest('.od-top') || ed;
       const leak = [...ed.querySelectorAll(':scope > [data-tlhid]')].filter(x => getComputedStyle(x).display !== 'none').length;
       const wide = [...ed.querySelectorAll('.ts-it')].filter(x => x.getBoundingClientRect().right > top.getBoundingClientRect().right + 1).length;
-      const pressed = [...document.querySelectorAll('#histMode .hist-mode[aria-pressed="true"]')].map(b => b.dataset.hm).join();
-      const hdr = document.querySelector('#todayPane .pane-header'), btns = [...document.querySelectorAll('#histMode .hist-mode')];
-      if (pressed !== document.body.dataset.hist || btns.length !== 3 || btns.some(b => !b.offsetWidth || b.getBoundingClientRect().right > hdr.getBoundingClientRect().right + 1)) return { mode: 'buttons: ' + pressed, hdr: hdr.getBoundingClientRect().width, w: btns.map(b => [b.offsetWidth, Math.round(b.getBoundingClientRect().right)]), r: Math.round(hdr.getBoundingClientRect().right), html: hdr.innerText };
       return { mode: document.body.dataset.hist, items: ed.querySelectorAll('.ts-it').length, leak, wide };
     }));
   }
   // Short folded lists (2026-11-07): List mode's folded Morning shows the Gantt list in a 3-row box (scrolls), ⤢ opens all.
-  await pg.click('#histMode [data-hm="compact"]'); await pg.waitForTimeout(250);
+  await setHM('compact');
   const hx1 = await pg.evaluate(async () => {
     const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]');
     const cap = ed.querySelector('.ts-row .ts-items.hx-cap'), btn = cap && cap.parentElement.querySelector('.hx-btn');
@@ -411,7 +412,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     return ed.querySelector('.ts-row .ts-items.hx-cap') ? [] : ['⤡ did not shrink it back'];
   });
   hx1.forEach(x => errs.push('History short list: ' + x));
-  await pg.click('#histMode [data-hm="full"]'); await pg.waitForTimeout(250);
+  await setHM('full');
   const hx2 = await pg.evaluate(async () => {
     const ed = document.querySelector('#todayScroll .day-editor[data-date="' + localToday() + '"]');
     const g = ed.querySelector(':scope > [data-cgrp="Gantt"]');

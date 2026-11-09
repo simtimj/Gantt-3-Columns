@@ -52,6 +52,10 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
+## 🧪 To be confirmed (2026-11-09)
+
+- **Cleanup round 1**: top toolbar slimmed: **Fit** and **Reset sizes** are now in the **Cols** menu (top two buttons), **☾ Light / dark** is in **Options** (first row); ▲ ▼ stay. **History**: the ▤ ≡ – buttons are gone; **tap a day's date** to cycle Full → List → Mini. **Urgent**: the empty "Add … task" lines show only when you hover the box, or tap its heading ("0 · Urgent") on the phone; they stay while you keep adding. **Weather** is now a chip in the center tab bar showing the current icon + temperature (e.g. ☀️ 64°); tap it for the full view. **New things** moved into the 🌴 tab (a short box on top, Fun below); the ✨ button is gone (name for the merged tab still to pick).
+
 ## 🧪 To be confirmed (2026-11-08)
 
 - **📅 Calendar: one toolbar line + Plan button + date in the corner**: the separate header row is gone. One line now holds **Today · date · ‹ ›** on the left and **Plan · Day|Week · ↻ · ✕** on the right (on the phone, Day / Week is one toggle button). **Plan** shows / hides the Plan box (hidden by default). In Day view, the weekday and date (e.g. **SUN 8**, today in a blue circle) sit in the top-left corner above the time labels, so there's no tall date header. **+ New is gone**: hold (phone) or drag (mouse) on an empty time slot or the all-day row to make an event.

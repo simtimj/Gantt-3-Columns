@@ -2202,24 +2202,65 @@ function intakeTime_(value) {
   return String(h).padStart(2, '0') + ':' + m[2];
 }
 
+// Memoize only deterministic ID digests, in small private cache blocks. Every
+// source row is still read/normalized, and all input strings must match exactly
+// before reusing a block. Cache eviction, corruption and failures only cost work.
+function doneRowHashes_(inputs, timer) {
+  const blocks = [];
+  for (let i = 0; i < inputs.length; i += 32) {
+    const values = inputs.slice(i, i + 32);
+    blocks.push({ key:'done-id-hashes:v1:' + (i / 32), values:values,
+      eligible:i < 1024 && JSON.stringify(values).length <= 18000 });
+  }
+  const keys = blocks.filter(b => b.eligible).map(b => b.key);
+  let cache = null, found = {};
+  if (keys.length) {
+    try {
+      cache = CacheService.getScriptCache();
+      found = speedPart_(timer, 'done.hashCacheRead', () => cache.getAll(keys)) || {};
+    } catch (e) { cache = null; found = {}; }
+  }
+  const pending = {}, result = [];
+  speedPart_(timer, 'done.hashes', () => {}); // zero also identifies a fully warm read
+  blocks.forEach(b => {
+    let saved = null;
+    try { saved = JSON.parse(found[b.key] || 'null'); } catch (e) {}
+    const valid = Array.isArray(saved) && saved.length === 2 &&
+      Array.isArray(saved[0]) && Array.isArray(saved[1]) &&
+      saved[0].length === b.values.length && saved[1].length === b.values.length &&
+      b.values.every((value, i) => saved[0][i] === value &&
+        typeof saved[1][i] === 'string' && /^[a-f0-9]{16}$/.test(saved[1][i]));
+    const hashes = valid ? saved[1] : speedPart_(timer, 'done.hashes', () => b.values.map(value => cellHash_(value)));
+    result.push(...hashes);
+    if (!valid && cache && b.eligible) {
+      const encoded = JSON.stringify([b.values, hashes]);
+      if (encoded.length <= 20000) pending[b.key] = encoded;
+    }
+  });
+  if (cache && Object.keys(pending).length) {
+    try { speedPart_(timer, 'done.hashCacheWrite', () => cache.putAll(pending, 600)); } catch (e) {}
+  }
+  return result;
+}
+
 function sheetDoneRows_(timer) {
   const sheet = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
-  // Use the intake snapshot for the header too: no separate header read on every import.
   const rows = speedPart_(timer, 'done.sourceRead', () => sheet.getDataRange().getValues());
-  if (rows[0][5] !== 'Type') sheet.getRange(1, 6).setValue('Type'); // tab made before this column
+  if (rows[0][5] !== 'Type') sheet.getRange(1, 6).setValue('Type');
   const oldest = addDaysToDateString_(todayString_(), -DONE_LOG_DAYS);
   const dateOf = intakeDateFormatter_();
-  return speedPart_(timer, 'done.rows', () => rows.slice(1).map(r => {
-    const date = dateOf(r[0]);
-    const project = String(r[1] || '').trim();
-    const title = String(r[2] || '').trim();
-    const details = String(r[3] || '').trim();
-    return {
-      id: 's-' + speedPart_(timer, 'done.hashes', () => cellHash_([date, project, title, details].join('|'))), date, project: project || 'Other', title, details,
-      mine: /^(julius|me)$/i.test(String(r[4] || '').trim()),
-      type: normLogType_(r[5]), // not in the id, so adding a type never re-adds a line
-    };
-  }).filter(x => x.title && x.date >= oldest));
+  return speedPart_(timer, 'done.rows', () => {
+    const normalized = rows.slice(1).map(r => {
+      const date = dateOf(r[0]), project = String(r[1] || '').trim();
+      const title = String(r[2] || '').trim(), details = String(r[3] || '').trim();
+      return { date, project:project || 'Other', title, details,
+        mine:/^(julius|me)$/i.test(String(r[4] || '').trim()), type:normLogType_(r[5]),
+        input:[date, project, title, details].join('|') };
+    });
+    const hashes = doneRowHashes_(normalized.map(x => x.input), timer);
+    return normalized.map(({input, ...item}, i) => Object.assign({id:'s-' + hashes[i]}, item))
+      .filter(x => x.title && x.date >= oldest);
+  });
 }
 
 function sheetTaskRows_(appliedIds) {

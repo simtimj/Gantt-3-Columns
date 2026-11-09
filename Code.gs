@@ -1310,9 +1310,9 @@ function parseDate_(dateString) {
    Dismissed / sent-to-Today ids are remembered in "inboxDone", so Claude's
    items stay gone even though they're still in inbox.js.
    ========================================================= */
-function inboxRead_(key, def) {
+function inboxRead_(key, def, snapshot) {
   try {
-    const v = PropertiesService.getUserProperties().getProperty(key);
+    const v = snapshot ? snapshot[key] : PropertiesService.getUserProperties().getProperty(key);
     return v ? JSON.parse(v) : def;
   } catch (e) { return def; }
 }
@@ -1617,9 +1617,13 @@ function saveNewThings(data) {
   } finally { lock.releaseLock(); }
 }
 function getInbox() {
-  const done = inboxRead_('inboxDone', []);
-  const mine = inboxRead_('inboxItems', []);
-  const over = inboxRead_('inboxOver', {});
+  // These three fields belong to the same user settings store. Read them once
+  // per response; keep individual-read fallback if the bulk read is unavailable.
+  let settings = null;
+  try { settings = PropertiesService.getUserProperties().getProperties(); } catch (e) {}
+  const done = inboxRead_('inboxDone', [], settings);
+  const mine = inboxRead_('inboxItems', [], settings);
+  const over = inboxRead_('inboxOver', {}, settings);
   const claude = (typeof CLAUDE_INBOX !== 'undefined' && Array.isArray(CLAUDE_INBOX)) ? CLAUDE_INBOX : [];
   return claude.map(x => Object.assign({ from: 'claude' }, x, over[String(x && x.id)] || {}))
     .concat(mine.map(x => Object.assign({ from: 'app' }, x)))
@@ -2211,7 +2215,7 @@ function sheetDoneRows_(timer) {
     const title = String(r[2] || '').trim();
     const details = String(r[3] || '').trim();
     return {
-      id: 's-' + cellHash_([date, project, title, details].join('|')), date, project: project || 'Other', title, details,
+      id: 's-' + speedPart_(timer, 'done.hashes', () => cellHash_([date, project, title, details].join('|'))), date, project: project || 'Other', title, details,
       mine: /^(julius|me)$/i.test(String(r[4] || '').trim()),
       type: normLogType_(r[5]), // not in the id, so adding a type never re-adds a line
     };

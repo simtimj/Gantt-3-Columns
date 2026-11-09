@@ -135,22 +135,30 @@ function ensureSetup_() {
    fixes). Fast start (2026-11-05, Julius: "update what it needs, like Google Sheets"): the first page load
    (doGet → getWorkspaceData({fast:true})) skips them and shows what's saved; the page then calls runImports(),
    which runs them and returns only the cells that changed, merged in place by the same code as fwSync. */
-function runImportSteps_(t) {
+function runImportSteps_(t, req) {
+  let snapshot = null;
   try { applyDeployedCodeLog_(); } catch (e) { console.error(e); } t.mark('deployLog');
   try { applyClaudeDone_(t); } catch (e) { console.error(e); } t.mark('done');
   try { applyClaudeNotes_(); } catch (e) { console.error(e); } t.mark('notes');
   try { applyClaudeTasks_(); } catch (e) { console.error(e); } t.mark('tasks');
   try { syncConfirmCard_(t); } catch (e) { console.error(e); } t.mark('confirm');
   try { syncStudyLog_(); } catch (e) { console.error(e); } t.mark('study');
-  try { moveScheduleToNotes_(); } catch (e) { console.error(e); } t.mark('schedule');
-  try { fixUrgentBold_(); } catch (e) { console.error(e); } t.mark('fixBold');
-  try { removeDaySections_(); } catch (e) { console.error(e); } t.mark('fixSecs');
+  try { if (req) snapshot = readScheduleForSync_(req, t); else moveScheduleToNotes_(); }
+  catch (e) { snapshot = null; console.error(e); } t.mark('schedule');
+  // Both one-time fixes can write Days after the schedule read. Only an
+  // explicit no-op preserves the snapshot; failures may have partially written.
+  try { if (fixUrgentBold_() !== false) snapshot = null; }
+  catch (e) { snapshot = null; console.error(e); } t.mark('fixBold');
+  try { if (removeDaySections_() !== false) snapshot = null; }
+  catch (e) { snapshot = null; console.error(e); } t.mark('fixSecs');
+  return snapshot;
 }
 
 function runImports(req) {
   const t = speedTimer_();
-  runImportSteps_(t);
-  const out = syncDiff_(req || {}, t);
+  req = req || {};
+  const snapshot = runImportSteps_(t, req);
+  const out = syncDiff_(req, t, snapshot);
   try { out.inbox = getInbox(); } catch (e) { console.error(e); } t.mark('inbox');
   out.timing = t.done();
   out.timing.build = out.build;
@@ -558,21 +566,27 @@ function getSyncState(req) {
   const t = speedTimer_();
   req = req || {};
   let snapshot = null;
-  try {
-    const dates = Object.keys(req.days || {}).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
-    const today = todayString_(), end = addDaysToDateString_(today, 7);
-    // One request-local read serves the schedule check and the visible-date diff.
-    // Never cache across requests: direct Sheet edits must remain visible.
-    if (!dates.length || (dates[0] <= end && dates[dates.length - 1] >= today)) {
-      snapshot = speedPart_(t, 'schedule.read', () => getDaysRange_(dates.length && dates[0] < today ? dates[0] : today,
-        dates.length && dates[dates.length - 1] > end ? dates[dates.length - 1] : end, null, new Set(dates)));
-      if (moveScheduleToNotes_(snapshot.filter(d => d.date >= today && d.date <= end))) snapshot = null;
-    } else moveScheduleToNotes_(); // disjoint historical views must not pull in the gap between ranges
-  } catch (e) { snapshot = null; console.error(e); } t.mark('schedule');
+  try { snapshot = readScheduleForSync_(req, t); }
+  catch (e) { console.error(e); } t.mark('schedule');
   const out = syncDiff_(req, t, snapshot);
   out.timing = t.done();
   out.timing.build = out.build;
   return out;
+}
+
+// A schedule read can also serve the response, only within this request.
+// A write or thrown/partial migration invalidates it; disjoint historical
+// views retain separate bounded ranges rather than reading the entire gap.
+function readScheduleForSync_(req, t) {
+  const dates = Object.keys(req.days || {}).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const today = todayString_(), end = addDaysToDateString_(today, 7);
+  if (dates.length && (dates[0] > end || dates[dates.length - 1] < today)) {
+    moveScheduleToNotes_();
+    return null;
+  }
+  const snapshot = speedPart_(t, 'schedule.read', () => getDaysRange_(dates.length && dates[0] < today ? dates[0] : today,
+    dates.length && dates[dates.length - 1] > end ? dates[dates.length - 1] : end, null, new Set(dates)));
+  return moveScheduleToNotes_(snapshot.filter(d => d.date >= today && d.date <= end)) ? null : snapshot;
 }
 
 // Cells whose hash differs from what the page has (days by date, Reference cards by id).
@@ -648,7 +662,7 @@ function moveScheduleToNotes_(snapshot) {
    title + plain details). The client now stops the carry-over (see "No stray bold" in Index.html). */
 function fixUrgentBold_() {
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('urgBoldFix') === '1') return;
+  if (props.getProperty('urgBoldFix') === '1') return false;
   const fix = html => doneBlocks_(String(html || '')).map(b => {
     if (!/^<div\b[^>]*class="[^"]*check-line/i.test(b) || !/\sdata-urg="/.test(b) || /\sdata-cid="/.test(b)) return b;
     return b.replace(/(<span class="check-text">)\s*<(b|strong)>((?:(?!<\/?(?:b|strong)>)[\s\S])*)<\/\2>\s*(<\/span>)/i, '$1$3$4');
@@ -682,6 +696,7 @@ function fixUrgentBold_() {
     }
     props.setProperty('urgBoldFix', '1');
   } finally { lock.releaseLock(); }
+  return true;
 }
 
 // Pull time-block check-lines (and the subtasks right under them) out of a Today cell.
@@ -1933,7 +1948,7 @@ function stripDaySections_(html) {
 }
 function removeDaySections_() {
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('daySecsRemoved') === '1') return;
+  if (props.getProperty('daySecsRemoved') === '1') return false;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -1953,6 +1968,7 @@ function removeDaySections_() {
     }
     props.setProperty('daySecsRemoved', '1');
   } finally { lock.releaseLock(); }
+  return true;
 }
 
 /* Sheet intake (2026-11-02, Julius): any AI appends a row to the "Done Log" or
@@ -2263,8 +2279,8 @@ function applyClaudeDone_(timer) {
   // Cheap check (one cell read): does today's cell hold done lines in a window that hasn't started yet?
   const daysSheet = getOrCreateSheet_('Days', DAYS_HEADERS);
   const needFix = speedPart_(timer, 'done.todayCheck', () => {
-    const todaySnapshot = readDoneToday_(daysSheet, todayString_());
-    return !!todaySnapshot.row && doneFutureLines_(todaySnapshot.content).moved.length > 0;
+    const todaySnapshot = speedPart_(timer, 'done.todayRead', () => readDoneToday_(daysSheet, todayString_()));
+    return speedPart_(timer, 'done.todayParse', () => !!todaySnapshot.row && doneFutureLines_(todaySnapshot.content).moved.length > 0);
   });
   if (!fresh.length && !migrate && !secFix && !needFix) return;
   const lock = LockService.getScriptLock();

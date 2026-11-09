@@ -122,3 +122,51 @@ server.getDaysRange_=(from,to,snapshot,hashDates)=>{scheduleSelection=hashDates;
 realMove();
 assert.equal(scheduleSelection.size,0,'standalone schedule import skips all version hashes');
 console.log('✓ sync/import callers select only hashes consumed by the response');
+
+// Background imports share their post-intake schedule read with the response.
+// All subsequent writers must explicitly report no-op; partial failures reread.
+const imports=vm.createContext({console:{error(){}}});
+vm.runInContext(source,imports);
+const originalImportMove=imports.moveScheduleToNotes_;
+let body='initial',dayReads=[],scheduleWrite=false,throwSchedule=false;
+imports.todayString_=()=> '2026-11-07';
+imports.addDaysToDateString_=()=> '2026-11-14';
+imports.appBuild_=()=> 'same-build';imports.getReference_=()=>[];imports.getInbox=()=>[];
+imports.getDaysRange_=(from,to)=>{dayReads.push([from,to]);return [{date:'2026-11-07',tasks:body,journal:'',plan:'',th:body,jh:'j',ph:'p'}];};
+for(const name of ['applyDeployedCodeLog_','applyClaudeDone_','applyClaudeNotes_','applyClaudeTasks_','syncConfirmCard_','syncStudyLog_']) imports[name]=()=>{};
+imports.moveScheduleToNotes_=()=>{if(scheduleWrite||throwSchedule)body='schedule changed';if(throwSchedule)throw Error('partial write');return scheduleWrite;};
+imports.fixUrgentBold_=()=>false;imports.removeDaySections_=()=>false;
+const importRequest={days:{'2026-11-07':{th:'old',jh:'j',ph:'p'}},ref:{}};
+const run=()=>{dayReads=[];return imports.runImports(importRequest);};
+assert.equal(run().days['2026-11-07'].tasks,'initial');assert.equal(dayReads.length,1,'unchanged import reads range once');
+body='direct edit';assert.equal(run().days['2026-11-07'].tasks,'direct edit');
+assert.equal(dayReads.length,1,'each new request still gets a fresh read');
+imports.applyClaudeDone_=()=>{body='intake changed';};
+assert.equal(run().days['2026-11-07'].tasks,'intake changed','snapshot is read after intake writes');
+imports.applyClaudeDone_=()=>{body='partial intake changed';throw Error('intake failure');};
+assert.equal(run().days['2026-11-07'].tasks,'partial intake changed','early failure cannot stale the later read');
+imports.applyClaudeDone_=()=>{};
+for(const mode of ['write','failure']) {
+  scheduleWrite=mode==='write';throwSchedule=mode==='failure';body='before schedule';
+  assert.equal(run().days['2026-11-07'].tasks,'schedule changed');
+  assert.equal(dayReads.length,2,'schedule '+mode+' invalidates snapshot');
+}
+scheduleWrite=false;throwSchedule=false;
+for(const name of ['fixUrgentBold_','removeDaySections_']) {
+  for(const mode of ['write','failure','unknown']) {
+    body='before repair';imports[name]=()=>{body='repair changed';if(mode==='failure')throw Error('partial repair');return mode==='write'?true:undefined;};
+    assert.equal(run().days['2026-11-07'].tasks,'repair changed');
+    assert.equal(dayReads.length,2,name+' '+mode+' must invalidate');
+  }
+  imports[name]=()=>false;
+}
+dayReads=[];imports.runImports({days:{'2025-01-01':{th:'old',jh:'j'}},ref:{}});
+assert.deepEqual(dayReads,[['2025-01-01','2025-01-01']], 'disjoint schedule helper uses its own bounded read, never an expanded gap');
+// Restore real standalone movement so the disjoint path proves two reads.
+imports.moveScheduleToNotes_=originalImportMove;
+dayReads=[];imports.runImports({days:{'2025-01-01':{th:'old',jh:'j'}},ref:{}});
+assert.deepEqual(dayReads,[['2026-11-07','2026-11-14'],['2025-01-01','2025-01-01']]);
+const original=vm.createContext({console});vm.runInContext(source,original);
+original.PropertiesService={getScriptProperties:()=>({getProperty:()=> '1'})};
+assert.equal(original.fixUrgentBold_(),false);assert.equal(original.removeDaySections_(),false);
+console.log('✓ import shared snapshot: one live range read, post-intake freshness; schedule/repair writes, partial failures and unknown results force reread');

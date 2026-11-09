@@ -648,3 +648,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Skip unused schedule hashes — 2026-11-09
 
 Schedule-line checks still read live Days text on every request, but no longer calculate cell version hashes that no response uses. Light sync hashes only the dates requested by the page; normal date loads retain all three hashes. Matching separated row runs reuse one column-width lookup. Adds a `schedule.read` timing substep; total speed savings still need live measurement.
+
+## 🧪 Share the post-intake Days read — 2026-11-09
+
+Background imports reuse their live schedule-check snapshot for the returned day diff when no later step writes. Schedule changes, partial failures, and one-time repairs force a fresh response read. Source intake still runs first; disjoint historical views keep separate bounded ranges. The unchanged import fixture reduces two Days-range passes to one; device timing savings remain unmeasured. Done Today timing now separates live read and HTML parsing without extra requests.

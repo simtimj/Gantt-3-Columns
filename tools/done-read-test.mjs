@@ -53,3 +53,9 @@ assert.equal(f.faults.locked,true);assert.equal(f.faults.released,true);
 assert.equal(f.rows[2][1],'fixed by another request');
 assert.ok(f.reads.some(r=>r.r===3&&r.c===2),'locked path rereads live content');
 console.log('Done import row-hint tests passed');
+
+// Split read/parse costs without another Sheet request or behavior change.
+f=fixture();const timing=f.ctx.speedTimer_();f.ctx.applyClaudeDone_(timing);
+assert.equal(f.reads.length,2);
+for(const key of ['done.todayCheck','done.todayRead','done.todayParse'])assert.equal(typeof timing.done().steps[key],'number');
+console.log('✓ Done Today read/parse substeps preserve the live-read budget');

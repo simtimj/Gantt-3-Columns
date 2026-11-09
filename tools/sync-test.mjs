@@ -102,3 +102,23 @@ assert.equal(parts['confirm.check.sourceRead'],4);assert.equal(parts.confirm,4);
 assert.ok(seen.includes('removeDaySections_'),'later imports run after a failed source read');
 assert.ok(Object.values(parts).every(v=>typeof v==='number'));
 console.log('✓ nested import timing: parent totals, accumulated/error stages, unchanged return/throw and import continuation');
+
+// Actual sync caller requests hashes only for its visible dates. Schedule
+// checks still see the full upcoming window; failure/write fallbacks above
+// continue using the normal complete reader.
+let selected;
+server.moveScheduleToNotes_=snapshot=>{assert.equal(snapshot.length,1);return false;};
+server.getDaysRange_=(from,to,snapshot,hashDates)=>{
+  selected=hashDates;
+  return [{date:'2026-11-07',tasks:'live text',journal:'',plan:'',th:'live-h',jh:'j',ph:'p'}];
+};
+server.getSyncState(request);
+assert.deepEqual([...selected],['2026-11-01','2026-11-07']);
+server.getSyncState({days:{},ref:{}});
+assert.equal(selected.size,0,'empty visible date set needs no hashes');
+let scheduleSelection;
+server.todayString_=()=> '2026-11-07';
+server.getDaysRange_=(from,to,snapshot,hashDates)=>{scheduleSelection=hashDates;return [];};
+realMove();
+assert.equal(scheduleSelection.size,0,'standalone schedule import skips all version hashes');
+console.log('✓ sync/import callers select only hashes consumed by the response');

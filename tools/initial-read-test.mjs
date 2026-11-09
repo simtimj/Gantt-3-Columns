@@ -93,3 +93,35 @@ const dstRows=[
 assert.deepEqual(plain(ctx.getDaysRange_('2026-11-01','2026-11-01',{width:4,rows:dstRows})).map(d=>d.tasks),
   ['start','first 1:30','second 1:30','last half hour']);
 console.log('✓ startup date window retains both repeated Pacific hours and the end of a 25-hour day');
+
+// Schedule-only reads retain live text but do not compute unused version IDs.
+// Both Sheet and initial-snapshot paths must still hash every requested date,
+// including duplicate rows, without changing any public/default result.
+ctx.parseDate_=v=>new Date(v+'T00:00:00Z');
+ctx.formatDate_=v=>v instanceof Date?v.toISOString().slice(0,10):String(v||'');
+rows=[['Date','Tasks','Notes','Plan'],
+  ...Array.from({length:8},(_,i)=>['2026-11-'+String(8+i).padStart(2,'0'),'task '+i,'note '+i,'plan '+i])];
+let digests=0,metadata=0;
+ctx.cellHash_=v=>{digests++;return 'hash:'+String(v||'');};
+sheet.getMaxColumns=()=>{metadata++;return 4;};
+const full=plain(ctx.getDaysRange_('2026-11-08','2026-11-15'));
+assert.equal(digests,24);
+for(const snapshot of [null,{width:4,rows:rows.slice(1)}]) {
+  digests=0;reads=0;
+  const schedule=plain(ctx.getDaysRange_('2026-11-08','2026-11-15',snapshot,new Set()));
+  assert.equal(digests,0,'schedule-only read computes no unused hashes');
+  assert.deepEqual(schedule,full.map(({th,jh,ph,...text})=>text));
+  assert.equal(reads,snapshot?0:2,'no extra service reads');
+  digests=0;
+  const subset=plain(ctx.getDaysRange_('2026-11-08','2026-11-15',snapshot,new Set(['2026-11-08'])));
+  assert.equal(digests,3);
+  assert.deepEqual(subset[0],full[0]);
+  assert.deepEqual(subset.slice(1),schedule.slice(1));
+}
+rows[1][1]='new direct edit';
+assert.equal(ctx.getDaysRange_('2026-11-08','2026-11-15',null,new Set())[0].tasks,'new direct edit');
+// Widely separated source rows still use one width lookup, not one per run.
+rows.splice(2,0,...Array.from({length:30},()=>['2000-01-01','unrelated','','']));
+metadata=0;ctx.getDaysRange_('2026-11-08','2026-11-15');
+assert.equal(metadata,1,'separated runs reuse request-local column width');
+console.log('✓ schedule reads: 24→0 unused hashes; requested dates retain all 3 hashes, text stays fresh, public/snapshot parity and one width lookup');

@@ -624,3 +624,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Offline Focus recovery drill — 2026-11-08
 
 - `tools/focus-recovery.mjs` extracts a selected Focus list from a local Script Properties JSON snapshot, verifies the generation length/hash, and supports legacy single/numbered chunks. It refuses corrupt selected data instead of using stale legacy copies; backups are created privately and existing files are never overwritten. The integration drill uses the actual Apps Script writer and MD5/UTF-8 hash implementation with synthetic data. No live backup or live rollback is claimed. See [Focus recovery procedure](docs/FOCUS_RECOVERY.md); keep the compatible generation reader when rolling back app code.
+
+## 🧪 Skip distant startup date formatting — 2026-11-08
+
+- The initial shared Days snapshot now filters distant Date cells before timezone formatting. It keeps a conservative timezone/DST margin and preserves text-date normalization, duplicate/unsorted rows, visible text/Plan hashes and the one-read startup budget. A synthetic 1,000-old-row/one-current-row fixture reduces this window reader's date-format calls from 1,001 to 1; that is not a measured page-load speedup. Boundary tests include both repeated Pacific 1:30 times and the last half hour of the 25-hour fall-back day. Actual phone/opening latency remains To Confirm.

@@ -16,6 +16,8 @@ Updated 2026-11-08. This is the current engineering handoff, not a declaration t
 3. Day hashes and Reference body/structure hashes drive changes. Reference manifests cover add/delete/title/parent/order/collapse, not just text. Existing editors are reused; focused, dirty, saving or dragging content is protected. An old response must not overwrite newer local mutations.
 4. Read reuse is request-local. After schedule writes or an uncertain mutation, reread. A currently unloaded task is not proof of deletion. Calendar browser caches are derived views, with revalidation and fresh data after writes.
 
+The initial snapshot window reader skips distant Date cells before timezone formatting, with a conservative two-day margin for offsets/DST; text dates still follow existing normalization. A synthetic 1,000-old-row/one-current-row fixture drops this reader’s date-format calls from 1,001 to 1 without extra reads. This is a targeted call count, not elapsed-time evidence.
+
 `readAllDays_` still reads the Days A:D history range for Urgent/Dailies seeds. Historical data has not been migrated or fully paged out of routine loading.
 
 ## Owners and identities
@@ -35,7 +37,7 @@ These are targeted service-read counts, not percentages of total runtime.
 
 | Path | Change |
 | --- | --- |
-| Initial day data | Typical three reads to one shared snapshot |
+| Initial day data | Typical three reads to one shared snapshot; distant Date cells skip timezone formatting before visible-window selection |
 | Overlapping light-sync day ranges | Two queries to one, invalidated after writes/errors |
 | Done Log intake / pending New Tasks intake | One raw read / raw plus display reads |
 | Already-applied New Tasks intake | One raw read; skip displayed times only after checking every raw row's ID |

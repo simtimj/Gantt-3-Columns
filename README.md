@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-08
+Last updated: 2026-11-09
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -644,3 +644,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Repeatable offline speed summaries — 2026-11-08
 
 - `tools/speed-summary.mjs` summarizes exported Speed Log range JSON with true medians and counts, separating release/build, viewport and visibility contexts. Repeated `reportId` values are removed only when the measured payload matches; conflicting IDs and possible identical legacy records are flagged and retained. Server, RPC, immediate draw and nested substeps remain separate. No Google calls, new logging requests, automatic baseline replacement or causal speedup claims. See [measurement procedure](docs/SPEED_MEASUREMENTS.md).
+
+## 🧪 Skip unused schedule hashes — 2026-11-09
+
+Schedule-line checks still read live Days text on every request, but no longer calculate cell version hashes that no response uses. Light sync hashes only the dates requested by the page; normal date loads retain all three hashes. Matching separated row runs reuse one column-width lookup. Adds a `schedule.read` timing substep; total speed savings still need live measurement.

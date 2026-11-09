@@ -79,3 +79,7 @@ For repeatable offline summaries, use [measurement procedure](SPEED_MEASUREMENTS
 5. Keep the agreed Big Three / Biggest Return planning model separate from urgency and from these infrastructure changes. Broader calendar/timer integration still has its own requirements.
 
 At project completion, give Julius a concise copy-ready Claude handoff linking this guide, the ownership map and the private measurement report. Include measured before/after results, deployed state, unverified behavior, known limits and exact remaining/resume steps. Do not put private task content in this public repository. Keep this guide linked rather than maintaining conflicting copies across assistants.
+
+### November 9: skip unused schedule hashes
+
+`getDaysRange_` accepts an optional request-local Set of dates needing hashes. Omitted means the public/full behavior, an empty Set means text-only internal schedule reads. `getSyncState` selects only client-requested dates while retaining the entire upcoming schedule window; `moveScheduleToNotes_` standalone uses no hashes. Schedule writes/failures still invalidate the snapshot and force a full fresh diff. No source reads or concurrent-edit checks are skipped. Tests cover raw/snapshot parity, fresh direct edits, requested hashes and width metadata once across disjoint row runs. An eight-day fixture reduces 24 unused digests to zero; real elapsed-time gains are unmeasured. `schedule` measures Days lookup/migration, not Google Calendar; `schedule.read` isolates the read portion.

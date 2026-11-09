@@ -660,3 +660,7 @@ Background imports reuse their live schedule-check snapshot for the returned day
 ## 🧪 One settings read per Inbox response — 2026-11-09
 
 Inbox replies read their three related user settings in one fresh snapshot instead of three separate property reads. Overrides, dismissed items and malformed-field defaults keep their existing behavior. If the snapshot read fails, the original individual reads remain available. No task data or settings are rewritten; elapsed-time gains remain unmeasured. Done Log timing also isolates ID hashing within its existing row-processing stage, without logging content or adding reporting requests.
+
+## 🧪 Reuse verified Done Log ID hashes — 2026-11-09
+
+Every Done Log source row is still read and normalized. Small private cache blocks can reuse ID digests only when every normalized input string matches exactly; edits, appends, moved rows, eviction or failures trigger the existing hash calculation. Task IDs, applied-state rules, dates and source writes are unchanged. The real-MD5 fixture drops324 digest calls to0 on an unchanged warm read; actual elapsed-time gains, including cache overhead, need measurement.

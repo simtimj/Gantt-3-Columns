@@ -172,3 +172,43 @@ keyFailure='inboxItems';compare();assert.equal(keyReads,3,'one field failure ret
 bulkFailure=false;keyFailure='';
 assert.equal(ctx.inboxRead_('inboxItems',[])[0].title,'New','other callers retain single-field behavior');
 console.log('✓ Inbox settings: 3→1 property reads, exact overrides/dismissals, fresh calls, missing/corrupt fields and independent-read failure fallback; zero writes');
+
+// Real MD5 compatibility and bounded advisory digest blocks. Cache never
+// replaces source reads or normalization; compare every result to no-cache.
+const crypto=await import('node:crypto');
+const hc=vm.createContext({console,Date});vm.runInContext(source,hc);
+hc.todayString_=()=> '2026-11-09';hc.addDaysToDateString_=()=> '2026-10-10';
+hc.formatDate_=d=>d instanceof Date?d.toISOString().slice(0,10):String(d||'');
+let digestCalls=0,gets=0,puts=0,readFail=false,writeFail=false,digestFail=false;
+const cacheData=new Map();
+const hashApi={getAll(keys){gets++;if(readFail)throw Error('cache read failed');return Object.fromEntries(keys.filter(k=>cacheData.has(k)).map(k=>[k,cacheData.get(k)]));},
+ putAll(values,ttl){puts++;assert.equal(ttl,600);if(writeFail)throw Error('cache write failed');for(const[k,v]of Object.entries(values)){assert.ok(k.length<250);assert.ok(Buffer.byteLength(v,'utf8')<100000);cacheData.set(k,v);}}};
+hc.CacheService={getScriptCache:()=>hashApi};
+hc.cellHash_=text=>{digestCalls++;if(digestFail)throw Error('digest failed');return crypto.createHash('md5').update(String(text||''),'utf8').digest('hex').slice(0,16);};
+const hashSheet=sheet([['Date','Project','Title','Details','Done by','Type'],
+ ...Array.from({length:324},(_,i)=>[new Date('2026-11-09T08:00:00Z'),i%2?' Gantt ':'','Task '+i,'Unicode 🦀 café 漢字 '+i,i%2?'Julius':'ChatGPT',i%2?'Fix':'Tweak'])]);
+hc.getOrCreateSheet_=()=>hashSheet;
+function freshExpected(){return hashSheet.rows.slice(1).map(r=>{const date=hc.intakeDate_(r[0]),project=String(r[1]||'').trim(),title=String(r[2]||'').trim(),details=String(r[3]||'').trim();return{id:'s-'+crypto.createHash('md5').update([date,project,title,details].join('|'),'utf8').digest('hex').slice(0,16),date,project:project||'Other',title,details,mine:/^(julius|me)$/i.test(String(r[4]||'').trim()),type:hc.normLogType_(r[5])};}).filter(x=>x.title&&x.date>='2026-10-10');}
+function verify(){digestCalls=0;gets=0;puts=0;hashSheet.reads=[];const actual=plain(hc.sheetDoneRows_());assert.deepEqual(actual,freshExpected());assert.deepEqual(hashSheet.reads,['values']);assert.deepEqual(hashSheet.writes,[]);return actual;}
+verify();assert.equal(digestCalls,324);assert.equal(gets,1);assert.equal(puts,1);
+verify();assert.equal(digestCalls,0);assert.equal(gets,1);assert.equal(puts,0,'unchanged source writes nothing to cache');
+hashSheet.rows[5][2]='Fresh title';verify();assert.equal(digestCalls,32,'an edited block is recomputed');
+hashSheet.rows[5][4]='Me';hashSheet.rows[5][5]='New';const mineNow=verify();assert.equal(digestCalls,0,'non-ID fields still map fresh without changing IDs');assert.equal(mineNow[4].mine,true);assert.equal(mineNow[4].type,'new');
+hashSheet.rows.push(['2026-11-08','Gantt','Backdated append','Keep','ChatGPT','Fix']);verify();assert.equal(digestCalls,5,'last partial block includes newly appended old-date rows');
+[hashSheet.rows[2],hashSheet.rows[67]]=[hashSheet.rows[67],hashSheet.rows[2]];verify();assert.equal(digestCalls,64,'row moves cannot hide changes');
+hashSheet.rows.splice(8,1);verify();assert.ok(digestCalls>0,'deletion invalidates shifted blocks');
+for(const bad of ['bad JSON','{}','[[],[]]',JSON.stringify([['wrong input'],['0123456789abcdef']])]){
+ cacheData.set('done-id-hashes:v1:0',bad);verify();assert.equal(digestCalls,32,'corrupt/mismatched blocks fall back');
+}
+const key='done-id-hashes:v1:0',stored=JSON.parse(cacheData.get(key));stored[1][0]='not a digest';cacheData.set(key,JSON.stringify(stored));verify();assert.equal(digestCalls,32);
+cacheData.delete(key);verify();assert.equal(digestCalls,32,'eviction costs work, not data');
+readFail=true;verify();assert.equal(digestCalls,324);assert.equal(puts,0);readFail=false;
+cacheData.clear();writeFail=true;verify();assert.equal(digestCalls,324);writeFail=false;
+cacheData.clear();digestFail=true;assert.throws(()=>hc.sheetDoneRows_(),/digest failed/);assert.equal(cacheData.size,0,'failed calculations are not published');digestFail=false;
+verify();const timer=hc.speedTimer_();hc.sheetDoneRows_(timer);assert.equal(typeof timer.done().steps['done.hashCacheRead'],'number');assert.equal(typeof timer.done().steps['done.hashes'],'number');
+// Oversized Unicode blocks bypass caching and retain normal IDs.
+hashSheet.rows[1][3]='🦀'.repeat(12000);cacheData.clear();verify();assert.equal(cacheData.has(key),false);verify();assert.equal(digestCalls,32);
+const emptyCalls=gets;assert.deepEqual(plain(hc.doneRowHashes_([])),[]);assert.equal(gets,emptyCalls);
+// Cache at most 32 small blocks: source growth cannot flood unrelated hints.
+const many=Array.from({length:1056},(_,i)=>'input '+i);cacheData.clear();hc.doneRowHashes_(many);digestCalls=0;hc.doneRowHashes_(many);assert.equal(digestCalls,32);assert.equal(cacheData.size,32);
+console.log('✓ Done IDs: 324→0 warm digest calls with exact real-MD5 output; every source still read; edited/moved/deleted/backdated rows, fresh non-ID fields, corruption/eviction/service failures, Unicode bounds and growth cap');

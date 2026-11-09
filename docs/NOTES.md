@@ -624,3 +624,26 @@ Three things only; everything else is a **view**, not a place:
 ### Task → calendar pipeline (option A) — PROPOSAL, paused 2026-11-08 for Julius to test what's built
 - Idea: one task, many views, never copied. Sources feed an **Unscheduled for today** list at the top of the 📅 day (mostly a live view; only hand-added picks saved in the Plan tab with the date): Big Three (+ Lead Tasks later), urgency 0 items, tasks dated today, all-day events, items carried over (↩). Drag onto the timeline = one linked event (existing `planSchedule` / `calPanelMoveEvent`); ticking either side ticks both (event → Graphite). Unfinished → 7 PM review: Tomorrow / pick date / Back.
 - Open questions (asked 2026-11-08, unanswered): (1) Big Three item vs its Lead Tasks; (2) urgency 0 only or 0+1; (3) all open tasks dated today or only ones with urgency; (4) all-day events in the list or the calendar's all-day row; (5) cap / "+N more"; (6) order (Big Three → urgent → dated → carried, or by urgency); (7) drag to reorder for the day; (8) scheduled task leaves the list or stays with 🕑 time; (9) default length 30 min; (10) deleted event → back to the list; (11) done event also renamed "[x] " or only Graphite; (12) carry over automatically or only "Tomorrow" picks; (13) ↩3 carry count; (14) also show on the main screen under the strip; (15) Cal Events panel overlap → decide in cleanup (C).
+
+## App cleanup (option C) — INVENTORY + PROPOSALS (2026-11-09, nothing changed yet)
+
+### What's on screen today (desktop: 3 columns, each split top / bottom)
+| Area | What's there |
+|---|---|
+| Top toolbar (10) | ↻ refresh · ☾ theme · 📅 Calendar · ▲ ▼ day step · Options · Cols · Fit · Reset sizes · Focus (hide toolbar) · status text |
+| Left top | ★ Big Three strip · HISTORY / LOG (day rows, Morn / Aft / Eve sections) + ▤ ≡ – detail buttons |
+| Left bottom | BLOCKS (Next Block, ▶ timer) |
+| Center top (6 tabs) | 📋 Dailies · ☁️ Weather · ⭐ Keep In Mind · 📊 Day Review · ✨ New things · 🌴 Fun |
+| Center bottom | Cal Events (Find, Cats, ⊞ 4 boxes, ↻) — now duplicated by the 📅 calendar |
+| Right top | Urgent panel (0 / 1 / 2 boxes, + create, Archive) |
+| Right bottom (2 tabs) | 📚 Reference cards (search, + Cell, Arc, Options, sort) · 📝 Scratch Pad |
+| Overlays | 📅 Calendar panel (Plan box: Big Three / Waiting / Backlog), Options panel, hold menus |
+
+### Proposals (SUGGESTIONS — need Julius's OK)
+1. **Toolbar 10 → 6**: fold **Fit** + **Reset sizes** into the **Cols** menu; move **☾** into **Options**; move **▲ ▼** next to the HISTORY title. Keeps ↻ · 📅 · Options · Cols · Focus · status.
+2. **Cal Events spot (center bottom)**: retire Cal Events; the spot becomes **Today** — the task → calendar pipeline's list (today's unscheduled + scheduled items, Big Three on top) once A is built. Until then: show Blocks there, or leave Cal Events.
+3. **Center tabs 6 → 4**: merge **✨ New things + 🌴 Fun** into one **🌴 Life** tab (two sections); turn **☁️ Weather** into a small chip in the tab bar (now temp + icon; tap opens the full view).
+4. **History detail ▤ ≡ –** → one button that cycles Full → List → Mini (saves 2 buttons).
+5. **Urgent panel vs Big Three**: keep both (urgency ≠ priority), but make empty "Add … task" lines appear only on tap / hover to save 3 lines.
+6. **Reference**: old / done cards move to Arc automatically after N days untouched (asked, not assumed); pinned cards stay.
+7. **Phone**: same changes apply; the toolbar savings matter most there.

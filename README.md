@@ -640,3 +640,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Identifiable speed reports — 2026-11-08
 
 - Each submitted browser timing measurement now carries a page-scoped `reportId`, alongside the existing build/viewport context. A transport retry keeps the same submitted ID, allowing later analysis to identify repeated log writes without guessing from identical timings. Different measurements retain different IDs; save acknowledgement `sampleId` values remain separate. No additional logging request is added. Old records lack this field and cannot be retroactively deduplicated with certainty.
+
+## 🧪 Repeatable offline speed summaries — 2026-11-08
+
+- `tools/speed-summary.mjs` summarizes exported Speed Log range JSON with true medians and counts, separating release/build, viewport and visibility contexts. Repeated `reportId` values are removed only when the measured payload matches; conflicting IDs and possible identical legacy records are flagged and retained. Server, RPC, immediate draw and nested substeps remain separate. No Google calls, new logging requests, automatic baseline replacement or causal speedup claims. See [measurement procedure](docs/SPEED_MEASUREMENTS.md).

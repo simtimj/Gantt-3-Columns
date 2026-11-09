@@ -68,6 +68,8 @@ Run `node tools/check.mjs` and `node tools/smoke.mjs`; CI includes save/conflict
 
 Import substeps in `Steps` now distinguish `done.sourceRead`, `done.rows`, `done.todayCheck`, `done.lock`, `done.reconcile`, and `confirm.check` / `confirm.write` source-read, rows, card-read and render stages plus `confirm.lock` / `confirm.reconcile`. These overlap their parent totals (and confirmation write stages overlap reconciliation); never sum parent and child durations. The same existing report carries them, with no new service reads or logging RPCs. Live post-deployment breakdowns still need to accumulate.
 
+For repeatable offline summaries, use [measurement procedure](SPEED_MEASUREMENTS.md) and `node tools/speed-summary.mjs speed-log.json`. It separates matching release/build and viewport/visibility groups, exact report-ID duplicates, legacy uncertainty and conflicting IDs. Preserve the historical audit baseline rather than replacing it with the retained rolling log.
+
 ## Resume order and final deliverable
 
 1. Gather matched page/server timings after a real `/dev` reload; distinguish cold/daily setup, warm loading, imports and save acknowledgements.

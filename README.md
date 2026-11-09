@@ -628,3 +628,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Skip distant startup date formatting — 2026-11-08
 
 - The initial shared Days snapshot now filters distant Date cells before timezone formatting. It keeps a conservative timezone/DST margin and preserves text-date normalization, duplicate/unsorted rows, visible text/Plan hashes and the one-read startup budget. A synthetic 1,000-old-row/one-current-row fixture reduces this window reader's date-format calls from 1,001 to 1; that is not a measured page-load speedup. Boundary tests include both repeated Pacific 1:30 times and the last half hour of the 25-hour fall-back day. Actual phone/opening latency remains To Confirm.
+
+## 🧪 Bounded confirmation card — 2026-11-08
+
+- The derived To Confirm card now stays below 48,000 characters. Small queues retain full instructions; larger queues show shorter instruction previews while every full source row stays in the To Confirm tab. If even titles cannot fit, whole check-lines are shown with an explicit remaining-count notice. Checkbox IDs and status acknowledgement stay unchanged. Regression tests cover an oversized queue, Unicode/HTML safety, ticks/direct edits and convergence to the normal two-read, no-lock/no-write refresh. Actual import timing and phone confirmation remain pending.

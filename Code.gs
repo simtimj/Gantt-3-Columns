@@ -2029,23 +2029,56 @@ function confirmRows_(sheet, timer, phase) {
   }).filter(x => x.change));
 }
 
+// Keep the derived card below the Sheet cell limit. Full source rows are never shortened.
+const CONFIRM_HTML_LIMIT = 48000;
 function confirmCardHtml_(rows) {
   const open = rows.filter(x => x.status !== 'works');
   const short = d => { const m = String(d).match(/^\d{4}-(\d{2})-(\d{2})$/); return m ? Number(m[1]) + '/' + Number(m[2]) : String(d); };
-  let html = '<h2>To Confirm</h2><p><i>' + (open.length ? open.length + ' to check' : 'Nothing to check') +
-    ' · tick a line once it works on your phone. Broken? Tell Claude. (From the To Confirm tab.)</i></p>';
+  const clip = (value, limit) => {
+    if (limit === Infinity) return String(value);
+    const chars = Array.from(String(value));
+    return chars.length > limit ? chars.slice(0,Math.max(0,limit-1)).join('') + '…' : String(value);
+  };
   const projects = [];
   open.forEach(x => { if (projects.indexOf(x.project) < 0) projects.push(x.project); });
-  projects.forEach(p => {
-    const list = open.filter(x => x.project === p).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.row - b.row);
-    html += '<div data-kgrp="' + doneEsc_(p) + '"><b><u>' + doneEsc_(p) + ' (' + list.length + ')</u></b></div>';
-    list.forEach(x => {
-      html += '<div class="check-line" data-level="0" data-kid="' + x.id + '">' + doneCheck_(false) +
-        '<span class="check-text">' + (x.status === 'broken' ? '⚠ broken · ' : '') + '<b>' + doneEsc_(x.change) + '</b> · ' +
-        short(x.date) + (x.how ? ': ' + doneEsc_(x.how) : '') + '</span></div>';
+  const ordered = [].concat(...projects.map(p => open.filter(x => x.project === p)
+    .sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.row - b.row)));
+  function render(items, howLimit, bounded) {
+    const compact = howLimit !== Infinity;
+    let html = '<h2>To Confirm</h2><p><i>' + (open.length ? open.length + ' to check' : 'Nothing to check') +
+      ' · tick a line once it works on your phone. Broken? Tell Claude. (From the To Confirm tab.)</i></p>';
+    if (compact) html += '<p><i>Short instructions shown; full text stays in the To Confirm tab.</i></p>';
+    projects.forEach(p => {
+      const list = items.filter(x => x.project === p);
+      if (!list.length) return;
+      const group = bounded ? 'group-' + cellHash_(p) : p;
+      html += '<div data-kgrp="' + doneEsc_(group) + '"><b><u>' + doneEsc_(bounded ? clip(p,80) : p) + ' (' + list.length + ')</u></b></div>';
+      list.forEach(x => {
+        const how = howLimit ? clip(x.how,howLimit) : '';
+        html += '<div class="check-line" data-level="0" data-kid="' + x.id + '">' + doneCheck_(false) +
+          '<span class="check-text">' + (x.status === 'broken' ? '⚠ broken · ' : '') + '<b>' + doneEsc_(bounded ? clip(x.change,200) : x.change) + '</b> · ' +
+          doneEsc_(bounded ? clip(short(x.date),32) : short(x.date)) + (how ? ': ' + doneEsc_(how) : '') + '</span></div>';
+      });
     });
-  });
-  return html;
+    if (items.length < open.length) html += '<p><i>Showing ' + items.length + ' of ' + open.length +
+      ' checks. Remaining checks and full instructions stay in the To Confirm tab.</i></p>';
+    return html;
+  }
+  // Preserve the existing full presentation when it fits. Compact deterministically
+  // before dropping any rows, so an unchanged large queue stops needing the lock.
+  for (const limit of [Infinity,120,80,40,0]) {
+    const html = render(ordered,limit,false);
+    if (html.length <= CONFIRM_HTML_LIMIT) return html;
+  }
+  // Even titles alone may eventually exceed one cell. Keep whole oldest-first
+  // check-lines (never slice HTML), make omissions explicit and retain the source.
+  let lo = 0, hi = ordered.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (render(ordered.slice(0,mid),0,true).length <= CONFIRM_HTML_LIMIT) lo = mid;
+    else hi = mid - 1;
+  }
+  return render(ordered.slice(0,lo),0,true);
 }
 
 function syncConfirmCard_(timer) {

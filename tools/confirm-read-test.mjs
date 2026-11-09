@@ -15,7 +15,7 @@ export function fixture(serverSource = source) {
       const get=()=>{reads.push({name,r,c,h,w});return Array.from({length:h},(_,i)=>Array.from({length:w},(_,j)=>this.rows[r-1+i]?.[c-1+j]??''));};
       return {getValues:get,getValue:()=>get()[0][0],setValues:values=>{
         writes.push({name,r,c,values});values.forEach((row,i)=>row.forEach((v,j)=>{this.rows[r-1+i] ||= [];this.rows[r-1+i][c-1+j]=v;}));
-      },setValue:v=>{writes.push({name,r,c,values:[[v]]});this.rows[r-1] ||= [];this.rows[r-1][c-1]=v;}};
+      },setValue:v=>{if(name==='Reference'&&c===5&&String(v).length>50000)throw Error('Sheet cell limit');writes.push({name,r,c,values:[[v]]});this.rows[r-1] ||= [];this.rows[r-1][c-1]=v;}};
     },appendRow(row){writes.push({name,append:true});this.rows.push(row);}
   }; }
   const intake=sheet('To Confirm',[HEAD,['2026-11-07','Gantt','Example','Check it','','']]);
@@ -77,3 +77,41 @@ assert.equal(typeof profile.done().steps['confirm.lock'],'number');
 for(const key of ['confirm.write.sourceRead','confirm.write.rows','confirm.write.cardRead','confirm.write.render','confirm.reconcile'])
   assert.equal(typeof profile.done().steps[key],'number',key);
 assert.ok(!f.ref.rows[1][4].includes('data-kid='));assert.equal(f.stats.released,true);
+
+// A growing queue must fit a single Reference cell, retain every current check
+// where possible, and converge to the existing lock-free/no-write fast path.
+f=fixture();
+f.intake.rows=[HEAD,...Array.from({length:190},(_,i)=>['2026-11-07',i%2?'Gantt':'Other',
+  'Change '+i,'Detailed check '+('instruction '.repeat(25)),'',''])];
+const original=JSON.stringify(f.intake.rows);
+f.ctx.syncConfirmCard_();
+let html=f.ref.rows[1][4];
+assert.ok(html.length<=48000);assert.ok(html.includes('Short instructions shown'));
+assert.equal((html.match(/data-kid=/g)||[]).length,190,'current-sized queue retains every checkbox');
+assert.equal(JSON.stringify(f.intake.rows),original,'full source instructions remain unchanged');
+f.reset();f.ctx.syncConfirmCard_();
+assert.equal(f.stats.locks,0,'bounded rendering converges instead of retrying a failed oversized write');
+assert.equal(f.writes.length,0);assert.equal(f.reads.length,2);
+// A checkbox tick still updates exactly its source status in a compact card.
+f.ref.rows[1][4]=html.replace('class="check-line"','class="check-line done"');
+f.ctx.syncConfirmCard_();
+assert.equal(f.intake.rows.filter(r=>r[4]==='works').length,1);
+assert.equal((f.ref.rows[1][4].match(/data-kid=/g)||[]).length,189);
+f.reset();f.ctx.syncConfirmCard_();assert.equal(f.writes.length,0);assert.equal(f.stats.locks,0);
+// Source edits remain live, including text in the displayed part of an instruction.
+f.intake.rows[2][3]='Visible correction '+f.intake.rows[2][3];
+f.ctx.syncConfirmCard_();assert.ok(f.ref.rows[1][4].includes('Visible correction'));
+// Pathological title-only queues use complete bounded rows with an explicit
+// remaining-count notice. Escaping and Unicode must survive every fallback.
+f=fixture();
+f.intake.rows=[HEAD,...Array.from({length:800},(_,i)=>['2026-11-07','Group <&> '+i,
+  '😀 <script>& '+('long title '.repeat(50))+i,'Full directions remain here','',''])];
+f.ctx.syncConfirmCard_();html=f.ref.rows[1][4];
+assert.ok(html.length<=48000);assert.ok(html.includes('Showing '));
+assert.ok(html.includes('Remaining checks and full instructions'));
+assert.ok(!html.includes('<script>'));assert.ok(html.includes('&lt;script&gt;'));
+assert.equal((html.match(/<div\b/g)||[]).length,(html.match(/<\/div>/g)||[]).length,'HTML is never sliced mid-row');
+assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(html),'clipping does not split Unicode code points');
+assert.equal(f.intake.rows.length,801,'overflow source rows are retained');
+f.reset();f.ctx.syncConfirmCard_();assert.equal(f.stats.locks,0);assert.equal(f.writes.length,0);
+console.log('✓ bounded confirmation card: compact queue retains all checks, source text and ticks; pathological overflow explicit, safe Unicode/HTML, no retry/write loop');

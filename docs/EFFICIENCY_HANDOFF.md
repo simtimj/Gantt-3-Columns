@@ -20,11 +20,12 @@ Updated 2026-11-08. This is the current engineering handoff, not a declaration t
 
 ## Owners and identities
 
-- Days date + column identifies Tasks/History, Notes, Plan/Blocks pad and Scratch. The Calendar `Plan` table is a separate daily-placement store.
+- Days date + column identifies Tasks/History, Notes, Plan/Blocks pad and Scratch. The Calendar `Plan` table is a separate planning-placement store.
 - Reference card UUID differs from a task's `data-tid`. Keep In Mind/Focus has property-backed item IDs. Copies and plan placements should resolve to the task, not become independent editable duplicates.
 - Calendar owns event timing/color; retain calendar, event and occurrence identity when linking/moving. Planned duration is distinct from measured timer effort.
 - Embedded `Timer Log` operations and the separate `tracker/` database are different systems. Do not merge them implicitly.
 - `New Tasks` is append-oriented intake, not a general update API: its generated ID hashes raw date + title. Due/urgency/subtask edits do not create a new ID. Done Log identity includes details; Type does not. Preserve deduplication/correction boundaries until immutable IDs and revisions are designed.
+- Big Three / Biggest Return is a standing list of up to three tasks or Reference projects, with one ranked Waiting list. `big` and `next` are undated; project refs use `card:<Reference UUID>`. Stretch is set aside (legacy rows remain readable). Completing an item suggests the next Waiting item for Julius to confirm; it does not automatically promote it. Urgent work stays separate. Lead Tasks is not implemented. These rules supersede the earlier dated Big Three model.
 - Visible urgency is now **0 red / 1 yellow / 2 blue**. HTML `data-urg` remains **1 / 2 / 3**. `Urgency 0-2` marks the new intake scale; the legacy header retains legacy numeric interpretation. Do not mass-convert stored HTML values.
 - Existing `Open Tasks` is the implementation work register. Reconcile it rather than inventing another master register. Reference project/task IDs and register IDs have distinct roles.
 

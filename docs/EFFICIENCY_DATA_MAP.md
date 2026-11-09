@@ -19,7 +19,7 @@ This is a code inventory and migration design, not a live referential-integrity 
 | Keep In Mind / Focus | Script properties: `focusDataHead` selects verified `focusV2_<generation>_<n>` JSON chunks | `getFocus` / `saveFocus`; item `id` is the bridge identity (`m-…` for newly generated tasks). Category IDs and item IDs have different roles. Public saves use locking and three-way merge |
 | Calendar appointment | Google Calendar; calendar ID, event ID and occurrence start matter | Calendar API writers own timing/color. The app's event references often encode `eventId@startMs`; a move must refresh those links |
 | Calendar display cache | Browser `fw.calCache.v1` and in-memory event/day maps | A derived last-known view, not a new event owner. Background reads refresh Google data; write paths request fresh data or apply the returned event shape |
-| Calendar daily plan | `Plan`: `Id, Date, Group, Rank, Ref, Title, Target, Event, Updated` | `planSave`; `Ref` is `tid:<taskId>` or `cal:<eventId>`. `Id` identifies the plan placement, not a new task. Big/Stretch are dated; Next/Backlog are undated |
+| Calendar daily plan | `Plan`: `Id, Date, Group, Rank, Ref, Title, Target, Event, Updated` | `planSave`; `Ref` is `tid:<taskId>`, `cal:<eventId>` or `card:<Reference UUID>`. `Id` identifies the plan placement, not a new task. Big Three is standing/undated; Next is the ranked Waiting list; Backlog is undated. Stretch is set aside, with legacy dated rows still readable |
 | AI task intake | `New Tasks`: Date, Title, Urgency, Due, Minutes, Subtasks, Added | `sheetTaskRows_` creates `s-` + hash(raw date + title); `applyClaudeTasks_` records applied IDs. This is append-oriented intake, not a general task-edit API. Visible urgency 0/1/2 uses header `Urgency 0-2`; stored HTML remains 1/2/3 |
 | Gantt implementation work register | Live `Open Tasks`: Task ID, Task, Status, Priority, Owner, Next action, Last updated, Source/location, Related link, Notes | Existing AI/project register with its own work-item IDs. Central Data Hub routes Gantt implementation work here. No direct consumer of this tab was found in the inspected app source; it is not the `New Tasks` intake |
 | AI completion intake | `Done Log`: Date, Project, Title, Details, Done by, Type | `sheetDoneRows_` hashes date/project/title/details into `s-…`; imported `data-cid` preserves provenance. The rolling intake window is 30 days |
@@ -29,7 +29,7 @@ This is a code inventory and migration design, not a live referential-integrity 
 | Fun / New Things | Script-property JSON, item/category IDs and updated times/tombstones | `saveFun` / `saveNewThings`; not automatically planner tasks or calendar events |
 | Confirmation checklist | `To Confirm` rows; card line `data-kid` hashes date/project/change | `syncConfirmCard_`; source status is authoritative, the pinned Reference card is derived. Confirmation IDs are not general task IDs |
 | Recovery copies | Browser-local app/page/record keys in `Drafts.html`; day key is date, Reference key is card ID | Pending text snapshots and their original merge bases. A recovery-copy ID is not a task identity; successful reviewed save returns authority to the server |
-| Performance samples | Speed Log with build/release labels | Diagnostic data, not task/session records. Save timing is a separate pending improvement (PR #31); do not treat a missing timing record as inactivity |
+| Performance samples | Speed Log with build/release labels | Diagnostic data, not task/session records. Save timing is implemented by PR #31; do not treat a missing timing record as inactivity |
 
 Sources: [Code.gs](../Code.gs), [Index.html](../Index.html), [Timer.gs](../Timer.gs), [StudyLog.gs](../StudyLog.gs), [tracker/Server.gs](../tracker/Server.gs), [Drafts.html](../Drafts.html).
 
@@ -41,7 +41,7 @@ Sources: [Code.gs](../Code.gs), [Index.html](../Index.html), [Timer.gs](../Timer
 | `Plan.Ref = tid:…` | Uses the live task bridge for text/done, including Focus | `fwTasks.info` may return null because the source is not loaded. The planner displays "not loaded" and disables that tick; that does not prove an orphan |
 | `Plan.Ref = cal:…` | Links to a Calendar event; cached row title can be a fallback | Ref does not contain calendar ID, while Event contains event ID/start. Verify cross-calendar and recurring-occurrence semantics before global event deduplication |
 | `Plan.Event` and `planEv:<tid>` | Schedule reuses the known task event; calendar moves relink event/start references | Preserve the event ID and refresh its occurrence/start locator. Never create a second event simply because a stale locator cannot find the first |
-| Plan row versus task | A dated/undated placement is found by Ref + the relevant day/undated group | Separate placement ID from task ID and from a recurring occurrence. A daily habit template needs occurrence identity; title equality is insufficient |
+| Plan row versus task | A standing or legacy dated placement is found by Ref + the relevant day/undated group | Separate placement ID from task ID and from a recurring occurrence. A daily habit template needs occurrence identity; title equality is insufficient |
 | Timer Item versus task | A line can carry both task and timer identity | Keep an explicit task-to-timer association before combining the two timer stores. Planned calendar duration is not measured work; estimates remain labelled estimates |
 | Done Log / History | Append-oriented materialized history with applied-ID guards | A completion record is not the same entity as the still-open task or its timer session |
 
@@ -67,7 +67,7 @@ Start with the existing Gantt-efficiency project itself, whose task lines alread
 | D. Shadow comparison | Compare old and derived task counts/status, plan references, event IDs and measured/estimated time totals; test retry, partial failure and two-device edits | Zero unexplained differences; documented reverse mapping and recovery exercise before changing write authority |
 | E. One write owner | Enable exact-field revisioned writes for the chosen owner and derive other views from it | No uncoordinated dual writers. Keep a compatible reader/rollback path and do not delete original storage until verified |
 
-Keep `Urgency` (red/yellow/blue), selected daily `Plan.Group` (Big Three/Stretch/Next/Backlog), due date and outcome target separate. They answer different questions. A quick timer activity may remain unallocated or explicitly linked to a task; it need not create a new permanent task automatically.
+Keep `Urgency` (red/yellow/blue), selected `Plan.Group` (standing Big Three / Waiting / Backlog; Stretch set aside), due date and outcome target separate. They answer different questions. A quick timer activity may remain unallocated or explicitly linked to a task; it need not create a new permanent task automatically.
 
 Use typed identity keys (task versus completion versus plan placement versus timer operation), even where existing string prefixes happen to match. Preserve legacy strings as aliases rather than globally renumbering them.
 

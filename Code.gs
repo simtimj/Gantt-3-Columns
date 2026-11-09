@@ -285,7 +285,20 @@ function getDaysRange_(startDate, endDate, snapshot) {
   // Initial loading has already read these exact rows for seeds and Urgent.
   // Reuse only that request's snapshot; later calls still read current data.
   if (snapshot && Array.isArray(snapshot.rows)) {
-    return snapshot.rows.map(row => ({ row: row, date: formatDate_(row[0]) }))
+    if (!snapshot.rows.length) return [];
+    // Skip distant Date cells before timezone formatting. Keep a conservative
+    // two-day margin for timezone offsets and 25-hour daylight-saving days.
+    const lo = parseDate_(startDate).getTime() - 2 * DAY_MS;
+    const hi = parseDate_(endDate).getTime() + 2 * DAY_MS;
+    return snapshot.rows.filter(row => {
+      const value = row[0];
+      if (!value) return false;
+      if (isDate_(value)) {
+        const time = value.getTime();
+        if (time < lo || time > hi) return false;
+      }
+      return true; // text dates still use the existing normalization below
+    }).map(row => ({ row: row, date: formatDate_(row[0]) }))
       .filter(x => x.date && x.date >= startDate && x.date <= endDate)
       .map(x => {
         const row = x.row, plan = snapshot.width >= 4 ? String(row[3] || '') : '';

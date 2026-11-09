@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { extractFocus } from './focus-recovery.mjs';
 const source = fs.readFileSync('Code.gs','utf8');
 const clone = v => JSON.parse(JSON.stringify(v));
 const old = {v:1,cats:[{id:'c',name:'Original',items:[{id:'a',t:'Keep this',d:0}]}]};
@@ -28,9 +32,9 @@ function fixture(initial = {focusData:JSON.stringify(old),funData:'unrelated'}) 
     },
     deleteProperty:k=>{if(faults.cleanup) throw Error('cleanup unavailable');delete props[k];}
   };
-  const ctx = vm.createContext({console,Utilities:{getUuid:()=> 'generation-'+(++gen)},PropertiesService:{getScriptProperties:()=>api}});
+  const ctx = vm.createContext({console,Utilities:{getUuid:()=> 'generation-'+(++gen),DigestAlgorithm:{MD5:'MD5'},Charset:{UTF_8:'UTF_8'},
+    computeDigest:(_,text)=>[...crypto.createHash('md5').update(text,'utf8').digest()].map(x=>x>127?x-256:x)},PropertiesService:{getScriptProperties:()=>api}});
   vm.runInContext(source,ctx);
-  ctx.cellHash_=s=>crypto.createHash('sha256').update(s).digest('hex');
   return {props,faults,ctx,read:()=>clone(ctx.readFocus_()),write:v=>ctx.writeFocus_(v)};
 }
 // Unicode boundaries and transparent legacy migration.
@@ -93,3 +97,44 @@ for(const legacy of [{focusDataN:'',focusData_0:'x'},{focusData_0:'x'},{focusDat
 f=fixture();f.write(next);head=JSON.parse(f.props.focusDataHead);delete f.props['focusV2_'+head.g+'_0'];
 assert.throws(()=>f.read(),/could not be read/);
 console.log('✓ Focus storage: Unicode byte limits; legacy migration; interrupted/corrupt staging; refused/lost commit acknowledgements; cleanup faults; orphan recovery; invalid heads never become empty lists');
+
+// Offline rollback drill: the independent extractor reads the actual writer's
+// selected generation, ignoring stale legacy data and uncommitted orphan chunks.
+f=fixture();f.write(next);
+f.props.focusData=JSON.stringify(old);
+f.props.focusV2_orphan_0='uncommitted';
+const recovered=extractFocus(f.props);
+assert.deepEqual(recovered.data,next);assert.equal(recovered.format,'generation-v2');
+assert.equal(recovered.raw,JSON.stringify(next),'preserve selected raw JSON exactly');
+assert.equal(f.props.funData,'unrelated');
+const broken={...f.props};delete broken['focusV2_'+JSON.parse(broken.focusDataHead).g+'_0'];
+assert.throws(()=>extractFocus(broken),/Missing or invalid/,'never recover stale legacy data after selected-generation loss');
+const corrupt={...f.props};corrupt['focusV2_'+JSON.parse(corrupt.focusDataHead).g+'_0']+='x';
+assert.throws(()=>extractFocus(corrupt),/length\/hash/);
+for(const props of [{focusData:JSON.stringify(next)},
+  {focusDataN:'2',focusData_0:JSON.stringify(next).slice(0,15),focusData_1:JSON.stringify(next).slice(15)}]) {
+  assert.deepEqual(extractFocus(props).data,next,'legacy and selected generation preserve identical logical data');
+}
+assert.throws(()=>extractFocus({funData:'unrelated'}),/No selected Focus/);
+assert.throws(()=>extractFocus({focusDataN:'',focusData:JSON.stringify(old)}),/chunk count/);
+assert.throws(()=>extractFocus({focusDataHead:'{}',focusData:JSON.stringify(old)}),/selected Focus head/);
+assert.throws(()=>extractFocus({focusDataN:'1',focusData_0:''}),/Empty legacy/);
+assert.throws(()=>extractFocus({focusData_0:'orphan'}),/Uncounted legacy/);
+assert.throws(()=>extractFocus({focusData:'{"cats":null}'}),/list is invalid/);
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'gantt-focus-recovery-'));
+try {
+  const input=path.join(temp,'properties.json'),output=path.join(temp,'recovered.json');
+  fs.writeFileSync(input,JSON.stringify(f.props),{mode:0o600});
+  const run=()=>spawnSync(process.execPath,['tools/focus-recovery.mjs',input,output],{encoding:'utf8'});
+  let cli=run();assert.equal(cli.status,0,cli.stderr);
+  assert.equal(fs.readFileSync(output,'utf8'),JSON.stringify(next)+'\n');
+  assert.equal(fs.statSync(output).mode & 0o777,0o600);
+  assert.ok(!cli.stdout.includes('日本語'),'task content stays out of the console');
+  cli=run();assert.notEqual(cli.status,0,'existing backups are not overwritten');
+  assert.equal(fs.readFileSync(output,'utf8'),JSON.stringify(next)+'\n');
+  fs.unlinkSync(output);fs.writeFileSync(input,JSON.stringify(broken));
+  cli=run();assert.notEqual(cli.status,0);assert.equal(fs.existsSync(output),false,'failed extraction creates no backup');
+  fs.writeFileSync(input,'private-task-text invalid json');
+  cli=run();assert.notEqual(cli.status,0);assert.ok(!cli.stderr.includes('private-task-text'),'invalid input is not echoed to the console');
+} finally {fs.rmSync(temp,{recursive:true,force:true});}
+console.log('✓ offline Focus recovery drill: actual MD5/UTF-8 writer, selected generation and legacy reads, stale/corrupt refusal, private output, no overwrite or live writes');

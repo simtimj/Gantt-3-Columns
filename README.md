@@ -620,3 +620,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 ## 🧪 Import stage timings — 2026-11-08
 
 - Existing Speed Log reports now break Done Log and confirmation work into source reads, row processing, current-day/card checks, lock waits and reconciliation. These numeric substeps overlap their parent `done`/`confirm` totals; do not sum parents and children. No new logging requests or task content are added. Refresh /dev and allow a normal import to produce the first live breakdown. This measures bottlenecks; it does not establish a speed improvement.
+
+## 🧪 Offline Focus recovery drill — 2026-11-08
+
+- `tools/focus-recovery.mjs` extracts a selected Focus list from a local Script Properties JSON snapshot, verifies the generation length/hash, and supports legacy single/numbered chunks. It refuses corrupt selected data instead of using stale legacy copies; backups are created privately and existing files are never overwritten. The integration drill uses the actual Apps Script writer and MD5/UTF-8 hash implementation with synthetic data. No live backup or live rollback is claimed. See [Focus recovery procedure](docs/FOCUS_RECOVERY.md); keep the compatible generation reader when rolling back app code.

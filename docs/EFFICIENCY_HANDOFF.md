@@ -51,6 +51,7 @@ Row hints never cache editable history text. Stale, deleted, invalid or unavaila
 - Reference saves protect exact requested fields and serialize card saves. Focus uses three-way merging; failures/conflicts retain local work instead of replacing it with empty or stale data. A lock alone does not merge stale snapshots, and external Sheet writers do not participate in script locks.
 - Day Tasks/Notes and Reference text have revision-specific browser recovery copies captured before debounce. Reopening offers Review/Restore/export; deleted cards are not automatically recreated. Browser storage can fail or be cleared. This is not cross-device or historical backup and does not extend text recovery to every module.
 - Focus property storage stages bounded UTF-8 generation chunks, verifies them, then publishes a head. **After migration, rollback must retain a compatible generation reader or convert verified data first.** An old reader alone can make current data inaccessible. Capacity limits remain.
+- Offline Focus extraction and its repeatable storage-writer drill are in [Focus recovery procedure](FOCUS_RECOVERY.md). The extractor verifies the selected generation (or legacy data) and creates a new private JSON file without writing to Google. Passing the synthetic drill does not establish that a live backup exists or that live restoration works.
 - Keep original HTML, IDs and reverse mappings until a structural migration and rollback are verified.
 
 ## Measurements and checks

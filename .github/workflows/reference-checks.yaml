@@ -11,6 +11,7 @@ on:
       - 'tools/reference-save-test.mjs'
       - 'tools/focus-save-test.mjs'
       - 'tools/focus-storage-test.mjs'
+      - 'tools/focus-recovery.mjs'
       - 'tools/import-read-test.mjs'
       - 'tools/confirm-read-test.mjs'
       - 'tools/sync-test.mjs'

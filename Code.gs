@@ -2624,6 +2624,7 @@ function addAllDayTask(dateString, title) {
   const cal = CalendarApp.getCalendarById(EVENT_CALENDARS[0]);
   if (!cal) throw new Error('Main calendar is unavailable');
   const ev = cal.createAllDayEvent(name, parseDate_(date));
+  try { ev.removeAllReminders(); } catch (e) { console.error(e); } // no notifications unless Julius asks (standing rule)
   return { id: ev.getId(), date: date };
 }
 

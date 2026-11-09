@@ -252,25 +252,28 @@ function studyPutBlock_(html, key, block, window) {
   return appendDoneInSection_(html, block, window);
 }
 
-function syncStudyLog_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(STUDY_TAB);
-  if (!sheet || sheet.getLastRow() < 2) return;
-  let range = sheet.getRange(1, 1, sheet.getLastRow(), STUDY_HEADERS.length);
-  let values = range.getValues();
+function syncStudyLog_(timer) {
+  const sheet = speedPart_(timer, 'study.lookup', () => SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STUDY_TAB));
+  if (!sheet) return;
+  const last = speedPart_(timer, 'study.bounds', () => sheet.getLastRow());
+  if (last < 2) return;
+  let range = sheet.getRange(1, 1, last, STUDY_HEADERS.length);
+  let values = speedPart_(timer, 'study.sourceRead', () => range.getValues());
   const props = PropertiesService.getScriptProperties();
-  let sig = cellHash_(todayString_() + JSON.stringify(values.map(r => r.slice(0, 12))));
-  if (props.getProperty('studySig') === sig) return;
+  let sig = speedPart_(timer, 'study.signature', () => cellHash_(todayString_() + JSON.stringify(values.map(r => r.slice(0, 12)))));
+  if (speedPart_(timer, 'study.appliedRead', () => props.getProperty('studySig')) === sig) return;
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) return; // next load retries
+  if (!speedPart_(timer, 'study.lock', () => lock.tryLock(10000))) return; // next load retries
   try {
     // The fast path needs only raw values. On change, reread under the lock:
     // another importer or an appended/corrected session may have arrived.
-    range = sheet.getRange(1, 1, sheet.getLastRow(), STUDY_HEADERS.length);
-    values = range.getValues();
-    sig = cellHash_(todayString_() + JSON.stringify(values.map(r => r.slice(0, 12))));
-    if (props.getProperty('studySig') === sig) return;
-    const display = range.getDisplayValues();
+    values = speedPart_(timer, 'study.lockedRead', () => {
+      range = sheet.getRange(1, 1, sheet.getLastRow(), STUDY_HEADERS.length);
+      return range.getValues();
+    });
+    sig = speedPart_(timer, 'study.lockedSignature', () => cellHash_(todayString_() + JSON.stringify(values.map(r => r.slice(0, 12)))));
+    if (speedPart_(timer, 'study.lockedAppliedRead', () => props.getProperty('studySig')) === sig) return;
+    const display = speedPart_(timer, 'study.displayRead', () => range.getDisplayValues());
     if (String(values[0][12] || '') !== 'Logged') sheet.getRange(1, 13).setValue('Logged');
     const today = todayString_();
     const segs = studySegments_(values, display);

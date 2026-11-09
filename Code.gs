@@ -142,7 +142,7 @@ function runImportSteps_(t, req) {
   try { applyClaudeNotes_(); } catch (e) { console.error(e); } t.mark('notes');
   try { applyClaudeTasks_(); } catch (e) { console.error(e); } t.mark('tasks');
   try { syncConfirmCard_(t); } catch (e) { console.error(e); } t.mark('confirm');
-  try { syncStudyLog_(); } catch (e) { console.error(e); } t.mark('study');
+  try { syncStudyLog_(t); } catch (e) { console.error(e); } t.mark('study');
   try { if (req) snapshot = readScheduleForSync_(req, t); else moveScheduleToNotes_(); }
   catch (e) { snapshot = null; console.error(e); } t.mark('schedule');
   // Both one-time fixes can write Days after the schedule read. Only an

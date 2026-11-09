@@ -5,10 +5,10 @@ import vm from 'node:vm';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
 function fixture() {
-  const reads=[],writes=[],props={},faults={};
+  const reads=[],writes=[],props={},faults={},bounds={};
   const header=['ID','Date','Started','Ended','Minutes','Topics','Questions (JSON)','Correct','Partial','Incorrect','Unanswered','Status','Logged'];
   const first=['it-example','2026-11-08','09:00','09:10',10,'DNS','',1,0,0,0,'draft',''];
-  function sheet(name,rows) {return {name,rows,getLastRow:()=>rows.length,
+  function sheet(name,rows) {return {name,rows,getLastRow:()=>{bounds[name]=(bounds[name]||0)+1;return rows.length;},
     getRange(r,c,h=1,w=1) {const raw=()=>Array.from({length:h},(_,i)=>Array.from({length:w},(_,j)=>rows[r-1+i]?.[c-1+j]??''));
       return {getValues(){reads.push(name+':raw');return raw();},getDisplayValues(){reads.push(name+':display');return raw().map(row=>row.map(String));},
         getValue(){reads.push(name+':cell');return raw()[0][0];},
@@ -34,7 +34,7 @@ function fixture() {
   ctx.getOrCreateSheet_=n=>sheets.get(n);
   ctx.backupCell_=()=>{};
   const signature=()=>ctx.cellHash_('2026-11-08'+JSON.stringify(intake.rows.map(r=>r.slice(0,12))));
-  return {ctx,intake,days,review,reads,writes,props,faults,signature};
+  return {ctx,intake,days,review,reads,writes,props,faults,bounds,signature};
 }
 let f=fixture();f.props.studySig=f.signature();f.ctx.syncStudyLog_();
 assert.deepEqual(f.reads,['Study Sessions:raw'],'unchanged import needs one raw read, no display read');
@@ -63,3 +63,15 @@ assert.deepEqual(f.reads,['Study Sessions:raw']);assert.deepEqual(f.writes,[]);
 f.intake.rows[2][12]='logged acknowledgement';f.reads.length=0;f.ctx.syncStudyLog_();
 assert.deepEqual(f.reads,['Study Sessions:raw']);
 console.log('Study unchanged read and locked correction tests passed');
+
+// One source-bound lookup on the unchanged path; locked input still gets its
+// own fresh bounds after an append. Numeric substeps add no source reads.
+f=fixture();f.props.studySig=f.signature();let timer=f.ctx.speedTimer_();f.ctx.syncStudyLog_(timer);
+assert.equal(f.bounds['Study Sessions'],1);assert.deepEqual(f.reads,['Study Sessions:raw']);
+for(const key of ['study.lookup','study.bounds','study.sourceRead','study.signature','study.appliedRead'])assert.equal(typeof timer.done().steps[key],'number');
+f=fixture();f.faults.onLock=()=>{f.intake.rows.push(['it-new','2026-11-08','09:15','09:20',5,'DNS','',1,0,0,0,'draft','']);};
+timer=f.ctx.speedTimer_();f.ctx.syncStudyLog_(timer);assert.equal(f.bounds['Study Sessions'],2);
+for(const key of ['study.lock','study.lockedRead','study.lockedSignature','study.lockedAppliedRead','study.displayRead'])assert.equal(typeof timer.done().steps[key],'number');
+assert.equal(f.props.studySig,f.signature());
+f=fixture();f.intake.rows.splice(1);f.ctx.syncStudyLog_();assert.equal(f.bounds['Study Sessions'],1);assert.deepEqual(f.reads,[]);assert.deepEqual(f.writes,[]);
+console.log('✓ study bounds: 2→1 unchanged lookups; fresh locked append, header-only behavior and numeric substeps without extra reads');

@@ -664,3 +664,7 @@ Inbox replies read their three related user settings in one fresh snapshot inste
 ## 🧪 Reuse verified Done Log ID hashes — 2026-11-09
 
 Every Done Log source row is still read and normalized. Small private cache blocks can reuse ID digests only when every normalized input string matches exactly; edits, appends, moved rows, eviction or failures trigger the existing hash calculation. Task IDs, applied-state rules, dates and source writes are unchanged. The real-MD5 fixture drops324 digest calls to0 on an unchanged warm read; actual elapsed-time gains, including cache overhead, need measurement.
+
+## 🧪 Study intake read budget — 2026-11-09
+
+Unchanged study imports reuse one fresh row-count lookup instead of making it twice. Changed intake still rereads source bounds and values under the lock before applying anything. Numeric timing now separates study lookup, source read, signature and lock work, with no extra source reads or logging requests. Actual latency savings remain unmeasured.

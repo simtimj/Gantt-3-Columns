@@ -1874,6 +1874,7 @@
     .fx .fx-task{padding:1px 0 1px calc(var(--lv,0) * 14px);gap:4px;}
     .fx-tt{word-break:normal;overflow-wrap:break-word;}
     .fx-note .fx-tt{font-style:italic;color:var(--muted,#888);font-size:.92em;}
+    .fx-ago{flex:0 0 auto;margin-left:.35em;font-size:.72em;color:var(--muted,#888);opacity:.75;align-self:center;white-space:nowrap;}
     .fx-tools{display:none;flex:0 0 auto;gap:1px;align-self:center;}
     .fx-task:focus-within .fx-tools,.fx-task:hover .fx-tools{display:inline-flex;}
     .fx-tools button{border:1px solid var(--border,#999);background:transparent;color:inherit;border-radius:5px;font:inherit;font-size:.85em;line-height:1;min-width:22px;height:22px;padding:0 3px;cursor:pointer;}
@@ -7563,8 +7564,22 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const wired = new WeakSet();
     const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
     const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    /* Recently updated (2026-11-09, Julius): each item carries u = when it was last changed, so the server can let the
+       newer edit win and the list can show a small "5m" tag on lines changed in the last day. */
+    let snap = null;
+    const itemKey = t => { const {u, ...rest} = t; return JSON.stringify(rest); };
+    function snapshot(){ snap = new Map(); if(data) data.cats.forEach(c => (c.items || []).forEach(t => snap.set(t.id,itemKey(t)))); }
+    function stampChanges(){
+      if(!data) return;
+      if(!snap) { snapshot(); return; }
+      const now = Date.now();
+      data.cats.forEach(c => (c.items || []).forEach(t => { if(snap.get(t.id) !== itemKey(t) && (t.t || '').trim()) t.u = now; }));
+      snapshot();
+    }
+    const ago = u => { const m = Math.max(0,Math.round((Date.now() - u) / 60000)); return m < 1 ? 'now' : m < 60 ? m + 'm' : Math.round(m / 60) + 'h'; };
     function save(){
       pending = true;
+      stampChanges();
       if(base) keepDraft();
       clearTimeout(saveT);
       if(!conflict) saveT = setTimeout(send,700);
@@ -7586,9 +7601,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           // New typing is based on the sent snapshot; the next merge also brings in remote additions.
           base = sent; pending = true; keepDraft(); saveT = setTimeout(send,0);
         } else {
-          data = valid(r && r.data) ? r.data : sent; base = copy(data); pending = false;
+          const remote = valid(r && r.data) && JSON.stringify(r.data) !== JSON.stringify(sent);
+          data = valid(r && r.data) ? r.data : sent; base = copy(data); pending = false; snapshot();
           try { localStorage.removeItem(DRAFT); } catch(e){}
-          render(); setStatus('Focus saved');
+          render(); setStatus(remote ? 'Keep In Mind saved — merged in changes from another device' : 'Focus saved');
         }
       }).withFailureHandler(e => {
         saving = false; pending = true; const stored = keepDraft();
@@ -7646,7 +7662,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           if(!(t.lv > 0) || !cell){ if(cell) out += '</div>'; out += '<div class="fx-cell">'; cell = true; }
           out += '<div class="fx-task' + (t.d ? ' fx-done' : '') + (t.n ? ' fx-note' : '') + '" data-ftid="' + h(t.id) + '" style="--lv:' + (t.lv || 0) + '">' +
             (t.n ? '' : '<input type="checkbox" data-fx="tick"' + (t.d ? ' checked' : '') + '>') +
-            '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="' + (t.lv ? 'Subtask' : 'Task') + '">' + h(t.t) + '</span></div>';
+            '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="' + (t.lv ? 'Subtask' : 'Task') + '">' + h(t.t) + '</span>' +
+            (t.u && Date.now() - t.u < 864e5 ? '<span class="fx-ago" title="Last changed ' + h(new Date(t.u).toLocaleString()) + '">' + ago(t.u) + '</span>' : '') + '</div>';
         });
         if(cell) out += '</div>';
         out += (items.length ? '' : '<button type="button" class="fx-add" data-fx="addt">+ Task</button>') + '</div></div>';
@@ -7920,8 +7937,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       loadError = false;
       if(window.google && google.script) google.script.run.withSuccessHandler(d => {
         const stored = draft();
-        data = valid(d) ? d : {v:1,cats:[]}; base = copy(data);
-        if(stored && valid(stored.data) && valid(stored.base)){ data = stored.data; base = stored.base; pending = true; }
+        data = valid(d) ? d : {v:1,cats:[]}; base = copy(data); snapshot();
+        if(stored && valid(stored.data) && valid(stored.base)){ data = stored.data; base = stored.base; pending = true; snapshot(); }
         if(migrate(data) || pending) save();
         render(); window.tidAnyOn && window.focusReconcile(window.tidAnyOn);
       }).withFailureHandler(() => {
@@ -7935,6 +7952,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
     load();
     render();
+    // Back to the app → pull the latest list so this device starts from the newest copy (only when idle).
+    document.addEventListener && document.addEventListener('visibilitychange', () => {
+      if(document.visibilityState !== 'visible' || !data || pending || saving || conflict || !(window.google && google.script)) return;
+      const host = document.querySelector('.fx'); if(host && host.contains(document.activeElement)) return;
+      google.script.run.withSuccessHandler(d => {
+        if(!valid(d) || pending || saving) return;
+        if(JSON.stringify(d) === JSON.stringify(base)) return;
+        data = d; base = copy(d); snapshot(); render();
+      }).getFocus();
+    });
   })();
   /* Done → Dailies matches (2026-11-05, Julius: "a task done today should tick its daily habit, just double check").
      Finished lines today (History / Today cell + Blocks pad) are matched by words to today's open Dailies; each match

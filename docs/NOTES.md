@@ -383,6 +383,8 @@ Requirements settled with Julius 2026-11-01; implement in phases, smallest safe 
 - `tools/smoke.mjs` checks the conversion and a Tab nest (+ saved levels).
 - 2026-11-06: render groups each lv-0 line + its deeper lines into `.fx-cell` (bordered; `.fx-cat` full border, no left line). `.fx-tools` (‹ › 📌) removed; hold the checkbox (450 ms) → `showTaskMenu` (Send to Today / Make subtask / Less indent / Remove; the click after a hold is swallowed). Backspace uses `readText` (empty incl. `<br>`). + Category seeds one empty task; + Task only on an empty category.
 
+- 2026-11-09 (Julius: no approve prompt): `mergeFocus_` never returns conflicts. Delete vs edit keeps the edited item; a field both sides changed → newer item `u` stamp, else the incoming save; order: side that reordered wins, else incoming. Duplicate ids are deduped. Losing values go to script property `focusMergeLog` (last 20, 500 chars each). Client `save()` → `stampChanges()` sets `u` on items whose content changed (vs `snap`); `.fx-ago` tag for `u` < 24 h; `visibilitychange` → `getFocus` refresh when idle. The old conflict UI stays as a dead path for safety.
+
 ## Fast start + live updates (2026-11-05, Julius: "like Google Sheets, update only what's needed")
 
 - Speed Log baseline before this (3 loads 11/4 ~20:40): server 4.8 / 5.9 / 4.9 s + ~1.8 s browser. Biggest steps: done 1.1 s, setup 0.3–1.2 s, cardCats 0.5 s, confirm 0.5 s, tasks 0.45 s, study 0.3 s, inbox 0.2 s.

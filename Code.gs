@@ -1468,33 +1468,43 @@ function getFocus() {
   try { return readFocus_(); } finally { lock.releaseLock(); }
 }
 
-// Three-way merge: independent records/fields survive; contradictory edits are never guessed.
+// Three-way merge (2026-11-09, Julius: "don't make me approve every add"): never asks. Items merge by id
+// (adds from every device survive), an item deleted on one side but edited on the other is kept, a field
+// both sides changed goes to the newer edit (item u stamp, else this save), and the losing value is kept
+// in script property focusMergeLog (last 20) so nothing is silently lost.
 function mergeFocus_(base, mine, theirs) {
-  const conflicts = [];
+  const overwritten = [];
   const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
   const object = v => v && typeof v === 'object' && !Array.isArray(v);
-  function merge(b,m,t,path) {
+  const stamp = v => object(v) && typeof v.u === 'number' ? v.u : 0;
+  function merge(b,m,t,path,mineNewer) {
     if(same(m,b)) return t;
     if(same(t,b) || same(m,t)) return m;
+    // Removed on one side, changed on the other: keep the changed copy.
+    if(m === undefined && object(t)) return t;
+    if(t === undefined && object(m)) return m;
     if(object(b) && object(m) && object(t)) {
+      const newer = stamp(m) || stamp(t) ? stamp(m) >= stamp(t) : mineNewer;
       const out = {};
       [...new Set(Object.keys(b).concat(Object.keys(m),Object.keys(t)))].forEach(k => {
-        const v = merge(b[k],m[k],t[k],path + '.' + k);
+        const v = merge(b[k],m[k],t[k],path + '.' + k,newer);
         if(v !== undefined) out[k] = v;
       });
       return out;
     }
-    const records = a => Array.isArray(a) && a.every(x => object(x) && typeof x.id === 'string') && new Set(a.map(x => x.id)).size === a.length;
-    if(records(b) && records(m) && records(t)) {
+    const records = a => Array.isArray(a) && a.every(x => object(x) && typeof x.id === 'string');
+    const uniq = a => { const seen = {}; return a.filter(x => seen[x.id] ? false : (seen[x.id] = true)); };
+    if(Array.isArray(b) && records(m) && records(t) && (records(b) || !b.length)) {
+      b = uniq(b); m = uniq(m); t = uniq(t);
       const maps = [b,m,t].map(a => new Map(a.map(x => [x.id,x]))), out = new Map();
       [...new Set(b.concat(m,t).map(x => x.id))].forEach(id => {
-        const v = merge(maps[0].get(id),maps[1].get(id),maps[2].get(id),path + '[' + id + ']');
+        const v = merge(maps[0].get(id),maps[1].get(id),maps[2].get(id),path + '[' + id + ']',mineNewer);
         if(v !== undefined) out.set(id,v);
       });
       const common = b.map(x => x.id).filter(id => maps[1].has(id) && maps[2].has(id) && out.has(id));
       const order = a => a.map(x => x.id).filter(id => common.indexOf(id) >= 0);
-      const mo = order(m), to = order(t), mc = !same(mo,common), tc = !same(to,common);
-      if(mc && tc && !same(mo,to)) conflicts.push(path + '.order');
+      const tc = !same(order(t),common) && same(order(m),common);
+      // Order: the side that reordered wins; if both did, this save (the latest action) wins.
       const primary = tc ? t : m, secondary = tc ? m : t;
       const ids = primary.map(x => x.id).filter(id => out.has(id));
       // Keep insertions near their next surviving neighbour, rather than losing their position.
@@ -1503,12 +1513,14 @@ function mergeFocus_(base, mine, theirs) {
         const next = secondary.slice(i+1).find(n => ids.indexOf(n.id) >= 0);
         ids.splice(next ? ids.indexOf(next.id) : ids.length,0,x.id);
       });
+      out.forEach((v,id) => { if(ids.indexOf(id) < 0) ids.push(id); });
       return ids.map(id => out.get(id));
     }
-    conflicts.push(path);
-    return t;
+    const win = mineNewer === false ? t : m, lose = win === m ? t : m;
+    overwritten.push({path:path,lost:lose});
+    return win;
   }
-  return {data:merge(base,mine,theirs,'focus'),conflicts:conflicts};
+  return {data:merge(base,mine,theirs,'focus',true),conflicts:[],overwritten:overwritten};
 }
 
 function saveFocus(data, opts) {
@@ -1519,9 +1531,16 @@ function saveFocus(data, opts) {
     if(JSON.stringify(data) === JSON.stringify(current)) return {data:current};
     if(!opts || !opts.base) throw new Error('Reload the app before saving Focus; this older tab cannot safely merge changes.');
     const result = mergeFocus_(opts.base,data,current);
-    if(result.conflicts.length) return {conflict:true,data:current,fields:result.conflicts};
     writeFocus_(result.data);
-    return {data:result.data};
+    if(result.overwritten.length) {
+      try {
+        const sp = PropertiesService.getScriptProperties();
+        let log = []; try { log = JSON.parse(sp.getProperty('focusMergeLog') || '[]'); } catch (e) {}
+        log = log.concat(result.overwritten.map(o => ({at:Date.now(),path:o.path,lost:JSON.stringify(o.lost === undefined ? null : o.lost).slice(0,500)}))).slice(-20);
+        sp.setProperty('focusMergeLog',JSON.stringify(log));
+      } catch (e) {}
+    }
+    return {data:result.data,merged:result.overwritten.length};
   } finally { lock.releaseLock(); }
 }
 

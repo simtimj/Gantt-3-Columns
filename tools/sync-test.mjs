@@ -66,9 +66,10 @@ assert.equal(out.days['2026-11-07'].tasks,'after');
 const logged = [];
 server.getOrCreateSheet_ = () => ({appendRow:r=>logged.push(r),getLastRow:()=>2});
 server.logSpeed('sync',{total:42,steps:{days:1},release:'response-release',build:'response-page'},
-  {pageRelease:'old-tab',rpcMs:90,serverRelease:'untrusted'});
+  {pageRelease:'old-tab',rpcMs:90,serverRelease:'untrusted',reportId:'report-under-test'});
 const context = JSON.parse(logged[0][4]);
 assert.equal(context.serverRelease,'response-release','identify the response build, not the logging backend or incoming context');
+assert.equal(context.reportId,'report-under-test','logging preserves the submitted measurement identity');
 assert.equal(context.pageRelease,'old-tab');assert.equal(context.rpcMs,90);assert.equal(context.schema,2);
 server.logSpeed('sync',{total:1},{});
 assert.equal(JSON.parse(logged[1][4]).serverRelease,'','legacy timing remains unknown, never relabeled as current');

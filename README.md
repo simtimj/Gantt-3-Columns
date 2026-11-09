@@ -656,3 +656,7 @@ Schedule-line checks still read live Days text on every request, but no longer c
 ## 🧪 Share the post-intake Days read — 2026-11-09
 
 Background imports reuse their live schedule-check snapshot for the returned day diff when no later step writes. Schedule changes, partial failures, and one-time repairs force a fresh response read. Source intake still runs first; disjoint historical views keep separate bounded ranges. The unchanged import fixture reduces two Days-range passes to one; device timing savings remain unmeasured. Done Today timing now separates live read and HTML parsing without extra requests.
+
+## 🧪 One settings read per Inbox response — 2026-11-09
+
+Inbox replies read their three related user settings in one fresh snapshot instead of three separate property reads. Overrides, dismissed items and malformed-field defaults keep their existing behavior. If the snapshot read fails, the original individual reads remain available. No task data or settings are rewritten; elapsed-time gains remain unmeasured. Done Log timing also isolates ID hashing within its existing row-processing stage, without logging content or adding reporting requests.

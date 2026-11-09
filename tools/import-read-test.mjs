@@ -105,6 +105,7 @@ assert.deepEqual(profiled,plain(ctx.sheetDoneRows_()));
 assert.deepEqual(done.reads,['values','values']);
 assert.equal(typeof importTimer.done().steps['done.sourceRead'],'number');
 assert.equal(typeof importTimer.done().steps['done.rows'],'number');
+assert.equal(typeof importTimer.done().steps['done.hashes'],'number');
 
 // Repeated Date cells reuse normalization only within one freshly read source.
 // Exercise both real intake functions with distinct Date objects, mixed text
@@ -146,3 +147,28 @@ assert.equal(formatter(new Date(0)),'recovered','failed normalization is not cac
 assert.equal(formatter(new Date(0)),'recovered');assert.equal(attempts,2);
 assert.equal(formatter('  undated  '),'undated');assert.equal(formatter(0),'');
 console.log('✓ intake dates: per-snapshot timestamp reuse; fresh reads/timezone/date edits, mixed values, original IDs/outputs and normalization errors preserved');
+
+// Inbox replies batch related user settings, never cache them across calls.
+// Compare against the original three-read behavior, including corrupt fields
+// and the individual-read fallback; no setting writes are allowed.
+const inboxState={inboxDone:'["dismissed"]',inboxItems:JSON.stringify([{id:'mine',title:'Mine',done:true},{id:'dismissed',title:'Hidden'}]),
+  inboxOver:JSON.stringify({ai:{title:'Overridden',details:'Keep details',arch:'archive'}}),unrelated:'private unrelated setting'};
+let bulkReads=0,keyReads=0,bulkFailure=false,keyFailure='';
+ctx.CLAUDE_INBOX=[{id:'ai',title:'Original',added:'today'},{id:'dismissed',title:'Hidden AI'},null];
+const api={getProperties(){bulkReads++;if(bulkFailure)throw Error('bulk unavailable');return {...inboxState};},
+ getProperty(k){keyReads++;if(k===keyFailure)throw Error('field unavailable');return inboxState[k]||null;},
+ setProperty(){throw Error('read-only path wrote a setting');}};
+ctx.PropertiesService={getUserProperties:()=>api};
+const originalRead=ctx.inboxRead_;
+function originalInbox(){const d=originalRead('inboxDone',[]),m=originalRead('inboxItems',[]),o=originalRead('inboxOver',{});
+ return ctx.CLAUDE_INBOX.map(x=>Object.assign({from:'claude'},x,o[String(x&&x.id)]||{})).concat(m.map(x=>Object.assign({from:'app'},x)))
+ .filter(x=>x&&x.id&&d.indexOf(String(x.id))<0).map(x=>({id:String(x.id),title:String(x.title||''),details:String(x.details||''),added:String(x.added||''),from:x.from,arch:String(x.arch||''),done:!!x.done}));}
+function compare(){const expected=plain(originalInbox());bulkReads=0;keyReads=0;const actual=plain(ctx.getInbox());assert.deepEqual(actual,expected);return actual;}
+let inbox=compare();assert.equal(bulkReads,1);assert.equal(keyReads,0);assert.equal(inbox.length,2);assert.equal(inbox[0].title,'Overridden');assert.equal(inbox[1].done,true);
+inboxState.inboxItems=JSON.stringify([{id:'new direct edit',title:'New'}]);assert.equal(compare()[1].title,'New','later calls see current settings');
+for(const k of ['inboxDone','inboxItems','inboxOver']){const saved=inboxState[k];inboxState[k]='not JSON';compare();assert.equal(bulkReads,1);assert.equal(keyReads,0);delete inboxState[k];compare();inboxState[k]=saved;}
+bulkFailure=true;compare();assert.equal(bulkReads,1);assert.equal(keyReads,3,'bulk failure preserves independent reads');
+keyFailure='inboxItems';compare();assert.equal(keyReads,3,'one field failure retains other readable fields');
+bulkFailure=false;keyFailure='';
+assert.equal(ctx.inboxRead_('inboxItems',[])[0].title,'New','other callers retain single-field behavior');
+console.log('✓ Inbox settings: 3→1 property reads, exact overrides/dismissals, fresh calls, missing/corrupt fields and independent-read failure fallback; zero writes');

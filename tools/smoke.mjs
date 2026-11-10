@@ -75,6 +75,16 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     return '';
   });
   if (study) errs.push('IT study entry: ' + study);
+  // Section rename preserves priority group names and the existing count controls.
+  {
+    const renamed = await pg.evaluate(() => {
+      const head = document.querySelector('#referencePane .urg-head-row .urg-head');
+      return !!head && head.getAttribute('aria-label') === 'Next Steps' &&
+        head.querySelector('.next-steps-label')?.textContent === 'Next Steps' &&
+        !!head.querySelector('.urg-counts');
+    });
+    if (!renamed) { fails++; console.error('✗ Next Steps heading/counts missing: ' + name); }
+  }
   // Urgent checkmarks + two-way sync with the real task (2026-11-04).
   const urg = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -1239,7 +1249,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         // + Add lists every source.
         panel.querySelector('[data-plan-act=add]').click(); await wait(80);
         const listText = det.textContent;
-        for (const [src, t] of [['Urgent', 'Pay rent'], ['Undated Tasks', 'Fix bike'], ['Keep In Mind', 'Gloves'], ['Events this day', 'Dentist']])
+        for (const [src, t] of [['Next Steps', 'Pay rent'], ['Undated Tasks', 'Fix bike'], ['Keep In Mind', 'Gloves'], ['Events this day', 'Dentist']])
           if (!listText.includes(src) || !listText.includes(t)) out.push('+ Add misses ' + src + ' / ' + t);
         if (/Bait/.test(listText)) out.push('+ Add lists a finished Keep In Mind item');
         const todayLine = () => [...document.querySelectorAll('#todayScroll .day-editor .check-line')].find(l => l.textContent.trim() === 'Pay rent');

@@ -64,7 +64,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Each day saves automatically to the sheet.
 - Notes **+ Template** inserts the Reference cell titled "Journal Template" into the selected Notes day.
 
-**Urgency** (like TickTick)
+**Next Steps** (active short-term queue)
 - Hold a checkbox (or right-click it) → pick 0 red (Urgent) / 1 yellow (Soon) / 2 blue (Can be later) / none, and optionally a due date. (Urgency reads 0 / 1 / 2 since 2026-11-08.)
 - Urgent panel at the top of Reference lists every urgent task from every day, grouped 1/2/3, with its subtasks underneath. Tap a task to jump to it in Today. Panel is collapsible.
 
@@ -75,6 +75,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-09)
+
+- **2026-11-10 · Next Steps naming and workflow:** the former Urgent section is named Next Steps, with the existing urgency groups, colored counts, numeric ordering and decimal insertions preserved. Reference holds full project context/backlog; Next Steps holds immediate actions; CalEvents schedules them. No task migration or new automatic routing.
 
 - **2026-11-10 · Schedule read profiling:** separate timing for Sheet lookup, bounds, date read/scan, width, text reads and decoding, using the existing requests. No content logging or read-policy change; use this to identify the next safe optimization.
 

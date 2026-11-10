@@ -75,6 +75,16 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     return '';
   });
   if (study) errs.push('IT study entry: ' + study);
+  // Section rename preserves priority group names and the existing count controls.
+  {
+    const renamed = await pg.evaluate(() => {
+      const head = document.querySelector('#referencePane .urg-head-row .urg-head');
+      return !!head && head.getAttribute('aria-label') === 'Next Steps' &&
+        head.querySelector('.next-steps-label')?.textContent === 'Next Steps' &&
+        !!head.querySelector('.urg-counts');
+    });
+    if (!renamed) { fails++; console.error('✗ Next Steps heading/counts missing: ' + name); }
+  }
   // Urgent checkmarks + two-way sync with the real task (2026-11-04).
   const urg = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));

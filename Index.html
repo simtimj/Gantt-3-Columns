@@ -1647,6 +1647,7 @@
     #referencePane .ref-pane-header{display:flex;align-items:center;padding-left:6px;padding-right:6px;}
     #referencePane .ref-pane-header .urg-head-row{flex:1;width:100%;min-width:0;margin:0;}
     #referencePane .ref-pane-header .urg-head{width:100%;display:flex;align-items:center;flex-wrap:nowrap;padding:0;text-align:left;}
+    .next-steps-label{flex:0 0 auto;margin-right:.55em;white-space:nowrap;}
     #referencePane .ref-pane-header .urg-counts{flex:1;min-width:0;margin:0;gap:.45em;overflow:hidden;white-space:nowrap;}
 
     .od-pad-head .blocks-add,.od-pad-head .blocks-task,.od-pad-head .blocks-remove{font:inherit;letter-spacing:normal;text-transform:none;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:3px 7px;margin-left:5px;cursor:pointer;}
@@ -2471,7 +2472,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
             </select>
           </label>
           <label class="ts-check">Collapse / expand all <button class="btn tiny ref-collapse-all" type="button" data-layout="reference" title="Collapse or expand all Reference cells" aria-label="Collapse or expand all Reference cells">−</button></label>
-          <div class="ts-sub">Urgent panel</div>
+          <div class="ts-sub">Next Steps panel</div>
           <label class="ts-check"><input type="checkbox" id="optUrgWrap"> Wrap long text</label>
           <label class="ts-check"><input type="checkbox" id="optUrgBatch"> Group by subject</label>
           <label class="ts-check">Due date
@@ -2496,7 +2497,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           </label>
           <button class="btn tiny" id="resetRefPad" type="button">Reset padding</button>
           <div class="ts-sub">Tips</div>
-          <div class="ref-opt-tip">Hold a level heading in Urgent (or tap + Task) to make a task there.</div>
+          <div class="ref-opt-tip">Hold a level heading in Next Steps (or tap + Task) to make a task there.</div>
         </div>
         <div class="ref-toolbar">
           <!-- Reference tabs (2026-11-03, Julius): same small symbols as Center Up. Last tab remembered. -->
@@ -2511,7 +2512,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
             placeholder="Search…">
           <button class="btn ref-tb-sm" title="New Reference cell" onclick="addReferenceCell()">+</button>
           <button class="btn ref-tb-sm" title="Archive: deleted cells — restore them" onclick="openArchive()">Arc</button>
-          <button class="btn ref-tb-sm" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: sort, collapse, Urgent panel, padding">Options</button>
+          <button class="btn ref-tb-sm" id="refOptionsBtn" type="button" aria-expanded="false" title="Reference options: sort, collapse, Next Steps panel, padding">Options</button>
         </div>
         <div id="referenceTree"></div>
         <div id="scratchPad" class="editor plan-editor" contenteditable="false" spellcheck="true"></div>
@@ -8791,8 +8792,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       n.title = name + ': ' + t.n + (t.t ? ' · subtasks ' + t.d + '/' + t.t + ' done' : '');
       counts.append(n);
     });
-    head.append(counts); // numbers only (Julius 2026-11-03); tap still folds
-    head.setAttribute('aria-label','Urgent');
+    const label = document.createElement('span'); label.className = 'next-steps-label'; label.textContent = 'Next Steps';
+    head.append(label, counts); // section name plus existing colored counts; tap still folds
+    head.setAttribute('aria-label','Next Steps');
     head.title = 'Tap to collapse/expand · hold to zoom';
     head.addEventListener('click',() => {
       if(urgCreateSuppress){ urgCreateSuppress = false; return; }
@@ -8803,7 +8805,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // Create menu moved off the numbers onto a + button (2026-11-06, Julius): holding the numbers now only zooms Urgent.
     const addBtn = document.createElement('button');
     addBtn.type = 'button'; addBtn.className = 'urg-add-btn'; addBtn.textContent = '+';
-    addBtn.title = 'Create an Urgent / Soon / Can be later task'; addBtn.setAttribute('aria-label','Create an urgent task');
+    addBtn.title = 'Create a Next Steps task: Urgent / Soon / Can be later'; addBtn.setAttribute('aria-label','Create a Next Steps task');
     addBtn.addEventListener('click',() => openCreateMenu(addBtn,null));
     headRow.append(head, addBtn);
     // Put Urgent and its live counts directly below the Reference heading.
@@ -9139,7 +9141,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const day = localToday();
     urgSubtree(line).forEach(l => { if(on) l.dataset.arch = day; else delete l.dataset.arch; });
     urgChanged(owner);
-    setStatus(on ? 'Archived ' + md(day) + ' — in Urgent → Archive' : 'Back in the Urgent panel');
+    setStatus(on ? 'Archived ' + md(day) + ' — in Next Steps → Archive' : 'Back in Next Steps');
   }
   const urgDraft = {1:'',2:'',3:''};
   let urgAddWant = 0;
@@ -15612,7 +15614,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const list = detail.querySelector('[data-plan-list]'); if(!list) return;
     const q2 = qs.trim().toLowerCase(), planned = {};
     ((planData && planData.items) || []).forEach(x => { planned[x.ref] = x.group; });
-    const SRC = [['urgent','Urgent'],['undated','Undated Tasks'],['kim','Keep In Mind'],['cal','Events this day']];
+    const SRC = [['urgent','Next Steps'],['undated','Undated Tasks'],['kim','Keep In Mind'],['cal','Events this day']];
     let h = '';
     SRC.forEach(([src, name]) => {
       const rows = candCache.map((c, i) => [c, i]).filter(([c]) => c.src === src && (!q2 || c.text.toLowerCase().indexOf(q2) >= 0));

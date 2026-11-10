@@ -2,6 +2,12 @@
 
 Updated 2026-11-10. Planning input, not an implementation claim. The Calendar Planning View Reference card remains the detailed product-planning home.
 
+## Reference → Next Steps → CalEvents
+
+The former Urgent section (top-right Gantt) is now **Next Steps**. Reference (Ref/Fridge) is the master repository for full project information, context and backlog. Next Steps is the active short-term action queue of immediate, pressing and timely work drawn from Reference. CalEvents coordinates/schedules that work into daily time slots.
+
+Preserve existing ordering, IDs and color mappings: visible urgency0 red /1 yellow /2 blue; stored data-urg1/2/3. Keep sequential prefixes such as01,02 and decimal insertions such as01.1 within the existing urgency ordering. This renames the component and documents its role; it does not authorize source migration, renumbering, duplicate tasks or a new automatic routing engine. Historical “Urgent area”/“urgency cell” references mean Next Steps; “Urgent” remains the name of the red priority level.
+
 ## Capture and scheduling
 
 “Add to today” means an all-day item on today's Google Calendar (America/Los_Angeles), unless a specific time is supplied. Calendar is the single capture landing place. Consult Reference and Urgency when planning.

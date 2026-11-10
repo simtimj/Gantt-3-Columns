@@ -1249,7 +1249,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         // + Add lists every source.
         panel.querySelector('[data-plan-act=add]').click(); await wait(80);
         const listText = det.textContent;
-        for (const [src, t] of [['Urgent', 'Pay rent'], ['Undated Tasks', 'Fix bike'], ['Keep In Mind', 'Gloves'], ['Events this day', 'Dentist']])
+        for (const [src, t] of [['Next Steps', 'Pay rent'], ['Undated Tasks', 'Fix bike'], ['Keep In Mind', 'Gloves'], ['Events this day', 'Dentist']])
           if (!listText.includes(src) || !listText.includes(t)) out.push('+ Add misses ' + src + ' / ' + t);
         if (/Bait/.test(listText)) out.push('+ Add lists a finished Keep In Mind item');
         const todayLine = () => [...document.querySelectorAll('#todayScroll .day-editor .check-line')].find(l => l.textContent.trim() === 'Pay rent');

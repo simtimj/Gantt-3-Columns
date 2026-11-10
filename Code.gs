@@ -319,7 +319,7 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates, timer) {
           ph:hashesFor(x.date) ? cellHash_(plan) : undefined };
       }).sort((a,b) => a.date.localeCompare(b.date));
   }
-  const sheet = speedPart_(timer, 'schedule.lookup', () => getOrCreateSheet_('Days', DAYS_HEADERS));
+  const sheet = speedPart_(timer, 'schedule.lookup', () => getOrCreateSheet_('Days', DAYS_HEADERS, timer));
   const lastRow = speedPart_(timer, 'schedule.bounds', () => sheet.getLastRow());
 
   if (lastRow < 2) {
@@ -1253,10 +1253,12 @@ function ensureDayRange_(sheet, pastDays, futureDays) {
    SHEET HELPERS
    ========================================================= */
 
-function getOrCreateSheet_(name, headers) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function getOrCreateSheet_(name, headers, timer) {
+  // Optional nested profiling uses the same service calls as ordinary callers.
+  // Only the schedule reader supplies a timer; names, IDs and data stay private.
+  const ss = speedPart_(timer, 'schedule.spreadsheet', () => SpreadsheetApp.getActiveSpreadsheet());
 
-  let sheet = ss.getSheetByName(name);
+  let sheet = speedPart_(timer, 'schedule.sheetLookup', () => ss.getSheetByName(name));
 
   if (!sheet) {
     sheet = ss.insertSheet(name);

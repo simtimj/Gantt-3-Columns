@@ -4,6 +4,9 @@ Updated 2026-11-10. This is the current engineering handoff, not a declaration t
 
 ## Latest checkpoint — 2026-11-10
 
+- Next diagnostic increment: `schedule.lookup` now nests `schedule.spreadsheet` (getActiveSpreadsheet) and `schedule.sheetLookup` (getSheetByName). The existing optional timer reaches the sheet helper only from the schedule reader. Source calls, creation/header behavior, direct callers and thrown errors are unchanged; no task data, dates, tab names or IDs are emitted. No speed gain claimed. Local/CI and deployment results are recorded below as completed.
+- Service-split validation: all local regression suites, syntax and deploy-log checks passed, including exact service-call budgets, missing-tab headers and thrown-error identity. Local browser smoke was attempted but the Playwright browser executable is absent; full browser CI must pass before merge. Actual service latency and device behavior remain unverified.
+
 - PR49 merged as `f185642`; full CI `42852365969` and deployment `42853372687` passed.
 - PR50 merged as `195dc0c`; full CI `42855036899` and deployment `42855879781` passed.
 - Synthetic counts: daily covered-date formatting 2,192 → 0; warm confirmation identity digests 190 → 0. Live reads, IDs, fallback behavior and locked rereads remain intact. Actual total elapsed gains are unmeasured.
@@ -198,7 +201,7 @@ Do not skip live date scans based on cached row positions: direct edits, moved/b
 
 ### Next bounded experiment
 
-1. Separate active-spreadsheet acquisition from getSheetByName inside the existing schedule.lookup measurement, with no extra calls. Record timings, not data or IDs.
+1. The service split is implemented: compare schedule.spreadsheet / schedule.sheetLookup inside schedule.lookup on matching visible deployed reports, with no extra calls. Record timings, not data or IDs.
 2. Compare matched light sync versus imports over ordinary use, separating first lookup, bounds and network overhead. Verify any apparent saving changes total request time rather than shifting its attribution.
 3. Only if one redundant service operation is demonstrated, remove/reuse it request-locally and compare total latency. Keep current full source freshness and failure fallback. If unavoidable Apps Script access/transport dominates, prepare a separately scoped architecture proposal rather than another content cache.
 

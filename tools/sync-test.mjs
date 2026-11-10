@@ -103,6 +103,47 @@ assert.ok(seen.includes('removeDaySections_'),'later imports run after a failed 
 assert.ok(Object.values(parts).every(v=>typeof v==='number'));
 console.log('✓ nested import timing: parent totals, accumulated/error stages, unchanged return/throw and import continuation');
 
+// Split the existing lookup budget without changing service calls or errors.
+const lookupServer=vm.createContext({console,Date:{now:()=>clock}});
+vm.runInContext(source,lookupServer);
+let accessCalls=0,lookupCalls=0,inserts=0,headerWrites=0,missing=false,failAt='';
+const sheet={getRange:(...args)=>{
+  assert.deepEqual(args,[1,1,1,2]);
+  return {setValues:values=>{headerWrites++;assert.equal(JSON.stringify(values),'[["Date","Tasks"]]');}};
+}};
+lookupServer.SpreadsheetApp={getActiveSpreadsheet:()=>{
+  accessCalls++;clock+=11;if(failAt==='spreadsheet')throw failure;
+  return {getSheetByName:name=>{
+    lookupCalls++;assert.equal(name,'Days');clock+=7;
+    if(failAt==='sheet')throw failure;
+    return missing?null:sheet;
+  },insertSheet:name=>{inserts++;assert.equal(name,'Days');clock+=5;return sheet;}};
+}};
+for(const timer of [undefined,{mark(){}},lookupServer.speedTimer_()]) {
+  const before=[accessCalls,lookupCalls];
+  assert.equal(lookupServer.getOrCreateSheet_('Days',['Date','Tasks'],timer),sheet);
+  assert.deepEqual([accessCalls,lookupCalls],[before[0]+1,before[1]+1]);
+  if(timer?.done) {
+    assert.equal(timer.done().steps['schedule.spreadsheet'],11);
+    assert.equal(timer.done().steps['schedule.sheetLookup'],7);
+  }
+}
+assert.equal(inserts,0);assert.equal(headerWrites,0);
+missing=true;
+const lookupProfile=lookupServer.speedTimer_();
+lookupServer.speedPart_(lookupProfile,'schedule.lookup',()=>lookupServer.getOrCreateSheet_('Days',['Date','Tasks'],lookupProfile));
+assert.equal(inserts,1);assert.equal(headerWrites,1);
+assert.equal(lookupProfile.done().steps['schedule.lookup'],23,'parent includes creation; children overlap it');
+for(const stage of ['spreadsheet','sheet']) {
+  failAt=stage;const t=lookupServer.speedTimer_(),beforeLookups=lookupCalls;
+  assert.throws(()=>lookupServer.getOrCreateSheet_('Days',['Date','Tasks'],t),e=>e===failure);
+  assert.equal(t.done().steps['schedule.spreadsheet'],11);
+  assert.equal(lookupCalls,beforeLookups+(stage==='sheet'?1:0));
+  if(stage==='sheet')assert.equal(t.done().steps['schedule.sheetLookup'],7);
+  assert.equal(inserts,1,'failed lookup must not create a sheet');
+}
+console.log('✓ schedule service profiling: exact calls, legacy timers, missing-tab headers and failure propagation');
+
 // Actual sync caller requests hashes only for its visible dates. Schedule
 // checks still see the full upcoming window; failure/write fallbacks above
 // continue using the normal complete reader.

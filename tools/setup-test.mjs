@@ -121,3 +121,15 @@ assert.equal(held,true);assert.equal(freed,true);assert.equal(maintained,1);
 assert.equal(typeof st.done().steps['setup.lock'],'number');assert.equal(typeof st.done().steps['setup.dateCoverage'],'number');
 held=false;tc.ensureSetup_(tc.speedTimer_());assert.equal(held,false,'warm setup still needs no lock');
 console.log('✓ setup timing separates existing lock/date coverage work; warm path remains unchanged');
+
+// Deterministic mixed-date fuzzing guards fallback coverage when timestamps do
+// not align with local midnight. Different row order/duplicates retain parity.
+let seed=731;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed;};
+for(let trial=0;trial<25;trial++) {
+ const input=Array.from({length:12},(_,i)=>{
+  const offset=(random()%11)-5,d=dayAt(offset);d.setTime(d.getTime()+((random()%37)-18)*3600000);
+  return [i%3?d:d.toISOString().slice(0,10),'task '+i,'note','plan '+i,'extra'];
+ });
+ parity(input,3,3,['UTC','America/Los_Angeles','Asia/Tokyo','Pacific/Kiritimati','Pacific/Pago_Pago'][trial%5]);
+}
+console.log('✓ daily coverage randomized parity: mixed text/time-offset dates across five zones');

@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-09
+Last updated: 2026-11-10
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -670,3 +670,7 @@ Every Done Log source row is still read and normalized. Small private cache bloc
 ## 🧪 Study intake read budget — 2026-11-09
 
 Unchanged study imports reuse one fresh row-count lookup instead of making it twice. Changed intake still rereads source bounds and values under the lock before applying anything. Numeric timing now separates study lookup, source read, signature and lock work, with no extra source reads or logging requests. Actual latency savings remain unmeasured.
+
+## 🧪 Skip already-covered daily date formatting — 2026-11-10
+
+Daily setup still reads the live Date column and adds/sorts missing dates with all other columns attached. Exact matching Date timestamps now prove coverage without formatting both existing and generated dates. Text dates retain normalization; nearby non-midnight Date values use a conservative timezone/DST fallback. A fully covered1096-day fixture drops2192 formatting calls to0; one missing day needs at most4. Cold/daily setup elapsed-time savings remain unmeasured. Nested setup timing separates date maintenance from lock waiting.

@@ -78,7 +78,7 @@ function setupWorkspace(opts) {
   const reference = getOrCreateSheet_('Reference', REF_HEADERS);
 
   // Keep a reasonable amount of stored date coverage.
-  ensureDayRange_(days, 730, 365);
+  speedPart_(opts && opts.timer, 'setup.dateCoverage', () => ensureDayRange_(days, 730, 365));
 
   const props = PropertiesService.getScriptProperties();
   // Routine date maintenance must not reformat the entire date column daily.
@@ -99,7 +99,7 @@ function setupWorkspace(opts) {
 
 // Cheap check used by every request: run the full setup only once per day,
 // or right away if a sheet is missing.
-function ensureSetup_() {
+function ensureSetup_(timer) {
   const today = todayString_();
   const props = PropertiesService.getScriptProperties();
   // Already set up today: one property read (2026-11-05: the two sheet look-ups cost ~0.3 s every load;
@@ -108,7 +108,7 @@ function ensureSetup_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) {
+  if (!speedPart_(timer, 'setup.lock', () => lock.tryLock(10000))) {
     return; // Another request is already doing it.
   }
 
@@ -119,7 +119,7 @@ function ensureSetup_() {
       props.getProperty('lastSetupDate') !== today;
 
     if (stillNeeded) {
-      setupWorkspace({ daily: true });
+      setupWorkspace({ daily: true, timer: timer });
     }
   } finally {
     lock.releaseLock();
@@ -168,7 +168,7 @@ function runImports(req) {
 function getWorkspaceData(opts) {
   const fast = !!(opts && opts.fast);
   const t = speedTimer_();
-  ensureSetup_(); t.mark('setup');
+  ensureSetup_(t); t.mark('setup');
   if (!fast) runImportSteps_(t);
 
   const today = todayString_();
@@ -1164,16 +1164,34 @@ function ensureDayRange_(sheet, pastDays, futureDays) {
     0
   );
 
-  const existing = new Set();
+  const existing = new Set(), timestamps = new Set(), dateValues = [];
+  const normalized = new Map();
   const lastRow = sheet.getLastRow();
 
   if (lastRow >= 2) {
-    // Date column only.
+    // Exact Date timestamps already prove coverage without formatting. Keep
+    // text-date normalization and a nearby-Date fallback for legacy times.
     sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(row => {
-      const date = formatDate_(row[0]);
-      if (date) existing.add(date);
+      const value = row[0];
+      if (isDate_(value)) {
+        timestamps.add(value.getTime()); dateValues.push(value);
+      } else {
+        const key = formatDate_(value);
+        if (key) existing.add(key);
+      }
     });
   }
+
+  const hasDate = (date, key) => existing.has(key) || dateValues.some(value => {
+    const time = value.getTime();
+    // Dates on the same timezone calendar day are within this conservative
+    // margin, including 25-hour DST days. Far history needs no conversion.
+    if (Math.abs(time - date.getTime()) > 2 * DAY_MS) return false;
+    if (!normalized.has(time)) normalized.set(time, formatDate_(value));
+    const found = normalized.get(time);
+    if (found) existing.add(found);
+    return found === key;
+  });
 
   const missing = [];
 
@@ -1188,13 +1206,14 @@ function ensureDayRange_(sheet, pastDays, futureDays) {
       today.getDate() + offset
     );
 
+    if (timestamps.has(date.getTime())) continue;
     const key = Utilities.formatDate(
       date,
       timezone,
       'yyyy-MM-dd'
     );
 
-    if (!existing.has(key)) {
+    if (!hasDate(date, key)) {
       missing.push([
         date,
         '',

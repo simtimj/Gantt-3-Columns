@@ -2084,13 +2084,18 @@ const CONFIRM_CARD_ID = 'p-to-confirm';
 function confirmRows_(sheet, timer, phase) {
   const rows = speedPart_(timer, phase + '.sourceRead', () => sheet.getDataRange().getValues());
   const dateOf = intakeDateFormatter_();
-  return speedPart_(timer, phase + '.rows', () => rows.slice(1).map((r, i) => {
-    const date = dateOf(r[0]);
-    const project = String(r[1] || '').trim() || 'Other';
-    const change = String(r[2] || '').trim();
-    return { row: i + 2, id: 'k-' + cellHash_([date, project, change].join('|')), date, project, change,
-      how: String(r[3] || '').trim(), status: String(r[4] || '').trim().toLowerCase() };
-  }).filter(x => x.change));
+  return speedPart_(timer, phase + '.rows', () => {
+    const normalized = rows.slice(1).map((r, i) => {
+      const date = dateOf(r[0]);
+      const project = String(r[1] || '').trim() || 'Other';
+      const change = String(r[2] || '').trim();
+      return { row: i + 2, input: [date, project, change].join('|'), date, project, change,
+        how: String(r[3] || '').trim(), status: String(r[4] || '').trim().toLowerCase() };
+    });
+    const hashes = rowIdentityHashes_(normalized.map(x => x.input), timer, phase, 'confirm');
+    return normalized.map(({input, ...item}, i) => Object.assign({id:'k-' + hashes[i]}, item))
+      .filter(x => x.change);
+  });
 }
 
 // Keep the derived card below the Sheet cell limit. Full source rows are never shortened.
@@ -2244,10 +2249,14 @@ function intakeTime_(value) {
 // source row is still read/normalized, and all input strings must match exactly
 // before reusing a block. Cache eviction, corruption and failures only cost work.
 function doneRowHashes_(inputs, timer) {
+  return rowIdentityHashes_(inputs, timer, 'done', 'done');
+}
+
+function rowIdentityHashes_(inputs, timer, phase, scope) {
   const blocks = [];
   for (let i = 0; i < inputs.length; i += 32) {
     const values = inputs.slice(i, i + 32);
-    blocks.push({ key:'done-id-hashes:v1:' + (i / 32), values:values,
+    blocks.push({ key:scope + '-id-hashes:v1:' + (i / 32), values:values,
       eligible:i < 1024 && JSON.stringify(values).length <= 18000 });
   }
   const keys = blocks.filter(b => b.eligible).map(b => b.key);
@@ -2255,11 +2264,11 @@ function doneRowHashes_(inputs, timer) {
   if (keys.length) {
     try {
       cache = CacheService.getScriptCache();
-      found = speedPart_(timer, 'done.hashCacheRead', () => cache.getAll(keys)) || {};
+      found = speedPart_(timer, phase + '.hashCacheRead', () => cache.getAll(keys)) || {};
     } catch (e) { cache = null; found = {}; }
   }
   const pending = {}, result = [];
-  speedPart_(timer, 'done.hashes', () => {}); // zero also identifies a fully warm read
+  speedPart_(timer, phase + '.hashes', () => {}); // zero also identifies a fully warm read
   blocks.forEach(b => {
     let saved = null;
     try { saved = JSON.parse(found[b.key] || 'null'); } catch (e) {}
@@ -2268,7 +2277,7 @@ function doneRowHashes_(inputs, timer) {
       saved[0].length === b.values.length && saved[1].length === b.values.length &&
       b.values.every((value, i) => saved[0][i] === value &&
         typeof saved[1][i] === 'string' && /^[a-f0-9]{16}$/.test(saved[1][i]));
-    const hashes = valid ? saved[1] : speedPart_(timer, 'done.hashes', () => b.values.map(value => cellHash_(value)));
+    const hashes = valid ? saved[1] : speedPart_(timer, phase + '.hashes', () => b.values.map(value => cellHash_(value)));
     result.push(...hashes);
     if (!valid && cache && b.eligible) {
       const encoded = JSON.stringify([b.values, hashes]);
@@ -2276,7 +2285,7 @@ function doneRowHashes_(inputs, timer) {
     }
   });
   if (cache && Object.keys(pending).length) {
-    try { speedPart_(timer, 'done.hashCacheWrite', () => cache.putAll(pending, 600)); } catch (e) {}
+    try { speedPart_(timer, phase + '.hashCacheWrite', () => cache.putAll(pending, 600)); } catch (e) {}
   }
   return result;
 }

@@ -167,3 +167,39 @@ To Confirm imports showed meaningful row-processing cost after source reads. Reu
 ## Schedule read breakdown — 2026-11-10
 
 Schedule reads remain a variable live-service cost. Add optional profiling only to the existing schedule reader call: schedule.lookup, bounds, datesRead, dateScan, width, textRead and decode. Text/decode durations accumulate across separated row runs. The outer schedule.read stays the parent total; do not sum nested values into it. Direct/public/initial-snapshot calls retain compatibility without a timer. No extra service calls, row counts, dates, content, hashes or task identifiers are logged. Throws retain their existing semantics, including timed failures and the caller's invalidation/fallback. This is diagnostic work, not a speed gain. Compare matching deployed visible samples before selecting a source cache or changing freshness. Existing phone sample is adequate; no special new user test is required immediately.
+
+
+## Schedule profiling findings — 2026-11-10, through 11:18 Pacific
+
+PR51 merged as9f3fd1d; full regression/browser CI42872929712 passed and deployment42873771588 succeeded. Numeric stage timings are now arriving. No source-read policy changed.
+
+Keep matched visible width1421 page/server9f3fd1d reports separate from the older open page46e1905 and width411 phone reports. There are14 matched desktop syncs and6 imports.
+
+| Metric | Sync median (14) | Import median (6) |
+| --- | ---: | ---: |
+| Total server |1,029.5 ms|2,747 ms|
+| Browser RPC |2,746.5 ms|4,407 ms|
+| Schedule total |564.5 ms|276 ms|
+| Sheet lookup |233.5 ms|3 ms|
+| Row bounds |86 ms|65 ms|
+| Date read |111.5 ms|117.5 ms|
+| Date scan |33.5 ms|18.5 ms|
+| Column width |1 ms|1 ms|
+| Text read |6 ms|5.5 ms|
+| Decode/hash |32.5 ms|23 ms|
+
+Nested/component medians are not additive. The older open page still received new server profiling; exclude its mixed-release reports from this matched table. No controlled causal speed comparison is established.
+
+### Interpretation and rejected shortcuts
+
+First Spreadsheet service access and metadata are a stronger target than text processing. Imports perform other Spreadsheet work before this lookup, which may explain their3 ms lookup median; this is an inference, not proof of initialization cost. Moving a call earlier could simply relocate the same delay. Browser round-trip time also remains substantially above server duration, even when responses contain few changes.
+
+Do not skip live date scans based on cached row positions: direct edits, moved/backdated rows and failed writes must remain visible. Do not cache task bodies to address a6 ms text read. The current raw GitHub Index fingerprint differs from the observed HtmlService-derived page hash; substituting a build-time fingerprint is not a behavior-preserving drop-in change. Keep existing fresh-page update detection until equivalence/manual-edit semantics are designed and tested.
+
+### Next bounded experiment
+
+1. Separate active-spreadsheet acquisition from getSheetByName inside the existing schedule.lookup measurement, with no extra calls. Record timings, not data or IDs.
+2. Compare matched light sync versus imports over ordinary use, separating first lookup, bounds and network overhead. Verify any apparent saving changes total request time rather than shifting its attribution.
+3. Only if one redundant service operation is demonstrated, remove/reuse it request-locally and compare total latency. Keep current full source freshness and failure fallback. If unavoidable Apps Script access/transport dominates, prepare a separately scoped architecture proposal rather than another content cache.
+
+This checkpoint ships documentation only. Rough completion remains65%; no new speed gain is claimed. No additional device run is requested immediately. Cross-device editing/live Focus restore and identity coverage remain open; recovery-prompt investigation and backlog implementation remain deferred.

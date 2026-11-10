@@ -18,6 +18,8 @@ PR49 (daily setup date coverage) and PR50 (confirmation identity digest reuse) a
 
 Latest visible phone run (Nov 10, 09:16–09:20 Pacific, matching build, width 411): 4 loads had median server 1,146.5 ms / reported ready 2,632 ms; 5 imports had median server 2,882 ms / browser RPC 4,591 ms. Four warm imports reused confirmation hashes; one initial miss recomputed them. One sync was 1,108 ms server / 3,037 ms RPC. Small sample, repeated reloads, no controlled old-phone comparison; daily setup benefit remains unmeasured. See the handoff for detailed limits.
 
+Schedule profiling follow-up (Nov 10): 14 matching visible desktop syncs show median schedule 564.5 ms, lookup 233.5 ms, bounds 86 ms, dates read 111.5 ms and text read only 6 ms. Six matching imports have schedule lookup median 3 ms after earlier Spreadsheet calls. This points toward first-service access/metadata overhead, not expensive task text processing; the exact cause still needs isolation. Do not cache task bodies or skip date scans based on these results. See the handoff's next experiment.
+
 Completion is approximately **65% (planning estimate within 60–70%)**, without a weighted denominator. It is not a speedup percentage; do not increment it automatically after commits.
 
 Next: measure matching deployed builds, inspect remaining schedule/Reference/import costs, and finish recovery plus identity/ownership verification. Do not reset the daily setup flag to manufacture a benchmark.

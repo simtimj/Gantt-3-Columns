@@ -28,6 +28,24 @@ The warm import still spent2,810 ms in Done, including1,490 ms reading today's c
 
 Next: gather several matching visible reports on the deployed page, assess confirmation cache overhead/hit behavior and source-read variability, then choose another bounded optimization. No runtime code change in this measurement checkpoint. Do not manufacture maintenance or change historical data. Rough completion estimate stays65%; cross-device/live restore and ownership checks remain open.
 
+## Visible phone follow-up — 2026-11-10, 09:16–09:20 Pacific
+
+All ten reports below match page/server release `a44c4a4`, build `4f3f14ff8b90b7ef`, viewport width411 and visible-at-reporting state. Several reloads occurred, so this is not one uninterrupted five-minute steady-state session. Exact report IDs are distinct.
+
+| Kind | Count | Server median | Browser RPC median | Reported ready median |
+| --- | ---: | ---: | ---: | ---: |
+| Load |4|1,146.5 ms|not reported|2,632 ms|
+| Imports |5|2,882 ms|4,591 ms|not applicable|
+| Sync |1|1,108 ms|3,037 ms|not applicable|
+
+Confirmation medians over all five imports: total573 ms, rows65 ms, hash work0 ms, cache read21 ms, source read234 ms, card read130 ms. Four imports reused the confirmation hashes; the first did199 ms of digest work and99 ms cache writes. Done hashes similarly warmed after the first import. Parent/component medians are not additive. Reference save had one successful2,464 ms acknowledgement; no typical save estimate from one sample.
+
+Import schedule.read median210 ms; the only sync spent703 ms there and346 ms in Reference. Source inspection confirms schedule already shares its request-local day snapshot and invalidates after writes/errors. Live date scanning is necessary to see moved/backdated rows; skipping it based only on cached positions could hide corrections. Reference bodies/manifests remain live to detect direct edits/additions/deletions. No additional cache or runtime rewrite is justified by this small sample alone.
+
+The latest retained sample has no matching old visible-phone release for a controlled before/after comparison. Do not compare it causally with the earlier width1421 desktop benchmark or the original mixed-history medians. Warm setup was17–107 ms across these loads; no daily maintenance ran, so PR49's elapsed benefit remains open.
+
+No further user five-minute run is needed immediately. Preserve current freshness behavior; next engineering work should isolate service-read/transport variability before changing read policy. Cross-device recovery, live Focus snapshot/restore and ownership coverage remain open. Frequent recovery prompts and backlog implementation remain deferred. This checkpoint changes documentation only and leaves the rough65% planning estimate unchanged.
+
 ## Start here
 
 - Apps Script and Google Sheets remain the architecture. Separate hosting/database migration is conditional future work.

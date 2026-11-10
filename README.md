@@ -16,7 +16,7 @@ PR49 (daily setup date coverage) and PR50 (confirmation identity digest reuse) a
 | Confirmation import | Warm 190-row fixture: 190 → 0 identity digests; every source row still read | Real hash/cache overhead and total import latency |
 | Phone Reference recovery | User reported offline recovery restored both online/offline lines | Cross-device edits and live Focus backup/restore; frequent prompts remain separately deferred |
 
-Latest live check (Nov 10, 09:13 Pacific): confirmation hash work was 0 ms, row processing 22 ms and cache read 5 ms on the deployed server. One warm import, hidden at reporting, is evidence that reuse occurred; it is not an overall speed benchmark. Opening was 1,203 ms server / 2,190 ms reported ready, with setup 12 ms on the warm path. Daily date maintenance remains unmeasured. See the handoff for sample limits and next steps.
+Latest visible phone run (Nov 10, 09:16–09:20 Pacific, matching build, width 411): 4 loads had median server 1,146.5 ms / reported ready 2,632 ms; 5 imports had median server 2,882 ms / browser RPC 4,591 ms. Four warm imports reused confirmation hashes; one initial miss recomputed them. One sync was 1,108 ms server / 3,037 ms RPC. Small sample, repeated reloads, no controlled old-phone comparison; daily setup benefit remains unmeasured. See the handoff for detailed limits.
 
 Completion is approximately **65% (planning estimate within 60–70%)**, without a weighted denominator. It is not a speedup percentage; do not increment it automatically after commits.
 

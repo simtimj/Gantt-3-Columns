@@ -289,7 +289,7 @@ function getDaysRange(startDate, endDate) {
 }
 
 
-function getDaysRange_(startDate, endDate, snapshot, hashDates) {
+function getDaysRange_(startDate, endDate, snapshot, hashDates, timer) {
   // Schedule checks need the live text, but only requested sync dates need
   // version hashes. No cross-request cache: each read still sees Sheet edits.
   const hashesFor = date => !hashDates || hashDates.has(date);
@@ -319,36 +319,38 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates) {
           ph:hashesFor(x.date) ? cellHash_(plan) : undefined };
       }).sort((a,b) => a.date.localeCompare(b.date));
   }
-  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const lastRow = sheet.getLastRow();
+  const sheet = speedPart_(timer, 'schedule.lookup', () => getOrCreateSheet_('Days', DAYS_HEADERS));
+  const lastRow = speedPart_(timer, 'schedule.bounds', () => sheet.getLastRow());
 
   if (lastRow < 2) {
     return [];
   }
 
   // Read only the Date column to find the rows.
-  const dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  const dates = speedPart_(timer, 'schedule.datesRead', () => sheet.getRange(2, 1, lastRow - 1, 1).getValues());
   const lo = parseDate_(startDate).getTime() - DAY_MS;
   const hi = parseDate_(endDate).getTime() + DAY_MS;
   const matches = [];
 
-  for (let i = 0; i < dates.length; i++) {
-    const value = dates[i][0];
+  speedPart_(timer, 'schedule.dateScan', () => {
+    for (let i = 0; i < dates.length; i++) {
+      const value = dates[i][0];
 
-    if (!value) continue;
+      if (!value) continue;
 
-    // Skip far-away dates without the slower formatting call.
-    if (isDate_(value)) {
-      const time = value.getTime();
-      if (time < lo || time > hi) continue;
+      // Skip far-away dates without the slower formatting call.
+      if (isDate_(value)) {
+        const time = value.getTime();
+        if (time < lo || time > hi) continue;
+      }
+
+      const key = formatDate_(value);
+
+      if (key && key >= startDate && key <= endDate) {
+        matches.push({ row: i + 2, date: key });
+      }
     }
-
-    const key = formatDate_(value);
-
-    if (key && key >= startDate && key <= endDate) {
-      matches.push({ row: i + 2, date: key });
-    }
-  }
+  });
 
   if (!matches.length) {
     return [];
@@ -373,14 +375,14 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates) {
 
   const out = [];
   // One metadata lookup even when matching dates occupy several row runs.
-  const width = sheet.getMaxColumns() >= 4 ? 3 : 2;
+  const width = speedPart_(timer, 'schedule.width', () => sheet.getMaxColumns() >= 4 ? 3 : 2);
   runs.forEach(group => {
     // Column D = Plan pad (one-day view, 2026-10-29) when the sheet has it.
-    const block = sheet
+    const block = speedPart_(timer, 'schedule.textRead', () => sheet
       .getRange(group.start, 2, group.end - group.start + 1, width)
-      .getValues();
+      .getValues());
 
-    group.items.forEach(match => {
+    speedPart_(timer, 'schedule.decode', () => group.items.forEach(match => {
       const row = block[match.row - group.start];
       const plan = width > 2 ? String(row[2] || '') : '';
       out.push({
@@ -392,7 +394,7 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates) {
         jh: hashesFor(match.date) ? cellHash_(row[1]) : undefined,
         ph: hashesFor(match.date) ? cellHash_(plan) : undefined
       });
-    });
+    }));
   });
 
   out.sort((a, b) => a.date.localeCompare(b.date));
@@ -585,7 +587,7 @@ function readScheduleForSync_(req, t) {
     return null;
   }
   const snapshot = speedPart_(t, 'schedule.read', () => getDaysRange_(dates.length && dates[0] < today ? dates[0] : today,
-    dates.length && dates[dates.length - 1] > end ? dates[dates.length - 1] : end, null, new Set(dates)));
+    dates.length && dates[dates.length - 1] > end ? dates[dates.length - 1] : end, null, new Set(dates), t));
   return moveScheduleToNotes_(snapshot.filter(d => d.date >= today && d.date <= end)) ? null : snapshot;
 }
 

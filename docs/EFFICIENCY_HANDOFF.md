@@ -12,6 +12,22 @@ Updated 2026-11-10. This is the current engineering handoff, not a declaration t
 - Roughly65% complete is a planning judgment in a60–70% range, not a weighted measure or speed gain. No source ownership migration has occurred.
 - [Daily planning requirements](PLANNING_WORKFLOW.md) are separate. Historical backlog implementation/cleanup is deferred. Continue efficiency work.
 
+## Live follow-up — 2026-11-10, 09:13 Pacific
+
+Latest retained log has only three reports from server release87b25ae:
+
+| Report | Page / visibility / width | Server | Interpretation |
+| --- | --- | ---: | --- |
+| 09:05 import | Old page390a3c4 / visible /1421 |10,085 ms | Deployment intake, Done reconciliation and confirmation reconcile occurred; not steady-state |
+| 09:13 load | Matching87b25ae / visible /1317 |1,203 ms | Reported ready2,190 ms, render329 ms; warm setup12 ms, not a daily-coverage measurement |
+| 09:13 import | Matching87b25ae / hidden /1317 |5,835 ms | One warm sample; do not combine with visible steady-state baseline |
+
+Warm confirmation: hashes0 ms, cache read5 ms, rows22 ms, source read847 ms, card read128 ms, total1,022 ms. Cold preceding check had hashes267 ms and rows347 ms, but also writes/different page state; this pair is not a controlled time-saving estimate. Zero hash work confirms real reuse without proving total latency improvement.
+
+The warm import still spent2,810 ms in Done, including1,490 ms reading today's cell, and741 ms in task intake. Reference568 ms and schedule.read361 ms remain live reads. These costs vary; do not infer another cache is safe or warranted from one slow call. One successful day save acknowledged in3,137 ms does not establish typical save latency.
+
+Next: gather several matching visible reports on the deployed page, assess confirmation cache overhead/hit behavior and source-read variability, then choose another bounded optimization. No runtime code change in this measurement checkpoint. Do not manufacture maintenance or change historical data. Rough completion estimate stays65%; cross-device/live restore and ownership checks remain open.
+
 ## Start here
 
 - Apps Script and Google Sheets remain the architecture. Separate hosting/database migration is conditional future work.

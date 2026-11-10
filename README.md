@@ -6,6 +6,22 @@ Last updated: 2026-11-10
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
+## Efficiency checkpoint — 2026-11-10
+
+PR49 (daily setup date coverage) and PR50 (confirmation identity digest reuse) are merged and deployed; both passed full regression and browser CI.
+
+| Change | Verified operation count | Remaining verification |
+| --- | --- | --- |
+| Daily setup | Covered 1,096-day fixture: 2,192 → 0 date-format calls | Real elapsed cost on the next normal daily maintenance run |
+| Confirmation import | Warm 190-row fixture: 190 → 0 identity digests; every source row still read | Real hash/cache overhead and total import latency |
+| Phone Reference recovery | User reported offline recovery restored both online/offline lines | Cross-device edits and live Focus backup/restore; frequent prompts remain separately deferred |
+
+Completion is approximately **65% (planning estimate within 60–70%)**, without a weighted denominator. It is not a speedup percentage; do not increment it automatically after commits.
+
+Next: measure matching deployed builds, inspect remaining schedule/Reference/import costs, and finish recovery plus identity/ownership verification. Do not reset the daily setup flag to manufacture a benchmark.
+
+Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements: [daily planning workflow](docs/PLANNING_WORKFLOW.md). Proposed features are not claims of implementation.
+
 ## Status key
 
 - ✅ **Working** — in use and confirmed

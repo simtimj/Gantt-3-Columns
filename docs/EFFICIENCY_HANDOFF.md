@@ -1,6 +1,16 @@
 # Gantt efficiency — operating guide and handoff
 
-Updated 2026-11-08. This is the current engineering handoff, not a declaration that the whole efficiency project or actual-device verification is finished. Read the latest `main`, deployment result and confirmation queue before changing code. Keep this guide current when resuming work.
+Updated 2026-11-10. This is the current engineering handoff, not a declaration that the whole efficiency project or actual-device verification is finished. Read the latest `main`, deployment result and confirmation queue before changing code. Keep this guide current when resuming work.
+
+## Latest checkpoint — 2026-11-10
+
+- PR49 merged as `f185642`; full CI `42852365969` and deployment `42853372687` passed.
+- PR50 merged as `195dc0c`; full CI `42855036899` and deployment `42855879781` passed.
+- Synthetic counts: daily covered-date formatting 2,192 → 0; warm confirmation identity digests 190 → 0. Live reads, IDs, fallback behavior and locked rereads remain intact. Actual total elapsed gains are unmeasured.
+- Next normal daily maintenance measures setup; refreshed deployed-build imports measure confirmation hash/cache overhead. Do not reset lastSetupDate or force production maintenance for a benchmark.
+- Phone Reference offline recovery was user-confirmed. Cross-device editing and live Focus backup/restore remain open. Frequent recovery prompts/apparently disappearing text are separately deferred.
+- Roughly65% complete is a planning judgment in a60–70% range, not a weighted measure or speed gain. No source ownership migration has occurred.
+- [Daily planning requirements](PLANNING_WORKFLOW.md) are separate. Historical backlog implementation/cleanup is deferred. Continue efficiency work.
 
 ## Start here
 

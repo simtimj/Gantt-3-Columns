@@ -22,6 +22,10 @@
 - Anything hub-related ("add this to the Central Data Hub", or a related idea) is appended to that card under the right section as a check-line `<b>Title</b>: details` — no new card, no `tasks.js` / Backlog entry. Reread the card first, check for duplicates, keep existing lines, done states and formatting. Stays Can be later (`data-urg="3"`) unless Julius sets urgency or a deadline; if a hub task becomes urgent, mirror only the actionable line into the urgency system and keep the details in the card.
 - Architecture: Gantt Sheet = tasks / urgency / day logs; Calendar = time; Google Docs = long-form plans + canonical shared AI instructions; Sheets = structured data; GitHub = code, deploy config, repo CLAUDE.md. Claude = coding; ChatGPT = planning and coordination.
 
+## Shared documentation — standing rule, 2026-11-10
+
+Every change updates README.md in the same commit: short outcome, status and links. Efficiency changes also update docs/EFFICIENCY_HANDOFF.md with checks, measurements, limitations, remaining work and the exact resume step. Planning decisions update docs/PLANNING_WORKFLOW.md. Distinguish proposed, implemented, tested and user-confirmed behavior. Keep private task contents, logs and recovery payloads out of the public repository. This applies to ChatGPT, Claude and other contributors.
+
 ## README is the feature list — always keep it current
 
 - `README.md` lists every feature under: ✅ Working · 🧪 To be confirmed · 🔧 To be improved · 📋 To do · 💤 Shelved.

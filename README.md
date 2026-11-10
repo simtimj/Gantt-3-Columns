@@ -20,6 +20,8 @@ Latest visible phone run (Nov 10, 09:16–09:20 Pacific, matching build, width 4
 
 Schedule profiling follow-up (Nov 10): 14 matching visible desktop syncs show median schedule 564.5 ms, lookup 233.5 ms, bounds 86 ms, dates read 111.5 ms and text read only 6 ms. Six matching imports have schedule lookup median 3 ms after earlier Spreadsheet calls. This points toward first-service access/metadata overhead, not expensive task text processing; the exact cause still needs isolation. Do not cache task bodies or skip date scans based on these results. See the handoff's next experiment.
 
+🧪 **Schedule service-access diagnostics (Nov 10):** the existing lookup now separates spreadsheet acquisition (`schedule.spreadsheet`) from tab lookup (`schedule.sheetLookup`). Same service calls, reads and writes; no content or IDs logged. Regression checks cover old callers, missing-tab creation and failures. This measures the next optimization target; it does not establish a speed gain. Live matching-build measurements remain pending.
+
 Completion is approximately **65% (planning estimate within 60–70%)**, without a weighted denominator. It is not a speedup percentage; do not increment it automatically after commits.
 
 Next: measure matching deployed builds, inspect remaining schedule/Reference/import costs, and finish recovery plus identity/ownership verification. Do not reset the daily setup flag to manufacture a benchmark.

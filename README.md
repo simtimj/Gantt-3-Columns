@@ -72,6 +72,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-09)
 
+- **2026-11-10 · Schedule read profiling:** separate timing for Sheet lookup, bounds, date read/scan, width, text reads and decoding, using the existing requests. No content logging or read-policy change; use this to identify the next safe optimization.
+
 - **2026-11-10 · Confirmation identity hash reuse:** live To Confirm rows are still read every import; unchanged exact identity inputs reuse bounded digest blocks. Source corrections, status/check instructions and locked rereads remain live; cache failures compute normally. Actual time saving awaits measurement.
 
 - **⭐ Keep In Mind syncs without asking**: adding or editing on one device while another has the app open no longer shows "This list changed on another device". Adds from every device are kept, an item removed on one device but edited on another stays, and if the same line was changed in two places the newer edit wins (the other version is kept server-side in `focusMergeLog`). Lines changed in the last day show a small faded "5m" / "3h" tag. Coming back to the app pulls the latest list.

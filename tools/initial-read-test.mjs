@@ -125,3 +125,16 @@ rows.splice(2,0,...Array.from({length:30},()=>['2000-01-01','unrelated','','']))
 metadata=0;ctx.getDaysRange_('2026-11-08','2026-11-15');
 assert.equal(metadata,1,'separated runs reuse request-local column width');
 console.log('✓ schedule reads: 24→0 unused hashes; requested dates retain all 3 hashes, text stays fresh, public/snapshot parity and one width lookup');
+
+// Schedule profiling wraps existing operations without changing reads or output.
+const before=plain(ctx.getDaysRange_('2026-11-08','2026-11-15',null,new Set(['2026-11-08'])));
+reads=0;metadata=0;const profile=ctx.speedTimer_();
+const after=plain(ctx.getDaysRange_('2026-11-08','2026-11-15',null,new Set(['2026-11-08']),profile));
+assert.deepEqual(after,before);assert.equal(reads,3,'date column plus exactly two existing text runs');assert.equal(metadata,1);
+for(const key of ['lookup','bounds','datesRead','dateScan','width','textRead','decode'])assert.equal(typeof profile.done().steps['schedule.'+key],'number',key);
+const noMeasure={mark(){}};
+assert.deepEqual(plain(ctx.getDaysRange_('2026-11-08','2026-11-15',null,new Set(['2026-11-08']),noMeasure)),before);
+const originalRange=sheet.getRange;sheet.getRange=()=>{throw Error('read failed');};
+const failing=ctx.speedTimer_();assert.throws(()=>ctx.getDaysRange_('2026-11-08','2026-11-15',null,null,failing),/read failed/);
+assert.equal(typeof failing.done().steps['schedule.datesRead'],'number','failed work is timed and still throws');sheet.getRange=originalRange;
+console.log('✓ schedule profile: identical text/hash output and read counts; separated runs accumulate durations; missing timers and read errors preserve behavior');

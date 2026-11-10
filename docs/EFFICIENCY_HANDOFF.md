@@ -113,3 +113,8 @@ A live startup showed5816ms in setup. `ensureDayRange_` now reads the same live 
 Phone recovery check, Nov10: Julius reported the saved online line remained and the offline line was recovered through the recovery UI, leaving both. This verifies that specific phone test only. More frequent recovery prompts/apparently disappearing text were reported separately and remain unresolved; Julius deferred investigation. Do not mark that symptom fixed or broadly certify all recovery paths.
 
 `setup.dateCoverage` and `setup.lock` split existing cold setup work from lock waiting without extra service calls. A setup spike alone does not prove date formatting caused the whole delay. Manual setup still works without a timer; already-completed daily setup keeps its property-only fast path.
+
+
+## Confirmation identity digest reuse — 2026-11-10
+
+To Confirm imports showed meaningful row-processing cost after source reads. Reuse the existing bounded exact-input digest helper with a separate confirm cache namespace. Every source row is read and normalized on every check and locked reconcile; only deterministic IDs are reused. Date, defaulted project and change title must match exactly. Instructions, status and row positions remain live. Done Log namespace, digest format and timing stay compatible. Misses, eviction, corrupt entries and cache errors compute normally; no source cursor or content cache. A 190-row fixture changes 190→0 warm digest calls, with identical IDs and source reads. Actual elapsed gain is unmeasured; compare confirm.check.hashes and hashCacheRead/Write after deployment. Keep the frequent recovery-prompt investigation deferred.

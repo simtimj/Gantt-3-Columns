@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 const source = fs.readFileSync('Code.gs','utf8');
 const HEAD = ['Date','Project','Change','How to check','Status','Checked on'];
 export function fixture(serverSource = source) {
-  const reads=[],writes=[],cache=new Map(),props={},stats={lookups:0,locks:0},faults={};
+  const reads=[],writes=[],cache=new Map(),props={},stats={lookups:0,locks:0,hashes:0},faults={};
   function sheet(name,rows) { return {name,rows,grid:1000,
     getLastRow(){return this.rows.length;},
     getDataRange(){return this.getRange(1,1,this.rows.length,Math.max(...this.rows.map(r=>r.length)));},
@@ -23,11 +23,11 @@ export function fixture(serverSource = source) {
   const sheets=new Map([['To Confirm',intake],['Reference',ref]]);
   const ss={getSheetByName:name=>{stats.lookups++;return sheets.get(name)||null;}};
   const ctx=vm.createContext({console,SpreadsheetApp:{getActiveSpreadsheet:()=>ss},
-    CacheService:{getScriptCache:()=>({get:k=>{if(faults.cache)throw Error('cache down');return cache.get(k)||null;},put:(k,v)=>{if(faults.cache)throw Error('cache down');cache.set(k,v);},remove:k=>cache.delete(k)})},
+    CacheService:{getScriptCache:()=>({getAll:keys=>{if(faults.cache)throw Error('cache down');return Object.fromEntries(keys.filter(k=>cache.has(k)).map(k=>[k,cache.get(k)]));},putAll:values=>{if(faults.cache)throw Error('cache down');for(const [k,v] of Object.entries(values))cache.set(k,v);},get:k=>{if(faults.cache)throw Error('cache down');return cache.get(k)||null;},put:(k,v)=>{if(faults.cache)throw Error('cache down');cache.set(k,v);},remove:k=>cache.delete(k)})},
     LockService:{getScriptLock:()=>({tryLock(){stats.locks++;if(faults.busy)return false;if(faults.onLock)faults.onLock();return true;},releaseLock(){stats.released=true;}})},
     PropertiesService:{getScriptProperties:()=>({setProperty:(k,v)=>props[k]=v})}});
   vm.runInContext(serverSource,ctx);
-  ctx.cellHash_=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
+  ctx.cellHash_=s=>{stats.hashes++;return crypto.createHash('sha256').update(String(s)).digest('hex').slice(0,16);};
   ctx.getOrCreateSheet_=(name)=>ss.getSheetByName(name);
   ctx.todayString_=()=> '2026-11-07';ctx.getRefPins_=()=>['other'];ctx.backupCell_=()=>{};
   ref.rows.push(['p-to-confirm','','item','To Confirm',ctx.confirmCardHtml_(ctx.confirmRows_(intake)),true,0]);
@@ -115,3 +115,33 @@ assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(html),'clipping does not sp
 assert.equal(f.intake.rows.length,801,'overflow source rows are retained');
 f.reset();f.ctx.syncConfirmCard_();assert.equal(f.stats.locks,0);assert.equal(f.writes.length,0);
 console.log('✓ bounded confirmation card: compact queue retains all checks, source text and ticks; pathological overflow explicit, safe Unicode/HTML, no retry/write loop');
+
+// Exact-input digest reuse never replaces live source data or locked rereads.
+f=fixture();f.intake.rows=[HEAD,...Array.from({length:190},(_,i)=>['2026-11-07','Gantt','Change '+i,'How '+i,'',''])];
+f.cache.clear();f.stats.hashes=0;
+const cold=JSON.parse(JSON.stringify(f.ctx.confirmRows_(f.intake)));
+assert.equal(f.stats.hashes,190);
+f.stats.hashes=0;f.reads.length=0;
+assert.deepEqual(JSON.parse(JSON.stringify(f.ctx.confirmRows_(f.intake))),cold);
+assert.equal(f.stats.hashes,0,'fully warm queue avoids all 190 ID digests');
+assert.equal(f.reads.length,1,'every source row is still read');
+f.intake.rows[5][3]='New instructions';f.intake.rows[5][4]='broken';
+f.stats.hashes=0;let current=f.ctx.confirmRows_(f.intake);
+assert.equal(current[4].how,'New instructions');assert.equal(current[4].status,'broken');
+assert.equal(current[4].id,cold[4].id);assert.equal(f.stats.hashes,0,'nonidentity fields remain live');
+f.intake.rows[5][2]='Corrected title';f.stats.hashes=0;current=f.ctx.confirmRows_(f.intake);
+assert.notEqual(current[4].id,cold[4].id);assert.equal(f.stats.hashes,32,'only changed block is recomputed');
+const expected=JSON.parse(JSON.stringify(current));
+for(const corruption of ['bad json',JSON.stringify([[],[]]),JSON.stringify([['wrong'],['0'.repeat(16)]])]) {
+  f.cache.set('confirm-id-hashes:v1:0',corruption);f.stats.hashes=0;
+  assert.deepEqual(JSON.parse(JSON.stringify(f.ctx.confirmRows_(f.intake))),expected);
+  assert.equal(f.stats.hashes,32);
+}
+f.cache.clear();f.faults.cache=true;f.stats.hashes=0;
+assert.deepEqual(JSON.parse(JSON.stringify(f.ctx.confirmRows_(f.intake))),expected);
+assert.equal(f.stats.hashes,190,'outage/eviction only costs computation');
+f.faults.cache=false;
+f.intake.rows.reverse();f.intake.rows.pop();f.intake.rows.unshift(HEAD);
+current=f.ctx.confirmRows_(f.intake);
+for(const row of current) assert.equal(row.id,'k-'+crypto.createHash('sha256').update([row.date,row.project,row.change].join('|')).digest('hex').slice(0,16));
+console.log('✓ Confirmation exact-input identities: 190→0 warm digests; edits, reorder, corrupt/evicted caches and outages retain live output');

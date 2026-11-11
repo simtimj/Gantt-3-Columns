@@ -75,6 +75,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-11)
+- **📅 Calendar backlog**: once a day (first app load), unfinished all-day tasks on the main calendar from past days (first run: last 30 days) move to the `Cal Backlog` tab; the original stays on its day as "↪ Title" in Graphite. **Backlog** button (phone: "↪ Backlog" in the Calendars row) opens the list (phone: bottom half; wider: left side), grouped Urgent / Next / Later / Not set, oldest first. Hold + drag a task onto a day = new event with the same color, no prompt; ✕ removes it from the backlog.
+- **📅 Zoom**: pinch the calendar (or ctrl + wheel, or − / + in the Calendars row) to make hours taller or shorter; saved per device.
 - **📅 Text fit**: timed event text shrinks with the card's width (never below 10px); the title gives up lines so the time stays visible; narrow cards show the start time only; day headers stay inside their column.
 
 ## 🧪 To be confirmed (2026-11-09)
@@ -564,7 +566,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 📋 To do
 
-- **Calendar backlog** (wanted 2026-11-11, design pending): unfinished calendar tasks from past days go to a backlog (kept, struck through on their old day, colors kept); a Backlog button opens a list on the left of the 📅 panel to drag tasks back onto a day. Answers saved 2026-11-11; build plan awaiting go. See `docs/NOTES.md` → "Calendar backlog".
+- **Calendar backlog** (wanted 2026-11-11, design pending): unfinished calendar tasks from past days go to a backlog (kept, struck through on their old day, colors kept); a Backlog button opens a list on the left of the 📅 panel to drag tasks back onto a day. Built 2026-11-11 (see 🧪). See `docs/NOTES.md` → "Calendar backlog".
 - **App cleanup** (wanted 2026-11-08): hide what isn't used, better grouping and sorting of the many panels / tabs First candidate: the **Cal Events** panel (center bottom), now covered by the 📅 calendar; decide what takes its spot.
 - **Task → calendar pipeline** (wanted 2026-11-08): how Lead Tasks, urgent items and scheduled tasks flow into the calendar and back, without duplicates.
 

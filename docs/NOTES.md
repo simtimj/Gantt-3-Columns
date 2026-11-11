@@ -674,3 +674,6 @@ Idea: unfinished (non-Graphite) calendar tasks from past days move to a backlog 
 6. Grouped by urgency (red → yellow → blue → not set) by default, oldest first inside.
 7. Separate from the Plan's "Backlog" group for now ("Calendar backlog" vs "Backlog").
 8. Phone: backlog opens as the bottom half under the calendar; side-by-side on wider screens. A full-screen calendar app may come later.
+Drop onto a day: no confirmation prompt (Julius).
+
+Built 2026-11-11: Code.gs `calBacklogSweep_` / `calBacklogSync` / `calBacklogPlace` (bottom of file); `Cal Backlog` tab (Id = iCalUID|date, Date, Title, ColorId, Urgency, Swept, Placed = date or `dropped`). Script property `calBacklogSwept` = last day covered; delete it to re-sweep. Swept originals: Calendar API patch → "↪ " + title, colorId 8. Client: `blLoad` (9 s after app start when idle, and on 📅 open; skipped if < 15 min old), `blRender`, `dropBacklog` (FullCalendar Draggable on `[data-bl-drag]`, `slotReq` 30 min for timed drops). Phone hides the toolbar Backlog button (no room) and shows `[data-bl-toggle]` in the Calendars row. Zoom: `--cp-slot` on #calPanel (14–120 px, `fw.calZoom`), pinch on #calMount (capture listeners), ctrl+wheel, − / +.

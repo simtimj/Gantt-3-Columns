@@ -14920,6 +14920,24 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-state button{font:inherit;padding:4px 12px;border-radius:8px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;}
   #calPanel .cp-body{flex:1 1 auto;min-height:0;position:relative;padding:6px 8px 8px;display:flex;flex-direction:column;}
   #calPanel #calMount{flex:1 1 auto;min-height:0;}
+  /* Calendar backlog (2026-11-11, Julius): phone = bottom half under the calendar; wider = list on the left. */
+  #calPanel .cp-bl{flex:0 0 45%;min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--cp-line);margin-top:6px;background:var(--cp-bg);}
+  #calPanel .cp-bl[hidden]{display:none;}
+  #calPanel .cp-blh{display:flex;align-items:baseline;gap:6px;padding:6px 8px 4px;font-size:13px;}
+  #calPanel .cp-blc{color:var(--cp-muted);}
+  #calPanel .cp-blhint{margin-left:auto;font-size:11px;color:var(--cp-muted);}
+  #calPanel .cp-blb{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 8px;}
+  #calPanel .cp-blg{font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--cp-muted);margin:8px 2px 3px;text-transform:uppercase;}
+  #calPanel .cp-bli{display:flex;align-items:center;gap:6px;padding:6px 8px;margin:2px 0;border-radius:6px;font-size:13px;line-height:1.25;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grab;touch-action:pan-y;}
+  #calPanel .cp-bli .cp-blt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+  #calPanel .cp-bli .cp-bld{flex:0 0 auto;font-size:11px;opacity:.8;}
+  #calPanel .cp-bli .cp-blx{flex:0 0 auto;border:0;background:transparent;color:inherit;opacity:.7;font-size:14px;padding:0 2px;cursor:pointer;}
+  #calPanel .cp-blmsg{padding:10px 4px;font-size:13px;color:var(--cp-muted);}
+  @media (min-width:721px){
+    #calPanel .cp-body.bl-open{padding-left:248px;}
+    #calPanel .cp-body.bl-open .cp-bl{position:absolute;left:8px;top:6px;bottom:8px;width:232px;margin:0;border:1px solid var(--cp-line);border-radius:10px;}
+  }
   #calPanel .cp-detail{position:absolute;left:10px;right:10px;bottom:10px;z-index:10;background:var(--cp-bg);color:var(--cp-text);border:1px solid var(--cp-line);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:12px 14px;}
   #calPanel .cp-detail[hidden]{display:none;}
   #calPanel .cp-detail .cp-dt{font-weight:600;font-size:15px;display:flex;gap:8px;align-items:flex-start;}
@@ -15185,6 +15203,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-cfold{font:inherit;font-size:13px;font-weight:500;color:var(--cp-muted);background:transparent;border:0;padding:3px 4px;cursor:pointer;}
   #calPanel .cp-ccnt{font-weight:400;}
   #calPanel .cp-cals.folded .cp-cbody{display:none;}
+  #calPanel .cp-crow{float:right;display:inline-flex;gap:4px;align-items:center;}
+  #calPanel .cp-zb,#calPanel .cp-blbtn{font:inherit;font-size:13px;color:var(--cp-text);background:transparent;border:1px solid var(--cp-line);border-radius:999px;min-width:30px;height:26px;padding:0 8px;cursor:pointer;}
+  #calPanel .cp-blbtn.on{background:var(--cp-soft);font-weight:600;}
+  #calPanel .cp-blbtn{display:none;}
+  @media (max-width:720px){ #calPanel .cp-blbtn{display:inline-block;} #calPanel .fc .fc-cpBacklog-button{display:none;} }
+  /* Calendar zoom (2026-11-11, Julius): slot height 14–120px, pinch / ctrl+wheel / − +, saved per device. */
+  #calPanel .fc .fc-timegrid-slot{height:var(--cp-slot,24px)!important;}
   #calPanel .cp-cals:not(.folded) .cp-parr{display:inline-block;transform:rotate(90deg);}
   #calPanel .cp-crow{display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:14px;cursor:pointer;}
   #calPanel .cp-crow input{width:18px;height:18px;margin:0;accent-color:var(--cc,#1a73e8);}
@@ -15203,7 +15228,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-corner.cp-today .cp-dh-n{background:var(--cp-blue);color:#fff;}
   html[data-theme=dark] #calPanel .cp-corner.cp-today .cp-dh-n{color:var(--cp-blue-text);}
   #calPanel .fc .fc-cpRefresh-button,#calPanel .fc .fc-cpClose-button{width:36px;padding:0;border-radius:50%!important;color:var(--cp-muted);font-size:17px;}
-  #calPanel .fc .fc-cpPlan-button{border:1px solid var(--cp-line);border-radius:999px!important;padding:0 12px;margin-right:4px;}
+  #calPanel .fc .fc-cpPlan-button,#calPanel .fc .fc-cpBacklog-button{border:1px solid var(--cp-line);border-radius:999px!important;padding:0 12px;margin-right:4px;}
   #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:8px 4px 6px 8px;}
   #calPanel .fc .fc-cpClose-button:focus,#calPanel .fc .fc-cpRefresh-button:focus{outline:0;box-shadow:none;}
   #calPanel .fc .fc-cpView-button{display:none;align-items:center;}
@@ -15219,7 +15244,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     #calPanel .fc .fc-cpView-button{display:inline-flex;border:1px solid var(--cp-line);border-radius:999px!important;padding:0 7px;margin-right:0;}
     #calPanel .fc .fc-today-button{padding:0 9px;margin-right:0;}
     #calPanel .fc .fc-prev-button,#calPanel .fc .fc-next-button{width:26px;}
-    #calPanel .fc .fc-cpPlan-button{padding:0 7px;margin-right:0;}
+    #calPanel .fc .fc-cpPlan-button,#calPanel .fc .fc-cpBacklog-button{padding:0 7px;margin-right:0;}
     #calPanel .fc .fc-timeGridDay-button,#calPanel .fc .fc-timeGridWeek-button{padding:0 8px;}
     #calPanel .fc .fc-cpRefresh-button,#calPanel .fc .fc-cpClose-button{width:28px;}
   }
@@ -15241,7 +15266,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div class="cp-state" data-cal-state hidden></div>
   <div class="cp-body">
     <section class="cp-cals folded" data-cal-cals aria-label="Calendars">
-      <button type="button" class="cp-cfold" data-cals-fold><span class="cp-parr">▸</span> Calendars <span class="cp-ccnt" data-cals-count></span></button>
+      <button type="button" class="cp-cfold" data-cals-fold><span class="cp-parr">▸</span> Calendars <span class="cp-ccnt" data-cals-count></span></button><span class="cp-crow"><button type="button" class="cp-zb" data-cal-zoom="-1" title="Zoom out (or pinch)" aria-label="Zoom out">−</button><button type="button" class="cp-zb" data-cal-zoom="1" title="Zoom in (or pinch)" aria-label="Zoom in">+</button><button type="button" class="cp-blbtn" data-bl-toggle title="Show / hide past unfinished tasks">↪ Backlog <span data-bl-n></span></button></span>
       <div class="cp-cbody" data-cals-body></div>
     </section>
     <section class="cp-plan" data-cal-plan aria-label="Daily plan">
@@ -15249,6 +15274,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <div class="cp-pbody" data-plan-body></div>
     </section>
     <div id="calMount"></div>
+    <section class="cp-bl" data-cal-bl aria-label="Calendar backlog" hidden>
+      <div class="cp-blh"><b>Backlog</b> <span class="cp-blc" data-bl-count></span><span class="cp-blhint">hold + drag onto a day</span></div>
+      <div class="cp-blb" data-bl-body></div>
+    </section>
     <div class="cp-detail" data-cal-detail hidden></div>
   </div>
 </aside>
@@ -15883,6 +15912,92 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const fe = cal && it.ev ? cal.getEvents().find(e => (e.extendedProps || {}).eventId === it.ev.eventId) : null;
     return fe && !fe.allDay && fe.end ? Math.max(15, Math.round((fe.end - fe.start) / 60000)) : 15;
   }
+  // ── Calendar backlog (2026-11-11, Julius) ── sweep runs server side at most once a day (calBacklogSync).
+  const blEl = panel.querySelector('[data-cal-bl]'), blBody = panel.querySelector('[data-bl-body]'), blCount = panel.querySelector('[data-bl-count]');
+  let blData = null, blAt = 0, blBusy = false;
+  const blById = id => ((blData && blData.items) || []).find(x => x.id === id);
+  const BL_G = [['1', 'Urgent'], ['2', 'Next'], ['3', 'Later'], ['', 'Not set']];
+  function blLoad(force){
+    if(blBusy || !canRun() || (!force && blData && Date.now() - blAt < 15 * 60000)) return;
+    blBusy = true;
+    google.script.run.withSuccessHandler(r => {
+      blBusy = false; blData = r || {items: []}; blAt = Date.now(); blRender();
+      const n = r && r.sweep && r.sweep.swept;
+      if(n){ if(cal){ flash(n + ' past task' + (n > 1 ? 's' : '') + ' moved to Backlog'); refetchFresh(); } }
+    }).withFailureHandler(() => { blBusy = false; }).calBacklogSync();
+  }
+  function blRender(){
+    const items = (blData && blData.items) || [], btn = panel.querySelector('.fc-cpBacklog-button');
+    if(btn){ btn.textContent = 'Backlog' + (items.length ? ' ' + items.length : ''); btn.classList.toggle('fc-button-active', !blEl.hidden); }
+    if(blCount) blCount.textContent = items.length ? items.length : '';
+    const pb = panel.querySelector('[data-bl-toggle]'); if(pb){ pb.querySelector('[data-bl-n]').textContent = items.length || ''; pb.classList.toggle('on', !blEl.hidden); }
+    if(blEl.hidden) return;
+    if(!blData){ blBody.innerHTML = '<div class="cp-blmsg">Loading…</div>'; return; }
+    if(!items.length){ blBody.innerHTML = '<div class="cp-blmsg">Nothing in the backlog.</div>'; return; }
+    let h = '';
+    BL_G.forEach(([u, name]) => {
+      const g = items.filter(x => (BL_G.some(b => b[0] === x.urg) ? x.urg : '') === u).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+      if(!g.length) return;
+      h += '<div class="cp-blg">' + name + ' · ' + g.length + '</div>';
+      g.forEach(x => { const c = softColor(x.color, false);
+        h += '<div class="cp-bli" data-bl-drag data-blid="' + esc(x.id) + '" style="background:' + c.bg + ';color:' + c.fg + '" title="Hold and drag onto a day">' +
+          '<span class="cp-blt">' + esc(x.title) + '</span><span class="cp-bld">' + esc(x.date.slice(5).replace('-', '/')) + '</span>' +
+          '<button type="button" class="cp-blx" data-bl-x="' + esc(x.id) + '" title="Remove from backlog" aria-label="Remove from backlog">✕</button></div>'; });
+    });
+    blBody.innerHTML = h;
+  }
+  function blToggle(){
+    blEl.hidden = !blEl.hidden; lsSet('fw.calBacklog', blEl.hidden ? '0' : '1');
+    panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
+    blRender(); if(!blEl.hidden) blLoad(false);
+    setTimeout(() => cal && cal.updateSize(), 0);
+  }
+  if(blBody) blBody.addEventListener('click', e => {
+    const b = e.target.closest('[data-bl-x]'); if(!b || moveBusy) return;
+    const id = b.dataset.blX; e.stopPropagation();
+    google.script.run.withSuccessHandler(() => { blData.items = blData.items.filter(x => x.id !== id); blRender(); })
+      .withFailureHandler(err => moveFail('Couldn’t remove — ' + errText(err))).calBacklogPlace({id: id, drop: true});
+  });
+  function dropBacklog(info){
+    const id = info.draggedEl.closest('[data-blid]').dataset.blid, it = blById(id);
+    if(!it) return;
+    if(moveBusy){ moveFail('Still saving — try again in a moment.'); return; }
+    moveBusy = true; setState('loading', 'Saving…');
+    google.script.run.withSuccessHandler(() => {
+      moveBusy = false; blData.items = blData.items.filter(x => x.id !== id); blRender(); flash('Scheduled ✓'); refetchFresh();
+    }).withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save — nothing changed. ' + errText(err)); })
+      .calBacklogPlace(Object.assign({id: id}, slotReq(info.allDay, info.dateStr, '', 30)));
+  }
+  panel.addEventListener('click', e => { if(e.target.closest('[data-bl-toggle]')){ e.stopPropagation(); blToggle(); } });
+  // ── Zoom ──
+  const Z_MIN = 14, Z_MAX = 120;
+  let zoomPx = Math.min(Z_MAX, Math.max(Z_MIN, Number(lsGet('fw.calZoom')) || 24)), zoomT = 0;
+  function setZoom(px, anchorY){
+    px = Math.round(Math.min(Z_MAX, Math.max(Z_MIN, px)));
+    if(px === zoomPx) return;
+    const sc = mount.querySelector('.fc-timegrid-body') && mount.querySelector('.fc-timegrid-body').closest('.fc-scroller');
+    const y = anchorY == null && sc ? sc.clientHeight / 2 : (anchorY || 0), at = sc ? (sc.scrollTop + y) / zoomPx : 0;
+    zoomPx = px; panel.style.setProperty('--cp-slot', px + 'px');
+    if(cal) cal.updateSize();
+    if(sc) sc.scrollTop = at * px - y;
+    clearTimeout(zoomT); zoomT = setTimeout(() => lsSet('fw.calZoom', String(px)), 300);
+  }
+  panel.style.setProperty('--cp-slot', zoomPx + 'px');
+  panel.addEventListener('click', e => { const b = e.target.closest('[data-cal-zoom]'); if(b){ e.stopPropagation(); setZoom(zoomPx * (b.dataset.calZoom === '1' ? 1.35 : 1 / 1.35)); } });
+  mount.addEventListener('wheel', e => { if(!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); setZoom(zoomPx * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientY - mount.getBoundingClientRect().top); }, {passive: false});
+  let pinch = null;
+  const pd = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  mount.addEventListener('touchstart', e => { if(e.touches.length === 2) pinch = {d: pd(e.touches), px: zoomPx}; }, {passive: true, capture: true});
+  mount.addEventListener('touchmove', e => {
+    if(!pinch || e.touches.length !== 2) return;
+    e.preventDefault(); e.stopPropagation();
+    const mid = (e.touches[0].clientY + e.touches[1].clientY) / 2 - mount.getBoundingClientRect().top;
+    setZoom(pinch.px * pd(e.touches) / pinch.d, mid);
+  }, {passive: false, capture: true});
+  mount.addEventListener('touchend', e => { if(e.touches.length < 2) pinch = null; }, {passive: true, capture: true});
+  if(lsGet('fw.calBacklog') === '1'){ blEl.hidden = false; panel.querySelector('.cp-body').classList.add('bl-open'); }
+  // Sweep on app load (cheap: once a day server side), when the device is idle.
+  setTimeout(() => (window.requestIdleCallback ? requestIdleCallback(() => blLoad(false), {timeout: 5000}) : blLoad(false)), 9000);
   function dropPlan(info){
     const r = info.draggedEl && info.draggedEl.closest('[data-pid]'), it = r && planById(r.dataset.pid);
     if(!it) return;
@@ -15999,8 +16114,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
       // One toolbar line (2026-11-08, Julius): Today · date · ‹ › … Plan · Day|Week · ↻ · ✕. The old header row and
       // + New are gone (hold / drag on the grid or the all-day row makes a new event).
-      headerToolbar: { left: 'today title prev,next', center: '', right: 'cpPlan timeGridDay,timeGridWeek cpView cpRefresh cpClose' },
+      headerToolbar: { left: 'today title prev,next', center: '', right: (phone ? '' : 'cpBacklog ') + 'cpPlan timeGridDay,timeGridWeek cpView cpRefresh cpClose' }, // phone: Backlog sits in the Calendars row
       customButtons: {
+        cpBacklog: { text: 'Backlog', hint: 'Show / hide past unfinished tasks', click: () => blToggle() },
         cpPlan: { text: 'Plan', hint: 'Show / hide the plan (Big Three, Waiting list)', click: () => { lsSet('fw.calPlanFold', planFolded() ? '0' : '1'); renderPlan(); setTimeout(() => cal && cal.updateSize(), 0); } },
         // Phones: one Day ⇄ Week toggle instead of the two-button pill (saves a button's width on the single line).
         cpView: { text: 'Week', hint: 'Switch Day / Week', click: () => cal.changeView(cal.view.type === 'timeGridDay' ? 'timeGridWeek' : 'timeGridDay') },
@@ -16045,9 +16161,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // ways. Per event `editable` = main calendar, not repeating, not done (Graphite stays put). Plan rows drop in too.
       editable: true, eventStartEditable: true, eventDurationEditable: true, eventResizableFromStart: false,
       eventLongPressDelay: 500, snapDuration: '00:15:00', defaultTimedEventDuration: '00:15:00', defaultAllDayEventDuration: {days: 1},
-      eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag]',
+      eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag],[data-bl-drag]',
       eventDragStart: () => { dropSeen = false; }, eventDragStop: info => { dragStopped(info); unselSoon(); }, eventResizeStop: () => unselSoon(),
-      eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: info => moveEvent(info), drop: dropPlan,
+      eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: info => moveEvent(info), drop: info => (info.draggedEl && info.draggedEl.closest('[data-blid]') ? dropBacklog(info) : dropPlan(info)),
       // Phase 2: drag (desktop) or hold + drag (touch) on empty grid → New event form. Moving / resizing events is phase 3.
       selectable: true, selectMirror: true, selectLongPressDelay: 500, unselectAuto: true,
       select: info => { if(!pending) openForm(formFromRange(info.allDay, info.startStr, info.endStr)); cal.unselect(); },
@@ -16083,12 +16199,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     renderPlan();
     // Plan rows → timeline: hold a row's title (touch) or drag it (mouse). create:false = nothing is drawn locally;
     // Google answers and the range is refetched.
+    if(FullCalendar.Draggable && blBody) new FullCalendar.Draggable(blBody, {
+      itemSelector: '[data-bl-drag]', longPressDelay: 400, minDistance: 5,
+      eventData: el => { const it = blById(el.dataset.blid); return {title: it ? it.title : '', duration: {minutes: 30}, create: false}; }
+    });
+    blRender();
     if(FullCalendar.Draggable && planBody) planDrag = new FullCalendar.Draggable(planBody, {
       itemSelector: '[data-plan-drag]', longPressDelay: 400, minDistance: 5,
       eventData: el => { const r = el.closest('[data-pid]'), it = r && planById(r.dataset.pid); return {title: it ? planView(it).title : '', duration: {minutes: it ? planMinutes(it) : 30}, create: false}; }
     });
   }
   function start(){
+    blLoad(false);
     if(cal){ cal.updateSize(); cal.refetchEvents(); loadPlan(true); return; }
     setState('loading', 'Loading calendar…');
     loadLibs().then(() => { if(!cal){ build(); } })

@@ -3582,3 +3582,114 @@ function saveLookSnapshot(slot, json, ua) {
 
 
 
+
+/* =========================================================
+   CALENDAR BACKLOG (2026-11-11, Julius; docs/NOTES.md → "Calendar backlog")
+   Unfinished all-day task events on the MAIN calendar from past days move to the `Cal Backlog` tab, so nothing gets
+   lost. The original stays on its day as history: title gets "↪ " and the color turns Graphite.
+   - Swept: all-day, main calendar, not repeating, not Graphite, not "[x] " / "↪ " / archive titles, ended before today.
+   - Cheap: runs at most once a day (script property calBacklogSwept = last date covered); each run reads only the
+     days since then (first run: last 30 days) with one Calendar API list. Script lock against double runs.
+   - Dropping a backlog task onto a day makes a NEW event (same title + color, reminders off) and marks the row placed.
+   - "↪ " Graphite events are moved tasks, not done work: Graphite transfers to the Done Log must skip them.
+   ========================================================= */
+const CAL_BACKLOG_SHEET = 'Cal Backlog';
+const CAL_BACKLOG_HEAD = ['Id', 'Date', 'Title', 'ColorId', 'Urgency', 'Swept', 'Placed'];
+const CAL_BACKLOG_PREFIX = '↪ ';
+const CAL_BACKLOG_FIRST_DAYS = 30;
+function calBacklogSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(CAL_BACKLOG_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(CAL_BACKLOG_SHEET);
+    sh.getRange(1, 1, 1, CAL_BACKLOG_HEAD.length).setValues([CAL_BACKLOG_HEAD]).setFontWeight('bold');
+    sh.getRange('A:G').setNumberFormat('@');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function calBacklogRows_(sh) {
+  const n = sh.getLastRow() - 1;
+  return n > 0 ? sh.getRange(2, 1, n, CAL_BACKLOG_HEAD.length).getDisplayValues() : [];
+}
+function calBacklogSweep_() {
+  const tz = Session.getScriptTimeZone(), props = PropertiesService.getScriptProperties();
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), yest = addDaysToDateString_(today, -1);
+  const last = props.getProperty('calBacklogSwept') || '';
+  if (last >= yest) return { swept: 0 };
+  if (typeof Calendar === 'undefined' || !Calendar.Events) return { swept: 0, off: true };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return { swept: 0, busy: true };
+  try {
+    if ((props.getProperty('calBacklogSwept') || '') >= yest) return { swept: 0 };
+    const floor = addDaysToDateString_(today, -CAL_BACKLOG_FIRST_DAYS);
+    const from = last && last >= floor ? addDaysToDateString_(last, 1) : floor;
+    const calId = EVENT_CALENDARS[0], items = [];
+    let token = null;
+    do {
+      const q = { timeMin: parseDate_(from).toISOString(), timeMax: parseDate_(today).toISOString(), singleEvents: true, maxResults: 2500,
+        fields: 'nextPageToken,items(id,iCalUID,status,summary,start,end,colorId,recurringEventId)' };
+      if (token) q.pageToken = token;
+      const r = Calendar.Events.list(calId, q);
+      (r.items || []).forEach(it => {
+        if (it.status === 'cancelled' || !it.start || !it.start.date || it.recurringEventId) return;
+        if (it.start.date < from || (it.end && it.end.date > today)) return; // still running today → not past yet
+        const t = String(it.summary || '');
+        if (String(it.colorId || '') === '8' || /^\[x\]\s/i.test(t) || t.indexOf(CAL_BACKLOG_PREFIX) === 0 || t.indexOf(ARCHIVE_PREFIX) === 0 || / X$/.test(t)) return;
+        items.push(it);
+      });
+      token = r.nextPageToken;
+    } while (token);
+    const sh = calBacklogSheet_(), have = {};
+    calBacklogRows_(sh).forEach(r => { have[r[0]] = 1; });
+    const stamp = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm'), add = [];
+    items.forEach(it => {
+      const id = (it.iCalUID || it.id) + '|' + it.start.date, colorId = String(it.colorId || '');
+      if (!have[id]) {
+        const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === colorId) || '';
+        add.push([id, it.start.date, String(it.summary || '(no title)'), colorId, u, stamp, '']);
+        have[id] = 1;
+      }
+      try { Calendar.Events.patch({ summary: CAL_BACKLOG_PREFIX + String(it.summary || ''), colorId: '8' }, calId, it.id); }
+      catch (e) { console.error('calBacklogSweep_ patch: ' + e); }
+    });
+    if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, CAL_BACKLOG_HEAD.length).setValues(add);
+    props.setProperty('calBacklogSwept', yest);
+    return { swept: add.length };
+  } finally { lock.releaseLock(); }
+}
+function calBacklogList_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CAL_BACKLOG_SHEET);
+  if (!sh) return [];
+  return calBacklogRows_(sh).filter(r => r[0] && !r[6]).map(r => ({
+    id: r[0], date: r[1], title: r[2], colorId: r[3], urg: r[4],
+    color: CAL_PANEL_COLORS_[r[3]] || CAL_PANEL_UNASSIGNED_COLOR_
+  }));
+}
+// Client entry: sweep if due (cheap check), then return the open backlog.
+function calBacklogSync() {
+  let sweep = {};
+  try { sweep = calBacklogSweep_(); } catch (e) { console.error('calBacklogSweep_: ' + e); sweep = { error: String(e.message || e) }; }
+  return { items: calBacklogList_(), sweep: sweep };
+}
+// Drop onto a day: new event with the same title + color; the row is marked placed (or 'dropped' when cleared).
+function calBacklogPlace(req) {
+  const r = req || {}, id = String(r.id || '');
+  if (!id) throw new Error('Missing backlog id');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = calBacklogSheet_(), rows = calBacklogRows_(sh), i = rows.findIndex(x => x[0] === id);
+    if (i < 0) throw new Error('Not in the backlog any more — tap ↻');
+    if (rows[i][6]) return { ok: true, already: rows[i][6] };
+    if (r.drop) { sh.getRange(i + 2, 7).setValue('dropped'); return { ok: true }; }
+    const w = calPanelWhen_(Object.assign({}, r, { title: rows[i][2] }));
+    const cal = calPanelMain_(EVENT_CALENDARS[0]);
+    const ev = w.allDay ? (w.oneDay ? cal.createAllDayEvent(w.title, w.start) : cal.createAllDayEvent(w.title, w.start, w.end))
+      : cal.createEvent(w.title, w.start, w.end);
+    try { ev.removeAllReminders(); } catch (e) { console.error(e); }
+    if (rows[i][3] && rows[i][3] !== '8') { try { ev.setColor(rows[i][3]); } catch (e) { console.error(e); } }
+    sh.getRange(i + 2, 7).setValue(Utilities.formatDate(w.start, Session.getScriptTimeZone(), 'yyyy-MM-dd'));
+    return { ok: true, event: calPanelOut_(ev, EVENT_CALENDARS[0]) };
+  } finally { lock.releaseLock(); }
+}

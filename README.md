@@ -75,6 +75,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-11)
+- **Cal Events 🕒 day view**: 🕒 on the Cal Events line shows a small scrollable timeline of the day's timed events (urgency colors, done = grey, red now line) above the list; 🕒 again hides it. Saved per device. The ⊞ 4-box view is gone.
 - **📅 Calendar backlog**: once a day (first app load), unfinished all-day tasks on the main calendar from past days (first run: last 30 days) move to the `Cal Backlog` tab; the original stays on its day as "↪ Title" in Graphite. **Backlog** button (phone: "↪ Backlog" in the Calendars row) opens the list (phone: bottom half; wider: left side), grouped Urgent / Next / Later / Not set, oldest first. Hold + drag a task onto a day = new event with the same color, no prompt; ✕ removes it from the backlog.
 - **📅 Zoom**: pinch the calendar (or ctrl + wheel, or − / + in the Calendars row) to make hours taller or shorter; saved per device.
 - **📅 Text fit**: timed event text shrinks with the card's width (never below 10px); the title gives up lines so the time stays visible; narrow cards show the start time only; day headers stay inside their column.
@@ -172,7 +173,6 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **History top tidied**: empty lines piled above the first time section are removed (today had 8 under "Today: x/y done").
 - **Time headers in 2 lines max**: when "Morn 8–2 (6a–2p)" and "· 6 done −" don't fit on one line, the count moves under the label as one piece instead of spreading over 4 lines.
 - **Compact timer bar**: smaller icon-only ❚❚ / ☕ / ■ buttons (names in the tooltips), tighter spacing.
-- **Cal Events 4-box view (first try)**: **⊞** next to Cats splits Cal Events into four boxes that flow clockwise: **1 Sort** (top left: everything new, ordered by Cats or Time, + to add) → **2 Urgency** (top right) → **3 Schedule** (bottom right) → **4 Done** (bottom left). Tap **1 / 2 / 3** on an event in box 1 to set its urgency (it moves to box 2; events that already have an urgency start there). Tap **→ 🧱** in box 2 to copy it into today's Blocks (it moves to box 3; delete that Blocks line and it goes back). Tick it and it moves to Done. **☰** goes back to the normal list. Drag-to-drop urgency isn't built (buttons for now).
 - **Cats**: the Category button in Cal Events is now just **Cats** (Time stays Time).
 - **Full time windows in History**: the three sections now cover the whole day in 8-hour windows: **Morning 6 am – 2 pm**, **Afternoon 2 – 8 pm**, **Night 8 pm – 6 am**. Headers keep your working hours and add the full window small: *Morn 8–2 (6a–2p)* · *After 2–7 (2p–8p)* · *Night 7–10 (8p–6a)*. Work after midnight sorts at the end of Night.
 - **Nothing lands in the future**: a Done Log row dated after today counts as today, and anything logged between midnight and 6 am goes to the night before. Done lines already sitting in a window of today that hasn't started yet (like last night's rows that landed in Thursday's Night) move to the previous day's Night on the next load (old cell backed up).
@@ -594,6 +594,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 ---
 
 ## 💤 Shelved
+- **Cal Events 4-box view** (2026-11-05 → removed 2026-11-11, Julius: "not gonna work right now"). Replaced by the 🕒 day view.
 - **Notes split + Review (hidden 2026-10-31, "for now"):** Notes column has two halves with a drag bar (double-tap = half and half), like Today and Reference. Top = Plan (the Notes cell: Suggested Day + Schedule). Bottom = live **Review** of the day shown in Today: Done n/m, what got focus (done tasks by Morning / Nap gap / Afternoon / Evening), what's at risk (open red/yellow tasks; on a past day everything still open = Slipped) and tomorrow's top 3 (open tasks, red → yellow → blue). Updates as you tick or edit; tap a line to jump to the task. Not saved anywhere.
 
 - **Morning / Afternoon / Evening day sections — removed 2026-10-29** (Julius): the section lines, boxes, + Blocks, done-log placement into the current block and the Options toggle are gone; saved section lines were stripped from every Today cell once (old copies in the Backup tab). Old notes:

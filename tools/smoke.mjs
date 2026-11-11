@@ -467,31 +467,21 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     return out;
   });
   win.forEach(x => errs.push('Time windows: ' + x));
-  // Cal Events 4-box view (2026-11-05): Cats label; ⊞ → 1 Sort (TL) → 2 Urgency (TR) → 3 Schedule (BR) → 4 Done (BL).
+  // Cal Events (2026-11-05): Cats label; 🕒 day view (2026-11-11).
   const quad = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const out = [];
     if (document.querySelector('[data-ce-sort]')?.textContent !== 'Cats') out.push('sort button not "Cats"');
-    document.querySelector('[data-ce-grid]').click(); await wait(100);
     const list = document.getElementById('centerCalendarList');
-    const boxes = [...list.querySelectorAll(':scope > .ce-q')];
-    if (boxes.length !== 4) return out.concat('boxes: ' + boxes.length);
-    const pos = n => { const r = list.querySelector('.ce-q' + n).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; };
-    const [p1, p2, p3, p4] = [1, 2, 3, 4].map(pos);
-    if (getComputedStyle(list).display === 'grid' && list.offsetParent && !(p1[0] < p2[0] && p1[1] === p2[1] && p3[0] === p2[0] && p3[1] > p2[1] && p4[0] === p1[0] && p4[1] === p3[1])) out.push('box order not clockwise: ' + JSON.stringify([p1, p2, p3, p4]));
-    const inBox = n => !!list.querySelector('.ce-q' + n + ' .ce-event[data-ce-id="e1"]');
-    if (!inBox(1)) out.push('new event not in box 1');
-    list.querySelector('.ce-q1 [data-ce-urg="2"]').click(); await wait(100);
-    if (!inBox(2) || list.querySelector('.ce-event[data-ce-id="e1"]').dataset.urg !== '2') out.push('urgency did not move it to box 2');
-    list.querySelector('.ce-q2 [data-ce-sched]').click(); await wait(200);
-    const pad = document.querySelector('#todayScroll .plan-pad[data-date="' + localToday() + '"]');
-    if (!inBox(3) || !pad.querySelector('[data-ceid^="e1|"]')) out.push('→ 🧱 did not move it to box 3');
-    list.querySelector('.ce-q3 .ce-check').click(); await wait(200);
-    if (!inBox(4)) out.push('tick did not move it to box 4');
-    pad.querySelector('[data-ceid^="e1|"]').remove(); // leave the Blocks pad as it was for the timer test
-    pad.dispatchEvent(new Event('input', { bubbles: true }));
-    document.querySelector('[data-ce-grid]').click(); await wait(100);
-    if (list.classList.contains('ce-grid')) out.push('☰ did not go back to the list');
+    // Mini day view (2026-11-11; replaced the 4-box view): 🕒 shows a scrollable day timeline on top, 🕒 again hides it.
+    document.querySelector('[data-ce-day]').click(); await wait(100);
+    const dv = list.querySelector(':scope > .ce-day');
+    if (!dv) out.push('🕒 did not show the day view');
+    else if (dv.scrollHeight <= dv.clientHeight) out.push('day view does not scroll');
+    if (!list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('day view hid the list');
+    document.querySelector('[data-ce-day]').click(); await wait(100);
+    if (list.querySelector('.ce-day')) out.push('🕒 did not hide the day view');
+    list.querySelector('.ce-event[data-ce-id="e1"] .ce-check').click(); await wait(200);
     // Cats list = urgency boxes then subjects (2026-11-06): e1 was ticked above → Done box.
     if (!list.querySelector('.ce-urg-done .ce-event[data-ce-id="e1"]')) out.push('Cats list: done event not in the Done urgency box');
     // Search box on the Cal Events line (2026-11-06): filters as you type, Esc clears, fits the header.
@@ -508,7 +498,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     if (sb.value || !list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('Esc did not clear the search');
     return out;
   });
-  quad.forEach(x => errs.push('Cal 4-box: ' + x));
+  quad.forEach(x => errs.push('Cal Events: ' + x));
   // Hold-to-zoom (2026-11-05): History zooms alone, on top of everything, and closes cleanly.
   const zm = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));

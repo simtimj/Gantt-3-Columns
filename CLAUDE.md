@@ -115,7 +115,7 @@ When he asks to organize his calendar tasks:
 - Fast start + live updates (2026-11-05, Julius)
 - Block timer MVP (2026-11-05, Julius)
 - Time windows, future-dated done lines, title menu (2026-11-05, Julius)
-- Cal Events 4-box view (2026-11-05, Julius)
+- Cal Events 4-box view (2026-11-05, Julius) — REMOVED 2026-11-11 (🕒 day view)
 - Urgent tick = log + archive (2026-11-05, Julius)
 - Time Tracker app (2026-11-05, Julius: separate app in `tracker/`, `?app=tracker`)
 - Fun for later tab (2026-11-05, Julius)

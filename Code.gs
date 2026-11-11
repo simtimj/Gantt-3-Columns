@@ -2804,7 +2804,7 @@ function getCalendarRange(startDate, endDate) {
   // Fast path (2026-11-08, Julius: "make the days load faster"): one Calendar API call per calendar returns every
   // field at once, instead of CalendarApp's per-event getters. Same output shape; any failure → CalendarApp below.
   const fast = calPanelRangeApi_(from, to, tz);
-  if (fast) return Object.assign(fast, { start: s, end: e, tz: tz, via: 'api', ms: Date.now() - t0 });
+  if (fast) { calPanelAttachMeta_(fast.events); return Object.assign(fast, { start: s, end: e, tz: tz, via: 'api', ms: Date.now() - t0 }); }
   const out = [], calendars = [], failed = [];
   EVENT_CALENDARS.forEach(id => {
     let cal = null;
@@ -2814,7 +2814,21 @@ function getCalendarRange(startDate, endDate) {
     calendars.push({ id: id, name: calName, color: calColor });
     cal.getEvents(from, to).forEach(ev => out.push(calPanelEventOut_(ev, id, calName, calColor, tz)));
   });
+  calPanelAttachMeta_(out);
   return { start: s, end: e, tz: tz, events: out, calendars: calendars, failed: failed, via: 'app', ms: Date.now() - t0 };
+}
+// Calendar panel checkboxes (2026-11-11, Julius): each event carries the urgency / subject / due / minutes saved from
+// the hold menu (same calMeta keys as Cal Events); no saved urgency → read it from the event color (Tomato / Banana /
+// Blueberry), like getMainCalendarEvents.
+function calPanelAttachMeta_(events) {
+  let saved = {};
+  try { saved = PropertiesService.getScriptProperties().getProperties(); } catch (err) { console.error(err); }
+  (events || []).forEach(ev => {
+    let m = {};
+    try { m = JSON.parse(saved[calMetaKey_(ev.eventId, ev.startMs, ev.recurring)] || '{}'); } catch (err) { m = {}; }
+    ['urg', 'due', 'dur', 'cat'].forEach(k => { if (m[k]) ev[k] = String(m[k]); });
+    if (!ev.urg) { const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === ev.colorId); if (u) ev.urg = u; }
+  });
 }
 // Calendar advanced service (appsscript.json → enabledAdvancedServices). Returns null when it's missing or fails, so
 // the caller falls back to CalendarApp; a failure is remembered for 30 min so the fallback doesn't pay for it each time.
@@ -2899,7 +2913,9 @@ function calPanelWhen_(req) {
 }
 function calPanelOut_(ev) {
   const cal = calPanelMain_();
-  return calPanelEventOut_(ev, EVENT_CALENDARS[0], cal.getName(), String(cal.getColor() || '#039be5'), Session.getScriptTimeZone());
+  const out = calPanelEventOut_(ev, EVENT_CALENDARS[0], cal.getName(), String(cal.getColor() || '#039be5'), Session.getScriptTimeZone());
+  calPanelAttachMeta_([out]); // keep the checkbox's urgency / subject after a move or edit
+  return out;
 }
 function calPanelEditable_(eventId, startMs) {
   if (!eventId) throw new Error('Missing event id');

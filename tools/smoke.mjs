@@ -949,7 +949,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           put({eventId:'c-'+d,title:'Old chore',allDay:false,start:t('13','00'),end:t('13','30'),startMs:ms(t('13','00')),color:'#616161',colorId:'8',done:true,cal:'Main',calId:'main',editable:true});
           put({eventId:'r-'+d,title:'Standup',allDay:false,start:t('15','00'),end:t('15','15'),startMs:ms(t('15','00')),color:'#039be5',colorId:'',cal:'Main',calId:'main',recurring:true,editable:false});
           put({eventId:'g-'+d,title:'Gig',allDay:false,start:t('19','00'),end:t('21','00'),startMs:ms(t('19','00')),color:'#33b679',colorId:'',cal:'Events',calId:'events',editable:false});}
-        return {start:a[0],end:a[1],events:window.__calEmpty?[]:Object.values(S.ev).concat(window.__calManyAllDay?Array.from({length:30},(_,i)=>({eventId:'m'+i,title:'Many '+i,allDay:true,start:a[0],end:a[1],startMs:ms(a[0]),color:'#3f51b5',colorId:'9',cal:'Main',calId:'main',editable:true})):[]).filter(e=>e.start.slice(0,10)<a[1]&&(e.allDay?e.end:e.end.slice(0,10))>=a[0]).map(e=>Object.assign({},e)),failed:[]};}
+        return {start:a[0],end:a[1],events:window.__calEmpty?[]:Object.values(S.ev).concat(window.__calManyAllDay&&(window.__mDay=window.fwCalendar.api().view.activeStart.toISOString().slice(0,10))?Array.from({length:30},(_,i)=>({id:'m'+i+'|x',eventId:'m'+i,title:'Many '+i,allDay:true,start:window.__mDay,end:L.fromISO(window.__mDay).plus({days:1}).toISODate(),startMs:ms(window.__mDay),color:'#3f51b5',colorId:(window.__mDone||{})['m'+i]??i%5===4?'8':'9',done:(window.__mDone||{})['m'+i]??i%5===4,urg:['1','2','3',''][i%4]||undefined,cat:i%2?'code':'',cal:'Main',calId:'main',editable:true})):[]).filter(e=>e.start.slice(0,10)<a[1]&&(e.allDay?e.end:e.end.slice(0,10))>=a[0]).map(e=>Object.assign({},e)),failed:[]};}
       const r=a[0]||{},shape=e=>{e.title=r.title;e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);return e;};
       if(m==='calPanelCreateEvent'){ if(S.ops[r.opId])return Object.assign({repeat:true},S.ev[S.ops[r.opId]]);
         const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));S.ops[r.opId]=e.eventId;return e;}
@@ -982,7 +982,8 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
       if(m==='planMoveEvent'){const e=S.ev[r.eventId];if(!e||e.recurring)throw new Error('read-only');const sh=L.fromISO(r.date).diff(L.fromISO(e.start.slice(0,10)),'days').days;
         const mv=x=>e.allDay?L.fromISO(x).plus({days:sh}).toISODate():L.fromISO(x).setZone(Z).plus({days:sh}).toISO({suppressMilliseconds:true});e.start=mv(e.start);e.end=mv(e.end);e.startMs=ms(e.start);put(e);
         const link=e.eventId+'@'+e.startMs;P.forEach(x=>{if(String(x.event).split('@')[0]===e.eventId)x.event=link;});return {event:link};}
-      if(m==='setCalendarEventDone'){const e=S.ev[a[1]];if(!e)throw new Error('Event not found');if(a[3]){e.prev=e.colorId;e.colorId='8';e.done=true;}else{e.colorId=e.prev||'';e.done=false;}return {done:!!a[3]};}
+      if(m==='setCalendarEventMeta'){const e=Object.values(S.ev).find(x=>x.eventId===a[0]);if(!e)throw new Error('Event not found');['urg','due','dur','cat'].forEach(k=>{if(a[3]&&a[3][k])e[k]=a[3][k];else delete e[k];});if(a[3]&&a[3].urg&&e.colorId!=='8')e.colorId={1:'11',2:'5',3:'9'}[a[3].urg];return null;}
+      if(m==='setCalendarEventDone'){if(/^m\d+$/.test(a[1])){(window.__mDone=window.__mDone||{})[a[1]]=!!a[3];return {done:!!a[3]};}const e=S.ev[a[1]];if(!e)throw new Error('Event not found');if(a[3]){e.prev=e.colorId;e.colorId='8';e.done=true;}else{e.colorId=e.prev||'';e.done=false;}return {done:!!a[3]};}
       return undefined;};
     window.google={script:{run:new Proxy({},{get(t,k){let ok=null,bad=null;const p=new Proxy({},{get(_,m){
       if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler')return f=>{bad=f;return p;}; if(m==='withUserObject')return()=>p;
@@ -1107,6 +1108,34 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           if (sc.clientHeight > H * 0.5 + 2) out.push('all-day cap: list taller than half the calendar (' + sc.clientHeight + ' of ' + H + ')');
           if (sc.scrollHeight <= sc.clientHeight) out.push('all-day cap: capped list does not scroll');
           if (panel.querySelector('.fc-timegrid-body').getBoundingClientRect().height < 40) out.push('all-day cap: timeline squeezed out');
+          // Checkboxes + urgency groups (2026-11-11): every card has one; labels top → bottom Urgent, Next, Later, Not set, Done.
+          if (panel.querySelector('.fc-event:not(.fc-event-mirror) .cp-ev') && [...panel.querySelectorAll('.fc-event .cp-ev')].some(e => !e.querySelector('.cp-chk'))) out.push('checkbox: an event card has no checkbox');
+          if (!panel.querySelector('.fc-daygrid-event .cp-chk-cat')) out.push('checkbox: subject color missing on a code event');
+          await wait(60);
+          const day = [...panel.querySelectorAll('.fc-daygrid-body .fc-daygrid-day-events')].find(d => d.querySelectorAll('[data-cpgl]').length);
+          const labs = day ? [...day.querySelectorAll('[data-cpgl]')].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).map(h => h.dataset.cpgl).join(',') : '';
+          if (labs !== 'Urgent,Next,Later,Not set,Done') out.push('urgency groups: got "' + labs + '"');
+          if (day) { const ev = [...day.querySelectorAll('.fc-daygrid-event')].map(e => e.getBoundingClientRect()).sort((a, b) => a.top - b.top);
+            if (ev.some((r, i) => i && r.top < ev[i - 1].bottom - 1)) out.push('urgency groups: labels make events overlap'); }
+          // Tap = done; hold = the Gantt hold menu, shown above the panel.
+          const ev0 = () => [...panel.querySelectorAll('.fc-daygrid-event')].find(x => /Many 0$/.test(x.textContent.trim()));
+          const n0 = window.__calls.filter(c => c[0] === 'setCalendarEventDone').length;
+          if (!ev0()) out.push('checkbox: Many 0 not drawn');
+          else {
+            ev0().querySelector('.cp-chk').click();
+            if (!ev0() || !ev0().classList.contains('cp-done')) out.push('checkbox: tap did not mark it done at once');
+            if (!await until(() => window.__calls.filter(c => c[0] === 'setCalendarEventDone').length > n0)) out.push('checkbox: tap did not save done');
+            await wait(300); await until(() => ev0());
+            if (!ev0()) { out.push('checkbox: Many 0 gone after the tap: ' + [...panel.querySelectorAll('.fc-daygrid-event')].map(x => x.textContent.trim()).slice(0, 4).join('|') + ' state=' + panel.querySelector('[data-cal-state]').textContent); } else {
+            const chk = ev0().querySelector('.cp-chk'), r = chk.getBoundingClientRect(), o = {bubbles: true, cancelable: true, clientX: r.left + 5, clientY: r.top + 5, pointerId: 1, pointerType: 'mouse', button: 0};
+            chk.dispatchEvent(new PointerEvent('pointerdown', o)); await wait(600);
+            const pk = document.querySelector('.urg-picker');
+            if (!pk) out.push('checkbox: hold did not open the menu');
+            else { const pr = pk.getBoundingClientRect(), top = document.elementFromPoint(pr.left + pr.width / 2, pr.top + pr.height / 2);
+              if (!top || !pk.contains(top)) out.push('checkbox: hold menu is under the calendar panel'); }
+            chk.dispatchEvent(new PointerEvent('pointerup', o)); document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+          } }
+          window.__calls = window.__calls.filter(c => c[0] !== 'setCalendarEventDone'); window.__mDone = {};
         }
         window.__calManyAllDay = 0; panel.querySelector('[data-cal-refresh]').click();
         if (!await until(() => !panel.querySelector('.cp-adgrip.on') && panel.querySelectorAll('.fc-daygrid-event').length < 10)) out.push('all-day cap: grip still shown for a short list');

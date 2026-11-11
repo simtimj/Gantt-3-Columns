@@ -1246,6 +1246,7 @@
     .urg-dur-pick{font-size:11px;line-height:1;padding:4px 5px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);cursor:pointer;}
     .urg-dur-pick.on{background:#1a73e8;border-color:#1a73e8;color:#fff;font-weight:600;}
     @media (prefers-color-scheme: dark){ .urg-dur-pick{background:#1c1c1c;color:var(--dm-text);border-color:#444;} .urg-dur-pick.on{background:#1a73e8;border-color:#1a73e8;color:#fff;} }
+    body.cal-open .urg-picker{z-index:4600;} body.cal-open .urg-cal{z-index:4601;}
     .urg-cal{position:fixed;z-index:3001;width:196px;padding:6px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-size:12px;}
     .uc-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;margin-bottom:4px;}
     .uc-nav{border:0;background:none;font-size:16px;line-height:1;padding:2px 8px;cursor:pointer;color:inherit;}
@@ -8565,7 +8566,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   let urgentOpen = true;
   try{ urgentOpen = localStorage.getItem('fw.urgentOpen') !== '0'; }catch(e){}
   function urgencyCheckbox(t){
-    const box = t && t.closest ? t.closest('#urgentPanel .urg-box, .due-notes .di-box, #inboxPanel .inbox-box, #centerCalendarList .ce-check') : null;
+    const box = t && t.closest ? t.closest('#urgentPanel .urg-box, .due-notes .di-box, #inboxPanel .inbox-box, #centerCalendarList .ce-check, #calPanel .cp-chk') : null;
     if(box) return box;
     // Hold anywhere on a Cal Events row opens its menu (2026-11-04, Julius): the box alone is a small target. Not while typing a title.
     const ceRow = t && t.closest ? t.closest('#centerCalendarList .ce-event') : null;
@@ -9562,6 +9563,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function saveCalMeta(line){
     const d = line.dataset, meta = {urg:d.urg || '',due:d.due || '',dur:d.dur || '',cat:d.cat || ''};
+    // 📅 Calendar panel card (2026-11-11): the panel saves it and redraws; Cal Events re-reads on its next load.
+    if(line.classList.contains('cp-ev') && window.fwCalendar && window.fwCalendar.saveMeta){ centerCalendarCache.clear(); window.fwCalendar.saveMeta(line,meta); return; }
     const label = line.querySelector('.ce-meta');
     if(label) label.textContent = lineMetaLabel(d.due,d.dur) || '';
     centerCalendarCache.forEach(entry => entry.data.events.forEach(ev => {
@@ -10618,8 +10621,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(typeof hideContextMenu === 'function') hideContextMenu();
     if(cb.classList && cb.classList.contains('inbox-box')){ showInboxPicker(cb,x,y); return; }
     // Calendar events (2026-11-03, Julius): same menu, minus what only fits a task saved in a cell.
-    const isCal = !!(cb.classList && cb.classList.contains('ce-check'));
-    const t = isCal ? {line:cb.closest('.ce-event'),owner:null} : urgTarget(cb);
+    // 📅 Calendar panel checkboxes (2026-11-11, Julius) use it too: `.cp-chk` inside a `.cp-ev` card with the same data-ce-* fields.
+    const isCal = !!(cb.classList && (cb.classList.contains('ce-check') || cb.classList.contains('cp-chk')));
+    const t = isCal ? {line:cb.closest('.ce-event, .cp-ev'),owner:null} : urgTarget(cb);
     if(!t){ setStatus('Scroll Today to that day first, then change it'); return; }
     const {line,owner} = t;
     const metaChanged = () => { if(isCal) saveCalMeta(line); else urgChanged(owner); };
@@ -15100,6 +15104,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .cp-tiny .cp-ev-m{font-size:10px;}
   #calPanel .fc .fc-toolbar-chunk:last-child{flex:0 0 auto;}
   #calPanel .fc .cp-done .cp-ev-t{text-decoration:line-through;}
+  /* Event checkboxes (2026-11-11, Julius): subject-colored box at the card's left; ✓ when done; smaller on short events. */
+  #calPanel .cp-evc{display:flex;align-items:flex-start;gap:5px;}
+  #calPanel .cp-evc.cp-ev-1{align-items:center;}
+  #calPanel .cp-evb{flex:1 1 auto;min-width:0;overflow:hidden;}
+  #calPanel .cp-ev-1 .cp-evb{white-space:nowrap;text-overflow:ellipsis;}
+  #calPanel .cp-chk{flex:0 0 auto;box-sizing:border-box;width:14px;height:14px;margin-top:1px;border:1.5px solid currentColor;border-radius:3px;
+    background:transparent;position:relative;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+  #calPanel .cp-chk::before{content:"";position:absolute;inset:-7px;} /* bigger touch target */
+  #calPanel .cp-chk-cat{background:var(--chk);border-color:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.35);}
+  #calPanel .cp-done .cp-chk::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;line-height:1;color:#fff;}
+  #calPanel .cp-done .cp-chk:not(.cp-chk-cat)::after{color:inherit;}
+  #calPanel .fc .cp-tiny .cp-chk{width:10px;height:10px;border-width:1px;margin-top:0;}
+  #calPanel .fc .cp-tiny .cp-done .cp-chk::after,#calPanel .fc .cp-tiny.cp-done .cp-chk::after{font-size:8px;}
+  @media (max-width:720px){ #calPanel .cp-chk{width:16px;height:16px;} #calPanel .fc .cp-tiny .cp-chk{width:11px;height:11px;} }
+  /* Urgency groups in the all-day row (2026-11-11, Julius). */
+  #calPanel .fc-daygrid-event-harness[data-cpgl]::before{content:attr(data-cpgl);display:block;font-size:10.5px;font-weight:600;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--cp-muted);padding:5px 4px 1px;}
   #calPanel .fc .cp-done{opacity:1;} /* done is already pale via softColor (2026-11-10) */
   #calPanel .fc .fc-event:hover{filter:brightness(.96);}
   #calPanel .fc .fc-event.fc-event-dragging,#calPanel .fc .fc-event-mirror{box-shadow:var(--cp-shadow)!important;}
@@ -15325,7 +15346,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return { bg: '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1), fg: lum > 0.62 ? '#1f1f1f' : '#fff' };
   };
-  const toFc = x => { const c = softColor(x.color, x.done); return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
+  const urgRank = x => ({1: 1, 2: 2, 3: 3})[x.urg] || 4; // checkbox order (2026-11-11): Urgent → Next → Later → not set
+  const toFc = x => { const c = softColor(x.color, x.done); x.urgRank = urgRank(x); return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
     backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg,
     classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x }; };
   const canRun = () => !!(window.google && google.script && google.script.run);
@@ -15829,6 +15851,56 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(isTid) google.script.run.withSuccessHandler(done).withFailureHandler(fail).planSchedule(Object.assign({ref: it.ref, title: v.title}, slot));
     else google.script.run.withSuccessHandler(done).withFailureHandler(fail).calPanelMoveEvent(Object.assign({eventId: ev.eventId, startMs: ev.startMs}, slot));
   }
+  // ── Event checkboxes (2026-11-11, Julius) ──
+  const cpCat = x => { try { return typeof calRowCat === 'function' ? calRowCat({cat: x.cat || '', title: x.title || ''}) : ''; } catch (e) { return ''; } };
+  const cpCatColor = k => { try { return k && CARD_CAT_BY_KEY[k] ? CARD_CAT_BY_KEY[k].color : ''; } catch (e) { return ''; } };
+  const CP_GROUPS = {1: 'Urgent', 2: 'Next', 3: 'Later', 4: 'Not set', done: 'Done'};
+  function cpEvAttrs(ev){
+    const x = ev.extendedProps || {}, k = cpCat(x), a = (n, v) => v ? ' data-' + n + '="' + esc(v) + '"' : '';
+    return a('ce-id', x.eventId) + a('ce-cal', x.calId) + a('ce-start', String(x.startMs || '')) + ' data-ce-rec="' + (x.recurring ? 1 : 0) + '"' +
+      a('urg', x.urg) + a('due', x.due) + a('dur', x.dur) + a('cat', x.cat) + a('tccat', k) + ' data-cpg="' + (x.done ? 'done' : urgRank(x)) + '"';
+  }
+  function cpChk(ev){
+    const x = ev.extendedProps || {}, c = cpCatColor(cpCat(x));
+    return '<span class="cp-chk' + (c ? ' cp-chk-cat' : '') + '" role="checkbox" aria-checked="' + (x.done ? 'true' : 'false') + '"' + (c ? ' style="--chk:' + esc(c) + '"' : '') +
+      ' title="Tap = done · hold = urgency, subject, due date"></span>';
+  }
+  // Tap the checkbox: Graphite (done) ⇄ back to its color. Drawn at once, then re-read from Google.
+  function toggleDone(ev){
+    if(pending || moveBusy) return;
+    const x = ev.extendedProps || {}, on = !x.done;
+    if(!x.eventId || !canRun()) return;
+    ev.setExtendedProp('done', on); ev.setProp('classNames', on ? ['cp-done'] : []);
+    google.script.run.withSuccessHandler(() => refetchFresh()).withFailureHandler(err => {
+      ev.setExtendedProp('done', !on); ev.setProp('classNames', on ? [] : ['cp-done']);
+      setState('error', 'Couldn’t mark it ' + (on ? 'done' : 'not done') + ': ' + errText(err));
+    }).setCalendarEventDone(x.calId, x.eventId, x.startMs, on);
+  }
+  // Hold menu saves (called from saveCalMeta): new subject / urgency shows at once; Google recolors the event, then a re-read.
+  function saveMeta(line, meta){
+    const d = line.dataset, ev = cal && cal.getEvents().find(e => (e.extendedProps || {}).eventId === d.ceId && String(e.extendedProps.startMs) === String(d.ceStart));
+    if(ev) ['urg', 'due', 'dur', 'cat'].forEach(k => ev.setExtendedProp(k, meta[k] || ''));
+    if(ev) ev.setExtendedProp('urgRank', urgRank(ev.extendedProps));
+    if(!canRun()) return;
+    google.script.run.withSuccessHandler(() => refetchFresh()).withFailureHandler(err => {
+      setState('error', 'Couldn’t save that event: ' + errText(err)); refetchFresh();
+    }).setCalendarEventMeta(d.ceId, Number(d.ceStart), d.ceRec === '1', meta, d.ceCal);
+  }
+  // The card's hold-to-move must not start on the checkbox (its hold opens the menu instead).
+  ['mousedown', 'touchstart'].forEach(t => mount.addEventListener(t, e => { if(e.target.closest && e.target.closest('.cp-chk')) e.stopPropagation(); }, {capture: true, passive: true}));
+  // Urgency group labels in the all-day row: a small heading over the first event of each group, per day, when a
+  // day's list has 2+ groups (order comes from eventOrder: done, start, urgRank).
+  let cpGroupsT = 0;
+  function cpGroupsSoon(){ if(!cpGroupsT) cpGroupsT = requestAnimationFrame(() => { cpGroupsT = 0; cpGroups(); }); }
+  function cpGroups(){
+    mount.querySelectorAll('.fc-daygrid-body .fc-daygrid-day-events').forEach(day => {
+      const hs = [...day.querySelectorAll(':scope > .fc-daygrid-event-harness')].filter(h => h.querySelector('.cp-ev') && !h.classList.contains('fc-daygrid-event-harness-abs'))
+        .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+      const keys = hs.map(h => h.querySelector('.cp-ev').dataset.cpg), many = new Set(keys).size > 1;
+      hs.forEach((h, i) => { const lab = many && (i === 0 || keys[i] !== keys[i - 1]) ? (CP_GROUPS[keys[i]] || '') : '';
+        if((h.dataset.cpgl || '') !== lab){ if(lab) h.dataset.cpgl = lab; else delete h.dataset.cpgl; } });
+    });
+  }
   // All-day cap (2026-11-10, Julius): see the CSS note above. The grip only shows while the list is capped (scrolling).
   const AD_KEY = 'fw.calAllDayMax', AD_DEF = 0.5, cpBody = panel.querySelector('.cp-body');
   let adRatio = Number(lsGet(AD_KEY)) || AD_DEF, adDrag = false, adSc = null;
@@ -15840,6 +15912,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const adRO = window.ResizeObserver ? new ResizeObserver(() => adLayout()) : null;
   if(adRO) adRO.observe(mount);
   function adLayout(){
+    cpGroupsSoon();
     const h = mount.querySelector('.fc-view-harness'), sc = adScroller();
     if(adRO && sc !== adSc){ if(adSc){ adRO.unobserve(adSc); if(adSc.firstElementChild) adRO.unobserve(adSc.firstElementChild); }
       adSc = sc; if(sc){ adRO.observe(sc); if(sc.firstElementChild) adRO.observe(sc.firstElementChild); } }
@@ -15872,7 +15945,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     cal = new FullCalendar.Calendar(mount, {
       // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
       timeZone: TZ,
-      eventOrder: 'done,start,-duration,allDay,title', // completed events last (2026-11-10, Julius)
+      eventOrder: 'done,start,urgRank,-duration,allDay,title', // completed events last (2026-11-10), then by urgency (2026-11-11, Julius)
       initialView: saved === 'timeGridDay' || saved === 'timeGridWeek' ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
       // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
       // One toolbar line (2026-11-08, Julius): Today · date · ‹ › … Plan · Day|Week · ↻ · ✕. The old header row and
@@ -15906,12 +15979,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         return { html: '<span class="cp-dh-w">' + L.toFormat('ccc').toUpperCase() + '</span><span class="cp-dh-n">' + L.day + '</span>' }; },
       // Event: title first (bold), time under it, like Google.
       eventClassNames: a => (!a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 20 * 60000) ? ['cp-tiny'] : [],
+      // Checkbox on every card (2026-11-11, Julius): filled with the subject color (saved, else auto-guessed like
+      // Gantt cards); tap = done (Graphite), hold = the Gantt hold menu (urgency, subject, due…). Holding the card
+      // itself still moves it.
       eventContent: a => {
         const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : esc(a.timeText || '');
         const short = !a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 30 * 60000;
-        return { html: a.event.allDay ? '<div class="cp-ev"><span class="cp-ev-t">' + t + '</span></div>'
-          : short ? '<div class="cp-ev cp-ev-1"><span class="cp-ev-t">' + t + '</span><span class="cp-ev-m">, ' + tm + '</span></div>'
-          : '<div class="cp-ev"><div class="cp-ev-t">' + t + '</div><div class="cp-ev-m">' + tm + '</div></div>' };
+        const body = a.event.allDay ? '<span class="cp-ev-t">' + t + '</span>'
+          : short ? '<span class="cp-ev-t">' + t + '</span><span class="cp-ev-m">, ' + tm + '</span>'
+          : '<div class="cp-ev-t">' + t + '</div><div class="cp-ev-m">' + tm + '</div>';
+        return { html: '<div class="cp-ev cp-evc' + (short ? ' cp-ev-1' : '') + '"' + cpEvAttrs(a.event) + '>' + cpChk(a.event) + '<div class="cp-evb">' + body + '</div></div>' };
       },
       height: '100%', nowIndicator: true, scrollTime: '07:00:00', slotMinTime: '00:00:00', slotMaxTime: '24:00:00',
       allDaySlot: true, dayMaxEvents: false,
@@ -15931,7 +16008,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
       loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
-      eventClick: info => { info.jsEvent.preventDefault(); if(!pending) showDetail(info.event); },
+      eventClick: info => { info.jsEvent.preventDefault();
+        if(info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')){ toggleDone(info.event); return; }
+        if(!pending) showDetail(info.event); },
+      eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
       datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
@@ -15972,7 +16052,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
   }
   function retry(){ if(cal){ refetchFresh(); loadPlan(true); } else start(); }
-  window.fwCalendar = { open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  window.fwCalendar = { saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

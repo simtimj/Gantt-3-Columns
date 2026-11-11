@@ -76,6 +76,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-09)
 
+- **2026-11-11 · 📅 Event checkboxes + urgency groups:** every event in the calendar panel has a checkbox at the left of its card, filled with its subject color (saved subject, else auto-guessed from the title like Gantt cards). **Tap** it = done (Graphite, struck through; tap again to undo). **Hold** it = the same hold menu as the rest of the Gantt (urgency, subject, due date, minutes); urgency also recolors the event in Google Calendar. Holding the card itself still moves it. Short events get a smaller box. All-day events are ordered by urgency and grouped under small headings: Urgent · Next · Later · Not set · Done (a day with only one group shows no heading). Yellow's name "Next" is a placeholder.
+
 - **2026-11-10 · 📅 All-day cap:** a long all-day list in the calendar panel stops at **half the calendar height** and scrolls inside itself, so the timeline always stays visible. A small bar under the list (only shown while it's capped) drags to make the cap taller or shorter; the setting is saved per device. Double-tap / double-click the bar = back to half.
 
 - **2026-11-10 · Next Steps naming and workflow:** the former Urgent section is named Next Steps, with the existing urgency groups, colored counts, numeric ordering and decimal insertions preserved. Reference holds full project context/backlog; Next Steps holds immediate actions; CalEvents schedules them. No task migration or new automatic routing.

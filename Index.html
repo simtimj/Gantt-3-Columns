@@ -9602,7 +9602,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const q = ceSearchWords();
       if(q.length) data = Object.assign({}, data, {events: data.events.filter(ev => { const t = String(ev.title || '').toLowerCase(); return q.every(w => t.includes(w)); })});
       const allDay = data.events.filter(ev => ev.allDay).sort((a,b) => Number(a.done) - Number(b.done)), scheduled = data.events.filter(ev => !ev.allDay);
-      const checkbox = ev => '<input type="checkbox" class="ce-check"' + (ev.done ? ' checked' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
+      const checkbox = ev => '<input type="checkbox" class="ce-check"' + (ev.done ? ' checked' : '') + (ev.ro ? ' disabled title="View-only calendar"' : '') + ' aria-label="Mark ' + esc(ev.title) + ' complete">';
       // Row carries the event's id + its menu fields (urgency, due, length, subject), like a task line.
       const row = (ev,cls,inner) => '<div class="ce-event' + cls + (ev.done ? ' ce-done' : '') + '"' + calRowAttrs(ev) + '>' + checkbox(ev) + inner + '<span class="ce-meta">' + esc(lineMetaLabel(ev.due,ev.dur) || '') + '</span></div>';
       // Rows sorted under their subject, in Options order; no subject goes last, under Other.
@@ -15136,8 +15136,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-detail .cp-dot{flex:0 0 14px;height:14px;border-radius:4px;margin-top:6px;}
   #calPanel .cp-detail .cp-dm{font-size:14px;margin-top:4px;padding-left:28px;}
   #calPanel .cp-detail .cp-note{padding-left:28px;}
-  #calPanel .cp-detail .cp-da{gap:6px;margin-top:14px;flex-wrap:wrap;}
-  #calPanel .cp-detail .cp-da a,#calPanel .cp-detail .cp-da button{border:0;background:transparent;border-radius:999px;padding:8px 14px;font-size:14px;font-weight:500;color:var(--cp-blue);}
+  #calPanel .cp-detail .cp-da{gap:2px;margin-top:8px;flex-wrap:wrap;}
+  #calPanel .cp-detail .cp-da a,#calPanel .cp-detail .cp-da button{border:0;background:transparent;border-radius:999px;padding:6px 10px;font-size:14px;font-weight:500;color:var(--cp-blue);white-space:nowrap;}
+  /* Event card (2026-11-11, Julius): smaller, Edit · Delete · GCal · Close on one line. */
+  #calPanel .cp-detail.cp-evcard{padding:10px 12px 8px;}
+  #calPanel .cp-detail.cp-evcard .cp-dt{font-size:17px;gap:10px;}
+  #calPanel .cp-detail.cp-evcard .cp-dm,#calPanel .cp-detail.cp-evcard .cp-note{font-size:13px;padding-left:24px;margin-top:2px;}
+  #calPanel .cp-detail.cp-evcard .cp-da{flex-wrap:nowrap;margin-top:6px;}
   #calPanel .cp-detail .cp-da a:hover,#calPanel .cp-detail .cp-da button:hover{background:var(--cp-hover);}
   #calPanel .cp-detail .cp-da .cp-primary{background:var(--cp-blue);color:#fff;}
   html[data-theme=dark] #calPanel .cp-detail .cp-da .cp-primary{color:var(--cp-blue-text);}
@@ -15162,6 +15167,20 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-pbtn button:hover:not(:disabled){background:var(--cp-hover);}
   /* Plan hidden until the toolbar's Plan button opens it; Day view puts the date in the top-left corner. */
   #calPanel .cp-plan.folded{display:none;}
+  /* Calendars fold (2026-11-11, Julius): pick which Google calendars show; 🔒 = view-only. */
+  #calPanel .cp-cals{flex:0 0 auto;margin:0 4px 4px 8px;max-height:40%;overflow:auto;}
+  #calPanel .cp-cfold{font:inherit;font-size:13px;font-weight:500;color:var(--cp-muted);background:transparent;border:0;padding:3px 4px;cursor:pointer;}
+  #calPanel .cp-ccnt{font-weight:400;}
+  #calPanel .cp-cals.folded .cp-cbody{display:none;}
+  #calPanel .cp-cals:not(.folded) .cp-parr{display:inline-block;transform:rotate(90deg);}
+  #calPanel .cp-crow{display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:14px;cursor:pointer;}
+  #calPanel .cp-crow input{width:18px;height:18px;margin:0;accent-color:var(--cc,#1a73e8);}
+  #calPanel .cp-crow .cp-cn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #calPanel .cp-crow .cp-lk{font-size:11px;opacity:.7;}
+  #calPanel .cp-cmsg{font-size:12px;color:var(--cp-muted);padding:2px 6px;}
+  #calPanel .cp-scope{display:flex;gap:12px;align-items:center;font-size:13px;margin-top:6px;}
+  #calPanel .cp-scope label{display:flex;gap:4px;align-items:center;}
+  #calPanel select[name=cal]{font:inherit;font-size:12px;margin-left:auto;max-width:55%;}
   #calPanel .fc-timeGridDay-view .fc-scrollgrid-section-header{display:none;}
   #calPanel .fc .fc-timegrid-axis-cushion:has(.cp-corner){padding:2px 0;max-width:none;}
   #calPanel .cp-corner{display:flex;flex-direction:column;align-items:center;line-height:1.1;}
@@ -15208,6 +15227,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   </div>
   <div class="cp-state" data-cal-state hidden></div>
   <div class="cp-body">
+    <section class="cp-cals folded" data-cal-cals aria-label="Calendars">
+      <button type="button" class="cp-cfold" data-cals-fold><span class="cp-parr">▸</span> Calendars <span class="cp-ccnt" data-cals-count></span></button>
+      <div class="cp-cbody" data-cals-body></div>
+    </section>
     <section class="cp-plan" data-cal-plan aria-label="Daily plan">
       <div class="cp-ph"><button type="button" class="cp-pfold" data-plan-act="fold" title="Fold / open the plan"><span class="cp-parr">▾</span> Plan · <span data-plan-day></span></button><span class="cp-pcnt" data-plan-count></span><button type="button" class="cp-padd" data-plan-act="add">+ Add</button></div>
       <div class="cp-pbody" data-plan-body></div>
@@ -15292,7 +15315,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // after a reload shows the last known events immediately, and the app warms it up a few seconds after start-up.
   // Days stay cached for 15 min before a quiet re-check (2026-11-08, Julius: "cache them, don't re-read every day").
   // ↻ always re-reads; a save re-reads only the dates on screen.
-  const CACHE_KEY = 'fw.calCache.v1', FRESH_MS = 15 * 60000;
+  const CACHE_KEY = 'fw.calCache.v2', FRESH_MS = 15 * 60000;
   const evById = new Map(), dayAt = new Map(); // id → server event; 'yyyy-MM-dd' → when that day was read from Google
   let cacheFailed = 0, forceNext = false, bgBusy = false, gen = 0, saveTimer = 0;
   const addDays = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
@@ -15439,13 +15462,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function showDetail(ev){
     const x = ev.extendedProps || {};
     sheetEv = ev;
-    const why = x.editable ? (x.done ? 'Done — stays where it is.' : 'Hold and drag to move it; drag its bottom edge to change the length.') : x.recurring ? 'Repeating event — read-only here, edit it in Google Calendar.' : 'Not on your main calendar — read-only here.';
+    const why = x.editable ? (x.done ? 'Done — stays where it is.' : '') : 'View-only calendar — read-only here.';
+    detail.classList.add('cp-evcard');
     detail.innerHTML = '<div class="cp-dt"><span class="cp-dot" style="background:' + esc(x.color) + '"></span><span>' + esc(ev.title) + '</span></div>' +
       '<div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
       '<div class="cp-dm">' + esc(x.cal || '') + (x.recurring ? ' · repeats' : '') + (x.done ? ' · done' : '') + '</div>' +
       (x.location ? '<div class="cp-dm">📍 ' + esc(x.location) + '</div>' : '') +
       '<div class="cp-da">' + (x.editable ? '<button type="button" class="cp-primary" data-cal-edit>Edit</button><button type="button" class="cp-danger" data-cal-del>Delete</button>' : '') +
-      (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener">Google Calendar</a>' : '') +
+      (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener" title="Open in Google Calendar">GCal</a>' : '') +
       '<span class="cp-sp"></span><button type="button" data-cal-detail-close>Close</button></div>' +
       (x.editable && planData ? '<div class="cp-plan-ev">Plan:' + PLAN_G.map(([g, n]) => '<button type="button" data-plan-act="evplan" data-g="' + g + '">' + n + '</button>').join('') + '</div>' : '') +
       (why ? '<div class="cp-note">' + esc(why) + '</div>' : '');
@@ -15461,14 +15485,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function flash(msg){ const k = ++flashTok; flashUntil = Date.now() + 2500; setState('ok', msg); setTimeout(() => { if(k !== flashTok) return; flashUntil = 0; refreshState(); }, 2600); }
   // f = {allDay, sd, st, ed, et} in Los Angeles wall time; ed is the LAST day (inclusive) for all-day events.
   function openForm(f, ev){
-    sheetEv = ev || null; pending = false; detail.dataset.pid = '';
+    sheetEv = ev || null; pending = false; detail.dataset.pid = ''; detail.classList.remove('cp-evcard');
     const x = ev ? ev.extendedProps : null;
+    const calPick = x ? '<span style="font-weight:400;color:var(--cp-muted);font-size:12px;margin-left:auto">' + esc(x.cal || '') + '</span>'
+      : '<select name="cal" aria-label="Calendar">' + calsWritable().map(c => '<option value="' + esc(c.id) + '"' + (c.main ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select>';
     detail.innerHTML = '<form class="cp-form' + (f.allDay ? ' allday' : '') + '" data-cal-form data-op="' + newOp() + '" novalidate>' +
-      '<div class="cp-dt">' + (x ? 'Edit event' : 'New event') + '<span style="font-weight:400;color:var(--cp-muted);font-size:12px;margin-left:auto">Main calendar</span></div>' +
+      '<div class="cp-dt">' + (x ? 'Edit event' : 'New event') + calPick + '</div>' +
       '<input type="text" name="title" placeholder="Title" maxlength="300" autocomplete="off" enterkeyhint="done" value="' + esc(x ? ev.title : '') + '">' +
       '<label class="cp-chk"><input type="checkbox" name="allDay"' + (f.allDay ? ' checked' : '') + '> All day</label>' +
       '<div class="cp-row"><span>Start</span><input type="date" name="sd" value="' + f.sd + '"><input type="time" name="st" step="300" value="' + f.st + '"></div>' +
       '<div class="cp-row"><span>End</span><input type="date" name="ed" value="' + f.ed + '"><input type="time" name="et" step="300" value="' + f.et + '"></div>' +
+      (x && x.recurring ? scopeHtml() : '') +
       '<div class="cp-ferr" data-cal-ferr></div>' +
       '<div class="cp-da"><button type="submit" class="cp-primary" data-cal-save>Save</button>' +
       (x ? '<button type="button" class="cp-danger" data-cal-del>Delete</button>' : '') +
@@ -15515,7 +15542,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const r = readForm(form), errEl = form.querySelector('[data-cal-ferr]'), btn = form.querySelector('[data-cal-save]');
     if(r.err){ errEl.textContent = r.err; return; }
     const x = sheetEv && sheetEv.extendedProps, req = Object.assign({opId: form.dataset.op}, r);
-    if(x){ req.eventId = x.eventId; req.startMs = x.startMs; }
+    if(x){ req.eventId = x.eventId; req.startMs = x.startMs; req.calId = x.calId; const sc = form.querySelector('input[name=scope]:checked'); if(sc) req.scope = sc.value; }
+    else if(form.elements.cal) req.calId = form.elements.cal.value;
     pending = true; btn.disabled = true; btn.textContent = 'Saving…'; errEl.textContent = '';
     google.script.run.withSuccessHandler(() => {
       pending = false;
@@ -15527,9 +15555,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     })[x ? 'calPanelUpdateEvent' : 'calPanelCreateEvent'](req);
   }
   function askDelete(ev){
-    sheetEv = ev; pending = false;
+    sheetEv = ev; pending = false; detail.classList.remove('cp-evcard');
     detail.innerHTML = '<div class="cp-dt">Delete “' + esc(ev.title) + '”?</div><div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
-      '<div class="cp-dm">It is removed from Google Calendar.</div><div class="cp-ferr" data-cal-ferr></div>' +
+      '<div class="cp-dm">It is removed from Google Calendar.</div>' + (ev.extendedProps.recurring ? scopeHtml() : '') + '<div class="cp-ferr" data-cal-ferr></div>' +
       '<div class="cp-da"><button type="button" class="cp-danger cp-primary" data-cal-del-yes>Delete</button><span class="cp-sp"></span><button type="button" data-cal-detail-close>Cancel</button></div>';
     detail.hidden = false;
   }
@@ -15542,7 +15570,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }).withFailureHandler(err => {
       pending = false; btn.disabled = false; btn.textContent = 'Retry delete';
       if(errEl) errEl.textContent = 'Not deleted: ' + errText(err) + '.';
-    }).calPanelDeleteEvent({eventId: x.eventId, startMs: x.startMs});
+    }).calPanelDeleteEvent({eventId: x.eventId, startMs: x.startMs, calId: x.calId, scope: (detail.querySelector('input[name=scope]:checked') || {}).value || 'one'});
   }
   // ---- Phase 3a: daily plan (Big Three / Stretch for the day shown, Next Up / Backlog undated). Rows live in the
   // Sheet's Plan tab (getPlan / planSave in Code.gs) and LINK to tasks: 'tid:<id>' (Gantt line, Undated Tasks,
@@ -15660,7 +15688,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!planData) return;
     if(planItems('big').length >= 3 && addGroup === 'big') addGroup = 'next';
     candCache = planCandidates();
-    detail.innerHTML = '<div class="cp-dt">Add to plan<span style="font-weight:400;color:var(--cp-muted);font-size:12px;margin-left:auto">' + esc(fmtDay(planDay)) + '</span></div>' +
+    detail.classList.remove('cp-evcard'); detail.innerHTML = '<div class="cp-dt">Add to plan<span style="font-weight:400;color:var(--cp-muted);font-size:12px;margin-left:auto">' + esc(fmtDay(planDay)) + '</span></div>' +
       '<div class="cp-seg">' + PLAN_G.map(([g, n]) => '<button type="button" data-plan-act="addgroup" data-g="' + g + '"' + (g === addGroup ? ' class="on"' : '') + '>' + n + '</button>').join('') + '</div>' +
       '<input type="search" class="cp-psearch" data-plan-search placeholder="Find a task…" autocomplete="off" enterkeyhint="search">' +
       '<div class="cp-plist" data-plan-list></div><div class="cp-ferr" data-cal-ferr></div>' +
@@ -15685,7 +15713,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function openMore(it){
     const v = planView(it), isTid = it.ref.indexOf('tid:') === 0, ev = it.ev && !it.ev.gone ? it.ev : null;
     const canMove = !isTid && ev && !ev.recurring;
-    detail.innerHTML = '<div class="cp-dt">' + esc(v.title || '(untitled)') + '</div>' + (v.meta ? '<div class="cp-dm">' + esc(v.meta) + '</div>' : '') +
+    detail.classList.remove('cp-evcard'); detail.innerHTML = '<div class="cp-dt">' + esc(v.title || '(untitled)') + '</div>' + (v.meta ? '<div class="cp-dm">' + esc(v.meta) + '</div>' : '') +
       '<div class="cp-dm" style="margin-top:8px">Move to</div><div class="cp-seg">' + PLAN_G.map(([g, n]) => '<button type="button" data-plan-act="group" data-g="' + g + '"' + (g === it.group ? ' class="on" disabled' : '') + '>' + n + '</button>').join('') + '</div>' +
       (isTid ? '<div class="cp-row2"><span>' + (ev ? 'Reschedule' : 'Schedule') + '</span><input type="date" data-plan-date value="' + esc(ev ? ev.date : planDay) + '"><button type="button" class="cp-primary" data-plan-act="sched">' + (ev ? 'Move' : 'Schedule') + '</button></div><div class="cp-note">All day on your main calendar, no reminder. One event per task.</div>' : '') +
       (canMove ? '<div class="cp-row2"><span>Move to date</span><input type="date" data-plan-date value="' + esc(ev.date) + '"><button type="button" class="cp-primary" data-plan-act="move">Move</button></div>' : '') +
@@ -15739,7 +15767,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(act === 'more'){ openMore(it); return; }
     if(act === 'target'){
       detail.dataset.pid = it.id;
-      detail.innerHTML = '<div class="cp-dt">Target</div><div class="cp-dm">' + esc(planView(it).title) + '</div>' +
+      detail.classList.remove('cp-evcard'); detail.innerHTML = '<div class="cp-dt">Target</div><div class="cp-dm">' + esc(planView(it).title) + '</div>' +
         '<input type="text" class="cp-psearch" data-plan-target-in maxlength="200" placeholder="What counts as done or enough progress" value="' + esc(it.target || '') + '" enterkeyhint="done">' +
         '<div class="cp-ferr" data-cal-ferr></div><div class="cp-da"><button type="button" class="cp-primary" data-plan-act="tsave">Save</button><span class="cp-sp"></span><button type="button" data-cal-detail-close>Cancel</button></div>';
       detail.hidden = false;
@@ -15794,10 +15822,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const cell = allDayCellAt(p), x = ev.extendedProps || {};
       if(!cell || moveBusy || !x.editable || x.done) return;
       const d = cell.dataset.date;
+      if(x.recurring && !info._scope){ askScope('Move', sc => { info._scope = sc; dropSeen = false; dragStopped(info); }, () => {}); return; }
       moveBusy = true; detail.hidden = true; sheetEv = null; setState('loading', 'Saving…');
       google.script.run.withSuccessHandler(() => { moveBusy = false; flash('Moved ✓'); refetchFresh(); loadPlan(true); })
         .withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save the move — put it back. ' + errText(err)); refetchFresh(); })
-        .calPanelMoveEvent({eventId: x.eventId, startMs: x.startMs, allDay: true, start: d, end: L().fromISO(d, {zone: TZ}).plus({days: 1}).toISODate()});
+        .calPanelMoveEvent({eventId: x.eventId, startMs: x.startMs, calId: x.calId, scope: info._scope || 'one', allDay: true, start: d, end: L().fromISO(d, {zone: TZ}).plus({days: 1}).toISODate()});
     }, 30);
   }
   // LA wall-time request for an event / slot: all-day 'yyyy-MM-dd' (end exclusive), timed 'yyyy-MM-ddTHH:mm'.
@@ -15806,18 +15835,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const a = L().fromISO(startStr).setZone(TZ), b = endStr ? L().fromISO(endStr).setZone(TZ) : a.plus({minutes: minutes || 60});
     return {allDay: false, start: wall(a), end: wall(b > a ? b : a.plus({minutes: minutes || 60}))};
   }
-  function moveEvent(info){
+  function moveEvent(info, scope){
     const ev = info.event, x = ev.extendedProps || {};
     if(moveBusy || !x.editable || x.done){ info.revert(); return; }
+    // Repeating event (2026-11-11, Julius): ask This day / All days first; Cancel puts it back.
+    if(x.recurring && !scope){ askScope('Move', sc => moveEvent(info, sc), () => info.revert()); return; }
     moveBusy = true; detail.hidden = true; sheetEv = null;
     // An all-day event dropped on a time slot gets 15 min (Julius 2026-11-08).
-    const req = Object.assign({eventId: x.eventId, startMs: x.startMs}, slotReq(ev.allDay, ev.startStr, ev.endStr, 15));
+    const req = Object.assign({eventId: x.eventId, startMs: x.startMs, calId: x.calId, scope: scope || 'one'}, slotReq(ev.allDay, ev.startStr, ev.endStr, 15));
     setState('loading', 'Saving…');
     google.script.run.withSuccessHandler(res => {
       moveBusy = false; flash('Moved ✓'); loadPlan(true);
       // Google's answer updates this event in place (no full refetch), so a touch-selected event keeps its resize
       // handle for the next step. Views / ↻ / reopening refetch as usual.
-      if(res && res.eventId){
+      if(res && res.refetch) refetchFresh();
+      else if(res && res.eventId){
         ['eventId','startMs','start','end','allDay','color','colorId','done','editable','recurring'].forEach(k => { if(res[k] !== undefined) ev.setExtendedProp(k, res[k]); });
         const s2 = String(res.start || ''), same = res.allDay ? ev.allDay && ev.startStr.slice(0, 10) === s2 : !ev.allDay && L().fromISO(s2).toMillis() === ev.start.valueOf();
         if(!same) refetchFresh(); else cacheReplace(ev.id, res);
@@ -15999,18 +16031,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Phase 3b: hold + drag (touch) or drag (mouse) moves an event, its bottom edge resizes it; timed ↔ all-day both
       // ways. Per event `editable` = main calendar, not repeating, not done (Graphite stays put). Plan rows drop in too.
       editable: true, eventStartEditable: true, eventDurationEditable: true, eventResizableFromStart: false,
-      eventLongPressDelay: 400, snapDuration: '00:15:00', defaultTimedEventDuration: '00:15:00', defaultAllDayEventDuration: {days: 1},
+      eventLongPressDelay: 500, snapDuration: '00:15:00', defaultTimedEventDuration: '00:15:00', defaultAllDayEventDuration: {days: 1},
       eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag]',
-      eventDragStart: () => { dropSeen = false; }, eventDragStop: dragStopped,
-      eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: moveEvent, drop: dropPlan,
+      eventDragStart: () => { dropSeen = false; }, eventDragStop: info => { dragStopped(info); unselSoon(); }, eventResizeStop: () => unselSoon(),
+      eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: info => moveEvent(info), drop: dropPlan,
       // Phase 2: drag (desktop) or hold + drag (touch) on empty grid → New event form. Moving / resizing events is phase 3.
-      selectable: true, selectMirror: true, selectLongPressDelay: 400, unselectAuto: true,
+      selectable: true, selectMirror: true, selectLongPressDelay: 500, unselectAuto: true,
       select: info => { if(!pending) openForm(formFromRange(info.allDay, info.startStr, info.endStr)); cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       events: fetchRange,
       eventsSet: () => setTimeout(adLayout, 0),
       // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
-      loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
+      loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes],[data-cal-scope]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault();
         // A press on the box can redraw the card before the release, so the click lands on the card: use the press (2026-11-11 fix).
@@ -16022,6 +16054,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
+    // Scroll vs pick up (2026-11-11, Julius): a held event stays "selected" (FullCalendar then moves it with no delay,
+    // so a scroll that starts on it grabs it). Drop that selection 3 s after the last touch, and right away on scroll.
+    mount.addEventListener('touchend', () => unselSoon(), {passive: true});
+    mount.addEventListener('scroll', () => { if(mount.querySelector('.fc-event-selected')) unselEv(); }, {capture: true, passive: true});
+    // Tap empty calendar space = close the open event card (2026-11-11, Julius). Forms / delete / scope prompts stay.
+    mount.addEventListener('click', e => { if(detail.hidden || !detail.classList.contains('cp-evcard') || pending) return;
+      if(e.target.closest && e.target.closest('.fc-event,.fc-button,.fc-toolbar')) return; detail.hidden = true; sheetEv = null; });
+    loadCals(false);
     // Toolbar buttons take over the old header's jobs; the header (only needed while the calendar loads) goes.
     const tb = b => panel.querySelector('.fc-' + b + '-button');
     if(tb('cpClose')){ tb('cpClose').setAttribute('data-cal-close', ''); tb('cpClose').setAttribute('aria-label', 'Close calendar'); }
@@ -16057,6 +16097,63 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!pending){ detail.hidden = true; sheetEv = null; }
     document.querySelectorAll('[data-cal-open]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
+  }
+  let unselT = 0;
+  function unselEv(){ clearTimeout(unselT); try { const d = cal && cal.getCurrentData && cal.getCurrentData(); if(d && d.dispatch && d.eventSelection) d.dispatch({type: 'UNSELECT_EVENT'}); } catch (e) {} }
+  function unselSoon(){ clearTimeout(unselT); unselT = setTimeout(() => { if(!moveBusy && !mount.querySelector('.fc-event-dragging,.fc-event-resizing')) unselEv(); }, 3000); }
+  // ── Repeat scope + Calendars fold (2026-11-11, Julius) ──
+  const scopeHtml = () => '<div class="cp-scope"><span>Change</span><label><input type="radio" name="scope" value="one" checked> This day</label><label><input type="radio" name="scope" value="all"> All days</label></div>';
+  let scopeCb = null;
+  function askScope(verb, ok, cancel){
+    scopeCb = {ok, cancel}; detail.classList.remove('cp-evcard');
+    detail.innerHTML = '<div class="cp-dt">Repeating event</div><div class="cp-dm">' + esc(verb) + ' just this day, or every day it repeats?</div>' +
+      '<div class="cp-da"><button type="button" class="cp-primary" data-cal-scope="one">This day</button><button type="button" data-cal-scope="all">All days</button><span class="cp-sp"></span><button type="button" data-cal-scope="">Cancel</button></div>';
+    detail.hidden = false;
+  }
+  panel.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-cal-scope]');
+    if(!b) return;
+    e.preventDefault(); const cb = scopeCb, v = b.dataset.calScope; scopeCb = null; detail.hidden = true;
+    if(cb) v ? cb.ok(v) : (cb.cancel && cb.cancel());
+  });
+  const calsEl = panel.querySelector('[data-cal-cals]'), calsBody = panel.querySelector('[data-cals-body]'), calsCount = panel.querySelector('[data-cals-count]');
+  let cals = null, calsMsg = '';
+  try { cals = JSON.parse(lsGet('fw.calPicker') || 'null'); } catch (e) { cals = null; }
+  const calsWritable = () => (cals && cals.calendars ? cals.calendars.filter(c => c.writable && (c.picked || c.main)) : []).concat(cals ? [] : [{id: '', name: 'Main calendar', main: true}]);
+  if(lsGet('fw.calCalsOpen') === '1' && calsEl) calsEl.classList.remove('folded');
+  function renderCals(){
+    if(!calsEl) return;
+    const list = (cals && cals.calendars) || [];
+    calsCount.textContent = list.length ? '· ' + list.filter(c => c.picked).length + '/' + list.length : '';
+    calsBody.innerHTML = list.map(c => '<label class="cp-crow" style="--cc:' + esc(c.color) + '"><input type="checkbox" data-cal-pick="' + esc(c.id) + '"' + (c.picked ? ' checked' : '') + '>' +
+      '<span class="cp-cn">' + esc(c.name) + '</span>' + (c.writable ? '' : '<span class="cp-lk" title="View-only">🔒</span>') + '</label>').join('') +
+      (calsMsg ? '<div class="cp-cmsg">' + esc(calsMsg) + '</div>' : list.length ? '' : '<div class="cp-cmsg">Loading calendars…</div>');
+  }
+  function loadCals(open){
+    renderCals();
+    if(!canRun() || (cals && !open && Date.now() - (cals.at || 0) < 6 * 3600000)) return;
+    google.script.run.withSuccessHandler(r => { cals = Object.assign(r || {}, {at: Date.now()}); calsMsg = ''; lsSet('fw.calPicker', JSON.stringify(cals)); renderCals(); })
+      .withFailureHandler(err => { calsMsg = 'Couldn’t load calendars: ' + errText(err); renderCals(); }).getCalendarPicker();
+  }
+  if(calsEl){
+    panel.querySelector('[data-cals-fold]').addEventListener('click', () => {
+      const open = calsEl.classList.toggle('folded') === false; lsSet('fw.calCalsOpen', open ? '1' : '0');
+      if(open) loadCals(true); setTimeout(() => { try { if(cal) cal.updateSize(); } catch (e) {} }, 0);
+    });
+    calsBody.addEventListener('change', e => {
+      if(!e.target.matches('[data-cal-pick]') || !cals) return;
+      const ids = [...calsBody.querySelectorAll('[data-cal-pick]:checked')].map(i => i.dataset.calPick);
+      if(!ids.length){ e.target.checked = true; return; } // at least one calendar stays on
+      calsMsg = 'Saving…'; renderCals();
+      cals.calendars.forEach(c => { c.picked = ids.includes(c.id); });
+      google.script.run.withSuccessHandler(r => {
+        cals = Object.assign(r || {}, {at: Date.now()}); calsMsg = ''; lsSet('fw.calPicker', JSON.stringify(cals)); renderCals();
+        // New set of calendars: forget every cached day, then read the dates on screen again.
+        evById.clear(); dayAt.clear(); try { localStorage.removeItem(CACHE_KEY); } catch (err) {}
+        try { if(typeof centerCalendarCache !== 'undefined') centerCalendarCache.clear(); } catch (err) {}
+        refetchFresh();
+      }).withFailureHandler(err => { calsMsg = 'Not saved: ' + errText(err); loadCals(true); }).setCalendarPicked(ids);
+    });
   }
   function retry(){ if(cal){ refetchFresh(); loadPlan(true); } else start(); }
   window.fwCalendar = { saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };

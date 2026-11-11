@@ -1146,7 +1146,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         tb.querySelector('[data-layout="scale"]').click(); await wait(100);
         if (document.getElementById('typeSettings').classList.contains('hidden')) out.push('Options button stopped working');
         document.getElementById('closeTypeSettings').click();
-        const writes = window.__calls.filter(c => /Calendar/i.test(c[0]) && c[0] !== 'getCalendarRange' && c[0] !== 'getMainCalendarEvents').map(c => c[0]);
+        const writes = window.__calls.filter(c => /Calendar/i.test(c[0]) && c[0] !== 'getCalendarRange' && c[0] !== 'getMainCalendarEvents' && c[0] !== 'getCalendarPicker').map(c => c[0]);
         if (writes.length) out.push('calendar write calls: ' + writes.join(', '));
         if (!window.__calls.some(c => c[0] === 'getCalendarRange')) out.push('getCalendarRange never called');
         return out;

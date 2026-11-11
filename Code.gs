@@ -2635,32 +2635,96 @@ const EVENT_CALENDARS = [
 ];
 const EVENT_DAYS_AHEAD = 3;
 
+/* Calendar picker (2026-11-11, Julius): the 📅 panel and Cal Events show every calendar he ticks in the panel's
+   "Calendars" fold (saved in script property calPicked, so phone and desktop match; default = main + Events).
+   Editing works on any calendar he can edit (owner / writer); view-only ones (Time To Pet dog walks, holidays,
+   subscriptions) stay read-only. Urgency colors (Tomato / Banana / Blueberry) stay main-calendar only. */
+const CAL_PICK_PROP_ = 'calPicked';
+let CAL_ACCESS_MEMO_ = null; // one read per server call
+function calAccess_(fresh) {
+  if (!fresh && CAL_ACCESS_MEMO_) return CAL_ACCESS_MEMO_;
+  const cache = CacheService.getScriptCache();
+  if (!fresh) { try { const c = JSON.parse(cache.get('calAccess') || 'null'); if (c) return (CAL_ACCESS_MEMO_ = c); } catch (e) {} }
+  const out = {};
+  try {
+    let token = null;
+    do {
+      const q = { maxResults: 250, fields: 'nextPageToken,items(id,summary,summaryOverride,backgroundColor,accessRole,primary)' };
+      if (token) q.pageToken = token;
+      const r = Calendar.CalendarList.list(q);
+      (r.items || []).forEach(c => { out[c.id] = { name: c.summaryOverride || c.summary || c.id, color: c.backgroundColor || '#039be5', role: c.accessRole || 'reader' }; });
+      token = r.nextPageToken;
+    } while (token);
+  } catch (e) {
+    console.error('calAccess_ → CalendarApp fallback: ' + e);
+    CalendarApp.getAllCalendars().forEach(c => { out[c.getId()] = { name: c.getName(), color: String(c.getColor() || '#039be5'), role: c.isOwnedByMe() ? 'owner' : 'reader' }; });
+  }
+  if (!out[EVENT_CALENDARS[0]]) out[EVENT_CALENDARS[0]] = { name: EVENT_CALENDARS[0], color: '#039be5', role: 'owner' };
+  out[EVENT_CALENDARS[0]].role = 'owner';
+  try { cache.put('calAccess', JSON.stringify(out), 21600); } catch (e) {}
+  return (CAL_ACCESS_MEMO_ = out);
+}
+function pickedCalendars_() {
+  let ids = null;
+  try { ids = JSON.parse(PropertiesService.getScriptProperties().getProperty(CAL_PICK_PROP_) || 'null'); } catch (e) { ids = null; }
+  if (!Array.isArray(ids)) ids = EVENT_CALENDARS.slice();
+  ids = ids.map(String).filter(Boolean);
+  return ids.length ? ids : [EVENT_CALENDARS[0]];
+}
+function calWritable_(calId) {
+  if (calId === EVENT_CALENDARS[0]) return true;
+  const a = calAccess_()[calId];
+  return !!a && (a.role === 'owner' || a.role === 'writer');
+}
+function calRequireWritable_(calId) {
+  if (!calWritable_(calId)) throw new Error('That calendar is view-only — edit it where it comes from');
+}
+// Panel fold: every calendar in his list, main first, then ticked ones, then the rest by name.
+function getCalendarPicker() {
+  const acc = calAccess_(true), picked = pickedCalendars_(), main = EVENT_CALENDARS[0];
+  const list = Object.keys(acc).map(id => ({ id: id, name: id === main ? 'Main (' + acc[id].name.split('@')[0] + ')' : acc[id].name,
+    color: acc[id].color, writable: calWritable_(id), picked: picked.indexOf(id) >= 0, main: id === main }));
+  list.sort((a, b) => Number(b.main) - Number(a.main) || Number(b.picked) - Number(a.picked) || a.name.localeCompare(b.name));
+  return { main: main, calendars: list };
+}
+function setCalendarPicked(ids) {
+  const acc = calAccess_();
+  const clean = (Array.isArray(ids) ? ids : []).map(String).filter(id => acc[id]).slice(0, 30);
+  PropertiesService.getScriptProperties().setProperty(CAL_PICK_PROP_, JSON.stringify(clean.length ? clean : [EVENT_CALENDARS[0]]));
+  return getCalendarPicker();
+}
+
 // Center-bottom list: main calendar only (no archive path).
 function getMainCalendarEvents(dateString) {
   const date = String(dateString || todayString_());
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid calendar date');
   const start = parseDate_(date), end = parseDate_(addDaysToDateString_(date, 1));
-  const cal = CalendarApp.getCalendarById(EVENT_CALENDARS[0]);
-  if (!cal) throw new Error('Main calendar is unavailable');
-  const tz = Session.getScriptTimeZone();
-  const events = cal.getEvents(start, end).map(ev => {
+  const tz = Session.getScriptTimeZone(), events = [];
+  // Follows the 📅 Calendars picker (2026-11-11, Julius); urgency-from-color stays main-calendar only.
+  pickedCalendars_().forEach(calId => {
+    let cal = null;
+    try { cal = CalendarApp.getCalendarById(calId); } catch (e) { cal = null; }
+    if (!cal) return;
+    const ro = !calWritable_(calId), isMain = calId === EVENT_CALENDARS[0];
+    cal.getEvents(start, end).forEach(ev => {
     const allDay = ev.isAllDayEvent();
     const s = ev.getStartTime(), e = ev.getEndTime();
-    return { title: ev.getTitle() || '(no title)', allDay: allDay,
-      id: ev.getId(), calId: EVENT_CALENDARS[0],
+    events.push({ title: ev.getTitle() || '(no title)', allDay: allDay, ro: ro, main: isMain,
+      id: ev.getId(), calId: calId,
       done: String(ev.getColor() || '') === '8',
       color: String(ev.getColor() || ''),
       start: (allDay ? ev.getAllDayStartDate() : s).getTime(), end: e.getTime(),
       recurring: ev.isRecurringEvent(),
-      time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') };
+      time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') });
+    });
   });
   const saved = PropertiesService.getScriptProperties().getProperties();
   events.forEach(ev => {
     try { Object.assign(ev, JSON.parse(saved[calMetaKey_(ev.id, ev.start, ev.recurring)] || '{}')); } catch (e) { console.error(e); }
     // Color = urgency both ways (2026-11-05, Julius): an event colored red / yellow / blue elsewhere (Calendar app,
     // Claude, ChatGPT) shows with that urgency here when the app hasn't saved one for it.
-    if (!ev.urg) { const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === ev.color); if (u) ev.urg = u; }
-    delete ev.color;
+    if (!ev.urg && ev.main) { const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === ev.color); if (u) ev.urg = u; }
+    delete ev.color; delete ev.main;
   });
   events.sort((a,b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start);
   return { date: date, events: events };
@@ -2687,7 +2751,7 @@ function calMetaKey_(eventId, start, recurring) {
 // Urgency shows on the calendar too (2026-11-04, Julius): 1 red (Tomato), 2 yellow (Banana), 3 blue (Blueberry), none = calendar default.
 const URG_EVENT_COLOR_ = { '1': '11', '2': '5', '3': '9' };
 function syncCalUrgencyColor_(calId, eventId, start, urg) {
-  if (EVENT_CALENDARS.indexOf(calId) < 0) return;
+  if (calId !== EVENT_CALENDARS[0]) return; // urgency colors: main calendar only (2026-11-11, Julius)
   const ev = calEventAt_(calId, eventId, start), color = URG_EVENT_COLOR_[urg] || '';
   if (String(ev.getColor() || '') === '8') { // done stays Graphite; unticking brings back the new urgency color
     PropertiesService.getScriptProperties().setProperty('calPrev:' + eventId.slice(0, 60) + ':' + Number(start), color || 'default');
@@ -2725,7 +2789,7 @@ function getCalendarEvents() {
   const start = parseDate_(today);
   const end = parseDate_(addDaysToDateString_(today, EVENT_DAYS_AHEAD + 1));
   const out = [];
-  EVENT_CALENDARS.forEach(id => {
+  pickedCalendars_().forEach(id => {
     let cal = null;
     try { cal = CalendarApp.getCalendarById(id); } catch (e) { cal = null; }
     if (!cal) return;
@@ -2790,9 +2854,9 @@ function calPanelEventOut_(ev, calId, calName, calColor, tz) {
     id: ev.getId() + '|' + st.getTime(), eventId: ev.getId(), startMs: st.getTime(), calId: calId, cal: calName,
     title: ev.getTitle() || '(no title)', allDay: allDay,
     start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
-    color: CAL_PANEL_COLORS_[colorId] || CAL_PANEL_UNASSIGNED_COLOR_, colorId: colorId, done: colorId === '8',
+    color: CAL_PANEL_COLORS_[colorId] || (calId === EVENT_CALENDARS[0] ? CAL_PANEL_UNASSIGNED_COLOR_ : calColor), colorId: colorId, done: colorId === '8',
     location: ev.getLocation() || '', recurring: recurring, link: link,
-    editable: calId === EVENT_CALENDARS[0] && !recurring
+    editable: calWritable_(calId) // any calendar he can edit; repeating too, with a This day / All days choice (2026-11-11)
   };
 }
 function getCalendarRange(startDate, endDate) {
@@ -2806,7 +2870,7 @@ function getCalendarRange(startDate, endDate) {
   const fast = calPanelRangeApi_(from, to, tz);
   if (fast) { calPanelAttachMeta_(fast.events); return Object.assign(fast, { start: s, end: e, tz: tz, via: 'api', ms: Date.now() - t0 }); }
   const out = [], calendars = [], failed = [];
-  EVENT_CALENDARS.forEach(id => {
+  pickedCalendars_().forEach(id => {
     let cal = null;
     try { cal = CalendarApp.getCalendarById(id); } catch (err) { cal = null; }
     if (!cal) { failed.push(id); return; }
@@ -2838,16 +2902,11 @@ function calPanelRangeApi_(from, to, tz) {
   const cache = CacheService.getScriptCache();
   if (cache.get('calApiOff')) return null;
   try {
-    const out = [], calendars = [];
-    EVENT_CALENDARS.forEach(id => {
-      let meta = null;
-      try { meta = JSON.parse(cache.get('calMeta:' + id) || 'null'); } catch (err) { meta = null; }
-      if (!meta) {
-        const c = CalendarApp.getCalendarById(id);
-        if (!c) throw new Error('Calendar not found: ' + id);
-        meta = { name: c.getName(), color: String(c.getColor() || '#039be5') };
-        cache.put('calMeta:' + id, JSON.stringify(meta), 21600);
-      }
+    const out = [], calendars = [], acc = calAccess_();
+    pickedCalendars_().forEach(id => {
+      const meta = acc[id] ? { name: acc[id].name, color: acc[id].color } : null;
+      if (!meta) return; // unsubscribed since it was picked
+      const canEdit = calWritable_(id), isMain = id === EVENT_CALENDARS[0];
       calendars.push({ id: id, name: meta.name, color: meta.color });
       let token = null;
       do {
@@ -2867,9 +2926,9 @@ function calPanelRangeApi_(from, to, tz) {
             id: eventId + '|' + st.getTime(), eventId: eventId, startMs: st.getTime(), calId: id, cal: meta.name,
             title: it.summary || '(no title)', allDay: allDay,
             start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
-            color: CAL_PANEL_COLORS_[colorId] || CAL_PANEL_UNASSIGNED_COLOR_, colorId: colorId, done: colorId === '8',
+            color: CAL_PANEL_COLORS_[colorId] || (isMain ? CAL_PANEL_UNASSIGNED_COLOR_ : meta.color), colorId: colorId, done: colorId === '8',
             location: it.location || '', recurring: recurring, link: it.htmlLink || '',
-            editable: id === EVENT_CALENDARS[0] && !recurring
+            editable: canEdit
           });
         });
         token = r.nextPageToken;
@@ -2888,10 +2947,49 @@ function calPanelRangeApi_(from, to, tz) {
    Duplicate guard: each form save carries an opId; a retry or double tap with the same opId returns the first result
    (script cache, 6 h) instead of creating again. New events get reminders off. Times are America/Los_Angeles wall
    time: all-day 'yyyy-MM-dd' (end exclusive, like Google), timed 'yyyy-MM-ddTHH:mm'. */
-function calPanelMain_() {
-  const cal = CalendarApp.getCalendarById(EVENT_CALENDARS[0]);
-  if (!cal) throw new Error('Main calendar is unavailable');
+function calPanelMain_(calId) {
+  const id = String(calId || EVENT_CALENDARS[0]);
+  calRequireWritable_(id);
+  const cal = CalendarApp.getCalendarById(id);
+  if (!cal) throw new Error('Calendar is unavailable');
   return cal;
+}
+// Repeating events (2026-11-11, Julius): 'one' = just this day, 'all' = the whole series. Done through the Calendar
+// API: find this day's instance by iCalUID + start, patch / remove it or its series (recurringEventId).
+function calApiStartMs_(i) { return i.start.date ? parseDate_(i.start.date).getTime() : new Date(i.start.dateTime).getTime(); }
+function calApiInstance_(calId, eventId, startMs) {
+  const t = Number(startMs);
+  const r = Calendar.Events.list(calId, { timeMin: new Date(t - 60000).toISOString(), timeMax: new Date(t + 60000).toISOString(),
+    singleEvents: true, maxResults: 250, fields: 'items(id,iCalUID,recurringEventId,start,end,summary,status)' });
+  const it = (r.items || []).find(i => i.iCalUID === eventId && i.status !== 'cancelled' && Math.abs(calApiStartMs_(i) - t) < 60000);
+  if (!it) throw new Error('Event not found (moved or deleted?) — tap ↻ on the Calendar');
+  return it;
+}
+function calApiTimes_(w, tz) {
+  const d = x => Utilities.formatDate(x, tz, 'yyyy-MM-dd');
+  return w.allDay ? { start: { date: d(w.start), dateTime: null }, end: { date: d(w.end), dateTime: null } }
+    : { start: { dateTime: w.start.toISOString(), timeZone: tz, date: null }, end: { dateTime: w.end.toISOString(), timeZone: tz, date: null } };
+}
+function calRecurringEdit_(calId, r, w, scope, opts) {
+  const tz = Session.getScriptTimeZone(), inst = calApiInstance_(calId, String(r.eventId), r.startMs);
+  const body = opts && opts.titleOnly ? {} : calApiTimes_(w, tz);
+  if (w.title) body.summary = w.title;
+  if (scope !== 'all') { Calendar.Events.patch(body, calId, inst.id); return { eventId: r.eventId, refetch: true }; }
+  const master = Calendar.Events.get(calId, inst.recurringEventId || inst.id);
+  if (!(opts && opts.titleOnly)) {
+    if (!!w.allDay !== !!inst.start.date) throw new Error('All-day ↔ timed can only change for this day');
+    const delta = w.start.getTime() - calApiStartMs_(inst), len = w.end.getTime() - w.start.getTime();
+    if (w.allDay) {
+      const ms = parseDate_(master.start.date).getTime() + delta, days = Math.round(len / DAY_MS);
+      const a = new Date(ms + 12 * 3600000), b = new Date(ms + days * DAY_MS + 12 * 3600000); // noon: no DST edge
+      body.start = { date: Utilities.formatDate(a, tz, 'yyyy-MM-dd') }; body.end = { date: Utilities.formatDate(b, tz, 'yyyy-MM-dd') };
+    } else {
+      const ms = new Date(master.start.dateTime).getTime() + delta, mtz = master.start.timeZone || tz;
+      body.start = { dateTime: new Date(ms).toISOString(), timeZone: mtz }; body.end = { dateTime: new Date(ms + len).toISOString(), timeZone: mtz };
+    }
+  }
+  Calendar.Events.patch(body, calId, master.id);
+  return { eventId: r.eventId, refetch: true };
 }
 function calPanelWhen_(req) {
   const r = req || {}, allDay = !!r.allDay, s = String(r.start || ''), e = String(r.end || '');
@@ -2911,17 +3009,17 @@ function calPanelWhen_(req) {
   if (b - a > 31 * DAY_MS) throw new Error('Event is longer than a month');
   return { title: title, allDay: false, start: a, end: b };
 }
-function calPanelOut_(ev) {
-  const cal = calPanelMain_();
-  const out = calPanelEventOut_(ev, EVENT_CALENDARS[0], cal.getName(), String(cal.getColor() || '#039be5'), Session.getScriptTimeZone());
+function calPanelOut_(ev, calId) {
+  const id = String(calId || EVENT_CALENDARS[0]), a = calAccess_()[id] || {};
+  const out = calPanelEventOut_(ev, id, a.name || id, a.color || '#039be5', Session.getScriptTimeZone());
   calPanelAttachMeta_([out]); // keep the checkbox's urgency / subject after a move or edit
   return out;
 }
-function calPanelEditable_(eventId, startMs) {
+function calPanelEditable_(eventId, startMs, calId) {
   if (!eventId) throw new Error('Missing event id');
-  const ev = calEventAt_(EVENT_CALENDARS[0], String(eventId), Number(startMs));
-  if (ev.isRecurringEvent()) throw new Error('Repeating events are read-only here — edit them in Google Calendar');
-  return ev;
+  const id = String(calId || EVENT_CALENDARS[0]);
+  calRequireWritable_(id);
+  return calEventAt_(id, String(eventId), Number(startMs));
 }
 function calPanelCreateEvent(req) {
   const w = calPanelWhen_(req), opId = String((req && req.opId) || '').replace(/[^\w-]/g, '').slice(0, 60);
@@ -2932,42 +3030,49 @@ function calPanelCreateEvent(req) {
     const done = key && cache.get(key);
     if (done) {
       const d = JSON.parse(done);
-      try { return Object.assign(calPanelOut_(calEventAt_(EVENT_CALENDARS[0], d.eventId, d.startMs)), { repeat: true }); }
+      try { return Object.assign(calPanelOut_(calEventAt_(d.calId || EVENT_CALENDARS[0], d.eventId, d.startMs), d.calId), { repeat: true }); }
       catch (e) { return { eventId: d.eventId, startMs: d.startMs, repeat: true }; }
     }
-    const cal = calPanelMain_();
+    const calId = String((req && req.calId) || EVENT_CALENDARS[0]), cal = calPanelMain_(calId);
     const ev = w.allDay ? (w.oneDay ? cal.createAllDayEvent(w.title, w.start) : cal.createAllDayEvent(w.title, w.start, w.end))
       : cal.createEvent(w.title, w.start, w.end);
     try { ev.removeAllReminders(); } catch (e) { console.error(e); }
-    const out = calPanelOut_(ev);
-    if (key) cache.put(key, JSON.stringify({ eventId: out.eventId, startMs: out.startMs }), 21600);
+    const out = calPanelOut_(ev, calId);
+    if (key) cache.put(key, JSON.stringify({ eventId: out.eventId, startMs: out.startMs, calId: calId }), 21600);
     return out;
   } finally { lock.releaseLock(); }
 }
 function calPanelUpdateEvent(req) {
-  const w = calPanelWhen_(req), ev = calPanelEditable_(req.eventId, req.startMs);
+  const w = calPanelWhen_(req), calId = String(req.calId || EVENT_CALENDARS[0]), ev = calPanelEditable_(req.eventId, req.startMs, calId);
+  if (ev.isRecurringEvent()) return calRecurringEdit_(calId, req, w, req.scope);
   if (ev.getTitle() !== w.title) ev.setTitle(w.title);
   if (w.allDay) { if (w.oneDay) ev.setAllDayDate(w.start); else ev.setAllDayDates(w.start, w.end); }
   else ev.setTime(w.start, w.end);
   planRelinkLocked_(ev);
-  return calPanelOut_(ev);
+  return calPanelOut_(ev, calId);
 }
 /* Phase 3b (2026-11-08, Julius): drag / resize in the panel. Moves the event in place (same id, color, title,
    reminders); timed ↔ all-day both ways. Done (Graphite) events are locked to their spot. Plan links follow. */
 function calPanelMoveEvent(req) {
-  const r = req || {}, ev = calPanelEditable_(r.eventId, r.startMs);
+  const r = req || {}, calId = String(r.calId || EVENT_CALENDARS[0]), ev = calPanelEditable_(r.eventId, r.startMs, calId);
   if (String(ev.getColor() || '') === '8') throw new Error('Done events stay where they are');
   const w = calPanelWhen_(Object.assign({}, r, { title: ev.getTitle() || 'Event' }));
+  if (ev.isRecurringEvent()) { w.title = ''; return calRecurringEdit_(calId, r, w, r.scope); }
   if (w.allDay) { if (w.oneDay) ev.setAllDayDate(w.start); else ev.setAllDayDates(w.start, w.end); }
   else ev.setTime(w.start, w.end);
   planRelinkLocked_(ev);
-  return calPanelOut_(ev);
+  return calPanelOut_(ev, calId);
 }
 function calPanelDeleteEvent(req) {
-  const r = req || {};
+  const r = req || {}, calId = String(r.calId || EVENT_CALENDARS[0]);
   let ev;
-  try { ev = calPanelEditable_(r.eventId, r.startMs); }
+  try { ev = calPanelEditable_(r.eventId, r.startMs, calId); }
   catch (e) { if (/not found/i.test(e.message)) return { ok: true, gone: true }; throw e; } // already deleted: nothing to do
+  if (ev.isRecurringEvent()) {
+    const inst = calApiInstance_(calId, String(r.eventId), r.startMs);
+    Calendar.Events.remove(calId, r.scope === 'all' ? (inst.recurringEventId || inst.id) : inst.id);
+    return { ok: true };
+  }
   ev.deleteEvent();
   return { ok: true };
 }
@@ -3184,7 +3289,7 @@ function calEventAt_(calId, eventId, start) {
 }
 // Editing a title in Cal Events changes the Google Calendar event (2026-11-04, Julius).
 function setCalendarEventTitle(calId, eventId, start, title) {
-  if (EVENT_CALENDARS.indexOf(calId) < 0) throw new Error('Not one of the app calendars');
+  calRequireWritable_(calId);
   const name = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
   if (!name) throw new Error('Title is empty');
   calEventAt_(calId, eventId, start).setTitle(name);
@@ -3195,7 +3300,7 @@ function setCalendarEventTitle(calId, eventId, start, title) {
    same way he does by hand — Graphite color. Unticking puts back the color it had (yellow = open if unknown).
    start = the event's start time (ms), so the right day of a repeating event is changed. */
 function setCalendarEventDone(calId, eventId, start, done) {
-  if (EVENT_CALENDARS.indexOf(calId) < 0) throw new Error('Not one of the app calendars');
+  calRequireWritable_(calId);
   const ev = calEventAt_(calId, eventId, start);
   const props = PropertiesService.getScriptProperties();
   const key = 'calPrev:' + eventId.slice(0, 60) + ':' + Number(start);

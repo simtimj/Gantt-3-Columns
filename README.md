@@ -76,6 +76,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-09)
 
+- **2026-11-11 · 📅 Calendars picker + edit any calendar:** a **Calendars** fold at the top of the 📅 panel lists every Google calendar (main first); tick / untick to show or hide it, saved in the Sheet's script properties (same on phone and desktop). Cal Events (center) follows the same picker. Calendars he can edit are fully editable from the panel (create, move, resize, delete, done); view-only ones (Time To Pet dog walks, subscriptions) show 🔒 and stay read-only. + New picks the calendar (default main). Uncolored events on other calendars show in that calendar's color; urgency colors stay main-only. **Repeating events** are editable: drag asks *This day / All days*; the edit and delete forms have the same choice (All days can't switch all-day ↔ timed).
+- **2026-11-11 · 📅 Scroll vs pick up + event card:** holding an event picks it up after ½ s; a held event drops its "selected" state 3 s after the last touch or on scroll, so starting a scroll on it no longer grabs it. Tapping empty calendar space closes the open event card. The card is smaller, with Edit · Delete · **GCal** · Close on one line.
 - **2026-11-11 · 📅 Event checkboxes + urgency groups:** every event in the calendar panel has a checkbox at the left of its card, filled with its subject color (saved subject, else auto-guessed from the title like Gantt cards). **Tap** it = done (Graphite, struck through; tap again to undo; 2026-11-11 fix: a real tap now works, the card redraw used to swallow it). **Hold** it = the same hold menu as the rest of the Gantt (urgency, subject, due date, minutes); urgency also recolors the event in Google Calendar. Holding the card itself still moves it. Short events get a smaller box. All-day events are ordered by urgency and grouped under small headings: Urgent · Next · Later · Not set · Done (a day with only one group shows no heading). Yellow's name "Next" is a placeholder.
 
 - **2026-11-10 · 📅 All-day cap:** a long all-day list in the calendar panel stops at **half the calendar height** and scrolls inside itself, so the timeline always stays visible. A small bar under the list (only shown while it's capped) drags to make the cap taller or shorter; the setting is saved per device. Double-tap / double-click the bar = back to half.
@@ -559,6 +561,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 📋 To do
 
+- **Calendar backlog** (wanted 2026-11-11, design pending): unfinished calendar tasks from past days go to a backlog (kept, struck through on their old day, colors kept); a Backlog button opens a list on the left of the 📅 panel to drag tasks back onto a day. Questions open in `docs/NOTES.md` → "Calendar backlog".
 - **App cleanup** (wanted 2026-11-08): hide what isn't used, better grouping and sorting of the many panels / tabs First candidate: the **Cal Events** panel (center bottom), now covered by the 📅 calendar; decide what takes its spot.
 - **Task → calendar pipeline** (wanted 2026-11-08): how Lead Tasks, urgent items and scheduled tasks flow into the calendar and back, without duplicates.
 

@@ -656,3 +656,13 @@ Three things only; everything else is a **view**, not a place:
 - **Build**: (1) Fit + Reset sizes into the Cols menu, ☾ into Options — but **▲ ▼ stay where they are** (not moved to History); (3) merge ✨ New things + 🌴 Fun into one tab (name TBD — not "Life"/"Fun"; it's about making it easier to get into fun / recharging) and Weather → a chip; (4) History ▤ ≡ – buttons replaced by **tapping the day's date line** (cycles Full → List → Mini); Julius also wants the same on Morn / Aft / Eve headers (conflicts with their current fold-on-tap — to settle); (5) Urgent's empty "Add … task" lines only on tap / hover.
 - **Wait**: (2) the Cal Events spot waits for Today (pipeline A).
 - **Reference (6)**: never move or delete automatically — **suggest only** ("you haven't touched this in a long time — move it?"). Idea: an **Active** reference area plus a **Less active** area that loads later / stays out of the way unless asked (could speed up start-up with a large library). Threshold to suggest.
+
+
+## Calendar picker + repeating edits (2026-11-11, Julius)
+
+Answers: picker = "Calendars" fold at the top of the 📅 panel; Cal Events follows the same picker; urgency colors only on the main calendar (the task calendar); repeating events editable with This day / All days (reflects in Google); Walk Blocks editable, Time To Pet dog walks not (it's an import calendar, view-only, so 🔒 comes automatically). Mechanics: `calAccess_()` (CalendarList, accessRole, cached 6 h + per-call memo), `pickedCalendars_()` (script property `calPicked`, default = EVENT_CALENDARS), `calWritable_()`; writes take `calId`; repeating → `calRecurringEdit_()` / instance remove via the Calendar API (`calApiInstance_` finds the instance by iCalUID + start). UI: `loadCals` / `renderCals` / `askScope` / `scopeHtml` in Index.html; picker cached in localStorage `fw.calPicker`; event cache key bumped to `fw.calCache.v2`.
+Hold to pick up: `eventLongPressDelay` 500; `unselSoon()` drops FullCalendar's event selection 3 s after the last touch (a selected event drags with no delay), `unselEv()` on scroll. Tap on empty calendar space closes the event card (`.cp-evcard`).
+
+## Calendar backlog (2026-11-11, Julius: PROPOSED, not built)
+
+Idea: unfinished (non-Graphite) calendar tasks from past days move to a backlog so nothing gets lost. The old event stays on its day, struck through, as a "moved to backlog" marker; the task keeps its color in the backlog. A Backlog button in the 📅 panel opens a list on the left (calendar on the right), sortable / grouped, and tasks drag from it onto a day. Open questions are in the chat of 2026-11-11; answers go here.

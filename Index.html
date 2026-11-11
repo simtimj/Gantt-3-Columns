@@ -15034,6 +15034,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-col-header-cell{border-left:0;border-right:0;border-top:0;}
   #calPanel .fc .fc-timegrid-slot{height:24px;border-bottom:0;}
   #calPanel .fc .fc-timegrid-slot-minor{border-top:0;}
+  /* Zoom guides: half / quarter-hour lines lighter and dashed, their labels smaller. */
+  #calPanel.cp-zfine .fc .fc-timegrid-slot-lane.cp-half{border-top:1px dashed var(--cp-line);}
+  #calPanel.cp-zfine .fc .fc-timegrid-slot-minor.cp-half{border-top:1px dashed var(--cp-line);}
+  #calPanel .fc .fc-timegrid-slot-label.cp-half .fc-timegrid-slot-label-cushion{font-size:9px;opacity:.75;}
   #calPanel .fc .fc-timegrid-slot-label{border:0;vertical-align:top;}
   #calPanel .fc .fc-timegrid-slot-label-cushion{font-size:10px;color:var(--cp-muted);position:relative;top:-7px;padding:0 8px 0 4px;background:var(--cp-bg);}
   #calPanel .fc .fc-timegrid-axis{border:0;}
@@ -15926,19 +15930,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   panel.addEventListener('click', e => { if(e.target.closest('[data-bl-toggle]')){ e.stopPropagation(); blToggle(); } });
   // ── Zoom ──
-  const Z_MIN = 14, Z_MAX = 120;
+  /* Zoom guides (2026-11-11, Julius): zoomed in → 30-minute lines + labels (10:30, 11, 11:30); further → 15-minute
+     slots (11:15, 11:30, 11:45). zoomPx = height of 30 minutes. */
+  const Z_MIN = 14, Z_MAX = 160;
+  const zoomMode = px => px >= 72 ? 15 : px >= 36 ? 30 : 60;
+  const zoomOpts = m => ({slotDuration: m === 15 ? '00:15:00' : '00:30:00', slotLabelInterval: m === 60 ? '01:00:00' : m === 30 ? '00:30:00' : '00:15:00'});
+  let zoomCur = 0;
+  function applyZoomMode(){
+    const m = zoomMode(zoomPx);
+    panel.classList.toggle('cp-zfine', m !== 60);
+    panel.style.setProperty('--cp-slot', (m === 15 ? zoomPx / 2 : zoomPx) + 'px');
+    if(cal && zoomCur && m !== zoomCur){ const o = zoomOpts(m); cal.setOption('slotDuration', o.slotDuration); cal.setOption('slotLabelInterval', o.slotLabelInterval); }
+    zoomCur = m;
+  }
   let zoomPx = Math.min(Z_MAX, Math.max(Z_MIN, Number(lsGet('fw.calZoom')) || 24)), zoomT = 0;
   function setZoom(px, anchorY){
     px = Math.round(Math.min(Z_MAX, Math.max(Z_MIN, px)));
     if(px === zoomPx) return;
     const sc = mount.querySelector('.fc-timegrid-body') && mount.querySelector('.fc-timegrid-body').closest('.fc-scroller');
     const y = anchorY == null && sc ? sc.clientHeight / 2 : (anchorY || 0), at = sc ? (sc.scrollTop + y) / zoomPx : 0;
-    zoomPx = px; panel.style.setProperty('--cp-slot', px + 'px');
+    zoomPx = px; applyZoomMode();
     if(cal) cal.updateSize();
     if(sc) sc.scrollTop = at * px - y;
     clearTimeout(zoomT); zoomT = setTimeout(() => lsSet('fw.calZoom', String(px)), 300);
   }
-  panel.style.setProperty('--cp-slot', zoomPx + 'px');
+  applyZoomMode();
   panel.addEventListener('click', e => { const b = e.target.closest('[data-cal-zoom]'); if(b){ e.stopPropagation(); setZoom(zoomPx * (b.dataset.calZoom === '1' ? 1.35 : 1 / 1.35)); } });
   mount.addEventListener('wheel', e => { if(!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); setZoom(zoomPx * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientY - mount.getBoundingClientRect().top); }, {passive: false});
   let pinch = null;
@@ -16091,8 +16107,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const D = luxon.DateTime.fromJSDate(a.view.currentStart, {zone: 'UTC'}), t = luxon.DateTime.now().setZone(TZ).toISODate() === D.toISODate();
         return { html: '<span class="cp-corner' + (t ? ' cp-today' : '') + '"><span class="cp-dh-w">' + D.toFormat('ccc').toUpperCase() + '</span><span class="cp-dh-n">' + D.day + '</span></span>' };
       },
-      slotLabelContent: a => String(a.text || '').replace(/^(\d+)(?::00)?\s*([ap])m?$/i, (m, h, ap) => h + ' ' + ap.toUpperCase() + 'M'),
-      slotLabelFormat: { hour: 'numeric', meridiem: 'short' },
+      slotLabelContent: a => String(a.text || '').replace(/^(\d+:\d\d)\s*[ap]m?$/i, '$1').replace(/^(\d+)(?::00)?\s*([ap])m?$/i, (m, h, ap) => h + ' ' + ap.toUpperCase() + 'M'),
+      slotLabelFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
+      slotDuration: zoomOpts(zoomMode(zoomPx)).slotDuration, slotLabelInterval: zoomOpts(zoomMode(zoomPx)).slotLabelInterval,
+      slotLaneClassNames: a => a.date.getUTCMinutes() ? ['cp-half'] : [], slotLabelClassNames: a => a.date.getUTCMinutes() ? ['cp-half'] : [],
       eventTimeFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
       defaultRangeSeparator: ' – ',
       // Header: small weekday over a big date number; today's number in a blue circle.

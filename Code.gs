@@ -2771,8 +2771,10 @@ function getCalendarEvents() {
    Dates are yyyy-MM-dd in the script zone (America/Los_Angeles); end is exclusive. All-day events come back as
    plain dates (end exclusive, like Google), timed events as ISO with offset. color = the event's own color, else
    neutral gray (not the calendar's background color). Phase 2+ plans: docs/NOTES.md → "Calendar panel (FullCalendar)". */
-const CAL_PANEL_COLORS_ = { '1': '#7986cb', '2': '#33b679', '3': '#8e24aa', '4': '#e67c73', '5': '#f6bf26', '6': '#f4511e',
-  '7': '#039be5', '8': '#616161', '9': '#3f51b5', '10': '#0b8043', '11': '#d50000' };
+// Colors as Julius's Google Calendar app shows them (2026-11-10, sampled from his phone screenshot): Tomato, Tangerine,
+// Banana, Sage, Peacock, Blueberry, Graphite. Lavender, Flamingo, Grape, Basil weren't on screen: Google's published values.
+const CAL_PANEL_COLORS_ = { '1': '#7986cb', '2': '#59af80', '3': '#8e24aa', '4': '#e67c73', '5': '#e6ba57', '6': '#db793a',
+  '7': '#5398cf', '8': '#808080', '9': '#7577c4', '10': '#0b8043', '11': '#de583d' };
 const CAL_PANEL_UNASSIGNED_COLOR_ = '#8a8f98'; // No priority/color: neutral, never calendar background.
 // One event in the panel's shape. editable = main calendar and not repeating (phase 2: repeating stay read-only).
 function calPanelEventOut_(ev, calId, calName, calColor, tz) {

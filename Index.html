@@ -15309,7 +15309,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // from how light the result is, so yellow / pale fills get dark text and stay readable.
   const softColor = (hex, done) => {
     const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '')); if(!m) return { bg: hex, fg: '#fff' };
-    const dark = document.documentElement.getAttribute('data-theme') === 'dark', k = dark ? (done ? .25 : 0) : (done ? .55 : 0); // open = exact Google color (2026-11-10 b)
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark', k = 0; // colors come exactly as Google shows them (Code.gs CAL_PANEL_COLORS_, 2026-11-10 c); only text color is picked here
     const n = parseInt(m[1], 16), mix = c => Math.round(dark ? c * (1 - k) + 0x16 * k : c + (255 - c) * k);
     const r = mix(n >> 16), g = mix((n >> 8) & 255), b = mix(n & 255);
     const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;

@@ -14898,8 +14898,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   html[data-theme=dark] #calPanel{--cp-bg:#161616;--cp-text:#e8eaed;--cp-muted:#9aa0a6;--cp-line:#3c4043;--cp-soft:#232323;}
   body.cal-open #calPanel{transform:none;visibility:visible;transition:transform .24s ease,visibility 0s;}
   body.cal-open #calPanelBackdrop{opacity:1;pointer-events:auto;}
-  @media (max-width:720px){ #calPanel{width:100vw;border-left:0;} }
-  /* Resizable width (2026-11-08, Julius): drag the left edge; saved per device (fw.calWidth), phone too (default full width). */
+  /* Phone peek (2026-11-10, Julius): leave a ~28px strip of the page showing on the left (tap it to close). */
+  @media (max-width:720px){ #calPanel{width:calc(100vw - 28px);max-width:calc(100vw - 28px);border-left:0;box-shadow:-4px 0 16px rgba(0,0,0,.22);} }
+  /* Resizable width (2026-11-08, Julius): drag the left edge; saved per device (fw.calWidth), phone too (default full width minus a 28px left peek). */
   #calPanel .cp-resize{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:ew-resize;z-index:20;touch-action:none;}
   #calPanel .cp-resize::after{content:"";position:absolute;left:3px;top:50%;width:4px;height:18px;margin-top:-9px;background:radial-gradient(circle,var(--cp-muted,#888) 1.5px,transparent 1.9px) center/4px 6px repeat-y;}
   #calPanel .cp-resize:hover::after,#calPanel.cp-resizing .cp-resize::after{background:radial-gradient(circle,var(--cp-blue,#1a73e8) 1.6px,transparent 2px) center/4px 6px repeat-y;}
@@ -15193,7 +15194,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Resizable width: drag the left edge (mouse or touch); saved per device. Double-click = default size.
   (function(){
     const grip = panel.querySelector('[data-cal-resize]'), KEY = 'fw.calWidth';
-    const clamp = w => Math.max(Math.min(280, window.innerWidth), Math.min(window.innerWidth, Math.round(w)));
+    const maxW = () => window.innerWidth - (window.innerWidth <= 720 ? 28 : 0); // phone: keep the left peek strip
+    const clamp = w => Math.max(Math.min(280, maxW()), Math.min(maxW(), Math.round(w)));
     const apply = w => { panel.style.width = w ? clamp(w) + 'px' : ''; };
     const fit = () => { try { const c = window.fwCalendar && window.fwCalendar.api(); if(c) c.updateSize(); } catch (e) {} };
     let saved = 0; try { saved = Number(localStorage.getItem(KEY)) || 0; } catch (e) {}

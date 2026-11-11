@@ -2706,6 +2706,8 @@ function getMainCalendarEvents(dateString) {
     try { cal = CalendarApp.getCalendarById(calId); } catch (e) { cal = null; }
     if (!cal) return;
     const ro = !calWritable_(calId), isMain = calId === EVENT_CALENDARS[0];
+    let calHex = '#039be5', calName = '';
+    try { calHex = String(cal.getColor() || calHex); calName = cal.getName(); } catch (e) { console.error(e); }
     cal.getEvents(start, end).forEach(ev => {
     const allDay = ev.isAllDayEvent();
     const s = ev.getStartTime(), e = ev.getEndTime();
@@ -2713,6 +2715,8 @@ function getMainCalendarEvents(dateString) {
       id: ev.getId(), calId: calId,
       done: String(ev.getColor() || '') === '8',
       color: String(ev.getColor() || ''),
+      // 🕒 day view colors (2026-11-11, Julius): event color, else its calendar's color (main: neutral grey), like 📅.
+      hex: CAL_PANEL_COLORS_[String(ev.getColor() || '')] || (isMain ? CAL_PANEL_UNASSIGNED_COLOR_ : calHex), cal: calName,
       start: (allDay ? ev.getAllDayStartDate() : s).getTime(), end: e.getTime(),
       recurring: ev.isRecurringEvent(),
       time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') });

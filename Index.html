@@ -2112,6 +2112,8 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-day-hr span{position:absolute;left:3px;top:1px;font-size:9.5px;color:var(--muted);}
 #centerCalendarList .ce-day-now{position:absolute;left:26px;right:0;border-top:2px solid #ea4335;z-index:2;}
 #centerCalendarList .ce-day-ev{position:absolute;box-sizing:border-box;border-radius:4px;padding:1px 4px;font-size:11px;line-height:1.2;color:#1f1f1f;overflow:hidden;z-index:1;}
+#centerCalendarList .ce-day-key{display:flex;flex-wrap:wrap;gap:2px 8px;margin:2px 2px 3px;font-size:10.5px;color:var(--muted);}
+#centerCalendarList .ce-day-key i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle;}
 #centerCalendarList .ce-day-ev b{font-weight:600;}
 #centerCalendarList .ce-day-ev span{opacity:.8;font-size:10px;}
 #centerCalendarList .ce-day-ev.done b{text-decoration:line-through;}
@@ -9502,19 +9504,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function ceDayHtml(data){
     const timed = data.events.filter(ev => !ev.allDay).sort((a,b) => a.start - b.start || b.end - a.end);
     const d0 = new Date(data.date + 'T00:00:00').getTime();
-    const col = ev => ev.done ? '#bdbdbd' : ({1:'#e67c73', 2:'#e6ba57', 3:'#4285f4'})[ev.urg] || '#8ab4f8';
+    // Colors (2026-11-11, Julius): each event's own color, else its calendar's color, like 📅; done = grey.
+    const col = ev => ev.done ? '#bdbdbd' : ev.hex || ({1:'#e67c73', 2:'#e6ba57', 3:'#4285f4'})[ev.urg] || '#8ab4f8';
+    const ink = hx => { const m = /^#?([0-9a-f]{6})$/i.exec(hx || ''); if(!m) return '#1f1f1f'; const n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.6 ? '#1f1f1f' : '#fff'; };
     // Overlaps: greedy lanes inside each cluster of touching events.
     const out = []; let cluster = [], end = 0;
     const flush = () => { const lanes = []; cluster.forEach(ev => { let l = lanes.findIndex(x => x <= ev.start); if(l < 0){ l = lanes.length; lanes.push(0); } lanes[l] = ev.end; ev._l = l; }); cluster.forEach(ev => { ev._n = lanes.length; out.push(ev); }); cluster = []; };
     timed.forEach(ev => { if(cluster.length && ev.start >= end) flush(); cluster.push(ev); end = Math.max(end, ev.end); });
     flush();
-    let h = '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
+    const cals = []; timed.forEach(ev => { if(ev.cal && !ev.done && !cals.some(c => c[0] === ev.cal)) cals.push([ev.cal, ev.hex]); });
+    let h = (cals.length > 1 ? '<div class="ce-day-key">' + cals.map(c => '<span><i style="background:' + esc(c[1] || '#8ab4f8') + '"></i>' + esc(c[0]) + '</span>').join('') + '</div>' : '') +
+      '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
     for(let i = 0; i < 24; i++) h += '<div class="ce-day-hr" style="top:' + i * CE_HOUR + 'px"><span>' + (i % 12 || 12) + (i < 12 ? 'a' : 'p') + '</span></div>';
     if(data.date === localToday()){ const n = new Date(); h += '<div class="ce-day-now" style="top:' + ((n.getHours() + n.getMinutes() / 60) * CE_HOUR) + 'px"></div>'; }
     out.forEach(ev => {
       const top = Math.max(0, (ev.start - d0) / 3600000 * CE_HOUR), ht = Math.max(14, (Math.min(ev.end, d0 + 86400000) - Math.max(ev.start, d0)) / 3600000 * CE_HOUR - 1);
       const w = 100 / ev._n;
-      h += '<div class="ce-day-ev' + (ev.done ? ' done' : '') + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(30px + (100% - 32px) * ' + (ev._l * w / 100) + ');width:calc((100% - 32px) * ' + (w / 100) + ' - 2px);background:' + col(ev) + '" title="' + esc(ev.time + ' ' + ev.title) + '"><b>' + esc(ev.title) + '</b> <span>' + esc(ev.time || '') + '</span></div>';
+      h += '<div class="ce-day-ev' + (ev.done ? ' done' : '') + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(30px + (100% - 32px) * ' + (ev._l * w / 100) + ');width:calc((100% - 32px) * ' + (w / 100) + ' - 2px);background:' + col(ev) + ';color:' + ink(col(ev)) + '" title="' + esc(ev.time + ' ' + ev.title) + '"><b>' + esc(ev.title) + '</b> <span>' + esc(ev.time || '') + '</span></div>';
     });
     return h + '</div></div>';
   }

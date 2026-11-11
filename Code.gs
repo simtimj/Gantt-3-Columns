@@ -2770,9 +2770,10 @@ function getCalendarEvents() {
    Never writes: no archive pass (unlike getCalendarEvents), no color sync. Same calendars as Cal Events.
    Dates are yyyy-MM-dd in the script zone (America/Los_Angeles); end is exclusive. All-day events come back as
    plain dates (end exclusive, like Google), timed events as ISO with offset. color = the event's own color, else
-   its calendar's color. Phase 2+ plans: docs/NOTES.md → "Calendar panel (FullCalendar)". */
+   neutral gray (not the calendar's background color). Phase 2+ plans: docs/NOTES.md → "Calendar panel (FullCalendar)". */
 const CAL_PANEL_COLORS_ = { '1': '#7986cb', '2': '#33b679', '3': '#8e24aa', '4': '#e67c73', '5': '#f6bf26', '6': '#f4511e',
   '7': '#039be5', '8': '#616161', '9': '#3f51b5', '10': '#0b8043', '11': '#d50000' };
+const CAL_PANEL_UNASSIGNED_COLOR_ = '#8a8f98'; // No priority/color: neutral, never calendar background.
 // One event in the panel's shape. editable = main calendar and not repeating (phase 2: repeating stay read-only).
 function calPanelEventOut_(ev, calId, calName, calColor, tz) {
   const allDay = ev.isAllDayEvent();
@@ -2787,7 +2788,7 @@ function calPanelEventOut_(ev, calId, calName, calColor, tz) {
     id: ev.getId() + '|' + st.getTime(), eventId: ev.getId(), startMs: st.getTime(), calId: calId, cal: calName,
     title: ev.getTitle() || '(no title)', allDay: allDay,
     start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
-    color: CAL_PANEL_COLORS_[colorId] || calColor, colorId: colorId, done: colorId === '8',
+    color: CAL_PANEL_COLORS_[colorId] || CAL_PANEL_UNASSIGNED_COLOR_, colorId: colorId, done: colorId === '8',
     location: ev.getLocation() || '', recurring: recurring, link: link,
     editable: calId === EVENT_CALENDARS[0] && !recurring
   };
@@ -2850,7 +2851,7 @@ function calPanelRangeApi_(from, to, tz) {
             id: eventId + '|' + st.getTime(), eventId: eventId, startMs: st.getTime(), calId: id, cal: meta.name,
             title: it.summary || '(no title)', allDay: allDay,
             start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
-            color: CAL_PANEL_COLORS_[colorId] || meta.color, colorId: colorId, done: colorId === '8',
+            color: CAL_PANEL_COLORS_[colorId] || CAL_PANEL_UNASSIGNED_COLOR_, colorId: colorId, done: colorId === '8',
             location: it.location || '', recurring: recurring, link: it.htmlLink || '',
             editable: id === EVENT_CALENDARS[0] && !recurring
           });

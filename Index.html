@@ -2424,10 +2424,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
       <div class="scroll notes-review" id="reviewScroll"></div>
+    </section>
+    <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
+    <!-- 4-panel layout (2026-11-11, Julius): Cal Events is the full right column; Next Steps + Reference
+         (#referencePane) became a right-side drawer opened by the edge tab. -->
+    <section class="pane" id="calPane">
       <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
       <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><input type="search" class="ce-search" data-ce-search placeholder="🔍 Find" aria-label="Find a Cal Events task" autocomplete="off" enterkeyhint="search"><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Cats</button><button type="button" class="btn" data-ce-day aria-label="Show or hide the day view" title="Day view: a small scrollable timeline of the day">🕒</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
-    <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
     <section
       class="pane"
       id="referencePane">
@@ -2557,7 +2561,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const TYPOGRAPHY_STORAGE_KEY = 'focusWorkspaceTypographyV1';
   const VIEW_STORAGE_KEY = 'focusWorkspaceViewV1';
   const VIEW_PANES = ['today','journal','reference'];
-  const PANE_LABELS = {today:'Today / Tasks',journal:'Notes',reference:'Reference'};
+  // 4-panel layout (2026-11-11): the 'reference' column on screen is Cal Events (#calPane); #referencePane is the drawer.
+  function colPaneEl(n){ return (n === 'reference' && document.getElementById('calPane')) || document.getElementById(n + 'Pane'); }
+  const PANE_LABELS = {today:'Today / Tasks',journal:'Notes',reference:'Cal Events'};
   let visiblePanes = [...VIEW_PANES];
   // Swipe to the hidden third column in 2-column view — paused (Julius, 2026-10-27):
   // it broke things in 2-column mode. Set PEEK_ENABLED true to bring it back.
@@ -7150,7 +7156,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       e.preventDefault();e.stopPropagation();edge.setPointerCapture(e.pointerId);edge.classList.add('dragging');
       const x=e.clientX,w=columnWidths.reference;
       // The right edge never goes past the window (2026-11-06, Julius: a line out of reach = Reset).
-      const maxW=Math.max(120,Math.round(window.innerWidth-8-document.getElementById('referencePane').getBoundingClientRect().left));
+      const maxW=Math.max(120,Math.round(window.innerWidth-8-(document.getElementById('calPane')||document.getElementById('referencePane')).getBoundingClientRect().left));
       const move=ev=>{columnWidths.reference=Math.max(120,Math.min(maxW,Math.round(w+ev.clientX-x)));applyColumnWidths();};
       const end=()=>{edge.classList.remove('dragging');edge.removeEventListener('pointermove',move);edge.removeEventListener('pointerup',end);edge.removeEventListener('pointercancel',end);localStorage.setItem(COLUMN_STORAGE_KEY,JSON.stringify(columnWidths));};
       edge.addEventListener('pointermove',move);edge.addEventListener('pointerup',end);edge.addEventListener('pointercancel',end);
@@ -7161,8 +7167,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         handle.setPointerCapture(e.pointerId);
         handle.classList.add('dragging');
         const left=handle.dataset.left,right=handle.dataset.right,startX=e.clientX;
-        const startLeft=document.getElementById(left+'Pane').getBoundingClientRect().width;
-        const startRight=document.getElementById(right+'Pane').getBoundingClientRect().width;
+        const startLeft=colPaneEl(left).getBoundingClientRect().width;
+        const startRight=colPaneEl(right).getBoundingClientRect().width;
         const move=ev=>{
           const dx=ev.clientX-startX;
           // Down to a tucked strip, not 120px (2026-11-06, Julius); under TUCK_SNAP it snaps to the strip.
@@ -11113,8 +11119,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const next=neighbor(dir);
       if(!next)return false;
       s.dir=dir; s.next=next;
-      s.cur=document.getElementById(visiblePanes[0]+'Pane');
-      s.nextPane=document.getElementById(next+'Pane');
+      s.cur=colPaneEl(visiblePanes[0]);
+      s.nextPane=colPaneEl(next);
       s.w=ws.clientWidth;
       s.nextPane.classList.remove('view-hidden');
       s.nextPane.classList.add('swipe-next');
@@ -14719,7 +14725,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const shown = el => el && el.isConnected && el.getClientRects().length && getComputedStyle(el).display !== 'none';
   function items(){
     const out = [], ws = document.getElementById('workspace');
-    ['today','journal','reference'].forEach(n => { const el = document.getElementById(n + 'Pane'); if(el && !el.classList.contains('view-hidden') && !(ws && ws.classList.contains('view-single'))) out.push({el, axis:'x', go:() => window.tuckRestorePane && window.tuckRestorePane(n)}); });
+    ['today','journal','reference'].forEach(n => { const el = document.getElementById(n === 'reference' ? 'calPane' : n + 'Pane'); /* 4-panel: the right column is Cal Events */ if(el && !el.classList.contains('view-hidden') && !(ws && ws.classList.contains('view-single'))) out.push({el, axis:'x', go:() => window.tuckRestorePane && window.tuckRestorePane(n)}); });
     const bar = (el,key) => el && out.push({el, axis:'y', go:() => window.splitBarRestore && window.splitBarRestore(key)});
     bar(document.getElementById('refTopScroll'),'fw.refSplit'); bar(document.getElementById('referenceScroll'),'fw.refSplit');
     ['journalScroll','weatherScroll','dayReviewScroll','funScroll','newScroll'].forEach(id => { const el = document.getElementById(id); if(shown(el)) bar(el,'fw.notesSplit'); });
@@ -16452,6 +16458,77 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   document.addEventListener('change', e => { if(e.target && e.target.type === 'checkbox' && !strip.contains(e.target)){ clearTimeout(t); t = setTimeout(render, 200); } }, true);
   document.addEventListener('visibilitychange', () => { if(!document.hidden && Date.now() - loadedAt > 5 * 60000) load(); });
   setTimeout(load, 1800);
+})();
+</script>
+<!-- 4-panel layout (2026-11-11, Julius): Cal Events = full right column (#calPane); Next Steps + Reference
+     (#referencePane) = right-side drawer, opened by the edge tab (◀). #calPane copies the old Reference column's
+     grid slot, width and Cols / split visibility, so the existing column machinery keeps working unchanged. -->
+<style>
+  #notesSplitBar{display:none!important;}
+  #journalPane #journalScroll{flex:1 1 0!important;}
+  #calPane{position:relative;}
+  #calPane #centerDownScroll{flex:1 1 0!important;min-height:0;}
+  html body #workspace #referencePane.rd-drawer{
+    position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:auto!important;
+    width:min(440px,90vw)!important;max-width:none!important;height:auto!important;min-height:0!important;
+    grid-column:auto!important;grid-row:auto!important;display:flex!important;z-index:2400;
+    border-left:1px solid var(--border);box-shadow:-6px 0 24px rgba(0,0,0,.25);
+    overscroll-behavior:contain;touch-action:pan-y;
+    transform:translateX(105%);visibility:hidden;transition:transform .2s ease,visibility 0s linear .2s;
+  }
+  html body.rd-open #workspace #referencePane.rd-drawer{transform:none;visibility:visible;transition:transform .2s ease;}
+  #rdBackdrop{position:fixed;inset:0;z-index:2390;background:rgba(0,0,0,.28);display:none;touch-action:none;}
+  body.rd-open #rdBackdrop{display:block;}
+  #rdTab{position:fixed;right:0;top:50%;z-index:2410;width:20px;height:64px;margin-top:-32px;padding:0;
+    display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:var(--muted);
+    background:var(--panel);border:1px solid var(--border);border-right:0;border-radius:8px 0 0 8px;
+    box-shadow:-2px 0 6px rgba(0,0,0,.12);opacity:.9;cursor:pointer;transition:right .2s ease;}
+  body.rd-open #rdTab{right:min(440px,90vw);opacity:1;}
+  body.cal-open #rdTab{display:none;}
+  /* Narrow Cal Events column (phone, 3 columns): tighter header so 🔍 still fits. */
+  @container (max-width:150px){#centerDownScroll .ce-head{gap:2px!important;}#centerDownScroll .ce-tools{gap:2px!important;}}
+</style>
+<script>
+(function initRefDrawer(){
+  const ref = document.getElementById('referencePane'), cal = document.getElementById('calPane');
+  if(!ref || !cal) return;
+  ref.classList.add('rd-drawer');
+  ref.setAttribute('aria-label', 'Next Steps and Reference');
+  const bd = document.createElement('div'); bd.id = 'rdBackdrop';
+  ref.parentNode.insertBefore(bd, ref); // same stacking context as the drawer, or it draws over it
+  const tab = document.createElement('button');
+  tab.type = 'button'; tab.id = 'rdTab'; tab.textContent = '◀';
+  tab.title = 'Next Steps + Reference'; tab.setAttribute('aria-expanded', 'false');
+  tab.setAttribute('aria-label', 'Open Next Steps and Reference');
+  document.body.append(tab);
+  const isOpen = () => document.body.classList.contains('rd-open');
+  function set(on){
+    document.body.classList.toggle('rd-open', on);
+    tab.textContent = on ? '▶' : '◀';
+    tab.setAttribute('aria-expanded', String(on));
+    tab.setAttribute('aria-label', (on ? 'Close' : 'Open') + ' Next Steps and Reference');
+    if(!on && ref.contains(document.activeElement)) document.activeElement.blur();
+  }
+  window.fwRefDrawer = {open:() => set(true), close:() => set(false), toggle:() => set(!isOpen()), isOpen};
+  tab.addEventListener('click', () => set(!isOpen()));
+  bd.addEventListener('click', () => set(false));
+  // Esc closes the drawer, unless it is closing something on top first (zoom, menu, picker, 📅 panel).
+  window.addEventListener('keydown', e => {
+    if(e.key !== 'Escape' || !isOpen() || document.body.classList.contains('cal-open')) return;
+    if(document.querySelector('.fw-focus-target,.fw-focus-spacer,.urg-create-menu,.ctx-menu:not([hidden]),.modal:not([hidden])')) return;
+    set(false);
+  }, true);
+  // Mouse drag on the drawer header must not pan the workspace behind it.
+  ref.addEventListener('pointerdown', e => {
+    if(e.target.closest('.pane-header') && !e.target.closest('button,input,select,a')) e.stopPropagation();
+  });
+  // The Cal Events column takes over the old Reference column's slot: copy its view classes + grid placement.
+  function mirror(){
+    ['view-hidden','peek-pane'].forEach(c => cal.classList.toggle(c, ref.classList.contains(c)));
+    ['gridColumn','gridRow','width','minWidth','minHeight'].forEach(k => { cal.style[k] = ref.style[k]; });
+  }
+  mirror();
+  new MutationObserver(mirror).observe(ref, {attributes:true, attributeFilter:['class','style']});
 })();
 </script>
 </body>

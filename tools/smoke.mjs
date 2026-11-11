@@ -137,6 +137,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   // Urgent add box (2026-11-05): has a checkbox; Enter makes a real row and puts the caret in it; Tab indents it.
   const uadd = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
+    window.fwRefDrawer && fwRefDrawer.open(); await wait(250); // 4-panel (2026-11-11): Next Steps is in the drawer
     const form = document.querySelector('#urgentPanel .urg-adder[data-urg="2"]');
     if(!form) return ['no add box'];
     if(!form.querySelector('.urg-box')) return ['add box has no checkbox'];
@@ -149,6 +150,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })); await wait(400);
     const ln = [...backlogCell().querySelectorAll('.check-line')].find(l => /Smoke new task/.test(l.textContent));
     if(!ln || ln.dataset.level !== '1') return ['Tab did not indent (level ' + (ln && ln.dataset.level) + ')'];
+    document.activeElement && document.activeElement.blur(); window.fwRefDrawer && fwRefDrawer.close(); await wait(250);
     return [];
   });
   uadd.forEach(x => errs.push('Urgent add: ' + x));
@@ -540,6 +542,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     if (c2) out.push('tab icon ' + c2); else if (!document.querySelector('#journalPane.fw-focus-target') || document.getElementById('journalPane').dataset.ctab !== 'review') out.push('holding 📊 did not open Day Review zoomed');
     await close(); document.querySelector('#journalPane button[data-ctab="notes"]').click(); await wait(100);
     // Urgent: fold it, hold the numbers → it opens + zooms with its rows, no create menu; + button = create menu.
+    window.fwRefDrawer && fwRefDrawer.open(); await wait(250); // 4-panel (2026-11-11): Next Steps + Reference live in the drawer
     const uh = document.querySelector('.urg-head'); uh.click(); await wait(100);
     const c3 = await hold(document.querySelector('.urg-head .urg-counts'));
     const up = document.getElementById('urgentPanel');
@@ -552,6 +555,8 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     if (c4) out.push('📝 ' + c4); else if (!document.querySelector('#referenceScroll.fw-focus-target') || document.getElementById('referencePane').dataset.rtab !== 'scratch') out.push('holding 📝 did not open Scratch Pad zoomed');
     await close(); document.querySelector('#referencePane button[data-rtab="reference"]').click(); await wait(100);
     if (document.querySelector('.fw-focus-target,.fw-focus-spacer')) out.push('zoom did not close cleanly');
+    if (window.fwRefDrawer && !fwRefDrawer.isOpen()) out.push('Esc on a zoom also closed the drawer');
+    window.fwRefDrawer && fwRefDrawer.close(); await wait(250);
     return out;
   });
   zm2.forEach(x => errs.push('Zoom: ' + x));
@@ -651,7 +656,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     const res = await pg.evaluate(async () => {
       const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
       window.tuckScan && tuckScan(); await wait(100);
-      const ref = document.getElementById('referencePane'), w = ref.getBoundingClientRect().width;
+      const ref = document.getElementById('calPane') || document.getElementById('referencePane'), w = ref.getBoundingClientRect().width;
       if (w > 30) out.push('Reference did not tuck: ' + Math.round(w) + 'px');
       if (ref.getBoundingClientRect().right > innerWidth + 1) out.push('Reference went past the window');
       const tab = document.querySelector('.fw-tuck-tab');
@@ -668,6 +673,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   await pg.waitForTimeout(1000);
   const refSync = await pg.evaluate(async () => {
     const failures = [], check = (ok,msg) => { if(!ok) failures.push(msg); };
+    window.fwRefDrawer && fwRefDrawer.open(); await new Promise(r => setTimeout(r, 250));
     document.querySelector('#referencePane button[data-rtab="reference"]')?.click();
     document.activeElement?.blur?.();
     const item = (id,content) => ({id,parentId:'',type:'item',title:id,sort:id==='a'?1:2,expanded:true,content,ch:'h-'+id});

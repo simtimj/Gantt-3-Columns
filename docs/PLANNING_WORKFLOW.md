@@ -8,6 +8,8 @@ The former Urgent section (top-right Gantt) is now **Next Steps**. Reference (Re
 
 Preserve existing ordering, IDs and color mappings: visible urgency0 red /1 yellow /2 blue; stored data-urg1/2/3. Keep sequential prefixes such as01,02 and decimal insertions such as01.1 within the existing urgency ordering. This renames the component and documents its role; it does not authorize source migration, renumbering, duplicate tasks or a new automatic routing engine. Historical “Urgent area”/“urgency cell” references mean Next Steps; “Urgent” remains the name of the red priority level.
 
+Layout (2026-11-11, implemented, not yet user-confirmed): CalEvents is the full right column; Next Steps + Reference sit in a right-side drawer (◀ edge tab).
+
 ## Capture and scheduling
 
 “Add to today” means an all-day item on today's Google Calendar (America/Los_Angeles), unless a specific time is supplied. Calendar is the single capture landing place. Consult Reference and Urgency when planning.

@@ -126,6 +126,7 @@ When he asks to organize his calendar tasks:
 - Done → Dailies matching (2026-11-05, Julius: first version)
 - Calendar panel (FullCalendar) (2026-11-08, Julius: phased plan)
 - Planning model: Big Three / Biggest Return + living project containers (2026-11-08, Julius: PLANNING ONLY)
+- 4-panel layout: Cal Events = right column, Next Steps + Reference = drawer (2026-11-11, Julius)
 
 ## IT study log (2026-11-04)
 

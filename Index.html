@@ -15104,6 +15104,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .cp-tiny .cp-ev-m{font-size:10px;}
   #calPanel .fc .fc-toolbar-chunk:last-child{flex:0 0 auto;}
   #calPanel .fc .cp-done .cp-ev-t{text-decoration:line-through;}
+  /* Text fit (2026-11-11, Julius): timed cards shrink text with their width (never below 10px), the title gives up
+     lines to the time as the card gets shorter, and the time never spills out (narrow cards show the start time only). */
+  #calPanel .fc .fc-timegrid-event{container:cpev / size;}
+  #calPanel .fc .fc-timegrid-event .cp-ev{font-size:clamp(10px, 7.5px + 7cqi, 14px);}
+  #calPanel .fc .fc-timegrid-event .cp-ev-m{font-size:max(10px, .88em);}
+  #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;}
+  #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  @container cpev (max-height:62px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:2;} }
+  @container cpev (max-height:46px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:1;} }
+  @container cpev (max-width:72px){ #calPanel .cp-tend{display:none;} }
+  /* Day headers stay inside their column on narrow screens. */
+  #calPanel .fc .fc-col-header-cell-cushion{width:100%;box-sizing:border-box;overflow:hidden;}
+  #calPanel .fc-timeGridWeek-view .cp-dh-n{max-width:100%;}
   /* Event checkboxes (2026-11-11, Julius): subject-colored box at the card's left; ✓ when done; smaller on short events. */
   #calPanel .cp-evc{display:flex;align-items:flex-start;gap:5px;}
   #calPanel .cp-evc.cp-ev-1{align-items:center;}
@@ -16019,7 +16032,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Gantt cards); tap = done (Graphite), hold = the Gantt hold menu (urgency, subject, due…). Holding the card
       // itself still moves it.
       eventContent: a => {
-        const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : esc(a.timeText || '');
+        const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : esc(a.timeText || '').replace(/ – (.+)$/, '<span class="cp-tend"> – $1</span>');
         const short = !a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 30 * 60000;
         const body = a.event.allDay ? '<span class="cp-ev-t">' + t + '</span>'
           : short ? '<span class="cp-ev-t">' + t + '</span><span class="cp-ev-m">, ' + tm + '</span>'

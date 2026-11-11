@@ -74,6 +74,9 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
+## 🧪 To be confirmed (2026-11-11)
+- **📅 Text fit**: timed event text shrinks with the card's width (never below 10px); the title gives up lines so the time stays visible; narrow cards show the start time only; day headers stay inside their column.
+
 ## 🧪 To be confirmed (2026-11-09)
 
 - **2026-11-11 · 📅 Calendars picker + edit any calendar:** a **Calendars** fold at the top of the 📅 panel lists every Google calendar (main first); tick / untick to show or hide it, saved in the Sheet's script properties (same on phone and desktop). Cal Events (center) follows the same picker. Calendars he can edit are fully editable from the panel (create, move, resize, delete, done); view-only ones (Time To Pet dog walks, subscriptions) show 🔒 and stay read-only. + New picks the calendar (default main). Uncolored events on other calendars show in that calendar's color; urgency colors stay main-only. **Repeating events** are editable: drag asks *This day / All days*; the edit and delete forms have the same choice (All days can't switch all-day ↔ timed).
@@ -561,7 +564,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 📋 To do
 
-- **Calendar backlog** (wanted 2026-11-11, design pending): unfinished calendar tasks from past days go to a backlog (kept, struck through on their old day, colors kept); a Backlog button opens a list on the left of the 📅 panel to drag tasks back onto a day. Questions open in `docs/NOTES.md` → "Calendar backlog".
+- **Calendar backlog** (wanted 2026-11-11, design pending): unfinished calendar tasks from past days go to a backlog (kept, struck through on their old day, colors kept); a Backlog button opens a list on the left of the 📅 panel to drag tasks back onto a day. Answers saved 2026-11-11; build plan awaiting go. See `docs/NOTES.md` → "Calendar backlog".
 - **App cleanup** (wanted 2026-11-08): hide what isn't used, better grouping and sorting of the many panels / tabs First candidate: the **Cal Events** panel (center bottom), now covered by the 📅 calendar; decide what takes its spot.
 - **Task → calendar pipeline** (wanted 2026-11-08): how Lead Tasks, urgent items and scheduled tasks flow into the calendar and back, without duplicates.
 

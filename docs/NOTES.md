@@ -665,4 +665,12 @@ Hold to pick up: `eventLongPressDelay` 500; `unselSoon()` drops FullCalendar's e
 
 ## Calendar backlog (2026-11-11, Julius: PROPOSED, not built)
 
-Idea: unfinished (non-Graphite) calendar tasks from past days move to a backlog so nothing gets lost. The old event stays on its day, struck through, as a "moved to backlog" marker; the task keeps its color in the backlog. A Backlog button in the 📅 panel opens a list on the left (calendar on the right), sortable / grouped, and tasks drag from it onto a day. Open questions are in the chat of 2026-11-11; answers go here.
+Idea: unfinished (non-Graphite) calendar tasks from past days move to a backlog so nothing gets lost. The old event stays on its day, struck through, as a "moved to backlog" marker; the task keeps its color in the backlog. A Backlog button in the 📅 panel opens a list on the left (calendar on the right), sortable / grouped, and tasks drag from it onto a day. Answers (Julius 2026-11-11):
+1. Swept: all-day events on the main calendar only (no timed, repeating or other calendars).
+2. Sweep on app load; must stay cheap (see plan).
+3. First run: last 30 days.
+4. Original stays on its day with a "↪ " title prefix and turns Graphite, so it's obviously moved (strike shows in the app).
+5. Drop onto a day: whichever is more efficient (plan: new event, struck original kept as history).
+6. Grouped by urgency (red → yellow → blue → not set) by default, oldest first inside.
+7. Separate from the Plan's "Backlog" group for now ("Calendar backlog" vs "Backlog").
+8. Phone: backlog opens as the bottom half under the calendar; side-by-side on wider screens. A full-screen calendar app may come later.

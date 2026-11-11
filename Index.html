@@ -15007,6 +15007,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-detail .cp-plan-ev button{font:inherit;font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--cp-line);background:var(--cp-soft);color:var(--cp-text);cursor:pointer;}
   /* ===== Google Calendar look (2026-11-08, Julius: "as close as Google Calendar, style and feel"). Overrides only;
      behaviour unchanged. Light + dark tokens follow Google's current palette. ===== */
+  /* Font (2026-11-10, Julius): Google Sans like Google Calendar; Roboto / system font until it loads or if blocked. */
+  #calPanel,#calPanel button,#calPanel input,#calPanel select,#calPanel .fc{font-family:'Google Sans Flex','Google Sans',Roboto,system-ui,Arial,sans-serif;}
   #calPanel{--cp-bg:#fff;--cp-text:#1f1f1f;--cp-muted:#70757a;--cp-line:#dde3ea;--cp-soft:#f0f4f9;--cp-hover:rgba(68,71,70,.08);
     --cp-blue:#0b57d0;--cp-blue-soft:#d3e3fd;--cp-blue-text:#041e49;--cp-shadow:0 1px 3px rgba(60,64,67,.3),0 4px 8px 3px rgba(60,64,67,.15);
     font-family:'Google Sans',Roboto,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;}
@@ -15244,6 +15246,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
   }
   function loadLibs(){
+    // Google Calendar's font (2026-11-10, Julius): Google Sans Flex from Google Fonts, fetched the first time the panel opens.
+    if(!document.getElementById('cpFont')){ const l = document.createElement('link'); l.id = 'cpFont'; l.rel = 'stylesheet';
+      l.href = 'https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..700&display=swap'; document.head.appendChild(l); }
     if(window.FullCalendar && window.FullCalendar.Calendar && window.FullCalendar.Luxon3) return Promise.resolve();
     if(!libsPromise) libsPromise = LIBS.reduce((p, src) => p.then(() => loadScript(src)), Promise.resolve())
       .catch(e => { libsPromise = null; throw e; });

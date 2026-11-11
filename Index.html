@@ -15541,7 +15541,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(it.ev && it.ev.gone && it.ref.indexOf('tid:') === 0) meta = (meta ? meta + ' · ' : '') + 'event gone';
     return {title, done, meta: meta.trim(), canTick};
   }
-  function planItems(g){ return ((planData && planData.items) || []).filter(x => x.group === g).sort((a,b) => a.rank - b.rank); }
+  // Done sinks (2026-11-10, Julius): completed rows go to the bottom of their group, open rows keep their rank order.
+  function planItems(g){ return ((planData && planData.items) || []).filter(x => x.group === g).sort((a,b) => (!!planView(a).done - !!planView(b).done) || a.rank - b.rank); }
   function renderPlan(){
     if(!planEl) return;
     const folded = planFolded();
@@ -15808,6 +15809,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     cal = new FullCalendar.Calendar(mount, {
       // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
       timeZone: TZ,
+      eventOrder: 'done,start,-duration,allDay,title', // completed events last (2026-11-10, Julius)
       initialView: saved === 'timeGridDay' || saved === 'timeGridWeek' ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
       // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
       // One toolbar line (2026-11-08, Julius): Today · date · ‹ › … Plan · Day|Week · ↻ · ✕. The old header row and
@@ -16005,7 +16007,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
     return {title: it.title || '(event)', urg: 0, kind: 'event', done: !!(it.ev && it.ev.done), tick: false};
   }
-  const group = g => ((data && data.items) || []).filter(x => x.group === g).sort((a,b) => a.rank - b.rank);
+  const group = g => ((data && data.items) || []).filter(x => x.group === g).sort((a,b) => (!!view(a).done - !!view(b).done) || a.rank - b.rank); // done last (2026-11-10)
   function render(){
     const big = group('big'), wait = group('next');
     if(!data){ strip.hidden = true; return; }

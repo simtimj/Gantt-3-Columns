@@ -9633,11 +9633,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       box.classList.toggle('ce-grid', grid);
       box.parentElement && box.parentElement.classList.toggle('ce-grid-on', grid);
       if(grid){ box.innerHTML = ceGridHtml(data, {row, allDayRow, timedRow, bySubject, byCategory, addHead}); return; }
-      // Category = every event together under its subject, no times (2026-11-04, Julius). Time = all-day first, then by start.
+      // Completed events go in one bottom section in Time mode, regardless of all-day/scheduled type.
+      // Category mode already puts the Done urgency group last; the four-box mode has its own Done box.
+      const activeAllDay = allDay.filter(ev => !ev.done);
+      const activeScheduled = scheduled.filter(ev => !ev.done).sort((a,b) => String(a.start).localeCompare(String(b.start)));
+      const completed = data.events.filter(ev => ev.done).sort((a,b) =>
+        Number(b.allDay) - Number(a.allDay) || String(a.start).localeCompare(String(b.start)));
       box.innerHTML = (byCategory
-        ? addHead('All events') + byUrgency(allDay.concat(scheduled)) // was "Tasks": read as the section's name (2026-11-07)
-        : addHead('All-Day Tasks') + allDay.map(allDayRow).join('') +
-          (scheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + scheduled.slice().sort((a,b) => String(a.start).localeCompare(String(b.start))).map(timedRow).join('') : '')) +
+        ? addHead('All events') + byUrgency(allDay.concat(scheduled))
+        : addHead('All-Day Tasks') + activeAllDay.map(allDayRow).join('') +
+          (activeScheduled.length ? '<div class="ce-group">Scheduled Tasks</div>' + activeScheduled.map(timedRow).join('') : '') +
+          (completed.length ? '<div class="ce-group">Completed · ' + completed.length + '</div>' +
+            completed.map(ev => ev.allDay ? allDayRow(ev) : timedRow(ev)).join('') : '')) +
         (!data.events.length ? '<div class="ce-empty">' + (q.length ? 'No match for “' + esc(q.join(' ')) + '”.' : 'No events.') + '</div>' : '');
     };
     const cached = centerCalendarCache.get(date);
@@ -9655,7 +9662,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     google.script.run.withSuccessHandler(()=>{
       cb.disabled=false;cb.closest('.ce-event')?.classList.toggle('ce-done',desired);
       centerCalendarCache.forEach(entry => entry.data.events.forEach(ev => { if(ev.id === row.dataset.ceId && Number(ev.start) === Number(row.dataset.ceStart)) ev.done = desired; }));
-      if(ceGridOn() && ceDraw) ceDraw(); // 4-box view: the row moves to / out of Done
+      if(ceDraw) ceDraw(); // All modes: move completed events to the bottom/Done immediately.
       centerCalendarCache.clear();
     }).withFailureHandler(err=>{
       cb.checked=!desired;cb.disabled=false;

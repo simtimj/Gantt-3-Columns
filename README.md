@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-10
+Last updated: 2026-11-11
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -75,6 +75,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-09)
+
+- **2026-11-10 · 📅 All-day cap:** a long all-day list in the calendar panel stops at **half the calendar height** and scrolls inside itself, so the timeline always stays visible. A small bar under the list (only shown while it's capped) drags to make the cap taller or shorter; the setting is saved per device. Double-tap / double-click the bar = back to half.
 
 - **2026-11-10 · Next Steps naming and workflow:** the former Urgent section is named Next Steps, with the existing urgency groups, colored counts, numeric ordering and decimal insertions preserved. Reference holds full project context/backlog; Next Steps holds immediate actions; CalEvents schedules them. No task migration or new automatic routing.
 

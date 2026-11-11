@@ -15062,6 +15062,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-axis-cushion{font-size:10px;color:var(--cp-muted);}
   #calPanel .fc .fc-timegrid-col{border-left:1px solid var(--cp-line);}
   #calPanel .fc .fc-timegrid-divider{display:none;}
+  /* All-day cap (2026-11-10, Julius): a long all-day list stops at half the calendar height (saved ratio, fw.calAllDayMax)
+     and scrolls; drag the small bar under it to change the cap, double-click / double-tap it = back to half. */
+  #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-scroller{max-height:var(--cp-ad-max,none);overflow-x:hidden !important;overflow-y:auto !important;}
+  #calPanel .cp-adgrip{position:absolute;left:50%;width:64px;margin-left:-32px;height:18px;z-index:6;cursor:ns-resize;touch-action:none;display:none;}
+  #calPanel .cp-adgrip.on{display:block;}
+  #calPanel .cp-adgrip::after{content:"";position:absolute;left:18px;right:18px;top:7px;height:4px;border-radius:2px;background:var(--cp-muted);opacity:.55;}
+  #calPanel .cp-adgrip:hover::after,#calPanel.cp-adresizing .cp-adgrip::after{background:var(--cp-blue,#1a73e8);opacity:1;}
+  #calPanel.cp-adresizing{user-select:none;}
   #calPanel .fc .fc-daygrid-body,#calPanel .fc .fc-timegrid-body{border-top:0;}
   #calPanel .fc .fc-scrollgrid-section-header > th,#calPanel .fc .fc-scrollgrid-section-header td{border-bottom:0;}
   #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:1px solid var(--cp-line);box-shadow:0 2px 3px -2px rgba(60,64,67,.25);}
@@ -15821,6 +15829,43 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(isTid) google.script.run.withSuccessHandler(done).withFailureHandler(fail).planSchedule(Object.assign({ref: it.ref, title: v.title}, slot));
     else google.script.run.withSuccessHandler(done).withFailureHandler(fail).calPanelMoveEvent(Object.assign({eventId: ev.eventId, startMs: ev.startMs}, slot));
   }
+  // All-day cap (2026-11-10, Julius): see the CSS note above. The grip only shows while the list is capped (scrolling).
+  const AD_KEY = 'fw.calAllDayMax', AD_DEF = 0.5, cpBody = panel.querySelector('.cp-body');
+  let adRatio = Number(lsGet(AD_KEY)) || AD_DEF, adDrag = false, adSc = null;
+  const adGrip = document.createElement('div');
+  adGrip.className = 'cp-adgrip'; adGrip.setAttribute('aria-hidden', 'true');
+  adGrip.title = 'Drag to change how tall the all-day list can get (double-click = half)';
+  if(cpBody) cpBody.appendChild(adGrip);
+  const adScroller = () => { const b = mount.querySelector('.fc-daygrid-body'); return b && b.closest('.fc-scroller'); };
+  const adRO = window.ResizeObserver ? new ResizeObserver(() => adLayout()) : null;
+  if(adRO) adRO.observe(mount);
+  function adLayout(){
+    const h = mount.querySelector('.fc-view-harness'), sc = adScroller();
+    if(adRO && sc !== adSc){ if(adSc){ adRO.unobserve(adSc); if(adSc.firstElementChild) adRO.unobserve(adSc.firstElementChild); }
+      adSc = sc; if(sc){ adRO.observe(sc); if(sc.firstElementChild) adRO.observe(sc.firstElementChild); } }
+    if(!h || !sc || !cpBody){ adGrip.classList.remove('on'); return; }
+    const cap = Math.max(40, Math.round(h.clientHeight * adRatio)) + 'px';
+    if(panel.style.getPropertyValue('--cp-ad-max') !== cap) panel.style.setProperty('--cp-ad-max', cap);
+    if(!adDrag && sc.scrollHeight <= sc.clientHeight + 1){ adGrip.classList.remove('on'); return; }
+    adGrip.style.top = Math.round(sc.getBoundingClientRect().bottom - cpBody.getBoundingClientRect().top - 9) + 'px';
+    adGrip.classList.add('on');
+  }
+  adGrip.addEventListener('pointerdown', e => {
+    const h = mount.querySelector('.fc-view-harness'), sc = adScroller(); if(!h || !sc) return;
+    e.preventDefault(); e.stopPropagation(); adGrip.setPointerCapture(e.pointerId); adDrag = true; panel.classList.add('cp-adresizing');
+    const top = sc.getBoundingClientRect().top, H = h.clientHeight || 1, y0 = e.clientY; let moved = false;
+    const move = ev => { if(Math.abs(ev.clientY - y0) > 4) moved = true; if(!moved) return;
+      adRatio = Math.max(0.1, Math.min(0.85, (ev.clientY - top) / H)); adLayout(); };
+    const up = () => {
+      adGrip.removeEventListener('pointermove', move); adGrip.removeEventListener('pointerup', up); adGrip.removeEventListener('pointercancel', up);
+      adDrag = false; panel.classList.remove('cp-adresizing');
+      if(!moved){ const t = Date.now(); if(t - adTap < 350){ adTap = 0; adReset(); return; } adTap = t; adLayout(); return; } // double-tap = half
+      lsSet(AD_KEY, adRatio.toFixed(3)); if(cal) cal.updateSize(); adLayout();
+    };
+    adGrip.addEventListener('pointermove', move); adGrip.addEventListener('pointerup', up); adGrip.addEventListener('pointercancel', up);
+  });
+  let adTap = 0;
+  function adReset(){ adRatio = AD_DEF; try { localStorage.removeItem(AD_KEY); } catch (e) {} adLayout(); if(cal) cal.updateSize(); }
   function build(){
     const phone = window.matchMedia('(max-width:720px)').matches;
     const saved = lsGet('fw.calView');
@@ -15882,11 +15927,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       select: info => { if(!pending) openForm(formFromRange(info.allDay, info.startStr, info.endStr)); cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       events: fetchRange,
+      eventsSet: () => setTimeout(adLayout, 0),
       // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
       loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault(); if(!pending) showDetail(info.event); },
-      datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(() => loadPlan(false), 0); }
+      datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
     // Toolbar buttons take over the old header's jobs; the header (only needed while the calendar loads) goes.

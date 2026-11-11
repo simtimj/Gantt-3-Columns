@@ -949,7 +949,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           put({eventId:'c-'+d,title:'Old chore',allDay:false,start:t('13','00'),end:t('13','30'),startMs:ms(t('13','00')),color:'#616161',colorId:'8',done:true,cal:'Main',calId:'main',editable:true});
           put({eventId:'r-'+d,title:'Standup',allDay:false,start:t('15','00'),end:t('15','15'),startMs:ms(t('15','00')),color:'#039be5',colorId:'',cal:'Main',calId:'main',recurring:true,editable:false});
           put({eventId:'g-'+d,title:'Gig',allDay:false,start:t('19','00'),end:t('21','00'),startMs:ms(t('19','00')),color:'#33b679',colorId:'',cal:'Events',calId:'events',editable:false});}
-        return {start:a[0],end:a[1],events:window.__calEmpty?[]:Object.values(S.ev).filter(e=>e.start.slice(0,10)<a[1]&&(e.allDay?e.end:e.end.slice(0,10))>=a[0]).map(e=>Object.assign({},e)),failed:[]};}
+        return {start:a[0],end:a[1],events:window.__calEmpty?[]:Object.values(S.ev).concat(window.__calManyAllDay?Array.from({length:30},(_,i)=>({eventId:'m'+i,title:'Many '+i,allDay:true,start:a[0],end:a[1],startMs:ms(a[0]),color:'#3f51b5',colorId:'9',cal:'Main',calId:'main',editable:true})):[]).filter(e=>e.start.slice(0,10)<a[1]&&(e.allDay?e.end:e.end.slice(0,10))>=a[0]).map(e=>Object.assign({},e)),failed:[]};}
       const r=a[0]||{},shape=e=>{e.title=r.title;e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);return e;};
       if(m==='calPanelCreateEvent'){ if(S.ops[r.opId])return Object.assign({repeat:true},S.ev[S.ops[r.opId]]);
         const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));S.ops[r.opId]=e.eventId;return e;}
@@ -1099,6 +1099,17 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         window.__calEmpty = 1; panel.querySelector('[data-cal-refresh]').click();
         if (!await until(() => /No events/.test(panel.querySelector('[data-cal-state]').textContent))) out.push('no empty state');
         window.__calEmpty = 0;
+        // All-day cap (2026-11-10): a long all-day list stops at half the calendar height, scrolls, shows the grip.
+        window.__calManyAllDay = 1; panel.querySelector('[data-cal-refresh]').click();
+        if (!await until(() => panel.querySelectorAll('.fc-daygrid-event').length > 20 && panel.querySelector('.cp-adgrip.on'))) out.push('all-day cap: grip not shown for a long all-day list');
+        else {
+          const sc = panel.querySelector('.fc-daygrid-body').closest('.fc-scroller'), H = panel.querySelector('.fc-view-harness').clientHeight;
+          if (sc.clientHeight > H * 0.5 + 2) out.push('all-day cap: list taller than half the calendar (' + sc.clientHeight + ' of ' + H + ')');
+          if (sc.scrollHeight <= sc.clientHeight) out.push('all-day cap: capped list does not scroll');
+          if (panel.querySelector('.fc-timegrid-body').getBoundingClientRect().height < 40) out.push('all-day cap: timeline squeezed out');
+        }
+        window.__calManyAllDay = 0; panel.querySelector('[data-cal-refresh]').click();
+        if (!await until(() => !panel.querySelector('.cp-adgrip.on') && panel.querySelectorAll('.fc-daygrid-event').length < 10)) out.push('all-day cap: grip still shown for a short list');
         panel.querySelector('[data-cal-close]').click(); await wait(320);
         // Workspace + header unchanged; Options still opens; only reads went to the server.
         if ([...document.querySelectorAll('#todayScroll .day-editor, #todayScroll .plan-editor')].map(x => x.innerHTML).join('') !== ws) out.push('Gantt workspace changed while the calendar was open');

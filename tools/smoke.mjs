@@ -1152,6 +1152,30 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         return out;
       }, !!view.isMobile);
       errs.push(...res);
+      // Real input on an event checkbox (2026-11-11 bug: element.click() passed, a real tap didn't toggle).
+      {
+        await pg.evaluate(async () => { const p = document.getElementById('calPanel'); if (!document.body.classList.contains('cal-open')) document.querySelector('#toolbar [data-cal-open]').click();
+          for (let i = 0; i < 80 && !(p.querySelector('.fc-timegrid-event .cp-chk') && p.getBoundingClientRect().right <= innerWidth + 1); i++) await new Promise(r => setTimeout(r, 50));
+          await new Promise(r => setTimeout(r, 400)); });
+        const box = await pg.evaluate(() => { const ev = document.querySelector('#calPanel .fc-timegrid-event:not(.cp-done):not(.fc-event-mirror)'); if (!ev) return null;
+          ev.setAttribute('data-realtap', '1'); window.__rtId = (ev.querySelector('.cp-ev') || {}).dataset?.ceId; ev.scrollIntoView({block: 'center'}); const r = ev.querySelector('.cp-chk').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, id: (ev.querySelector('.cp-ev') || {}).dataset?.ceId }; });
+        if (!box) errs.push('real tap: no timed event with a checkbox');
+        else {
+          const n0 = await pg.evaluate(() => window.__calls.filter(c => c[0] === 'setCalendarEventDone').length);
+          if (view.hasTouch) await pg.touchscreen.tap(box.x, box.y); else await pg.mouse.click(box.x, box.y);
+          await pg.waitForTimeout(700);
+          const r = await pg.evaluate(n0 => ({ n: window.__calls.filter(c => c[0] === 'setCalendarEventDone').length - n0, det: !document.querySelector('#calPanel [data-cal-detail]').hidden }), n0);
+          if (r.n !== 1) errs.push('real ' + (view.hasTouch ? 'tap' : 'click') + ' on a checkbox did not mark the event done (' + r.n + ' saves' + (r.det ? ', opened the details instead' : '') + ')');
+          // Tap again = undo (and leaves the fixture as it was for the next phases).
+          await pg.waitForTimeout(500);
+          const b2 = await pg.evaluate(() => { const ev = document.querySelector('#calPanel .fc-timegrid-event[data-realtap].cp-done .cp-chk') || [...document.querySelectorAll('#calPanel .fc-timegrid-event.cp-done')].find(e => e.querySelector('.cp-ev')?.dataset.ceId === window.__rtId)?.querySelector('.cp-chk'); if (!ev) return null; ev.scrollIntoView({block: 'center'}); const r = ev.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+          if (!b2) errs.push('real tap: done event not drawn as done');
+          else { if (view.hasTouch) await pg.touchscreen.tap(b2.x, b2.y); else await pg.mouse.click(b2.x, b2.y); await pg.waitForTimeout(900);
+            const u = await pg.evaluate(() => ({ n: window.__calls.filter(c => c[0] === 'setCalendarEventDone' && c[1][3] === false).length, left: [...document.querySelectorAll('#calPanel .fc-timegrid-event.cp-done')].filter(e => e.querySelector('.cp-ev')?.dataset.ceId === window.__rtId).length }));
+            if (u.n !== 1 || u.left) errs.push('real tap: second tap did not undo done (' + JSON.stringify(u) + ')'); }
+          await pg.evaluate(async () => { window.__calls = window.__calls.filter(c => c[0] !== 'setCalendarEventDone'); document.querySelector('#calPanel [data-cal-close]')?.click(); await new Promise(r => setTimeout(r, 400)); });
+        }
+      }
       // Phase 2 (2026-11-08): create / edit / delete on the main calendar, duplicates, failures, read-only repeats.
       const res2 = await pg.evaluate(async () => {
         const out = [], wait = ms => new Promise(r => setTimeout(r, ms));

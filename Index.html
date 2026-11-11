@@ -15888,6 +15888,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   // The card's hold-to-move must not start on the checkbox (its hold opens the menu instead).
   ['mousedown', 'touchstart'].forEach(t => mount.addEventListener(t, e => { if(e.target.closest && e.target.closest('.cp-chk')) e.stopPropagation(); }, {capture: true, passive: true}));
+  let cpDown = null; // last press on a checkbox: {id, ms, t, held} (a hold ≥ 450 ms opens the menu, so it must not also tick)
+  mount.addEventListener('pointerdown', e => { const c = e.target.closest && e.target.closest('.cp-chk'), v = c && c.closest('.cp-ev');
+    cpDown = v ? {id: v.dataset.ceId, ms: v.dataset.ceStart, t: Date.now(), held: false} : null; }, true);
+  document.addEventListener('pointerup', () => { if(cpDown && Date.now() - cpDown.t >= 450) cpDown.held = true; }, true);
   // Urgency group labels in the all-day row: a small heading over the first event of each group, per day, when a
   // day's list has 2+ groups (order comes from eventOrder: done, start, urgRank).
   let cpGroupsT = 0;
@@ -16009,7 +16013,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault();
-        if(info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')){ toggleDone(info.event); return; }
+        // A press on the box can redraw the card before the release, so the click lands on the card: use the press (2026-11-11 fix).
+        const x = info.event.extendedProps || {}, dn = cpDown; cpDown = null;
+        const onBox = (info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')) || (dn && dn.id === x.eventId && dn.ms === String(x.startMs) && Date.now() - dn.t < 1200);
+        if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
         if(!pending) showDetail(info.event); },
       eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
       datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }

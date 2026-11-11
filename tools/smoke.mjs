@@ -1076,7 +1076,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (det.hidden) out.push('tapping an event shows no detail');
             const close = panel.querySelector('[data-cal-close]').getBoundingClientRect();
             if (close.top < 0 || close.right > innerWidth + 1 || close.height < 30) out.push('close button not reachable');
-            if (phone && Math.abs(panel.getBoundingClientRect().width - innerWidth) > 2) out.push('phone panel not full width');
+            if (phone && Math.abs(panel.getBoundingClientRect().width - (innerWidth - 28)) > 2) out.push('phone panel should leave a 28px left peek');
             if (document.documentElement.scrollWidth > innerWidth + 1) out.push('page scrolls sideways with the panel open');
           }
           if (i === 1) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

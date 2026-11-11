@@ -15304,12 +15304,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       c.events.forEach(x => { if(x && x.id && dayAt.has(String(x.start || '').slice(0, 10))) evById.set(x.id, x); });
     } catch (e) {}
   })();
-  // Softer colors, Google Calendar style (2026-11-10, Julius): light theme mixes each event color with white
-  // (open events a little, done Graphite a lot, like Google's dimmed past events), then picks dark or white text
+  // Google Calendar colors (2026-11-10, Julius): open events use Google's exact event colors (Tomato, Tangerine,
+  // Banana, Blueberry… from Code.gs CAL_PANEL_COLORS_); done Graphite is mixed a lot with white, like Google's dimmed past events), then picks dark or white text
   // from how light the result is, so yellow / pale fills get dark text and stay readable.
   const softColor = (hex, done) => {
     const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '')); if(!m) return { bg: hex, fg: '#fff' };
-    const dark = document.documentElement.getAttribute('data-theme') === 'dark', k = dark ? (done ? .25 : 0) : (done ? .55 : .22);
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark', k = dark ? (done ? .25 : 0) : (done ? .55 : 0); // open = exact Google color (2026-11-10 b)
     const n = parseInt(m[1], 16), mix = c => Math.round(dark ? c * (1 - k) + 0x16 * k : c + (255 - c) * k);
     const r = mix(n >> 16), g = mix((n >> 8) & 255), b = mix(n & 255);
     const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;

@@ -15088,7 +15088,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .cp-tiny .cp-ev-m{font-size:10px;}
   #calPanel .fc .fc-toolbar-chunk:last-child{flex:0 0 auto;}
   #calPanel .fc .cp-done .cp-ev-t{text-decoration:line-through;}
-  #calPanel .fc .cp-done{opacity:.75;}
+  #calPanel .fc .cp-done{opacity:1;} /* done is already pale via softColor (2026-11-10) */
   #calPanel .fc .fc-event:hover{filter:brightness(.96);}
   #calPanel .fc .fc-event.fc-event-dragging,#calPanel .fc .fc-event-mirror{box-shadow:var(--cp-shadow)!important;}
   /* Now: red line with a dot on the left. */
@@ -15299,9 +15299,20 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       c.events.forEach(x => { if(x && x.id && dayAt.has(String(x.start || '').slice(0, 10))) evById.set(x.id, x); });
     } catch (e) {}
   })();
-  const toFc = x => ({ id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
-    backgroundColor: x.color, borderColor: x.color, textColor: x.colorId === '5' ? '#202124' : '#fff',
-    classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x });
+  // Softer colors, Google Calendar style (2026-11-10, Julius): light theme mixes each event color with white
+  // (open events a little, done Graphite a lot, like Google's dimmed past events), then picks dark or white text
+  // from how light the result is, so yellow / pale fills get dark text and stay readable.
+  const softColor = (hex, done) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '')); if(!m) return { bg: hex, fg: '#fff' };
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark', k = dark ? (done ? .25 : 0) : (done ? .55 : .22);
+    const n = parseInt(m[1], 16), mix = c => Math.round(dark ? c * (1 - k) + 0x16 * k : c + (255 - c) * k);
+    const r = mix(n >> 16), g = mix((n >> 8) & 255), b = mix(n & 255);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return { bg: '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1), fg: lum > 0.62 ? '#1f1f1f' : '#fff' };
+  };
+  const toFc = x => { const c = softColor(x.color, x.done); return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
+    backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg,
+    classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x }; };
   const canRun = () => !!(window.google && google.script && google.script.run);
   // Quiet re-read of the window around [s, e). Redraws only when the dates on screen changed, and never under an
   // open card / form, a drag or a save (the cache is updated either way, so the next view uses the new copy).

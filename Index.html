@@ -2116,7 +2116,8 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-day-hr{position:absolute;left:0;right:0;border-top:1px solid var(--divider);height:0;}
 #centerCalendarList .ce-day-hr span{position:absolute;left:3px;top:1px;font-size:9.5px;color:var(--muted);}
 #centerCalendarList .ce-day-now{position:absolute;left:22px;right:0;border-top:2px solid #ea4335;z-index:2;}
-#centerCalendarList .ce-day-ev{position:absolute;box-sizing:border-box;border-radius:4px;padding:1px 4px;font-size:11px;line-height:1.2;color:#1f1f1f;overflow:hidden;z-index:1;}
+#centerCalendarList .ce-day-ev{position:absolute;box-sizing:border-box;border-radius:4px;padding:1px 5px;font-size:12px;line-height:1.25;font-family:Roboto,'Segoe UI',system-ui,sans-serif;color:#1f1f1f;overflow:hidden;z-index:1;}
+#centerCalendarList .ce-day-ev b{font-weight:500;} /* Google Calendar look: medium weight, not bold (2026-11-11) */
 #centerCalendarList .ce-day-key{display:flex;flex-wrap:wrap;gap:2px 8px;margin:2px 2px 3px;font-size:10.5px;color:var(--muted);}
 #centerCalendarList .ce-day-key i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle;}
 #centerCalendarList .ce-day-ev b{font-weight:600;}
@@ -9514,6 +9515,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   let CE_HOUR = 36;
   try{ const v = Number(localStorage.getItem('fw.ceHour')); if(v >= CE_HOUR_MIN && v <= CE_HOUR_MAX) CE_HOUR = v; }catch(e){}
   let ceDayTopNext = -1; // scroll position to use on the next draw (zoom keeps the middle of the view in place)
+  let ceeFloorFix = false; // guards the one-shot zoom-out-floor redraw
   /* Hide from the list (2026-11-11, Julius): whole calendars (e.g. the dog walks) and title words (sleep, nap,
      cooldown…) stay off the Cal Events list but still show on the timeline. Saved in the Sheet's script properties
      (getCalEventsHide / setCalEventsHide), cached on the device so the first draw is right. */
@@ -9568,7 +9570,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const m = /^#?([0-9a-f]{6})$/i.exec(hx || ''); if(!m) return hx;
       const n = parseInt(m[1], 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
       const L = (Math.max(r,g,b) + Math.min(r,g,b)) / 510;
-      if(L > 0.78){ const f = 0.78 / L; r = Math.round(r * f); g = Math.round(g * f); b = Math.round(b * f); } // ceiling 0.86 → 0.78 (2026-11-11, Julius: Chill still too bright)
+      if(L > 0.70){ const f = 0.70 / L; r = Math.round(r * f); g = Math.round(g * f); b = Math.round(b * f); } // ceiling 0.86 → 0.78 → 0.70 (2026-11-11, Julius: Chill kept reading too light)
       else if(L < 0.26){ const k = (0.34 - L) / (1 - L); r = Math.round(r + (255 - r) * k); g = Math.round(g + (255 - g) * k); b = Math.round(b + (255 - b) * k); }
       return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
     };
@@ -9602,6 +9604,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Pinch rescale (2026-11-11, Julius: one pinch now covers the whole range): moving existing nodes keeps the
      browser's touch stream alive — rebuilding the DOM mid-pinch killed it, so a pinch only got one small step. */
   const ceStep = () => CE_HOUR >= 112 ? 15 : CE_HOUR >= 64 ? 30 : 0;
+  /* Zoom-out floor (2026-11-11, Julius): fully zoomed out, the 24 hours exactly fill the visible timeline — midnight
+     at the top, midnight at the bottom, no empty space under the day. */
+  const ceHourMin = () => { const d = document.querySelector('#centerCalendarList .ce-day'); return Math.max(CE_HOUR_MIN, d && d.clientHeight ? d.clientHeight / 24 : CE_HOUR_MIN); };
   function ceDayRescale(){
     const d = document.querySelector('#centerCalendarList .ce-day'), din = d && d.querySelector('.ce-day-in');
     if(!din) return false;
@@ -9734,7 +9739,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         try{ const v = parseFloat(localStorage.getItem('fw.ceSplit')); if(v >= 10 && v <= 85){ box.style.setProperty('--ce-ls', v + '%'); box.classList.add('ce-man'); } else { box.classList.remove('ce-man'); } }catch(err){}
         box.insertAdjacentHTML('beforeend', '<div class="ce-split" title="Drag to size the list and timeline · double-tap to reset" aria-label="Resize the events list"></div>');
       }
-      if(dayOn){ box.insertAdjacentHTML('beforeend', ceDayHtml(full)); const d = box.querySelector('.ce-day'); if(d){ d.scrollTop = ceDayTopNext >= 0 ? ceDayTopNext : dayTop >= 0 ? dayTop : ceDayScroll(full); ceDayTopNext = -1; } }
+      if(dayOn){
+        box.insertAdjacentHTML('beforeend', ceDayHtml(full));
+        const d = box.querySelector('.ce-day');
+        if(d){
+          d.scrollTop = ceDayTopNext >= 0 ? ceDayTopNext : dayTop >= 0 ? dayTop : ceDayScroll(full);
+          ceDayTopNext = -1;
+          // Below the zoom-out floor (saved zoom from a bigger screen, resized column): snap up so the day fills it.
+          const mn = ceHourMin();
+          if(CE_HOUR < mn - 0.5 && !ceeFloorFix){ ceeFloorFix = true; CE_HOUR = Math.round(mn * 10) / 10; setTimeout(() => { ceeFloorFix = false; if(ceDraw) ceDraw(); }, 0); }
+        }
+      }
     };
     const cached = centerCalendarCache.get(date);
     if(!force && cached && Date.now() - cached.at < 60000){ draw(cached.data); return; }
@@ -9779,7 +9794,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(z && ceePinch.pz) return; // mid-pinch taps are part of the pinch
     if(z){
       const d = document.querySelector('#centerCalendarList .ce-day'), old = CE_HOUR;
-      CE_HOUR = Math.round(Math.max(CE_HOUR_MIN, Math.min(CE_HOUR_MAX, z.dataset.ceZoom === '1' ? CE_HOUR * 1.25 : CE_HOUR / 1.25)));
+      CE_HOUR = Math.round(Math.max(ceHourMin(), Math.min(CE_HOUR_MAX, z.dataset.ceZoom === '1' ? CE_HOUR * 1.25 : CE_HOUR / 1.25)) * 10) / 10;
       try{ localStorage.setItem('fw.ceHour', String(CE_HOUR)); }catch(err){}
       if(d){ const mid = (d.scrollTop + d.clientHeight / 2) / old; ceDayTopNext = Math.max(0, mid * CE_HOUR - d.clientHeight / 2); }
       if(ceDraw) ceDraw();
@@ -9819,7 +9834,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const pz = ceePinch.pz;
       if(!pz || e.touches.length !== 2) return;
       e.preventDefault();
-      const nh = Math.round(Math.max(CE_HOUR_MIN, Math.min(CE_HOUR_MAX, pz.h0 * dist(e.touches) / pz.start)));
+      const nh = Math.round(Math.max(ceHourMin(), Math.min(CE_HOUR_MAX, pz.h0 * dist(e.touches) / pz.start)) * 10) / 10;
       if(nh === CE_HOUR) return;
       CE_HOUR = nh;
       ceDayTopNext = Math.max(0, (pz.top0 + pz.midY) / pz.h0 * nh - pz.midY);
@@ -16746,9 +16761,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Separator = drag bar (2026-11-11, Julius): the 2px line between the list and the timeline can be dragged to give
      the top or bottom more room (saved per device); double-tap it to go back to automatic. Grip like the other bars. */
   #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:60px;margin-top:0;border:0;border-radius:0;}
-  #centerCalendarList .ce-split{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;margin:4px 0 3px;}
-  #centerCalendarList .ce-split::before{content:"";position:absolute;left:0;right:0;top:-12px;bottom:-12px;}
-  #centerCalendarList .ce-split::after{content:"";position:absolute;left:50%;top:-1.5px;width:30px;height:5px;margin-left:-15px;border-radius:2px;background:var(--grip,var(--divider));}
+  /* Only the center handle drags (2026-11-11, Julius): the line itself ignores touches so scrolling past it is safe. */
+  #centerCalendarList .ce-split{flex:0 0 2px;position:relative;background:var(--divider);touch-action:none;z-index:5;margin:4px 0 3px;pointer-events:none;}
+  #centerCalendarList .ce-split::before{content:"";position:absolute;left:50%;width:64px;margin-left:-32px;top:-12px;bottom:-12px;pointer-events:auto;cursor:row-resize;}
+  #centerCalendarList .ce-split::after{content:"";position:absolute;left:50%;top:-1px;width:22px;height:3px;margin-left:-11px;border-radius:2px;background:color-mix(in srgb,var(--grip,var(--divider)) 70%,transparent);}
   #centerCalendarList .ce-list[hidden] + .ce-split{display:none;}
   #centerCalendarList.ce-man > .ce-list:not([hidden]){flex:0 0 var(--ce-ls,40%);max-height:88%;min-height:28px;}
   #centerCalendarList .ce-list[hidden]{display:none!important;}

@@ -2641,18 +2641,25 @@ const EVENT_DAYS_AHEAD = 3;
    subscriptions) stay read-only. Urgency colors (Tomato / Banana / Blueberry) stay main-calendar only. */
 const CAL_PICK_PROP_ = 'calPicked';
 let CAL_ACCESS_MEMO_ = null; // one read per server call
+// Modern Google Calendar *calendar* colors by colorId (the event palette is CAL_PANEL_COLORS_).
+const CAL_LIST_COLORS_ = { '1': '#795548', '2': '#e67c73', '3': '#d50000', '4': '#f4511e', '5': '#ef6c00', '6': '#f09300',
+  '7': '#009688', '8': '#0b8043', '9': '#7cb342', '10': '#c0ca33', '11': '#e4c441', '12': '#f6bf26', '13': '#33b679',
+  '14': '#039be5', '15': '#4285f4', '16': '#3f51b5', '17': '#7986cb', '18': '#b39ddb', '19': '#616161', '20': '#a79b8e',
+  '21': '#ad1457', '22': '#d81b60', '23': '#8e24aa', '24': '#9e69af' };
 function calAccess_(fresh) {
   if (!fresh && CAL_ACCESS_MEMO_) return CAL_ACCESS_MEMO_;
   const cache = CacheService.getScriptCache();
-  if (!fresh) { try { const c = JSON.parse(cache.get('calAccess') || 'null'); if (c) return (CAL_ACCESS_MEMO_ = c); } catch (e) {} }
+  if (!fresh) { try { const c = JSON.parse(cache.get('calAccess2') || 'null'); if (c) return (CAL_ACCESS_MEMO_ = c); } catch (e) {} }
   const out = {};
   try {
     let token = null;
     do {
-      const q = { maxResults: 250, fields: 'nextPageToken,items(id,summary,summaryOverride,backgroundColor,accessRole,primary)' };
+      const q = { maxResults: 250, fields: 'nextPageToken,items(id,summary,summaryOverride,backgroundColor,colorId,accessRole,primary)' };
       if (token) q.pageToken = token;
       const r = Calendar.CalendarList.list(q);
-      (r.items || []).forEach(c => { out[c.id] = { name: c.summaryOverride || c.summary || c.id, color: c.backgroundColor || '#039be5', role: c.accessRole || 'reader' }; });
+      // The API's backgroundColor is Google's OLD pastel palette; the app shows the modern one. Map colorId → modern
+      // (2026-11-11, Julius: match what Google Calendar shows), fall back to backgroundColor for custom colors.
+      (r.items || []).forEach(c => { out[c.id] = { name: c.summaryOverride || c.summary || c.id, color: CAL_LIST_COLORS_[c.colorId] || c.backgroundColor || '#039be5', role: c.accessRole || 'reader' }; });
       token = r.nextPageToken;
     } while (token);
   } catch (e) {
@@ -2661,7 +2668,7 @@ function calAccess_(fresh) {
   }
   if (!out[EVENT_CALENDARS[0]]) out[EVENT_CALENDARS[0]] = { name: EVENT_CALENDARS[0], color: '#039be5', role: 'owner' };
   out[EVENT_CALENDARS[0]].role = 'owner';
-  try { cache.put('calAccess', JSON.stringify(out), 21600); } catch (e) {}
+  try { cache.put('calAccess2', JSON.stringify(out), 21600); } catch (e) {}
   return (CAL_ACCESS_MEMO_ = out);
 }
 function pickedCalendars_() {

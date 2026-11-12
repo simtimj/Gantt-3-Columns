@@ -2110,7 +2110,7 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-day-in{position:relative;}
 #centerCalendarList .ce-day-hr{position:absolute;left:0;right:0;border-top:1px solid var(--divider);height:0;}
 #centerCalendarList .ce-day-hr span{position:absolute;left:3px;top:1px;font-size:9.5px;color:var(--muted);}
-#centerCalendarList .ce-day-now{position:absolute;left:26px;right:0;border-top:2px solid #ea4335;z-index:2;}
+#centerCalendarList .ce-day-now{position:absolute;left:22px;right:0;border-top:2px solid #ea4335;z-index:2;}
 #centerCalendarList .ce-day-ev{position:absolute;box-sizing:border-box;border-radius:4px;padding:1px 4px;font-size:11px;line-height:1.2;color:#1f1f1f;overflow:hidden;z-index:1;}
 #centerCalendarList .ce-day-key{display:flex;flex-wrap:wrap;gap:2px 8px;margin:2px 2px 3px;font-size:10.5px;color:var(--muted);}
 #centerCalendarList .ce-day-key i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle;}
@@ -2265,6 +2265,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
+    <button class="btn" type="button" data-rd-open title="Next Steps + Reference" aria-label="Open Next Steps and Reference">Ref</button>
     <button class="btn" type="button" data-layout="scale" title="Options: scale, padding, fonts">Options</button>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
@@ -2376,6 +2377,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <button class="btn view-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">Cols</button>
       <div class="view-menu-popup" hidden></div>
     </div>
+    <button class="btn" type="button" data-rd-open title="Next Steps + Reference" aria-label="Open Next Steps and Reference">Ref</button>
     <button class="btn" type="button" data-layout="fit" title="Fit columns to the window">Fit</button>
     <button class="btn" type="button" data-layout="reset-columns" title="Reset column sizes">Reset sizes</button>
     <!-- Focus (hide toolbar) shelved 2026-10-26 — code kept; put this back to restore:
@@ -9562,15 +9564,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const flush = () => { const lanes = []; cluster.forEach(ev => { let l = lanes.findIndex(x => x <= ev.start); if(l < 0){ l = lanes.length; lanes.push(0); } lanes[l] = ev.end; ev._l = l; }); cluster.forEach(ev => { ev._n = lanes.length; out.push(ev); }); cluster = []; };
     timed.forEach(ev => { if(cluster.length && ev.start >= end) flush(); cluster.push(ev); end = Math.max(end, ev.end); });
     flush();
-    const cals = []; timed.forEach(ev => { if(ev.cal && !ev.done && !cals.some(c => c[0] === ev.cal)) cals.push([ev.cal, ev.hex]); });
-    let h = (cals.length > 1 ? '<div class="ce-day-key">' + cals.map(c => '<span><i style="background:' + esc(c[1] || '#8ab4f8') + '"></i>' + esc(c[0]) + '</span>').join('') + '</div>' : '') +
-      '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
+    // Color legend removed (2026-11-11, Julius): colors stay, the key took up room.
+    let h = '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
     for(let i = 0; i < 24; i++) h += '<div class="ce-day-hr" style="top:' + i * CE_HOUR + 'px"><span>' + (i % 12 || 12) + (i < 12 ? 'a' : 'p') + '</span></div>';
     if(data.date === localToday()){ const n = new Date(); h += '<div class="ce-day-now" style="top:' + ((n.getHours() + n.getMinutes() / 60) * CE_HOUR) + 'px"></div>'; }
     out.forEach(ev => {
       const top = Math.max(0, (ev.start - d0) / 3600000 * CE_HOUR), ht = Math.max(14, (Math.min(ev.end, d0 + 86400000) - Math.max(ev.start, d0)) / 3600000 * CE_HOUR - 1);
       const w = 100 / ev._n;
-      h += '<div class="ce-day-ev' + (ev.done ? ' done' : '') + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(30px + (100% - 32px) * ' + (ev._l * w / 100) + ');width:calc((100% - 32px) * ' + (w / 100) + ' - 2px);background:' + col(ev) + ';color:' + ink(col(ev)) + '" title="' + esc(ev.time + ' ' + ev.title) + '"><b>' + esc(ev.title) + '</b> <span>' + esc(ev.time || '') + '</span></div>';
+      h += '<div class="ce-day-ev' + (ev.done ? ' done' : '') + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(22px + (100% - 23px) * ' + (ev._l * w / 100) + ');width:calc((100% - 23px) * ' + (w / 100) + ' - 1px);background:' + col(ev) + ';color:' + ink(col(ev)) + '" title="' + esc(ev.time + ' ' + ev.title) + '"><b>' + esc(ev.title) + '</b> <span>' + esc(ev.time || '') + '</span></div>';
     });
     return h + '</div></div>';
   }
@@ -16624,10 +16625,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #rdTab{touch-action:none;}
   body.rd-sizing #rdTab,body.rd-sizing #workspace #referencePane.rd-drawer{transition:none!important;}
   body.cal-open #rdTab{display:none;}
-  /* Easier to spot (2026-11-11, Julius: "pretty hidden"): wider, blue, with a vertical "Ref" label under the arrow. */
-  #rdTab{width:26px;height:92px;margin-top:-46px;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:#fff;background:#1a73e8;border-color:#1a73e8;opacity:1;box-shadow:-3px 0 10px rgba(26,115,232,.35);}
-  #rdTab::after{content:"Ref";writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:1px;font-weight:700;}
-  html[data-theme=dark] #rdTab{background:#8ab4f8;border-color:#8ab4f8;color:#0b1a33;box-shadow:-3px 0 10px rgba(138,180,248,.3);}
+  /* 2026-11-11 (Julius): the blue "Ref" tag was too much — back to the quiet edge tab, just a little wider; the
+     toolbar Ref button (next to Cols) is the visible way in. */
+  #rdTab{width:24px;}
   /* Cal Events, Google Calendar layout (2026-11-11, Julius): bar (▾ Events · hidden · ⚙ − +), the list (foldable, at
      most half the column), then the day timeline filling the rest. */
   #calPane #centerDownScroll:has(#centerCalendarList.ce-has-day){display:flex;flex-direction:column;overflow:hidden;}
@@ -16679,6 +16679,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!on && ref.contains(document.activeElement)) document.activeElement.blur();
   }
   window.fwRefDrawer = {open:() => set(true), close:() => set(false), toggle:() => set(!isOpen()), isOpen};
+  // Toolbar Ref button (2026-11-11, Julius): next to Cols, toggles the drawer.
+  document.addEventListener('click', e => { if(e.target.closest && e.target.closest('[data-rd-open]')) set(!isOpen()); });
   // Drag the tab to size the drawer (2026-11-11, Julius): left = wider, right = narrower; the width is saved on
   // this device. Dragging a closed tab pulls the drawer open at that width. A plain tap still opens / closes.
   const RD_KEY = 'fw.rdWidth', RD_MIN = 220;

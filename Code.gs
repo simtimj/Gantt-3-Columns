@@ -2694,6 +2694,22 @@ function setCalendarPicked(ids) {
   return getCalendarPicker();
 }
 
+// Cal Events hide list (2026-11-11, Julius): calendars and title words kept off the Cal Events list (the timeline
+// still shows them). {cals:[{id,name}], words:[string]} in script property ceHide, same on every device.
+function getCalEventsHide() {
+  try { const raw = PropertiesService.getScriptProperties().getProperty('ceHide'); const h = raw ? JSON.parse(raw) : null;
+    return h && Array.isArray(h.cals) && Array.isArray(h.words) ? h : { cals: [], words: [] }; }
+  catch (e) { return { cals: [], words: [] }; }
+}
+function setCalEventsHide(h) {
+  const cals = (h && Array.isArray(h.cals) ? h.cals : []).filter(c => c && c.id).slice(0, 30)
+    .map(c => ({ id: String(c.id).slice(0, 200), name: String(c.name || c.id).slice(0, 80) }));
+  const words = (h && Array.isArray(h.words) ? h.words : []).map(w => String(w || '').trim().slice(0, 40)).filter(Boolean).slice(0, 60);
+  const out = { cals: cals, words: words };
+  PropertiesService.getScriptProperties().setProperty('ceHide', JSON.stringify(out));
+  return out;
+}
+
 // Center-bottom list: main calendar only (no archive path).
 function getMainCalendarEvents(dateString) {
   const date = String(dateString || todayString_());

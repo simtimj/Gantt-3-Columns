@@ -2128,6 +2128,8 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayScroll .day-editor > [data-tsf]{flex-wrap:wrap;}
 #todayScroll .day-editor > [data-tsec] > .ts-sum{order:3;flex:0 0 100%;min-width:0;margin-top:3px;font-size:calc(var(--paragraph-size,14px) * .8);font-weight:400;line-height:1.3;text-transform:none;letter-spacing:0;white-space:normal;}
 #todayScroll .ts-row{margin:3px 0;}
+#todayScroll .ts-row > .ts-tc{margin:0 6px;color:var(--muted);font-size:.95em;white-space:normal;} /* Types view counts (2026-11-11) */
+#todayScroll .day-label .day-dash{cursor:pointer;} /* tap = Mini → Types → Full (2026-11-11) */
 /* History / Log: long task text runs under the checkbox at any pane width, not only under 420px (2026-11-04, Julius). */
 #todayScroll .day-editor .check-line:not([data-tlon]){display:flow-root!important;}
 #todayScroll .day-editor .check-line:not([data-tlon]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
@@ -2389,7 +2391,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     <section class="pane" id="todayPane">
       <div class="pane-header">
         <span class="today-jump" data-jump-today role="button" tabindex="0" title="Jump to today">HISTORY<span class="hl-log"> / LOG</span></span>
-        <span id="histMode" class="hist-modes" role="group" aria-label="History detail"><button type="button" class="hist-mode" data-hm="full" title="History detail: Full" aria-label="History detail: Full">▤</button><button type="button" class="hist-mode" data-hm="compact" title="History detail: List" aria-label="History detail: List">≡</button><button type="button" class="hist-mode" data-hm="mini" title="History detail: Mini" aria-label="History detail: Mini">–</button></span>
+        <span id="histMode" class="hist-modes" role="group" aria-label="History detail"><button type="button" class="hist-mode" data-hm="full" title="History detail: Full" aria-label="History detail: Full">▤</button><button type="button" class="hist-mode" data-hm="compact" title="History detail: List" aria-label="History detail: List">≡</button><button type="button" class="hist-mode" data-hm="types" title="History detail: Types" aria-label="History detail: Types">#</button><button type="button" class="hist-mode" data-hm="mini" title="History detail: Mini" aria-label="History detail: Mini">–</button></span>
         <span id="focusStatus" class="focus-status">Loading…</span>
       </div>
       <div id="b3Strip" class="b3-strip" aria-label="Big Three" hidden></div>
@@ -9499,8 +9501,50 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   let centerCalendarSeq = 0, ceShownDate = '', ceDraw = null;
   /* Mini day view (2026-11-11, Julius; the 4-box view was removed the same day): a small scrollable timeline of the
      day's timed events on top of Cal Events, toggled by 🕒. View only; colors follow urgency, done is grey. */
-  function ceDayOn(){ try{ return localStorage.getItem('fw.ceDay') === '1'; }catch(e){ return false; } }
-  const CE_HOUR = 36;
+  // 2026-11-11 (Julius): the timeline is on by default (🕒 still hides it); − / + zoom its hour height (per device).
+  function ceDayOn(){ try{ return localStorage.getItem('fw.ceDay') !== '0'; }catch(e){ return true; } }
+  const CE_HOUR_MIN = 18, CE_HOUR_MAX = 140;
+  let CE_HOUR = 36;
+  try{ const v = Number(localStorage.getItem('fw.ceHour')); if(v >= CE_HOUR_MIN && v <= CE_HOUR_MAX) CE_HOUR = v; }catch(e){}
+  let ceDayTopNext = -1; // scroll position to use on the next draw (zoom keeps the middle of the view in place)
+  /* Hide from the list (2026-11-11, Julius): whole calendars (e.g. the dog walks) and title words (sleep, nap,
+     cooldown…) stay off the Cal Events list but still show on the timeline. Saved in the Sheet's script properties
+     (getCalEventsHide / setCalEventsHide), cached on the device so the first draw is right. */
+  let ceHide = {cals: [], words: []}, ceHideLoaded = false, ceShowHidden = false;
+  const ceOpt = {open: false};
+  try{ const h = JSON.parse(localStorage.getItem('fw.ceHide') || 'null'); if(h && Array.isArray(h.cals) && Array.isArray(h.words)) ceHide = h; }catch(e){}
+  function ceIsHidden(ev){
+    if(ceHide.cals.some(c => c.id === ev.calId)) return true;
+    const t = String(ev.title || '').toLowerCase();
+    return ceHide.words.some(w => w && t.includes(String(w).toLowerCase()));
+  }
+  function ceHideSave(){
+    try{ localStorage.setItem('fw.ceHide', JSON.stringify(ceHide)); }catch(e){}
+    if(ceDraw) ceDraw();
+    google.script.run.withFailureHandler(err => { if(typeof setStatus === 'function') setStatus('Could not save the Cal Events hide list: ' + (err && err.message || err)); })
+      .setCalEventsHide(ceHide);
+  }
+  function ceHideLoad(){
+    if(ceHideLoaded) return; ceHideLoaded = true;
+    google.script.run.withSuccessHandler(h => {
+      if(!h || !Array.isArray(h.cals) || !Array.isArray(h.words)) return;
+      if(JSON.stringify(h) === JSON.stringify(ceHide)) return;
+      ceHide = h; try{ localStorage.setItem('fw.ceHide', JSON.stringify(h)); }catch(e){}
+      if(ceDraw) ceDraw();
+    }).withFailureHandler(() => { ceHideLoaded = false; }).getCalEventsHide();
+  }
+  const CE_HIDE_SUGGEST = ['Sleep','Nap','Cooldown','Wake','Walk','Work Block'];
+  function ceOptHtml(full){
+    const seen = []; full.events.forEach(ev => { if(ev.calId && !seen.some(c => c.id === ev.calId)) seen.push({id: ev.calId, name: ev.cal || ev.calId}); });
+    ceHide.cals.forEach(c => { if(!seen.some(x => x.id === c.id)) seen.push(c); });
+    const low = ceHide.words.map(w => String(w).toLowerCase());
+    return '<div class="ce-opt" data-ce-optbox><div class="ce-opt-h"><b>Hide from the list</b><button type="button" class="btn" data-ce-opt-done>Done</button></div>' +
+      '<div class="ce-opt-note">Still shows on the timeline.</div>' +
+      '<div class="ce-opt-s">Calendars</div>' + (seen.length ? seen.map(c => '<label class="ce-opt-c"><input type="checkbox" data-ce-hcal="' + esc(c.id) + '" data-name="' + esc(c.name) + '"' + (ceHide.cals.some(x => x.id === c.id) ? ' checked' : '') + '> ' + esc(c.name) + '</label>').join('') : '<div class="ce-opt-note">No calendars today.</div>') +
+      '<div class="ce-opt-s">Titles with</div><div class="ce-opt-w">' + ceHide.words.map(w => '<span class="ce-chip on">' + esc(w) + '<button type="button" data-ce-hword-x="' + esc(w) + '" aria-label="Stop hiding ' + esc(w) + '">✕</button></span>').join('') +
+      CE_HIDE_SUGGEST.filter(w => low.indexOf(w.toLowerCase()) < 0).map(w => '<button type="button" class="ce-chip" data-ce-hword-add="' + esc(w) + '">+ ' + esc(w) + '</button>').join('') + '</div>' +
+      '<form class="ce-opt-f" data-ce-hword-form><input type="text" maxlength="40" placeholder="Word or phrase" aria-label="Hide titles containing"><button type="submit" class="btn">Add</button></form></div>';
+  }
   function ceDayScroll(data){
     const t = data.events.filter(ev => !ev.allDay && !ev.done).map(ev => Number(ev.start)).sort((a,b) => a - b)[0];
     const now = new Date(), isToday = data.date === localToday();
@@ -9530,6 +9574,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
     return h + '</div></div>';
   }
+  function ceListFolded(){ try{ return localStorage.getItem('fw.ceListFold') === '1'; }catch(e){ return false; } }
   function ceSortMode(){ try{ return localStorage.getItem('fw.ceSort') === 'time' ? 'time' : 'cat'; }catch(e){ return 'cat'; } }
   // + Task box: kept outside the list so a refresh mid-typing doesn't lose the text.
   const ceAdd = {open:false,text:'',busy:false};
@@ -9584,7 +9629,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(seq !== centerCalendarSeq || box.querySelector('[data-ce-editing]')) return;
       ceShownDate = full.date;
       ceDraw = () => draw(full);
-      let data = full;
+      ceHideLoad();
+      let data = ceShowHidden ? full : Object.assign({}, full, {events: full.events.filter(ev => !ceIsHidden(ev))});
       const q = ceSearchWords();
       if(q.length) data = Object.assign({}, data, {events: data.events.filter(ev => { const t = String(ev.title || '').toLowerCase(); return q.every(w => t.includes(w)); })});
       const allDay = data.events.filter(ev => ev.allDay).sort((a,b) => Number(a.done) - Number(b.done)), scheduled = data.events.filter(ev => !ev.allDay);
@@ -9632,7 +9678,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
           (completed.length ? '<div class="ce-group">Completed · ' + completed.length + '</div>' +
             completed.map(ev => ev.allDay ? allDayRow(ev) : timedRow(ev)).join('') : '')) +
         (!data.events.length ? '<div class="ce-empty">' + (q.length ? 'No match for “' + esc(q.join(' ')) + '”.' : 'No events.') + '</div>' : '');
-      if(dayOn){ box.insertAdjacentHTML('afterbegin', ceDayHtml(full)); const d = box.querySelector('.ce-day'); if(d) d.scrollTop = dayTop >= 0 ? dayTop : ceDayScroll(full); }
+      /* Google Calendar layout (2026-11-11, Julius): a bar with ▾ Events (fold / open the list), ⚙ (hide list) and − / +
+         (timeline zoom), then the list, then the day timeline filling the rest of the column. */
+      const nHid = full.events.filter(ceIsHidden).length, folded = ceListFolded();
+      const listHtml = box.innerHTML;
+      box.innerHTML = '<div class="ce-bar"><button type="button" class="ce-fold" data-ce-fold aria-expanded="' + !folded + '" title="Fold / open the events list"><span class="ce-farr">' + (folded ? '▸' : '▾') + '</span> Events <small>' + data.events.length + '</small></button>' +
+        (nHid ? '<button type="button" class="ce-hidn' + (ceShowHidden ? ' on' : '') + '" data-ce-showhid title="' + (ceShowHidden ? 'Hide them again' : 'Show them in the list for now') + '">' + nHid + ' hidden</button>' : '') +
+        '<span class="ce-bsp"></span><button type="button" class="btn ce-bb" data-ce-opt aria-label="Choose what to hide from the list" title="Hide calendars or titles from the list">⚙</button>' +
+        (dayOn ? '<button type="button" class="btn ce-bb" data-ce-zoom="-1" aria-label="Zoom out the timeline" title="Zoom out">−</button><button type="button" class="btn ce-bb" data-ce-zoom="1" aria-label="Zoom in the timeline" title="Zoom in">+</button>' : '') + '</div>' +
+        (ceOpt.open ? ceOptHtml(full) : '') +
+        '<div class="ce-list"' + (folded ? ' hidden' : '') + '>' + listHtml + '</div>';
+      box.classList.toggle('ce-has-day', dayOn);
+      if(dayOn){ box.insertAdjacentHTML('beforeend', ceDayHtml(full)); const d = box.querySelector('.ce-day'); if(d){ d.scrollTop = ceDayTopNext >= 0 ? ceDayTopNext : dayTop >= 0 ? dayTop : ceDayScroll(full); ceDayTopNext = -1; } }
     };
     const cached = centerCalendarCache.get(date);
     if(!force && cached && Date.now() - cached.at < 60000){ draw(cached.data); return; }
@@ -9662,6 +9719,25 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       try{ localStorage.setItem('fw.ceDay', ceDayOn() ? '0' : '1'); }catch(err){}
       if(ceDraw) ceDraw();
     }
+    if(e.target.closest('[data-ce-fold]')){
+      try{ localStorage.setItem('fw.ceListFold', ceListFolded() ? '0' : '1'); }catch(err){}
+      if(ceDraw) ceDraw();
+    }
+    if(e.target.closest('[data-ce-showhid]')){ ceShowHidden = !ceShowHidden; if(ceDraw) ceDraw(); }
+    if(e.target.closest('[data-ce-opt]')){ ceOpt.open = !ceOpt.open; if(ceDraw) ceDraw(); }
+    if(e.target.closest('[data-ce-opt-done]')){ ceOpt.open = false; if(ceDraw) ceDraw(); }
+    const hx = e.target.closest('[data-ce-hword-x]');
+    if(hx){ ceHide.words = ceHide.words.filter(w => w !== hx.dataset.ceHwordX); ceHideSave(); }
+    const ha = e.target.closest('[data-ce-hword-add]');
+    if(ha && !ceHide.words.some(w => w.toLowerCase() === ha.dataset.ceHwordAdd.toLowerCase())){ ceHide.words.push(ha.dataset.ceHwordAdd); ceHideSave(); }
+    const z = e.target.closest('[data-ce-zoom]');
+    if(z){
+      const d = document.querySelector('#centerCalendarList .ce-day'), old = CE_HOUR;
+      CE_HOUR = Math.round(Math.max(CE_HOUR_MIN, Math.min(CE_HOUR_MAX, z.dataset.ceZoom === '1' ? CE_HOUR * 1.25 : CE_HOUR / 1.25)));
+      try{ localStorage.setItem('fw.ceHour', String(CE_HOUR)); }catch(err){}
+      if(d){ const mid = (d.scrollTop + d.clientHeight / 2) / old; ceDayTopNext = Math.max(0, mid * CE_HOUR - d.clientHeight / 2); }
+      if(ceDraw) ceDraw();
+    }
     if(e.target.closest('[data-ce-sort]')){
       try{ localStorage.setItem('fw.ceSort',ceSortMode() === 'cat' ? 'time' : 'cat'); }catch(err){}
       if(ceDraw) ceDraw();
@@ -9682,6 +9758,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
   });
   document.addEventListener('input', e => { if(e.target.matches?.('#centerCalendarList .ce-add input')) ceAdd.text = e.target.value; });
+  document.addEventListener('change', e => {
+    const c = e.target.closest?.('[data-ce-hcal]'); if(!c) return;
+    ceHide.cals = ceHide.cals.filter(x => x.id !== c.dataset.ceHcal);
+    if(c.checked) ceHide.cals.push({id: c.dataset.ceHcal, name: c.dataset.name || c.dataset.ceHcal});
+    ceHideSave();
+  });
+  document.addEventListener('submit', e => {
+    const f = e.target.closest?.('[data-ce-hword-form]'); if(!f) return;
+    e.preventDefault();
+    const v = (f.querySelector('input').value || '').trim().slice(0, 40);
+    if(v && !ceHide.words.some(w => w.toLowerCase() === v.toLowerCase())){ ceHide.words.push(v); ceHideSave(); }
+  }, true);
   /* Title editing (2026-11-04, Julius): first tap picks the row, second tap edits, like task cells.
      Leaving the title saves it to the Google Calendar event; Esc or an empty title puts it back. */
   (function initCalTitles(){
@@ -12266,7 +12354,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      Afternoon / Evening (and old-style sections and project groups) folded to its list, one item per line · Mini =
      the same, but each project row is just name + count. Per device (localStorage fw.histMode); display only, never
      saved into a cell. Tapping a header opens just that one ('open:<key>' in the day's fw.tsecFold entry). */
-  const HIST_MODES = ['full','compact','mini']; // buttons in #histMode: ▤ Full · ≡ List · – Mini
+  // 2026-11-11 (Julius): + Types = Mini rows with per-type counts ("Gantt 10 ✓ · 4 new · 1 fix · 1 other"), no lists.
+  const HIST_MODES = ['full','compact','types','mini']; // buttons in #histMode: ▤ Full · ≡ List · # Types · – Mini
+  const HIST_SHUT = () => histMode === 'mini' || histMode === 'types'; // project rows start shut (open one by tapping its count)
+  const HIST_NAME = {full:'Full', compact:'List', types:'Types', mini:'Mini'};
   let histMode = 'full';
   try{ const m = localStorage.getItem('fw.histMode'); if(HIST_MODES.indexOf(m) >= 0) histMode = m; }catch(e){}
   function histModeButton(){
@@ -12325,8 +12416,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     e.preventDefault();
     const next = HIST_MODES[(HIST_MODES.indexOf(histMode) + 1) % HIST_MODES.length];
     setHistMode(next);
-    if(typeof setStatus === 'function') setStatus('History: ' + ({full:'Full', compact:'List', mini:'Mini'})[next] + ' · tap the date again to switch');
+    if(typeof setStatus === 'function') setStatus('History: ' + HIST_NAME[next] + ' · tap the date again to switch');
   });
+  /* Done count on the date line (2026-11-11, Julius): tap it to step Mini (sections + "Gantt 10") → Types ("Gantt: 4 new ·
+     1 fix") → Full (every line) → Mini. Display only, per device, like the date tap. */
+  const HIST_COUNT_CYCLE = ['mini','types','full'];
+  document.addEventListener('click',e => {
+    const d = e.target && e.target.closest ? e.target.closest('#todayScroll .day-label .day-dash') : null;
+    if(!d || !d.textContent.trim()) return;
+    e.preventDefault(); e.stopPropagation();
+    const i = HIST_COUNT_CYCLE.indexOf(histMode), next = HIST_COUNT_CYCLE[(i + 1) % HIST_COUNT_CYCLE.length];
+    setHistMode(next);
+    if(typeof setStatus === 'function') setStatus('History: ' + HIST_NAME[next] + ' · tap the count again to switch');
+  },true);
   // Old-style day sections (data-sec) and project groups (data-cgrp) follow the mode too.
   function histKey(n){
     if(n.dataset.sec) return 'sec:' + n.dataset.sec;
@@ -12407,7 +12509,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function tsecDrawSum(n,rows,folds){
     const k = n.dataset.tsec;
-    const shutOf = r => histMode === 'mini' ? !folds['show:' + k + ':' + r.name] : !!folds[k + ':' + r.name];
+    const shutOf = r => HIST_SHUT() ? !folds['show:' + k + ':' + r.name] : !!folds[k + ':' + r.name];
     const sig = rows ? JSON.stringify([histMode,rows.map(r => [r.name,r.count,r.items,r.types,shutOf(r),hxIs(n.parentElement || n,'ts:' + k + ':' + r.name)])]) : '';
     if((n.dataset.tssum || '') === sig && !!n.querySelector(':scope > .ts-sum') === !!rows) return;
     n.querySelectorAll(':scope > .ts-sum').forEach(x => x.remove());
@@ -12421,6 +12523,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const shut = shutOf(r);
       b.textContent = r.count + (shut ? ' +' : ' −'); b.title = shut ? 'Show the list' : 'Hide the list';
       row.append(name,b);
+      // Types view (2026-11-11): the type counts on the row itself.
+      if(histMode === 'types' && r.types){ const tc = document.createElement('span'); tc.className = 'ts-tc'; tc.textContent = r.types.map(t => t.n + ' ' + t.name.toLowerCase().replace(/^fixes$/,'fix').replace(/^tweaks$/,'tweak')).join(' · '); row.insertBefore(tc,b); }
       // Short lists (2026-11-07): 3 rows + scroll; ⤢ next to the count shows the whole list.
       const hxk = 'ts:' + k + ':' + r.name, hxOpen = hxIs(n.parentElement || n,hxk), nItems = r.types ? r.types.reduce((a,t) => a + t.items.length + 1,0) : r.items.length;
       if(!shut && nItems > 3){ const xb = hxButton(hxOpen,r.count); xb.dataset.hxk = hxk; row.appendChild(xb); }
@@ -12442,7 +12546,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     n.appendChild(box);
   }
   function tsecToggleList(h,ed,proj){
-    const all = tsecFolds(), d = ed.dataset.date, key = (histMode === 'mini' ? 'show:' : '') + h.dataset.tsec + ':' + proj, day = all[d] = all[d] || {};
+    const all = tsecFolds(), d = ed.dataset.date, key = (HIST_SHUT() ? 'show:' : '') + h.dataset.tsec + ':' + proj, day = all[d] = all[d] || {};
     if(day[key]) delete day[key]; else day[key] = 1;
     try{ localStorage.setItem(TSEC_FOLD_KEY,JSON.stringify(all)); }catch(e){}
     refreshTitleLines(ed);
@@ -12549,7 +12653,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const fold = (histForced(n,ed) ? !histIsOpen(ed,histKey(n)) : n.dataset.fold === '1') && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden', sum:fold && histMode !== 'mini' ? titleSummary(cov) : ''});
+      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden', sum:fold && !HIST_SHUT() ? titleSummary(cov) : ''});
       if(fold){
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);
@@ -14827,7 +14931,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function resolve(node){
     if(!node || !node.closest)return null;
     if(node.closest('#refSearch'))return document.getElementById('referenceScroll');
-    if(node.closest('.ce-head strong'))return document.getElementById('centerDownScroll');
+    // Cal Events (2026-11-11, Julius): holding its title, the ▾ Events bar or the timeline opens the big 📅 calendar.
+    if(node.closest('.ce-head strong,#centerCalendarList .ce-fold,#centerCalendarList .ce-day'))return document.getElementById('centerDownScroll');
     if(node.closest('.urg-head'))return document.getElementById('urgentPanel');
     // History only (2026-11-04, Julius): zooming the whole pane also stretched Blocks under it.
     if(node.closest('.today-jump'))return (document.body.classList.contains('one-day') && document.querySelector('#todayScroll .od-on > .od-top')) || document.getElementById('todayPane');
@@ -14844,7 +14949,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const target=resolve(e.target);if(!target)return;
     startX=e.clientX;startY=e.clientY;clearTimeout(timer);
     const tab=e.target.closest&&e.target.closest('#journalPane button[data-ctab],#referencePane button[data-rtab]');
-    timer=setTimeout(()=>{timer=0;if(tab&&!tab.classList.contains('on'))tab.click();if(target.id==='urgentPanel'&&window.urgEnsureOpen)window.urgEnsureOpen();suppressUntil=Date.now()+650;open(target);if(document.activeElement?.id==='refSearch')document.activeElement.blur();},550);
+    timer=setTimeout(()=>{timer=0;if(target.id==='centerDownScroll'&&window.fwCalendar){suppressUntil=Date.now()+650;window.fwCalendar.open();return;}if(tab&&!tab.classList.contains('on'))tab.click();if(target.id==='urgentPanel'&&window.urgEnsureOpen)window.urgEnsureOpen();suppressUntil=Date.now()+650;open(target);if(document.activeElement?.id==='refSearch')document.activeElement.blur();},550);
   },true);
   document.addEventListener('pointermove',e=>{if(timer&&(Math.abs(e.clientX-startX)>12||Math.abs(e.clientY-startY)>12)){clearTimeout(timer);timer=0;}},true);
   ['pointerup','pointercancel'].forEach(name=>document.addEventListener(name,()=>{clearTimeout(timer);timer=0;},true));
@@ -15143,6 +15248,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-detail .cp-da a,#calPanel .cp-detail .cp-da button{border:0;background:transparent;border-radius:999px;padding:6px 10px;font-size:14px;font-weight:500;color:var(--cp-blue);white-space:nowrap;}
   /* Event card (2026-11-11, Julius): smaller, Edit · Delete · GCal · Close on one line. */
   #calPanel .cp-detail.cp-evcard{padding:10px 12px 8px;}
+  /* Popup card (2026-11-11): beside the event, with a clear border so it stands out from the grid. */
+  #calPanel .cp-detail{border:1.5px solid #9aa0a6!important;}
+  html[data-theme=dark] #calPanel .cp-detail{border-color:#c4c7c5!important;}
+  #calPanel .cp-detail.cp-evcard.cp-pop{left:var(--pop-x);top:var(--pop-y);right:auto;bottom:auto;width:var(--pop-w);box-sizing:border-box;max-height:calc(100% - 16px);z-index:30;
+    box-shadow:0 8px 28px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.18);}
   #calPanel .cp-detail.cp-evcard .cp-dt{font-size:17px;gap:10px;}
   #calPanel .cp-detail.cp-evcard .cp-dm,#calPanel .cp-detail.cp-evcard .cp-note{font-size:13px;padding-left:24px;margin-top:2px;}
   #calPanel .cp-detail.cp-evcard .cp-da{flex-wrap:nowrap;margin-top:6px;}
@@ -15473,7 +15583,32 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const a = L.fromISO(x.start).setZone(TZ), b = L.fromISO(x.end).setZone(TZ);
     return a.toFormat('EEE MMM d · h:mm a') + ' – ' + (a.hasSame(b, 'day') ? b.toFormat('h:mm a') : b.toFormat('EEE MMM d h:mm a'));
   }
-  function showDetail(ev){
+  /* Popup card (2026-11-11, Julius: "pop up as a little window, just like Google Calendar"): the event card opens next
+     to the event (right, else left, else below / above it) instead of along the bottom, with a clear border. Forms and
+     plan cards keep the bottom sheet (they drop .cp-evcard, which is what the popup position needs). */
+  function popAt(el){
+    const body = detail.parentElement;
+    detail.classList.remove('cp-pop');
+    if(!el || !body || !el.getBoundingClientRect) return;
+    const B = body.getBoundingClientRect(), E0 = el.getBoundingClientRect(), m = 8;
+    const E = {l: E0.left - B.left, r: E0.right - B.left, t: E0.top - B.top, b: E0.bottom - B.top};
+    const w = Math.min(340, B.width - 2 * m);
+    detail.style.setProperty('--pop-w', w + 'px');
+    detail.classList.add('cp-pop');
+    const h = Math.min(detail.offsetHeight, B.height - 2 * m), clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    let x, y;
+    if(E.r + m + w <= B.width - m){ x = E.r + m; y = clamp(E.t, m, B.height - h - m); }
+    else if(E.l - m - w >= m){ x = E.l - m - w; y = clamp(E.t, m, B.height - h - m); }
+    else { x = clamp(E.l, m, B.width - w - m); y = E.b + 6 + h <= B.height - m ? E.b + 6 : E.t - 6 - h >= m ? E.t - 6 - h : clamp(E.b + 6, m, B.height - h - m); }
+    detail.style.setProperty('--pop-x', Math.round(x) + 'px'); detail.style.setProperty('--pop-y', Math.round(y) + 'px');
+  }
+  // A tap outside the popup (not on another event) closes it.
+  panel.addEventListener('pointerdown', e => {
+    if(detail.hidden || !detail.classList.contains('cp-evcard') || !detail.classList.contains('cp-pop')) return;
+    if(detail.contains(e.target) || (e.target.closest && e.target.closest('.fc-event,.urg-picker'))) return;
+    detail.hidden = true; sheetEv = null;
+  }, true);
+  function showDetail(ev, el){
     const x = ev.extendedProps || {};
     sheetEv = ev;
     const why = x.editable ? (x.done ? 'Done — stays where it is.' : '') : 'View-only calendar — read-only here.';
@@ -15489,6 +15624,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       (why ? '<div class="cp-note">' + esc(why) + '</div>' : '');
     detail.dataset.pid = '';
     detail.hidden = false;
+    popAt(el);
   }
   // ---- Phase 2: create / edit / delete (main calendar, non-repeating). Google Calendar stays the truth: after every
   // save the range is refetched; nothing is drawn from local guesses.
@@ -16164,7 +16300,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const x = info.event.extendedProps || {}, dn = cpDown; cpDown = null;
         const onBox = (info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')) || (dn && dn.id === x.eventId && dn.ms === String(x.startMs) && Date.now() - dn.t < 1200);
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
-        if(!pending) showDetail(info.event); },
+        if(!pending) showDetail(info.event, info.el); },
       eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
       datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
     });
@@ -16322,6 +16458,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 <style>
   #b3Strip{flex:0 0 auto;padding:2px 6px 3px;border-bottom:1px solid var(--divider,#ccc);font-size:.86em;line-height:1.3;}
   #b3Strip[hidden]{display:none;}
+  #todayPane #b3Strip{display:none!important;} /* 2026-11-11 (Julius): not needed at the top of History; ★ hold-menu / Plan tab unchanged */
   #b3Strip .b3-r{display:flex;align-items:center;gap:6px;min-height:22px;cursor:pointer;border-radius:5px;padding:0 2px;}
   #b3Strip .b3-r:hover{background:color-mix(in srgb,var(--accent,#1a73e8) 8%,transparent);}
   #b3Strip .b3-n{flex:0 0 auto;font-weight:700;color:#d99a00;min-width:1.6em;}
@@ -16487,6 +16624,36 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #rdTab{touch-action:none;}
   body.rd-sizing #rdTab,body.rd-sizing #workspace #referencePane.rd-drawer{transition:none!important;}
   body.cal-open #rdTab{display:none;}
+  /* Easier to spot (2026-11-11, Julius: "pretty hidden"): wider, blue, with a vertical "Ref" label under the arrow. */
+  #rdTab{width:26px;height:92px;margin-top:-46px;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:#fff;background:#1a73e8;border-color:#1a73e8;opacity:1;box-shadow:-3px 0 10px rgba(26,115,232,.35);}
+  #rdTab::after{content:"Ref";writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;letter-spacing:1px;font-weight:700;}
+  html[data-theme=dark] #rdTab{background:#8ab4f8;border-color:#8ab4f8;color:#0b1a33;box-shadow:-3px 0 10px rgba(138,180,248,.3);}
+  /* Cal Events, Google Calendar layout (2026-11-11, Julius): bar (▾ Events · hidden · ⚙ − +), the list (foldable, at
+     most half the column), then the day timeline filling the rest. */
+  #calPane #centerDownScroll:has(#centerCalendarList.ce-has-day){display:flex;flex-direction:column;overflow:hidden;}
+  #centerCalendarList.ce-has-day{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+  #centerCalendarList.ce-has-day > .ce-list{flex:0 1 auto;max-height:50%;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
+  #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:110px;margin-top:4px;}
+  #centerCalendarList .ce-list[hidden]{display:none!important;}
+  #centerCalendarList .ce-bar{display:flex;align-items:center;gap:4px;margin:2px 0 3px;min-height:26px;}
+  #centerCalendarList .ce-fold{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:2px 4px 2px 0;cursor:pointer;white-space:nowrap;}
+  #centerCalendarList .ce-fold small{font-weight:500;color:var(--muted);margin-left:2px;}
+  #centerCalendarList .ce-farr{display:inline-block;width:1em;color:var(--muted);}
+  #centerCalendarList .ce-hidn{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted);font:inherit;font-size:11px;border-radius:999px;padding:1px 7px;cursor:pointer;white-space:nowrap;}
+  #centerCalendarList .ce-hidn.on{background:var(--accent-soft,rgba(66,133,244,.18));color:inherit;}
+  #centerCalendarList .ce-bsp{flex:1 1 auto;}
+  #centerCalendarList .ce-bb{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;padding:0!important;margin:0;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
+  #centerCalendarList .ce-opt{border:1.5px solid var(--divider);border-radius:10px;padding:8px 9px;margin:2px 0 6px;font-size:13px;background:var(--panel);}
+  #centerCalendarList .ce-opt-h{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  #centerCalendarList .ce-opt-note{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  #centerCalendarList .ce-opt-s{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:8px 0 3px;}
+  #centerCalendarList .ce-opt-c{display:flex;align-items:center;gap:6px;padding:3px 0;}
+  #centerCalendarList .ce-opt-w{display:flex;flex-wrap:wrap;gap:4px;}
+  #centerCalendarList .ce-chip{display:inline-flex;align-items:center;gap:3px;font:inherit;font-size:12px;padding:2px 8px;border-radius:999px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+  #centerCalendarList .ce-chip.on{border-style:solid;color:inherit;background:var(--accent-soft,rgba(66,133,244,.18));cursor:default;}
+  #centerCalendarList .ce-chip button{appearance:none;border:0;background:transparent;color:inherit;font-size:11px;padding:0 0 0 2px;cursor:pointer;}
+  #centerCalendarList .ce-opt-f{display:flex;gap:4px;margin-top:6px;}
+  #centerCalendarList .ce-opt-f input{flex:1 1 auto;min-width:0;font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:inherit;}
   /* Narrow Cal Events column (phone, 3 columns): tighter header so 🔍 still fits. */
   @container (max-width:150px){#centerDownScroll .ce-head{gap:2px!important;}#centerDownScroll .ce-tools{gap:2px!important;}}
 </style>

@@ -266,6 +266,25 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     else if (d.getBoundingClientRect().right > row.getBoundingClientRect().right + 1) out.push('count cut off');
     return out; });
   dl.forEach(x => errs.push('History date line: ' + x));
+  // Count tap cycles Mini → Types → Full (2026-11-11); Big Three strip hidden at the top of History.
+  const cyc = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+    const d = document.querySelector('#todayScroll .day-row[data-date="' + localToday() + '"] .day-dash');
+    if (!d) return ['no count'];
+    const prev = document.body.dataset.hist, seen = [];
+    for (let i = 0; i < 3; i++) { d.click(); await wait(120); seen.push(document.body.dataset.hist); }
+    const start = seen.indexOf('mini');
+    const order = start < 0 ? seen : seen.slice(start).concat(seen.slice(0, start));
+    if (order.join() !== 'mini,types,full') out.push('cycle: ' + seen.join());
+    if (document.body.dataset.hist !== 'types') { while (document.body.dataset.hist !== 'types') { d.click(); await wait(100); } }
+    if (document.querySelector('#todayScroll [data-tsec]') && !document.querySelector('#todayScroll [data-tsf="c"]')) out.push('Types left sections open');
+    const b3 = document.getElementById('b3Strip');
+    if (b3 && getComputedStyle(b3).display !== 'none') out.push('Big Three strip still shows');
+    // back to where it was
+    if (prev && window.setHistMode) window.setHistMode(prev);
+    else { const fs = document.querySelector('#histMode [data-hm="' + (prev || 'full') + '"]'); if (fs) fs.click(); await wait(100); }
+    return out; });
+  cyc.forEach(x => errs.push('History count cycle: ' + x));
   // Fold buttons (2026-11-07: the wrapped "+ hidden" button didn't respond): time section header, group −, title-line button.
   const folds = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
@@ -508,14 +527,44 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     const out = [];
     if (document.querySelector('[data-ce-sort]')?.textContent !== 'Cats') out.push('sort button not "Cats"');
     const list = document.getElementById('centerCalendarList');
-    // Mini day view (2026-11-11; replaced the 4-box view): 🕒 shows a scrollable day timeline on top, 🕒 again hides it.
-    document.querySelector('[data-ce-day]').click(); await wait(100);
+    // Day timeline (2026-11-11): on by default, under the list (Google Calendar layout); 🕒 hides / shows it.
     const dv = list.querySelector(':scope > .ce-day');
-    if (!dv) out.push('🕒 did not show the day view');
-    else if (dv.scrollHeight <= dv.clientHeight) out.push('day view does not scroll');
+    if (!dv) out.push('timeline not on by default');
+    else {
+      if (dv.scrollHeight <= dv.clientHeight) out.push('day view does not scroll');
+      const lst = list.querySelector(':scope > .ce-list');
+      if (!lst || !(lst.compareDocumentPosition(dv) & Node.DOCUMENT_POSITION_FOLLOWING)) out.push('list is not above the timeline');
+      // − / + zoom changes the hour height.
+      const h0 = dv.querySelector('.ce-day-in').offsetHeight;
+      list.querySelector('[data-ce-zoom="1"]').click(); await wait(80);
+      const h1 = list.querySelector('.ce-day-in').offsetHeight;
+      if (!(h1 > h0)) out.push('+ zoom did not grow the timeline: ' + h0 + ' → ' + h1);
+      list.querySelector('[data-ce-zoom="-1"]').click(); await wait(80);
+      if (list.querySelector('.ce-day-in').offsetHeight >= h1) out.push('− zoom did not shrink the timeline');
+    }
     if (!list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('day view hid the list');
+    // ▾ Events folds the list and back.
+    list.querySelector('[data-ce-fold]').click(); await wait(80);
+    if (list.querySelector('.ce-list') && !list.querySelector('.ce-list').hidden) out.push('▾ Events did not fold the list');
+    list.querySelector('[data-ce-fold]').click(); await wait(80);
+    if (list.querySelector('.ce-list').hidden) out.push('▸ Events did not open the list');
+    // ⚙ hide list: a word hides the event from the list, not the timeline; "1 hidden" shows; ✕ brings it back.
+    list.querySelector('[data-ce-opt]').click(); await wait(80);
+    const f = list.querySelector('[data-ce-hword-form]');
+    if (!f) out.push('⚙ did not open the hide list');
+    else {
+      f.querySelector('input').value = 'sample'; f.requestSubmit(); await wait(80);
+      if (list.querySelector('.ce-list .ce-event[data-ce-id="e1"]')) out.push('hidden word still in the list');
+      if (!/1 hidden/.test(list.querySelector('[data-ce-showhid]')?.textContent || '')) out.push('no "1 hidden" count');
+      if (!(window.__calls || []).some(c => c[0] === 'setCalEventsHide')) out.push('hide list not saved');
+      list.querySelector('[data-ce-hword-x="sample"]').click(); await wait(80);
+      if (!list.querySelector('.ce-list .ce-event[data-ce-id="e1"]')) out.push('✕ did not bring the event back');
+      list.querySelector('[data-ce-opt-done]').click(); await wait(50);
+    }
     document.querySelector('[data-ce-day]').click(); await wait(100);
     if (list.querySelector('.ce-day')) out.push('🕒 did not hide the day view');
+    document.querySelector('[data-ce-day]').click(); await wait(100);
+    if (!list.querySelector('.ce-day')) out.push('🕒 did not bring the day view back');
     list.querySelector('.ce-event[data-ce-id="e1"] .ce-check').click(); await wait(200);
     // Cats list = urgency boxes then subjects (2026-11-06): e1 was ticked above → Done box.
     if (!list.querySelector('.ce-urg-done .ce-event[data-ce-id="e1"]')) out.push('Cats list: done event not in the Done urgency box');
@@ -1104,6 +1153,14 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             panel.querySelector('.fc-timegrid-event').click(); await wait(80);
             const det = panel.querySelector('[data-cal-detail]');
             if (det.hidden) out.push('tapping an event shows no detail');
+            else {
+              // Popup card beside / under the event (2026-11-11), inside the panel, with a visible border.
+              const dr = det.getBoundingClientRect(), br = det.parentElement.getBoundingClientRect(), er = panel.querySelector('.fc-timegrid-event').getBoundingClientRect();
+              if (!det.classList.contains('cp-pop')) out.push('detail is not a popup');
+              if (dr.left < br.left - 1 || dr.right > br.right + 1 || dr.top < br.top - 1 || dr.bottom > br.bottom + 1) out.push('popup outside the panel');
+              if (dr.left < er.right - 1 && dr.right > er.left + 1 && dr.top < er.bottom - 1 && dr.bottom > er.top + 1) out.push('popup covers the event');
+              if (parseFloat(getComputedStyle(det).borderTopWidth) < 1) out.push('popup has no border');
+            }
             const close = panel.querySelector('[data-cal-close]').getBoundingClientRect();
             if (close.top < 0 || close.right > innerWidth + 1 || close.height < 30) out.push('close button not reachable ' + JSON.stringify([innerWidth, Math.round(close.right), Math.round(close.height), [...panel.querySelectorAll('.fc-header-toolbar .fc-button')].map(b => b.className.match(/fc-(\w+)-button/)[1] + ':' + Math.round(b.getBoundingClientRect().width))]));
             if (phone && Math.abs(panel.getBoundingClientRect().width - (innerWidth - 28)) > 2) out.push('phone panel should leave a 28px left peek');

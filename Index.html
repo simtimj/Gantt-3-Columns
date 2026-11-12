@@ -9578,7 +9578,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     timed.forEach(ev => { if(cluster.length && ev.start >= end) flush(); cluster.push(ev); end = Math.max(end, ev.end); });
     flush();
     // Color legend removed (2026-11-11, Julius): colors stay, the key took up room.
-    let h = '<div class="ce-day" aria-label="Day view"><div class="ce-zoom"><button type="button" data-ce-zoom="-1" aria-label="Zoom out the timeline" title="Zoom out">−</button><button type="button" data-ce-zoom="1" aria-label="Zoom in the timeline" title="Zoom in">+</button></div><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
+    let h = '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
     for(let i = 0; i < 24; i++) h += '<div class="ce-day-hr" style="top:' + i * CE_HOUR + 'px"><span>' + (i % 12 || 12) + (i < 12 ? 'a' : 'p') + '</span></div>';
     /* Zoom guides (2026-11-11, Julius, like 📅): zoomed in → dashed 30-minute lines + labels; further in → 15-minute. */
     const step = CE_HOUR >= 112 ? 15 : CE_HOUR >= 64 ? 30 : 0;
@@ -9593,7 +9593,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const w = 100 / ev._n;
       h += '<div class="ce-day-ev' + (ev.done ? ' done' : '') + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(22px + (100% - 23px) * ' + (ev._l * w / 100) + ');width:calc((100% - 23px) * ' + (w / 100) + ' - 1px);background:' + col(ev) + ';color:' + ink(col(ev)) + '" title="' + esc(ev.time + ' ' + ev.title) + '"><b>' + esc(ev.title) + '</b> <span>' + esc(ev.time || '') + '</span></div>';
     });
-    return h + '</div></div>';
+    /* − / + (2026-11-11, Julius): bottom-right corner of the timeline, mostly transparent so they stay out of the way. */
+    return h + '</div></div><div class="ce-zoom"><button type="button" data-ce-zoom="-1" aria-label="Zoom out the timeline" title="Zoom out">−</button><button type="button" data-ce-zoom="1" aria-label="Zoom in the timeline" title="Zoom in">+</button></div>';
   }
   function ceListFolded(){ try{ return localStorage.getItem('fw.ceListFold') === '1'; }catch(e){ return false; } }
   function ceSortMode(){ try{ return localStorage.getItem('fw.ceSort') === 'time' ? 'time' : 'cat'; }catch(e){ return 'cat'; } }
@@ -9756,6 +9757,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const ha = e.target.closest('[data-ce-hword-add]');
     if(ha && !ceHide.words.some(w => w.toLowerCase() === ha.dataset.ceHwordAdd.toLowerCase())){ ceHide.words.push(ha.dataset.ceHwordAdd); ceHideSave(); }
     const z = e.target.closest('[data-ce-zoom]');
+    if(z && ceePinch.pz) return; // mid-pinch taps are part of the pinch
     if(z){
       const d = document.querySelector('#centerCalendarList .ce-day'), old = CE_HOUR;
       CE_HOUR = Math.round(Math.max(CE_HOUR_MIN, Math.min(CE_HOUR_MAX, z.dataset.ceZoom === '1' ? CE_HOUR * 1.25 : CE_HOUR / 1.25)));
@@ -9783,6 +9785,35 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
   });
   document.addEventListener('input', e => { if(e.target.matches?.('#centerCalendarList .ce-add input')) ceAdd.text = e.target.value; });
+  /* Pinch zoom on the timeline (2026-11-11, Julius): two fingers stretch / squeeze the hours, anchored between the
+     fingers, like a phone map; saved like the − / + buttons. */
+  const ceePinch = {pz: null};
+  (function(){
+    const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    document.addEventListener('touchstart', e => {
+      if(e.touches.length !== 2) return;
+      const d = e.target.closest?.('#centerCalendarList .ce-day'); if(!d) return;
+      ceePinch.pz = {start: dist(e.touches), h0: CE_HOUR, top0: d.scrollTop, raf: 0,
+        midY: (e.touches[0].clientY + e.touches[1].clientY) / 2 - d.getBoundingClientRect().top};
+    }, {passive: true, capture: true});
+    document.addEventListener('touchmove', e => {
+      const pz = ceePinch.pz;
+      if(!pz || e.touches.length !== 2) return;
+      e.preventDefault();
+      const nh = Math.round(Math.max(CE_HOUR_MIN, Math.min(CE_HOUR_MAX, pz.h0 * dist(e.touches) / pz.start)));
+      if(nh === CE_HOUR) return;
+      CE_HOUR = nh;
+      ceDayTopNext = Math.max(0, (pz.top0 + pz.midY) / pz.h0 * nh - pz.midY);
+      if(!pz.raf) pz.raf = requestAnimationFrame(() => { if(ceePinch.pz) ceePinch.pz.raf = 0; if(ceDraw) ceDraw(); });
+    }, {passive: false, capture: true});
+    const end = e => {
+      if(!ceePinch.pz || (e.touches && e.touches.length >= 2)) return;
+      try{ localStorage.setItem('fw.ceHour', String(CE_HOUR)); }catch(err){}
+      setTimeout(() => { ceePinch.pz = null; }, 250);
+    };
+    document.addEventListener('touchend', end, true);
+    document.addEventListener('touchcancel', end, true);
+  })();
   /* List / timeline drag bar (2026-11-11, Julius): drag sets the list's share (fw.ceSplit); a quick second tap resets. */
   (function(){
     let sp = null, lastTap = 0;
@@ -16708,8 +16739,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #centerCalendarList .ce-bsp{flex:1 1 auto;}
   #centerCalendarList .ce-bb{appearance:none;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;padding:0!important;margin:0;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;} /* 2026-11-11 (Julius): ⚙ event-font-sized — big enough to read, no bigger */
   /* − / + live on the timeline itself (2026-11-11, Julius): stuck to its top-right corner, always next to the calendar. */
-  #centerCalendarList .ce-zoom{position:sticky;top:3px;z-index:4;height:0;display:flex;justify-content:flex-end;gap:4px;padding-right:5px;pointer-events:none;}
-  #centerCalendarList .ce-zoom button{pointer-events:auto;appearance:none;width:28px;height:28px;border:1px solid var(--border);border-radius:8px;background:color-mix(in srgb,var(--panel) 88%,transparent);color:inherit;font-size:17px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.18);}
+  #centerCalendarList{position:relative;}
+  #centerCalendarList .ce-zoom{position:absolute;right:6px;bottom:8px;z-index:4;display:flex;gap:4px;pointer-events:none;}
+  #centerCalendarList .ce-zoom button{pointer-events:auto;appearance:none;width:28px;height:28px;border:1px solid color-mix(in srgb,var(--border) 45%,transparent);border-radius:8px;background:color-mix(in srgb,var(--panel) 40%,transparent);color:inherit;font-size:17px;line-height:1;cursor:pointer;opacity:.55;}
+  #centerCalendarList .ce-zoom button:active,#centerCalendarList .ce-zoom button:hover{opacity:1;background:var(--panel);}
   #centerCalendarList .ce-opt{border:1.5px solid var(--divider);border-radius:10px;padding:8px 9px;margin:2px 0 6px;font-size:13px;background:var(--panel);}
   #centerCalendarList .ce-opt-h{display:flex;align-items:center;justify-content:space-between;gap:6px;}
   #centerCalendarList .ce-opt-note{font-size:11.5px;color:var(--muted);margin-top:2px;}

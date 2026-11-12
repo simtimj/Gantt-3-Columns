@@ -611,19 +611,18 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   // 2026-11-06: hold the BLOCKS word → Blocks zooms and History keeps its height; hold a top-middle tab icon → that tab, zoomed.
   const zm2 = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
-    const hold = async el => { el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, hit = document.elementFromPoint(x, y);
+    const hold = async (el, fx = .5) => { el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(), x = r.left + Math.min(r.width * fx, Math.max(8, r.width / 2)), y = r.top + r.height / 2, hit = document.elementFromPoint(x, y);
       if (hit !== el && !el.contains(hit)) return 'covered by ' + (hit && hit.className);
       const o = { bubbles: true, clientX: x, clientY: y, button: 0 }; hit.dispatchEvent(new PointerEvent('pointerdown', o)); await wait(1300); hit.dispatchEvent(new PointerEvent('pointerup', o)); return ''; };
     const close = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(900); };
-    // 2026-11-12: Blocks moved to the bottom of the middle column (#blocksScroll); Thoughts took the bottom-left slot.
+    // 2026-11-12 (later): Focus / Thinking at the bottom of the middle column (#blocksScroll); bottom-left = empty Timer.
     const lab = document.querySelector('#blocksScroll .od-pad-head .od-pad-lab'), top = document.querySelector('#todayScroll .od-on > .od-top');
-    if (lab && top) { const h0 = top.getBoundingClientRect().height, c = await hold(lab);
-      if (c) out.push('BLOCKS label ' + c); else if (!document.querySelector('.plan-pad.fw-focus-target')) out.push('Blocks did not zoom');
-      else if (Math.abs(top.getBoundingClientRect().height - h0) > 2) out.push('History changed height behind zoomed Blocks');
-      await close(); } else out.push('no Blocks label in the middle column');
+    if (lab && top) { const h0 = top.getBoundingClientRect().height, c = await hold(lab, .1); /* the word "Focus": the split grip sits mid-label on phone */
+      if (c) out.push('FOCUS label ' + c); else if (!document.querySelector('.thought-pad.fw-focus-target')) out.push('Focus / Thinking did not zoom');
+      else if (Math.abs(top.getBoundingClientRect().height - h0) > 2) out.push('History changed height behind zoomed Focus');
+      await close(); } else out.push('no Focus label in the middle column');
     const tlab = document.querySelector('#todayScroll .od-on > .od-pad-head .od-pad-lab');
-    if (!tlab || tlab.textContent.trim() !== 'Thoughts') out.push('bottom-left label is not Thoughts');
-    else { const c = await hold(tlab); if (c) out.push('THOUGHTS label ' + c); else if (!document.querySelector('.thought-pad.fw-focus-target')) out.push('Thoughts did not zoom'); await close(); }
+    if (!tlab || tlab.textContent.trim() !== 'Timer') out.push('bottom-left label is not Timer');
     const tab = document.querySelector('#journalPane button[data-ctab="review"]'), c2 = await hold(tab);
     if (c2) out.push('tab icon ' + c2); else if (!document.querySelector('#journalPane.fw-focus-target') || document.getElementById('journalPane').dataset.ctab !== 'review') out.push('holding 📊 did not open Day Review zoomed');
     await close(); document.querySelector('#journalPane button[data-ctab="notes"]').click(); await wait(100);
@@ -652,7 +651,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   const tmr = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const out = [];
-    const pad = document.querySelector('#blocksScroll > .plan-pad[data-date="' + localToday() + '"]'); // docked in the middle column (2026-11-12)
+    const pad = document.querySelector('#todayScroll .day-row > .plan-pad[data-date="' + localToday() + '"]'); // Blocks hidden in its row (2026-11-12): timer logic still runs
     if (!pad || !window.fwTimer) return ['no Blocks pad or timer'];
     const layer = () => pad.parentElement.querySelector('.tmr-layer');
     const bar = () => pad.parentElement.querySelector('.tmr-bar');
@@ -732,12 +731,15 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   // Thoughts pad (2026-11-12): bottom-left free writing, saves to its own column; Blocks sits in the middle column.
   const tho = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
-    const tp = document.querySelector('#todayScroll .od-on > .thought-pad');
-    if (!tp) return ['no Thoughts pad in the left column'];
-    if (getComputedStyle(tp).display === 'none') out.push('Thoughts pad hidden');
-    if (document.querySelector('#todayScroll .od-on > .plan-pad')) out.push('Blocks still in the left column');
+    // 2026-11-12 (later): the same pad is now Focus / Thinking, docked bottom-middle; bottom-left = empty Timer slot.
     const bs = document.getElementById('blocksScroll');
-    if (!bs || getComputedStyle(bs).display === 'none' || !bs.querySelector(':scope > .plan-pad')) out.push('Blocks not shown in the middle column');
+    const tp = bs && bs.querySelector(':scope > .thought-pad[data-date="' + localToday() + '"]');
+    if (!tp) return ['no Focus / Thinking pad in the middle column'];
+    if (getComputedStyle(tp).display === 'none' || getComputedStyle(bs).display === 'none') out.push('Focus / Thinking hidden');
+    const ts = document.querySelector('#todayScroll .od-on > .timer-slot');
+    if (!ts || getComputedStyle(ts).display === 'none') out.push('no empty Timer slot bottom-left'); else if (ts.textContent.trim()) out.push('Timer slot not empty');
+    const pp = document.querySelector('#todayScroll .od-on > .plan-pad');
+    if (pp && getComputedStyle(pp).display !== 'none') out.push('Blocks still showing');
     tp.focus(); tp.innerHTML = 'free thought, no rules'; tp.dispatchEvent(new Event('input', { bubbles: true }));
     await wait(1500);
     const saves = (window.__calls || []).filter(c => c[0] === 'saveThoughtPad');

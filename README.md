@@ -76,7 +76,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-12)
 
-- **2026-11-12 · Thoughts + Blocks move:** one-day view — bottom-left is now **Thoughts**, a free writing space with no rules (own column E, safe autosave, hold the label to zoom). **Blocks** (with the block timer) moved to the bottom of the middle column under Dailies; drag the line between them to resize.
+- **2026-11-12 · Focus / Thinking + Timer slot:** one-day view — bottom of the middle column is now **Focus / Thinking**, a free writing space unique to each day (what you wrote in Thoughts today is there), half the column by default; drag the line to resize. Bottom-left is **Timer**, left empty for now. Blocks is hidden (its saved content is kept).
+- **2026-11-12 · Thoughts + Blocks move (replaced same day by the line above):** one-day view — bottom-left is now **Thoughts**, a free writing space with no rules (own column E, safe autosave, hold the label to zoom). **Blocks** (with the block timer) moved to the bottom of the middle column under Dailies; drag the line between them to resize.
 - **2026-11-12 · Cal Events sub-hour cells:** zoomed in, each hour splits into smaller half- / quarter-hour tiles (fainter fill, tighter gaps than the hour break) instead of 30 / 15-min lines.
 - **2026-11-12 · Cal Events hour cells:** the timeline shows each hour as a soft rounded tile with a small gap (Google Calendar style) instead of hour lines; labels sit in the left gutter; 30 / 15-minute guides stay faint lines inside the tiles.
 

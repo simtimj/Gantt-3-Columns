@@ -693,3 +693,4 @@ Edge swipe (2026-11-11, option C): window capture touch listeners; start within 
 - Smoke: Cal Events block (list above timeline, zoom, fold, ⚙ word hide + save + ✕, 🕒 off / on), History count cycle + Big Three hidden, 📅 popup position + border.
 - Tweaks (same evening): #rdTab back to the quiet style (24px); `[data-rd-open]` Ref buttons in both toolbars toggle the drawer; `ce-day-key` legend removed; timeline events left:22px, 1px gutter (now line matches).
 - Tweaks 2 (same evening): `body:not(.rd-open) #rdTab{display:none}` (Ref button / edge swipe open; tab shows while open for close + size drag); `.ce-day` in ce-has-day = border-top 2px var(--divider) only (wall-to-wall separator).
+- Tweaks 3 (same evening): mini timeline sub-hour guides — `ce-day-sub` dashed lines, 30-min at CE_HOUR ≥ 64, 15-min at ≥ 112, CE_HOUR_MAX 170; `.ce-day-in::before` axis line at left 21px.

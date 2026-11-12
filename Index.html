@@ -2109,7 +2109,9 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-day{height:clamp(140px,38vh,300px);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--divider);border-radius:8px;margin:2px 0 6px;position:relative;}
 #centerCalendarList .ce-day-in{position:relative;}
 #centerCalendarList .ce-day-in::before{content:"";position:absolute;top:0;bottom:0;left:21px;border-left:1px solid var(--divider);} /* axis line between the hour labels and the events (2026-11-11) */
-#centerCalendarList .ce-day-hr.ce-day-sub{border-top:1px solid color-mix(in srgb,var(--divider) 55%,transparent);} /* thin solid, not dashed (2026-11-11) */
+/* Sub-hour cells (2026-11-12, Julius): the 30- / 15-minute guides are smaller tiles too — fainter fill, tighter
+   radius — so zoomed in, each hour splits into little section cells instead of lines. */
+#centerCalendarList .ce-day-hr.ce-day-sub{border-top:0;margin-top:1px;border-radius:5px;background:color-mix(in srgb,var(--muted) 5%,transparent);}
 #centerCalendarList .ce-day-in[data-step="0"] .ce-day-sub{display:none;}
 #centerCalendarList .ce-day-in[data-step="30"] .ce-day-s15{display:none;}
 #centerCalendarList .ce-day-hr.ce-day-sub span{font-size:8.5px;opacity:.85;}
@@ -2120,8 +2122,13 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-day-in::before{display:none;}
 #centerCalendarList .ce-day-hr:not(.ce-day-sub){border-top:0;left:22px;right:2px;height:calc(var(--ce-h,48px) - 2px);margin-top:1px;border-radius:6px;background:color-mix(in srgb,var(--muted) 9%,transparent);}
 #centerCalendarList .ce-day-hr:not(.ce-day-sub) span{left:-21px;top:-1px;width:19px;text-align:right;}
-#centerCalendarList .ce-day-hr.ce-day-sub{left:22px;right:2px;}
 #centerCalendarList .ce-day-hr.ce-day-sub span{left:-21px;width:19px;text-align:right;}
+#centerCalendarList .ce-day-hr.ce-day-sub{left:22px;right:2px;}
+/* Zoomed in, the hour tile shrinks to its first section and the sub tiles fill the rest of the hour. */
+#centerCalendarList .ce-day-in[data-step="30"] .ce-day-hr:not(.ce-day-sub),
+#centerCalendarList .ce-day-in[data-step="30"] .ce-day-hr.ce-day-sub{height:calc(var(--ce-h,48px) / 2 - 2px);}
+#centerCalendarList .ce-day-in[data-step="15"] .ce-day-hr:not(.ce-day-sub),
+#centerCalendarList .ce-day-in[data-step="15"] .ce-day-hr.ce-day-sub{height:calc(var(--ce-h,48px) / 4 - 2px);}
 #centerCalendarList .ce-day-now{position:absolute;left:22px;right:0;border-top:2px solid #ea4335;z-index:2;}
 #centerCalendarList .ce-day-ev{position:absolute;box-sizing:border-box;border-radius:4px;padding:1px 5px;font-size:12px;line-height:1.25;font-family:Roboto,'Segoe UI',system-ui,sans-serif;color:#1f1f1f;overflow:hidden;z-index:1;}
 #centerCalendarList .ce-day-ev b{font-weight:500;} /* Google Calendar look: medium weight, not bold (2026-11-11) */

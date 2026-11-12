@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-12)
 
+- **2026-11-12 · Cal Events sub-hour cells:** zoomed in, each hour splits into smaller half- / quarter-hour tiles (fainter fill) instead of 30 / 15-min lines.
 - **2026-11-12 · Cal Events hour cells:** the timeline shows each hour as a soft rounded tile with a small gap (Google Calendar style) instead of hour lines; labels sit in the left gutter; 30 / 15-minute guides stay faint lines inside the tiles.
 
 ## 🧪 To be confirmed (2026-11-11)

@@ -16628,12 +16628,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* 2026-11-11 (Julius): the blue "Ref" tag was too much — back to the quiet edge tab, just a little wider; the
      toolbar Ref button (next to Cols) is the visible way in. */
   #rdTab{width:24px;}
+  /* 2026-11-11 (Julius): no pull tab on the edge — the Ref button (next to Cols) and the edge swipe open the drawer.
+     The tab still shows while the drawer is open (close / drag-to-size handle). */
+  body:not(.rd-open) #rdTab{display:none;}
   /* Cal Events, Google Calendar layout (2026-11-11, Julius): bar (▾ Events · hidden · ⚙ − +), the list (foldable, at
      most half the column), then the day timeline filling the rest. */
   #calPane #centerDownScroll:has(#centerCalendarList.ce-has-day){display:flex;flex-direction:column;overflow:hidden;}
   #centerCalendarList.ce-has-day{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
   #centerCalendarList.ce-has-day > .ce-list{flex:0 1 auto;max-height:50%;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
-  #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:110px;margin-top:4px;}
+  /* Clear separator above the timeline (2026-11-11, Julius): same 2px wall-to-wall line as the column headers. */
+  #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:110px;margin-top:7px;border:0;border-top:2px solid var(--divider);border-radius:0;}
   #centerCalendarList .ce-list[hidden]{display:none!important;}
   #centerCalendarList .ce-bar{display:flex;align-items:center;gap:4px;margin:2px 0 3px;min-height:26px;}
   #centerCalendarList .ce-fold{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:2px 4px 2px 0;cursor:pointer;white-space:nowrap;}

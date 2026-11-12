@@ -707,3 +707,12 @@ Edge swipe (2026-11-11, option C): window capture touch listeners; start within 
 - Tweaks 15 (2026-11-12): sub-hour cells — `.ce-day-sub` tiles like the hour tile (left 22 / right 2, margin-top 1, radius 5, fill muted 5%, no border); at data-step 30 all tiles = `--ce-h`/2 − 2px, at 15 = `--ce-h`/4 − 2px (hour tile shrinks to its first section).
 - Tweaks 14 (2026-11-12): hour cells — hour `.ce-day-hr` (not sub) = tile left 22px / right 2px, height `var(--ce-h)` − 2px (set on `.ce-day-in` in build + ceDayRescale), radius 6, fill muted 9%, no border; labels right-aligned in the gutter (left −21px); axis `::before` hidden; sub lines start at 22px.
 - Tweaks 13 (2026-11-11 night): band() mixes 20% white before the L-clamps (softer, less vibrant chips); ◉ Now ring = currentColor, no red.
+
+## Thoughts pad + Blocks in the middle column (2026-11-12, Julius)
+
+- Layout (one-day view): left column = History / Completed on top, **Thoughts** below (`.thought-pad`, freeform, no card/urgency logic). Middle column = Dailies (and the other Center tabs) on top, **Blocks** below in `#blocksScroll`; `#notesSplitBar` is back in one-day view and resizes them (`--ns-a/--ns-b`, `fw.notesSplit`, box bottom = `#blocksScroll`). Outside one-day the middle stays one piece.
+- Storage: Thoughts = Days column **E** (`Thoughts` header), `saveThoughtPad(date, html, baseHash)` = same safe-save as `savePlanPad` (conflict returns `{conflict, tho, hh}`; big-shrink backup). Day reads return `tho` + `hh`; `syncDiff_` takes `want.hh` and sends `tho`. Client: `initThoughtPad` IIFE (autosave 900 ms, IME-safe, 3-way merge), hooked into `fwUnsaved` / `fwFlushAll` and the sync request (`odThoughtHash` / `odThoughtTheirs`).
+- Blocks dock: each row still builds its own `.plan-pad`; `blocksDock(date)` (called from `odApply`) moves the active day's pad into `#blocksScroll` and sends others home, dropping `pad._tmr` so the timer recreates its bar/layer beside it. Pad lookups (`padEl`, timer `findLine` / `paintAll`) include `#blocksScroll > .plan-pad`. `#blocksScroll` copies the Dailies row tint.
+- Zoom: hold BLOCKS (middle) → Blocks; hold THOUGHTS (left) → Thoughts. The left `.od-pad-head` drag now resizes History vs Thoughts.
+- Smoke: Blocks label in the middle zooms, Thoughts label zooms, timer suite runs on the docked pad, Thoughts saves via `saveThoughtPad` and never leaks into the Blocks save.
+

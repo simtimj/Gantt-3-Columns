@@ -241,7 +241,8 @@ function readAllDays_() {
   const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { width: 3, rows: [] };
-  const width = sheet.getMaxColumns() >= 4 ? 4 : 3;
+  const mc = sheet.getMaxColumns();
+  const width = mc >= 5 ? 5 : mc >= 4 ? 4 : 3;
   return { width: width, rows: sheet.getRange(2, 1, lastRow - 1, width).getValues() };
 }
 
@@ -313,10 +314,12 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates, timer) {
       .filter(x => x.date && x.date >= startDate && x.date <= endDate)
       .map(x => {
         const row = x.row, plan = snapshot.width >= 4 ? String(row[3] || '') : '';
-        return { date:x.date, tasks:String(row[1] || ''), journal:String(row[2] || ''), plan:plan,
+        const tho = snapshot.width >= 5 ? String(row[4] || '') : '';
+        return { date:x.date, tasks:String(row[1] || ''), journal:String(row[2] || ''), plan:plan, tho:tho,
           th:hashesFor(x.date) ? cellHash_(row[1]) : undefined,
           jh:hashesFor(x.date) ? cellHash_(row[2]) : undefined,
-          ph:hashesFor(x.date) ? cellHash_(plan) : undefined };
+          ph:hashesFor(x.date) ? cellHash_(plan) : undefined,
+          hh:hashesFor(x.date) ? cellHash_(tho) : undefined };
       }).sort((a,b) => a.date.localeCompare(b.date));
   }
   const sheet = speedPart_(timer, 'schedule.lookup', () => getOrCreateSheet_('Days', DAYS_HEADERS, timer));
@@ -375,9 +378,9 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates, timer) {
 
   const out = [];
   // One metadata lookup even when matching dates occupy several row runs.
-  const width = speedPart_(timer, 'schedule.width', () => sheet.getMaxColumns() >= 4 ? 3 : 2);
+  const width = speedPart_(timer, 'schedule.width', () => { const mc = sheet.getMaxColumns(); return mc >= 5 ? 4 : mc >= 4 ? 3 : 2; });
   runs.forEach(group => {
-    // Column D = Plan pad (one-day view, 2026-10-29) when the sheet has it.
+    // Column D = Plan pad (one-day view, 2026-10-29); column E = Thoughts pad (2026-11-12).
     const block = speedPart_(timer, 'schedule.textRead', () => sheet
       .getRange(group.start, 2, group.end - group.start + 1, width)
       .getValues());
@@ -385,14 +388,17 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates, timer) {
     speedPart_(timer, 'schedule.decode', () => group.items.forEach(match => {
       const row = block[match.row - group.start];
       const plan = width > 2 ? String(row[2] || '') : '';
+      const tho = width > 3 ? String(row[3] || '') : '';
       out.push({
         date: match.date,
         tasks: String(row[0] || ''),
         journal: String(row[1] || ''),
         plan: plan,
+        tho: tho,
         th: hashesFor(match.date) ? cellHash_(row[0]) : undefined,
         jh: hashesFor(match.date) ? cellHash_(row[1]) : undefined,
-        ph: hashesFor(match.date) ? cellHash_(plan) : undefined
+        ph: hashesFor(match.date) ? cellHash_(plan) : undefined,
+        hh: hashesFor(match.date) ? cellHash_(tho) : undefined
       });
     }));
   });
@@ -473,6 +479,33 @@ function savePlanPad(dateString, html, baseHash) {
     }
     sheet.getRange(row, 4).setValue(html);
     return { ph: cellHash_(html), build: appBuild_() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* Thoughts pad (Julius, 2026-11-12): free writing space with no rules, bottom of the left
+   column in the one-day view (Blocks moved to the bottom of the middle column). Stored in
+   Days column E ("Thoughts"). Same safe-save rule as savePlanPad. */
+function saveThoughtPad(dateString, html, baseHash) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
+    if (sheet.getMaxColumns() < 5) sheet.insertColumnsAfter(sheet.getMaxColumns(), 5 - sheet.getMaxColumns());
+    if (!sheet.getRange(1, 5).getValue()) sheet.getRange(1, 5).setValue('Thoughts');
+    let row = findDayRow_(sheet, dateString);
+    const cur = row ? String(sheet.getRange(row, 5).getValue() || '') : '';
+    html = String(html || '');
+    const same = baseHash ? cellHash_(cur) === baseHash : cur === '';
+    if (!same) return { hh: cellHash_(cur), conflict: true, tho: cur, build: appBuild_() };
+    if (cur.length > 400 && html.length < cur.length * 0.6) backupCell_(dateString, 'Thoughts', 'big shrink', cur);
+    if (!row) {
+      sheet.appendRow([parseDate_(dateString), '', '']);
+      row = sheet.getLastRow();
+    }
+    sheet.getRange(row, 5).setValue(html);
+    return { hh: cellHash_(html), build: appBuild_() };
   } finally {
     lock.releaseLock();
   }
@@ -599,11 +632,12 @@ function syncDiff_(req, t, daysSnapshot) {
     (daysSnapshot || getDaysRange_(dates[0], dates[dates.length - 1])).forEach(d => {
       const want = req.days[d.date];
       if (!want) return;
-      const e = { th: d.th, jh: d.jh, ph: d.ph };
+      const e = { th: d.th, jh: d.jh, ph: d.ph, hh: d.hh };
       if (want.th !== d.th) e.tasks = d.tasks;
       if (want.jh !== d.jh) e.journal = d.journal;
       if (want.ph !== undefined && want.ph !== d.ph) e.plan = d.plan;
-      if (e.tasks !== undefined || e.journal !== undefined || e.plan !== undefined) out.days[d.date] = e;
+      if (want.hh !== undefined && want.hh !== d.hh) e.tho = d.tho;
+      if (e.tasks !== undefined || e.journal !== undefined || e.plan !== undefined || e.tho !== undefined) out.days[d.date] = e;
     });
   }
   t.mark('days');

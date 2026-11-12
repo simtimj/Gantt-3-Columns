@@ -1967,6 +1967,14 @@
     .od-top{display:contents;}
     body.one-day #todayScroll .od-on > .plan-pad{display:block;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
     .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
+    /* Thoughts pad (2026-11-12, Julius): freeform, no rules, bottom-left slot where Blocks used to be. */
+    .thought-pad{display:none;}
+    body.one-day #todayScroll .od-on > .thought-pad{display:block;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.3;padding:3px 3px 24px;word-break:break-word;}
+    .thought-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;font-style:italic;}
+    /* Blocks docked in the middle column (2026-11-12): the active day's pad lives in #blocksScroll. */
+    body.one-day #blocksScroll > .plan-pad{display:block;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
+    #blocksScroll > .blocks-head{display:block;flex:0 0 auto;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;padding:0 2px;border:0;cursor:default;}
+    #blocksScroll{position:relative;flex-direction:column;overflow:hidden;}
 
     /* One text size everywhere (Julius, 2026-10-29): Reference panels (Urgent, Inbox, Calendar) and the Plan
        pad use the same font, size and line height as the Today / Notes / Reference cells
@@ -2053,7 +2061,9 @@ body.fw-focus-on #fwFocusBackdrop{display:block;}
 body.fw-focus-on :has(.fw-focus-target){z-index:auto!important;}
 body.fw-focus-on .fw-focus-target{position:fixed!important;inset:5dvh 4vw!important;width:92vw!important;height:90dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--fw-focus-bg)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
 body.fw-focus-on .fw-focus-target.plan-pad{padding-top:36px!important;}
-body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Plan / Think';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
+body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Blocks';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
+body.fw-focus-on .fw-focus-target.thought-pad{padding-top:36px!important;}
+body.fw-focus-on .fw-focus-target.thought-pad::before{content:'Thoughts';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
 @media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:5dvh 3vw!important;width:94vw!important;height:90dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
 
 #centerCalendarList .ce-event{display:flex;align-items:flex-start;gap:7px;}
@@ -2447,6 +2457,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <!-- Notes split (2026-10-31, Julius, option A): top = Plan (Notes cell: Suggested Day + Schedule),
            bottom = live Review of the day shown in Today. Render-only, never saved. -->
       <div id="notesSplitBar" title="Drag to resize · double-tap to reset"></div>
+      <!-- Blocks / Timer (2026-11-12, Julius): Blocks moved here, bottom of the middle column.
+           The active day's .plan-pad is docked in by odApply; Thoughts took its old bottom-left slot. -->
+      <div class="scroll" id="blocksScroll"><div class="od-head od-pad-head blocks-head"><span class="od-pad-lab">Blocks</span></div></div>
       <div class="scroll notes-review" id="reviewScroll"></div>
     </section>
     <div class="column-resizer" data-left="journal" data-right="reference" title="Drag to resize columns"></div>
@@ -3236,7 +3249,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       { const top = document.createElement('div'); top.className = 'od-top';
         row.insertBefore(top, row.firstElementChild);
         [...row.children].forEach(n => { if(n !== top && n.matches('.day-label,.od-head:not(.od-pad-head),.editor')) top.appendChild(n); }); }
-      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head"><span class="od-pad-lab">Blocks</span></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
+      // Thoughts (2026-11-12, Julius): freeform writing space, no rules, bottom of the left column.
+      // Blocks (the .plan-pad) is still built per row but lives visually in #blocksScroll (middle column);
+      // odApply docks the active day's pad there.
+      row.insertAdjacentHTML('beforeend','<div class="od-head od-pad-head"><span class="od-pad-lab">Thoughts</span></div><div class="thought-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Write anything — no rules."></div><div class="editor plan-editor plan-pad" contenteditable="true" data-date="' + day.date + '" data-placeholder="Add a block or task…"></div>');
+      const tpad = row.querySelector('.thought-pad');
+      tpad.innerHTML = storedToHtml(day.tho || '');
       const pad = row.querySelector('.plan-pad');
       pad.innerHTML = storedToHtml(day.plan || '');
       // Blocks MVP: reuse the existing Plan column, checkbox editor, indent/outdent,
@@ -5914,12 +5932,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function fwUnsaved(){
     if(fwRefStructurePending) return true;
     if(window.odPadUnsaved && odPadUnsaved()) return true;
+    if(window.odThoughtUnsaved && odThoughtUnsaved()) return true;
     for(const [date,info] of daySaveState) if(info.inFlight || info.pending) return true;
     if(refInFlight > 0) return true;
     return (state.reference || []).some(it => it._timer || it._refDeleted);
   }
   function fwFlushAll(){
     if(window.odPadFlush) odPadFlush();
+    if(window.odThoughtFlush) odThoughtFlush();
     for(const [date,info] of daySaveState) if(info.pending && !info.inFlight) saveDay(date);
     (state.reference || []).forEach(it => { if(it._timer){ clearTimeout(it._timer); it._timer = 0; sendRefItem(it); } });
   }
@@ -6022,6 +6042,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const b = dayBase.get(d.date);
       if(b && b.tasks.h) req.days[d.date] = {th:b.tasks.h,jh:b.journal.h};
       if(window.odPadHash){ const ph = odPadHash(d.date); if(ph !== undefined && req.days[d.date]) req.days[d.date].ph = ph; }
+      if(window.odThoughtHash){ const hh = odThoughtHash(d.date); if(hh !== undefined && req.days[d.date]) req.days[d.date].hh = hh; }
     });
     (state.reference || []).forEach(it => { const b = refBase(it); req.ref[it.id] = b.h; });
     fwSyncBusy = true;
@@ -6037,6 +6058,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         Object.keys(out.days || {}).forEach(date => {
           const e = out.days[date];
           if(e.plan !== undefined && window.odPadTheirs) odPadTheirs(date,e.plan,e.ph);
+          if(e.tho !== undefined && window.odThoughtTheirs) odThoughtTheirs(date,e.tho,e.hh);
           const info = daySaveState.get(date);
           if(info && (info.inFlight || info.pending)){ retry = true; return; } // that save merges; check again shortly
           if(e.tasks !== undefined) note = fwReconcileDay(date,'tasks',e.tasks,e.th) || note;
@@ -13812,7 +13834,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       box:() => {
         // Center Up (whichever tab is showing) above, Center Down below (2026-11-01).
         const p = document.getElementById('journalPane');
-        const t = document.getElementById(p && (p.dataset.ctab === 'weather' || p.dataset.ctab === 'wxdaily') ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : p && p.dataset.ctab === 'fun' ? 'funScroll' : p && p.dataset.ctab === 'new' ? 'newScroll' : 'journalScroll'), b = document.getElementById('centerDownScroll');
+        const t = document.getElementById(p && (p.dataset.ctab === 'weather' || p.dataset.ctab === 'wxdaily') ? 'weatherScroll' : p && p.dataset.ctab === 'review' ? 'dayReviewScroll' : p && p.dataset.ctab === 'fun' ? 'funScroll' : p && p.dataset.ctab === 'new' ? 'newScroll' : 'journalScroll'), b = document.getElementById('blocksScroll');
         if(!t || !b) return null;
         const r1 = t.getBoundingClientRect(), r2 = b.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};
@@ -13820,7 +13842,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     wire({sel:'body.one-day #todayScroll .od-on > .od-pad-head',key:'fw.odSplit',a:'--od-a',b:'--od-b',
       host:() => document.getElementById('todayScroll') || document.documentElement,
       box:bar => {
-        const row = bar.parentNode, ed = row && (row.querySelector(':scope > .od-top') || row.querySelector('.day-editor')), pad = row && row.querySelector('.plan-pad');
+        const row = bar.parentNode, ed = row && (row.querySelector(':scope > .od-top') || row.querySelector('.day-editor')), pad = row && row.querySelector('.thought-pad');
         if(!ed || !pad) return null;
         const r1 = ed.getBoundingClientRect(), r2 = pad.getBoundingClientRect();
         return {top:r1.top,height:r2.bottom - r1.top};
@@ -13925,6 +13947,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       }
       document.querySelectorAll('#todayScroll > .day-row, #journalScroll > .day-row')
         .forEach(r => { r.classList.toggle('od-on', r.dataset.date === date); r.style.height = ''; });
+      blocksDock(date);
       refreshPersistentNotes(date);
       if(window.renderFocus) window.renderFocus();
       loadCenterCalendar(date);
@@ -13942,6 +13965,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
       window.odDate = date;
       odApply();
+    }
+    // Blocks dock (2026-11-12, Julius): the active day's .plan-pad lives at the bottom of the middle
+    // column (#blocksScroll). Other days' pads stay hidden in their rows; switching day sends the old
+    // pad home and docks the new one. Timer bar/layer are removed on any move so the timer script
+    // recreates them next to the pad's new position.
+    function dropTmr(p){ if(p && p._tmr){ try{ p._tmr.bar.remove(); p._tmr.layer.remove(); }catch(e){} p._tmr = null; } }
+    function blocksDock(date){
+      const bs = document.getElementById('blocksScroll'); if(!bs) return;
+      [...bs.querySelectorAll(':scope > .plan-pad')].forEach(p => {
+        if(p.dataset.date === date) return;
+        dropTmr(p);
+        const home = document.querySelector('#todayScroll .day-row[data-date="' + CSS.escape(p.dataset.date || '') + '"]');
+        if(home && !home.querySelector(':scope > .plan-pad')) home.appendChild(p); else p.remove();
+      });
+      const rp = document.querySelector('#todayScroll .day-row[data-date="' + CSS.escape(date) + '"] > .plan-pad');
+      if(rp){
+        const cur = bs.querySelector(':scope > .plan-pad');
+        if(cur && cur !== rp){ dropTmr(cur); cur.remove(); } // stale copy from a rebuilt row
+        dropTmr(rp);
+        bs.appendChild(rp);
+      }
+      // Same day tint as Dailies above it (the pad left its tinted row).
+      const jr = document.querySelector('#journalScroll .day-row[data-date="' + CSS.escape(date) + '"]') || rp && rp.closest('.day-row');
+      if(jr){ const cs = getComputedStyle(jr); bs.style.background = cs.backgroundColor; bs.style.color = cs.color; }
+      if(window.fwTimer && window.fwTimer.paintAll) requestAnimationFrame(() => { try{ fwTimer.paintAll(); }catch(e){} });
     }
     window.odApply = () => { odApply(); if(window.applyDayLines) applyDayLines(); };
     window.odGo = odGo;
@@ -13974,7 +14022,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       return padBase.get(d) || {t:'', h:null};
     }
     const st = d => { if(!padSt.has(d)) padSt.set(d,{timer:0,inFlight:false,pending:false}); return padSt.get(d); };
-    const padEl = d => document.querySelector(`#todayScroll .plan-pad[data-date="${CSS.escape(d)}"]`);
+    const padEl = d => document.querySelector(`.plan-pad[data-date="${CSS.escape(d)}"]`); // may be docked in #blocksScroll (2026-11-12)
     const clean = html => /^(\s|<br\s*\/?>|<div><br\s*\/?><\/div>)*$/i.test(html || '') ? '' : String(html);
     function schedule(d){
       const x = st(d); x.pending = true; clearTimeout(x.timer);
@@ -14058,6 +14106,87 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     window.odPadTheirs = (d, plan, h) => { const x = st(d); if(x.inFlight || x.pending) return; merge(d, plan, h); };
     window.odPadUnsaved = () => [...padSt.values()].some(x => x.inFlight || x.pending);
     window.odPadFlush = () => { for(const [d,x] of padSt) if(x.pending && !x.inFlight) save(d); };
+  })();
+  // Thoughts pad (2026-11-12, Julius): freeform writing, no rules — same conflict-safe autosave as the
+  // Plan pad (Days column E, saveThoughtPad), but no urgency scanning, no card machinery.
+  (function initThoughtPad(){
+    const tBase = new Map(), tSt = new Map();
+    function base(d){
+      if(!tBase.has(d)){
+        const day = (state.days || []).find(y => y.date === d);
+        if(day && day.hh !== undefined) tBase.set(d,{t:day.tho || '', h:day.hh});
+      }
+      return tBase.get(d) || {t:'', h:null};
+    }
+    const st = d => { if(!tSt.has(d)) tSt.set(d,{timer:0,inFlight:false,pending:false}); return tSt.get(d); };
+    const el = d => document.querySelector(`.thought-pad[data-date="${CSS.escape(d)}"]`);
+    const clean = html => /^(\s|<br\s*\/?>|<div><br\s*\/?><\/div>)*$/i.test(html || '') ? '' : String(html);
+    function schedule(d){
+      const x = st(d); x.pending = true; clearTimeout(x.timer);
+      setStatus('Unsaved…');
+      x.timer = setTimeout(() => save(d), 900);
+    }
+    function save(d){
+      const x = st(d); clearTimeout(x.timer); x.timer = 0;
+      if(dictating.has(d)){ x.pending = true; return; }
+      if(x.inFlight){ x.pending = true; return; }
+      const pad = el(d); if(!pad){ x.pending = false; return; }
+      const html = clean(pad.innerHTML);
+      const b = base(d);
+      if(html === b.t){ x.pending = false; return; }
+      x.inFlight = true; x.pending = false;
+      setStatus('Saving…');
+      google.script.run
+        .withSuccessHandler(res => {
+          x.inFlight = false;
+          if(res && res.build && typeof fwCheckBuild === 'function') fwCheckBuild(res.build);
+          if(res && res.conflict){ merge(d, res.tho, res.hh); }
+          else if(res){
+            tBase.set(d,{t:html, h:res.hh});
+            const day = state.days.find(y => y.date === d); if(day){ day.tho = html; day.hh = res.hh; }
+            if(!x.pending) setStatus('Saved');
+          }
+          if(x.pending) save(d);
+        })
+        .withFailureHandler(e => {
+          x.inFlight = false; x.pending = true;
+          setStatus('Thoughts save failed — retrying');
+          x.timer = setTimeout(() => save(d), 5000);
+        })
+        .saveThoughtPad(d, html, b.h);
+    }
+    // Android dictation (IME composition): never touch the DOM mid-composition.
+    const dictating = new Set(), deferred = new Map();
+    document.addEventListener('compositionstart', e => {
+      const p = e.target.closest?.('.thought-pad');
+      if(p) dictating.add(p.dataset.date);
+    }, true);
+    document.addEventListener('compositionend', e => {
+      const p = e.target.closest?.('.thought-pad');
+      if(!p) return;
+      const d = p.dataset.date;
+      dictating.delete(d);
+      schedule(d);
+      const def = deferred.get(d);
+      if(def){ deferred.delete(d); setTimeout(() => merge(d, def.tho, def.h), 100); }
+    }, true);
+    function merge(d, theirs, h){
+      if(dictating.has(d)){ deferred.set(d,{tho:theirs,h}); return; }
+      const b = base(d);
+      tBase.set(d,{t:theirs || '', h});
+      const pad = el(d); if(!pad) return;
+      const mine = fwBlocks(clean(pad.innerHTML)), their = fwBlocks(theirs || '');
+      const m = fwMerge3(fwBlocks(b.t), mine, their);
+      if(!fwSame(m.blocks, mine)) replaceEditorHtml(pad, m.blocks.join(''));
+      if(!fwSame(m.blocks, their)) schedule(d);
+      setStatus(m.conflict ? 'Thoughts merged with changes from elsewhere' : 'Synced changes from elsewhere');
+    }
+    document.addEventListener('input', e => { const p = e.target.closest && e.target.closest('.thought-pad'); if(p) schedule(p.dataset.date); }, true);
+    document.addEventListener('focusout', e => { const p = e.target.closest && e.target.closest('.thought-pad'); if(p && st(p.dataset.date).pending) save(p.dataset.date); });
+    window.odThoughtHash = d => { const b = base(d); return b && b.h ? b.h : undefined; };
+    window.odThoughtTheirs = (d, tho, h) => { const x = st(d); if(x.inFlight || x.pending) return; merge(d, tho, h); };
+    window.odThoughtUnsaved = () => [...tSt.values()].some(x => x.inFlight || x.pending);
+    window.odThoughtFlush = () => { for(const [d,x] of tSt) if(x.pending && !x.inFlight) save(d); };
   })();
 </script>
 <script>
@@ -14444,6 +14573,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .tmr-bar,.tmr-layer{display:none;}
   body.one-day #todayScroll .od-on > .tmr-bar.on{display:flex;}
   body.one-day #todayScroll .od-on > .tmr-layer{display:block;}
+  body.one-day #blocksScroll > .tmr-bar.on{display:flex;}
+  body.one-day #blocksScroll > .tmr-layer{display:block;}
   .tmr-bar{flex:0 0 auto;align-items:center;gap:2px 4px;flex-wrap:wrap;font-size:12px;line-height:1.25;padding:2px 2px 3px;color:var(--muted);}
   .tmr-bar .tmr-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
   .tmr-bar .tmr-name{color:var(--text,inherit);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -14608,7 +14739,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function findLine(id){
     if(!id) return null;
-    for(const pad of document.querySelectorAll('#todayScroll .plan-pad')){ const n = pad.querySelector('[data-tmr="' + CSS.escape(id) + '"]'); if(n) return {pad, line:n}; }
+    for(const pad of document.querySelectorAll('#todayScroll .plan-pad, #blocksScroll > .plan-pad')){ const n = pad.querySelector('[data-tmr="' + CSS.escape(id) + '"]'); if(n) return {pad, line:n}; }
     return null;
   }
   const PLACEHOLDER = /^(?:Next Block(?:\s+\d+)?|Block name)$/i;
@@ -14800,7 +14931,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
   function paintAll(){
     snap = replay(Date.now());
-    document.querySelectorAll('#todayScroll .plan-pad').forEach(p => { try{ paint(p, snap); }catch(e){ console.error(e); } });
+    document.querySelectorAll('#todayScroll .plan-pad, #blocksScroll > .plan-pad').forEach(p => { try{ paint(p, snap); }catch(e){ console.error(e); } });
     snap = null;
   }
   // A timer left running for hours: say so once per block, so the time can be corrected (it's never trimmed).
@@ -15041,7 +15172,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return el.animate(out?[to,from]:[from,to],timing);
   }
   // While History is zoomed out of its row, Blocks keeps the height it had instead of filling the gap.
-  function padOf(el){ return el.classList.contains('od-top') && el.parentElement ? el.parentElement.querySelector(':scope > .plan-pad') : null; }
+  function padOf(el){ return el.classList.contains('od-top') && el.parentElement ? el.parentElement.querySelector(':scope > .thought-pad, :scope > .plan-pad') : null; }
   // Section outlines are drawn for the cell's size: redraw them for the zoomed / normal size.
   function repaintSecs(el){ requestAnimationFrame(() => { const ed = el.matches('.day-editor') ? el : el.querySelector('.day-editor'); if(ed && typeof paintDaySecs === 'function') try{ paintDaySecs(ed); }catch(e){} }); }
   // History zoomed out of its row: a same-height spacer keeps Blocks where it was (2026-11-05, Julius).
@@ -15080,7 +15211,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(node.closest('.urg-head'))return document.getElementById('urgentPanel');
     // History only (2026-11-04, Julius): zooming the whole pane also stretched Blocks under it.
     if(node.closest('.today-jump'))return (document.body.classList.contains('one-day') && document.querySelector('#todayScroll .od-on > .od-top')) || document.getElementById('todayPane');
-    if(node.closest('.od-pad-head'))return document.querySelector('#todayScroll .od-on .plan-pad');
+    if(node.closest('#blocksScroll .od-pad-head'))return document.querySelector('#blocksScroll > .plan-pad');
+    if(node.closest('.od-pad-head'))return document.querySelector('#todayScroll .od-on .thought-pad');
     // Top-middle tab icons (2026-11-06, Julius): hold one → that tab opens, zoomed (tabs stay usable inside).
     const tab=node.closest('#journalPane button[data-ctab]');if(tab)return document.getElementById('journalPane');
     // Reference tab icons too (📚 Reference, 📝 Scratch Pad): the tabs live inside #referenceScroll.
@@ -16745,8 +16877,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      (#referencePane) = right-side drawer, opened by the edge tab (◀). #calPane copies the old Reference column's
      grid slot, width and Cols / split visibility, so the existing column machinery keeps working unchanged. -->
 <style>
-  #notesSplitBar{display:none!important;}
-  #journalPane #journalScroll{flex:1 1 0!important;}
+  /* 2026-11-12: Blocks moved to the bottom of the middle column (#blocksScroll); the split bar
+     is back in one-day view to resize Dailies vs Blocks. Outside one-day the middle stays one piece. */
+  body:not(.one-day) #notesSplitBar{display:none!important;}
+  body:not(.one-day) #journalPane #journalScroll{flex:1 1 0!important;}
+  #blocksScroll{display:none;}
+  body.one-day #journalPane #blocksScroll{display:flex;flex:var(--ns-b,1) 1 0;min-height:34px;}
+  body.one-day #journalPane #journalScroll{flex:var(--ns-a,1) 1 0;}
   #calPane{position:relative;}
   #calPane #centerDownScroll{flex:1 1 0!important;min-height:0;padding-inline:3px!important;} /* tighter side margins around the list + timeline (2026-11-11) */
   html body #workspace #referencePane.rd-drawer{

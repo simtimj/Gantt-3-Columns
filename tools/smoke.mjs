@@ -615,11 +615,15 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       if (hit !== el && !el.contains(hit)) return 'covered by ' + (hit && hit.className);
       const o = { bubbles: true, clientX: x, clientY: y, button: 0 }; hit.dispatchEvent(new PointerEvent('pointerdown', o)); await wait(1300); hit.dispatchEvent(new PointerEvent('pointerup', o)); return ''; };
     const close = async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(900); };
-    const lab = document.querySelector('#todayScroll .od-on > .od-pad-head .od-pad-lab'), top = document.querySelector('#todayScroll .od-on > .od-top');
+    // 2026-11-12: Blocks moved to the bottom of the middle column (#blocksScroll); Thoughts took the bottom-left slot.
+    const lab = document.querySelector('#blocksScroll .od-pad-head .od-pad-lab'), top = document.querySelector('#todayScroll .od-on > .od-top');
     if (lab && top) { const h0 = top.getBoundingClientRect().height, c = await hold(lab);
       if (c) out.push('BLOCKS label ' + c); else if (!document.querySelector('.plan-pad.fw-focus-target')) out.push('Blocks did not zoom');
       else if (Math.abs(top.getBoundingClientRect().height - h0) > 2) out.push('History changed height behind zoomed Blocks');
-      await close(); }
+      await close(); } else out.push('no Blocks label in the middle column');
+    const tlab = document.querySelector('#todayScroll .od-on > .od-pad-head .od-pad-lab');
+    if (!tlab || tlab.textContent.trim() !== 'Thoughts') out.push('bottom-left label is not Thoughts');
+    else { const c = await hold(tlab); if (c) out.push('THOUGHTS label ' + c); else if (!document.querySelector('.thought-pad.fw-focus-target')) out.push('Thoughts did not zoom'); await close(); }
     const tab = document.querySelector('#journalPane button[data-ctab="review"]'), c2 = await hold(tab);
     if (c2) out.push('tab icon ' + c2); else if (!document.querySelector('#journalPane.fw-focus-target') || document.getElementById('journalPane').dataset.ctab !== 'review') out.push('holding 📊 did not open Day Review zoomed');
     await close(); document.querySelector('#journalPane button[data-ctab="notes"]').click(); await wait(100);
@@ -648,7 +652,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   const tmr = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const out = [];
-    const pad = document.querySelector('#todayScroll .plan-pad[data-date="' + localToday() + '"]');
+    const pad = document.querySelector('#blocksScroll > .plan-pad[data-date="' + localToday() + '"]'); // docked in the middle column (2026-11-12)
     if (!pad || !window.fwTimer) return ['no Blocks pad or timer'];
     const layer = () => pad.parentElement.querySelector('.tmr-layer');
     const bar = () => pad.parentElement.querySelector('.tmr-bar');
@@ -724,6 +728,24 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     return out;
   });
   tmr.forEach(x => errs.push('Timer: ' + x));
+
+  // Thoughts pad (2026-11-12): bottom-left free writing, saves to its own column; Blocks sits in the middle column.
+  const tho = await pg.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+    const tp = document.querySelector('#todayScroll .od-on > .thought-pad');
+    if (!tp) return ['no Thoughts pad in the left column'];
+    if (getComputedStyle(tp).display === 'none') out.push('Thoughts pad hidden');
+    if (document.querySelector('#todayScroll .od-on > .plan-pad')) out.push('Blocks still in the left column');
+    const bs = document.getElementById('blocksScroll');
+    if (!bs || getComputedStyle(bs).display === 'none' || !bs.querySelector(':scope > .plan-pad')) out.push('Blocks not shown in the middle column');
+    tp.focus(); tp.innerHTML = 'free thought, no rules'; tp.dispatchEvent(new Event('input', { bubbles: true }));
+    await wait(1500);
+    const saves = (window.__calls || []).filter(c => c[0] === 'saveThoughtPad');
+    if (!saves.some(c => String(c[1][1]).includes('free thought'))) out.push('Thoughts did not save');
+    if ((window.__calls || []).filter(c => c[0] === 'savePlanPad').some(c => String(c[1][1]).includes('free thought'))) out.push('Thoughts text leaked into Blocks');
+    return out;
+  });
+  tho.forEach(x => errs.push('Thoughts: ' + x));
   const before = await pg.evaluate(() => window.fwTimer.events().length);
   await pg.reload(); await pg.waitForTimeout(800);
   const after = await pg.evaluate(() => window.fwTimer && window.fwTimer.events().length);

@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-12)
 
+- **2026-11-12 · Thoughts + Blocks move:** one-day view — bottom-left is now **Thoughts**, a free writing space with no rules (own column E, safe autosave, hold the label to zoom). **Blocks** (with the block timer) moved to the bottom of the middle column under Dailies; drag the line between them to resize.
 - **2026-11-12 · Cal Events sub-hour cells:** zoomed in, each hour splits into smaller half- / quarter-hour tiles (fainter fill, tighter gaps than the hour break) instead of 30 / 15-min lines.
 - **2026-11-12 · Cal Events hour cells:** the timeline shows each hour as a soft rounded tile with a small gap (Google Calendar style) instead of hour lines; labels sit in the left gutter; 30 / 15-minute guides stay faint lines inside the tiles.
 
@@ -588,6 +589,9 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+
+- **Blocks timer next (2026-11-12):** child item timers + Break polish; Quick Add while a block runs (comma-split into lines).
+- **Calendar backlog (2026-11-12, captured):** pop-out events panel that covers the middle column for long titles; Cal Events always shows Soon + Later lines (drag in = set priority); small calendar = 1:1 mini of the big calendar, with hold-drag move, top/bottom resize handles and Google Calendar sync.
 
 - **Calendar backlog** (wanted 2026-11-11, design pending): unfinished calendar tasks from past days go to a backlog (kept, struck through on their old day, colors kept); a Backlog button opens a list on the left of the 📅 panel to drag tasks back onto a day. Built 2026-11-11 (see 🧪). See `docs/NOTES.md` → "Calendar backlog".
 - **App cleanup** (wanted 2026-11-08): hide what isn't used, better grouping and sorting of the many panels / tabs First candidate: the **Cal Events** panel (center bottom), now covered by the 📅 calendar; decide what takes its spot.

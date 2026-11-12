@@ -9579,22 +9579,37 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     flush();
     // Color legend removed (2026-11-11, Julius): colors stay, the key took up room.
     let h = '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
-    for(let i = 0; i < 24; i++) h += '<div class="ce-day-hr" style="top:' + i * CE_HOUR + 'px"><span>' + (i % 12 || 12) + (i < 12 ? 'a' : 'p') + '</span></div>';
+    for(let i = 0; i < 24; i++) h += '<div class="ce-day-hr" data-m="' + i * 60 + '" style="top:' + i * CE_HOUR + 'px"><span>' + (i % 12 || 12) + (i < 12 ? 'a' : 'p') + '</span></div>';
     /* Zoom guides (2026-11-11, Julius, like 📅): zoomed in → dashed 30-minute lines + labels; further in → 15-minute. */
     const step = CE_HOUR >= 112 ? 15 : CE_HOUR >= 64 ? 30 : 0;
     if(step) for(let mnt = step; mnt < 24 * 60; mnt += step){
       if(mnt % 60 === 0) continue;
       const hr = Math.floor(mnt / 60);
-      h += '<div class="ce-day-hr ce-day-sub" style="top:' + (mnt / 60 * CE_HOUR) + 'px"><span>' + (hr % 12 || 12) + ':' + ('0' + mnt % 60).slice(-2) + '</span></div>';
+      h += '<div class="ce-day-hr ce-day-sub" data-m="' + mnt + '" style="top:' + (mnt / 60 * CE_HOUR) + 'px"><span>' + (hr % 12 || 12) + ':' + ('0' + mnt % 60).slice(-2) + '</span></div>';
     }
-    if(data.date === localToday()){ const n = new Date(); h += '<div class="ce-day-now" style="top:' + ((n.getHours() + n.getMinutes() / 60) * CE_HOUR) + 'px"></div>'; }
+    if(data.date === localToday()){ const n = new Date(); h += '<div class="ce-day-now" data-m="' + (n.getHours() * 60 + n.getMinutes()) + '" style="top:' + ((n.getHours() + n.getMinutes() / 60) * CE_HOUR) + 'px"></div>'; }
     out.forEach(ev => {
-      const top = Math.max(0, (ev.start - d0) / 3600000 * CE_HOUR), ht = Math.max(14, (Math.min(ev.end, d0 + 86400000) - Math.max(ev.start, d0)) / 3600000 * CE_HOUR - 1);
+      const m0 = Math.max(0, (ev.start - d0) / 60000), m1 = (Math.min(ev.end, d0 + 86400000) - d0) / 60000;
+      const top = m0 / 60 * CE_HOUR, ht = Math.max(14, (m1 - m0) / 60 * CE_HOUR - 1);
       const w = 100 / ev._n;
-      h += '<div class="ce-day-ev' + (ev.done ? ' done' : '') + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(22px + (100% - 23px) * ' + (ev._l * w / 100) + ');width:calc((100% - 23px) * ' + (w / 100) + ' - 1px);background:' + col(ev) + ';color:' + ink(col(ev)) + '" title="' + esc(ev.time + ' ' + ev.title) + '"><b>' + esc(ev.title) + '</b> <span>' + esc(ev.time || '') + '</span></div>';
+      h += '<div class="ce-day-ev' + (ev.done ? ' done' : '') + '" data-m0="' + m0.toFixed(1) + '" data-m1="' + m1.toFixed(1) + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(22px + (100% - 23px) * ' + (ev._l * w / 100) + ');width:calc((100% - 23px) * ' + (w / 100) + ' - 1px);background:' + col(ev) + ';color:' + ink(col(ev)) + '" title="' + esc(ev.time + ' ' + ev.title) + '"><b>' + esc(ev.title) + '</b> <span>' + esc(ev.time || '') + '</span></div>';
     });
     /* − / + (2026-11-11, Julius): bottom-right corner of the timeline, mostly transparent so they stay out of the way. */
     return h + '</div></div><div class="ce-zoom"><button type="button" data-ce-zoom="-1" aria-label="Zoom out the timeline" title="Zoom out">−</button><button type="button" data-ce-zoom="1" aria-label="Zoom in the timeline" title="Zoom in">+</button></div>';
+  }
+  /* Pinch rescale (2026-11-11, Julius: one pinch now covers the whole range): moving existing nodes keeps the
+     browser's touch stream alive — rebuilding the DOM mid-pinch killed it, so a pinch only got one small step. */
+  function ceDayRescale(){
+    const d = document.querySelector('#centerCalendarList .ce-day'), din = d && d.querySelector('.ce-day-in');
+    if(!din) return false;
+    din.style.height = 24 * CE_HOUR + 'px';
+    din.querySelectorAll('[data-m]').forEach(n => { n.style.top = (n.dataset.m / 60 * CE_HOUR) + 'px'; });
+    din.querySelectorAll('.ce-day-ev').forEach(n => {
+      n.style.top = (n.dataset.m0 / 60 * CE_HOUR) + 'px';
+      n.style.height = Math.max(14, (n.dataset.m1 - n.dataset.m0) / 60 * CE_HOUR - 1) + 'px';
+    });
+    if(ceDayTopNext >= 0){ d.scrollTop = ceDayTopNext; ceDayTopNext = -1; }
+    return true;
   }
   function ceListFolded(){ try{ return localStorage.getItem('fw.ceListFold') === '1'; }catch(e){ return false; } }
   function ceSortMode(){ try{ return localStorage.getItem('fw.ceSort') === 'time' ? 'time' : 'cat'; }catch(e){ return 'cat'; } }
@@ -9804,11 +9819,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(nh === CE_HOUR) return;
       CE_HOUR = nh;
       ceDayTopNext = Math.max(0, (pz.top0 + pz.midY) / pz.h0 * nh - pz.midY);
-      if(!pz.raf) pz.raf = requestAnimationFrame(() => { if(ceePinch.pz) ceePinch.pz.raf = 0; if(ceDraw) ceDraw(); });
+      if(!pz.raf) pz.raf = requestAnimationFrame(() => { if(ceePinch.pz) ceePinch.pz.raf = 0; if(!ceDayRescale() && ceDraw) ceDraw(); });
     }, {passive: false, capture: true});
     const end = e => {
       if(!ceePinch.pz || (e.touches && e.touches.length >= 2)) return;
       try{ localStorage.setItem('fw.ceHour', String(CE_HOUR)); }catch(err){}
+      const d = document.querySelector('#centerCalendarList .ce-day');
+      if(d) ceDayTopNext = d.scrollTop;
+      if(ceDraw) ceDraw(); // full draw once: refreshes the 30- / 15-minute guide lines for the final zoom
       setTimeout(() => { ceePinch.pz = null; }, 250);
     };
     document.addEventListener('touchend', end, true);

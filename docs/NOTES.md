@@ -699,3 +699,4 @@ Edge swipe (2026-11-11, option C): window capture touch listeners; start within 
 - Tweaks 6 (same evening): ce-bb 22px/15px; ce-bar 22px min-height; ce-split margin 4/3; #calPane #centerDownScroll padding-inline 3px; ce-zoom gap 4 / right 5.
 - Tweaks 7 (same evening): band() lightness ceiling 0.86 → 0.78 (Chill / pale fills a notch darker).
 - Tweaks 8 (same evening): pinch zoom on `.ce-day` (touchstart/move capture, CE_HOUR h0×ratio, rAF ceDraw, anchor at finger midpoint via ceDayTopNext, saved on touchend; ceePinch.pz guards stray [data-ce-zoom] taps); `.ce-zoom` now absolute bottom-right of #centerCalendarList (position:relative), 40% panel bg, opacity .55 → 1 on press.
+- Tweaks 9 (same evening): pinch fix — mid-pinch ceDraw removed the touch-target DOM and Chrome dropped the touch stream (one small step per pinch). Now ceDayRescale() moves existing nodes (data-m on lines / now, data-m0/m1 on events) each frame; full ceDraw only on touchend (guides refresh).

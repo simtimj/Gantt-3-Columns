@@ -697,3 +697,4 @@ Edge swipe (2026-11-11, option C): window capture touch listeners; start within 
 - Tweaks 4 (same evening): `.ce-split` drag bar between `.ce-list` and `.ce-day` (replaces the border-top separator; grip like #notesSplitBar). Drag sets `--ce-ls` + `.ce-man` (list flex 10–85%, `fw.ceSplit`); double-tap resets to auto; hidden while the list is folded; 4px tap threshold.
 - Tweaks 5 (same evening): getMainCalendarEvents calHex from calAccess_ (API pastels, CalendarApp fallback); client band() clamps lightness 0.26–0.86 before ink(); ce-bb 30px/19px (⚙); `.ce-zoom` sticky top-right inside `.ce-day` (buttons left the bar).
 - Tweaks 6 (same evening): ce-bb 22px/15px; ce-bar 22px min-height; ce-split margin 4/3; #calPane #centerDownScroll padding-inline 3px; ce-zoom gap 4 / right 5.
+- Tweaks 7 (same evening): band() lightness ceiling 0.86 → 0.78 (Chill / pale fills a notch darker).

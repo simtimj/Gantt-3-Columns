@@ -9566,7 +9566,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const m = /^#?([0-9a-f]{6})$/i.exec(hx || ''); if(!m) return hx;
       const n = parseInt(m[1], 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
       const L = (Math.max(r,g,b) + Math.min(r,g,b)) / 510;
-      if(L > 0.86){ const f = 0.86 / L; r = Math.round(r * f); g = Math.round(g * f); b = Math.round(b * f); }
+      if(L > 0.78){ const f = 0.78 / L; r = Math.round(r * f); g = Math.round(g * f); b = Math.round(b * f); } // ceiling 0.86 → 0.78 (2026-11-11, Julius: Chill still too bright)
       else if(L < 0.26){ const k = (0.34 - L) / (1 - L); r = Math.round(r + (255 - r) * k); g = Math.round(g + (255 - g) * k); b = Math.round(b + (255 - b) * k); }
       return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
     };

@@ -9569,10 +9569,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const band = hx => {
       const m = /^#?([0-9a-f]{6})$/i.exec(hx || ''); if(!m) return hx;
       const n = parseInt(m[1], 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+      // Softened like Google's chips (2026-11-11, Julius: "too vibrant"): 20% toward white, then the readable band.
+      r += (255 - r) * 0.2; g += (255 - g) * 0.2; b += (255 - b) * 0.2;
       const L = (Math.max(r,g,b) + Math.min(r,g,b)) / 510;
       if(L > 0.70){ const f = 0.70 / L; r = Math.round(r * f); g = Math.round(g * f); b = Math.round(b * f); } // ceiling 0.86 → 0.78 → 0.70 (2026-11-11, Julius: Chill kept reading too light)
       else if(L < 0.26){ const k = (0.34 - L) / (1 - L); r = Math.round(r + (255 - r) * k); g = Math.round(g + (255 - g) * k); b = Math.round(b + (255 - b) * k); }
-      return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+      return '#' + ((1 << 24) | (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b)).toString(16).slice(1);
     };
     const col = ev => band(ev.done ? '#bdbdbd' : ev.hex || ({1:'#e67c73', 2:'#e6ba57', 3:'#4285f4'})[ev.urg] || '#8ab4f8');
     const ink = hx => { const m = /^#?([0-9a-f]{6})$/i.exec(hx || ''); if(!m) return '#1f1f1f'; const n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.6 ? '#1f1f1f' : '#fff'; };
@@ -16785,7 +16787,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #centerCalendarList{position:relative;}
   #centerCalendarList .ce-zoom{position:absolute;right:6px;bottom:8px;z-index:4;display:flex;gap:4px;pointer-events:none;}
   #centerCalendarList .ce-zoom button{pointer-events:auto;appearance:none;width:24px;height:24px;border:1px solid color-mix(in srgb,var(--border) 45%,transparent);border-radius:7px;background:color-mix(in srgb,var(--panel) 40%,transparent);color:inherit;font-size:15px;line-height:1;cursor:pointer;opacity:.55;display:inline-flex;align-items:center;justify-content:center;padding:0;}
-  #centerCalendarList .ce-zoom [data-ce-now] i{width:9px;height:9px;border-radius:50%;border:2px solid #ea4335;display:block;box-sizing:border-box;} /* little "now" dot like the red line */
+  #centerCalendarList .ce-zoom [data-ce-now] i{width:9px;height:9px;border-radius:50%;border:2px solid currentColor;display:block;box-sizing:border-box;} /* plain ring, same color as − / + (2026-11-11) */
   #centerCalendarList .ce-zoom button:active,#centerCalendarList .ce-zoom button:hover{opacity:1;background:var(--panel);}
   #centerCalendarList .ce-opt{border:1.5px solid var(--divider);border-radius:10px;padding:8px 9px;margin:2px 0 6px;font-size:13px;background:var(--panel);}
   #centerCalendarList .ce-opt-h{display:flex;align-items:center;justify-content:space-between;gap:6px;}

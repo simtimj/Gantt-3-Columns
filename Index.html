@@ -2115,6 +2115,13 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-day-hr.ce-day-sub span{font-size:8.5px;opacity:.85;}
 #centerCalendarList .ce-day-hr{position:absolute;left:0;right:0;border-top:1px solid var(--divider);height:0;}
 #centerCalendarList .ce-day-hr span{position:absolute;left:3px;top:1px;font-size:9.5px;color:var(--muted);}
+/* Hour cells (2026-11-12, Julius: "like Google Calendar"): each hour is a soft rounded tile with a small gap, no
+   hour line; labels sit in the gutter. Sub-hour guides stay faint lines inside the tiles. */
+#centerCalendarList .ce-day-in::before{display:none;}
+#centerCalendarList .ce-day-hr:not(.ce-day-sub){border-top:0;left:22px;right:2px;height:calc(var(--ce-h,48px) - 2px);margin-top:1px;border-radius:6px;background:color-mix(in srgb,var(--muted) 9%,transparent);}
+#centerCalendarList .ce-day-hr:not(.ce-day-sub) span{left:-21px;top:-1px;width:19px;text-align:right;}
+#centerCalendarList .ce-day-hr.ce-day-sub{left:22px;right:2px;}
+#centerCalendarList .ce-day-hr.ce-day-sub span{left:-21px;width:19px;text-align:right;}
 #centerCalendarList .ce-day-now{position:absolute;left:22px;right:0;border-top:2px solid #ea4335;z-index:2;}
 #centerCalendarList .ce-day-ev{position:absolute;box-sizing:border-box;border-radius:4px;padding:1px 5px;font-size:12px;line-height:1.25;font-family:Roboto,'Segoe UI',system-ui,sans-serif;color:#1f1f1f;overflow:hidden;z-index:1;}
 #centerCalendarList .ce-day-ev b{font-weight:500;} /* Google Calendar look: medium weight, not bold (2026-11-11) */
@@ -9584,7 +9591,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     timed.forEach(ev => { if(cluster.length && ev.start >= end) flush(); cluster.push(ev); end = Math.max(end, ev.end); });
     flush();
     // Color legend removed (2026-11-11, Julius): colors stay, the key took up room.
-    let h = '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" data-step="' + ceStep() + '" style="height:' + 24 * CE_HOUR + 'px">';
+    let h = '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" data-step="' + ceStep() + '" style="height:' + 24 * CE_HOUR + 'px;--ce-h:' + CE_HOUR + 'px">';
     for(let i = 0; i < 24; i++) h += '<div class="ce-day-hr" data-m="' + i * 60 + '" style="top:' + i * CE_HOUR + 'px"><span>' + (i % 12 || 12) + (i < 12 ? 'a' : 'p') + '</span></div>';
     /* Zoom guides (2026-11-11, Julius): all 15-minute lines live in the DOM; data-step on .ce-day-in shows / hides
        them by zoom level, so they appear mid-pinch (no node swaps under the fingers). Thin solid lines, not dashed. */
@@ -9613,7 +9620,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const d = document.querySelector('#centerCalendarList .ce-day'), din = d && d.querySelector('.ce-day-in');
     if(!din) return false;
     din.dataset.step = ceStep(); // the 30- / 15-minute lines come and go live, mid-pinch
-    din.style.height = 24 * CE_HOUR + 'px';
+    din.style.height = 24 * CE_HOUR + 'px'; din.style.setProperty('--ce-h', CE_HOUR + 'px');
     din.querySelectorAll('[data-m]').forEach(n => { n.style.top = (n.dataset.m / 60 * CE_HOUR) + 'px'; });
     din.querySelectorAll('.ce-day-ev').forEach(n => {
       n.style.top = (n.dataset.m0 / 60 * CE_HOUR) + 'px';

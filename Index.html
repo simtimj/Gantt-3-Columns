@@ -16470,7 +16470,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPane #centerDownScroll{flex:1 1 0!important;min-height:0;}
   html body #workspace #referencePane.rd-drawer{
     position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:auto!important;
-    width:min(440px,90vw)!important;max-width:none!important;height:auto!important;min-height:0!important;
+    width:min(var(--rd-w,340px),calc(100vw - 32px))!important;max-width:none!important;height:auto!important;min-height:0!important;
     grid-column:auto!important;grid-row:auto!important;display:flex!important;z-index:2400;
     border-left:1px solid var(--border);box-shadow:-6px 0 24px rgba(0,0,0,.25);
     overscroll-behavior:contain;touch-action:pan-y;
@@ -16483,7 +16483,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:var(--muted);
     background:var(--panel);border:1px solid var(--border);border-right:0;border-radius:8px 0 0 8px;
     box-shadow:-2px 0 6px rgba(0,0,0,.12);opacity:.9;cursor:pointer;transition:right .2s ease;}
-  body.rd-open #rdTab{right:min(440px,90vw);opacity:1;}
+  body.rd-open #rdTab{right:min(var(--rd-w,340px),calc(100vw - 32px));opacity:1;}
+  #rdTab{touch-action:none;}
+  body.rd-sizing #rdTab,body.rd-sizing #workspace #referencePane.rd-drawer{transition:none!important;}
   body.cal-open #rdTab{display:none;}
   /* Narrow Cal Events column (phone, 3 columns): tighter header so 🔍 still fits. */
   @container (max-width:150px){#centerDownScroll .ce-head{gap:2px!important;}#centerDownScroll .ce-tools{gap:2px!important;}}
@@ -16510,7 +16512,35 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!on && ref.contains(document.activeElement)) document.activeElement.blur();
   }
   window.fwRefDrawer = {open:() => set(true), close:() => set(false), toggle:() => set(!isOpen()), isOpen};
-  tab.addEventListener('click', () => set(!isOpen()));
+  // Drag the tab to size the drawer (2026-11-11, Julius): left = wider, right = narrower; the width is saved on
+  // this device. Dragging a closed tab pulls the drawer open at that width. A plain tap still opens / closes.
+  const RD_KEY = 'fw.rdWidth', RD_MIN = 220;
+  const setW = px => document.documentElement.style.setProperty('--rd-w', Math.round(px) + 'px');
+  try { const w = +localStorage.getItem(RD_KEY); if(w >= RD_MIN) setW(w); } catch(_){}
+  let size = null, skipClick = false;
+  tab.addEventListener('pointerdown', e => {
+    if(e.button > 0) return;
+    size = {x:e.clientX, moved:false, id:e.pointerId};
+    try { tab.setPointerCapture(e.pointerId); } catch(_){}
+  });
+  tab.addEventListener('pointermove', e => {
+    if(!size) return;
+    if(!size.moved){ if(Math.abs(e.clientX - size.x) < 6) return; size.moved = true; document.body.classList.add('rd-sizing'); if(!isOpen()) set(true); }
+    e.preventDefault();
+    setW(Math.max(RD_MIN, Math.min(window.innerWidth - 32, window.innerWidth - e.clientX - tab.offsetWidth / 2)));
+  });
+  function endSize(){
+    if(!size) return;
+    const moved = size.moved; size = null;
+    document.body.classList.remove('rd-sizing');
+    if(!moved) return;
+    skipClick = true; setTimeout(() => { skipClick = false; }, 400);
+    const w = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--rd-w'), 10);
+    try { if(w >= RD_MIN) localStorage.setItem(RD_KEY, String(w)); } catch(_){}
+  }
+  tab.addEventListener('pointerup', endSize);
+  tab.addEventListener('pointercancel', endSize);
+  tab.addEventListener('click', () => { if(skipClick){ skipClick = false; return; } set(!isOpen()); });
   bd.addEventListener('click', () => set(false));
   // Esc closes the drawer, unless it is closing something on top first (zoom, menu, picker, 📅 panel).
   window.addEventListener('keydown', e => {
@@ -16518,6 +16548,46 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(document.querySelector('.fw-focus-target,.fw-focus-spacer,.urg-create-menu,.ctx-menu:not([hidden]),.modal:not([hidden])')) return;
     set(false);
   }, true);
+  // Edge swipe (phone, 2026-11-11): drag left from the right edge to pull the drawer in; drag it (or the dimmed
+  // page) right to push it out. The drawer follows the finger; release past 60px or with a quick flick.
+  // A touch that holds before moving (card drag, hold menus) never counts.
+  const EDGE = 24, PASS = 60, HOLD_MS = 350;
+  let sw = null;
+  const drawerW = () => ref.getBoundingClientRect().width || Math.min(340, window.innerWidth - 32);
+  function follow(px){ ref.style.transition = 'none'; ref.style.visibility = 'visible'; ref.style.transform = 'translateX(' + px + 'px)'; }
+  function unfollow(){ ref.style.transition = ref.style.visibility = ref.style.transform = ''; }
+  window.addEventListener('touchstart', e => {
+    sw = null;
+    if(e.touches.length !== 1 || document.body.classList.contains('cal-open')) return;
+    const t = e.touches[0], open = isOpen();
+    const fromEdge = !open && t.clientX >= window.innerWidth - EDGE;
+    if(e.target === tab || (!fromEdge && !(open && (ref.contains(e.target) || e.target === bd)))) return;
+    sw = {x:t.clientX, y:t.clientY, t:Date.now(), open, lock:null, dx:0, w:drawerW()};
+    if(fromEdge) e.stopPropagation(); // the edge strip belongs to the drawer, not the column swipe
+  }, {capture:true, passive:true});
+  window.addEventListener('touchmove', e => {
+    if(!sw || e.touches.length !== 1) return;
+    const t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+    if(!sw.lock){
+      if(Math.abs(dx) + Math.abs(dy) < 10) return;
+      const h = Math.abs(dx) > Math.abs(dy) * 1.5 && (sw.open ? dx > 0 : dx < 0);
+      if(!h || Date.now() - sw.t > HOLD_MS){ sw = null; return; }
+      sw.lock = 'h';
+    }
+    e.preventDefault();
+    sw.dx = dx;
+    follow(sw.open ? Math.max(0, dx) : Math.max(0, sw.w + dx));
+  }, {capture:true, passive:false});
+  function endSwipe(){
+    if(!sw) return;
+    const s = sw; sw = null;
+    if(!s.lock) return;
+    const dist = s.open ? s.dx : -s.dx, fast = dist / Math.max(1, Date.now() - s.t) > .5;
+    unfollow();
+    set((dist > PASS || (fast && dist > 20)) ? !s.open : s.open);
+  }
+  window.addEventListener('touchend', endSwipe, true);
+  window.addEventListener('touchcancel', () => { if(sw && sw.lock){ unfollow(); set(sw.open); } sw = null; }, true);
   // Mouse drag on the drawer header must not pan the workspace behind it.
   ref.addEventListener('pointerdown', e => {
     if(e.target.closest('.pane-header') && !e.target.closest('button,input,select,a')) e.stopPropagation();

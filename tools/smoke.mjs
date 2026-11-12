@@ -63,6 +63,39 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   const merged = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll .day-editor .check-text')].some(x => x.textContent === 'From import')
     && (window.__calls || []).some(c => c[0] === 'runImports'));
   if (!merged) errs.push('Fast start: the runImports line did not merge into the page');
+  // Drawer edge swipe (2026-11-11, phone): left from the right edge opens Next Steps + Reference; right closes it.
+  if (view.hasTouch) {
+    const swipe = await pg.evaluate(async () => {
+      const wait = ms => new Promise(r => setTimeout(r, ms));
+      const W = innerWidth, H = innerHeight, y = H / 2, ys = H * .3; // ys: away from the ◀ tab
+      async function drag(x0, x1, target){
+        const tgt = target || document.elementFromPoint(x0, ys) || document.body;
+        const touch = x => new Touch({identifier: 1, target: tgt, clientX: x, clientY: ys});
+        tgt.dispatchEvent(new TouchEvent('touchstart', {bubbles:true, cancelable:true, touches:[touch(x0)], changedTouches:[touch(x0)]}));
+        for (let i = 1; i <= 6; i++) { const x = x0 + (x1 - x0) * i / 6; tgt.dispatchEvent(new TouchEvent('touchmove', {bubbles:true, cancelable:true, touches:[touch(x)], changedTouches:[touch(x)]})); await wait(16); }
+        tgt.dispatchEvent(new TouchEvent('touchend', {bubbles:true, cancelable:true, touches:[], changedTouches:[touch(x1)]}));
+        await wait(300);
+      }
+      const out = [];
+      await drag(W - 6, W - 160);
+      if (!fwRefDrawer.isOpen()) out.push('edge swipe left did not open the drawer');
+      await drag(W - 300, W - 120, document.querySelector('#referenceScroll') || document.getElementById('referencePane'));
+      if (fwRefDrawer.isOpen()) out.push('swipe right on the drawer did not close it');
+      await drag(W - 6, W - 20);
+      if (fwRefDrawer.isOpen()) out.push('a tiny edge drag opened the drawer');
+      if (document.getElementById('referencePane').style.transform) out.push('drawer kept an inline transform');
+      // Drag the ◀ tab: pulls the drawer open at that width and saves it.
+      const tab = document.getElementById('rdTab'), pe = (type, x) => tab.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true, pointerId:7, pointerType:'touch', clientX:x, clientY:y, isPrimary:true}));
+      pe('pointerdown', W - 10); for (const x of [W - 40, W - 150, W - 250]) { pe('pointermove', x); await wait(16); } pe('pointerup', W - 250); tab.click(); await wait(300);
+      const dw = Math.round(document.getElementById('referencePane').getBoundingClientRect().width);
+      if (!fwRefDrawer.isOpen()) out.push('dragging the tab did not open the drawer');
+      if (Math.abs(dw - 240) > 20) out.push('tab drag width ' + dw + ', wanted ~240');
+      if (+localStorage.getItem('fw.rdWidth') !== dw) out.push('drawer width not saved (' + localStorage.getItem('fw.rdWidth') + ')');
+      fwRefDrawer.close(); await wait(250);
+      return out;
+    });
+    swipe.forEach(m => errs.push('Drawer swipe: ' + m));
+  }
   // The study entry stays folded: its 2 detail lines are hidden, the next task is not, and they follow it.
   const study = await pg.evaluate(() => {
     const head = document.querySelector('.day-editor [data-study]');

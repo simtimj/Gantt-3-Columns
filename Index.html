@@ -9560,7 +9560,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const timed = data.events.filter(ev => !ev.allDay).sort((a,b) => a.start - b.start || b.end - a.end);
     const d0 = new Date(data.date + 'T00:00:00').getTime();
     // Colors (2026-11-11, Julius): each event's own color, else its calendar's color, like 📅; done = grey.
-    const col = ev => ev.done ? '#bdbdbd' : ev.hex || ({1:'#e67c73', 2:'#e6ba57', 3:'#4285f4'})[ev.urg] || '#8ab4f8';
+    /* Readable band (2026-11-11, Julius): a too-light fill (Cooldown) is nudged darker, a too-dark one lighter, so
+       the text always has something to sit on; everything in between stays exactly as Google has it. */
+    const band = hx => {
+      const m = /^#?([0-9a-f]{6})$/i.exec(hx || ''); if(!m) return hx;
+      const n = parseInt(m[1], 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+      const L = (Math.max(r,g,b) + Math.min(r,g,b)) / 510;
+      if(L > 0.86){ const f = 0.86 / L; r = Math.round(r * f); g = Math.round(g * f); b = Math.round(b * f); }
+      else if(L < 0.26){ const k = (0.34 - L) / (1 - L); r = Math.round(r + (255 - r) * k); g = Math.round(g + (255 - g) * k); b = Math.round(b + (255 - b) * k); }
+      return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+    };
+    const col = ev => band(ev.done ? '#bdbdbd' : ev.hex || ({1:'#e67c73', 2:'#e6ba57', 3:'#4285f4'})[ev.urg] || '#8ab4f8');
     const ink = hx => { const m = /^#?([0-9a-f]{6})$/i.exec(hx || ''); if(!m) return '#1f1f1f'; const n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.6 ? '#1f1f1f' : '#fff'; };
     // Overlaps: greedy lanes inside each cluster of touching events.
     const out = []; let cluster = [], end = 0;
@@ -9568,7 +9578,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     timed.forEach(ev => { if(cluster.length && ev.start >= end) flush(); cluster.push(ev); end = Math.max(end, ev.end); });
     flush();
     // Color legend removed (2026-11-11, Julius): colors stay, the key took up room.
-    let h = '<div class="ce-day" aria-label="Day view"><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
+    let h = '<div class="ce-day" aria-label="Day view"><div class="ce-zoom"><button type="button" data-ce-zoom="-1" aria-label="Zoom out the timeline" title="Zoom out">−</button><button type="button" data-ce-zoom="1" aria-label="Zoom in the timeline" title="Zoom in">+</button></div><div class="ce-day-in" style="height:' + 24 * CE_HOUR + 'px">';
     for(let i = 0; i < 24; i++) h += '<div class="ce-day-hr" style="top:' + i * CE_HOUR + 'px"><span>' + (i % 12 || 12) + (i < 12 ? 'a' : 'p') + '</span></div>';
     /* Zoom guides (2026-11-11, Julius, like 📅): zoomed in → dashed 30-minute lines + labels; further in → 15-minute. */
     const step = CE_HOUR >= 112 ? 15 : CE_HOUR >= 64 ? 30 : 0;
@@ -9696,7 +9706,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       box.innerHTML = '<div class="ce-bar"><button type="button" class="ce-fold" data-ce-fold aria-expanded="' + !folded + '" title="Fold / open the events list"><span class="ce-farr">' + (folded ? '▸' : '▾') + '</span> Events <small>' + data.events.length + '</small></button>' +
         (nHid ? '<button type="button" class="ce-hidn' + (ceShowHidden ? ' on' : '') + '" data-ce-showhid title="' + (ceShowHidden ? 'Hide them again' : 'Show them in the list for now') + '">' + nHid + ' hidden</button>' : '') +
         '<span class="ce-bsp"></span><button type="button" class="btn ce-bb" data-ce-opt aria-label="Choose what to hide from the list" title="Hide calendars or titles from the list">⚙</button>' +
-        (dayOn ? '<button type="button" class="btn ce-bb" data-ce-zoom="-1" aria-label="Zoom out the timeline" title="Zoom out">−</button><button type="button" class="btn ce-bb" data-ce-zoom="1" aria-label="Zoom in the timeline" title="Zoom in">+</button>' : '') + '</div>' +
+        '</div>' +
         (ceOpt.open ? ceOptHtml(full) : '') +
         '<div class="ce-list"' + (folded ? ' hidden' : '') + '>' + listHtml + '</div>';
       box.classList.toggle('ce-has-day', dayOn);
@@ -16696,7 +16706,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #centerCalendarList .ce-hidn{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted);font:inherit;font-size:11px;border-radius:999px;padding:1px 7px;cursor:pointer;white-space:nowrap;}
   #centerCalendarList .ce-hidn.on{background:var(--accent-soft,rgba(66,133,244,.18));color:inherit;}
   #centerCalendarList .ce-bsp{flex:1 1 auto;}
-  #centerCalendarList .ce-bb{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;padding:0!important;margin:0;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
+  #centerCalendarList .ce-bb{appearance:none;flex:0 0 30px;width:30px;height:30px;min-width:30px;min-height:30px;padding:0!important;margin:0;font-size:19px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;} /* 2026-11-11 (Julius): the ⚙ was unrecognizably small */
+  /* − / + live on the timeline itself (2026-11-11, Julius): stuck to its top-right corner, always next to the calendar. */
+  #centerCalendarList .ce-zoom{position:sticky;top:4px;z-index:4;height:0;display:flex;justify-content:flex-end;gap:5px;padding-right:8px;pointer-events:none;}
+  #centerCalendarList .ce-zoom button{pointer-events:auto;appearance:none;width:28px;height:28px;border:1px solid var(--border);border-radius:8px;background:color-mix(in srgb,var(--panel) 88%,transparent);color:inherit;font-size:17px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.18);}
   #centerCalendarList .ce-opt{border:1.5px solid var(--divider);border-radius:10px;padding:8px 9px;margin:2px 0 6px;font-size:13px;background:var(--panel);}
   #centerCalendarList .ce-opt-h{display:flex;align-items:center;justify-content:space-between;gap:6px;}
   #centerCalendarList .ce-opt-note{font-size:11.5px;color:var(--muted);margin-top:2px;}

@@ -2722,8 +2722,11 @@ function getMainCalendarEvents(dateString) {
     try { cal = CalendarApp.getCalendarById(calId); } catch (e) { cal = null; }
     if (!cal) return;
     const ro = !calWritable_(calId), isMain = calId === EVENT_CALENDARS[0];
+    // Calendar color from the API list (2026-11-11, Julius): the same pastels Google Calendar shows.
+    // CalendarApp.getColor() returns the old palette (dark navy for a light-blue calendar, etc.).
     let calHex = '#039be5', calName = '';
-    try { calHex = String(cal.getColor() || calHex); calName = cal.getName(); } catch (e) { console.error(e); }
+    try { const acc = calAccess_()[calId]; if (acc) { calHex = acc.color || calHex; calName = acc.name; } } catch (e) { console.error(e); }
+    if (!calName) try { calHex = String(cal.getColor() || calHex); calName = cal.getName(); } catch (e) { console.error(e); }
     cal.getEvents(start, end).forEach(ev => {
     const allDay = ev.isAllDayEvent();
     const s = ev.getStartTime(), e = ev.getEndTime();

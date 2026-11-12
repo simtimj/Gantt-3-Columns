@@ -16659,7 +16659,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #notesSplitBar{display:none!important;}
   #journalPane #journalScroll{flex:1 1 0!important;}
   #calPane{position:relative;}
-  #calPane #centerDownScroll{flex:1 1 0!important;min-height:0;}
+  #calPane #centerDownScroll{flex:1 1 0!important;min-height:0;padding-inline:3px!important;} /* tighter side margins around the list + timeline (2026-11-11) */
   html body #workspace #referencePane.rd-drawer{
     position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:auto!important;
     width:min(var(--rd-w,340px),calc(100vw - 32px))!important;max-width:none!important;height:auto!important;min-height:0!important;
@@ -16693,22 +16693,22 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Separator = drag bar (2026-11-11, Julius): the 2px line between the list and the timeline can be dragged to give
      the top or bottom more room (saved per device); double-tap it to go back to automatic. Grip like the other bars. */
   #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:60px;margin-top:0;border:0;border-radius:0;}
-  #centerCalendarList .ce-split{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;margin:6px 0 5px;}
+  #centerCalendarList .ce-split{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;margin:4px 0 3px;}
   #centerCalendarList .ce-split::before{content:"";position:absolute;left:0;right:0;top:-12px;bottom:-12px;}
   #centerCalendarList .ce-split::after{content:"";position:absolute;left:50%;top:-1.5px;width:30px;height:5px;margin-left:-15px;border-radius:2px;background:var(--grip,var(--divider));}
   #centerCalendarList .ce-list[hidden] + .ce-split{display:none;}
   #centerCalendarList.ce-man > .ce-list:not([hidden]){flex:0 0 var(--ce-ls,40%);max-height:88%;min-height:28px;}
   #centerCalendarList .ce-list[hidden]{display:none!important;}
-  #centerCalendarList .ce-bar{display:flex;align-items:center;gap:4px;margin:2px 0 3px;min-height:26px;}
+  #centerCalendarList .ce-bar{display:flex;align-items:center;gap:3px;margin:0 0 2px;min-height:22px;}
   #centerCalendarList .ce-fold{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:2px 4px 2px 0;cursor:pointer;white-space:nowrap;}
   #centerCalendarList .ce-fold small{font-weight:500;color:var(--muted);margin-left:2px;}
   #centerCalendarList .ce-farr{display:inline-block;width:1em;color:var(--muted);}
   #centerCalendarList .ce-hidn{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted);font:inherit;font-size:11px;border-radius:999px;padding:1px 7px;cursor:pointer;white-space:nowrap;}
   #centerCalendarList .ce-hidn.on{background:var(--accent-soft,rgba(66,133,244,.18));color:inherit;}
   #centerCalendarList .ce-bsp{flex:1 1 auto;}
-  #centerCalendarList .ce-bb{appearance:none;flex:0 0 30px;width:30px;height:30px;min-width:30px;min-height:30px;padding:0!important;margin:0;font-size:19px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;} /* 2026-11-11 (Julius): the ⚙ was unrecognizably small */
+  #centerCalendarList .ce-bb{appearance:none;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;padding:0!important;margin:0;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;} /* 2026-11-11 (Julius): ⚙ event-font-sized — big enough to read, no bigger */
   /* − / + live on the timeline itself (2026-11-11, Julius): stuck to its top-right corner, always next to the calendar. */
-  #centerCalendarList .ce-zoom{position:sticky;top:4px;z-index:4;height:0;display:flex;justify-content:flex-end;gap:5px;padding-right:8px;pointer-events:none;}
+  #centerCalendarList .ce-zoom{position:sticky;top:3px;z-index:4;height:0;display:flex;justify-content:flex-end;gap:4px;padding-right:5px;pointer-events:none;}
   #centerCalendarList .ce-zoom button{pointer-events:auto;appearance:none;width:28px;height:28px;border:1px solid var(--border);border-radius:8px;background:color-mix(in srgb,var(--panel) 88%,transparent);color:inherit;font-size:17px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.18);}
   #centerCalendarList .ce-opt{border:1.5px solid var(--divider);border-radius:10px;padding:8px 9px;margin:2px 0 6px;font-size:13px;background:var(--panel);}
   #centerCalendarList .ce-opt-h{display:flex;align-items:center;justify-content:space-between;gap:6px;}

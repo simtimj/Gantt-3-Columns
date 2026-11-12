@@ -9700,6 +9700,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         (ceOpt.open ? ceOptHtml(full) : '') +
         '<div class="ce-list"' + (folded ? ' hidden' : '') + '>' + listHtml + '</div>';
       box.classList.toggle('ce-has-day', dayOn);
+      if(dayOn){
+        try{ const v = parseFloat(localStorage.getItem('fw.ceSplit')); if(v >= 10 && v <= 85){ box.style.setProperty('--ce-ls', v + '%'); box.classList.add('ce-man'); } else { box.classList.remove('ce-man'); } }catch(err){}
+        box.insertAdjacentHTML('beforeend', '<div class="ce-split" title="Drag to size the list and timeline · double-tap to reset" aria-label="Resize the events list"></div>');
+      }
       if(dayOn){ box.insertAdjacentHTML('beforeend', ceDayHtml(full)); const d = box.querySelector('.ce-day'); if(d){ d.scrollTop = ceDayTopNext >= 0 ? ceDayTopNext : dayTop >= 0 ? dayTop : ceDayScroll(full); ceDayTopNext = -1; } }
     };
     const cached = centerCalendarCache.get(date);
@@ -9769,6 +9773,36 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
   });
   document.addEventListener('input', e => { if(e.target.matches?.('#centerCalendarList .ce-add input')) ceAdd.text = e.target.value; });
+  /* List / timeline drag bar (2026-11-11, Julius): drag sets the list's share (fw.ceSplit); a quick second tap resets. */
+  (function(){
+    let sp = null, lastTap = 0;
+    document.addEventListener('pointerdown', e => {
+      const b = e.target.closest?.('#centerCalendarList .ce-split'); if(!b) return;
+      e.preventDefault(); e.stopPropagation();
+      const box = b.closest('#centerCalendarList'), r = box.getBoundingClientRect();
+      sp = {box, top: r.top, h: r.height, y0: e.clientY, moved: false};
+      try{ b.setPointerCapture(e.pointerId); }catch(err){}
+    }, true);
+    document.addEventListener('pointermove', e => {
+      if(!sp) return;
+      if(!sp.moved && Math.abs(e.clientY - sp.y0) < 4) return; // a jittery tap is still a tap
+      sp.moved = true;
+      sp.pct = Math.max(10, Math.min(85, (e.clientY - sp.top) / sp.h * 100));
+      sp.box.classList.add('ce-man'); sp.box.style.setProperty('--ce-ls', sp.pct.toFixed(1) + '%');
+    }, true);
+    const done = e => {
+      if(!sp) return;
+      if(sp.moved && sp.pct != null){ try{ localStorage.setItem('fw.ceSplit', sp.pct.toFixed(1)); }catch(err){} }
+      else {
+        const now = Date.now();
+        if(now - lastTap < 350){ sp.box.classList.remove('ce-man'); sp.box.style.removeProperty('--ce-ls'); try{ localStorage.removeItem('fw.ceSplit'); }catch(err){} lastTap = 0; }
+        else lastTap = now;
+      }
+      sp = null;
+    };
+    document.addEventListener('pointerup', done, true);
+    document.addEventListener('pointercancel', done, true);
+  })();
   document.addEventListener('change', e => {
     const c = e.target.closest?.('[data-ce-hcal]'); if(!c) return;
     ceHide.cals = ceHide.cals.filter(x => x.id !== c.dataset.ceHcal);
@@ -16646,8 +16680,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPane #centerDownScroll:has(#centerCalendarList.ce-has-day){display:flex;flex-direction:column;overflow:hidden;}
   #centerCalendarList.ce-has-day{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
   #centerCalendarList.ce-has-day > .ce-list{flex:0 1 auto;max-height:50%;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
-  /* Clear separator above the timeline (2026-11-11, Julius): same 2px wall-to-wall line as the column headers. */
-  #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:110px;margin-top:7px;border:0;border-top:2px solid var(--divider);border-radius:0;}
+  /* Separator = drag bar (2026-11-11, Julius): the 2px line between the list and the timeline can be dragged to give
+     the top or bottom more room (saved per device); double-tap it to go back to automatic. Grip like the other bars. */
+  #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:60px;margin-top:0;border:0;border-radius:0;}
+  #centerCalendarList .ce-split{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;margin:6px 0 5px;}
+  #centerCalendarList .ce-split::before{content:"";position:absolute;left:0;right:0;top:-12px;bottom:-12px;}
+  #centerCalendarList .ce-split::after{content:"";position:absolute;left:50%;top:-1.5px;width:30px;height:5px;margin-left:-15px;border-radius:2px;background:var(--grip,var(--divider));}
+  #centerCalendarList .ce-list[hidden] + .ce-split{display:none;}
+  #centerCalendarList.ce-man > .ce-list:not([hidden]){flex:0 0 var(--ce-ls,40%);max-height:88%;min-height:28px;}
   #centerCalendarList .ce-list[hidden]{display:none!important;}
   #centerCalendarList .ce-bar{display:flex;align-items:center;gap:4px;margin:2px 0 3px;min-height:26px;}
   #centerCalendarList .ce-fold{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:2px 4px 2px 0;cursor:pointer;white-space:nowrap;}

@@ -9599,7 +9599,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       h += '<div class="ce-day-ev' + (ev.done ? ' done' : '') + '" data-m0="' + m0.toFixed(1) + '" data-m1="' + m1.toFixed(1) + '" style="top:' + top + 'px;height:' + ht + 'px;left:calc(22px + (100% - 23px) * ' + (ev._l * w / 100) + ');width:calc((100% - 23px) * ' + (w / 100) + ' - 1px);background:' + col(ev) + ';color:' + ink(col(ev)) + '" title="' + esc(ev.time + ' ' + ev.title) + '"><b>' + esc(ev.title) + '</b> <span>' + esc(ev.time || '') + '</span></div>';
     });
     /* − / + (2026-11-11, Julius): bottom-right corner of the timeline, mostly transparent so they stay out of the way. */
-    return h + '</div></div><div class="ce-zoom"><button type="button" data-ce-zoom="-1" aria-label="Zoom out the timeline" title="Zoom out">−</button><button type="button" data-ce-zoom="1" aria-label="Zoom in the timeline" title="Zoom in">+</button></div>';
+    return h + '</div></div><div class="ce-zoom"><button type="button" data-ce-now aria-label="Jump to the current time" title="Jump to now"><i></i></button><button type="button" data-ce-zoom="-1" aria-label="Zoom out the timeline" title="Zoom out">−</button><button type="button" data-ce-zoom="1" aria-label="Zoom in the timeline" title="Zoom in">+</button></div>';
   }
   /* Pinch rescale (2026-11-11, Julius: one pinch now covers the whole range): moving existing nodes keeps the
      browser's touch stream alive — rebuilding the DOM mid-pinch killed it, so a pinch only got one small step. */
@@ -9790,6 +9790,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(hx){ ceHide.words = ceHide.words.filter(w => w !== hx.dataset.ceHwordX); ceHideSave(); }
     const ha = e.target.closest('[data-ce-hword-add]');
     if(ha && !ceHide.words.some(w => w.toLowerCase() === ha.dataset.ceHwordAdd.toLowerCase())){ ceHide.words.push(ha.dataset.ceHwordAdd); ceHideSave(); }
+    /* ◉ Now (2026-11-11, Julius): floats left of − / +, scrolls the timeline to the red now line, centered. */
+    if(e.target.closest('[data-ce-now]')){
+      const d = document.querySelector('#centerCalendarList .ce-day');
+      if(d){ const n = new Date(); d.scrollTo({top: Math.max(0, (n.getHours() + n.getMinutes() / 60) * CE_HOUR - d.clientHeight / 2), behavior: 'smooth'}); }
+    }
     const z = e.target.closest('[data-ce-zoom]');
     if(z && ceePinch.pz) return; // mid-pinch taps are part of the pinch
     if(z){
@@ -16779,7 +16784,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* − / + live on the timeline itself (2026-11-11, Julius): stuck to its top-right corner, always next to the calendar. */
   #centerCalendarList{position:relative;}
   #centerCalendarList .ce-zoom{position:absolute;right:6px;bottom:8px;z-index:4;display:flex;gap:4px;pointer-events:none;}
-  #centerCalendarList .ce-zoom button{pointer-events:auto;appearance:none;width:28px;height:28px;border:1px solid color-mix(in srgb,var(--border) 45%,transparent);border-radius:8px;background:color-mix(in srgb,var(--panel) 40%,transparent);color:inherit;font-size:17px;line-height:1;cursor:pointer;opacity:.55;}
+  #centerCalendarList .ce-zoom button{pointer-events:auto;appearance:none;width:24px;height:24px;border:1px solid color-mix(in srgb,var(--border) 45%,transparent);border-radius:7px;background:color-mix(in srgb,var(--panel) 40%,transparent);color:inherit;font-size:15px;line-height:1;cursor:pointer;opacity:.55;display:inline-flex;align-items:center;justify-content:center;padding:0;}
+  #centerCalendarList .ce-zoom [data-ce-now] i{width:9px;height:9px;border-radius:50%;border:2px solid #ea4335;display:block;box-sizing:border-box;} /* little "now" dot like the red line */
   #centerCalendarList .ce-zoom button:active,#centerCalendarList .ce-zoom button:hover{opacity:1;background:var(--panel);}
   #centerCalendarList .ce-opt{border:1.5px solid var(--divider);border-radius:10px;padding:8px 9px;margin:2px 0 6px;font-size:13px;background:var(--panel);}
   #centerCalendarList .ce-opt-h{display:flex;align-items:center;justify-content:space-between;gap:6px;}

@@ -3667,9 +3667,11 @@ const CAL_BACKLOG_PREFIX = '↪ ';
 const CAL_BACKLOG_COLOR = '3'; // Grape — the OLD backlog color (until 2026-11-13); only used to find and undo it
 // Undo the old Grape (or Graphite) backlog recolor: put back the color the event had when it was swept (Cal Backlog
 // ColorId). Blank = it had no color of its own → clear colorId (full update, since a patch can't unset a field).
+// 2026-11-13 BUG FIX (Julius: done tasks came back undone): Graphite = DONE, never an old recolor. This used to
+// "restore" Graphite too, so a ↪ task ticked done got its old color back on the next roll. Grape only now.
 function calBacklogRestoreColor_(calId, it, rows) {
   const c = String(it.colorId || '');
-  if (c !== CAL_BACKLOG_COLOR && c !== '8') return;
+  if (c !== CAL_BACKLOG_COLOR) return;
   const uid = String(it.iCalUID || it.id), row = rows.find(r => r[0].split('|')[0] === uid);
   const orig = row && row[3] && row[3] !== '8' && row[3] !== CAL_BACKLOG_COLOR ? row[3] : '';
   if (orig) { Calendar.Events.patch({ colorId: orig }, calId, it.id); return; }
@@ -3787,6 +3789,13 @@ function calBacklogRoll_() {
     moved.forEach(it => {
       const uid = String(it.iCalUID || it.id);
       try {
+        // Done (Graphite) → it leaves the backlog: drop "↪ ", row marked done, left on its day (Graphite stays).
+        if (String(it.colorId || '') === '8') {
+          const j = rows.findIndex(r => !r[6] && r[0].split('|')[0] === uid);
+          Calendar.Events.patch({ summary: String(it.summary || '').slice(CAL_BACKLOG_PREFIX.length) }, calId, it.id);
+          if (j >= 0) { sh.getRange(j + 2, 7).setValue('done'); rows[j][6] = 'done'; }
+          return;
+        }
         calBacklogRestoreColor_(calId, it, rows); // undo the old Grape recolor first (no-op otherwise)
         if (it.start.date < yest) {
           // Still undealt-with on an older day → roll it to yesterday (color untouched).

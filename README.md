@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-13)
 
+- **2026-11-13 · Fix: done backlog tasks came back undone:** the backlog roll treated Graphite on a ↪ task as the old backlog recolor and put its color back every few minutes. Now Graphite = done: the task drops its "↪ " and leaves the backlog list, and stays Graphite.
 - **2026-11-13 · Calendar column cleanup:** no "Cal Events" / 📅 label, no Events bar or list above the calendar (events show on the calendar), no 🕒 button. ⚙ sits on the search line; inside it, "🕒 Day calendar" switches to the plain events list and back, plus the hide list.
 - **2026-11-13 · Unsaved copies restore themselves:** leftover device copies (from a tab that closed mid-save) now merge back in automatically after ~1.5 min; a clash keeps both versions. Ones that can't go back yet stay under Review and retry every minute.
 - **2026-11-13 · Calendar toolbar in one row:** ⚙ (calendars list), − +, BL and ↻ moved into the date row (wraps to a 2nd row on a narrow column); Plan button hidden for now; "Nov 13, 2026" short date; the calendars list lines up from the left (no more right-floating rows / odd indents), no "7/8" count.

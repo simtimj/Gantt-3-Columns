@@ -2493,7 +2493,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
          (#referencePane) became a right-side drawer opened by the edge tab. -->
     <section class="pane" id="calPane">
       <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
-      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><input type="search" class="ce-search" data-ce-search placeholder="🔍 Find" aria-label="Find a Cal Events task" autocomplete="off" enterkeyhint="search"><span class="ce-tools"><button type="button" class="btn" data-ce-opt aria-label="Options" title="Options: calendars, day calendar, what to hide">⚙</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
+      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><button type="button" class="ce-dk ce-today" data-ce-today title="Today" aria-label="Today">◉</button><span class="ce-dk ce-ttl" data-ce-title></span><input type="search" class="ce-search" data-ce-search placeholder="🔍 Find" aria-label="Find a Cal Events task" autocomplete="off" enterkeyhint="search"><span class="ce-tools"><button type="button" class="btn" data-ce-opt aria-label="Options" title="Options: calendars, day calendar, what to hide">⚙</button><button type="button" class="ce-dk ce-bl" data-ce-bl title="Backlog: show / hide past unfinished tasks">BL<span data-ce-bln></span></button><button type="button" class="ce-dk ce-rf" data-cal-refresh title="Reload events from Google Calendar" aria-label="Reload events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
     <section
       class="pane"
@@ -9650,7 +9650,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const ceOpt = {open: false};
   try{ const h = JSON.parse(localStorage.getItem('fw.ceHide') || 'null'); if(h && Array.isArray(h.cals) && Array.isArray(h.words)) ceHide = h; }catch(e){}
   function ceIsHidden(ev){
-    if(ceHide.cals.some(c => c.id === ev.calId)) return true;
     const t = String(ev.title || '').toLowerCase();
     return ceHide.words.some(w => w && t.includes(String(w).toLowerCase()));
   }
@@ -9678,13 +9677,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return '<div class="ce-opt" data-ce-optbox><div class="ce-opt-h"><b>Options</b><button type="button" class="btn" data-ce-opt-done>Done</button></div>' +
       '<label class="ce-opt-c"><input type="checkbox" data-ce-day' + (ceDayOn() ? ' checked' : '') + '> 🕒 Day calendar (off = events list)</label>' +
       // 2026-11-13 (Julius): one ⚙ — the calendar's own ⚙ (which calendars show) and the Cats / Time order live here too.
-      (ceDayOn() && window.fwCalendar && window.fwCalendar.dockReady && window.fwCalendar.dockReady() ? '<button type="button" class="btn ce-opt-b" data-ce-cals>📅 Calendars: pick which show</button>' : '') +
+      // 2026-11-13 evening (Julius): the colored calendar checkboxes live only here (moved out of the calendar).
+      (window.fwCalendar && window.fwCalendar.mountCals ? '<div class="ce-opt-s">Calendars</div><div class="ce-opt-cals" data-ce-calslot></div>' : '') +
       (!ceDayOn() ? '<div class="ce-opt-s">List order</div><label class="ce-opt-c"><input type="radio" name="ceSort" data-ce-sortpick="cat"' + (ceSortMode() === 'cat' ? ' checked' : '') + '> By category</label><label class="ce-opt-c"><input type="radio" name="ceSort" data-ce-sortpick="time"' + (ceSortMode() !== 'cat' ? ' checked' : '') + '> By time</label>' : '') +
-      '<div class="ce-opt-s">Hide from the list</div><div class="ce-opt-note">Still shows on the calendar.</div>' +
-      '<div class="ce-opt-s">Calendars</div>' + (seen.length ? seen.map(c => '<label class="ce-opt-c"><input type="checkbox" data-ce-hcal="' + esc(c.id) + '" data-name="' + esc(c.name) + '"' + (ceHide.cals.some(x => x.id === c.id) ? ' checked' : '') + '> ' + esc(c.name) + '</label>').join('') : '<div class="ce-opt-note">No calendars today.</div>') +
-      '<div class="ce-opt-s">Titles with</div><div class="ce-opt-w">' + ceHide.words.map(w => '<span class="ce-chip on">' + esc(w) + '<button type="button" data-ce-hword-x="' + esc(w) + '" aria-label="Stop hiding ' + esc(w) + '">✕</button></span>').join('') +
+      // The old "Hide from the list → Calendars" checkboxes are gone (duplicate of the list above, 2026-11-13).
+      // Title words only matter for the events list, so they show only when the day calendar is off.
+      (ceDayOn() ? '' : '<div class="ce-opt-s">Hide titles from the list</div><div class="ce-opt-w">' + ceHide.words.map(w => '<span class="ce-chip on">' + esc(w) + '<button type="button" data-ce-hword-x="' + esc(w) + '" aria-label="Stop hiding ' + esc(w) + '">✕</button></span>').join('') +
       CE_HIDE_SUGGEST.filter(w => low.indexOf(w.toLowerCase()) < 0).map(w => '<button type="button" class="ce-chip" data-ce-hword-add="' + esc(w) + '">+ ' + esc(w) + '</button>').join('') + '</div>' +
-      '<form class="ce-opt-f" data-ce-hword-form><input type="text" maxlength="40" placeholder="Word or phrase" aria-label="Hide titles containing"><button type="submit" class="btn">Add</button></form></div>';
+      '<form class="ce-opt-f" data-ce-hword-form><input type="text" maxlength="40" placeholder="Word or phrase" aria-label="Hide titles containing"><button type="submit" class="btn">Add</button></form>') + '</div>';
   }
   function ceDayScroll(data){
     const t = data.events.filter(ev => !ev.allDay && !ev.done).map(ev => Number(ev.start)).sort((a,b) => a - b)[0];
@@ -9874,6 +9874,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         (ceOpt.open ? ceOptHtml(full) : '') +
         (dayOn ? '' : '<div class="ce-list"' + (folded ? ' hidden' : '') + '>' + listHtml + '</div>');
       box.classList.toggle('ce-has-day', dayOn);
+      if(fwc && fwc.mountCals) fwc.mountCals(ceOpt.open ? box.querySelector('[data-ce-calslot]') : null);
       if(false){ // list/timeline splitter: no list above the calendar any more (2026-11-13)
         try{ const v = parseFloat(localStorage.getItem('fw.ceSplit')); if(v >= 10 && v <= 85){ box.style.setProperty('--ce-ls', v + '%'); box.classList.add('ce-man'); } else { box.classList.remove('ce-man'); } }catch(err){}
         box.insertAdjacentHTML('beforeend', '<div class="ce-split" title="Drag to size the list and timeline · double-tap to reset" aria-label="Resize the events list"></div>');
@@ -9935,7 +9936,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(e.target.closest('[data-ce-opt]')){ ceOpt.open = !ceOpt.open; if(ceDraw) ceDraw(); }
     // 📅 Show calendar (list mode): never get stuck without the day calendar (2026-11-13, Julius).
     if(e.target.closest('[data-ce-showcal]')){ try{ localStorage.setItem('fw.ceDay', '1'); }catch(err){} ceOpt.open = false; if(ceDraw) ceDraw(); }
-    if(e.target.closest('[data-ce-cals]')){ ceOpt.open = false; if(ceDraw) ceDraw(); setTimeout(() => { const f = document.querySelector('#calPanel [data-cals-fold]'); if(f) f.click(); }, 0); }
+    if(e.target.closest('[data-ce-today]')){ const a = window.fwCalendar && window.fwCalendar.api && window.fwCalendar.api(); if(a) a.today(); }
+    if(e.target.closest('[data-ce-bl]') && window.fwCalendar && window.fwCalendar.blToggle) window.fwCalendar.blToggle();
     const sp = e.target.closest('[data-ce-sortpick]');
     if(sp){ try{ localStorage.setItem('fw.ceSort', sp.dataset.ceSortpick); }catch(err){} if(ceDraw) ceDraw(); }
     if(e.target.closest('[data-ce-opt-done]')){ ceOpt.open = false; if(ceDraw) ceDraw(); }
@@ -15900,6 +15902,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-cals .cp-crow{justify-content:flex-start;padding-left:2px;}
   #calPanel .fc .fc-cpCals-button{font-size:14px;}
   #calPanel.cp-docked .fc .fc-cpCals-button{display:none;} /* one ⚙: it's in the search line's ⚙ (2026-11-13) */
+  #calPanel.cp-docked .fc .fc-header-toolbar,#calPanel.cp-docked .cp-cals{display:none!important;} /* one header row: the search line carries ◉ · date · BL · ↻ */
+  #centerDownScroll .ce-head .ce-dk{display:none;}
+  #centerDownScroll.ce-dkon{padding-inline:2px!important;}
+  #centerDownScroll.ce-dkon .ce-head{gap:3px!important;margin:2px 0 2px!important;flex-wrap:nowrap!important;}
+  #centerDownScroll.ce-dkon .ce-head .ce-dk{display:inline-flex;align-items:center;justify-content:center;}
+  #centerDownScroll.ce-dkon .ce-head button.ce-dk{appearance:none;box-sizing:border-box;height:22px!important;min-height:22px!important;min-width:20px!important;padding:0 5px!important;margin:0;font:inherit;font-size:12px!important;line-height:1;border:1px solid var(--border);border-radius:11px;background:var(--panel);color:inherit;cursor:pointer;flex:0 0 auto;}
+  #centerDownScroll.ce-dkon .ce-head .ce-today{width:20px!important;padding:0!important;font-size:11px!important;}
+  #centerDownScroll.ce-dkon .ce-head .ce-rf{width:22px!important;padding:0!important;font-size:13px!important;border:0!important;background:none!important;}
+  #centerDownScroll.ce-dkon .ce-head .ce-bl.on{background:var(--accent-soft,rgba(66,133,244,.22));}
+  #centerDownScroll.ce-dkon .ce-head .ce-ttl{font-size:13px;font-weight:600;white-space:nowrap;flex:0 0 auto;margin:0 1px;}
+  #centerDownScroll.ce-dkon .ce-head .ce-search{flex:1 1 40px!important;min-width:34px!important;max-width:none!important;height:22px!important;}
+  #centerDownScroll.ce-dkon .ce-head .ce-tools{gap:3px!important;}
+  #centerCalendarList .ce-opt-cals .cp-crow{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13px;cursor:pointer;}
+  #centerCalendarList .ce-opt-cals .cp-crow input{width:16px;height:16px;margin:0;accent-color:var(--cc,#1a73e8);}
+  #centerCalendarList .ce-opt-cals .cp-cn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #centerCalendarList .ce-opt-cals .cp-lk{font-size:11px;opacity:.7;}
+  #centerCalendarList .ce-opt-cals .cp-cmsg{font-size:12px;color:var(--muted);}
   #centerCalendarList .ce-bar :is(.ce-showcal,.ce-relist){font:inherit;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:inherit;padding:1px 7px;cursor:pointer;}
   #centerCalendarList .ce-bar .ce-showcal{margin-left:auto;}
   #centerCalendarList .ce-opt .ce-opt-b{display:block;margin:4px 0;font-size:12px;}
@@ -16664,6 +16683,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // Count via data-n + CSS, never textContent: FullCalendar re-renders its own text node, so writing text doubled it ("BacklogBacklog").
     if(btn){ if(items.length) btn.dataset.n = items.length; else delete btn.dataset.n; btn.classList.toggle('fc-button-active', !blEl.hidden); }
     if(blCount) blCount.textContent = items.length ? items.length : '';
+    const hb = document.querySelector('[data-ce-bl]'); if(hb){ hb.querySelector('[data-ce-bln]').textContent = items.length ? ' ' + items.length : ''; hb.classList.toggle('on', !blEl.hidden); }
     const pb = panel.querySelector('[data-bl-toggle]'); if(pb){ pb.querySelector('[data-bl-n]').textContent = items.length || ''; pb.classList.toggle('on', !blEl.hidden); }
     if(blEl.hidden) return;
     if(!blData){ blBody.innerHTML = '<div class="cp-blmsg">Loading…</div>'; return; }
@@ -16990,7 +17010,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
         if(!pending) showDetail(info.event, info.el); },
       eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
-      datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
+      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
     window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
@@ -17085,6 +17105,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   if(calsEl){
     panel.querySelector('[data-cals-fold]').addEventListener('click', () => {
+      mountCals(null);
       const open = calsEl.classList.toggle('folded') === false; lsSet('fw.calCalsOpen', open ? '1' : '0');
       if(open) loadCals(true); setTimeout(() => { try { if(cal) cal.updateSize(); } catch (e) {} }, 0);
     });
@@ -17102,6 +17123,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         refetchFresh();
       }).withFailureHandler(err => { calsMsg = 'Not saved: ' + errText(err); loadCals(true); }).setCalendarPicked(ids);
     });
+  }
+  // The calendar list lives in the column's ⚙ box (2026-11-13 evening, Julius); back in the panel when the box shuts.
+  function mountCals(host){
+    if(!calsBody) return;
+    if(host){ if(calsBody.parentNode !== host){ host.appendChild(calsBody); loadCals(false); } }
+    else if(calsBody.parentNode !== calsEl) calsEl.appendChild(calsBody);
   }
   function retry(){ if(cal){ refetchFresh(); loadPlan(true); } else start(); }
   /* ── Docked in the right column (2026-11-13, Julius: "match the mini calendar to the big one") ──
@@ -17129,6 +17156,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     docked = true;
     panel.classList.add('cp-docked'); panel.setAttribute('aria-hidden', 'false'); panel.setAttribute('aria-modal', 'false'); panel.setAttribute('role', 'region');
     if(panel.parentNode !== host) host.appendChild(panel);
+    dkHead(true);
     try {
       if(cal.view.type !== 'timeGridDay') cal.changeView('timeGridDay', date || undefined);
       else if(date && cal.view.currentStart && luxon.DateTime.fromJSDate(cal.view.currentStart, {zone: 'UTC'}).toISODate() !== date) cal.gotoDate(date);
@@ -17138,10 +17166,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     blPlace();
     return true;
   }
+  /* One header row while docked (2026-11-13 evening, Julius): the calendar's own toolbar is hidden and the column's
+     search line carries ◉ · date · 🔍 · ⚙ · BL n · ↻. */
+  function dkHead(on){
+    const cd = document.getElementById('centerDownScroll'); if(cd) cd.classList.toggle('ce-dkon', !!on);
+    const t = document.querySelector('[data-ce-title]'); if(t && on && cal) t.textContent = cal.view.title;
+    if(on) blRender();
+  }
   function park(){ if(docked && panel.parentNode !== parkEl){ saveDockTop(); parkEl.appendChild(panel); } }
   function undock(){
     if(!docked) return;
-    saveDockTop(); docked = false;
+    saveDockTop(); docked = false; dkHead(false);
     panel.classList.remove('cp-docked'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('role', 'dialog');
     if(panelNext && panelNext.parentNode === panelHome) panelHome.insertBefore(panel, panelNext); else panelHome.appendChild(panel);
     blPlace();
@@ -17206,7 +17241,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   if(ws) new MutationObserver(() => { if(docked) blPlace(); }).observe(ws, {attributes: true, attributeFilter: ['class']});
   window.addEventListener('resize', () => { if(docked) blPlace(); });
-  window.fwCalendar = { askDeleteLine, dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  window.fwCalendar = { askDeleteLine, mountCals, blToggle: () => blToggle(), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

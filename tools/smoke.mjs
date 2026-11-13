@@ -1870,9 +1870,23 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           if (!panel.closest('#calPane .ce-dock')) out.push('📅 Show calendar did not bring it back');
           const ownGear = panel.querySelector('.fc-cpCals-button'); if (ownGear && ownGear.offsetWidth) out.push("calendar's own ⚙ still shows");
           document.querySelector('[data-ce-opt]').click(); await wait(150);
-          const pick = document.querySelector('[data-ce-cals]');
-          if (!pick) out.push('top ⚙ has no Calendars picker');
-          else { pick.click(); await wait(300); const cf = panel.querySelector('[data-cal-cals]'); if (!cf || cf.classList.contains('folded')) out.push('Calendars picker did not open'); else panel.querySelector('[data-cals-fold]').click(); }
+          // Calendar list (colored checkboxes) only inside the ⚙ box; no "hide calendars" duplicate (2026-11-13 evening).
+          const slot = document.querySelector('[data-ce-calslot]');
+          if (!slot || !slot.querySelector('.cp-cbody')) out.push('⚙ box has no calendar list');
+          if (document.querySelector('[data-ce-hcal]')) out.push('old hide-calendars list still in ⚙');
+          document.querySelector('[data-ce-opt-done]')?.click(); await wait(300);
+          if (!panel.querySelector('[data-cal-cals] .cp-cbody')) out.push('calendar list did not go back to the calendar when ⚙ closed');
+          // One header row while docked: ◉ · date · 🔍 · ⚙ · BL · ↻ on the search line, calendar toolbar hidden.
+          const hd = document.querySelector('#centerDownScroll .ce-head');
+          const vis = sel => { const el = hd.querySelector(sel); return el && el.offsetWidth > 0 && el; };
+          if (!vis('[data-ce-today]') || !vis('[data-ce-bl]') || !vis('[data-cal-refresh]') || !vis('[data-ce-search]') || !vis('[data-ce-opt]')) out.push('search line is missing ◉ / BL / ↻ / search / ⚙');
+          if (!/\d/.test(hd.querySelector('[data-ce-title]').textContent)) out.push('no date on the search line');
+          const tops = ['[data-ce-today]', '[data-ce-search]', '[data-ce-bl]'].map(x => Math.round(hd.querySelector(x).getBoundingClientRect().top));
+          if (Math.max(...tops) - Math.min(...tops) > 4) out.push('header not on one row: ' + tops);
+          const ftb = panel.querySelector('.fc-header-toolbar'); if (ftb && ftb.offsetHeight) out.push('calendar toolbar row still shows');
+          vis('[data-ce-bl]').click(); await wait(300);
+          if (!document.body.classList.contains('bl-push') && !document.body.classList.contains('bl-left')) out.push('BL on the search line did not open the backlog');
+          vis('[data-ce-bl]').click(); await wait(300);
           if (!panel.closest('#calPane .ce-dock') || panel.offsetHeight < 100) out.push('⚙ Day calendar off → on: calendar did not come back (' + (panel.parentElement && (panel.parentElement.id || panel.parentElement.className)) + ', h ' + panel.offsetHeight + ')');
           return out;
         }, name === 'phone');

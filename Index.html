@@ -11469,6 +11469,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const amount=shiftPan ? e.deltaY : e.deltaX;
       if(Math.abs(amount)<.01)return;
       e.preventDefault();
+      // Over the docked calendar: a sideways swipe changes the day instead (2026-11-13, Julius).
+      if(e.target.closest && e.target.closest('#calPanel.cp-docked #calMount') && window.fwCalSwipeDay){
+        const now=Date.now(); if(now-(window.__cdAt||0)>250) window.__cdAcc=0; window.__cdAt=now; window.__cdAcc=(window.__cdAcc||0)+amount;
+        if(Math.abs(window.__cdAcc)>60){ window.fwCalSwipeDay(window.__cdAcc>0?1:-1); window.__cdAcc=0; }
+        return;
+      }
       workspace.scrollLeft+=amount;
     },{capture:true,passive:false});
   }
@@ -16789,6 +16795,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       .withFailureHandler(err => setState('error', 'Not deleted: ' + errText(err)))
       .calPanelDeleteEvent({eventId: d.ceId, startMs: Number(d.ceStart), calId: d.ceCal, scope: 'one'});
   }
+  /* Docked calendar (2026-11-13, Julius: "slide left / right to change the day", more height): no ‹ › — a sideways
+     swipe / trackpad swipe / Shift + wheel on the calendar goes to the next / previous day; − + float in its
+     bottom-right corner. Sliding the app between halves still works from the search line above the calendar. */
+  const zf = document.createElement('div'); zf.className = 'cp-zfloat';
+  zf.innerHTML = '<button type="button" data-zf="-1" aria-label="Zoom out">−</button><button type="button" data-zf="1" aria-label="Zoom in">+</button>';
+  zf.addEventListener('click', e => { const b = e.target.closest('[data-zf]'); if(!b) return; e.stopPropagation(); setZoom(zoomPx * (b.dataset.zf === '1' ? 1.35 : 1 / 1.35)); });
+  ['pointerdown', 'touchstart', 'mousedown'].forEach(t => zf.addEventListener(t, e => e.stopPropagation(), {passive: true}));
+  mount.parentElement.style.position = 'relative'; mount.parentElement.appendChild(zf);
+  let swp = null, swpLock = 0;
+  const swDay = dir => { if(!cal || !docked || Date.now() < swpLock) return; swpLock = Date.now() + 450; dir > 0 ? cal.next() : cal.prev(); };
+  window.fwCalSwipeDay = swDay;
+  mount.addEventListener('touchstart', e => { if(!docked || e.touches.length !== 1) { swp = null; return; } const t = e.touches[0]; swp = {x: t.clientX, y: t.clientY, at: Date.now()}; }, {passive: true});
+  mount.addEventListener('touchend', e => {
+    const p = swp; swp = null; if(!p || !docked || document.querySelector('.fc-event-dragging,.fc-event-resizing')) return;
+    const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y;
+    if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.6 && Date.now() - p.at < 700) swDay(dx < 0 ? 1 : -1);
+  }, {passive: true});
   let evHold = null, evHoldOpenAt = 0;
   mount.addEventListener('pointerdown', e => {
     if(evHold){ clearTimeout(evHold.timer); evHold = null; }
@@ -17427,6 +17450,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-docked span.cp-zrow{gap:2px;}
   #calPanel.cp-docked .cp-zb,#calPanel.cp-docked .cp-blbtn{min-width:22px;height:22px;padding:0 5px;font-size:12px;margin:0;}
   #calPanel .fc .fc-cpBacklog-button[data-n]::after{content:" " attr(data-n);white-space:pre;}
+  #calPanel .cp-zfloat{display:none;}
+  #calPanel.cp-docked .cp-zfloat{display:flex;gap:4px;position:absolute;right:8px;bottom:8px;z-index:6;}
+  #calPanel.cp-docked .cp-zfloat button{font:inherit;font-size:15px;line-height:1;width:28px;height:28px;border-radius:50%;border:1px solid var(--cp-line);background:var(--cp-bg);color:var(--cp-text);opacity:.85;box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;padding:0;}
+  #calPanel.cp-docked .fc .fc-prev-button,#calPanel.cp-docked .fc .fc-next-button,#calPanel.cp-docked .fc .fc-cpZoomOut-button,#calPanel.cp-docked .fc .fc-cpZoomIn-button{display:none!important;}
+  /* the calendar keeps sideways finger swipes for itself (day change), so the app doesn't slide from there */
+  #calPanel.cp-docked #calMount{touch-action:pan-y pinch-zoom;}
   #calPark{display:none;}
   /* Backlog column left of Cal Events: the app slides left by its width (2026-11-13, Julius). */
   #blCol,#calBlLeft{display:none;--cp-bg:var(--panel,#fff);--cp-text:var(--text,#202124);--cp-muted:var(--muted,#5f6368);--cp-line:var(--divider,#dadce0);--cp-soft:color-mix(in srgb,var(--divider,#ccc) 40%,transparent);}

@@ -1802,7 +1802,18 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             const sl = await swipe(x, y, -260);
             if (sl < 150) errs.push('half view: swipe left at ' + x + ',' + y + ' did not reach the calendar (' + sl + ')');
           }
-          for (const [x, y] of [[300, 450], [100, 450]]) {
+          // 2026-11-13: a sideways swipe ON the docked calendar changes its day (the app stays); sliding back starts
+          // from the search line above it (or anywhere left of the calendar).
+          {
+            await pg.evaluate(() => { const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; }); await pg.waitForTimeout(150);
+            const d0 = await pg.evaluate(() => window.fwCalendar.api().view.currentStart.toISOString());
+            const sl = await swipe(300, 450, 160);
+            const d1 = await pg.evaluate(() => window.fwCalendar.api().view.currentStart.toISOString());
+            if (d1 === d0) errs.push('half view: swipe on the calendar did not change the day');
+            if (sl < 150) errs.push('half view: swipe on the calendar slid the app (' + sl + ')');
+            await pg.evaluate(() => window.fwCalendar.api().today()); await pg.waitForTimeout(200);
+          }
+          for (const [x, y] of [[300, 60], [100, 450]]) {
             await pg.evaluate(() => { const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; }); await pg.waitForTimeout(100);
             const sl = await swipe(x, y, 260);
             if (sl > 50) errs.push('half view: swipe right at ' + x + ',' + y + ' did not go back (' + sl + ')');

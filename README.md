@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-13)
 
+- **2026-11-13 · Calendar: one ⚙, can't lose it:** the search line is just 🔍 Find + ⚙ (no Cats, no ↻; the calendar's own ↻ stays). Everything is in that ⚙: 📅 Calendars (which show — the calendar's own ⚙ is gone), 🕒 Day calendar on / off, list order (category / time, list mode only) and the hide list. With the day calendar off, the events list has a **📅 Show calendar** button (and ↻) so it always comes back.
 - **2026-11-13 · Calendar: swipe for the day, floating zoom:** no ‹ › — swipe sideways on the calendar (or trackpad / Shift + wheel over it) for the next / previous day; − + float in the calendar's bottom-right corner. Sliding the app between halves now starts from the search line or the left half.
 - **2026-11-13 · Fix: done backlog tasks came back undone:** the backlog roll treated Graphite on a ↪ task as the old backlog recolor and put its color back every few minutes. Now Graphite = done: the task drops its "↪ " and leaves the backlog list, and stays Graphite.
 - **2026-11-13 · Calendar column cleanup:** no "Cal Events" / 📅 label, no Events bar or list above the calendar (events show on the calendar), no 🕒 button. ⚙ sits on the search line; inside it, "🕒 Day calendar" switches to the plain events list and back, plus the hide list.

@@ -540,7 +540,8 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   const quad = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const out = [];
-    if (document.querySelector('[data-ce-sort]')?.textContent !== 'Cats') out.push('sort button not "Cats"');
+    // 2026-11-13 (Julius): search line = Find + ⚙ only (no Cats, no ↻).
+    if (document.querySelector('.ce-head [data-ce-sort], .ce-head [data-ce-refresh]')) out.push('Cats / ↻ still on the search line');
     const list = document.getElementById('centerCalendarList');
     // Day timeline on by default (2026-11-11). 2026-11-13: no Events bar / list above it, no "Cal Events" title, no 🕒 —
     // ⚙ sits on the search line and holds the 🕒 day-calendar switch; switching it off brings the events list back.
@@ -568,6 +569,8 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       else { dayCb.click(); await wait(100); }
       if (list.querySelector('.ce-day')) out.push('switch off did not hide the day calendar');
       if (!list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('switch off did not bring the events list back');
+      if (!list.querySelector('[data-ce-showcal]')) out.push('list mode has no 📅 Show calendar button');
+      if (!list.querySelector('[data-ce-sortpick="cat"]')) out.push('⚙ has no list order choice');
       list.querySelector('[data-ce-opt-done]')?.click(); await wait(50);
     }
     // ▾ Events folds the list and back (list mode).
@@ -1854,6 +1857,23 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           if (panel.closest('#calPane')) out.push('pop-out still inside the column');
           window.fwCalendar.close(); await wait(900);
           if (!panel.closest('#calPane')) out.push('did not go back into the column');
+          // ⚙ Day calendar off → on brings the docked calendar back (2026-11-13: Julius couldn't get it back).
+          for (let k = 0; k < 2; k++) {
+            document.querySelector('[data-ce-opt]').click(); await wait(100);
+            document.querySelector('[data-ce-optbox] input[data-ce-day]').click(); await wait(300);
+            document.querySelector('[data-ce-opt-done]')?.click(); await wait(300);
+          }
+          // 📅 Show calendar in list mode brings it back too; one ⚙ (the calendar's own ⚙ is hidden, its picker is in the top ⚙).
+          document.querySelector('[data-ce-opt]').click(); await wait(100);
+          document.querySelector('[data-ce-optbox] input[data-ce-day]').click(); await wait(300);
+          document.querySelector('[data-ce-showcal]').click(); await wait(400);
+          if (!panel.closest('#calPane .ce-dock')) out.push('📅 Show calendar did not bring it back');
+          const ownGear = panel.querySelector('.fc-cpCals-button'); if (ownGear && ownGear.offsetWidth) out.push("calendar's own ⚙ still shows");
+          document.querySelector('[data-ce-opt]').click(); await wait(150);
+          const pick = document.querySelector('[data-ce-cals]');
+          if (!pick) out.push('top ⚙ has no Calendars picker');
+          else { pick.click(); await wait(300); const cf = panel.querySelector('[data-cal-cals]'); if (!cf || cf.classList.contains('folded')) out.push('Calendars picker did not open'); else panel.querySelector('[data-cals-fold]').click(); }
+          if (!panel.closest('#calPane .ce-dock') || panel.offsetHeight < 100) out.push('⚙ Day calendar off → on: calendar did not come back (' + (panel.parentElement && (panel.parentElement.id || panel.parentElement.className)) + ', h ' + panel.offsetHeight + ')');
           return out;
         }, name === 'phone');
         errs.push(...dk.map(x => 'docked calendar: ' + x));

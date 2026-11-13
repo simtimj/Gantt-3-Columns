@@ -2493,7 +2493,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
          (#referencePane) became a right-side drawer opened by the edge tab. -->
     <section class="pane" id="calPane">
       <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
-      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><input type="search" class="ce-search" data-ce-search placeholder="🔍 Find" aria-label="Find a Cal Events task" autocomplete="off" enterkeyhint="search"><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Cats</button><button type="button" class="btn" data-ce-opt aria-label="Options" title="Options: day calendar, what to hide">⚙</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
+      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><input type="search" class="ce-search" data-ce-search placeholder="🔍 Find" aria-label="Find a Cal Events task" autocomplete="off" enterkeyhint="search"><span class="ce-tools"><button type="button" class="btn" data-ce-opt aria-label="Options" title="Options: calendars, day calendar, what to hide">⚙</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
     <section
       class="pane"
@@ -9677,6 +9677,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // 2026-11-13 (Julius): ⚙ sits by the search box; the 🕒 day-calendar switch lives in here now.
     return '<div class="ce-opt" data-ce-optbox><div class="ce-opt-h"><b>Options</b><button type="button" class="btn" data-ce-opt-done>Done</button></div>' +
       '<label class="ce-opt-c"><input type="checkbox" data-ce-day' + (ceDayOn() ? ' checked' : '') + '> 🕒 Day calendar (off = events list)</label>' +
+      // 2026-11-13 (Julius): one ⚙ — the calendar's own ⚙ (which calendars show) and the Cats / Time order live here too.
+      (ceDayOn() && window.fwCalendar && window.fwCalendar.dockReady && window.fwCalendar.dockReady() ? '<button type="button" class="btn ce-opt-b" data-ce-cals>📅 Calendars: pick which show</button>' : '') +
+      (!ceDayOn() ? '<div class="ce-opt-s">List order</div><label class="ce-opt-c"><input type="radio" name="ceSort" data-ce-sortpick="cat"' + (ceSortMode() === 'cat' ? ' checked' : '') + '> By category</label><label class="ce-opt-c"><input type="radio" name="ceSort" data-ce-sortpick="time"' + (ceSortMode() !== 'cat' ? ' checked' : '') + '> By time</label>' : '') +
       '<div class="ce-opt-s">Hide from the list</div><div class="ce-opt-note">Still shows on the calendar.</div>' +
       '<div class="ce-opt-s">Calendars</div>' + (seen.length ? seen.map(c => '<label class="ce-opt-c"><input type="checkbox" data-ce-hcal="' + esc(c.id) + '" data-name="' + esc(c.name) + '"' + (ceHide.cals.some(x => x.id === c.id) ? ' checked' : '') + '> ' + esc(c.name) + '</label>').join('') : '<div class="ce-opt-note">No calendars today.</div>') +
       '<div class="ce-opt-s">Titles with</div><div class="ce-opt-w">' + ceHide.words.map(w => '<span class="ce-chip on">' + esc(w) + '<button type="button" data-ce-hword-x="' + esc(w) + '" aria-label="Stop hiding ' + esc(w) + '">✕</button></span>').join('') +
@@ -9865,6 +9868,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // 2026-11-13 (Julius): no Events bar / list above the calendar — the events are on the calendar itself. The list
       // (with its bar) comes back only when the day calendar is switched off in ⚙.
       box.innerHTML = (dayOn ? '' : '<div class="ce-bar"><button type="button" class="ce-fold" data-ce-fold aria-expanded="' + !folded + '" title="Fold / open the events list"><span class="ce-farr">' + (folded ? '▸' : '▾') + '</span> Events <small>' + data.events.length + '</small></button>' +
+        '<button type="button" class="ce-showcal" data-ce-showcal title="Show the day calendar again">📅 Show calendar</button><button type="button" class="ce-relist" data-ce-refresh title="Refresh the events" aria-label="Refresh calendar events">↻</button>' +
         (nHid ? '<button type="button" class="ce-hidn' + (ceShowHidden ? ' on' : '') + '" data-ce-showhid title="' + (ceShowHidden ? 'Hide them again' : 'Show them in the list for now') + '">' + nHid + ' hidden</button>' : '') +
         '</div>') +
         (ceOpt.open ? ceOptHtml(full) : '') +
@@ -9929,6 +9933,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
     if(e.target.closest('[data-ce-showhid]')){ ceShowHidden = !ceShowHidden; if(ceDraw) ceDraw(); }
     if(e.target.closest('[data-ce-opt]')){ ceOpt.open = !ceOpt.open; if(ceDraw) ceDraw(); }
+    // 📅 Show calendar (list mode): never get stuck without the day calendar (2026-11-13, Julius).
+    if(e.target.closest('[data-ce-showcal]')){ try{ localStorage.setItem('fw.ceDay', '1'); }catch(err){} ceOpt.open = false; if(ceDraw) ceDraw(); }
+    if(e.target.closest('[data-ce-cals]')){ ceOpt.open = false; if(ceDraw) ceDraw(); setTimeout(() => { const f = document.querySelector('#calPanel [data-cals-fold]'); if(f) f.click(); }, 0); }
+    const sp = e.target.closest('[data-ce-sortpick]');
+    if(sp){ try{ localStorage.setItem('fw.ceSort', sp.dataset.ceSortpick); }catch(err){} if(ceDraw) ceDraw(); }
     if(e.target.closest('[data-ce-opt-done]')){ ceOpt.open = false; if(ceDraw) ceDraw(); }
     const hx = e.target.closest('[data-ce-hword-x]');
     if(hx){ ceHide.words = ceHide.words.filter(w => w !== hx.dataset.ceHwordX); ceHideSave(); }
@@ -15890,6 +15899,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-cals.folded{display:none;}
   #calPanel .cp-cals .cp-crow{justify-content:flex-start;padding-left:2px;}
   #calPanel .fc .fc-cpCals-button{font-size:14px;}
+  #calPanel.cp-docked .fc .fc-cpCals-button{display:none;} /* one ⚙: it's in the search line's ⚙ (2026-11-13) */
+  #centerCalendarList .ce-bar :is(.ce-showcal,.ce-relist){font:inherit;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:inherit;padding:1px 7px;cursor:pointer;}
+  #centerCalendarList .ce-bar .ce-showcal{margin-left:auto;}
+  #centerCalendarList .ce-opt .ce-opt-b{display:block;margin:4px 0;font-size:12px;}
   #calPanel .fc .fc-cpZoomOut-button,#calPanel .fc .fc-cpZoomIn-button{min-width:24px;padding:0 4px!important;}
   #calPanel .fc .fc-header-toolbar{flex-wrap:wrap;row-gap:3px;}
   #calPanel .fc .fc-header-toolbar .fc-toolbar-chunk:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:2px;min-width:0;}

@@ -63,6 +63,15 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   const merged = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll .day-editor .check-text')].some(x => x.textContent === 'From import')
     && (window.__calls || []).some(c => c[0] === 'runImports'));
   if (!merged) errs.push('Fast start: the runImports line did not merge into the page');
+  // Hold to drag (2026-11-12): slider sets the hold time; the drag handle never shows, even on a picked card.
+  const holdOk = await pg.evaluate(() => {
+    const s = document.getElementById('holdMs'); if (!s || window.fwHoldMs() !== 500) return 'hold slider missing or default not 0.5 s';
+    s.value = 800; s.dispatchEvent(new Event('input')); if (window.fwHoldMs() !== 800) return 'hold slider did not change the hold time';
+    document.getElementById('resetHoldMs').click(); if (window.fwHoldMs() !== 500) return 'hold Reset did not go back to 0.5 s';
+    const ln = document.querySelector('#todayScroll .day-editor .check-line'); if (ln && window.tcGripPlace) window.tcGripPlace(ln);
+    return document.getElementById('tcGrip').hidden ? '' : 'drag handle still shows';
+  });
+  if (holdOk) errs.push(holdOk);
   // Drawer edge swipe (2026-11-11, phone): left from the right edge opens Next Steps + Reference; right closes it.
   if (view.hasTouch) {
     const swipe = await pg.evaluate(async () => {

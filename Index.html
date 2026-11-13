@@ -2322,6 +2322,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <button class="btn tiny" id="resetMobileScale" type="button">Reset</button>
     </div>
     <div class="ts-row">
+      <span class="ts-label" title="How long to hold a card (or calendar task) before it picks up to drag. Saved on this device.">Hold to drag</span>
+      <input id="holdMs" type="range" min="200" max="1200" step="50" value="500" aria-label="Hold time before a card drags">
+      <output id="holdMsValue">0.5 s</output>
+      <button class="btn tiny" id="resetHoldMs" type="button">Reset</button>
+    </div>
+    <div class="ts-row">
       <span class="ts-label" title="Room left and right of the text in cells, section boxes and task cards (narrow columns get less automatically)">Side space</span>
       <input id="sideSpace" type="range" min="20" max="150" step="5" value="70" aria-label="Side space in cells and task cards">
       <output id="sideSpaceValue">70%</output>
@@ -13093,7 +13099,24 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     p.appendChild(row);
   }
 
-  /* ---- Drag a card by its checkbox ---- */
+  /* Hold-to-drag time (2026-11-12, Julius): one per-device setting (Options → "Hold to drag" slider, 0.2–1.2 s,
+     default 0.5 s) used by every card drag and the 📅 panel's drags. Read live, so a slider change applies at once. */
+  window.fwHoldMs = () => {
+    let v = 500;
+    try{ v = Number(localStorage.getItem('fw.holdMs')) || 500; }catch(err){}
+    return Math.min(1200, Math.max(200, v));
+  };
+  (function(){
+    const el = document.getElementById('holdMs'), out = document.getElementById('holdMsValue'), rs = document.getElementById('resetHoldMs');
+    if(!el) return;
+    const show = v => { if(out) out.textContent = (v / 1000).toFixed(v % 100 ? 2 : 1).replace(/0$/, '') + ' s'; };
+    const set = v => { try{ localStorage.setItem('fw.holdMs', String(v)); }catch(err){} show(v); window.dispatchEvent(new Event('fw-holdms')); };
+    el.value = window.fwHoldMs(); show(Number(el.value));
+    el.addEventListener('input', () => set(Number(el.value)));
+    if(rs) rs.addEventListener('click', () => { el.value = 500; set(500); });
+  })();
+
+  /* ---- Drag a card: hold anywhere on it (2026-11-12, Julius: drag handle + checkbox-drag removed — too sensitive) ---- */
   (function(){
     let press = null, drag = null, suppressUntil = 0;
     const editorOf = el => el && el.closest ? el.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell') : null;
@@ -13101,26 +13124,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     grip.id = 'tcGrip'; grip.textContent = '⠿'; grip.hidden = true;
     grip.setAttribute('aria-label','Drag to move this task');
     document.body.appendChild(grip);
-    // Bottom middle of the line, on its bottom edge (Julius, 2026-10-28: top hid where it was going under the finger).
-    window.tcGripPlace = (line,copy) => {
-      grip._line = null; grip._copy = null;
-      let box = null;
-      if(drag){ grip.hidden = true; return; }
-      if(line){
-        const ed = editorOf(line);
-        if(ed && ed.contains(line) && !line.closest('table[data-cnote],[data-render-due]')){ grip._line = line; box = line; }
-      } else if(copy){
-        // No grip in the Urgent panel: it showed as stray dots by the add box and isn't used there (2026-10-31, Julius).
-        if(copy.closest('#urgentPanel')){ grip.hidden = true; return; }
-        grip._copy = copy; box = copy.closest('.urg-row,.di-line') || copy;
-      }
-      if(!box){ grip.hidden = true; return; }
-      const r = box.getBoundingClientRect();
-      if(r.bottom < 0 || r.top > window.innerHeight || !r.height){ grip.hidden = true; return; }
-      grip.hidden = false;
-      grip.style.left = Math.round(r.left + r.width / 2 - 13) + 'px';
-      grip.style.top = Math.round(r.bottom - 7) + 'px';
-    };
+    // Drag handle retired 2026-11-12 (Julius): always hidden; hold-to-drag is the only way.
+    window.tcGripPlace = () => { grip.hidden = true; grip._line = null; grip._copy = null; };
     function startPoint(e){
       if(e.button === 2) return;
       // Inbox box: drag it out of the inbox into any cell (2026-10-27, Julius).
@@ -13144,19 +13149,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(gl && gl.isConnected && ged && ged.contains(gl) && !gl.closest('table[data-cnote],[data-render-due]')) press = {cb:gp,line:gl,ed:ged,x:e.clientX,y:e.clientY,id:e.pointerId,grip:true};
         return;
       }
+      // Checkbox: tap = done, hold = its menu; no longer drags on a slight move (2026-11-12, Julius: too sensitive).
       const cb = e.target && e.target.closest ? e.target.closest('input[type=checkbox]') : null;
-      if(!cb){ holdStart(e); return; }
-      const line = cb.closest('.check-line'), ed = editorOf(line);
-      if(!line || !ed || line.parentElement !== ed) return; // not inside note boxes etc.
-      press = {cb,line,ed,x:e.clientX,y:e.clientY,id:e.pointerId};
+      if(!cb) holdStart(e);
     }
     /* Hold anywhere on a card to drag it (Julius, 2026-10-28): press and hold the card's text
        (not the checkbox) ~350ms, then move. Works in Today / Notes / Reference cells (nested too)
        and on Urgent / Due-today rows. Moving before the hold = normal scroll / text selection.
-       The line you're typing in keeps the phone's own hold (select words); use the grip there.
+       The line you're typing in keeps the phone's own hold (select words): tap off it first, then hold to drag.
        Holding still keeps the existing menus (they open as before; a drag closes them). */
-    const HOLD_MS = 350;
-    let hold = null;
+    let hold = null; // hold time = window.fwHoldMs() (Options slider, 2026-11-12)
     function holdCancel(){
       if(!hold) return;
       clearTimeout(hold.timer);
@@ -13196,7 +13198,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const h = holdTarget(e.target);
       if(!h) return;
       hold = {...h,x:e.clientX,y:e.clientY,id:e.pointerId,el:e.target,touch:e.pointerType !== 'mouse'};
-      hold.timer = setTimeout(holdReady,HOLD_MS);
+      hold.timer = setTimeout(holdReady,window.fwHoldMs());
     }
     function holdReady(){
       const h = hold;
@@ -16553,7 +16555,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Phase 3b: hold + drag (touch) or drag (mouse) moves an event, its bottom edge resizes it; timed ↔ all-day both
       // ways. Per event `editable` = main calendar, not repeating, not done (Graphite stays put). Plan rows drop in too.
       editable: true, eventStartEditable: true, eventDurationEditable: true, eventResizableFromStart: false,
-      eventLongPressDelay: 500, snapDuration: '00:15:00', defaultTimedEventDuration: '00:15:00', defaultAllDayEventDuration: {days: 1},
+      eventLongPressDelay: window.fwHoldMs(), snapDuration: '00:15:00', defaultTimedEventDuration: '00:15:00', defaultAllDayEventDuration: {days: 1},
       eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag],[data-bl-drag]',
       eventDragStart: () => { dropSeen = false; }, eventDragStop: info => { dragStopped(info); unselSoon(); }, eventResizeStop: () => unselSoon(),
       eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: info => moveEvent(info), drop: info => (info.draggedEl && info.draggedEl.closest('[data-blid]') ? dropBacklog(info) : dropPlan(info)),
@@ -16576,6 +16578,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
+    window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
     // Scroll vs pick up (2026-11-11, Julius): a held event stays "selected" (FullCalendar then moves it with no delay,
     // so a scroll that starts on it grabs it). Drop that selection 3 s after the last touch, and right away on scroll.
     mount.addEventListener('touchend', () => unselSoon(), {passive: true});
@@ -16593,12 +16596,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // Plan rows → timeline: hold a row's title (touch) or drag it (mouse). create:false = nothing is drawn locally;
     // Google answers and the range is refetched.
     if(FullCalendar.Draggable && blBody) new FullCalendar.Draggable(blBody, {
-      itemSelector: '[data-bl-drag]', longPressDelay: 400, minDistance: 5,
+      itemSelector: '[data-bl-drag]', longPressDelay: window.fwHoldMs(), minDistance: 5,
       eventData: el => { const it = blById(el.dataset.blid); return {title: it ? it.title : '', duration: {minutes: 30}, create: false}; }
     });
     blRender();
     if(FullCalendar.Draggable && planBody) planDrag = new FullCalendar.Draggable(planBody, {
-      itemSelector: '[data-plan-drag]', longPressDelay: 400, minDistance: 5,
+      itemSelector: '[data-plan-drag]', longPressDelay: window.fwHoldMs(), minDistance: 5,
       eventData: el => { const r = el.closest('[data-pid]'), it = r && planById(r.dataset.pid); return {title: it ? planView(it).title : '', duration: {minutes: it ? planMinutes(it) : 30}, create: false}; }
     });
   }

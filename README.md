@@ -76,6 +76,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-12)
 
+- **2026-11-12 · Hold to drag, no drag handle:** the ⠿ handle is gone from every card. To move a card, hold anywhere on its text until it lifts, then drag. Moving first still scrolls. Pressing a checkbox no longer drags on a small slip: tap = done, hold = its menu. **Options → Hold to drag** slider sets the hold time (0.2–1.2 s, default 0.5 s, saved per device); the 📅 calendar's event / Backlog / Plan drags use the same time. The line you're typing in still selects words on hold: tap off it first.
+
 - **2026-11-12 · Focus / Thinking + Timer slot:** one-day view — bottom of the middle column is now **Focus / Thinking**, a free writing space unique to each day (what you wrote in Thoughts today is there), half the column by default; drag the line to resize. Bottom-left is **Timer**, left empty for now. Blocks is hidden (its saved content is kept).
 - **2026-11-12 · Thoughts + Blocks move (replaced same day by the line above):** one-day view — bottom-left is now **Thoughts**, a free writing space with no rules (own column E, safe autosave, hold the label to zoom). **Blocks** (with the block timer) moved to the bottom of the middle column under Dailies; drag the line between them to resize.
 - **2026-11-12 · Cal Events sub-hour cells:** zoomed in, each hour splits into smaller half- / quarter-hour tiles (fainter fill, tighter gaps than the hour break) instead of 30 / 15-min lines.

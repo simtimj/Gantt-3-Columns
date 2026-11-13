@@ -772,6 +772,9 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   // Last on purpose: it changes the column widths the earlier checks measure against.
   // Tuck (2026-11-06): drag the last column line to the right edge → Reference is a thin strip with a pull tab; tap = back.
   const tk = [];
+  // Half view (2026-11-13) turns the column lines off; tuck is tested with it off.
+  await pg.evaluate(() => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); localStorage.setItem('fw.halves', '0'); dispatchEvent(new Event('resize')); });
+  await pg.waitForTimeout(200);
   const hp = await pg.evaluate(() => { const hs = [...document.querySelectorAll('.column-resizer')].filter(h => h.offsetParent); if (!hs.length) return null; const r = hs[hs.length - 1].getBoundingClientRect(); return [r.left + r.width / 2, r.top + 30, innerWidth]; });
   if (hp) {
     await pg.mouse.move(hp[0], hp[1]); await pg.mouse.down(); await pg.mouse.move(hp[0] + 60, hp[1], { steps: 3 }); await pg.mouse.move(hp[2] - 1, hp[1], { steps: 4 }); await pg.mouse.up();
@@ -1741,6 +1744,27 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         await pg.evaluate(() => window.fwCalendar.open()); await pg.waitForTimeout(400);
         const w2 = await pg.evaluate(() => document.getElementById('calPanel').getBoundingClientRect().width);
         if (Math.abs(w2 - w1) > 3) errs.push('resize: width not restored after reload (' + w1 + ' → ' + w2 + ')');
+      }
+      // Half view (2026-11-13, Julius): computer = each column half the screen; opens on History + middle,
+      // scrolled right = middle + calendar.
+      if (name !== 'phone') {
+        const hv = await pg.evaluate(async () => {
+          const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+          const ws = document.getElementById('workspace');
+          if (!ws.classList.contains('ws-halves')) return ['half view not on'];
+          ws.scrollLeft = 0; await wait(200);
+          const r = id => document.getElementById(id).getBoundingClientRect(), W = ws.getBoundingClientRect();
+          const t = r('todayPane'), j = r('journalPane');
+          if (Math.abs(t.width - W.width / 2) > 3) out.push('History not half the screen: ' + t.width + ' / ' + W.width);
+          if (Math.abs(j.right - W.right) > 3) out.push('middle column not at the right edge: ' + j.right + ' / ' + W.right);
+          ws.scrollLeft = ws.scrollWidth; await wait(300);
+          const j2 = r('journalPane'), c2 = r('calPane');
+          if (Math.abs(j2.left - W.left) > 3) out.push('scrolled right: middle not on the left: ' + j2.left);
+          if (Math.abs(c2.right - W.right) > 3 || Math.abs(c2.width - W.width / 2) > 3) out.push('scrolled right: calendar not the right half: ' + c2.left + '-' + c2.right);
+          ws.scrollLeft = 0; await wait(200);
+          return out;
+        });
+        errs.push(...hv.map(x => 'half view: ' + x));
       }
       // Docked calendar (2026-11-13, Julius): with the pop-out closed, the same calendar sits in the right column
       // (Day view); Backlog opens as a column left of it and slides the app left (columns) / the left half (phone).

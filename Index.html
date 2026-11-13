@@ -2629,6 +2629,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Swipe to the hidden third column in 2-column view — paused (Julius, 2026-10-27):
   // it broke things in 2-column mode. Set PEEK_ENABLED true to bring it back.
   var PEEK_ENABLED=false, PEEK_SIDE_KEY='fw.peekSide', lastPeekKey='', peekRevealing=false;
+  var lastHalfW=0;
+  function halvesOn(){ try{ return localStorage.getItem('fw.halves')!=='0'; }catch(e){ return true; } }
   const COLUMN_STORAGE_KEY = 'focusWorkspaceColumnsV1';
   const FOCUS_STORAGE_KEY = 'focusWorkspaceFocusV1';
   const REF_COLLAPSE_STORAGE_KEY = 'focusWorkspaceRefCollapsedV1';
@@ -6954,6 +6956,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const tracks=[];
     let slot=1;
     const width=workspace.clientWidth || window.innerWidth;
+    /* Half-screen view (2026-11-13, Julius: "the calendar needs a lot more room"): on a computer / tablet (wider than 900px) with
+       all three columns on, each column is half the screen. It opens on History + the middle column; slide / scroll right
+       and it snaps to the middle column on the left half + the calendar on the right half. Resizer lines are off here.
+       localStorage fw.halves = '0' turns it off (old sized columns). */
+    const halves=!phone && !peek && visiblePanes.length===3 && window.innerWidth>900 && halvesOn();
+    const halfW=halves ? Math.max(TUCK,Math.floor((width-1)/2)) : 0;
+    const wasRight=halves && lastHalfW>0 && workspace.scrollLeft>lastHalfW/2;
+    workspace.classList.toggle('ws-halves',halves);
+    document.body.classList.toggle('ws-halves-on',halves);
+    if(halves)workspace.style.setProperty('--half-w',halfW+'px'); else workspace.style.removeProperty('--half-w');
     // Desktop defaults to fitting visible panes. Custom widths still work,
     // but never force Reference entirely outside the viewport on first load.
     const desktopFit=!phone && visiblePanes.length>1 && !localStorage.getItem(COLUMN_STORAGE_KEY);
@@ -6970,6 +6982,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const pane=document.getElementById(name+'Pane');
       pane.style.gridColumn=String(slot++);pane.style.gridRow='1';
       if(phone)tracks.push(`${Math.max(280,width)}px`);
+      else if(halves)tracks.push(`${halfW}px`);
       else if(visiblePanes.length===1)tracks.push('minmax(0,1fr)');
       // With a peek pane the visible ones need fixed widths, or fr tracks
       // would shrink to make room for it instead of the workspace scrolling.
@@ -6980,6 +6993,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const handle=handles[index];
         handle.dataset.left=name;handle.dataset.right=visiblePanes[index+1];
         handle.style.display='block';handle.style.gridColumn=String(slot++);handle.style.gridRow='1';
+        handle.style.pointerEvents=halves?'none':'';
         tracks.push('1px');
       }
     });
@@ -6988,15 +7002,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     workspace.style.justifyContent='start';
     workspace.style.overflowX=visiblePanes.length>1?'auto':'hidden';
     workspace.style.overflowY='hidden';
-    workspace.style.scrollSnapType='none';
+    workspace.style.scrollSnapType=halves?'x mandatory':'none';
     workspace.classList.toggle('view-single',visiblePanes.length===1);
     const peekKey=peek ? peek+':'+peekSide : '';
     const peekChanged=peekKey!==lastPeekKey;
     lastPeekKey=peekKey;
+    const halfChanged=halves && halfW!==lastHalfW;
+    lastHalfW=halves?halfW:0;
     requestAnimationFrame(()=>{
       // Land on the two chosen columns, with the peek pane just out of view.
       if(peek && peekChanged && !peekRevealing)
         workspace.scrollLeft=peekSide==='left' ? peekWidth : 0;
+      // Half view: keep whichever half pair was showing when the window size changes (calendar side stays put).
+      if(halfChanged && !document.body.classList.contains('bl-push'))workspace.scrollLeft=wasRight ? halfW+1 : 0;
       syncDayHeights();restoreDayScroll();
     });
   }
@@ -17247,6 +17265,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   body.bl-push #blCol{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--divider);overflow:hidden;}
   body.bl-push #workspace:not(.view-single){grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--bl-w,260px) var(--col-reference)!important;}
   body.bl-push #workspace #blCol{grid-column:5;grid-row:1;}
+  body.bl-push #workspace.ws-halves:not(.view-single){grid-template-columns:var(--half-w) 1px var(--half-w) 1px var(--bl-w,260px) var(--half-w)!important;}
+  /* Half view snap points (2026-11-13): History + middle at the left, middle + calendar at the right. */
+  #workspace.ws-halves > .pane{scroll-snap-align:start;}
+  #workspace.ws-halves > #calPane{scroll-snap-align:end;}
+  #workspace.ws-halves > #blCol{scroll-snap-align:none;}
+  body.ws-halves-on #referenceEdgeResize{display:none;}
   body.bl-push #workspace #calPane{grid-column:6!important;}
   body.bl-left #calPane:not(.view-hidden){display:flex!important;flex-direction:row;}
   body.bl-left #calBlLeft{display:flex;flex-direction:column;flex:0 0 44%;min-width:0;border-right:1px solid var(--divider);overflow:hidden;}

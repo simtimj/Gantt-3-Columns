@@ -666,6 +666,8 @@ Hold to pick up: `eventLongPressDelay` 500; `unselSoon()` drops FullCalendar's e
 
 ## Calendar backlog (2026-11-11, Julius: PROPOSED, not built)
 
+- 2026-11-13 (Julius): the ↪ move keeps the event's own color (urgency). `calBacklogRestoreColor_` turns old Grape / Graphite ↪ events back to the swept `ColorId` (blank → Events.get + update without colorId, since a patch can't unset it); runs inside `calBacklogRoll_` and `calBacklogPlace`. CAL_BACKLOG_COLOR only identifies the old recolor now.
+
 Idea: unfinished (non-Graphite) calendar tasks from past days move to a backlog so nothing gets lost. The old event stays on its day, struck through, as a "moved to backlog" marker; the task keeps its color in the backlog. A Backlog button in the 📅 panel opens a list on the left (calendar on the right), sortable / grouped, and tasks drag from it onto a day. Answers (Julius 2026-11-11):
 1. Swept: all-day events on the main calendar only (no timed, repeating or other calendars).
 2. Sweep on app load; must stay cheap (see plan).

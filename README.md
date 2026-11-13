@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -74,6 +74,10 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
+## 🧪 To be confirmed (2026-11-13)
+
+- **2026-11-13 · ↪ Backlog keeps colors:** moving a task to yesterday ("↪ Title") no longer turns it purple; it keeps its own color (red / yellow / blue = urgency). The ↪ events that were already made purple get their original color back on the next app load (uncolored ones go back to no color).
+
 ## 🧪 To be confirmed (2026-11-12)
 
 - **2026-11-12 · Hold to drag, no drag handle:** the ⠿ handle is gone from every card. To move a card, hold anywhere on its text until it lifts, then drag. Moving first still scrolls. Pressing a checkbox no longer drags on a small slip: tap = done, hold = its menu. **Options → Hold to drag** slider sets the hold time (0.2–1.2 s, default 0.5 s, saved per device); the 📅 calendar's event / Backlog / Plan drags use the same time. The line you're typing in still selects words on hold: tap off it first.
@@ -109,7 +113,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-09)
 
-- **2026-11-12 · 📅 Backlog rework (after audit):** swept events now **move to yesterday** as "↪ Title" in **Grape** (purple; Graphite is strictly done again) and keep rolling onto yesterday each day until dealt with. Drag a ↪ event onto today or a future day — in Google Calendar or from the Backlog list — and it restores itself: ↪ stripped, color back (uncolored → blue / Later), backlog row closed. Backlog drops now move the real event (no duplicates); ✕ also deletes the ↪ event. A task re-created on a newer day supersedes its older backlog rows (stale ↪ events deleted). The Backlog list groups uncolored tasks under Later (Not set group gone).
+- **2026-11-12 · 📅 Backlog rework (after audit):** swept events now **move to yesterday** as "↪ Title" (~~in Grape~~ — since 2026-11-13 they keep their own color; Graphite is strictly done again) and keep rolling onto yesterday each day until dealt with. Drag a ↪ event onto today or a future day — in Google Calendar or from the Backlog list — and it restores itself: ↪ stripped, backlog row closed. Backlog drops now move the real event (no duplicates); ✕ also deletes the ↪ event. A task re-created on a newer day supersedes its older backlog rows (stale ↪ events deleted). The Backlog list groups uncolored tasks under Later (Not set group gone).
 - **2026-11-11 · 📅 Calendars picker + edit any calendar:** a **Calendars** fold at the top of the 📅 panel lists every Google calendar (main first); tick / untick to show or hide it, saved in the Sheet's script properties (same on phone and desktop). Cal Events (center) follows the same picker. Calendars he can edit are fully editable from the panel (create, move, resize, delete, done); view-only ones (Time To Pet dog walks, subscriptions) show 🔒 and stay read-only. + New picks the calendar (default main). Uncolored events on other calendars show in that calendar's color; urgency colors stay main-only. **Repeating events** are editable: drag asks *This day / All days*; the edit and delete forms have the same choice (All days can't switch all-day ↔ timed).
 - **2026-11-11 · 📅 Scroll vs pick up + event card:** holding an event picks it up after ½ s; a held event drops its "selected" state 3 s after the last touch or on scroll, so starting a scroll on it no longer grabs it. Tapping empty calendar space closes the open event card. The card is smaller, with Edit · Delete · **GCal** · Close on one line.
 - **2026-11-11 · 📅 Event checkboxes + urgency groups:** every event in the calendar panel has a checkbox at the left of its card, filled with its subject color (saved subject, else auto-guessed from the title like Gantt cards). **Tap** it = done (Graphite, struck through; tap again to undo; 2026-11-11 fix: a real tap now works, the card redraw used to swallow it). **Hold** it = the same hold menu as the rest of the Gantt (urgency, subject, due date, minutes); urgency also recolors the event in Google Calendar. Holding the card itself still moves it. Short events get a smaller box. All-day events are ordered by urgency and grouped under small headings: Urgent · Next · Later · Not set · Done (a day with only one group shows no heading). Yellow's name "Next" is a placeholder.

@@ -17277,6 +17277,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #workspace.ws-halves > .pane{scroll-snap-align:start;}
   #workspace.ws-halves > #calPane{scroll-snap-align:end;}
   #workspace.ws-halves > #blCol{scroll-snap-align:none;}
+  /* Phone swipe (2026-11-13, Julius: "sliding right doesn't work"): inner scrollers had overscroll-behavior:contain on
+     both axes, which kept a sideways swipe from ever reaching #workspace. Half view lets the sideways part through. */
+  #workspace.ws-halves .pane,#workspace.ws-halves .pane *{overscroll-behavior-x:auto!important;}
+  /* History's day editor was pan-y only (vertical), so a sideways swipe there did nothing. */
+  #workspace.ws-halves .pane .day-editor{touch-action:pan-x pan-y!important;}
   body.ws-halves-on #referenceEdgeResize{display:none;}
   body.bl-push #workspace #calPane{grid-column:6!important;}
   body.bl-left #calPane:not(.view-hidden){display:flex!important;flex-direction:row;}

@@ -1771,6 +1771,24 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           return out;
         });
         errs.push(...hv.map(x => 'half view: ' + x));
+        // Phone swipe (2026-11-13, Julius: "sliding right doesn't work"): a real finger swipe moves between the halves,
+        // starting on History, the middle column and (going back) the calendar.
+        if (name === 'phone') {
+          const cdp = await pg.context().newCDPSession(pg);
+          await pg.evaluate(() => window.fwCalendar.close()); await pg.waitForTimeout(900);
+          const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+          const swipe = async (x, y, dx) => { await T('touchStart', x, y); for (let i = 1; i <= 12; i++) { await T('touchMove', x + dx * i / 12, y); await pg.waitForTimeout(16); } await T('touchEnd'); await pg.waitForTimeout(700); return pg.evaluate(() => document.getElementById('workspace').scrollLeft); };
+          for (const [x, y] of [[100, 450], [300, 450], [300, 700]]) {
+            await pg.evaluate(() => { document.getElementById('workspace').scrollLeft = 0; }); await pg.waitForTimeout(100);
+            const sl = await swipe(x, y, -260);
+            if (sl < 150) errs.push('half view: swipe left at ' + x + ',' + y + ' did not reach the calendar (' + sl + ')');
+          }
+          for (const [x, y] of [[300, 450], [100, 450]]) {
+            await pg.evaluate(() => { const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; }); await pg.waitForTimeout(100);
+            const sl = await swipe(x, y, 260);
+            if (sl > 50) errs.push('half view: swipe right at ' + x + ',' + y + ' did not go back (' + sl + ')');
+          }
+        }
       }
       // Docked calendar (2026-11-13, Julius): with the pop-out closed, the same calendar sits in the right column
       // (Day view); Backlog opens as a column left of it and slides the app left (columns) / the left half (phone).

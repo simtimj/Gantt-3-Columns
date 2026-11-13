@@ -3863,3 +3863,35 @@ function calBacklogPlace(req) {
     return { ok: true, event: out };
   } finally { lock.releaseLock(); }
 }
+
+/* =========================================================
+   KEEP IN MIND — one shared list (2026-11-13, Julius: "shared between all days, should not change its contents";
+   categories / dashboard removed, just his own header lines + tasks + subtasks). Stored once in the
+   `Keep In Mind` tab, cell A2 (A1 = header). Safe save like the pads: a stale base hash gets the server copy back.
+   `fresh` = never saved yet → the client builds the first copy (latest day's Keep In Mind lines + the old
+   category items as plain lines) and saves it. docs/NOTES.md → "Keep In Mind shared list".
+   ========================================================= */
+const KIM_SHEET = 'Keep In Mind';
+function kimSheet_() { return getOrCreateSheet_(KIM_SHEET, ['Keep In Mind (shared list, HTML) — edited in the app']); }
+function getKim() {
+  const sh = kimSheet_();
+  const html = String(sh.getRange(2, 1).getValue() || '');
+  const fresh = !html && PropertiesService.getScriptProperties().getProperty('kimMigrated') !== '1';
+  return { html: html, h: cellHash_(html), fresh: fresh, build: appBuild_() };
+}
+function saveKim(html, baseHash) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = kimSheet_();
+    const cur = String(sh.getRange(2, 1).getValue() || '');
+    html = String(html || '');
+    if (baseHash !== cellHash_(cur)) return { conflict: true, html: cur, h: cellHash_(cur), build: appBuild_() };
+    if (cur.length > 400 && html.length < cur.length * 0.6) backupCell_('Keep In Mind', 'A2', 'big shrink', cur);
+    sh.getRange(2, 1).setValue(html);
+    PropertiesService.getScriptProperties().setProperty('kimMigrated', '1');
+    return { h: cellHash_(html), build: appBuild_() };
+  } finally {
+    lock.releaseLock();
+  }
+}

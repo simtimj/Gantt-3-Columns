@@ -129,6 +129,7 @@ When he asks to organize his calendar tasks:
 - 4-panel layout: Cal Events = right column, Next Steps + Reference = drawer (2026-11-11, Julius)
 - Cal Events Google layout + hide list; 📅 popup; History count cycle (2026-11-11 evening, Julius)
 - Thoughts pad + Blocks in the middle column (2026-11-12, Julius)
+- Keep In Mind shared list + Focus editor + voice typing (2026-11-13, Julius)
 
 ## IT study log (2026-11-04)
 

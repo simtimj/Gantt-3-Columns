@@ -15,7 +15,10 @@ const focus = { v: 1, cats: [{ id: 'c1', name: 'Crabbing prep', col: false, proj
   { id: 'p1', title: 'Gear', why: 'Before Friday', col: false, tasks: [{ id: 'm-a', t: 'Gloves', d: 0 }, { id: 'm-b', t: 'Bait', d: 1 }] }] }] };
 const data = {
   today, inbox: [], cardCats: [], notesSeeds: {}, urgent: [], refPins: [],
-  days: [{ date: yday, journal: '', plan: '', tasks: line('Renew license', ' data-urg="2"') }, { date: today, journal: '',
+  days: [{ date: yday, plan: '',
+    // Keep In Mind (2026-11-13): yesterday's per-day section seeds the shared list (styles stripped).
+    journal: '<div data-nsec="focus" contenteditable="false">Keep In Mind</div><div><b><u>Trip</u></b></div>' +
+      '<div class="check-line" data-level="1" style="margin-left: 24px;"><input type="checkbox"><span class="check-text">Pack <span style="color: rgb(255, 255, 255);">rods</span></span></div>', tasks: line('Renew license', ' data-urg="2"') }, { date: today, journal: '',
     tasks: line('Pay rent', ' data-urg="1"') + line('Walk dog') +
       // Urgent checkmarks (2026-11-04): a finished urgent task (yellow) and one with a subtask.
       '<div class="check-line done" data-level="0" data-urg="2"><input type="checkbox" checked><span class="check-text">Paid bill</span></div>' +
@@ -38,7 +41,7 @@ const imported = { build: 'smoke', ref: {}, inbox: [], days: { [today]: { th: 'h
   tasks: data.days[1].tasks + '<div class="check-line" data-level="0" data-at="09:30"><input type="checkbox"><span class="check-text">From import</span></div>' } } };
 const stub = `<script>window.google={script:{run:new Proxy({},{get(t,k){let ok=null;const p=new Proxy({},{get(_,m){
   if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler'||m==='withUserObject')return()=>p;
-  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='runImports'||m==='getSyncState'?${JSON.stringify(imported)}:m==='getFocus'?${JSON.stringify(focus)}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
+  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='runImports'||m==='getSyncState'?${JSON.stringify(imported)}:m==='getFocus'?${JSON.stringify(focus)}:m==='getKim'?{html:'',h:'k0',fresh:true}:m==='saveKim'?{h:'k1'}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),10);};}});return p[k];}})}};</script>`;
 let html = fs.readFileSync('Index.html', 'utf8')
   .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
   .replace("<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>", fs.readFileSync('Drafts.html', 'utf8'))
@@ -196,28 +199,24 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     return [];
   });
   uadd.forEach(x => errs.push('Urgent add: ' + x));
-  // Keep In Mind: converted to Gear > (note, Gloves, Bait); Tab nests a line one deeper and saves.
+  // Keep In Mind (2026-11-13): one shared list in ⭐, built once from yesterday's lines + the old categories as plain lines.
   const kim = await pg.evaluate(async () => {
-    const wait = ms => new Promise(r => setTimeout(r, ms));
-    document.querySelector('[data-ctab="focus"]')?.click(); await wait(300);
-    const rows = () => [...document.querySelectorAll('.journal-editor[data-date="' + localToday() + '"] .fx .fx-task')].map(t => (t.style.getPropertyValue('--lv') || '0') + (t.classList.contains('fx-note') ? '~' : '') + t.querySelector('.fx-tt').textContent);
-    const got = rows().join('|');
-    if (got !== '0Gear|1~Before Friday|1Gloves|1Bait') return ['converted list: ' + got];
-    const bait = [...document.querySelectorAll('.journal-editor[data-date="' + localToday() + '"] .fx .fx-tt')].find(x => x.textContent === 'Bait');
-    bait.focus(); bait.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })); await wait(900);
-    const after = rows().join('|');
-    const saves = (window.__calls || []).filter(c => c[0] === 'saveFocus');
-    const saved = saves.length ? saves[saves.length - 1][1][0].cats[0].items.map(i => i.lv).join('') : '';
-    if(!(after === '0Gear|1~Before Friday|1Gloves|2Bait' && saved === '0112')) return ['Tab nesting: ' + after + ' saved ' + saved];
-    // 2026-11-06: one bordered cell per top line, no ‹ › 📌 buttons, Backspace on an emptied subtask removes it.
-    const fx = document.querySelector('.journal-editor[data-date="' + localToday() + '"] .fx');
-    if(fx.querySelector('.fx-tools')) return ['line buttons still shown'];
-    if(fx.querySelectorAll('.fx-cell').length !== 1) return ['cells: ' + fx.querySelectorAll('.fx-cell').length];
-    const b2 = [...fx.querySelectorAll('.fx-tt')].find(x => x.textContent === 'Bait');
-    b2.focus(); b2.innerHTML = '<br>';
-    b2.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true })); await wait(900);
-    const gone = rows().join('|');
-    return gone === '0Gear|1~Before Friday|1Gloves' ? [] : ['Backspace remove: ' + gone];
+    const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+    document.querySelector('[data-ctab="focus"]')?.click(); await wait(600);
+    const ed = document.querySelector('#kimScroll .kim-editor');
+    if (!ed || getComputedStyle(document.getElementById('kimScroll')).display === 'none') return ['shared list not shown in ⭐'];
+    const txt = ed.textContent.replace(/\s+/g, ' ');
+    for (const w of ['Trip', 'Pack rods', 'Crabbing prep', 'Gear', 'Before Friday', 'Gloves', 'Bait']) if (!txt.includes(w)) out.push('missing ' + w + ' in: ' + txt);
+    if (txt.indexOf('Trip') > txt.indexOf('Crabbing prep')) out.push('old categories not at the bottom');
+    if (ed.querySelector('span[style]')) out.push('font color kept');
+    if (document.querySelector('.fx')) out.push('category dashboard still there');
+    const g = [...ed.querySelectorAll('.check-line')].find(l => /Gloves/.test(l.textContent));
+    if (!g || g.dataset.tid !== 'm-a') out.push('Gloves lost its id');
+    if (!(window.__calls || []).some(c => c[0] === 'saveKim' && String(c[1][0]).includes('Gloves'))) out.push('first copy not saved');
+    // Same on every day: the list lives outside the day cells.
+    if (ed.closest('.day-row')) out.push('list is inside a day');
+    document.querySelector('[data-ctab="notes"]')?.click(); await wait(200);
+    return out;
   });
   kim.forEach(x => errs.push('Keep In Mind: ' + x));
   // Weather (2026-11-07): one ☁️ tab (hourly + daily merged).
@@ -751,6 +750,8 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     if (pp && getComputedStyle(pp).display !== 'none') out.push('Blocks still showing');
     tp.focus(); tp.innerHTML = 'free thought, no rules'; tp.dispatchEvent(new Event('input', { bubbles: true }));
     await wait(1500);
+    // 2026-11-13: Focus / Thinking is a full editor — tasks get checkboxes + cards, and a tick saves.
+    if (!tp.classList.contains('editor')) out.push('Focus / Thinking is not a full editor');
     const saves = (window.__calls || []).filter(c => c[0] === 'saveThoughtPad');
     if (!saves.some(c => String(c[1][1]).includes('free thought'))) out.push('Thoughts did not save');
     if ((window.__calls || []).filter(c => c[0] === 'savePlanPad').some(c => String(c[1][1]).includes('free thought'))) out.push('Thoughts text leaked into Blocks');

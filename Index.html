@@ -567,8 +567,17 @@
     /* Keep In Mind = one shared list (2026-11-13, Julius): ⭐ shows #kimScroll, the same on every day. The old per-day
        Keep In Mind section inside Notes cells stays hidden (kept in the Sheet, never shown or copied forward). */
     #journalPane .journal-editor > :is([data-nsec="focus"],[data-nsec="focus"] ~ :not(table,table ~ *)){display:none!important;}
-    #kimScroll{display:none;flex:var(--ns-a,1) 1 0;padding:4px 6px 24px;}
+    #kimScroll{display:none;flex:var(--ns-a,1) 1 0;padding:3px 3px 10px;position:relative;}
     #journalPane[data-ctab="focus"] #kimScroll{display:block;}
+    /* 2026-11-13 (Julius: "huge margins, too much empty space"): tight cards, small side room. */
+    #kimScroll > .kim-editor{position:relative;z-index:1;padding:0 3px!important;}
+    .kim-editor .check-line[data-tc^="f"]{margin-top:1px!important;padding-top:1px!important;}
+    .kim-editor .check-line[data-tc$="l"]{margin-bottom:1px!important;padding-bottom:1px!important;}
+    .kim-editor .check-line[data-tc]{padding-top:1px;padding-bottom:1px;}
+    /* Group borders (2026-11-13, Julius: "the bigger group has the border on by default"): a header line and
+       everything under it down to the next empty line = one bordered group. Drawn render-only behind the
+       editor (.kg-box in #kimScroll, never saved). */
+    #kimScroll .kg-box{position:absolute;z-index:0;pointer-events:none;border:1px solid color-mix(in srgb,var(--text,#888) 28%,transparent);border-radius:7px;}
     #journalPane[data-ctab="focus"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
     #kimScroll > .kim-editor{min-height:100%;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;word-break:break-word;}
     .kim-editor:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;font-style:italic;}
@@ -14299,8 +14308,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         html = clean(html);
         ed.innerHTML = html ? storedToHtml(html) : '';
         if(typeof normalizeEditorTasks === 'function') normalizeEditorTasks(ed);
-        wireBoxes();
-        loaded = true; pending = true; save();
+        wireBoxes(); squeezeBlanks();
+        loaded = true; pending = true; save(); repaint();
       }
     }
     function load(first){
@@ -14310,7 +14319,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(first){
           base = {t:r.html || '', h:r.h};
           if(r.fresh){ migrate(); return; }
-          ed.innerHTML = storedToHtml(r.html || ''); if(typeof normalizeEditorTasks === 'function') normalizeEditorTasks(ed); wireBoxes(); loaded = true; return;
+          ed.innerHTML = storedToHtml(r.html || ''); if(typeof normalizeEditorTasks === 'function') normalizeEditorTasks(ed); wireBoxes(); loaded = true;
+          if(squeezeBlanks()) schedule();
+          repaint(); return;
         }
         if(!loaded || r.h === base.h || inFlight || pending) return;
         merge(r.html || '', r.h);
@@ -14326,6 +14337,47 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     ed.addEventListener('focusout', () => { if(pending) save(); });
     document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') load(false); });
     setInterval(() => { if(document.visibilityState === 'visible' && document.activeElement !== ed && !ed.contains(document.activeElement)) load(false); }, 60000);
+    // Group borders: one box per run of non-empty top-level lines (a header + its tasks, down to the empty line).
+    const scroller = document.getElementById('kimScroll');
+    let kgRaf = 0;
+    function paintGroups(){
+      kgRaf = 0;
+      if(!scroller || scroller.offsetParent === null) return;
+      scroller.querySelectorAll(':scope > .kg-box').forEach(b => b.remove());
+      const blank = n => !n.classList.contains('check-line') && !n.textContent.trim() && !n.querySelector('input,img');
+      const groups = []; let cur = null;
+      [...ed.children].forEach(n => {
+        if(blank(n) || getComputedStyle(n).display === 'none'){ cur = null; return; }
+        if(!cur){ cur = [n,n]; groups.push(cur); } else cur[1] = n;
+      });
+      const sr = scroller.getBoundingClientRect(), er = ed.getBoundingClientRect();
+      groups.forEach(([a,b]) => {
+        const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+        const box = document.createElement('div'); box.className = 'kg-box';
+        box.style.left = (er.left - sr.left + scroller.scrollLeft) + 'px';
+        box.style.width = er.width + 'px';
+        box.style.top = (ra.top - sr.top + scroller.scrollTop - 2) + 'px';
+        box.style.height = (rb.bottom - ra.top + 4) + 'px';
+        scroller.appendChild(box);
+      });
+    }
+    const repaint = () => { if(!kgRaf) kgRaf = requestAnimationFrame(paintGroups); };
+    new MutationObserver(repaint).observe(ed,{childList:true,subtree:true,characterData:true});
+    window.addEventListener('resize', repaint);
+    new MutationObserver(repaint).observe(document.getElementById('journalPane'),{attributes:true,attributeFilter:['data-ctab']});
+    if(window.ResizeObserver) new ResizeObserver(repaint).observe(ed);
+    // Runs of empty lines shrink to one (old per-day copies had stacks of them — wasted space).
+    function squeezeBlanks(){
+      let prevBlank = true, changed = false;
+      [...ed.children].forEach(n => {
+        const b = !n.classList.contains('check-line') && !n.textContent.trim() && !n.querySelector('input,img');
+        if(b && prevBlank){ n.remove(); changed = true; return; }
+        prevBlank = b;
+      });
+      const last = ed.lastElementChild;
+      if(last && !last.classList.contains('check-line') && !last.textContent.trim() && last.previousElementSibling && document.activeElement !== ed){ last.remove(); changed = true; }
+      return changed;
+    }
     window.kimSave = schedule;
     window.kimUnsaved = () => inFlight || pending;
     window.kimFlush = () => { if(pending && !inFlight) save(); };

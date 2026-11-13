@@ -77,6 +77,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 ## 🧪 To be confirmed (2026-11-13)
 
 - **2026-11-13 · ⭐ Keep In Mind = one shared list:** the same list on every day; changing days never changes it. The category dashboard (+ Category, menus, colors) is gone: just your own header lines, tasks and subtasks, with checkboxes, cards and drag like everywhere else. It started from your 11/12 lines (font colors stripped), with the old category items added as plain lines at the bottom. Saved once in the `Keep In Mind` tab.
+- **2026-11-13 · ⭐ Keep In Mind tighter + group borders:** much less empty space (small side room, tight task cards, stacked empty lines shrink to one). Each group — a header line and everything under it down to the next empty line — has a thin rounded border by default. Inner per-card borders still only show on the line you're on (to decide later).
 - **2026-11-13 · Focus / Thinking is a full editor:** tasks there are cards with checkboxes, [] + Space, hold menus and drag, like Today and Blocks. Still one per day.
 - **2026-11-13 · Voice typing fix (everywhere):** tapping the mic no longer closes the box you're typing in. The app used to read the shorter voice panel as "keyboard closed" and drop your cursor; now it only lets go when the keyboard is really gone. Text formatting also waits until dictation finishes.
 

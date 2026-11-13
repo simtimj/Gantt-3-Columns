@@ -215,6 +215,13 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     if (!(window.__calls || []).some(c => c[0] === 'saveKim' && String(c[1][0]).includes('Gloves'))) out.push('first copy not saved');
     // Same on every day: the list lives outside the day cells.
     if (ed.closest('.day-row')) out.push('list is inside a day');
+    // 2026-11-13: each group (header + lines down to the empty line) gets a border; no stacked empty lines.
+    await wait(100);
+    const boxes = document.querySelectorAll('#kimScroll > .kg-box').length;
+    if (boxes < 2) out.push('group borders: ' + boxes);
+    const kids = [...ed.children], bl = n => !n.classList.contains('check-line') && !n.textContent.trim();
+    if (kids.some((n, i) => i && bl(n) && bl(kids[i - 1]))) out.push('stacked empty lines kept');
+    if ((window.__calls || []).filter(c => c[0] === 'saveKim').some(c => /kg-box/.test(String(c[1][0])))) out.push('group border saved into the list');
     document.querySelector('[data-ctab="notes"]')?.click(); await wait(200);
     return out;
   });

@@ -15942,7 +15942,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div class="cp-state" data-cal-state hidden></div>
   <div class="cp-body">
     <section class="cp-cals folded" data-cal-cals aria-label="Calendars">
-      <button type="button" class="cp-cfold" data-cals-fold><span class="cp-parr">▸</span> Calendars <span class="cp-ccnt" data-cals-count></span></button><span class="cp-crow"><button type="button" class="cp-zb" data-cal-zoom="-1" title="Zoom out (or pinch)" aria-label="Zoom out">−</button><button type="button" class="cp-zb" data-cal-zoom="1" title="Zoom in (or pinch)" aria-label="Zoom in">+</button><button type="button" class="cp-blbtn" data-bl-toggle title="Show / hide past unfinished tasks">↪ Backlog <span data-bl-n></span></button></span>
+      <button type="button" class="cp-cfold" data-cals-fold><span class="cp-parr">▸</span> Calendars <span class="cp-ccnt" data-cals-count></span></button><span class="cp-crow"><button type="button" class="cp-zb" data-cal-zoom="-1" title="Zoom out (or pinch)" aria-label="Zoom out">−</button><button type="button" class="cp-zb" data-cal-zoom="1" title="Zoom in (or pinch)" aria-label="Zoom in">+</button><button type="button" class="cp-blbtn" data-bl-toggle title="Backlog: show / hide past unfinished tasks">BL <span data-bl-n></span></button></span>
       <div class="cp-cbody" data-cals-body></div>
     </section>
     <section class="cp-plan" data-cal-plan aria-label="Daily plan">
@@ -16631,7 +16631,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function blRender(){
     const items = (blData && blData.items) || [], btn = panel.querySelector('.fc-cpBacklog-button');
-    if(btn){ btn.textContent = 'Backlog' + (items.length ? ' ' + items.length : ''); btn.classList.toggle('fc-button-active', !blEl.hidden); }
+    // Count via data-n + CSS, never textContent: FullCalendar re-renders its own text node, so writing text doubled it ("BacklogBacklog").
+    if(btn){ if(items.length) btn.dataset.n = items.length; else delete btn.dataset.n; btn.classList.toggle('fc-button-active', !blEl.hidden); }
     if(blCount) blCount.textContent = items.length ? items.length : '';
     const pb = panel.querySelector('[data-bl-toggle]'); if(pb){ pb.querySelector('[data-bl-n]').textContent = items.length || ''; pb.classList.toggle('on', !blEl.hidden); }
     if(blEl.hidden) return;
@@ -16863,14 +16864,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // + New are gone (hold / drag on the grid or the all-day row makes a new event).
       headerToolbar: { left: 'today title prev,next', center: '', right: (phone ? '' : 'cpBacklog ') + 'cpPlan timeGridDay,timeGridWeek cpView cpRefresh cpClose' }, // phone: Backlog sits in the Calendars row
       customButtons: {
-        cpBacklog: { text: 'Backlog', hint: 'Show / hide past unfinished tasks', click: () => blToggle() },
+        cpBacklog: { text: 'BL', hint: 'Show / hide past unfinished tasks', click: () => blToggle() },
         cpPlan: { text: 'Plan', hint: 'Show / hide the plan (Big Three, Waiting list)', click: () => { lsSet('fw.calPlanFold', planFolded() ? '0' : '1'); renderPlan(); setTimeout(() => cal && cal.updateSize(), 0); } },
         // Phones: one Day ⇄ Week toggle instead of the two-button pill (saves a button's width on the single line).
         cpView: { text: 'Week', hint: 'Switch Day / Week', click: () => cal.changeView(cal.view.type === 'timeGridDay' ? 'timeGridWeek' : 'timeGridDay') },
         cpRefresh: { text: '↻', hint: 'Reload events from Google Calendar', click: () => {} }, // handled by the [data-cal-refresh] listener
         cpClose: { text: '✕', hint: 'Close (Esc) and go back to the Gantt', click: () => {} } // handled by [data-cal-close]
       },
-      buttonText: { today: 'Today', day: 'Day', week: phone ? 'Wk' : 'Week' },
+      buttonText: { today: '◉', day: 'Day', week: phone ? 'Wk' : 'Week' }, // ◉ = Today (2026-11-13, Julius: room)
+      buttonHints: { today: 'Today' },
       buttonIcons: { prev: 'chevron-left', next: 'chevron-right' },
       titleFormat: { month: 'long', year: 'numeric' },
       views: { timeGridDay: { titleFormat: phone ? { month: 'short', day: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' } } },
@@ -16882,7 +16884,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const D = luxon.DateTime.fromJSDate(a.view.currentStart, {zone: 'UTC'}), t = luxon.DateTime.now().setZone(TZ).toISODate() === D.toISODate();
         return { html: '<span class="cp-corner' + (t ? ' cp-today' : '') + '"><span class="cp-dh-w">' + D.toFormat('ccc').toUpperCase() + '</span><span class="cp-dh-n">' + D.day + '</span></span>' };
       },
-      slotLabelContent: a => String(a.text || '').replace(/^(\d+:\d\d)\s*[ap]m?$/i, '$1').replace(/^(\d+)(?::00)?\s*([ap])m?$/i, (m, h, ap) => h + ' ' + ap.toUpperCase() + 'M'),
+      // Time labels stacked to save width (2026-11-13, Julius): "1" over "AM", "12" over ":45".
+      slotLabelContent: a => {
+        const t = String(a.text || '').trim(), m = t.match(/^(\d+)(?::(\d\d))?\s*([ap])?m?$/i);
+        if(!m) return t;
+        const low = m[2] && m[2] !== '00' ? ':' + m[2] : m[3] ? m[3].toUpperCase() + 'M' : '';
+        return { html: '<span class="cp-sl"><b>' + m[1] + '</b>' + (low ? '<i>' + low + '</i>' : '') + '</span>' };
+      },
       slotLabelFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
       slotDuration: zoomOpts(zoomMode(zoomPx)).slotDuration, slotLabelInterval: zoomOpts(zoomMode(zoomPx)).slotLabelInterval,
       slotLaneClassNames: a => a.date.getUTCMinutes() ? ['cp-half'] : [], slotLabelClassNames: a => a.date.getUTCMinutes() ? ['cp-half'] : [],
@@ -17385,6 +17393,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-docked .fc .fc-toolbar-title{font-size:15px;}
   #calPanel.cp-docked .fc .fc-button{padding:.25em .5em;min-height:28px;font-size:12px;}
   #calPanel.cp-blout .cp-body.bl-open{padding-left:0;}
+  /* Compact calendar (2026-11-13, Julius: buttons cut off): tighter toolbar, ◉ Today, BL n, close − +, stacked times. */
+  #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-weight:500;font-size:11px;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-style:normal;font-size:8px;opacity:.85;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 3px 0 1px;}
+  #calPanel.cp-docked .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;}
+  #calPanel.cp-docked .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;}
+  #calPanel.cp-docked .fc .fc-toolbar-title{font-size:13px;margin:0 2px;white-space:nowrap;}
+  #calPanel.cp-docked .fc .fc-button{padding:0 6px!important;min-height:24px;height:24px;font-size:12px;margin:0!important;}
+  #calPanel.cp-docked .fc .fc-today-button{padding:0 5px!important;font-size:13px;}
+  #calPanel.cp-docked .fc .fc-prev-button,#calPanel.cp-docked .fc .fc-next-button{width:20px;padding:0!important;}
+  #calPanel.cp-docked .fc .fc-cpRefresh-button{width:24px;font-size:14px;}
+  #calPanel.cp-docked span.cp-crow{gap:2px;}
+  #calPanel.cp-docked .cp-zb,#calPanel.cp-docked .cp-blbtn{min-width:22px;height:22px;padding:0 5px;font-size:12px;margin:0;}
+  #calPanel .fc .fc-cpBacklog-button[data-n]::after{content:" " attr(data-n);white-space:pre;}
   #calPark{display:none;}
   /* Backlog column left of Cal Events: the app slides left by its width (2026-11-13, Julius). */
   #blCol,#calBlLeft{display:none;--cp-bg:var(--panel,#fff);--cp-text:var(--text,#202124);--cp-muted:var(--muted,#5f6368);--cp-line:var(--divider,#dadce0);--cp-soft:color-mix(in srgb,var(--divider,#ccc) 40%,transparent);}

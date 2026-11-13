@@ -747,3 +747,8 @@ Edge swipe (2026-11-11, option C): window capture touch listeners; start within 
 - `flattenLooseLines(ed)` (Focus / KIM only, from `refreshCards` and the ▤ Title action): bare top-level text / inline runs → their own `<div>`; attribute-less `<div>` wrappers holding block lines are unwrapped. Skipped mid-composition (`ed.__composing`). Cause: Julius's 11/13 pad was `Gantt<div>…all lines…</div>`, so the title found no top-level line.
 - Open title lines in `.thought-editor,.kim-editor` get render-only `data-tlcnt` ("done/total ✓") shown after − (stripped in `cardCleanHtml`).
 - Computer slide (2026-11-13): a capture `wheel` listener (registered before the old pan at `addEventListener('wheel'` ~11.5k) handles `#workspace.ws-halves`: sideways delta (or Shift + wheel) ≥ 30 accumulated → `scrollTo` smooth to 0 or max, 650 ms lock for trackpad momentum, `stopImmediatePropagation` so the old `scrollLeft += amount` pan doesn't fight the mandatory snap (it was snapping back). Inner `overflow-x:auto/scroll` scrollers keep their own scroll.
+
+## Compact calendar (2026-11-13, Julius: buttons cut off)
+
+- Names (Julius): **"calendar" / "main calendar" = the docked right-side calendar; "big calendar" = the pop-out.**
+- `buttonText.today` '◉' (hint Today); `cpBacklog` text 'BL', count via `data-n` + `::after` (writing `textContent` into a FullCalendar button doubled it on re-render); `.cp-blbtn` reads "BL n". Docked: toolbar gaps 2px, buttons 24px tall / 0 6px, ‹ › 20px, − + 22px. `slotLabelContent` → `.cp-sl` (hour bold, then AM/PM or :mm small under it). `CAL_SHOT=dir SMOKE_ONLY=calendar node tools/smoke.mjs` screenshots the docked calendar.

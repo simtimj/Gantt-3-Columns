@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-13)
 
+- **2026-11-13 · Compact calendar:** ◉ = Today, Backlog button reads **BL n** (no arrow; also fixed it showing "BacklogBacklog"), − / + closer and smaller, tighter toolbar, and the time labels are stacked ("1" over "AM", "12" over ":45") so the time column is narrower.
 - **2026-11-13 · Computer slide:** in half view, a sideways trackpad swipe (or Shift + mouse wheel) slides the whole app to the calendar half and back in one smooth move, like the phone swipe.
 - **2026-11-13 · Hold a calendar event → 🗑 Delete:** hold any event in the calendar (or its checkbox) without dragging → the hold menu has 🗑 Delete event; it asks once, then removes it from Google Calendar too. Tapping still opens the card (Edit / Delete).
 - **2026-11-13 · Focus / Thinking title lines fixed + count:** ▤ Title now works there (loose first lines and pasted wrapper boxes are split into real lines); an open title shows its count next to − (e.g. "− 1/3 ✓"), folded shows "+ 1/3 ✓". Same in Keep In Mind.

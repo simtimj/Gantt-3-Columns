@@ -1140,6 +1140,10 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
       pg.on('pageerror', e => errs.push(e.message));
       await pg.goto('file://' + cOut);
       await pg.waitForTimeout(5000); // let the app's own start-up (imports, live refresh) settle before snapshotting
+      // CAL_SHOT=dir (2026-11-13): screenshot the docked calendar (app slid to the calendar half) for a look.
+      if (process.env.CAL_SHOT) { await pg.evaluate(() => { const w = document.getElementById('workspace'); w.scrollLeft = w.scrollWidth; }); await pg.waitForTimeout(600);
+        await pg.screenshot({ path: path.join(process.env.CAL_SHOT, 'cal-' + name + '.png') });
+        const cp = await pg.$('#calPane'); if (cp) await cp.screenshot({ path: path.join(process.env.CAL_SHOT, 'calpane-' + name + '.png') }); }
       const res = await pg.evaluate(async (phone) => {
         const out = [], wait = ms => new Promise(r => setTimeout(r, ms));
         const until = async (f, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (f()) return true; await wait(50); } return false; };

@@ -1747,7 +1747,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
       }
       // Half view (2026-11-13, Julius): computer = each column half the screen; opens on History + middle,
       // scrolled right = middle + calendar.
-      if (name !== 'phone') {
+      {
         const hv = await pg.evaluate(async () => {
           const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
           const ws = document.getElementById('workspace');
@@ -1762,6 +1762,12 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           if (Math.abs(j2.left - W.left) > 3) out.push('scrolled right: middle not on the left: ' + j2.left);
           if (Math.abs(c2.right - W.right) > 3 || Math.abs(c2.width - W.width / 2) > 3) out.push('scrolled right: calendar not the right half: ' + c2.left + '-' + c2.right);
           ws.scrollLeft = 0; await wait(200);
+          // Options → Columns (this device): 3 columns turns it off, Half view back on.
+          const sel = document.getElementById('halvesMode');
+          sel.value = '0'; sel.dispatchEvent(new Event('change')); await wait(150);
+          if (ws.classList.contains('ws-halves')) out.push('Options "3 columns" did not turn it off');
+          sel.value = '1'; sel.dispatchEvent(new Event('change')); await wait(150);
+          if (!ws.classList.contains('ws-halves')) out.push('Options "Half view" did not turn it back on');
           return out;
         });
         errs.push(...hv.map(x => 'half view: ' + x));

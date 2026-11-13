@@ -2406,6 +2406,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     <label class="ts-check"><input type="checkbox" id="cardsAuto" checked> Color cards by subject automatically</label>
     <label class="ts-check">Divider lines <input type="color" id="dividerColor" value="#1f2937" aria-label="Divider line color"> <button class="btn tiny" type="button" id="dividerReset">Reset</button></label>
     <label class="ts-check">Line strength <input type="range" id="lineStrength" min="20" max="100" step="5" value="70" aria-label="Dividing line strength"> <span id="lineStrengthVal">70%</span></label>
+    <div class="ts-row"><span class="ts-label" title="This device only">Columns (this device)</span><select id="halvesMode" aria-label="Column layout on this device"><option value="1">Half view (2 at a time, slide right for the calendar)</option><option value="0">3 columns</option></select></div>
     <label class="ts-check"><input type="checkbox" id="oneDayOn" checked> One day at a time (▲ ▼ to change day; Completed on top, Plan pad below)</label>
     <div class="ts-row"><span class="ts-label">Task subject color</span><select id="cardsColorMode" aria-label="Task subject color"><option value="checkbox">Checkbox only</option><option value="whole">Whole card</option><option value="subtle">Whole card, subtle</option><option value="subtleline">Subtle + border line</option><option value="border">Card border only</option></select></div>
     <div class="ts-row">
@@ -2631,6 +2632,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   var PEEK_ENABLED=false, PEEK_SIDE_KEY='fw.peekSide', lastPeekKey='', peekRevealing=false;
   var lastHalfW=0;
   function halvesOn(){ try{ return localStorage.getItem('fw.halves')!=='0'; }catch(e){ return true; } }
+  // Options → "Columns (this device)" (2026-11-13, Julius): half view or 3 columns, saved per device.
+  document.addEventListener('DOMContentLoaded',()=>{
+    const sel=document.getElementById('halvesMode'); if(!sel)return;
+    sel.value=halvesOn()?'1':'0';
+    sel.addEventListener('change',()=>{ try{ localStorage.setItem('fw.halves',sel.value); }catch(e){} lastHalfW=0; const ws=document.getElementById('workspace'); if(ws)ws.scrollLeft=0; updateWorkspaceLayout(); });
+  });
   const COLUMN_STORAGE_KEY = 'focusWorkspaceColumnsV1';
   const FOCUS_STORAGE_KEY = 'focusWorkspaceFocusV1';
   const REF_COLLAPSE_STORAGE_KEY = 'focusWorkspaceRefCollapsedV1';
@@ -6956,11 +6963,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const tracks=[];
     let slot=1;
     const width=workspace.clientWidth || window.innerWidth;
-    /* Half-screen view (2026-11-13, Julius: "the calendar needs a lot more room"): on a computer / tablet (wider than 900px) with
+    /* Half-screen view (2026-11-13, Julius: "the calendar needs a lot more room"): on any device (phone too, 2026-11-13) with
        all three columns on, each column is half the screen. It opens on History + the middle column; slide / scroll right
        and it snaps to the middle column on the left half + the calendar on the right half. Resizer lines are off here.
        localStorage fw.halves = '0' turns it off (old sized columns). */
-    const halves=!phone && !peek && visiblePanes.length===3 && window.innerWidth>900 && halvesOn();
+    const halves=!phone && !peek && visiblePanes.length===3 && halvesOn();
     const halfW=halves ? Math.max(TUCK,Math.floor((width-1)/2)) : 0;
     const wasRight=halves && lastHalfW>0 && workspace.scrollLeft>lastHalfW/2;
     workspace.classList.toggle('ws-halves',halves);

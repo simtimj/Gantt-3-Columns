@@ -1785,7 +1785,7 @@
     #centerCalendarList .ce-event{margin:calc(2px * var(--pad-y,1)) 0;padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}
     #centerCalendarList .ce-scheduled{margin:calc(2px * var(--pad-y,1)) 0;}
     #centerCalendarList .ce-title{margin-top:calc(1px * var(--pad-y,1));}
-    #centerDownScroll .ce-head :is([data-ce-refresh],[data-ce-day]){font-size:12px;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;max-width:22px;max-height:22px;}
+    #centerDownScroll .ce-head :is([data-ce-refresh],[data-ce-opt]){font-size:12px;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;max-width:22px;max-height:22px;}
     @media(max-width:600px){#centerDownScroll{padding-inline:calc(8px * var(--pad-x,1) * var(--side-k,1));}#centerCalendarList .ce-event{padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}}
     /* Plan / Think-like separation; graphite is the completion signal. */
     #centerDownScroll .ce-head{margin-bottom:calc(7px * var(--pad-y,1));}
@@ -2132,8 +2132,8 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 @container (max-width:260px){#centerDownScroll .ce-head{gap:3px;}#centerDownScroll .ce-head strong{font-size:0;}#centerDownScroll .ce-head strong::before{content:"📅";font-size:14px;} /* narrow: a 📅 instead of hiding the title (2026-11-07) */#centerDownScroll .ce-head .ce-search{min-width:36px;padding:1px 4px;}#centerDownScroll .ce-head:has(.ce-search:focus) :is([data-ce-sort],[data-ce-day]){display:none;}#centerDownScroll .ce-head .ce-search:focus{max-width:none;}}
 @container (max-width:175px){#centerDownScroll .ce-head strong{display:none;}} /* phone-narrow: no room even for 📅 */
 /* Mini day view in Cal Events (2026-11-11, Julius). */
-#centerDownScroll .ce-head [data-ce-day]{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px;padding:0!important;margin:0;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
-#centerDownScroll .ce-head [data-ce-day].on{background:var(--accent-soft,rgba(66,133,244,.18));}
+#centerDownScroll .ce-head [data-ce-opt]{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px;padding:0!important;margin:0;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
+#centerDownScroll .ce-head [data-ce-opt].on{background:var(--accent-soft,rgba(66,133,244,.18));}
 #centerCalendarList .ce-day{height:clamp(140px,38vh,300px);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--divider);border-radius:8px;margin:2px 0 6px;position:relative;}
 #centerCalendarList .ce-day-in{position:relative;}
 #centerCalendarList .ce-day-in::before{content:"";position:absolute;top:0;bottom:0;left:21px;border-left:1px solid var(--divider);} /* axis line between the hour labels and the events (2026-11-11) */
@@ -2493,7 +2493,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
          (#referencePane) became a right-side drawer opened by the edge tab. -->
     <section class="pane" id="calPane">
       <!-- Calendar Events (2026-11-03, Julius): simple read-only main-calendar list. -->
-      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><input type="search" class="ce-search" data-ce-search placeholder="🔍 Find" aria-label="Find a Cal Events task" autocomplete="off" enterkeyhint="search"><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Cats</button><button type="button" class="btn" data-ce-day aria-label="Show or hide the day view" title="Day view: a small scrollable timeline of the day">🕒</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
+      <div class="scroll" id="centerDownScroll"><div class="ce-head"><strong>Cal Events</strong><input type="search" class="ce-search" data-ce-search placeholder="🔍 Find" aria-label="Find a Cal Events task" autocomplete="off" enterkeyhint="search"><span class="ce-tools"><button type="button" class="btn" data-ce-sort aria-label="Change Cal Events order" title="Order by category or time">Cats</button><button type="button" class="btn" data-ce-opt aria-label="Options" title="Options: day calendar, what to hide">⚙</button><button type="button" class="btn" data-ce-refresh aria-label="Refresh calendar events">↻</button></span></div><div id="centerCalendarList" aria-live="polite">Loading…</div></div>
     </section>
     <section
       class="pane"
@@ -9674,8 +9674,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const seen = []; full.events.forEach(ev => { if(ev.calId && !seen.some(c => c.id === ev.calId)) seen.push({id: ev.calId, name: ev.cal || ev.calId}); });
     ceHide.cals.forEach(c => { if(!seen.some(x => x.id === c.id)) seen.push(c); });
     const low = ceHide.words.map(w => String(w).toLowerCase());
-    return '<div class="ce-opt" data-ce-optbox><div class="ce-opt-h"><b>Hide from the list</b><button type="button" class="btn" data-ce-opt-done>Done</button></div>' +
-      '<div class="ce-opt-note">Still shows on the timeline.</div>' +
+    // 2026-11-13 (Julius): ⚙ sits by the search box; the 🕒 day-calendar switch lives in here now.
+    return '<div class="ce-opt" data-ce-optbox><div class="ce-opt-h"><b>Options</b><button type="button" class="btn" data-ce-opt-done>Done</button></div>' +
+      '<label class="ce-opt-c"><input type="checkbox" data-ce-day' + (ceDayOn() ? ' checked' : '') + '> 🕒 Day calendar (off = events list)</label>' +
+      '<div class="ce-opt-s">Hide from the list</div><div class="ce-opt-note">Still shows on the calendar.</div>' +
       '<div class="ce-opt-s">Calendars</div>' + (seen.length ? seen.map(c => '<label class="ce-opt-c"><input type="checkbox" data-ce-hcal="' + esc(c.id) + '" data-name="' + esc(c.name) + '"' + (ceHide.cals.some(x => x.id === c.id) ? ' checked' : '') + '> ' + esc(c.name) + '</label>').join('') : '<div class="ce-opt-note">No calendars today.</div>') +
       '<div class="ce-opt-s">Titles with</div><div class="ce-opt-w">' + ceHide.words.map(w => '<span class="ce-chip on">' + esc(w) + '<button type="button" data-ce-hword-x="' + esc(w) + '" aria-label="Stop hiding ' + esc(w) + '">✕</button></span>').join('') +
       CE_HIDE_SUGGEST.filter(w => low.indexOf(w.toLowerCase()) < 0).map(w => '<button type="button" class="ce-chip" data-ce-hword-add="' + esc(w) + '">+ ' + esc(w) + '</button>').join('') + '</div>' +
@@ -9860,14 +9862,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
          (timeline zoom), then the list, then the day timeline filling the rest of the column. */
       const nHid = full.events.filter(ceIsHidden).length, folded = ceListFolded();
       const listHtml = box.innerHTML;
-      box.innerHTML = '<div class="ce-bar"><button type="button" class="ce-fold" data-ce-fold aria-expanded="' + !folded + '" title="Fold / open the events list"><span class="ce-farr">' + (folded ? '▸' : '▾') + '</span> Events <small>' + data.events.length + '</small></button>' +
+      // 2026-11-13 (Julius): no Events bar / list above the calendar — the events are on the calendar itself. The list
+      // (with its bar) comes back only when the day calendar is switched off in ⚙.
+      box.innerHTML = (dayOn ? '' : '<div class="ce-bar"><button type="button" class="ce-fold" data-ce-fold aria-expanded="' + !folded + '" title="Fold / open the events list"><span class="ce-farr">' + (folded ? '▸' : '▾') + '</span> Events <small>' + data.events.length + '</small></button>' +
         (nHid ? '<button type="button" class="ce-hidn' + (ceShowHidden ? ' on' : '') + '" data-ce-showhid title="' + (ceShowHidden ? 'Hide them again' : 'Show them in the list for now') + '">' + nHid + ' hidden</button>' : '') +
-        '<span class="ce-bsp"></span><button type="button" class="btn ce-bb" data-ce-opt aria-label="Choose what to hide from the list" title="Hide calendars or titles from the list">⚙</button>' +
-        '</div>' +
+        '</div>') +
         (ceOpt.open ? ceOptHtml(full) : '') +
-        '<div class="ce-list"' + (folded ? ' hidden' : '') + '>' + listHtml + '</div>';
+        (dayOn ? '' : '<div class="ce-list"' + (folded ? ' hidden' : '') + '>' + listHtml + '</div>');
       box.classList.toggle('ce-has-day', dayOn);
-      if(dayOn){
+      if(false){ // list/timeline splitter: no list above the calendar any more (2026-11-13)
         try{ const v = parseFloat(localStorage.getItem('fw.ceSplit')); if(v >= 10 && v <= 85){ box.style.setProperty('--ce-ls', v + '%'); box.classList.add('ce-man'); } else { box.classList.remove('ce-man'); } }catch(err){}
         box.insertAdjacentHTML('beforeend', '<div class="ce-split" title="Drag to size the list and timeline · double-tap to reset" aria-label="Resize the events list"></div>');
       }
@@ -17457,6 +17460,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #centerCalendarList .ce-list[hidden] + .ce-split{display:none;}
   #centerCalendarList.ce-man > .ce-list:not([hidden]){flex:0 0 var(--ce-ls,40%);max-height:88%;min-height:28px;}
   #centerCalendarList .ce-list[hidden]{display:none!important;}
+  #centerDownScroll .ce-head > strong{display:none!important;} /* 2026-11-13: no "Cal Events" / 📅 label */
+  #centerCalendarList.ce-has-day > .ce-opt{flex:0 1 auto;max-height:55%;overflow-y:auto;}
   #centerCalendarList .ce-bar{display:flex;align-items:center;gap:3px;margin:0 0 2px;min-height:22px;}
   #centerCalendarList .ce-fold{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:2px 4px 2px 0;cursor:pointer;white-space:nowrap;}
   #centerCalendarList .ce-fold small{font-weight:500;color:var(--muted);margin-left:2px;}

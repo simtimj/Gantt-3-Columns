@@ -542,14 +542,13 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     const out = [];
     if (document.querySelector('[data-ce-sort]')?.textContent !== 'Cats') out.push('sort button not "Cats"');
     const list = document.getElementById('centerCalendarList');
-    // Day timeline (2026-11-11): on by default, under the list (Google Calendar layout); 🕒 hides / shows it.
+    // Day timeline on by default (2026-11-11). 2026-11-13: no Events bar / list above it, no "Cal Events" title, no 🕒 —
+    // ⚙ sits on the search line and holds the 🕒 day-calendar switch; switching it off brings the events list back.
     const dv = list.querySelector(':scope > .ce-day');
     if (!dv) out.push('timeline not on by default');
     else {
       if (dv.scrollHeight <= dv.clientHeight) out.push('day view does not scroll');
-      const lst = list.querySelector(':scope > .ce-list');
-      if (!lst || !(lst.compareDocumentPosition(dv) & Node.DOCUMENT_POSITION_FOLLOWING)) out.push('list is not above the timeline');
-      // − / + zoom changes the hour height.
+      if (list.querySelector(':scope > .ce-list, :scope > .ce-bar')) out.push('events list / bar still above the calendar');
       const h0 = dv.querySelector('.ce-day-in').offsetHeight;
       list.querySelector('[data-ce-zoom="1"]').click(); await wait(80);
       const h1 = list.querySelector('.ce-day-in').offsetHeight;
@@ -557,14 +556,27 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       list.querySelector('[data-ce-zoom="-1"]').click(); await wait(80);
       if (list.querySelector('.ce-day-in').offsetHeight >= h1) out.push('− zoom did not shrink the timeline');
     }
-    if (!list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('day view hid the list');
-    // ▾ Events folds the list and back.
+    const head0 = document.querySelector('#centerDownScroll .ce-head');
+    if (head0.querySelector('strong') && head0.querySelector('strong').offsetWidth) out.push('Cal Events title / 📅 still shows');
+    if (head0.textContent.includes('🕒')) out.push('🕒 button still in the header');
+    const opt = head0.querySelector('[data-ce-opt]');
+    if (!opt) out.push('no ⚙ on the search line');
+    else {
+      opt.click(); await wait(80);
+      const dayCb = list.querySelector('[data-ce-optbox] input[data-ce-day]');
+      if (!dayCb || !dayCb.checked) out.push('⚙ has no checked 🕒 Day calendar switch');
+      else { dayCb.click(); await wait(100); }
+      if (list.querySelector('.ce-day')) out.push('switch off did not hide the day calendar');
+      if (!list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('switch off did not bring the events list back');
+      list.querySelector('[data-ce-opt-done]')?.click(); await wait(50);
+    }
+    // ▾ Events folds the list and back (list mode).
     list.querySelector('[data-ce-fold]').click(); await wait(80);
     if (list.querySelector('.ce-list') && !list.querySelector('.ce-list').hidden) out.push('▾ Events did not fold the list');
     list.querySelector('[data-ce-fold]').click(); await wait(80);
     if (list.querySelector('.ce-list').hidden) out.push('▸ Events did not open the list');
-    // ⚙ hide list: a word hides the event from the list, not the timeline; "1 hidden" shows; ✕ brings it back.
-    list.querySelector('[data-ce-opt]').click(); await wait(80);
+    // ⚙ hide list: a word hides the event from the list; "1 hidden" shows; ✕ brings it back.
+    opt.click(); await wait(80);
     const f = list.querySelector('[data-ce-hword-form]');
     if (!f) out.push('⚙ did not open the hide list');
     else {
@@ -576,10 +588,6 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       if (!list.querySelector('.ce-list .ce-event[data-ce-id="e1"]')) out.push('✕ did not bring the event back');
       list.querySelector('[data-ce-opt-done]').click(); await wait(50);
     }
-    document.querySelector('[data-ce-day]').click(); await wait(100);
-    if (list.querySelector('.ce-day')) out.push('🕒 did not hide the day view');
-    document.querySelector('[data-ce-day]').click(); await wait(100);
-    if (!list.querySelector('.ce-day')) out.push('🕒 did not bring the day view back');
     list.querySelector('.ce-event[data-ce-id="e1"] .ce-check').click(); await wait(200);
     // Cats list = urgency boxes then subjects (2026-11-06): e1 was ticked above → Done box.
     if (!list.querySelector('.ce-urg-done .ce-event[data-ce-id="e1"]')) out.push('Cats list: done event not in the Done urgency box');
@@ -595,6 +603,9 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     sb.focus(); if (!fits()) out.push('search box overflows while typing');
     sb.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await wait(50);
     if (sb.value || !list.querySelector('.ce-event[data-ce-id="e1"]')) out.push('Esc did not clear the search');
+    opt.click(); await wait(80); list.querySelector('[data-ce-optbox] input[data-ce-day]').click(); await wait(100);
+    if (!list.querySelector('.ce-day')) out.push('switch on did not bring the day calendar back');
+    list.querySelector('[data-ce-opt-done]')?.click(); await wait(50);
     return out;
   });
   quad.forEach(x => errs.push('Cal Events: ' + x));

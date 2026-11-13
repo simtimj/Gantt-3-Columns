@@ -9742,6 +9742,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(e.key === 'Escape'){ i.value = ''; if(ceDraw) ceDraw(); i.blur(); }
     if(e.key === 'Enter'){ e.preventDefault(); i.blur(); }
   }, true);
+  window.fwCeRedraw = () => { if(ceDraw) ceDraw(); else loadCenterCalendar(); };
   function loadCenterCalendar(date, force){
     date = date || window.odDate || state.today;
     const box = document.getElementById('centerCalendarList');
@@ -9750,6 +9751,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const seq = ++centerCalendarSeq;
     const draw = full => {
       if(seq !== centerCalendarSeq || box.querySelector('[data-ce-editing]')) return;
+      const fwc = window.fwCalendar;
+      if(fwc && fwc.park) fwc.park(); // the docked big calendar steps out before the HTML is rewritten
       ceShownDate = full.date;
       ceDraw = () => draw(full);
       ceHideLoad();
@@ -9816,7 +9819,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         try{ const v = parseFloat(localStorage.getItem('fw.ceSplit')); if(v >= 10 && v <= 85){ box.style.setProperty('--ce-ls', v + '%'); box.classList.add('ce-man'); } else { box.classList.remove('ce-man'); } }catch(err){}
         box.insertAdjacentHTML('beforeend', '<div class="ce-split" title="Drag to size the list and timeline · double-tap to reset" aria-label="Resize the events list"></div>');
       }
-      if(dayOn){
+      // 2026-11-13 (Julius): the day timeline is the big calendar itself (Day view), docked here; the old mini
+      // timeline only shows until its libraries are loaded (or if they can't load).
+      const dockIt = dayOn && fwc && fwc.dockReady && fwc.dockReady() && !(fwc.isOpen && fwc.isOpen());
+      if(dayOn && fwc && fwc.prepareDock && !dockIt) fwc.prepareDock();
+      if(dockIt){
+        box.insertAdjacentHTML('beforeend', '<div class="ce-dock"></div>');
+        if(!fwc.dockTo(box.querySelector('.ce-dock'), full.date)) box.querySelector('.ce-dock').textContent = 'Loading calendar…';
+      } else if(dayOn && fwc && fwc.isOpen && fwc.isOpen() && fwc.dockReady && fwc.dockReady()){
+        box.insertAdjacentHTML('beforeend', '<div class="ce-dock ce-dock-away">📅 Open in the big calendar</div>');
+      } else if(dayOn){
         box.insertAdjacentHTML('beforeend', ceDayHtml(full));
         const d = box.querySelector('.ce-day');
         if(d){
@@ -15464,19 +15476,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-body{flex:1 1 auto;min-height:0;position:relative;padding:6px 8px 8px;display:flex;flex-direction:column;}
   #calPanel #calMount{flex:1 1 auto;min-height:0;}
   /* Calendar backlog (2026-11-11, Julius): phone = bottom half under the calendar; wider = list on the left. */
-  #calPanel .cp-bl{flex:0 0 45%;min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--cp-line);margin-top:6px;background:var(--cp-bg);}
-  #calPanel .cp-bl[hidden]{display:none;}
-  #calPanel .cp-blh{display:flex;align-items:baseline;gap:6px;padding:6px 8px 4px;font-size:13px;}
-  #calPanel .cp-blc{color:var(--cp-muted);}
-  #calPanel .cp-blhint{margin-left:auto;font-size:11px;color:var(--cp-muted);}
-  #calPanel .cp-blb{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 8px;}
-  #calPanel .cp-blg{font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--cp-muted);margin:8px 2px 3px;text-transform:uppercase;}
-  #calPanel .cp-bli{display:flex;align-items:center;gap:6px;padding:6px 8px;margin:2px 0;border-radius:6px;font-size:13px;line-height:1.25;
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bl{flex:0 0 45%;min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--cp-line);margin-top:6px;background:var(--cp-bg);}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bl[hidden]{display:none;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blh{display:flex;align-items:baseline;gap:6px;padding:6px 8px 4px;font-size:13px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blc{color:var(--cp-muted);}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blhint{margin-left:auto;font-size:11px;color:var(--cp-muted);}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blb{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 8px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blg{font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--cp-muted);margin:8px 2px 3px;text-transform:uppercase;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli{display:flex;align-items:center;gap:6px;padding:6px 8px;margin:2px 0;border-radius:6px;font-size:13px;line-height:1.25;
     -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grab;touch-action:pan-y;}
-  #calPanel .cp-bli .cp-blt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
-  #calPanel .cp-bli .cp-bld{flex:0 0 auto;font-size:11px;opacity:.8;}
-  #calPanel .cp-bli .cp-blx{flex:0 0 auto;border:0;background:transparent;color:inherit;opacity:.7;font-size:14px;padding:0 2px;cursor:pointer;}
-  #calPanel .cp-blmsg{padding:10px 4px;font-size:13px;color:var(--cp-muted);}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-bld{flex:0 0 auto;font-size:11px;opacity:.8;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{flex:0 0 auto;border:0;background:transparent;color:inherit;opacity:.7;font-size:14px;padding:0 2px;cursor:pointer;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blmsg{padding:10px 4px;font-size:13px;color:var(--cp-muted);}
   @media (min-width:721px){
     #calPanel .cp-body.bl-open{padding-left:248px;}
     #calPanel .cp-body.bl-open .cp-bl{position:absolute;left:8px;top:6px;bottom:8px;width:232px;margin:0;border:1px solid var(--cp-line);border-radius:10px;}
@@ -15756,10 +15768,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-ccnt{font-weight:400;}
   #calPanel .cp-cals.folded .cp-cbody{display:none;}
   #calPanel .cp-crow{float:right;display:inline-flex;gap:4px;align-items:center;}
-  #calPanel .cp-zb,#calPanel .cp-blbtn{font:inherit;font-size:13px;color:var(--cp-text);background:transparent;border:1px solid var(--cp-line);border-radius:999px;min-width:30px;height:26px;padding:0 8px;cursor:pointer;}
-  #calPanel .cp-blbtn.on{background:var(--cp-soft);font-weight:600;}
-  #calPanel .cp-blbtn{display:none;}
-  @media (max-width:720px){ #calPanel .cp-blbtn{display:inline-block;} #calPanel .fc .fc-cpBacklog-button{display:none;} }
+  #calPanel .cp-zb,:is(#calPanel,#blCol,#calBlLeft) .cp-blbtn{font:inherit;font-size:13px;color:var(--cp-text);background:transparent;border:1px solid var(--cp-line);border-radius:999px;min-width:30px;height:26px;padding:0 8px;cursor:pointer;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blbtn.on{background:var(--cp-soft);font-weight:600;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blbtn{display:none;}
+  @media (max-width:720px){ :is(#calPanel,#blCol,#calBlLeft) .cp-blbtn{display:inline-block;} #calPanel .fc .fc-cpBacklog-button{display:none;} }
   /* Calendar zoom (2026-11-11, Julius): slot height 14–120px, pinch / ctrl+wheel / − +, saved per device. */
   #calPanel .fc .fc-timegrid-slot{height:var(--cp-slot,24px)!important;}
   #calPanel .cp-cals:not(.folded) .cp-parr{display:inline-block;transform:rotate(90deg);}
@@ -15866,6 +15878,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     grip.addEventListener('dblclick', () => { saved = 0; try { localStorage.removeItem(KEY); } catch (e) {} apply(0); setTimeout(fit, 50); });
   })();
   let cal = null, libsPromise = null, lastFocus = null, loadSeq = 0, partial = 0, loadErr = false, busy = false;
+  let docked = false; // 2026-11-13: this same calendar sits in the right column (day view) whenever the pop-out is closed
   let sheetEv = null, pending = false, flashUntil = 0, viewStart = '', viewEnd = '';
   // Empty / partial note for the dates on screen (also after Day ↔ Week switches served from FullCalendar's cache).
   function refreshState(){
@@ -15983,7 +15996,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }).withFailureHandler(() => { bgBusy = false; }).getCalendarRange(ws, we);
   }
   function redrawWhenSafe(n){
-    if(!cal || !isOpen() || n > 40) return;
+    if(!cal || !(isOpen() || docked) || n > 40) return;
     const safe = !busy && !pending && !moveBusy && detail.hidden && !mount.querySelector('.fc-event-mirror,.fc-event-dragging,.fc-event-resizing');
     if(safe) cal.refetchEvents(); else setTimeout(() => redrawWhenSafe(n + 1), 1500);
   }
@@ -16525,8 +16538,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     blBody.innerHTML = h;
   }
   function blToggle(){
-    blEl.hidden = !blEl.hidden; lsSet('fw.calBacklog', blEl.hidden ? '0' : '1');
+    blEl.hidden = !blEl.hidden; if(!docked) lsSet('fw.calBacklog', blEl.hidden ? '0' : '1');
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
+    if(typeof blPlace === 'function') blPlace();
     blRender(); if(!blEl.hidden) blLoad(false);
     setTimeout(() => cal && cal.updateSize(), 0);
   }
@@ -16772,7 +16786,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
         if(!pending) showDetail(info.event, info.el); },
       eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
-      datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
+      datesSet: info => { const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
     window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
@@ -16811,6 +16825,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function open(){
     if(isOpen()) return;
+    undock();
     lastFocus = document.activeElement;
     document.body.classList.add('cal-open');
     panel.setAttribute('aria-hidden', 'false');
@@ -16825,6 +16840,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!pending){ detail.hidden = true; sheetEv = null; }
     document.querySelectorAll('[data-cal-open]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
+    setTimeout(() => { if(!isOpen() && window.fwCeRedraw) window.fwCeRedraw(); }, 260); // back into the right column
   }
   let unselT = 0;
   function unselEv(){ clearTimeout(unselT); try { const d = cal && cal.getCurrentData && cal.getCurrentData(); if(d && d.dispatch && d.eventSelection) d.dispatch({type: 'UNSELECT_EVENT'}); } catch (e) {} }
@@ -16884,7 +16900,106 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
   }
   function retry(){ if(cal){ refetchFresh(); loadPlan(true); } else start(); }
-  window.fwCalendar = { saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  /* ── Docked in the right column (2026-11-13, Julius: "match the mini calendar to the big one") ──
+     The right column's day timeline IS this calendar: while the pop-out is closed, the whole panel lives inside the
+     Cal Events column (under the events list), forced to Day view on the day the app shows. Opening the pop-out
+     takes it back (its own Day / Week choice), closing puts it back. Cal Events' draw() calls dockTo(host, date)
+     with a .ce-dock placeholder, and park() before it rewrites its HTML. Until the libraries load (or if they
+     can't), the old mini timeline shows instead. */
+  const panelHome = panel.parentNode, panelNext = panel.nextSibling;
+  const parkEl = document.createElement('div'); parkEl.id = 'calPark'; parkEl.hidden = true; document.body.appendChild(parkEl);
+  let dockTop = -1, dockFailed = false, dockLoading = false, blFirstDock = true;
+  function saveDockTop(){ const sc = mount.querySelector('.fc-timegrid .fc-scroller-liquid-absolute'); if(sc) dockTop = sc.scrollTop; }
+  function restoreDockTop(){ const sc = mount.querySelector('.fc-timegrid .fc-scroller-liquid-absolute'); if(sc && dockTop >= 0) sc.scrollTop = dockTop; }
+  function dockReady(){ return !!cal && !dockFailed; }
+  function prepareDock(){
+    if(cal || dockLoading || dockFailed || !canRun()) return;
+    dockLoading = true;
+    loadLibs().then(() => { dockLoading = false; if(!cal && !isOpen()){ build(); } if(window.fwCeRedraw) window.fwCeRedraw(); })
+      .catch(() => { dockLoading = false; dockFailed = true; });
+  }
+  function dockTo(host, date){
+    if(!host || isOpen()) return false;
+    if(!cal){ prepareDock(); return false; }
+    if(blFirstDock){ blFirstDock = false; if(!blEl.hidden){ blEl.hidden = true; } } // start with the backlog shut in the column
+    docked = true;
+    panel.classList.add('cp-docked'); panel.setAttribute('aria-hidden', 'false'); panel.setAttribute('aria-modal', 'false'); panel.setAttribute('role', 'region');
+    if(panel.parentNode !== host) host.appendChild(panel);
+    try {
+      if(cal.view.type !== 'timeGridDay') cal.changeView('timeGridDay', date || undefined);
+      else if(date && cal.view.currentStart && luxon.DateTime.fromJSDate(cal.view.currentStart, {zone: 'UTC'}).toISODate() !== date) cal.gotoDate(date);
+      cal.updateSize();
+    } catch (e) {}
+    restoreDockTop(); setTimeout(restoreDockTop, 0);
+    blPlace();
+    return true;
+  }
+  function park(){ if(docked && panel.parentNode !== parkEl){ saveDockTop(); parkEl.appendChild(panel); } }
+  function undock(){
+    if(!docked) return;
+    saveDockTop(); docked = false;
+    panel.classList.remove('cp-docked'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('role', 'dialog');
+    if(panelNext && panelNext.parentNode === panelHome) panelHome.insertBefore(panel, panelNext); else panelHome.appendChild(panel);
+    blPlace();
+    const v = lsGet('fw.calView');
+    try { if(cal && v && v !== cal.view.type) cal.changeView(v); } catch (e) {}
+  }
+  /* ── Backlog beside the docked calendar (2026-11-13, Julius) ──
+     Columns view: the backlog becomes its own column just left of Cal Events and the whole app slides left by its
+     width (History goes partly off the left edge; swipe / scroll back if needed). Phone (one column): it opens on the
+     left half of the calendar column, or — the ⇣ / ⇤ button in its header — under the calendar like before. */
+  const cpBodyEl = panel.querySelector('.cp-body');
+  const ws = document.getElementById('workspace'), calPaneEl = document.getElementById('calPane');
+  let blCol = document.getElementById('blCol'), blLeft = document.getElementById('calBlLeft');
+  if(!blCol && ws && calPaneEl){ blCol = document.createElement('section'); blCol.id = 'blCol'; blCol.setAttribute('aria-label', 'Calendar backlog'); ws.insertBefore(blCol, calPaneEl); }
+  if(!blLeft && calPaneEl){ blLeft = document.createElement('div'); blLeft.id = 'calBlLeft'; calPaneEl.insertBefore(blLeft, calPaneEl.firstChild); }
+  [blCol, blLeft].forEach(h => h && ['touchstart','pointerdown','keydown','keyup','input'].forEach(n => h.addEventListener(n, e => e.stopPropagation(), {passive: true})));
+  if(blEl){
+    const bh = blEl.querySelector('.cp-blh');
+    if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blside" data-bl-side title="Phone: show the backlog on the left or under the calendar"></button><button type="button" class="cp-blclose" data-bl-close title="Close the backlog" aria-label="Close the backlog">✕</button>');
+    blEl.addEventListener('click', e => {
+      if(e.target.closest('[data-bl-side]')){ e.stopPropagation(); lsSet('fw.blPhone', lsGet('fw.blPhone') === 'below' ? 'left' : 'below'); blPlace(); setTimeout(() => cal && cal.updateSize(), 0); }
+      else if(e.target.closest('[data-bl-close]')){ e.stopPropagation(); if(!blEl.hidden) blToggle(); }
+    });
+  }
+  const blWidth = () => blCol ? (blCol.getBoundingClientRect().width || 260) : 260;
+  function blMode(){
+    if(!docked) return 'home';
+    // Phone / narrow or split layouts: the backlog shares the calendar column (left half, or below if chosen).
+    const phone = window.innerWidth <= 720 || document.body.classList.contains('mobile-split') || !!(ws && ws.classList.contains('view-single'));
+    document.body.classList.toggle('bl-phone', phone);
+    if(!phone) return 'push';
+    return lsGet('fw.blPhone') === 'below' ? 'home' : 'left';
+  }
+  let blPushed = false, blScrollWas = 0;
+  function blPlace(){
+    if(!blEl) return;
+    const m = blMode(), target = m === 'push' ? blCol : m === 'left' ? blLeft : null;
+    if(target){ if(blEl.parentNode !== target) target.appendChild(blEl); }
+    else if(blEl.parentNode !== cpBodyEl) cpBodyEl.insertBefore(blEl, detail);
+    panel.classList.toggle('cp-blout', !!target);
+    cpBodyEl.classList.toggle('bl-open', !blEl.hidden && !target);
+    const side = blEl.querySelector('[data-bl-side]'); if(side) side.textContent = lsGet('fw.blPhone') === 'below' ? '⇤ Left' : '⇣ Below';
+    const push = m === 'push' && !blEl.hidden;
+    document.body.classList.toggle('bl-left', m === 'left' && !blEl.hidden);
+    if(push !== blPushed){
+      blPushed = push;
+      document.body.classList.toggle('bl-push', push);
+      // Slide the app left by the backlog's width (open) / back (closed).
+      // Open: scroll so the calendar column sits at the right edge again (History slides off by the backlog's width).
+      // Close: back to where it was.
+      if(push && ws) blScrollWas = ws.scrollLeft;
+      requestAnimationFrame(() => {
+        if(!ws) return;
+        if(push){ const cp = calPaneEl.getBoundingClientRect(), wr = ws.getBoundingClientRect(); ws.scrollLeft += Math.max(0, cp.right - wr.right); }
+        else ws.scrollLeft = blScrollWas;
+        if(cal) cal.updateSize();
+      });
+    }
+  }
+  if(ws) new MutationObserver(() => { if(docked) blPlace(); }).observe(ws, {attributes: true, attributeFilter: ['class']});
+  window.addEventListener('resize', () => { if(docked) blPlace(); });
+  window.fwCalendar = { dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');
@@ -16917,7 +17032,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // touchmove is let through (like pointermove): FullCalendar cancels page scrolling during a touch drag from a
   // window listener (phase 3b). The workspace never saw the touchstart, so its swipe handlers stay idle.
   ['touchstart','pointerdown','keydown','keyup','input'].forEach(n => panel.addEventListener(n, e => e.stopPropagation(), {passive: true}));
-  window.addEventListener('resize', () => { if(cal && isOpen()) cal.updateSize(); });
+  window.addEventListener('resize', () => { if(cal && (isOpen() || docked)) cal.updateSize(); });
 })();
 </script>
 <!-- Big Three strip (2026-11-08, Julius: "Big Three / Biggest Return"). A thin standing list at the top of Today:
@@ -17114,6 +17229,33 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Separator = drag bar (2026-11-11, Julius): the 2px line between the list and the timeline can be dragged to give
      the top or bottom more room (saved per device); double-tap it to go back to automatic. Grip like the other bars. */
   #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:60px;margin-top:0;border:0;border-radius:0;}
+  /* Docked big calendar (2026-11-13, Julius): the 📅 panel itself fills the timeline spot, Day view, same look. */
+  #centerCalendarList.ce-has-day > .ce-dock{flex:1 1 0;min-height:120px;display:flex;flex-direction:column;position:relative;}
+  #centerCalendarList .ce-dock-away{align-items:center;justify-content:center;color:var(--muted);font-size:13px;}
+  #calPanel.cp-docked{position:relative;inset:auto;z-index:auto;flex:1 1 0;min-height:0;width:auto!important;max-width:none;margin:0;padding:0;
+    transform:none;visibility:visible;transition:none;box-shadow:none;border:0;border-radius:0;font-size:13px;}
+  #calPanel.cp-docked .cp-resize,#calPanel.cp-docked .cp-head,
+  #calPanel.cp-docked .fc-cpClose-button,#calPanel.cp-docked .fc-timeGridDay-button,#calPanel.cp-docked .fc-timeGridWeek-button,#calPanel.cp-docked .fc-cpView-button{display:none!important;}
+  #calPanel.cp-docked .cp-body{padding:0 2px 2px 0;}
+  #calPanel.cp-docked .fc .fc-toolbar{gap:4px;margin-bottom:4px;}
+  #calPanel.cp-docked .fc .fc-toolbar-title{font-size:15px;}
+  #calPanel.cp-docked .fc .fc-button{padding:.25em .5em;min-height:28px;font-size:12px;}
+  #calPanel.cp-blout .cp-body.bl-open{padding-left:0;}
+  #calPark{display:none;}
+  /* Backlog column left of Cal Events: the app slides left by its width (2026-11-13, Julius). */
+  #blCol,#calBlLeft{display:none;--cp-bg:var(--panel,#fff);--cp-text:var(--text,#202124);--cp-muted:var(--muted,#5f6368);--cp-line:var(--divider,#dadce0);--cp-soft:color-mix(in srgb,var(--divider,#ccc) 40%,transparent);}
+  body.bl-push #blCol{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--divider);overflow:hidden;}
+  body.bl-push #workspace:not(.view-single){grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--bl-w,260px) var(--col-reference)!important;}
+  body.bl-push #workspace #blCol{grid-column:5;grid-row:1;}
+  body.bl-push #workspace #calPane{grid-column:6!important;}
+  body.bl-left #calPane:not(.view-hidden){display:flex!important;flex-direction:row;}
+  body.bl-left #calBlLeft{display:flex;flex-direction:column;flex:0 0 44%;min-width:0;border-right:1px solid var(--divider);overflow:hidden;}
+  body.bl-left #calPane > #centerDownScroll{flex:1 1 0;min-width:0;}
+  :is(#blCol,#calBlLeft) > .cp-bl{flex:1 1 auto;margin:0;border-top:0;font-size:13px;}
+  .cp-blside,.cp-blclose{appearance:none;border:1px solid var(--cp-line);background:transparent;color:inherit;font:inherit;font-size:11px;border-radius:6px;padding:1px 6px;cursor:pointer;}
+  .cp-blside{margin-left:4px;}
+  body:not(.bl-phone) .cp-blside{display:none;}
+  #calPanel:not(.cp-blout) .cp-blclose{display:none;}
   /* Only the center handle drags (2026-11-11, Julius): the line itself ignores touches so scrolling past it is safe. */
   #centerCalendarList .ce-split{flex:0 0 2px;position:relative;background:var(--divider);touch-action:none;z-index:5;margin:4px 0 3px;pointer-events:none;}
   #centerCalendarList .ce-split::before{content:"";position:absolute;left:50%;width:64px;margin-left:-32px;top:-12px;bottom:-12px;pointer-events:auto;cursor:row-resize;}

@@ -1211,7 +1211,8 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           else if (i === 2) document.getElementById('calPanelBackdrop').click();
           else panel.querySelector('[data-cal-close]').click();
           await wait(320);
-          if (document.body.classList.contains('cal-open') || getComputedStyle(panel).visibility !== 'hidden') out.push('close #' + (i + 1) + ' did not close the panel');
+          // 2026-11-13: closed = back in the right column (docked Day view), not floating over the app.
+          if (document.body.classList.contains('cal-open') || !(getComputedStyle(panel).visibility === 'hidden' || panel.closest('#calPane'))) out.push('close #' + (i + 1) + ' did not close the panel');
         }
         if (document.querySelectorAll('#calPanel').length !== 1 || document.querySelectorAll('#calPanel .fc-view-harness').length !== 1 || document.querySelectorAll('#calPanel .fc-header-toolbar').length !== 1) out.push('duplicate panels or calendars after reopening');
         // Error → Retry
@@ -1737,8 +1738,46 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         const w1 = await pg.evaluate(() => document.getElementById('calPanel').getBoundingClientRect().width);
         if (Math.abs(w1 - Math.max(280, g.w - 200)) > 12) errs.push('resize: drag did not narrow the calendar (' + g.w + ' → ' + w1 + ')');
         await pg.reload(); await pg.waitForTimeout(2500);
+        await pg.evaluate(() => window.fwCalendar.open()); await pg.waitForTimeout(400);
         const w2 = await pg.evaluate(() => document.getElementById('calPanel').getBoundingClientRect().width);
         if (Math.abs(w2 - w1) > 3) errs.push('resize: width not restored after reload (' + w1 + ' → ' + w2 + ')');
+      }
+      // Docked calendar (2026-11-13, Julius): with the pop-out closed, the same calendar sits in the right column
+      // (Day view); Backlog opens as a column left of it and slides the app left (columns) / the left half (phone).
+      {
+        const dk = await pg.evaluate(async phone => {
+          const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+          window.fwCalendar.close(); await wait(900);
+          if (window.fwCeRedraw) window.fwCeRedraw(); await wait(600);
+          const panel = document.getElementById('calPanel');
+          if (!panel.closest('#calPane .ce-dock')) return ['calendar not docked in the right column: ' + (panel.parentElement && (panel.parentElement.id || panel.parentElement.className))];
+          if (!panel.classList.contains('cp-docked')) out.push('no docked look');
+          if (window.fwCalendar.api().view.type !== 'timeGridDay') out.push('docked view is not Day: ' + window.fwCalendar.api().view.type);
+          if (document.querySelector('#centerCalendarList .ce-day')) out.push('old mini timeline still drawn');
+          const ws = document.getElementById('workspace'), single = phone || ws.classList.contains('view-single');
+          const btn = panel.querySelector('.fc-cpBacklog-button') || panel.querySelector('[data-bl-toggle]');
+          btn.click(); await wait(400);
+          const bl = document.querySelector('[data-cal-bl]');
+          if (!single) {
+            if (!bl.closest('#blCol')) out.push('backlog not in its own column');
+            const bc = document.getElementById('blCol').getBoundingClientRect(), cp = document.getElementById('calPane').getBoundingClientRect();
+            if (bc.width < 100) out.push('backlog column too narrow: ' + bc.width);
+            if (Math.abs(bc.right - cp.left) > 3) out.push('backlog not just left of the calendar');
+            if (Math.abs(cp.right - innerWidth) > 3) out.push('calendar column not at the right edge: ' + cp.right + ' / ' + innerWidth);
+            if (ws.scrollLeft < 50) out.push('app did not slide left: ' + ws.scrollLeft);
+          } else if (!bl.closest('#calBlLeft') || !document.body.classList.contains('bl-left')) out.push('phone backlog not on the left');
+          // Close: everything slides back.
+          (panel.querySelector('.fc-cpBacklog-button') || bl.querySelector('[data-bl-close]') || panel.querySelector('[data-bl-toggle]')).click(); await wait(400);
+          if (document.body.classList.contains('bl-push') || document.body.classList.contains('bl-left')) out.push('backlog did not close');
+          if (!single && ws.scrollLeft > 2) out.push('app did not slide back: ' + ws.scrollLeft);
+          // Pop-out takes it back and closing re-docks.
+          window.fwCalendar.open(); await wait(350);
+          if (panel.closest('#calPane')) out.push('pop-out still inside the column');
+          window.fwCalendar.close(); await wait(900);
+          if (!panel.closest('#calPane')) out.push('did not go back into the column');
+          return out;
+        }, name === 'phone');
+        errs.push(...dk.map(x => 'docked calendar: ' + x));
       }
 
       if (shot > 0) { await pg.click('#toolbar [data-cal-open]'); await pg.waitForTimeout(900); await pg.screenshot({ path: process.argv[shot + 1].replace(/(\.png)?$/, '-calendar-' + name + '.png') }); }

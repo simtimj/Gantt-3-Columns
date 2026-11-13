@@ -16295,7 +16295,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const blEl = panel.querySelector('[data-cal-bl]'), blBody = panel.querySelector('[data-bl-body]'), blCount = panel.querySelector('[data-bl-count]');
   let blData = null, blAt = 0, blBusy = false;
   const blById = id => ((blData && blData.items) || []).find(x => x.id === id);
-  const BL_G = [['1', 'Urgent'], ['2', 'Next'], ['3', 'Later'], ['', 'Not set']];
+  const BL_G = [['1', 'Urgent'], ['2', 'Next'], ['3', 'Later']]; // blank urgency counts as Later (2026-11-12, Julius)
   function blLoad(force){
     if(blBusy || !canRun() || (!force && blData && Date.now() - blAt < 15 * 60000)) return;
     blBusy = true;
@@ -16315,7 +16315,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!items.length){ blBody.innerHTML = '<div class="cp-blmsg">Nothing in the backlog.</div>'; return; }
     let h = '';
     BL_G.forEach(([u, name]) => {
-      const g = items.filter(x => (BL_G.some(b => b[0] === x.urg) ? x.urg : '') === u).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+      const g = items.filter(x => (BL_G.some(b => b[0] === x.urg) ? x.urg : '3') === u).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
       if(!g.length) return;
       h += '<div class="cp-blg">' + name + ' · ' + g.length + '</div>';
       g.forEach(x => { const c = softColor(x.color, false);

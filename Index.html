@@ -1384,6 +1384,7 @@
     [data-tlon]::after{order:2;}
     [data-tlon]::before{content:"−";order:1;flex:0 0 auto;margin-left:4px;padding:0 1px;min-width:.75em;font-size:10px;font-weight:700;line-height:1.25;text-align:center;border:1px solid var(--tc-cat,var(--border));border-radius:5px;color:var(--tc-cat,var(--muted));background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
     [data-tlon="c"]::before{content:"+  " attr(data-tlinfo);font-weight:600;}
+    [data-tlon="o"][data-tlcnt]::before{content:"−  " attr(data-tlcnt);font-weight:600;}
     [data-tlhid]{display:none!important;}
     /* Folded summary (2026-10-29): bold starts of the hidden lines, as one condensed block under the title. */
     [data-tlon="c"][data-tlsum]{flex-wrap:wrap;}
@@ -4683,7 +4684,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }
     restoreSelection();
     if(action === 'title'){
-      let n = savedRange.startContainer; if(n.nodeType !== 1) n = n.parentElement;
+      if(flattenLooseLines(ed)){ const sel = window.getSelection(); if(sel && sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange(); }
+      let n = savedRange.startContainer; if(n.nodeType !== 1 || n === ed) n = n === ed ? (ed.childNodes[savedRange.startOffset] || ed.lastChild) : n.parentElement;
+      if(n && n.nodeType !== 1) n = n.parentElement;
       while(n && n.parentElement !== ed) n = n.parentElement;
       if(!n || n === ed){ setStatus('Tap a line first'); return; }
       toggleTitleLine(n,ed);
@@ -5615,7 +5618,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const c = el.cloneNode(true);
     c.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
-    c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => { ['data-tlon','data-tlinfo','data-tlhid','data-tlsum','data-tlbox'].forEach(a => n.removeAttribute(a)); n.querySelectorAll(':scope > .tl-sum').forEach(x => x.remove()); });
+    c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => { ['data-tlon','data-tlinfo','data-tlhid','data-tlsum','data-tlbox','data-tlcnt'].forEach(a => n.removeAttribute(a)); n.querySelectorAll(':scope > .tl-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
     c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
@@ -11073,6 +11076,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       p.appendChild(tb);
     }
     // Archive / unarchive the task + its subtasks (2026-10-27, Julius).
+    // Delete a calendar event (2026-11-13, Julius): hold it → 🗑 Delete; asks once, then removes it from Google Calendar too.
+    if(isCal && line && window.fwCalendar && window.fwCalendar.askDeleteLine){
+      const db = document.createElement('button');
+      db.type = 'button'; db.className = 'urg-goto urg-del';
+      db.textContent = '🗑 Delete event (from Google Calendar too)';
+      db.addEventListener('pointerdown',e => e.preventDefault());
+      db.addEventListener('click',() => { hideUrgencyPicker(); window.fwCalendar.askDeleteLine(line); });
+      p.appendChild(db);
+    }
     if(!isCal){
       const ab = document.createElement('button');
       ab.type = 'button'; ab.className = 'urg-goto';
@@ -12120,6 +12132,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       line.dataset.cat = dailyCat;
     });
     let changed = ensureDaySections(ed);
+    if(ed.matches('.thought-editor,.kim-editor') && flattenLooseLines(ed)){ changed = true; saveEditorOwner(ed); }
     requestAnimationFrame(() => paintDaySecs(ed));
     // Older lines carry the one-line due label; switch them to the stacked one (display only).
     try{ ed.querySelectorAll('.check-line[data-due],.check-line[data-dur]').forEach(syncMetaLabel); }catch(e){}
@@ -12390,6 +12403,50 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      title line). − / + at its right end folds them; folded it shows
      "+ 20 hidden · 18 done". data-tl and data-fold are saved; data-tlon,
      data-tlinfo and data-tlhid are render-only (stripped in cardCleanHtml). */
+  /* Loose lines (2026-11-13, Julius: "titleize not working" in Focus / Thinking). Typing into an empty editor leaves the
+     first line as bare text, and a paste can wrap many lines in one plain <div>. Title lines only see top-level lines,
+     so: wrap loose text in its own line and lift plain wrapper boxes' lines up. Caret stays put (same text nodes). */
+  const FL_BLOCK = /^(DIV|P|H[1-6]|UL|OL|HR|PRE|TABLE|BLOCKQUOTE|BR)$/;
+  function flattenLooseLines(ed){
+    if(!ed || ed.__composing) return false;
+    const sel = window.getSelection(), keep = sel && sel.rangeCount && ed.contains(sel.anchorNode) ? [sel.anchorNode,sel.anchorOffset,sel.focusNode,sel.focusOffset] : null;
+    let changed = false;
+    const plainBox = n => n.nodeType === 1 && n.tagName === 'DIV' && !n.attributes.length && [...n.children].some(c => FL_BLOCK.test(c.tagName) && c.tagName !== 'BR');
+    for(let guard = 0; guard < 20; guard++){
+      let did = false;
+      for(const n of [...ed.childNodes]){
+        if(plainBox(n)){
+          // Its leading inline bits become a line, then its lines move up in place.
+          let run = null;
+          for(const c of [...n.childNodes]){
+            if(c.nodeType === 3 || (c.nodeType === 1 && !FL_BLOCK.test(c.tagName))){
+              if(c.nodeType === 3 && !c.textContent.replace(/[\s\u200b]/g,'') && !run){ c.remove(); continue; }
+              if(!run){ run = document.createElement('div'); n.before(run); }
+              run.appendChild(c);
+            }else{ run = null; n.before(c); }
+          }
+          n.remove(); did = true;
+        }
+      }
+      // Bare text / inline runs straight in the editor → one line each run.
+      let run = null;
+      for(const n of [...ed.childNodes]){
+        const inline = n.nodeType === 3 || (n.nodeType === 1 && !FL_BLOCK.test(n.tagName) && !(n.classList && n.classList.contains('tl-sum')));
+        if(!inline){ run = null; continue; }
+        if(n.nodeType === 3 && !n.textContent.replace(/[\s\u200b]/g,'') && !run){ continue; }
+        if(!run){ run = document.createElement('div'); n.before(run); did = true; }
+        run.appendChild(n);
+      }
+      if(!did) break;
+      changed = true;
+    }
+    if(changed && keep && keep[0].isConnected && keep[2].isConnected){ try{ sel.setBaseAndExtent(keep[0],keep[1],keep[2],keep[3]); }catch(e){} }
+    return changed;
+  }
+  ['compositionstart','compositionend'].forEach(t => document.addEventListener(t,e => {
+    const ed = e.target && e.target.closest && e.target.closest('.thought-editor,.kim-editor');
+    if(ed) ed.__composing = t === 'compositionstart';
+  },true));
   function isTitleLine(n){ return n.nodeType === 1 && (n.dataset.tl === '1' || n.hasAttribute('data-cgrp')); }
   function isEmptyLine(n){
     if(n.tagName === 'BR' || n.tagName === 'HR') return true;
@@ -12895,7 +12952,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const fold = (histForced(n,ed) ? !histIsOpen(ed,histKey(n)) : n.dataset.fold === '1') && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden', sum:fold && !HIST_SHUT() ? titleSummary(cov) : ''});
+      on.set(n,{state:fold ? 'c' : 'o', cnt:tasks.length && ed.matches('.thought-editor,.kim-editor') ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : '', info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden', sum:fold && !HIST_SHUT() ? titleSummary(cov) : ''});
       if(fold){
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);
@@ -12915,9 +12972,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       });
     }
     if(refreshTsecFolds(ed,hide)) changed = true;
-    for(const n of ed.querySelectorAll(':scope > [data-tlon]')) if(!on.has(n)){ n.removeAttribute('data-tlon'); n.removeAttribute('data-tlinfo'); n.removeAttribute('data-tlsum'); changed = true; }
+    for(const n of ed.querySelectorAll(':scope > [data-tlon]')) if(!on.has(n)){ n.removeAttribute('data-tlon'); n.removeAttribute('data-tlinfo'); n.removeAttribute('data-tlsum'); n.removeAttribute('data-tlcnt'); changed = true; }
     for(const n of ed.querySelectorAll(':scope > [data-tlhid]')) if(!hide.has(n)){ n.removeAttribute('data-tlhid'); changed = true; }
-    on.forEach((v,n) => { if(setAttr(n,'data-tlon',v.state)) changed = true; setAttr(n,'data-tlinfo',v.info); if(v.sum) setAttr(n,'data-tlsum',v.sum); else n.removeAttribute('data-tlsum'); });
+    on.forEach((v,n) => { if(setAttr(n,'data-tlon',v.state)) changed = true; setAttr(n,'data-tlinfo',v.info);
+      // Open title lines in Focus / Keep In Mind show their count too ("− 3/7 ✓"), like History (2026-11-13, Julius).
+      if(v.cnt) setAttr(n,'data-tlcnt',v.cnt); else n.removeAttribute('data-tlcnt'); if(v.sum) setAttr(n,'data-tlsum',v.sum); else n.removeAttribute('data-tlsum'); });
     histSumBoxes(ed,on);
     hide.forEach(n => { if(setAttr(n,'data-tlhid','1')) changed = true; });
     return changed;
@@ -12992,7 +13051,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(rr && rr.width) right = Math.max(right,rr.right);
       });
       if(right === -Infinity) right = t.getBoundingClientRect().left;
-      meas.textContent = t.dataset.tlon === 'c' ? '+  ' + (t.dataset.tlinfo || '') : '−';
+      meas.textContent = t.dataset.tlon === 'c' ? '+  ' + (t.dataset.tlinfo || '') : '−' + (t.dataset.tlcnt ? '  ' + t.dataset.tlcnt : '');
       const w = Math.max(22,meas.getBoundingClientRect().width + 4);
       if(e.clientX >= right - 2 && e.clientX <= right + 6 + w + 6) return t;
       // Narrow column (2026-11-07): the button wraps onto its own row under the text, at the line's left edge.
@@ -16677,6 +16736,37 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   // The card's hold-to-move must not start on the checkbox (its hold opens the menu instead).
   ['mousedown', 'touchstart'].forEach(t => mount.addEventListener(t, e => { if(e.target.closest && e.target.closest('.cp-chk')) e.stopPropagation(); }, {capture: true, passive: true}));
+  // Hold an event (anywhere on it, no drag) → the same hold menu as its checkbox, with 🗑 Delete (2026-11-13, Julius).
+  function askDeleteLine(line){
+    const d = line.dataset, ev = cal && cal.getEvents().find(e => (e.extendedProps || {}).eventId === d.ceId && String(e.extendedProps.startMs) === String(d.ceStart));
+    if(ev){
+      if(!(ev.extendedProps || {}).editable){ flash('View-only calendar — can’t delete here'); return; }
+      askDelete(ev); popAt(line); return;
+    }
+    // A Cal Events list row (not in the panel): plain confirm, then the same server delete.
+    if(!confirm('Delete “' + (d.ceTitle || 'this event') + '”? It is removed from Google Calendar.')) return;
+    google.script.run.withSuccessHandler(() => { flash('Deleted ✓'); if(typeof centerCalendarCache !== 'undefined') centerCalendarCache.clear(); refetchFresh(); if(typeof ceDraw === 'function') ceDraw(); })
+      .withFailureHandler(err => setState('error', 'Not deleted: ' + errText(err)))
+      .calPanelDeleteEvent({eventId: d.ceId, startMs: Number(d.ceStart), calId: d.ceCal, scope: 'one'});
+  }
+  let evHold = null, evHoldOpenAt = 0;
+  mount.addEventListener('pointerdown', e => {
+    if(evHold){ clearTimeout(evHold.timer); evHold = null; }
+    if(e.button !== 0 || (e.target.closest && e.target.closest('.cp-chk'))) return;
+    const v = e.target.closest && e.target.closest('.cp-ev'); if(!v) return;
+    const h = evHold = {v, x: e.clientX, y: e.clientY, id: e.pointerId, ready: false};
+    h.timer = setTimeout(() => { if(evHold === h) h.ready = true; }, window.fwHoldMs ? window.fwHoldMs() : 500);
+  }, true);
+  document.addEventListener('pointermove', e => { if(evHold && evHold.id === e.pointerId && Math.hypot(e.clientX - evHold.x, e.clientY - evHold.y) > 8){ clearTimeout(evHold.timer); evHold = null; } }, true);
+  document.addEventListener('pointercancel', () => { if(evHold){ clearTimeout(evHold.timer); evHold = null; } }, true);
+  document.addEventListener('pointerup', e => {
+    const h = evHold; if(!h || h.id !== e.pointerId) return;
+    clearTimeout(h.timer); evHold = null;
+    if(!h.ready || Math.hypot(e.clientX - h.x, e.clientY - h.y) > 8 || !h.v.isConnected) return;
+    const cb = h.v.querySelector('.cp-chk');
+    evHoldOpenAt = Date.now();
+    if(cb && typeof showUrgencyPicker === 'function') showUrgencyPicker(cb, e.clientX, e.clientY); else askDeleteLine(h.v);
+  }, true);
   let cpDown = null; // last press on a checkbox: {id, ms, t, held} (a hold ≥ 450 ms opens the menu, so it must not also tick)
   mount.addEventListener('pointerdown', e => { const c = e.target.closest && e.target.closest('.cp-chk'), v = c && c.closest('.cp-ev');
     cpDown = v ? {id: v.dataset.ceId, ms: v.dataset.ceStart, t: Date.now(), held: false} : null; }, true);
@@ -16805,6 +16895,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes],[data-cal-scope]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault();
+        if(Date.now() - evHoldOpenAt < 600) return; // the hold already opened its menu
         // A press on the box can redraw the card before the release, so the click lands on the card: use the press (2026-11-11 fix).
         const x = info.event.extendedProps || {}, dn = cpDown; cpDown = null;
         const onBox = (info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')) || (dn && dn.id === x.eventId && dn.ms === String(x.startMs) && Date.now() - dn.t < 1200);
@@ -17024,7 +17115,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   if(ws) new MutationObserver(() => { if(docked) blPlace(); }).observe(ws, {attributes: true, attributeFilter: ['class']});
   window.addEventListener('resize', () => { if(docked) blPlace(); });
-  window.fwCalendar = { dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  window.fwCalendar = { askDeleteLine, dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

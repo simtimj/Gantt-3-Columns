@@ -740,3 +740,9 @@ Edge swipe (2026-11-11, option C): window capture touch listeners; start within 
 - Smoke: Blocks label in the middle zooms, Thoughts label zooms, timer suite runs on the docked pad, Thoughts saves via `saveThoughtPad` and never leaks into the Blocks save.
 - **Later 2026-11-12 (Julius, supersedes the layout above):** bottom-left = **Timer**, an empty `.timer-slot` for now (left `.od-pad-head` drag resizes History vs Timer). Bottom-middle = **Focus / Thinking**: the same `.thought-pad` (column E, unique to each day), docked into `#blocksScroll` by `blocksDock`; default half the column (split key bumped to `fw.notesSplit2` so old sizes reset). Blocks (`.plan-pad`) is still built and saved in its row but hidden (`display:none`), so its bar/chips stay hidden; timer logic still runs on it. Keep In Mind is the part that is NOT per-day (pending change). Smoke: hold the word "Focus" (left of the label; the phone split grip sits mid-label).
 
+
+## Calendar hold-to-delete + Focus title fix (2026-11-13, Julius)
+
+- Hold a `.cp-ev` (body, no move > 8 px, ≥ `fwHoldMs`) → `showUrgencyPicker` on its `.cp-chk` (same menu as the checkbox hold); `eventClick` skips 600 ms after. Menu entry `.urg-del` (calendar only) → `fwCalendar.askDeleteLine(line)` → `askDelete` card (+ `popAt`); Cal Events list rows fall back to `confirm()` + `calPanelDeleteEvent`. On phone the hold still selects the event for resize (smoke closes the menu first and checks 🗑 → confirm card).
+- `flattenLooseLines(ed)` (Focus / KIM only, from `refreshCards` and the ▤ Title action): bare top-level text / inline runs → their own `<div>`; attribute-less `<div>` wrappers holding block lines are unwrapped. Skipped mid-composition (`ed.__composing`). Cause: Julius's 11/13 pad was `Gantt<div>…all lines…</div>`, so the title found no top-level line.
+- Open title lines in `.thought-editor,.kim-editor` get render-only `data-tlcnt` ("done/total ✓") shown after − (stripped in `cardCleanHtml`).

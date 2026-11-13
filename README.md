@@ -76,6 +76,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-13)
 
+- **2026-11-13 · Hold a calendar event → 🗑 Delete:** hold any event in the calendar (or its checkbox) without dragging → the hold menu has 🗑 Delete event; it asks once, then removes it from Google Calendar too. Tapping still opens the card (Edit / Delete).
+- **2026-11-13 · Focus / Thinking title lines fixed + count:** ▤ Title now works there (loose first lines and pasted wrapper boxes are split into real lines); an open title shows its count next to − (e.g. "− 1/3 ✓"), folded shows "+ 1/3 ✓". Same in Keep In Mind.
 - **2026-11-13 · Half-screen columns (computer / tablet):** each column is half the screen. It opens on History + the middle column (tabs + Focus / Thinking); slide or scroll right and it snaps to the middle column on the left half + the calendar on the right half, so the calendar gets much more room. Column lines don't drag in this view. Works on the phone too. **Options → Columns (this device)** picks Half view or 3 columns, saved per device. Fixed the same day: sliding sideways on the phone didn't move the view (the columns' own scroll areas were swallowing the swipe).
 
 - **2026-11-13 · Right-column calendar = the big calendar:** the day timeline under Cal Events is now the 📅 calendar itself in Day view (same look, hold-drag to move, resize, pinch / − + zoom, tap for the event card, checkboxes, Plan). It follows the day the app shows. Opening the 📅 pop-out takes it over (Day / Week as before); closing puts it back. The Events list, ⚙ hide list and the split bar stay above it. Until the calendar has loaded (or if it can't), the old mini timeline shows.

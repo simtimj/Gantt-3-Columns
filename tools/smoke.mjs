@@ -1601,7 +1601,11 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         // Resize: bottom edge 11:30 → 12:30 (touch: hold first to select the event, then drag the handle).
         await center('11:00');
         if (phone) { const p = await evPt('Dentist', 'middle'); await touch('touchStart', [p]); await pg.waitForTimeout(600);
-          await touch('touchEnd', [p]); await pg.waitForTimeout(300); await pg.evaluate(() => { const d = document.querySelector('#calPanel [data-cal-detail]'); if (!d.hidden) d.querySelector('[data-cal-detail-close]').click(); }); await pg.waitForTimeout(100); }
+          await touch('touchEnd', [p]); await pg.waitForTimeout(300); await pg.evaluate(() => { const d = document.querySelector('#calPanel [data-cal-detail]'); if (!d.hidden) d.querySelector('[data-cal-detail-close]').click();
+            // 2026-11-13: a hold now also opens the hold menu (🗑 Delete); check it, then shut it the way a tap outside would.
+            const m = document.querySelector('.urg-picker'), del = m && m.querySelector('.urg-del'); if (del) del.click();
+            const ask = d.querySelector('[data-cal-del-yes]'); window.__holdMenuDel = !!(del && ask && !d.hidden); if (ask) d.querySelector('[data-cal-detail-close]').click(); const m2 = document.querySelector('.urg-picker'); if (m2) m2.remove(); }); await pg.waitForTimeout(100);
+          if (!(await pg.evaluate(() => window.__holdMenuDel))) out.push('hold on Dentist → 🗑 Delete did not ask to delete it'); }
         else { const p = await evPt('Dentist'); await pg.mouse.move(p.x, p.y + 10); await pg.waitForTimeout(150); }
         const rz = await evPt('Dentist', 'resizer'), s1 = await slotPt(day, '11:30'), s2 = await slotPt(day, '12:00');
         if (!rz || !s1) out.push('no resize handle on Dentist');

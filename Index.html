@@ -17488,6 +17488,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-weight:500;font-size:11px;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-style:normal;font-size:8px;opacity:.85;}
   #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 3px 0 1px;}
+  /* Docked: narrower time column, no FRI 13 badge (the date is on the header line) (2026-11-13 evening, Julius). */
+  #calPanel.cp-docked .cp-corner{display:none!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-axis-cushion{padding:0!important;min-width:0!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion{padding:0 1px 0 0!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:10px;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-size:7px;}
+  #calPanel.cp-docked .fc .fc-daygrid-body-natural .fc-daygrid-day-events{margin-bottom:0;}
+  #calPanel.cp-docked .cp-body{padding:0 1px 1px 0!important;}
   #calPanel.cp-docked .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;flex-wrap:wrap;} /* one row when it fits, else two (2026-11-13) */
   #calPanel.cp-docked .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;}
   #calPanel.cp-docked .fc .fc-toolbar-title{font-size:13px;margin:0 2px;white-space:nowrap;}

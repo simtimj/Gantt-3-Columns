@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-13)
 
+- **2026-11-13 · Calendar: narrower time column, no FRI 13 badge:** the time labels on the left take about half the width (smaller text, no side padding), and the weekday / date badge in the top-left corner is gone (the date is on the header line), so events get more room.
 - **2026-11-13 · Calendar: one header row + calendar list in ⚙:** the calendar's own toolbar row is gone; the search line now reads ◉ (smaller) · Nov 13 · 🔍 Find · ⚙ · BL n · ↻, with less margin around the column. The colored calendar checkboxes (which calendars show) live only inside ⚙; the old "Hide from the list → Calendars" list is removed. Title-word hiding shows in ⚙ only when the events list is on.
 - **2026-11-13 · Calendar: one ⚙, can't lose it:** the search line is just 🔍 Find + ⚙ (no Cats, no ↻; the calendar's own ↻ stays). Everything is in that ⚙: 📅 Calendars (which show — the calendar's own ⚙ is gone), 🕒 Day calendar on / off, list order (category / time, list mode only) and the hide list. With the day calendar off, the events list has a **📅 Show calendar** button (and ↻) so it always comes back.
 - **2026-11-13 · Calendar: swipe for the day, floating zoom:** no ‹ › — swipe sideways on the calendar (or trackpad / Shift + wheel over it) for the next / previous day; − + float in the calendar's bottom-right corner. Sliding the app between halves now starts from the search line or the left half.

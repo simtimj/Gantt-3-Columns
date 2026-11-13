@@ -2632,6 +2632,34 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // it broke things in 2-column mode. Set PEEK_ENABLED true to bring it back.
   var PEEK_ENABLED=false, PEEK_SIDE_KEY='fw.peekSide', lastPeekKey='', peekRevealing=false;
   var lastHalfW=0;
+  /* Computer slide (2026-11-13, Julius: "the computer should also have the sliding effect"): in half view a sideways
+     trackpad swipe or Shift + mouse wheel slides the whole app to the other half (History + middle ↔ middle + calendar)
+     in one smooth move, like the phone swipe. Inner sideways scrollers (wide tables, code) keep their own scroll. */
+  (function(){
+    let lockUntil=0, acc=0, accT=0;
+    document.addEventListener('wheel',e=>{
+      const ws=document.getElementById('workspace');
+      if(!ws || !ws.classList.contains('ws-halves') || e.ctrlKey) return;
+      const dx=e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX, dy=e.shiftKey ? 0 : e.deltaY;
+      if(Math.abs(dx)<=Math.abs(dy) || !dx || !ws.contains(e.target)) return;
+      for(let n=e.target; n && n!==ws; n=n.parentElement){
+        if(n.scrollWidth>n.clientWidth+2){ const ox=getComputedStyle(n).overflowX; if(ox==='auto'||ox==='scroll') return; }
+      }
+      e.preventDefault(); e.stopImmediatePropagation(); // the old pixel-by-pixel pan below would fight the snap
+      const now=Date.now();
+      if(now<lockUntil) return;
+      if(now-accT>250) acc=0;
+      acc+=dx; accT=now;
+      if(Math.abs(acc)<30) return; // a light brush of the trackpad doesn't flip the view
+      const max=ws.scrollWidth-ws.clientWidth;
+      if(max<=0) return;
+      const target=acc>0 ? max : 0;
+      acc=0;
+      if(Math.abs(ws.scrollLeft-target)<2) return;
+      lockUntil=now+650; // one swipe = one slide (trackpads keep sending momentum events)
+      ws.scrollTo({left:target,behavior:'smooth'});
+    },{passive:false,capture:true});
+  })();
   function halvesOn(){ try{ return localStorage.getItem('fw.halves')!=='0'; }catch(e){ return true; } }
   // Options → "Columns (this device)" (2026-11-13, Julius): half view or 3 columns, saved per device.
   document.addEventListener('DOMContentLoaded',()=>{

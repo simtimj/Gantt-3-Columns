@@ -135,6 +135,7 @@ When he asks to organize his calendar tasks:
 - Docked calendar + backlog column (2026-11-13, Julius)
 - Calendar hold-to-delete + Focus title fix (2026-11-13, Julius)
 - Compact calendar (2026-11-13, Julius)
+- Auto-restore, one-row calendar toolbar, half-width backlog, soft snap (2026-11-13 afternoon, Julius)
 
 ## IT study log (2026-11-04)
 

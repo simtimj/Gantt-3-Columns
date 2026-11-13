@@ -1810,7 +1810,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           if (!panel.classList.contains('cp-docked')) out.push('no docked look');
           if (window.fwCalendar.api().view.type !== 'timeGridDay') out.push('docked view is not Day: ' + window.fwCalendar.api().view.type);
           if (document.querySelector('#centerCalendarList .ce-day')) out.push('old mini timeline still drawn');
-          const ws = document.getElementById('workspace'), single = phone || ws.classList.contains('view-single');
+          const ws = document.getElementById('workspace'), single = ws.classList.contains('view-single') || (phone && !ws.classList.contains('ws-halves')); // half view (phone too): own half column (2026-11-13)
           const btn = panel.querySelector('.fc-cpBacklog-button') || panel.querySelector('[data-bl-toggle]');
           btn.click(); await wait(400);
           const bl = document.querySelector('[data-cal-bl]');
@@ -1818,6 +1818,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (!bl.closest('#blCol')) out.push('backlog not in its own column');
             const bc = document.getElementById('blCol').getBoundingClientRect(), cp = document.getElementById('calPane').getBoundingClientRect();
             if (bc.width < 100) out.push('backlog column too narrow: ' + bc.width);
+            if (ws.classList.contains('ws-halves') && Math.abs(bc.width - cp.width) > 3) out.push('half view: backlog is not a half-screen column: ' + bc.width + ' vs ' + cp.width);
             if (Math.abs(bc.right - cp.left) > 3) out.push('backlog not just left of the calendar');
             if (Math.abs(cp.right - innerWidth) > 3) out.push('calendar column not at the right edge: ' + cp.right + ' / ' + innerWidth);
             if (ws.scrollLeft < 50) out.push('app did not slide left: ' + ws.scrollLeft);

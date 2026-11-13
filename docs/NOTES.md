@@ -752,3 +752,10 @@ Edge swipe (2026-11-11, option C): window capture touch listeners; start within 
 
 - Names (Julius): **"calendar" / "main calendar" = the docked right-side calendar; "big calendar" = the pop-out.**
 - `buttonText.today` '◉' (hint Today); `cpBacklog` text 'BL', count via `data-n` + `::after` (writing `textContent` into a FullCalendar button doubled it on re-render); `.cp-blbtn` reads "BL n". Docked: toolbar gaps 2px, buttons 24px tall / 0 6px, ‹ › 20px, − + 22px. `slotLabelContent` → `.cp-sl` (hour bold, then AM/PM or :mm small under it). `CAL_SHOT=dir SMOKE_ONLY=calendar node tools/smoke.mjs` screenshots the docked calendar.
+
+## Auto-restore, one-row calendar toolbar, half-width backlog, soft snap (2026-11-13 afternoon, Julius)
+
+- `fwDraftAuto()` (after `fwDraftRestore(entry, auto)`): runs 1.5 s after the drafts notice updates; skips copies < 90 s old (another open tab may be mid-save) and anything tried in the last 60 s; waits while `fwUnsaved()`; auto skips the conflict `confirm` (merge keeps both). Failures stay listed for Review; retried every ~61 s.
+- Calendar toolbar right chunk: `cpCals` (⚙ → clicks the hidden `[data-cals-fold]`), `cpZoomOut` / `cpZoomIn` (`setZoom`), `cpBacklog`, `cpPlan` (kept for smoke, hidden by CSS; `fw.calPlanFold` forced to '1' once per session), Day|Week group hidden when docked. Old `.cp-cfold` + zoom span (`.cp-zrow`, was a second `.cp-crow` with `float:right` — that rule also floated the calendar list rows right) hidden. Docked toolbar wraps: last chunk `flex:1 0 auto; nowrap` so it moves to row 2 whole. Day title `{month:'short', day, year}`.
+- `blMode()`: `#workspace.ws-halves` → 'push' on phone too; `body.bl-push #workspace.ws-halves` grid gives `#blCol` a `--half-w` track. Smoke: half view checks backlog width = calendar width.
+- Snap: `updateWorkspaceLayout` sets `scrollSnapType` 'x proximity' (was mandatory). The morning's wheel flip handler is gone; the old pan handler pans freely.

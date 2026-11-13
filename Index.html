@@ -2632,34 +2632,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // it broke things in 2-column mode. Set PEEK_ENABLED true to bring it back.
   var PEEK_ENABLED=false, PEEK_SIDE_KEY='fw.peekSide', lastPeekKey='', peekRevealing=false;
   var lastHalfW=0;
-  /* Computer slide (2026-11-13, Julius: "the computer should also have the sliding effect"): in half view a sideways
-     trackpad swipe or Shift + mouse wheel slides the whole app to the other half (History + middle ↔ middle + calendar)
-     in one smooth move, like the phone swipe. Inner sideways scrollers (wide tables, code) keep their own scroll. */
-  (function(){
-    let lockUntil=0, acc=0, accT=0;
-    document.addEventListener('wheel',e=>{
-      const ws=document.getElementById('workspace');
-      if(!ws || !ws.classList.contains('ws-halves') || e.ctrlKey) return;
-      const dx=e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX, dy=e.shiftKey ? 0 : e.deltaY;
-      if(Math.abs(dx)<=Math.abs(dy) || !dx || !ws.contains(e.target)) return;
-      for(let n=e.target; n && n!==ws; n=n.parentElement){
-        if(n.scrollWidth>n.clientWidth+2){ const ox=getComputedStyle(n).overflowX; if(ox==='auto'||ox==='scroll') return; }
-      }
-      e.preventDefault(); e.stopImmediatePropagation(); // the old pixel-by-pixel pan below would fight the snap
-      const now=Date.now();
-      if(now<lockUntil) return;
-      if(now-accT>250) acc=0;
-      acc+=dx; accT=now;
-      if(Math.abs(acc)<30) return; // a light brush of the trackpad doesn't flip the view
-      const max=ws.scrollWidth-ws.clientWidth;
-      if(max<=0) return;
-      const target=acc>0 ? max : 0;
-      acc=0;
-      if(Math.abs(ws.scrollLeft-target)<2) return;
-      lockUntil=now+650; // one swipe = one slide (trackpads keep sending momentum events)
-      ws.scrollTo({left:target,behavior:'smooth'});
-    },{passive:false,capture:true});
-  })();
+  /* Computer slide (2026-11-13): the one-swipe-flips-all handler was replaced the same day (Julius: magnetize only when
+     close) — sideways trackpad / Shift + wheel pans freely (the pan below) and proximity snap pulls in near a half. */
   function halvesOn(){ try{ return localStorage.getItem('fw.halves')!=='0'; }catch(e){ return true; } }
   // Options → "Columns (this device)" (2026-11-13, Julius): half view or 3 columns, saved per device.
   document.addEventListener('DOMContentLoaded',()=>{
@@ -5407,7 +5381,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const notice=document.createElement('div');notice.id='fwDraftNotice';
     notice.style.cssText='position:fixed;bottom:44px;right:8px;z-index:99998;background:var(--bg,#fff);color:var(--text,#111);border:1px solid #888;border-radius:8px;padding:8px;max-width:min(420px,calc(100vw - 16px));font-size:12px;display:none';
     const text=document.createElement('span'),review=document.createElement('button');review.className='btn tiny';review.textContent='Review';review.onclick=fwDraftReview;notice.append(text,review);document.body.append(notice);
-    const update=()=>{const n=fwDrafts.list().length,problem=fwDrafts.problem();text.textContent=problem || (n+' unsaved '+(n===1?'copy':'copies')+' from this device. ');notice.style.display=n||problem?'':'none';};
+    const update=()=>{const n=fwDrafts.list().length,problem=fwDrafts.problem();text.textContent=problem || (n+' unsaved '+(n===1?'copy':'copies')+' from this device. ');notice.style.display=n||problem?'':'none';if(n)fwDraftAutoSoon();};
     fwDrafts.subscribe(update);fwDrafts.init(document.querySelector('.refresh-btn')?.getAttribute('href') || location.href);update();
     const capture=()=>{for(const [date,info] of daySaveState)if(info.pending||info.inFlight)fwDraftCaptureDay(date);
       (state.reference||[]).forEach(item=>{if(item._timer||item._refSaving||item._refDeleted)fwDraftCaptureRef(item);});};
@@ -5434,7 +5408,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     };
     const close=document.createElement('button');close.className='btn';close.textContent='Close';close.onclick=()=>dialog.close();dialog.append(download,close);dialog.onclose=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
   }
-  async function fwDraftRestore(entry){
+  async function fwDraftRestore(entry,auto){
     if(fwUnsaved()){setStatus('Finish saving current edits before restoring a copy');return false;}
     if(entry.kind==='day'){
       if(!/^\d{4}-\d{2}-\d{2}$/.test(entry.id))throw Error('Invalid day');
@@ -5451,7 +5425,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const m=fwMerge3(fwBlocks(f.base.t),fwBlocks(f.mine),fwBlocks(cardCleanHtml(ed)));conflict ||= m.conflict;pending.push([ed,m.blocks.join('')]);
       }
       if(!pending.length)throw Error('No saved text');
-      if(conflict && !confirm('These lines also changed elsewhere. Restore both versions for review?'))return false;
+      if(conflict && !auto && !confirm('These lines also changed elsewhere. Restore both versions for review?'))return false;
       if(!fwDrafts.adopt(entry))throw Error('Could not keep a recovery copy; download it first');
       pending.forEach(([ed,html])=>replaceEditorHtml(ed,html));scheduleDaySave(entry.id);
     }else if(entry.kind==='ref'){
@@ -5460,11 +5434,33 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(typeof p.content!=='string' || typeof p.base?.c!=='string')throw Error('Unreadable copy');
       const cell=document.querySelector('#referenceTree .ref-cell-wrapper[data-id="'+CSS.escape(entry.id)+'"] > .ref-cell');if(!cell)throw Error('Open Reference before restoring');
       const m=fwMerge3(fwBlocks(p.base.c),fwBlocks(p.content),fwBlocks(cardCleanHtml(cell)));
-      if(m.conflict && !confirm('These lines also changed elsewhere. Restore both versions for review?'))return false;
+      if(m.conflict && !auto && !confirm('These lines also changed elsewhere. Restore both versions for review?'))return false;
       if(!fwDrafts.adopt(entry))throw Error('Could not keep a recovery copy; download it first');
       replaceEditorHtml(cell,m.blocks.join(''));saveRefFromDom(item.id);
     }else throw Error('Unknown copy type');
-    setStatus('Recovered device copy — saving');return true;
+    setStatus(auto ? 'Restored an unsaved copy automatically — saving' : 'Recovered device copy — saving');return true;
+  }
+  /* Auto-restore (2026-11-13, Julius: "always automatically restore them"): unsaved device copies merge back in on
+     their own (a clash keeps both versions, so nothing is lost). Copies that can't go back yet (day not loaded, card
+     deleted) stay listed under Review and are retried every minute. */
+  let fwAutoBusy=false, fwAutoTimer=0;
+  const fwAutoTried=new Map();
+  function fwDraftAutoSoon(ms){ clearTimeout(fwAutoTimer); fwAutoTimer=setTimeout(fwDraftAuto,ms||1500); }
+  async function fwDraftAuto(){
+    if(fwAutoBusy || !window.fwDrafts) return;
+    if(fwUnsaved()){ fwDraftAutoSoon(4000); return; }
+    fwAutoBusy=true;
+    try{
+      for(const entry of fwDrafts.list()){
+        if(Date.now()-entry.at<90000) continue; // still fresh: may belong to another open tab that is mid-save
+        const k=entry.kind+':'+entry.id+':'+entry.at, last=fwAutoTried.get(k)||0;
+        if(Date.now()-last<60000) continue;
+        fwAutoTried.set(k,Date.now());
+        try{ await fwDraftRestore(entry,true); }catch(e){}
+        if(fwUnsaved()) break; // let that save finish first
+      }
+    }finally{ fwAutoBusy=false; }
+    if(fwDrafts.list().length) fwDraftAutoSoon(fwUnsaved() ? 4000 : 61000);
   }
   function scheduleDaySave(date){
     if(!date) return;
@@ -7040,7 +7036,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     workspace.style.justifyContent='start';
     workspace.style.overflowX=visiblePanes.length>1?'auto':'hidden';
     workspace.style.overflowY='hidden';
-    workspace.style.scrollSnapType=halves?'x mandatory':'none';
+    workspace.style.scrollSnapType=halves?'x proximity':'none'; // 2026-11-13 (Julius): only pulls in when you stop close to a half; anywhere else stays put
     workspace.classList.toggle('view-single',visiblePanes.length===1);
     const peekKey=peek ? peek+':'+peekSide : '';
     const peekChanged=peekKey!==lastPeekKey;
@@ -15879,11 +15875,22 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-cfold{font:inherit;font-size:13px;font-weight:500;color:var(--cp-muted);background:transparent;border:0;padding:3px 4px;cursor:pointer;}
   #calPanel .cp-ccnt{font-weight:400;}
   #calPanel .cp-cals.folded .cp-cbody{display:none;}
-  #calPanel .cp-crow{float:right;display:inline-flex;gap:4px;align-items:center;}
+  #calPanel .cp-zrow{float:right;display:inline-flex;gap:4px;align-items:center;}
+  /* 2026-11-13: the old "▸ Calendars" row + − + / BL are in the toolbar now (⚙ opens the list); the list rows start at the left. */
+  #calPanel .cp-cfold,#calPanel .cp-zrow{display:none!important;}
+  #calPanel .cp-cals.folded{display:none;}
+  #calPanel .cp-cals .cp-crow{justify-content:flex-start;padding-left:2px;}
+  #calPanel .fc .fc-cpCals-button{font-size:14px;}
+  #calPanel .fc .fc-cpZoomOut-button,#calPanel .fc .fc-cpZoomIn-button{min-width:24px;padding:0 4px!important;}
+  #calPanel .fc .fc-header-toolbar{flex-wrap:wrap;row-gap:3px;}
+  #calPanel .fc .fc-header-toolbar .fc-toolbar-chunk:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:2px;min-width:0;}
+  #calPanel .fc .fc-cpPlan-button{display:none!important;}
+  #calPanel.cp-docked .fc .fc-button-group:has(.fc-timeGridDay-button){display:none!important;}
+  #calPanel.cp-docked .fc .fc-header-toolbar .fc-toolbar-chunk:last-child{flex:1 0 auto;flex-wrap:nowrap;min-width:auto;}
   #calPanel .cp-zb,:is(#calPanel,#blCol,#calBlLeft) .cp-blbtn{font:inherit;font-size:13px;color:var(--cp-text);background:transparent;border:1px solid var(--cp-line);border-radius:999px;min-width:30px;height:26px;padding:0 8px;cursor:pointer;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-blbtn.on{background:var(--cp-soft);font-weight:600;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-blbtn{display:none;}
-  @media (max-width:720px){ :is(#calPanel,#blCol,#calBlLeft) .cp-blbtn{display:inline-block;} #calPanel .fc .fc-cpBacklog-button{display:none;} }
+  /* phone: the toolbar BL is used everywhere now (2026-11-13). */
   /* Calendar zoom (2026-11-11, Julius): slot height 14–120px, pinch / ctrl+wheel / − +, saved per device. */
   #calPanel .fc .fc-timegrid-slot{height:var(--cp-slot,24px)!important;}
   #calPanel .cp-cals:not(.folded) .cp-parr{display:inline-block;transform:rotate(90deg);}
@@ -15942,7 +15949,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <div class="cp-state" data-cal-state hidden></div>
   <div class="cp-body">
     <section class="cp-cals folded" data-cal-cals aria-label="Calendars">
-      <button type="button" class="cp-cfold" data-cals-fold><span class="cp-parr">▸</span> Calendars <span class="cp-ccnt" data-cals-count></span></button><span class="cp-crow"><button type="button" class="cp-zb" data-cal-zoom="-1" title="Zoom out (or pinch)" aria-label="Zoom out">−</button><button type="button" class="cp-zb" data-cal-zoom="1" title="Zoom in (or pinch)" aria-label="Zoom in">+</button><button type="button" class="cp-blbtn" data-bl-toggle title="Backlog: show / hide past unfinished tasks">BL <span data-bl-n></span></button></span>
+      <button type="button" class="cp-cfold" data-cals-fold><span class="cp-parr">▸</span> Calendars <span class="cp-ccnt" data-cals-count></span></button><span class="cp-zrow"><button type="button" class="cp-zb" data-cal-zoom="-1" title="Zoom out (or pinch)" aria-label="Zoom out">−</button><button type="button" class="cp-zb" data-cal-zoom="1" title="Zoom in (or pinch)" aria-label="Zoom in">+</button><button type="button" class="cp-blbtn" data-bl-toggle title="Backlog: show / hide past unfinished tasks">BL <span data-bl-n></span></button></span>
       <div class="cp-cbody" data-cals-body></div>
     </section>
     <section class="cp-plan" data-cal-plan aria-label="Daily plan">
@@ -16326,6 +16333,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const PLAN_G = [['big','Big Three',3],['next','Waiting list',0],['backlog','Backlog',0]];
   const PLAN_NAME = {big:'Big Three', stretch:'Stretch', next:'Waiting list', backlog:'Backlog'};
   let planDay = '', planData = null, planBusy = false, planErr = '', planSeq = 0, addGroup = 'big';
+  try{ if(!sessionStorage.getItem('fw.planShut')){ lsSet('fw.calPlanFold', '1'); sessionStorage.setItem('fw.planShut', '1'); } }catch(e){} // Plan button hidden: start shut
   const planFolded = () => lsGet('fw.calPlanFold') !== '0'; // hidden until the toolbar's Plan button opens it (2026-11-08)
   const bkOpen = () => lsGet('fw.calPlanBk') === '1';
   const fmtDay = d => { try { return L().fromISO(d, {zone: TZ}).toFormat('EEE MMM d'); } catch (e) { return d; } };
@@ -16862,8 +16870,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
       // One toolbar line (2026-11-08, Julius): Today · date · ‹ › … Plan · Day|Week · ↻ · ✕. The old header row and
       // + New are gone (hold / drag on the grid or the all-day row makes a new event).
-      headerToolbar: { left: 'today title prev,next', center: '', right: (phone ? '' : 'cpBacklog ') + 'cpPlan timeGridDay,timeGridWeek cpView cpRefresh cpClose' }, // phone: Backlog sits in the Calendars row
+      // 2026-11-13 (Julius): Plan button gone; ⚙ (calendars list), − +, BL moved up here so the controls sit in one row
+      // (wraps to a second row only when the column is too narrow).
+      headerToolbar: { left: 'today title prev,next', center: '', right: 'cpCals cpZoomOut cpZoomIn cpBacklog cpPlan timeGridDay,timeGridWeek cpView cpRefresh cpClose' },
       customButtons: {
+        cpCals: { text: '⚙', hint: 'Calendars: pick which ones show', click: () => { const f = panel.querySelector('[data-cals-fold]'); if(f) f.click(); } },
+        cpZoomOut: { text: '−', hint: 'Zoom out (or pinch)', click: () => setZoom(zoomPx / 1.35) },
+        cpZoomIn: { text: '+', hint: 'Zoom in (or pinch)', click: () => setZoom(zoomPx * 1.35) },
         cpBacklog: { text: 'BL', hint: 'Show / hide past unfinished tasks', click: () => blToggle() },
         cpPlan: { text: 'Plan', hint: 'Show / hide the plan (Big Three, Waiting list)', click: () => { lsSet('fw.calPlanFold', planFolded() ? '0' : '1'); renderPlan(); setTimeout(() => cal && cal.updateSize(), 0); } },
         // Phones: one Day ⇄ Week toggle instead of the two-button pill (saves a button's width on the single line).
@@ -16874,8 +16887,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       buttonText: { today: '◉', day: 'Day', week: phone ? 'Wk' : 'Week' }, // ◉ = Today (2026-11-13, Julius: room)
       buttonHints: { today: 'Today' },
       buttonIcons: { prev: 'chevron-left', next: 'chevron-right' },
-      titleFormat: { month: 'long', year: 'numeric' },
-      views: { timeGridDay: { titleFormat: phone ? { month: 'short', day: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' } } },
+      views: { timeGridDay: { titleFormat: phone ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' } } }, // "Nov 13, 2026"
+      titleFormat: { month: 'short', year: 'numeric' },
       titleRangeSeparator: ' – ',
       allDayText: '',
       // Day view: the weekday + date sit in the top-left corner (above the time labels), no separate header row.
@@ -17020,7 +17033,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function renderCals(){
     if(!calsEl) return;
     const list = (cals && cals.calendars) || [];
-    calsCount.textContent = list.length ? '· ' + list.filter(c => c.picked).length + '/' + list.length : '';
+    calsCount.textContent = ''; // count removed (2026-11-13, Julius)
     calsBody.innerHTML = list.map(c => '<label class="cp-crow" style="--cc:' + esc(c.color) + '"><input type="checkbox" data-cal-pick="' + esc(c.id) + '"' + (c.picked ? ' checked' : '') + '>' +
       '<span class="cp-cn">' + esc(c.name) + '</span>' + (c.writable ? '' : '<span class="cp-lk" title="View-only">🔒</span>') + '</label>').join('') +
       (calsMsg ? '<div class="cp-cmsg">' + esc(calsMsg) + '</div>' : list.length ? '' : '<div class="cp-cmsg">Loading calendars…</div>');
@@ -17119,8 +17132,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!docked) return 'home';
     // Phone / narrow or split layouts: the backlog shares the calendar column (left half, or below if chosen).
     const phone = window.innerWidth <= 720 || document.body.classList.contains('mobile-split') || !!(ws && ws.classList.contains('view-single'));
-    document.body.classList.toggle('bl-phone', phone);
-    if(!phone) return 'push';
+    // Half view (computer or phone, 2026-11-13, Julius): the backlog opens as its own half-screen column left of the
+    // calendar, so the screen shows Backlog | Calendar.
+    const halves = !!(ws && ws.classList.contains('ws-halves'));
+    document.body.classList.toggle('bl-phone', phone && !halves);
+    if(!phone || halves) return 'push';
     return lsGet('fw.blPhone') === 'below' ? 'home' : 'left';
   }
   let blPushed = false, blScrollWas = 0;
@@ -17398,14 +17414,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-weight:500;font-size:11px;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-style:normal;font-size:8px;opacity:.85;}
   #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 3px 0 1px;}
-  #calPanel.cp-docked .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;}
+  #calPanel.cp-docked .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;flex-wrap:wrap;} /* one row when it fits, else two (2026-11-13) */
   #calPanel.cp-docked .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;}
   #calPanel.cp-docked .fc .fc-toolbar-title{font-size:13px;margin:0 2px;white-space:nowrap;}
   #calPanel.cp-docked .fc .fc-button{padding:0 6px!important;min-height:24px;height:24px;font-size:12px;margin:0!important;}
   #calPanel.cp-docked .fc .fc-today-button{padding:0 5px!important;font-size:13px;}
   #calPanel.cp-docked .fc .fc-prev-button,#calPanel.cp-docked .fc .fc-next-button{width:20px;padding:0!important;}
   #calPanel.cp-docked .fc .fc-cpRefresh-button{width:24px;font-size:14px;}
-  #calPanel.cp-docked span.cp-crow{gap:2px;}
+  #calPanel.cp-docked span.cp-zrow{gap:2px;}
   #calPanel.cp-docked .cp-zb,#calPanel.cp-docked .cp-blbtn{min-width:22px;height:22px;padding:0 5px;font-size:12px;margin:0;}
   #calPanel .fc .fc-cpBacklog-button[data-n]::after{content:" " attr(data-n);white-space:pre;}
   #calPark{display:none;}
@@ -17414,7 +17430,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   body.bl-push #blCol{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--divider);overflow:hidden;}
   body.bl-push #workspace:not(.view-single){grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--bl-w,260px) var(--col-reference)!important;}
   body.bl-push #workspace #blCol{grid-column:5;grid-row:1;}
-  body.bl-push #workspace.ws-halves:not(.view-single){grid-template-columns:var(--half-w) 1px var(--half-w) 1px var(--bl-w,260px) var(--half-w)!important;}
+  body.bl-push #workspace.ws-halves:not(.view-single){grid-template-columns:var(--half-w) 1px var(--half-w) 1px var(--half-w) var(--half-w)!important;}
   /* Half view snap points (2026-11-13): History + middle at the left, middle + calendar at the right. */
   #workspace.ws-halves > .pane{scroll-snap-align:start;}
   #workspace.ws-halves > #calPane{scroll-snap-align:end;}

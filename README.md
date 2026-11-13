@@ -76,6 +76,10 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-13)
 
+- **2026-11-13 · Unsaved copies restore themselves:** leftover device copies (from a tab that closed mid-save) now merge back in automatically after ~1.5 min; a clash keeps both versions. Ones that can't go back yet stay under Review and retry every minute.
+- **2026-11-13 · Calendar toolbar in one row:** ⚙ (calendars list), − +, BL and ↻ moved into the date row (wraps to a 2nd row on a narrow column); Plan button hidden for now; "Nov 13, 2026" short date; the calendars list lines up from the left (no more right-floating rows / odd indents), no "7/8" count.
+- **2026-11-13 · Backlog = half-screen column:** in half view (computer and phone) BL opens the backlog as a full half column on the left with the calendar on the right half.
+- **2026-11-13 · Soft snap:** sliding sideways (phone swipe, trackpad, Shift + wheel) now only pulls into a half when you stop close to it; anywhere else it stays where you left it. Replaces this morning's one-swipe-flips-all slide.
 - **2026-11-13 · Compact calendar:** ◉ = Today, Backlog button reads **BL n** (no arrow; also fixed it showing "BacklogBacklog"), − / + closer and smaller, tighter toolbar, and the time labels are stacked ("1" over "AM", "12" over ":45") so the time column is narrower.
 - **2026-11-13 · Computer slide:** in half view, a sideways trackpad swipe (or Shift + mouse wheel) slides the whole app to the calendar half and back in one smooth move, like the phone swipe.
 - **2026-11-13 · Hold a calendar event → 🗑 Delete:** hold any event in the calendar (or its checkbox) without dragging → the hold menu has 🗑 Delete event; it asks once, then removes it from Google Calendar too. Tapping still opens the card (Edit / Delete).

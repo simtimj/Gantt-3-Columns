@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-14)
 
+- **Slimmer hour column** (calendar): the hour numbers' column is only as wide as the numbers (less empty margin on the left); the day-view date in the corner is smaller so it doesn't widen it.
 - **Calendar zoom-out fix**: zooming out (− or pinch) keeps the hour numbers on their lines and events at the right times; every hour stays evenly spaced, and zoom-out stops once the whole day fits on screen (no empty gap below).
 - **Google-style event pop-up** (calendar): tap an event → a card like Google Calendar's: ✏️ edit · 🗑 delete · ⋮ (Duplicate, Open in Google Calendar) · ✕ on top; title with its color, when, repeats, 📍 location, event notes (long notes fold, tap to open; links work), calendar. One-tap **All day** ⇄ back to its old time (else 9:00, or the next hour today), **Mark done / not done** (Graphite), and a **color row** (Tomato / Banana / Blueberry = urgency on the main calendar; the saved urgency follows the color). The card stays open after each action. Mouse: `e` = edit, Delete / Backspace = delete, Esc = close; edit / new-event forms pop beside the event with a mouse (phones keep the bottom sheet).
 

@@ -15985,7 +15985,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Zoomed-out fix (2026-11-14, Julius): the time labels take no row height, so every slot is exactly --cp-slot and
      the hours stay evenly spaced on the grid lines at any zoom (labels used to push their rows taller). */
   #calPanel .fc .fc-timegrid-slot{line-height:0;padding:0;}
-  #calPanel .fc .fc-timegrid-slot-label-cushion{display:block;height:0;overflow:visible;line-height:0;}
+  /* inline-block (not block) so the label's own width sets the hour column, no wider (2026-11-14, Julius: less left margin) */
+  #calPanel .fc .fc-timegrid-slot-label-cushion{display:inline-block;vertical-align:top;height:0;overflow:visible;line-height:0;}
   #calPanel .cp-cals:not(.folded) .cp-parr{display:inline-block;transform:rotate(90deg);}
   #calPanel .cp-crow{display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:14px;cursor:pointer;}
   #calPanel .cp-crow input{width:18px;height:18px;margin:0;accent-color:var(--cc,#1a73e8);}
@@ -15998,8 +15999,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc-timeGridDay-view .fc-scrollgrid-section-header{display:none;}
   #calPanel .fc .fc-timegrid-axis-cushion:has(.cp-corner){padding:2px 0;max-width:none;}
   #calPanel .cp-corner{display:flex;flex-direction:column;align-items:center;line-height:1.1;}
-  #calPanel .cp-corner .cp-dh-w{font-size:10px;font-weight:500;letter-spacing:.6px;color:var(--cp-muted);}
-  #calPanel .cp-corner .cp-dh-n{font-size:17px;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;color:var(--cp-text);}
+  #calPanel .cp-corner .cp-dh-w{font-size:8px;font-weight:500;letter-spacing:0;color:var(--cp-muted);}
+  #calPanel .cp-corner .cp-dh-n{font-size:12px;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;color:var(--cp-text);}
   #calPanel .cp-corner.cp-today .cp-dh-w{color:var(--cp-blue);}
   #calPanel .cp-corner.cp-today .cp-dh-n{background:var(--cp-blue);color:#fff;}
   html[data-theme=dark] #calPanel .cp-corner.cp-today .cp-dh-n{color:var(--cp-blue-text);}

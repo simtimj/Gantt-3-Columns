@@ -15982,6 +15982,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* phone: the toolbar BL is used everywhere now (2026-11-13). */
   /* Calendar zoom (2026-11-11, Julius): slot height 14–120px, pinch / ctrl+wheel / − +, saved per device. */
   #calPanel .fc .fc-timegrid-slot{height:var(--cp-slot,24px)!important;}
+  /* Zoomed-out fix (2026-11-14, Julius): the time labels take no row height, so every slot is exactly --cp-slot and
+     the hours stay evenly spaced on the grid lines at any zoom (labels used to push their rows taller). */
+  #calPanel .fc .fc-timegrid-slot{line-height:0;padding:0;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion{display:block;height:0;overflow:visible;line-height:0;}
   #calPanel .cp-cals:not(.folded) .cp-parr{display:inline-block;transform:rotate(90deg);}
   #calPanel .cp-crow{display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:14px;cursor:pointer;}
   #calPanel .cp-crow input{width:18px;height:18px;margin:0;accent-color:var(--cc,#1a73e8);}
@@ -16912,13 +16916,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     zoomCur = m;
   }
   let zoomPx = Math.min(Z_MAX, Math.max(Z_MIN, Number(lsGet('fw.calZoom')) || 24)), zoomT = 0;
+  /* Zoomed-out fix (2026-11-14, Julius): FullCalendar only measures its time slots when it redraws, and updateSize()
+     doesn't redraw, so after a zoom the events (and the grid's end) kept the old spacing while the hour labels moved.
+     A fresh slotLaneClassNames function makes it redraw and re-measure, once per frame (pinch fires many times). */
+  const laneCls = a => a.date.getUTCMinutes() ? ['cp-half'] : [];
+  let zoomRaf = 0;
+  function remeasure(){ cancelAnimationFrame(zoomRaf); zoomRaf = requestAnimationFrame(() => { if(cal){ cal.setOption('slotLaneClassNames', a => laneCls(a)); cal.updateSize(); } }); }
   function setZoom(px, anchorY){
-    px = Math.round(Math.min(Z_MAX, Math.max(Z_MIN, px)));
-    if(px === zoomPx) return;
     const sc = mount.querySelector('.fc-timegrid-body') && mount.querySelector('.fc-timegrid-body').closest('.fc-scroller');
+    // No zooming out past the point where the whole day (48 half-hours) fills the view: below that is empty space.
+    const fit = sc && sc.clientHeight ? Math.ceil(sc.clientHeight / 48) : Z_MIN;
+    px = Math.round(Math.min(Z_MAX, Math.max(Z_MIN, fit, px)));
+    if(px === zoomPx) return;
     const y = anchorY == null && sc ? sc.clientHeight / 2 : (anchorY || 0), at = sc ? (sc.scrollTop + y) / zoomPx : 0;
     zoomPx = px; applyZoomMode();
-    if(cal) cal.updateSize();
+    if(cal){ cal.updateSize(); remeasure(); }
     if(sc) sc.scrollTop = at * px - y;
     clearTimeout(zoomT); zoomT = setTimeout(() => lsSet('fw.calZoom', String(px)), 300);
   }
@@ -17138,7 +17150,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       },
       slotLabelFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
       slotDuration: zoomOpts(zoomMode(zoomPx)).slotDuration, slotLabelInterval: zoomOpts(zoomMode(zoomPx)).slotLabelInterval,
-      slotLaneClassNames: a => a.date.getUTCMinutes() ? ['cp-half'] : [], slotLabelClassNames: a => a.date.getUTCMinutes() ? ['cp-half'] : [],
+      slotLaneClassNames: laneCls, slotLabelClassNames: a => a.date.getUTCMinutes() ? ['cp-half'] : [],
       eventTimeFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short' },
       defaultRangeSeparator: ' – ',
       // Header: small weekday over a big date number; today's number in a blue circle.

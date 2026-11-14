@@ -1823,6 +1823,17 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           }
         }
       }
+      // Computer wheel slide (2026-11-14, Julius: "calendar does not appear when I scroll right"): small sideways wheel
+      // steps over the middle column must move the app to the calendar half (the snap used to pull each one back).
+      if (name === 'desktop') {
+        await pg.evaluate(() => { window.fwCalendar.close(); document.getElementById('workspace').scrollLeft = 0; }); await pg.waitForTimeout(900);
+        await pg.mouse.move(view.width * 0.75, view.height / 2);
+        for (let i = 0; i < 16; i++) { await pg.mouse.wheel(60, 0); await pg.waitForTimeout(16); }
+        await pg.waitForTimeout(900);
+        const ws = await pg.evaluate(() => { const w = document.getElementById('workspace'); return [w.scrollLeft, w.scrollWidth - w.clientWidth]; });
+        if (ws[0] < ws[1] - 3) errs.push('wheel slide right did not reach the calendar: ' + ws.join(' / '));
+        await pg.evaluate(() => { document.getElementById('workspace').scrollLeft = 0; }); await pg.waitForTimeout(300);
+      }
       // Docked calendar (2026-11-13, Julius): with the pop-out closed, the same calendar sits in the right column
       // (Day view); Backlog opens as a column left of it and slides the app left (columns) / the left half (phone).
       {

@@ -11481,11 +11481,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(Math.abs(amount)<.01)return;
       e.preventDefault();
       // Over the docked calendar: a sideways swipe changes the day instead (2026-11-13, Julius).
-      if(e.target.closest && e.target.closest('#calPanel.cp-docked #calMount') && window.fwCalSwipeDay){
+      // …unless this scroll started as an app slide (the calendar slid in under the pointer mid-gesture): keep sliding
+      // until the wheel has been still for 250 ms (2026-11-14).
+      const panning=Date.now()<(workspace.__panUntil||0);
+      if(!panning && e.target.closest && e.target.closest('#calPanel.cp-docked #calMount') && window.fwCalSwipeDay){
         const now=Date.now(); if(now-(window.__cdAt||0)>250) window.__cdAcc=0; window.__cdAt=now; window.__cdAcc=(window.__cdAcc||0)+amount;
         if(Math.abs(window.__cdAcc)>60){ window.fwCalSwipeDay(window.__cdAcc>0?1:-1); window.__cdAcc=0; }
         return;
       }
+      /* 2026-11-14 (Julius: "calendar does not appear on computer when I scroll right"): each wheel step set
+         scrollLeft and the proximity snap pulled it straight back to the left. Snapping is off while the wheel moves
+         and comes back ~160 ms after it stops (then it only pulls in when you stopped close to a half). */
+      workspace.__panUntil=Date.now()+250;
+      workspace.style.scrollSnapType='none';
+      clearTimeout(workspace.__snapT);
+      workspace.__snapT=setTimeout(()=>{ workspace.style.scrollSnapType=''; },160);
       workspace.scrollLeft+=amount;
     },{capture:true,passive:false});
   }

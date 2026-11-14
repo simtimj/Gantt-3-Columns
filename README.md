@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-13
+Last updated: 2026-11-14
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -73,6 +73,10 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-14)
+
+- **Google-style event pop-up** (calendar): tap an event → a card like Google Calendar's: ✏️ edit · 🗑 delete · ⋮ (Duplicate, Open in Google Calendar) · ✕ on top; title with its color, when, repeats, 📍 location, event notes (long notes fold, tap to open; links work), calendar. One-tap **All day** ⇄ back to its old time (else 9:00, or the next hour today), **Mark done / not done** (Graphite), and a **color row** (Tomato / Banana / Blueberry = urgency on the main calendar; the saved urgency follows the color). The card stays open after each action. Mouse: `e` = edit, Delete / Backspace = delete, Esc = close; edit / new-event forms pop beside the event with a mouse (phones keep the bottom sheet).
 
 ## 🧪 To be confirmed (2026-11-13)
 

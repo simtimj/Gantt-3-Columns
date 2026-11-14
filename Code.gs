@@ -2919,9 +2919,19 @@ function calPanelEventOut_(ev, calId, calName, calColor, tz) {
     title: ev.getTitle() || '(no title)', allDay: allDay,
     start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
     color: CAL_PANEL_COLORS_[colorId] || (calId === EVENT_CALENDARS[0] ? CAL_PANEL_UNASSIGNED_COLOR_ : calColor), colorId: colorId, done: colorId === '8',
-    location: ev.getLocation() || '', recurring: recurring, link: link,
+    location: ev.getLocation() || '', desc: calPanelDesc_(ev.getDescription()), recurring: recurring, link: link,
     editable: calWritable_(calId) // any calendar he can edit; repeating too, with a This day / All days choice (2026-11-11)
   };
+}
+// Event popup notes (2026-11-14, Julius: "like Google Calendar's pop-up"): the description as plain text, short
+// enough for the cached copy (HTML from Google's editor → text; lists keep their line breaks).
+function calPanelDesc_(d) {
+  let t = String(d || '');
+  if (!t) return '';
+  t = t.replace(/<br\s*\/?>|<\/(p|div|li|h\d)>/gi, '\n').replace(/<li[^>]*>/gi, '• ').replace(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/gi, (m, u, x) => x && x !== u ? x + ' ' + u : u)
+    .replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  t = t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return t.length > 700 ? t.slice(0, 700) + '…' : t;
 }
 function getCalendarRange(startDate, endDate) {
   const s = String(startDate || ''), e = String(endDate || '');
@@ -2975,7 +2985,7 @@ function calPanelRangeApi_(from, to, tz) {
       let token = null;
       do {
         const q = { timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: true, maxResults: 2500,
-          fields: 'nextPageToken,items(id,iCalUID,status,summary,start,end,colorId,location,recurringEventId,htmlLink)' };
+          fields: 'nextPageToken,items(id,iCalUID,status,summary,description,start,end,colorId,location,recurringEventId,htmlLink)' };
         if (token) q.pageToken = token;
         const r = Calendar.Events.list(id, q);
         (r.items || []).forEach(it => {
@@ -2991,7 +3001,7 @@ function calPanelRangeApi_(from, to, tz) {
             title: it.summary || '(no title)', allDay: allDay,
             start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
             color: CAL_PANEL_COLORS_[colorId] || (isMain ? CAL_PANEL_UNASSIGNED_COLOR_ : meta.color), colorId: colorId, done: colorId === '8',
-            location: it.location || '', recurring: recurring, link: it.htmlLink || '',
+            location: it.location || '', desc: calPanelDesc_(it.description), recurring: recurring, link: it.htmlLink || '',
             editable: canEdit
           });
         });
@@ -3125,6 +3135,45 @@ function calPanelMoveEvent(req) {
   if (w.allDay) { if (w.oneDay) ev.setAllDayDate(w.start); else ev.setAllDayDates(w.start, w.end); }
   else ev.setTime(w.start, w.end);
   planRelinkLocked_(ev);
+  return calPanelOut_(ev, calId);
+}
+/* Event popup actions (2026-11-14, Julius: Google Calendar-style pop-up). Color: any Google event color or the
+   calendar default (''). On the main calendar the saved urgency follows the color (Tomato / Banana / Blueberry →
+   1 / 2 / 3, anything else clears it), so Cal Events and the checkboxes agree. A done (Graphite) event keeps Graphite;
+   the new color is what "Mark not done" brings back. */
+function calPanelSetColor(req) {
+  const r = req || {}, calId = String(r.calId || EVENT_CALENDARS[0]), c = String(r.colorId || '');
+  if (c && !/^([1-9]|1[01])$/.test(c)) throw new Error('Unknown color');
+  if (c === '8') throw new Error('Graphite = done — use Mark done');
+  const ev = calPanelEditable_(r.eventId, r.startMs, calId), props = PropertiesService.getScriptProperties();
+  if (String(ev.getColor() || '') === '8') props.setProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs), c || 'default');
+  else ev.setColor(c || '0');
+  if (calId === EVENT_CALENDARS[0]) {
+    const key = calMetaKey_(String(r.eventId), Number(r.startMs), !!r.recurring);
+    let m = {};
+    try { m = JSON.parse(props.getProperty(key) || '{}'); } catch (e) { m = {}; }
+    const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === c) || '';
+    if (u) m.urg = u; else delete m.urg;
+    if (Object.keys(m).some(k => k !== 's')) props.setProperty(key, JSON.stringify(Object.assign(m, { s: Number(r.startMs) })));
+    else props.deleteProperty(key);
+  }
+  return { colorId: c };
+}
+// Duplicate (Google's ⋮ → Duplicate): same calendar, title, times, location, notes and color; a done copy starts open.
+function calPanelDuplicateEvent(req) {
+  const r = req || {}, calId = String(r.calId || EVENT_CALENDARS[0]), src = calPanelEditable_(r.eventId, r.startMs, calId), cal = calPanelMain_(calId);
+  const opts = {}, loc = src.getLocation(), desc = src.getDescription();
+  if (loc) opts.location = loc;
+  if (desc) opts.description = desc;
+  let ev;
+  if (src.isAllDayEvent()) {
+    const a = src.getAllDayStartDate(), b = src.getAllDayEndDate();
+    ev = b - a > DAY_MS ? cal.createAllDayEvent(src.getTitle(), a, b, opts) : cal.createAllDayEvent(src.getTitle(), a, opts);
+  } else ev = cal.createEvent(src.getTitle(), src.getStartTime(), src.getEndTime(), opts);
+  try { ev.removeAllReminders(); } catch (e) { console.error(e); }
+  let c = String(src.getColor() || '');
+  if (c === '8') { const p = PropertiesService.getScriptProperties().getProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs)); c = p && p !== 'default' && p !== '8' ? p : ''; }
+  if (c) try { ev.setColor(c); } catch (e) { console.error(e); }
   return calPanelOut_(ev, calId);
 }
 function calPanelDeleteEvent(req) {

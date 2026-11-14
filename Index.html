@@ -15871,11 +15871,49 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Popup card (2026-11-11): beside the event, with a clear border so it stands out from the grid. */
   #calPanel .cp-detail{border:1.5px solid #9aa0a6!important;}
   html[data-theme=dark] #calPanel .cp-detail{border-color:#c4c7c5!important;}
-  #calPanel .cp-detail.cp-evcard.cp-pop{left:var(--pop-x);top:var(--pop-y);right:auto;bottom:auto;width:var(--pop-w);box-sizing:border-box;max-height:calc(100% - 16px);z-index:30;
+  #calPanel .cp-detail.cp-pop{left:var(--pop-x);top:var(--pop-y);right:auto;bottom:auto;width:var(--pop-w);box-sizing:border-box;max-height:calc(100% - 16px);z-index:30;
     box-shadow:0 8px 28px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.18);}
   #calPanel .cp-detail.cp-evcard .cp-dt{font-size:17px;gap:10px;}
   #calPanel .cp-detail.cp-evcard .cp-dm,#calPanel .cp-detail.cp-evcard .cp-note{font-size:13px;padding-left:24px;margin-top:2px;}
   #calPanel .cp-detail.cp-evcard .cp-da{flex-wrap:nowrap;margin-top:6px;}
+  /* Google Calendar-style event pop-up (2026-11-14, Julius). */
+  #calPanel .cp-detail.cp-evcard{padding:6px 8px 12px 14px;}
+  #calPanel .cp-etop{display:flex;justify-content:flex-end;gap:2px;margin:0 -2px 2px 0;}
+  #calPanel .cp-ib{width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--cp-muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+  #calPanel .cp-ib:hover,#calPanel .cp-ib[aria-expanded=true]{background:var(--cp-hover);color:var(--cp-text);}
+  #calPanel .cp-emenu{display:flex;flex-direction:column;margin:0 0 6px auto;max-width:260px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);background:var(--cp-bg);padding:4px 0;}
+  #calPanel .cp-emenu button,#calPanel .cp-emenu a{display:flex;align-items:center;gap:12px;border:0;background:transparent;color:var(--cp-text);font-size:14px;padding:8px 14px;text-align:left;text-decoration:none;cursor:pointer;}
+  #calPanel .cp-emenu svg{color:var(--cp-muted);flex:0 0 auto;}
+  #calPanel .cp-emenu button:hover,#calPanel .cp-emenu a:hover{background:var(--cp-hover);}
+  #calPanel .cp-etitle{display:flex;align-items:flex-start;gap:14px;font-size:20px;line-height:1.3;padding-right:6px;}
+  #calPanel .cp-etitle .cp-dot{flex:0 0 14px;width:14px;height:14px;border-radius:4px;margin:6px 0 0 3px;}
+  #calPanel .cp-etitle [data-cal-edit]{cursor:pointer;overflow-wrap:anywhere;}
+  #calPanel .cp-etitle .cp-edone{text-decoration:line-through;color:var(--cp-muted);}
+  #calPanel .cp-ewhen{font-size:14px;color:var(--cp-text);padding-left:34px;margin:2px 0 8px;}
+  #calPanel .cp-emuted{color:var(--cp-muted);font-size:13px;}
+  #calPanel .cp-er{display:flex;gap:14px;align-items:flex-start;font-size:14px;margin:6px 6px 0 0;}
+  #calPanel .cp-ei{flex:0 0 20px;color:var(--cp-muted);line-height:0;}
+  #calPanel .cp-ev2{min-width:0;overflow-wrap:anywhere;padding-top:1px;}
+  #calPanel .cp-ev2 a{color:var(--cp-blue);}
+  #calPanel .cp-desc{white-space:pre-line;max-height:6.2em;overflow:hidden;cursor:pointer;position:relative;}
+  #calPanel .cp-desc:not(.open)::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.4em;background:linear-gradient(transparent,var(--cp-bg));}
+  #calPanel .cp-desc.open{max-height:none;}
+  #calPanel .cp-desc.fits{cursor:auto;}
+  #calPanel .cp-desc.fits::after{display:none;}
+  #calPanel .cp-equick{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0 34px;}
+  #calPanel .cp-equick button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--cp-line);background:transparent;color:var(--cp-text);border-radius:999px;padding:5px 12px 5px 9px;font-size:13px;font-weight:500;cursor:pointer;}
+  #calPanel .cp-equick button svg{width:17px;height:17px;color:var(--cp-muted);}
+  #calPanel .cp-equick button:hover{background:var(--cp-hover);}
+  #calPanel .cp-equick button.on{background:var(--cp-blue-soft);border-color:transparent;color:var(--cp-blue-text);}
+  #calPanel .cp-equick button.on svg{color:inherit;}
+  #calPanel .cp-ecolors{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 0 34px;}
+  #calPanel .cp-ecolors button{width:20px;height:20px;border-radius:50%;border:0;padding:0;background:var(--sw);cursor:pointer;position:relative;}
+  #calPanel .cp-ecolors button.cp-sw0{background:var(--cp-bg);border:2px dashed var(--cp-muted);}
+  #calPanel .cp-ecolors button.on::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--cp-text);}
+  #calPanel .cp-detail.cp-evcard .cp-plan-ev{margin-left:34px;}
+  #calPanel .cp-detail.cp-evcard .cp-note{padding-left:34px;}
+  #calPanel .cp-detail.cp-evcard .cp-ferr{padding-left:34px;}
+  #calPanel .cp-detail.cp-busy .cp-equick,#calPanel .cp-detail.cp-busy .cp-ecolors{opacity:.55;pointer-events:none;}
   #calPanel .cp-detail .cp-da a:hover,#calPanel .cp-detail .cp-da button:hover{background:var(--cp-hover);}
   #calPanel .cp-detail .cp-da .cp-primary{background:var(--cp-blue);color:#fff;}
   html[data-theme=dark] #calPanel .cp-detail .cp-da .cp-primary{color:var(--cp-blue-text);}
@@ -16259,26 +16297,149 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   panel.addEventListener('pointerdown', e => {
     if(detail.hidden || !detail.classList.contains('cp-evcard') || !detail.classList.contains('cp-pop')) return;
     if(detail.contains(e.target) || (e.target.closest && e.target.closest('.fc-event,.urg-picker'))) return;
+    if(pending) return; // an action is saving: the card re-opens when it's done
     detail.hidden = true; sheetEv = null;
   }, true);
+  /* Google Calendar-style event pop-up (2026-11-14, Julius: "as close to the functionality and look of Google
+     Calendar"): icon row on top (edit · delete · ⋮ · close), color square + title, when, calendar, location, notes,
+     then one-tap actions — All day ⇄ timed, Mark done, color (= urgency on the main calendar) — and the plan row.
+     After an action the card re-opens on the re-read event (keepOpen), so it stays put like Google's. Keys (mouse):
+     e = edit, Delete / Backspace = delete, Esc = close. */
+  const CP_ICON = {
+    edit: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
+    del: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+    more: 'M12 8a2 2 0 100-4 2 2 0 000 4zm0 2a2 2 0 100 4 2 2 0 000-4zm0 6a2 2 0 100 4 2 2 0 000-4z',
+    close: 'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
+    time: 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z',
+    place: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z',
+    notes: 'M3 18h12v-2H3v2zM3 6v2h18V6H3zm0 7h18v-2H3v2z',
+    cal: 'M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z',
+    sun: 'M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z',
+    check: 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
+    copy: 'M16 1H4a2 2 0 00-2 2v14h2V3h12V1zm3 4H8a2 2 0 00-2 2v14a2 2 0 002 2h11a2 2 0 002-2V7a2 2 0 00-2-2zm0 16H8V7h11v14z',
+    open: 'M19 19H5V5h7V3H5a2 2 0 00-2 2v14c0 1.1.9 2 2 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z'
+  };
+  const ico = k => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="' + CP_ICON[k] + '"/></svg>';
+  // Google's event colors in Google's menu order (hex = Code.gs CAL_PANEL_COLORS_); Graphite is "Mark done" instead.
+  const CP_COLORS = [['11','Tomato','#de583d','Urgent'],['4','Flamingo','#e67c73'],['6','Tangerine','#db793a'],['5','Banana','#e6ba57','Next'],
+    ['2','Sage','#59af80'],['10','Basil','#0b8043'],['7','Peacock','#5398cf'],['9','Blueberry','#7577c4','Can be later'],['1','Lavender','#7986cb'],['3','Grape','#8e24aa']];
+  let keepOpen = null, cardAnchor = null, cardMore = false, cardDescOpen = false;
+  const linkify = t => esc(t).replace(/\bhttps?:\/\/[^\s<>"']+/g, u => '<a href="' + u + '" target="_blank" rel="noopener">' + (u.length > 42 ? u.slice(0, 40) + '…' : u) + '</a>');
   function showDetail(ev, el){
-    const x = ev.extendedProps || {};
-    sheetEv = ev;
-    const why = x.editable ? (x.done ? 'Done — stays where it is.' : '') : 'View-only calendar — read-only here.';
+    const x = ev.extendedProps || {}, same = sheetEv && sheetEv.extendedProps && sheetEv.extendedProps.eventId === x.eventId;
+    if(!same){ cardMore = false; cardDescOpen = false; }
+    sheetEv = ev; cardAnchor = el || cardAnchor;
+    const ed = !!x.editable, row = (k, html, cls) => '<div class="cp-er' + (cls ? ' ' + cls : '') + '"><span class="cp-ei">' + ico(k) + '</span><div class="cp-ev2">' + html + '</div></div>';
+    const iconBtn = (k, attr, label) => '<button type="button" class="cp-ib" ' + attr + ' title="' + label + '" aria-label="' + label + '">' + ico(k) + '</button>';
+    let h = '<div class="cp-etop">' + (ed ? iconBtn('edit', 'data-cal-edit', 'Edit event (e)') + iconBtn('del', 'data-cal-del', 'Delete event') : '') +
+      iconBtn('more', 'data-cal-act="more" aria-expanded="' + cardMore + '"', 'Options') + iconBtn('close', 'data-cal-detail-close', 'Close') + '</div>';
+    if(cardMore) h += '<div class="cp-emenu" role="menu">' +
+      (ed ? '<button type="button" role="menuitem" data-cal-act="dup">' + ico('copy') + 'Duplicate</button>' : '') +
+      (x.link ? '<a role="menuitem" href="' + esc(x.link) + '" target="_blank" rel="noopener">' + ico('open') + 'Open in Google Calendar</a>' : '') + '</div>';
+    h += '<div class="cp-etitle"><span class="cp-dot" style="background:' + esc(x.done ? '#808080' : x.color) + '"></span><span' + (ed ? ' data-cal-edit title="Edit"' : '') + (x.done ? ' class="cp-edone"' : '') + '>' + esc(ev.title) + '</span></div>';
+    h += '<div class="cp-ewhen">' + esc(fmtWhen(ev)) + (x.recurring ? '<br><span class="cp-emuted">Repeats</span>' : '') + '</div>';
+    if(x.location) h += row('place', linkify(x.location));
+    if(x.desc) h += row('notes', '<div class="cp-desc' + (cardDescOpen ? ' open' : '') + '" data-cal-act="desc">' + linkify(x.desc) + '</div>');
+    h += row('cal', esc(x.cal || '') + (x.done ? ' · done' : ''));
+    if(ed){
+      h += '<div class="cp-equick">' +
+        (x.done ? '' : '<button type="button" data-cal-act="allday" class="' + (x.allDay ? 'on' : '') + '" title="' + (x.allDay ? 'Back to a time slot' : 'Make it an all-day event') + '">' + ico('sun') + 'All day</button>') +
+        '<button type="button" data-cal-act="done" class="' + (x.done ? 'on' : '') + '">' + ico('check') + (x.done ? 'Mark not done' : 'Mark done') + '</button></div>';
+      if(!x.done) h += '<div class="cp-ecolors" role="group" aria-label="Color">' + CP_COLORS.map(([id, n, hex, u]) =>
+        '<button type="button" data-cal-act="color" data-c="' + id + '" class="' + (x.colorId === id ? 'on' : '') + '" style="--sw:' + hex + '" title="' + n + (u && x.calId === calsMainId() ? ' — ' + u : '') + '" aria-label="' + n + '"></button>').join('') +
+        '<button type="button" data-cal-act="color" data-c="" class="cp-sw0' + (x.colorId ? '' : ' on') + '" title="Calendar color (no urgency)" aria-label="Calendar color"></button></div>';
+    }
+    if(ed && planData) h += '<div class="cp-plan-ev">Plan:' + PLAN_G.map(([g, n]) => '<button type="button" data-plan-act="evplan" data-g="' + g + '">' + n + '</button>').join('') + '</div>';
+    if(!ed) h += '<div class="cp-note">View-only calendar — read-only here.</div>';
+    h += '<div class="cp-ferr" data-cal-ferr></div>';
     detail.classList.add('cp-evcard');
-    detail.innerHTML = '<div class="cp-dt"><span class="cp-dot" style="background:' + esc(x.color) + '"></span><span>' + esc(ev.title) + '</span></div>' +
-      '<div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
-      '<div class="cp-dm">' + esc(x.cal || '') + (x.recurring ? ' · repeats' : '') + (x.done ? ' · done' : '') + '</div>' +
-      (x.location ? '<div class="cp-dm">📍 ' + esc(x.location) + '</div>' : '') +
-      '<div class="cp-da">' + (x.editable ? '<button type="button" class="cp-primary" data-cal-edit>Edit</button><button type="button" class="cp-danger" data-cal-del>Delete</button>' : '') +
-      (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener" title="Open in Google Calendar">GCal</a>' : '') +
-      '<span class="cp-sp"></span><button type="button" data-cal-detail-close>Close</button></div>' +
-      (x.editable && planData ? '<div class="cp-plan-ev">Plan:' + PLAN_G.map(([g, n]) => '<button type="button" data-plan-act="evplan" data-g="' + g + '">' + n + '</button>').join('') + '</div>' : '') +
-      (why ? '<div class="cp-note">' + esc(why) + '</div>' : '');
+    detail.innerHTML = h;
     detail.dataset.pid = '';
     detail.hidden = false;
-    popAt(el);
+    const dsc = detail.querySelector('.cp-desc'); if(dsc && !cardDescOpen && dsc.scrollHeight <= dsc.clientHeight + 2) dsc.classList.add('fits'); // short notes: no fade, no tap
+    popAt(el && el.isConnected ? el : cardAnchor && cardAnchor.isConnected ? cardAnchor : null);
   }
+  const calsMainId = () => { const m = (typeof calsWritable === 'function' ? calsWritable() : []).find(c => c.main); return m ? m.id : ''; };
+  const cardErr = msg => { const e = detail.querySelector('[data-cal-ferr]'); if(e) e.textContent = msg; else setState('error', msg); };
+  function evElFor(eventId, startMs){
+    const q = '.cp-evc[data-ce-id="' + (window.CSS && CSS.escape ? CSS.escape(eventId) : eventId) + '"]' + (startMs != null ? '[data-ce-start="' + startMs + '"]' : '');
+    const c = mount && mount.querySelector(q); return c ? (c.closest('.fc-event') || c) : null;
+  }
+  // Re-open the card on the re-read event (same event id; start may have moved).
+  function reopenKept(){
+    const k = keepOpen; keepOpen = null;
+    if(!k || !cal || pending || Date.now() - (k.at || 0) > 20000) return;
+    const evs = cal.getEvents().filter(e => (e.extendedProps || {}).eventId === k.eventId);
+    const ev = evs.find(e => String(e.extendedProps.startMs) === String(k.startMs)) || (evs.length === 1 ? evs[0] : null);
+    if(!ev){ detail.hidden = true; sheetEv = null; return; }
+    showDetail(ev, evElFor(k.eventId, ev.extendedProps.startMs));
+  }
+  function cardRun(fn, args, okMsg, keep){
+    if(pending || moveBusy || !canRun()) return;
+    pending = true; detail.classList.add('cp-busy');
+    google.script.run.withSuccessHandler(r => {
+      pending = false; detail.classList.remove('cp-busy');
+      keepOpen = typeof keep === 'function' ? keep(r) : keep; if(keepOpen) keepOpen.at = Date.now(); flash(okMsg); refetchFresh(); loadPlan(true);
+    }).withFailureHandler(err => {
+      pending = false; detail.classList.remove('cp-busy');
+      cardErr('Not saved: ' + errText(err) + '.'); refetchFresh();
+    })[fn](args);
+  }
+  // All day ⇄ timed, one tap. Timed → all day on its start date (its time is remembered on this device); all day →
+  // back to that time, else 9:00 (or the next whole hour when it's today), 1 hour. Repeating: this day only.
+  function cardAllDay(ev){
+    const x = ev.extendedProps || {}, D = L(), key = 'fw.cpTimed.' + String(x.eventId).slice(0, 60);
+    if(x.done) return;
+    let req, ms;
+    if(!x.allDay){
+      const a = D.fromISO(x.start).setZone(TZ), mins = Math.round(D.fromISO(x.end).diff(a, 'minutes').minutes);
+      lsSet(key, JSON.stringify({st: a.toFormat('HH:mm'), mins}));
+      const d = a.startOf('day');
+      req = {allDay: true, start: d.toISODate(), end: d.plus({days: 1}).toISODate()}; ms = d.toMillis();
+    } else {
+      const day = String(x.start).slice(0, 10);
+      let st = '09:00', mins = 60;
+      try { const p = JSON.parse(lsGet(key) || 'null'); if(p && /^\d\d:\d\d$/.test(p.st)){ st = p.st; mins = Math.max(15, Math.min(720, Number(p.mins) || 60)); } else if(day === todayLA()) st = D.now().setZone(TZ).startOf('hour').plus({hours: 1}).toFormat('HH:mm'); } catch (e) {}
+      const a = D.fromISO(day + 'T' + st, {zone: TZ}), b = a.plus({minutes: mins}), f = "yyyy-MM-dd'T'HH:mm";
+      req = {allDay: false, start: a.toFormat(f), end: b.toFormat(f)}; ms = a.toMillis();
+    }
+    cardRun('calPanelMoveEvent', Object.assign({eventId: x.eventId, startMs: x.startMs, calId: x.calId, scope: 'one'}, req), x.allDay ? 'Timed ✓' : 'All day ✓', {eventId: x.eventId, startMs: ms});
+  }
+  function cardColor(ev, c){
+    const x = ev.extendedProps || {}, sw = CP_COLORS.find(z => z[0] === c);
+    if(c === (x.colorId || '')) return;
+    detail.querySelectorAll('.cp-ecolors button').forEach(b => b.classList.toggle('on', b.dataset.c === c));
+    const dot = detail.querySelector('.cp-etitle .cp-dot'); if(dot && sw) dot.style.background = sw[2];
+    if(sw){ const k = softColor(sw[2], false); ev.setProp('backgroundColor', k.bg); ev.setProp('borderColor', k.bg); ev.setProp('textColor', k.fg); }
+    cardRun('calPanelSetColor', {calId: x.calId, eventId: x.eventId, startMs: x.startMs, recurring: !!x.recurring, colorId: c}, (sw ? sw[1] : 'Calendar color') + ' ✓', {eventId: x.eventId, startMs: x.startMs});
+  }
+  function cardDone(ev){
+    const x = ev.extendedProps || {};
+    if(pending || moveBusy) return;
+    keepOpen = {eventId: x.eventId, startMs: x.startMs, at: Date.now()};
+    toggleDone(ev);
+    showDetail(ev, cardAnchor);
+  }
+  detail.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-cal-act]');
+    if(!t || !sheetEv || !detail.classList.contains('cp-evcard')) return;
+    if(e.target.closest('a')) return; // links in notes / location open normally
+    const a = t.dataset.calAct;
+    if(a === 'more'){ cardMore = !cardMore; showDetail(sheetEv, cardAnchor); }
+    else if(a === 'desc'){ if(t.classList.contains('fits')) return; cardDescOpen = !cardDescOpen; t.classList.toggle('open', cardDescOpen); }
+    else if(a === 'allday') cardAllDay(sheetEv);
+    else if(a === 'done') cardDone(sheetEv);
+    else if(a === 'color') cardColor(sheetEv, t.dataset.c || '');
+    else if(a === 'dup'){ const x = sheetEv.extendedProps; cardMore = false; cardRun('calPanelDuplicateEvent', {calId: x.calId, eventId: x.eventId, startMs: x.startMs}, 'Duplicated ✓', r => r && r.eventId ? {eventId: r.eventId, startMs: r.startMs} : null); }
+  });
+  // Google's keys while the card is open (mouse / keyboard): e = edit, Delete / Backspace = delete.
+  document.addEventListener('keydown', e => {
+    if(detail.hidden || !detail.classList.contains('cp-evcard') || !sheetEv || pending || e.ctrlKey || e.metaKey || e.altKey) return;
+    if(e.target && e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
+    if(!(sheetEv.extendedProps || {}).editable) return;
+    if(e.key === 'e' || e.key === 'E'){ e.preventDefault(); editEvent(sheetEv); }
+    else if(e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); askDelete(sheetEv); popAt(cardAnchor && cardAnchor.isConnected ? cardAnchor : null); }
+  });
   // ---- Phase 2: create / edit / delete (main calendar, non-repeating). Google Calendar stays the truth: after every
   // save the range is refetched; nothing is drawn from local guesses.
   const L = () => luxon.DateTime;
@@ -16288,7 +16449,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function flash(msg){ const k = ++flashTok; flashUntil = Date.now() + 2500; setState('ok', msg); setTimeout(() => { if(k !== flashTok) return; flashUntil = 0; refreshState(); }, 2600); }
   // f = {allDay, sd, st, ed, et} in Los Angeles wall time; ed is the LAST day (inclusive) for all-day events.
   function openForm(f, ev){
-    sheetEv = ev || null; pending = false; detail.dataset.pid = ''; detail.classList.remove('cp-evcard');
+    sheetEv = ev || null; pending = false; detail.dataset.pid = ''; detail.classList.remove('cp-evcard', 'cp-pop');
     const x = ev ? ev.extendedProps : null;
     const calPick = x ? '<span style="font-weight:400;color:var(--cp-muted);font-size:12px;margin-left:auto">' + esc(x.cal || '') + '</span>'
       : '<select name="cal" aria-label="Calendar">' + calsWritable().map(c => '<option value="' + esc(c.id) + '"' + (c.main ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select>';
@@ -16322,9 +16483,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const st = day.startOf('hour').plus({hours: 1});
     openForm(formFromRange(false, st.toISO(), st.plus({hours: 1}).toISO()));
   }
+  const finePointer = () => { try { return matchMedia('(pointer: fine)').matches; } catch (e) { return false; } };
   function editEvent(ev){
-    const x = ev.extendedProps;
+    const x = ev.extendedProps, wasPop = detail.classList.contains('cp-pop');
     openForm(formFromRange(!!x.allDay, x.start, x.end), ev);
+    if(wasPop && finePointer()) popAt(cardAnchor && cardAnchor.isConnected ? cardAnchor : null); // like Google's quick edit (mouse); phones keep the sheet
   }
   function readForm(form){
     const g = n => form.elements[n], allDay = g('allDay').checked, title = g('title').value.replace(/\s+/g, ' ').trim();
@@ -16358,7 +16521,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     })[x ? 'calPanelUpdateEvent' : 'calPanelCreateEvent'](req);
   }
   function askDelete(ev){
-    sheetEv = ev; pending = false; detail.classList.remove('cp-evcard');
+    sheetEv = ev; pending = false; detail.classList.remove('cp-evcard', 'cp-pop');
     detail.innerHTML = '<div class="cp-dt">Delete “' + esc(ev.title) + '”?</div><div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
       '<div class="cp-dm">It is removed from Google Calendar.</div>' + (ev.extendedProps.recurring ? scopeHtml() : '') + '<div class="cp-ferr" data-cal-ferr></div>' +
       '<div class="cp-da"><button type="button" class="cp-danger cp-primary" data-cal-del-yes>Delete</button><span class="cp-sp"></span><button type="button" data-cal-detail-close>Cancel</button></div>';
@@ -17005,12 +17168,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: info => moveEvent(info), drop: info => (info.draggedEl && info.draggedEl.closest('[data-blid]') ? dropBacklog(info) : dropPlan(info)),
       // Phase 2: drag (desktop) or hold + drag (touch) on empty grid → New event form. Moving / resizing events is phase 3.
       selectable: true, selectMirror: true, selectLongPressDelay: 500, unselectAuto: true,
-      select: info => { if(!pending) openForm(formFromRange(info.allDay, info.startStr, info.endStr)); cal.unselect(); },
+      select: info => { if(!pending){ const at = finePointer() ? mount.querySelector('.fc-event-mirror,.fc-highlight') : null; openForm(formFromRange(info.allDay, info.startStr, info.endStr)); if(at) popAt(at); } cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       events: fetchRange,
       eventsSet: () => setTimeout(adLayout, 0),
       // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
-      loading: b => { busy = b; if(b){ if(!detail.querySelector('[data-cal-form],[data-cal-del-yes],[data-cal-scope]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
+      loading: b => { busy = b; if(!b && keepOpen) setTimeout(reopenKept, 60); if(b){ if(!keepOpen && !detail.querySelector('[data-cal-form],[data-cal-del-yes],[data-cal-scope]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault();
         if(Date.now() - evHoldOpenAt < 600) return; // the hold already opened its menu
@@ -17262,7 +17425,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     else if(t.hasAttribute('data-cal-detail-close')){ if(!pending){ detail.hidden = true; sheetEv = null; } }
     else if(t.hasAttribute('data-cal-new')){ if(cal && !pending) newEvent(); }
     else if(t.hasAttribute('data-cal-edit')){ if(sheetEv) editEvent(sheetEv); }
-    else if(t.hasAttribute('data-cal-del')){ if(sheetEv && !pending) askDelete(sheetEv); }
+    else if(t.hasAttribute('data-cal-del')){ if(sheetEv && !pending){ const wasPop = detail.classList.contains('cp-pop'); askDelete(sheetEv); if(wasPop) popAt(cardAnchor && cardAnchor.isConnected ? cardAnchor : null); } }
     else if(t.hasAttribute('data-cal-del-yes')) doDelete(t);
     else retry();
   });

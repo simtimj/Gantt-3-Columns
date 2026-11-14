@@ -1081,7 +1081,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         for(let d=a[0];d<a[1];d=L.fromISO(d).plus({days:1}).toISODate()){ if(S.seeded[d])continue; S.seeded[d]=1;
           const t=(h,mi)=>iso(d+'T'+h+':'+mi),nx=L.fromISO(d).plus({days:1}).toISODate();
           put({eventId:'a-'+d,title:'All-day A',allDay:true,start:d,end:nx,startMs:ms(d),color:'#3f51b5',colorId:'9',cal:'Main',calId:'main',editable:true});
-          put({eventId:'b-'+d,title:'Dentist',allDay:false,start:t('09','00'),end:t('10','00'),startMs:ms(t('09','00')),color:'#d50000',colorId:'11',cal:'Main',calId:'main',location:'Main St',editable:true});
+          put({eventId:'b-'+d,title:'Dentist',allDay:false,start:t('09','00'),end:t('10','00'),startMs:ms(t('09','00')),color:'#d50000',colorId:'11',cal:'Main',calId:'main',location:'Main St',desc:'Bring the insurance card\\nhttps://example.com/form',editable:true});
           put({eventId:'c-'+d,title:'Old chore',allDay:false,start:t('13','00'),end:t('13','30'),startMs:ms(t('13','00')),color:'#616161',colorId:'8',done:true,cal:'Main',calId:'main',editable:true});
           put({eventId:'r-'+d,title:'Standup',allDay:false,start:t('15','00'),end:t('15','15'),startMs:ms(t('15','00')),color:'#039be5',colorId:'',cal:'Main',calId:'main',recurring:true,editable:false});
           put({eventId:'g-'+d,title:'Gig',allDay:false,start:t('19','00'),end:t('21','00'),startMs:ms(t('19','00')),color:'#33b679',colorId:'',cal:'Events',calId:'events',editable:false});}
@@ -1119,6 +1119,9 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         const mv=x=>e.allDay?L.fromISO(x).plus({days:sh}).toISODate():L.fromISO(x).setZone(Z).plus({days:sh}).toISO({suppressMilliseconds:true});e.start=mv(e.start);e.end=mv(e.end);e.startMs=ms(e.start);put(e);
         const link=e.eventId+'@'+e.startMs;P.forEach(x=>{if(String(x.event).split('@')[0]===e.eventId)x.event=link;});return {event:link};}
       if(m==='setCalendarEventMeta'){const e=Object.values(S.ev).find(x=>x.eventId===a[0]);if(!e)throw new Error('Event not found');['urg','due','dur','cat'].forEach(k=>{if(a[3]&&a[3][k])e[k]=a[3][k];else delete e[k];});if(a[3]&&a[3].urg&&e.colorId!=='8')e.colorId={1:'11',2:'5',3:'9'}[a[3].urg];return null;}
+      // Google-style popup (2026-11-14): color + duplicate.
+      if(m==='calPanelSetColor'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');if(!e.editable)throw new Error('read-only');if(e.colorId==='8'){e.prev=r.colorId;}else{e.colorId=r.colorId;e.color=r.colorId?'#e6ba57':'#8a8f98';}return {colorId:r.colorId};}
+      if(m==='calPanelDuplicateEvent'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');const c=Object.assign({},e,{eventId:'d'+(++S.n),done:false});if(c.colorId==='8')c.colorId=e.prev||'';return Object.assign({},put(c));}
       if(m==='setCalendarEventDone'){if(/^m\d+$/.test(a[1])){(window.__mDone=window.__mDone||{})[a[1]]=!!a[3];return {done:!!a[3]};}const e=S.ev[a[1]];if(!e)throw new Error('Event not found');if(a[3]){e.prev=e.colorId;e.colorId='8';e.done=true;}else{e.colorId=e.prev||'';e.done=false;}return {done:!!a[3]};}
       return undefined;};
     window.google={script:{run:new Proxy({},{get(t,k){let ok=null,bad=null;const p=new Proxy({},{get(_,m){
@@ -1407,6 +1410,42 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         await until(() => det.hidden && !evEl('Lunch moved'));
         if (byTitle('Lunch moved').length || evEl('Lunch moved')) out.push('deleted event still there');
         if (calls('calPanelDeleteEvent').length !== 1) out.push('delete sent ' + calls('calPanelDeleteEvent').length + ' requests');
+        // Google-style popup (2026-11-14, Julius): notes shown; one-tap All day ⇄ timed keeps the card open and comes
+        // back to the old time; color swatch saves; ⋮ → Duplicate makes a copy.
+        {
+          evEl('Dentist').click(); await wait(60);
+          if (!/insurance card/.test(det.textContent) || !det.querySelector('.cp-desc a')) out.push('popup: notes / link not shown');
+          if (!det.querySelector('.cp-etop [data-cal-edit]') || !det.querySelector('.cp-etop [data-cal-del]')) out.push('popup: no edit / delete icons on top');
+          const ad = det.querySelector('[data-cal-act="allday"]');
+          if (!ad) out.push('popup: no All day button');
+          else {
+            ad.click();
+            await until(() => byTitle('Dentist').some(x => x.allDay) && !det.hidden && det.querySelector('[data-cal-act="allday"].on'), 3000);
+            if (!byTitle('Dentist').some(x => x.allDay)) out.push('popup: All day did not make it all-day');
+            else if (det.hidden || !det.querySelector('[data-cal-act="allday"].on')) out.push('popup: card did not stay open after All day');
+            else {
+              det.querySelector('[data-cal-act="allday"]').click();
+              await until(() => !byTitle('Dentist').some(x => x.allDay) && !det.hidden && det.querySelector('[data-cal-act="allday"]:not(.on)'), 3000);
+              if (byTitle('Dentist').some(x => x.allDay) || !byTitle('Dentist').every(x => /T09:00/.test(x.start))) out.push('popup: back to timed did not restore 9:00 ' + JSON.stringify(byTitle('Dentist').map(x => x.start)));
+            }
+          }
+          const sw = det.querySelector('[data-cal-act="color"][data-c="5"]');
+          if (!sw) out.push('popup: no color swatches');
+          else {
+            sw.click();
+            await until(() => calls('calPanelSetColor').length && !det.hidden && det.querySelector('[data-cal-act="color"][data-c="5"].on'), 3000);
+            if (!calls('calPanelSetColor').length) out.push('popup: color not saved');
+            else if (det.hidden) out.push('popup: card closed after a color change');
+          }
+          const nD = byTitle('Dentist').length;
+          det.querySelector('[data-cal-act="more"]').click(); await wait(40);
+          const dup = det.querySelector('[data-cal-act="dup"]');
+          if (!dup) out.push('popup: no Duplicate in ⋮');
+          else { dup.click(); await until(() => byTitle('Dentist').length > nD, 3000); if (byTitle('Dentist').length !== nD + 1) out.push('popup: Duplicate made ' + (byTitle('Dentist').length - nD)); }
+          await wait(200);
+          if (!det.hidden) det.querySelector('[data-cal-detail-close]').click();
+          await wait(40);
+        }
         // Read-only: a repeating event and an Events-calendar event have no Edit / Delete.
         for (const t of ['Standup', 'Gig']) {
           const el = evEl(t); if (!el) { out.push(t + ' not shown'); continue; }

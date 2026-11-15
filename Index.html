@@ -17350,14 +17350,24 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   panel.addEventListener('click', e => { if(e.target.closest('[data-bl-toggle]')){ e.stopPropagation(); blToggle(); } });
   /* Hold a backlog row and let go without moving (2026-11-15, Julius) → small menu: 📌 Send to Today (all-day task
      today). Hold + drag still places it on a day / time. "Mark complete" is next, once Julius decides what it does. */
+  // 2026-11-15 14:10 (Julius: "speed up backlog → all day"): optimistic — the row leaves the backlog and a stand-in
+  // all-day card shows at once; the save runs in the background (several can run back to back, the server lock
+  // queues them). Failure puts the row back. No "Saving…" lock-out.
   function blSendToday(id, day){
     const it = blById(id); if(!it) return;
-    if(moveBusy){ moveFail('Still saving — try again in a moment.'); return; }
     const today = L().now().setZone(TZ).toISODate(); day = day || today;
-    moveBusy = true; setState('loading', 'Saving…');
-    google.script.run.withSuccessHandler(() => {
-      moveBusy = false; blData.items = blData.items.filter(x => x.id !== id); blRender(); flash(day === today ? 'Sent to today ✓' : 'All day ✓'); refetchFresh();
-    }).withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save — nothing changed. ' + errText(err)); })
+    blData.items = blData.items.filter(x => x.id !== id); blRender();
+    let tmp = null;
+    if(cal) try { const c = softColor(it.color, false);
+      tmp = cal.addEvent({id: 'bltmp-' + id, title: it.title, start: day, allDay: true, backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg, editable: false, extendedProps: {urg: it.urg, blTmp: true}});
+    } catch (e) { tmp = null; }
+    if(typeof fadSoon === 'function') fadSoon();
+    flash(day === today ? 'Sent to today ✓' : 'All day ✓');
+    window.__fwBlPending = (window.__fwBlPending || 0) + 1;
+    const done = () => { window.__fwBlPending--; if(tmp) try { tmp.remove(); } catch (e) {} };
+    // Success: re-read first, drop the stand-in a moment later so the card doesn't blink out while the re-read runs.
+    google.script.run.withSuccessHandler(() => { refetchFresh(); setTimeout(done, 2500); })
+      .withFailureHandler(err => { done(); if(blData && !blById(id)) blData.items.push(it); blRender(); if(typeof fadSoon === 'function') fadSoon(); moveFail('Couldn’t save — put back in the backlog. ' + errText(err)); })
       .calBacklogPlace(Object.assign({id: id}, slotReq(true, day, '', 0)));
   }
   function blMenu(id, x, y){

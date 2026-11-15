@@ -75,7 +75,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-15)
-- **Backlog → All day box** (full calendar, 2026-11-15): hold a backlog row and drag it onto the All day list (it outlines blue) → it becomes an all-day task on the day shown.
+- **Backlog → All day box** (full calendar, 2026-11-15): hold a backlog row and drag it onto the All day list (it outlines blue) → it becomes an all-day task on the day shown. Faster (14:10): the row leaves the backlog and the card shows in All day at once; saving runs in the background (failure puts it back), and the server does one Calendar call instead of two.
 
 - **Full-screen Week = full width**: in Week view the calendar fills the screen, the left column (all-day + backlog) hides, and the all-day tasks sit on top of the grid again. Day view keeps the left column.
 - **Day title in its weekday color** (half + full calendar, Day view): e.g. "Nov 15, Sun" uses Sunday's color from the day rows.

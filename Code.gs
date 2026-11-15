@@ -3897,8 +3897,10 @@ function calBacklogPlace(req) {
     const tz = Session.getScriptTimeZone();
     let out = null;
     try {
-      try { calBacklogRestoreColor_(calId, Calendar.Events.get(calId, evId), rows); } catch (e) { console.error('calBacklogPlace color: ' + e); }
+      // 2026-11-15 (Julius: "speed up backlog → all day"): one patch, no Events.get first. The color goes in the same
+      // patch; the old Grape cleanup only runs when the patched event still comes back Grape (rare since 11-13).
       const body = { summary: w.title };
+      if (color) body.colorId = color;
       if (w.allDay) {
         body.start = { date: Utilities.formatDate(w.start, tz, 'yyyy-MM-dd'), dateTime: null };
         body.end = { date: Utilities.formatDate(w.end, tz, 'yyyy-MM-dd'), dateTime: null }; // w.end is already exclusive
@@ -3907,6 +3909,7 @@ function calBacklogPlace(req) {
         body.end = { dateTime: w.end.toISOString(), date: null };
       }
       const ev = Calendar.Events.patch(body, calId, evId);
+      if (String(ev.colorId || '') === CAL_BACKLOG_COLOR) try { calBacklogRestoreColor_(calId, ev, rows); } catch (e) { console.error('calBacklogPlace color: ' + e); }
       out = { id: ev.id };
     } catch (e) {
       console.error('calBacklogPlace move: ' + e); // original gone → make a fresh one

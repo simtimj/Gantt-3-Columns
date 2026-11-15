@@ -16211,6 +16211,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Popup card (2026-11-11): beside the event, with a clear border so it stands out from the grid. */
   #calPanel .cp-detail{border:1.5px solid #9aa0a6!important;}
   html[data-theme=dark] #calPanel .cp-detail{border-color:#c4c7c5!important;}
+  #calPanel .cp-detail.cp-pop.cp-popfix{position:fixed;z-index:3000;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);}
   #calPanel .cp-detail.cp-pop{left:var(--pop-x);top:var(--pop-y);right:auto;bottom:auto;width:var(--pop-w);box-sizing:border-box;max-height:calc(100% - 16px);z-index:30;
     box-shadow:0 8px 28px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.18);}
   #calPanel .cp-detail.cp-evcard .cp-dt{font-size:17px;gap:10px;}
@@ -16650,11 +16651,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      plan cards keep the bottom sheet (they drop .cp-evcard, which is what the popup position needs). */
   function popAt(el){
     const body = detail.parentElement;
-    detail.classList.remove('cp-pop');
+    detail.classList.remove('cp-pop', 'cp-popfix');
     if(!el || !body || !el.getBoundingClientRect) return;
-    const B = body.getBoundingClientRect(), E0 = el.getBoundingClientRect(), m = 8;
+    /* Half calendar (2026-11-15 13:25, Julius: "it can pop out further than its column allows; the focus is
+       readability"): the docked column is narrow, so the card is placed against the whole screen (position:fixed,
+       up to 380px wide) instead of being squeezed inside the column. */
+    const wide = docked && !full;
+    const B = wide ? {left: 0, top: 0, width: window.innerWidth, height: window.innerHeight} : body.getBoundingClientRect(), E0 = el.getBoundingClientRect(), m = 8;
     const E = {l: E0.left - B.left, r: E0.right - B.left, t: E0.top - B.top, b: E0.bottom - B.top};
-    const w = Math.min(340, B.width - 2 * m);
+    const w = Math.min(wide ? 380 : 340, B.width - 2 * m);
+    if(wide) detail.classList.add('cp-popfix');
     detail.style.setProperty('--pop-w', w + 'px');
     detail.classList.add('cp-pop');
     const h = Math.min(detail.offsetHeight, B.height - 2 * m), clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -18414,6 +18420,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:10px;}
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-size:7px;}
   #calPanel.cp-docked .fc .fc-daygrid-body-natural .fc-daygrid-day-events{margin-bottom:0;}
+  /* All-day row (2026-11-15 13:21, Julius: "the line under the all-day tasks is basically invisible, make it white;
+     shrink the margins; get rid of the empty quadrant left of it"). The line is now a 3px border on the all-day
+     section itself (axis-line color: white in dark), not the thin divider row. Docked: the empty time-axis cell left
+     of the all-day tasks is gone (they start at the panel's left edge) and the cards sit tight. */
+  #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:3px solid var(--cp-axis-line)!important;box-shadow:none!important;}
+  #calPanel .fc .fc-timegrid-divider{display:none!important;}
+  #calPanel.cp-docked .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) col:first-child{width:0!important;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-timegrid-axis{width:0!important;min-width:0!important;max-width:0!important;padding:0!important;border:0!important;overflow:hidden;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-timegrid-axis > *{display:none!important;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-daygrid-day{border-left:0!important;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-daygrid-day-frame{min-height:0!important;padding:0!important;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-daygrid-day-events{min-height:0!important;margin:0!important;padding:1px 0 3px;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-daygrid-day-bottom{display:none;}
+  #calPanel.cp-docked .fc .fc-daygrid-event{margin:0 1px 1px 1px!important;padding:0;}
+  #calPanel.cp-docked .fc .fc-daygrid-event .fc-event-main{padding:1px 4px!important;}
   #calPanel.cp-docked .cp-body{padding:0 1px 1px 0!important;}
   #calPanel.cp-docked .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;flex-wrap:wrap;} /* one row when it fits, else two (2026-11-13) */
   #calPanel.cp-docked .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;}

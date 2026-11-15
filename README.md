@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-14)
 
+- **Tap outside closes the event card**: with an event's card open, a tap anywhere outside it (other columns, the backlog, Plan, header, empty calendar) closes it. Tapping another event opens that one instead.
 - **All-day tasks in the full-screen left column**: in the full-screen calendar the all-day strip moves off the grid into the left column — all-day tasks on top (Week view: every day, grouped by day), backlog below, with a draggable line between them (double-tap = default; remembered). Tap a task = its card, tap its box = done, hold the box = the usual menu. The half-screen calendar keeps its all-day strip.
 - **White dividing lines + always-draggable all-day line** (calendar): the hour-numbers line and the line under the all-day tasks are white in dark mode (near-black in light); the all-day / timeline line can always be dragged, not only when the list overflows.
 - **Scrolling no longer picks up tasks** (calendar, backlog, Plan): if your finger moves before the hold time is up, it's a scroll — nothing gets picked up, even if you then rest your finger. Hold still to pick something up, same as before. A selected event still moves / resizes right away.

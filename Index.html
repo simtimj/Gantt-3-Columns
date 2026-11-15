@@ -17301,8 +17301,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     mount.addEventListener('touchend', () => unselSoon(), {passive: true});
     mount.addEventListener('scroll', () => { if(mount.querySelector('.fc-event-selected')) unselEv(); }, {capture: true, passive: true});
     // Tap empty calendar space = close the open event card (2026-11-11, Julius). Forms / delete / scope prompts stay.
-    mount.addEventListener('click', e => { if(detail.hidden || !detail.classList.contains('cp-evcard') || pending) return;
-      if(e.target.closest && e.target.closest('.fc-event,.fc-button,.fc-toolbar')) return; detail.hidden = true; sheetEv = null; });
+    // 2026-11-14 (Julius): a tap ANYWHERE outside the card closes it (other columns, the left column, Plan, header…),
+    // not just empty calendar space. Taps on another event (opens that one) and on the hold menus don't count.
+    document.addEventListener('click', e => { if(detail.hidden || !detail.classList.contains('cp-evcard') || pending) return;
+      const t = e.target; if(!t || !t.closest || !document.contains(t)) return;
+      if(t.closest('.cp-detail,.fc-event,.cp-ev,.urg-picker,.urg-cal,[role=dialog]:not(#calPanel)')) return;
+      detail.hidden = true; sheetEv = null; }, true);
     loadCals(false);
     // Toolbar buttons take over the old header's jobs; the header (only needed while the calendar loads) goes.
     const tb = b => panel.querySelector('.fc-' + b + '-button');

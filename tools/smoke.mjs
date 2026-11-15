@@ -1901,6 +1901,19 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             bl: !!bl && !bl.hidden && !!bl.closest('#calPanel') && bl.getBoundingClientRect().width > 100, wrap: t ? getComputedStyle(t).whiteSpace : 'normal', docked: window.fwCalendar.isDocked() }; });
         await pg.evaluate(() => { localStorage.removeItem('fw.calFullView'); localStorage.removeItem('fw.calFullBl'); });
         await prep();
+        // Tap outside the event card closes it (2026-11-14, Julius), e.g. on the column left of the calendar.
+        {
+          const ev = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .fc-timegrid-event')].find(x => /Dentist/.test(x.textContent)); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return { x: r.x + r.width * 0.7, y: r.y + r.height / 2 }; });
+          if (!ev) errs.push('card close: Dentist not found');
+          else {
+            await pg.waitForTimeout(200); await pg.mouse.click(ev.x, ev.y); await pg.waitForTimeout(400);
+            if (await pg.evaluate(() => document.querySelector('#calPanel [data-cal-detail]').hidden)) errs.push('card close: tapping the event did not open its card');
+            const jp = await pg.evaluate(() => { const r = document.getElementById('journalPane').getBoundingClientRect(); return { x: Math.max(r.left + 20, 20), y: r.top + r.height / 2 }; });
+            await pg.mouse.click(jp.x, jp.y); await pg.waitForTimeout(300);
+            if (!(await pg.evaluate(() => document.querySelector('#calPanel [data-cal-detail]').hidden))) errs.push('card close: tapping outside (middle column) did not close the card');
+          }
+          await pg.evaluate(() => { const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; }); await pg.waitForTimeout(400);
+        }
         const slideIn = async () => {
           if (name === 'phone') {
             const cdp = await pg.context().newCDPSession(pg);

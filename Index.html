@@ -15670,12 +15670,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-body{padding-left:var(--blw)!important;}
   /* Full screen ↻ ✕ top right (2026-11-14, Julius): pinned to the corner instead of wrapping onto a 3rd toolbar row. */
   #calPanel .cp-fbtns{display:none;}
-  #calPanel.cp-full .cp-fbtns{display:flex;gap:2px;position:absolute;top:4px;right:4px;z-index:6;}
+  #calPanel.cp-full .cp-fbtns{display:flex;gap:2px;position:absolute;top:3px;right:4px;z-index:6;}
+  @media (max-width:699px){ #calPanel.cp-full .cp-fbtns{right:2px;gap:0;} #calPanel.cp-full .cp-fbtns button{width:27px;height:26px;border-radius:13px;font-size:15px;} #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:56px;} #calPanel.cp-full .cp-plan .cp-ph{padding-right:58px;} } /* stays inside toolbar row 1 */
   #calPanel .cp-fbtns button{font:inherit;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:var(--cp-bg);color:var(--cp-muted);font-size:17px;cursor:pointer;}
   #calPanel .cp-fbtns button:hover,#calPanel .cp-fbtns button:active{background:var(--cp-hover);}
   #calPanel.cp-full .fc-cpRefresh-button,#calPanel.cp-full .fc-cpClose-button{display:none!important;}
   #calPanel.cp-full .cp-plan .cp-ph{padding-right:70px;}
-  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:70px;}
+  /* Plan folded: the toolbar's first row makes room for ↻ ✕ (phone: only the first chunk, so row 2 keeps its width). */
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:70px;}
+  @media (min-width:700px){ #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:70px;}
+    #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:0;} }
+  /* Full screen (2026-11-14 evening, Julius): no BL button — the backlog always sits in the left column (▾ minimizes it);
+     Week fits on the second row, so only two rows of buttons above the calendar. */
+  #calPanel.cp-full .fc-cpBacklog-button,#calPanel.cp-full .cp-blbtn{display:none!important;}
   /* Minimize the backlog (2026-11-14, Julius): ▾ on its header folds it to a bar at the bottom, all-day gets the room. */
   #calPanel .cp-blmin-btn{display:none;}
   #calPanel.cp-full .cp-blmin-btn{display:inline-block;font:inherit;background:transparent;border:0;color:var(--cp-muted);padding:0 4px;cursor:pointer;font-size:12px;}
@@ -15696,6 +15703,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-fadh .cp-fadn{font-weight:400;color:var(--cp-muted);}
   #calPanel .cp-fadb{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 8px;}
   #calPanel .cp-fadd{font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--cp-muted);margin:8px 2px 3px;text-transform:uppercase;}
+  #calPanel .cp-fads{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--cp-muted);margin:8px 2px 3px;}
+  #calPanel .cp-fads::after{content:"";flex:1;height:1px;background:var(--cp-line);}
+  /* Half-screen all-day strip: the Done group starts with a line across, so to-do and done read as two lists. */
+  #calPanel .fc-daygrid-event-harness[data-cpgl="Done"]::before{border-top:1px solid var(--cp-axis-line,var(--cp-line));margin-top:5px;}
   #calPanel .cp-fadd.cp-today{color:var(--cp-blue,#1a73e8);}
   #calPanel .cp-fai{display:flex;align-items:flex-start;gap:6px;padding:5px 6px 5px 6px;margin:2px 0;border-radius:6px;font-size:13px;line-height:1.25;cursor:pointer;}
   #calPanel .cp-fai .cp-chk{flex:0 0 auto;margin-top:1px;}
@@ -17587,8 +17598,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     try { cal.setOption('allDaySlot', false); } catch (e) {} // all-day tasks live in the left column here
     try { const v = lsGet('fw.calFullView') === 'timeGridWeek' ? 'timeGridWeek' : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
     fadRender();
-    blEl.hidden = lsGet('fw.calFullBl') === '0';
-    panel.classList.toggle('cp-blmin', lsGet('fw.calFullBlMin') === '1');
+    blEl.hidden = false; // always in the left column in full screen (no BL button there); ▾ minimizes it
+    panel.classList.toggle('cp-blmin', lsGet('fw.calFullBlMin') !== '0'); // minimized by default (2026-11-14, Julius)
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     blPlace(); blRender(); if(!blEl.hidden) blLoad(false);
     setTimeout(() => { try { cal.updateSize(); } catch (e) {} }, 0);
@@ -17655,7 +17666,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const list = evs.filter(e => { const s0 = (e.startStr || '').slice(0, 10), e0 = (e.endStr || '').slice(0, 10) || s0; return s0 <= day && (e0 > day || (e0 === s0 && s0 === day)); }).sort(ord);
       if(days.length > 1) h += '<div class="cp-fadd' + (day === today ? ' cp-today' : '') + '">' + esc(luxon.DateTime.fromISO(day).toFormat('ccc M/d')) + (list.length ? ' · ' + list.length : '') + '</div>';
       if(!list.length && days.length > 1) return;
+      // To do first, then a "Done" divider (2026-11-14, Julius: split incomplete / done).
+      const nDone = list.filter(e => (e.extendedProps || {}).done).length; let sep = false;
       list.forEach(e => { const x = e.extendedProps || {}, i = fadList.push(e) - 1; total++;
+        if(x.done && !sep){ sep = true; h += '<div class="cp-fads">Done · ' + nDone + '</div>'; }
         h += '<div class="cp-ev cp-fai' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '"' + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
           cpChk(e) + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + '</span></div>'; });
     });

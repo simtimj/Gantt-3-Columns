@@ -1930,15 +1930,25 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           if (br.width < 40 || br.top - pr.top > 8 || pr.right - br.right > 8) out.push('↻ ✕ not at the top right');
           const tb = p.querySelector('#calMount .fc-header-toolbar'), tops = new Set([...tb.querySelectorAll('.fc-button,.fc-toolbar-title')].filter(x => x.offsetParent).map(x => Math.round(x.getBoundingClientRect().top / 8)));
           if (tops.size > 2) out.push('toolbar still has ' + tops.size + ' rows');
-          const f = p.querySelector('.cp-fad'), h0 = f.getBoundingClientRect().height; p.querySelector('[data-bl-min]').click(); await w(200);
-          const h1 = f.getBoundingClientRect().height, bl = p.querySelector('.cp-bl').getBoundingClientRect();
-          if (h1 < h0 + 40) out.push('minimizing the backlog did not grow all-day (' + Math.round(h0) + ' → ' + Math.round(h1) + ')');
+          { const pl = p.querySelector('.cp-plan'), was = pl.classList.contains('folded'); pl.classList.add('folded'); await w(150);
+            const t2 = new Set([...tb.querySelectorAll('.fc-button,.fc-toolbar-title')].filter(x => x.offsetParent).map(x => Math.round(x.getBoundingClientRect().top / 8)));
+            if (t2.size > 2) out.push('Plan folded: toolbar has ' + t2.size + ' rows');
+            const cb = p.querySelector('.cp-fbtns').getBoundingClientRect(), hit = [...tb.querySelectorAll('.fc-button')].filter(x => x.offsetParent).some(x => { const r = x.getBoundingClientRect(); return r.right > cb.left && r.left < cb.right && r.bottom > cb.top && r.top < cb.bottom; });
+            if (hit) out.push('Plan folded: a toolbar button sits under ↻ ✕ ' + JSON.stringify([...tb.children].map(c => { const r = c.getBoundingClientRect(); return [c.className, Math.round(r.left), Math.round(r.top), Math.round(r.width), getComputedStyle(c).marginRight]; })) + ' btns ' + JSON.stringify([Math.round(cb.left), Math.round(cb.top), Math.round(cb.bottom)]));
+            if (!was) pl.classList.remove('folded'); await w(100); }
+          const tb3 = p.querySelector('.fc-cpBacklog-button'); if (tb3 && tb3.offsetParent) out.push('BL button still shown');
+          const f = p.querySelector('.cp-fad'), h0 = f.getBoundingClientRect().height, bl = p.querySelector('.cp-bl').getBoundingClientRect();
+          if (!p.classList.contains('cp-blmin')) out.push('backlog not minimized by default');
           if (bl.top < f.getBoundingClientRect().bottom || bl.height > 60) out.push('minimized backlog is not a bar under all-day');
-          if (localStorage.getItem('fw.calFullBlMin') !== '1') out.push('minimize not remembered');
+          p.querySelector('[data-bl-min]').click(); await w(200);
+          const h1 = f.getBoundingClientRect().height;
+          if (h1 > h0 - 40) out.push('opening the backlog did not make room (' + Math.round(h0) + ' → ' + Math.round(h1) + ')');
+          if (localStorage.getItem('fw.calFullBlMin') !== '0') out.push('open backlog not remembered');
+          p.querySelector('[data-bl-min]').click(); await w(200);
           window.__shotMin = 1; return out; });
           errs.push(...fb.map(x => 'full screen: ' + x));
           if (process.env.CAL_SHOT) await pg.screenshot({ path: path.join(process.env.CAL_SHOT, 'calfull-' + name + '.png') });
-          await pg.evaluate(async () => { document.querySelector('#calPanel [data-bl-min]').click(); localStorage.removeItem('fw.calFullBlMin'); await new Promise(r => setTimeout(r, 200)); }); }
+          await pg.evaluate(async () => { document.querySelector('#calPanel [data-bl-min]').click(); localStorage.removeItem('fw.calFullBlMin'); await new Promise(r => setTimeout(r, 200)); }); } // leave it open for the checks below
         if (!a.full) errs.push('full screen: one more slide left at the calendar did not open it');
         else {
           if (Math.abs(a.w - a.vw) > 2) errs.push('full screen: not the whole width (' + a.w + ' / ' + a.vw + ')');
@@ -1953,6 +1963,10 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (fr.width < 80) out.push('all-day list not shown');
             if (!/All-day A/.test(f.textContent)) out.push('all-day task missing from the left column');
             if (br.top < fr.bottom) out.push('backlog not below the all-day list');
+            { const api = window.fwCalendar.api(), d0 = api.view.currentStart, tmp = api.addEvent({ title: 'Done all-day Z', allDay: true, start: d0, extendedProps: { done: true } }); await w(400);
+              const kids = [...f.querySelectorAll('.cp-fadb > *')], si = kids.findIndex(k => k.classList.contains('cp-fads')), zi = kids.findIndex(k => /Done all-day Z/.test(k.textContent)), ai = kids.findIndex(k => /All-day A/.test(k.textContent));
+              if (si < 0 || !(ai < si && si < zi)) out.push('all-day list: no Done divider between to-do and done (' + [ai, si, zi] + ')');
+              tmp.remove(); await w(300); }
             window.fwCalendar.api().changeView('timeGridWeek'); await w(400);
             const dh = p.querySelectorAll('.cp-fad .cp-fadd').length; if (dh !== 7) out.push('week: ' + dh + ' day groups, not 7');
             window.fwCalendar.api().changeView('timeGridDay'); await w(300);

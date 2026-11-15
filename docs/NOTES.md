@@ -815,3 +815,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - 23:18 (Julius: "scrolling on the task side, the left half, should bring me back to the previous view"): the full-screen exit swipe (right, dx > 60, > 1.5× |dy|) now also starts anywhere on `.cp-fad` / `.cp-bl` (not the grips), not only < 30 px from the edge. Sideways wheel there already closed it.
 - 23:29 (Julius): sun tint back to `--sun-a` .10 (the .14 was too much).
 - 00:47 (Julius): halfway point, `--sun-a` .12.
+- 00:49 (Julius: "dark yellow comes out brown"): yellows recolored in HSL instead of darkened. `SUN_Y` → 250,214,60 (more lemon). Dark mode tint uses `--sun-bgd`: warm stops at lightness .66, full saturation, alpha ×1.25; purple unchanged. Light-mode hour numbers on warm stops = `sunHsl(c,.95,.4)` (deep gold) instead of ×.62. Helpers `sunHsl()`, `sunWarm()`.

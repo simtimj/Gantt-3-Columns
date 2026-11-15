@@ -15715,6 +15715,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Sun colors (2026-11-14 night, Julius): full screen only. --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
   #calPanel{--sun-a:.12;}
   #calPanel.cp-full .fc .fc-timegrid-col{background-image:var(--sun-bg,none);}
+  html[data-theme=dark] #calPanel.cp-full .fc .fc-timegrid-col{background-image:var(--sun-bgd,var(--sun-bg,none));}
   #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-cl,var(--cp-muted))!important;}
   html[data-theme=dark] #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-c,var(--cp-muted))!important;}
   #calPanel .cp-sunmk{display:none;}
@@ -17724,7 +17725,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      around Vallejo / Benicia: night purple → yellow at sunrise → yellow (morning) → yellow-orange (afternoon) → orange at
      sunset → fades to purple. Sunrise / sunset worked out per day (NOAA formula, no network). Event cards keep their colors. */
   const SUN_LAT = 38.08, SUN_LON = -122.2;
-  const SUN_P = [123,92,214], SUN_Y = [242,201,76], SUN_YO = [245,166,35], SUN_O = [242,113,28];
+  const SUN_P = [123,92,214], SUN_Y = [250,214,60], SUN_YO = [245,166,35], SUN_O = [242,113,28];
   function sunTimes(iso){ // minutes after local midnight
     const day = luxon.DateTime.fromISO(iso, {zone: 'America/Los_Angeles'}).set({hour: 12});
     const g = 2 * Math.PI / 365 * (day.ordinal - 1), r = Math.PI / 180;
@@ -17742,6 +17743,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     for(let i = 1; i < stops.length; i++) if(m <= stops[i][0]){ const [a, ca] = stops[i - 1], [b, cb] = stops[i], f = b > a ? (m - a) / (b - a) : 0; return ca.map((v, k) => Math.round(v + (cb[k] - v) * f)); }
     return stops[stops.length - 1][1];
   }
+  // Dark yellow turns brown (Julius 11-15): recolor in HSL — keep the hue, push saturation up, and set lightness —
+  // instead of darkening RGB. sunHsl(c, sMin, l) → rgb array.
+  function sunHsl(c, sMin, lSet){
+    const [r, g, b] = c.map(v => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let h = 0; if(d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h = (h * 60 + 360) % 360;
+    const l0 = (mx + mn) / 2, s0 = d ? d / (1 - Math.abs(2 * l0 - 1)) : 0, s1 = Math.max(s0, sMin), l = lSet;
+    const C = (1 - Math.abs(2 * l - 1)) * s1, X = C * (1 - Math.abs((h / 60) % 2 - 1)), m = l - C / 2;
+    const [a, bb, cc] = h < 60 ? [C, X, 0] : h < 120 ? [X, C, 0] : h < 180 ? [0, C, X] : h < 240 ? [0, X, C] : h < 300 ? [X, 0, C] : [C, 0, X];
+    return [a, bb, cc].map(v => Math.round((v + m) * 255));
+  }
+  const sunWarm = c => c[0] > c[2] + 60; // yellow / orange stops (not purple)
   const sunHm = m => { const h = Math.floor(m / 60), mi = Math.round(m % 60); return ((h + 11) % 12 + 1) + ':' + String(mi).padStart(2, '0'); };
   function sunPaint(){
     if(!full) return;
@@ -17749,6 +17762,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     mount.querySelectorAll('.fc-timegrid-col[data-date]').forEach(col => {
       const iso = col.getAttribute('data-date'), s = sunStops(iso); if(!first) first = s;
       col.style.setProperty('--sun-bg', 'linear-gradient(to bottom,' + s.stops.map(([m, c]) => 'rgb(' + c.join(' ') + ' / var(--sun-a)) ' + (m / 14.4).toFixed(2) + '%').join(',') + ')');
+      // Dark mode: a faint yellow over dark grey reads as olive / brown, so the warm stops use a lighter, fully
+      // saturated version (lightness .66) at a touch more strength (×1.25); purple stays as is.
+      col.style.setProperty('--sun-bgd', 'linear-gradient(to bottom,' + s.stops.map(([m, c]) => { const w = sunWarm(c); return 'rgb(' + (w ? sunHsl(c, 1, .66) : c).join(' ') + ' / calc(var(--sun-a) * ' + (w ? 1.25 : 1) + ')) ' + (m / 14.4).toFixed(2) + '%'; }).join(',') + ')');
       const fr = col.querySelector('.fc-timegrid-col-frame'); if(!fr) return;
       fr.querySelectorAll(':scope > .cp-sunmk').forEach(x => x.remove());
       [['sunrise', s.t.rise], ['sunset', s.t.set]].forEach(([k, m]) => { const d = document.createElement('div'); d.className = 'cp-sunmk'; d.style.top = (m / 14.4) + '%'; d.innerHTML = '<span>' + k + ' ' + sunHm(m) + '</span>'; fr.appendChild(d); });
@@ -17757,7 +17773,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     mount.querySelectorAll('.fc-timegrid-slot-label[data-time]').forEach(td => {
       const [h, mi] = td.getAttribute('data-time').split(':').map(Number), c = sunAt(first.stops, h * 60 + mi);
       td.style.setProperty('--sun-c', 'rgb(' + c.join(' ') + ')');
-      td.style.setProperty('--sun-cl', 'rgb(' + c.map(v => Math.round(v * .62)).join(' ') + ')');
+      td.style.setProperty('--sun-cl', 'rgb(' + (sunWarm(c) ? sunHsl(c, .95, .4) : c.map(v => Math.round(v * .62))).join(' ') + ')'); // light mode: deep gold, not brown
     });
   }
   function fadRender(){

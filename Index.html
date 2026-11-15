@@ -11456,7 +11456,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(e.pointerType==='touch' || e.button!==0 || !e.target.closest('.pane-header') ||
          e.target.closest('button,input,select,a,[data-jump-today]') || workspace.scrollWidth<=workspace.clientWidth+2 ||
          isSplitActive())return;
-      drag={x:e.clientX,left:workspace.scrollLeft};
+      drag={x:e.clientX,left:workspace.scrollLeft,end:wsAtEnd()};
       workspace.setPointerCapture(e.pointerId);
     });
     workspace.addEventListener('pointermove',e=>{
@@ -11464,7 +11464,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const dx=e.clientX-drag.x;
       if(Math.abs(dx)>2)workspace.scrollLeft=drag.left-dx;
     });
-    ['pointerup','pointercancel','lostpointercapture'].forEach(type=>workspace.addEventListener(type,()=>{drag=null;}));
+    workspace.addEventListener('pointerup',e=>{ if(drag && drag.end && drag.x-e.clientX>80) tryFull(); drag=null; });
+    ['pointercancel','lostpointercapture'].forEach(type=>workspace.addEventListener(type,()=>{drag=null;}));
+    /* Full-screen calendar (2026-11-14, Julius): with the half-screen calendar showing (app slid all the way left),
+       one more slide left opens the big calendar full screen. Only a slide that STARTS at the end counts, so a
+       slide that just arrived there doesn't overshoot into it. */
+    function wsAtEnd(){ return workspace.scrollLeft>=workspace.scrollWidth-workspace.clientWidth-2; }
+    function tryFull(){ return !!(window.fwCalendar && window.fwCalendar.canFull && window.fwCalendar.canFull() && window.fwCalendar.openFull()); }
+    let ts=null;
+    workspace.addEventListener('touchstart',e=>{ ts=e.touches.length===1 && wsAtEnd() && !(e.target.closest && e.target.closest('#calMount')) ? {x:e.touches[0].clientX,y:e.touches[0].clientY,at:Date.now()} : null; },{passive:true});
+    workspace.addEventListener('touchend',e=>{ const p=ts; ts=null; if(!p || !wsAtEnd()) return; const t=e.changedTouches[0], dx=t.clientX-p.x, dy=t.clientY-p.y;
+      if(dx<-70 && Math.abs(dx)>Math.abs(dy)*1.5 && Date.now()-p.at<900) tryFull(); },{passive:true});
     /* Nested day/reference containers have overflow-x:hidden and consume
        macOS two-finger sideways gestures before they can reach #workspace.
        Capture from anywhere in the app and send just the horizontal motion
@@ -11492,6 +11502,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       /* 2026-11-14 (Julius: "calendar does not appear on computer when I scroll right"): each wheel step set
          scrollLeft and the proximity snap pulled it straight back to the left. Snapping is off while the wheel moves
          and comes back ~160 ms after it stops (then it only pulls in when you stopped close to a half). */
+      if(!panning){ workspace.__startEnd=wsAtEnd(); workspace.__endAcc=0; }
+      if(amount>0 && workspace.__startEnd && wsAtEnd()){
+        workspace.__endAcc=(workspace.__endAcc||0)+amount;
+        if(workspace.__endAcc>150){ workspace.__endAcc=0; workspace.__startEnd=false; if(tryFull()) return; }
+      }
       workspace.__panUntil=Date.now()+250;
       workspace.style.scrollSnapType='none';
       clearTimeout(workspace.__snapT);
@@ -15627,6 +15642,25 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-bld{flex:0 0 auto;font-size:11px;opacity:.8;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{flex:0 0 auto;border:0;background:transparent;color:inherit;opacity:.7;font-size:14px;padding:0 2px;cursor:pointer;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-blmsg{padding:10px 4px;font-size:13px;color:var(--cp-muted);}
+  /* Full-screen calendar (2026-11-14, Julius): one more slide left from the half-screen calendar. Same panel as the
+     📅 pop-out, stretched to the whole screen, with the backlog beside it and its task names shown in full. */
+  #calPanel.cp-full{width:100vw!important;max-width:100vw!important;left:0;border-left:0;box-shadow:none;}
+  body.cal-full #calPanelBackdrop{display:none;}
+  #calPanel.cp-full .cp-resize{display:none;}
+  #calPanel.cp-full{--blw:clamp(150px,30vw,320px);}
+  #calPanel.cp-full .cp-body.bl-open{padding-left:var(--blw)!important;}
+  #calPanel.cp-full .cp-body.bl-open .cp-bl{position:absolute;left:6px;top:6px;bottom:8px;width:calc(var(--blw) - 12px);margin:0;border:1px solid var(--cp-line);border-radius:10px;display:flex;flex-direction:column;}
+  #calPanel.cp-full .cp-bli{align-items:flex-start;}
+  #calPanel.cp-full .cp-bli .cp-blt{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  #calPanel.cp-full .cp-blside,#calPanel.cp-full .cp-blclose{display:none;}
+  /* Phone: narrower backlog and a compact toolbar (wrapping onto 2 rows) so the calendar keeps its room. */
+  @media (max-width:720px){
+    #calPanel.cp-full{--blw:clamp(120px,32vw,220px);}
+    #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;flex-wrap:wrap;}
+    #calPanel.cp-full .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:wrap;}
+    #calPanel.cp-full .fc .fc-toolbar-title{font-size:13px;margin:0 2px;white-space:nowrap;}
+    #calPanel.cp-full .fc .fc-button{padding:0 6px!important;min-height:24px;height:24px;font-size:12px;margin:0!important;}
+  }
   @media (min-width:721px){
     #calPanel .cp-body.bl-open{padding-left:248px;}
     #calPanel .cp-body.bl-open .cp-bl{position:absolute;left:8px;top:6px;bottom:8px;width:232px;margin:0;border:1px solid var(--cp-line);border-radius:10px;}
@@ -16879,7 +16913,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     blBody.innerHTML = h;
   }
   function blToggle(){
-    blEl.hidden = !blEl.hidden; if(!docked) lsSet('fw.calBacklog', blEl.hidden ? '0' : '1');
+    blEl.hidden = !blEl.hidden; if(full) lsSet('fw.calFullBl', blEl.hidden ? '0' : '1'); else if(!docked) lsSet('fw.calBacklog', blEl.hidden ? '0' : '1');
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     if(typeof blPlace === 'function') blPlace();
     blRender(); if(!blEl.hidden) blLoad(false);
@@ -17023,11 +17057,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   ['pointerdown', 'touchstart', 'mousedown'].forEach(t => zf.addEventListener(t, e => e.stopPropagation(), {passive: true}));
   mount.parentElement.style.position = 'relative'; mount.parentElement.appendChild(zf);
   let swp = null, swpLock = 0;
-  const swDay = dir => { if(!cal || !docked || Date.now() < swpLock) return; swpLock = Date.now() + 450; dir > 0 ? cal.next() : cal.prev(); };
+  const swDay = dir => { if(!cal || !(docked || full) || Date.now() < swpLock) return; swpLock = Date.now() + 450; dir > 0 ? cal.next() : cal.prev(); };
   window.fwCalSwipeDay = swDay;
-  mount.addEventListener('touchstart', e => { if(!docked || e.touches.length !== 1) { swp = null; return; } const t = e.touches[0]; swp = {x: t.clientX, y: t.clientY, at: Date.now()}; }, {passive: true});
+  mount.addEventListener('touchstart', e => { if(!(docked || full) || e.touches.length !== 1) { swp = null; return; } const t = e.touches[0]; swp = {x: t.clientX, y: t.clientY, at: Date.now()}; }, {passive: true});
   mount.addEventListener('touchend', e => {
-    const p = swp; swp = null; if(!p || !docked || document.querySelector('.fc-event-dragging,.fc-event-resizing')) return;
+    const p = swp; swp = null; if(!p || !(docked || full) || document.querySelector('.fc-event-dragging,.fc-event-resizing')) return;
     const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y;
     if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.6 && Date.now() - p.at < 700) swDay(dx < 0 ? 1 : -1);
   }, {passive: true});
@@ -17196,7 +17230,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
         if(!pending) showDetail(info.event, info.el); },
       eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
-      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet('fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
+      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
     });
     cal.render();
     window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
@@ -17245,6 +17279,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function close(){
     if(!isOpen()) return;
+    if(full){
+      full = false; panel.classList.remove('cp-full'); document.body.classList.remove('cal-full');
+      blEl.hidden = fullBlWas; panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
+    }
     document.body.classList.remove('cal-open');
     panel.setAttribute('aria-hidden', 'true');
     if(!pending){ detail.hidden = true; sheetEv = null; }
@@ -17325,7 +17363,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      can't), the old mini timeline shows instead. */
   const panelHome = panel.parentNode, panelNext = panel.nextSibling;
   const parkEl = document.createElement('div'); parkEl.id = 'calPark'; parkEl.hidden = true; document.body.appendChild(parkEl);
-  let dockTop = -1, dockFailed = false, dockLoading = false, blFirstDock = true;
+  let dockTop = -1, dockFailed = false, dockLoading = false, blFirstDock = true, full = false, fullBlWas = true;
   function saveDockTop(){ const sc = mount.querySelector('.fc-timegrid .fc-scroller-liquid-absolute'); if(sc) dockTop = sc.scrollTop; }
   function restoreDockTop(){ const sc = mount.querySelector('.fc-timegrid .fc-scroller-liquid-absolute'); if(sc && dockTop >= 0) sc.scrollTop = dockTop; }
   function dockReady(){ return !!cal && !dockFailed; }
@@ -17427,7 +17465,39 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   if(ws) new MutationObserver(() => { if(docked) blPlace(); }).observe(ws, {attributes: true, attributeFilter: ['class']});
   window.addEventListener('resize', () => { if(docked) blPlace(); });
-  window.fwCalendar = { askDeleteLine, mountCals, blToggle: () => blToggle(), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  /* Full-screen calendar (2026-11-14, Julius): from the half-screen calendar, slide left once more (finger, trackpad,
+     Shift + wheel, or dragging a column header) → the big calendar fills the screen. Starts in Day view, then
+     remembers Day / Week (fw.calFullView); backlog beside it unless closed there (fw.calFullBl). ✕, Esc, or a swipe
+     in from the left edge → back to the half-screen calendar. The 📅 button keeps the old pop-out. */
+  const canFull = () => !!cal && docked && !isOpen() && !!(ws && ws.classList.contains('ws-halves'));
+  function openFull(){
+    if(!canFull()) return false;
+    let d = null; try { d = cal.getDate(); } catch (e) {}
+    fullBlWas = blEl.hidden;
+    panel.classList.add('cp-full'); document.body.classList.add('cal-full');
+    open(); full = true; fullAt = Date.now();
+    try { const v = lsGet('fw.calFullView') === 'timeGridWeek' ? 'timeGridWeek' : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
+    blEl.hidden = lsGet('fw.calFullBl') === '0';
+    panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
+    blPlace(); blRender(); if(!blEl.hidden) blLoad(false);
+    setTimeout(() => { try { cal.updateSize(); } catch (e) {} }, 0);
+    return true;
+  }
+  // Leave full screen: a swipe that starts at the left edge and goes right, or a sideways wheel (not over the grid).
+  let fsw = null, fwAcc = 0, fwAt = 0, fullAt = 0;
+  panel.addEventListener('touchstart', e => { fsw = full && e.touches.length === 1 && e.touches[0].clientX < 30 ? {x: e.touches[0].clientX, y: e.touches[0].clientY} : null; }, {passive: true, capture: true});
+  panel.addEventListener('touchend', e => { const p = fsw; fsw = null; if(!p || !full) return; const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y; if(dx > 60 && dx > Math.abs(dy) * 1.5) close(); }, {passive: true, capture: true});
+  panel.addEventListener('wheel', e => {
+    if(!full || e.ctrlKey || e.metaKey) return;
+    if(Date.now() - fullAt < 700){ e.preventDefault(); return; } // the slide that opened it is still coasting
+    const sp = e.shiftKey && Math.abs(e.deltaY) > Math.abs(e.deltaX), a = sp ? e.deltaY : e.deltaX;
+    if(Math.abs(a) < Math.abs(sp ? 0 : e.deltaY) || Math.abs(a) < .01) return;
+    e.preventDefault();
+    const now = Date.now(); if(now - fwAt > 250) fwAcc = 0; fwAt = now; fwAcc += a;
+    if(e.target.closest && e.target.closest('#calMount .fc-view-harness')){ if(Math.abs(fwAcc) > 60){ swDay(fwAcc > 0 ? 1 : -1); fwAcc = 0; } return; }
+    if(fwAcc < -150){ fwAcc = 0; close(); }
+  }, {passive: false});
+  window.fwCalendar = { canFull, openFull, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

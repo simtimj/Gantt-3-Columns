@@ -137,6 +137,7 @@ When he asks to organize his calendar tasks:
 - Compact calendar (2026-11-13, Julius)
 - Auto-restore, one-row calendar toolbar, half-width backlog, soft snap (2026-11-13 afternoon, Julius)
 - Google-style event pop-up (2026-11-14, Julius)
+- Full-screen calendar (2026-11-14, Julius)
 
 ## IT study log (2026-11-04)
 

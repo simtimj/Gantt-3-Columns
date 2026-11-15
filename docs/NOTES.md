@@ -775,3 +775,11 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Notes: `calPanelDesc_` turns the description into plain text (≤ 700 chars), sent as `desc` by both range paths (API field `description`).
 - Mouse only: `e` edit, Delete / Backspace delete; edit / drag-to-create forms pop at the event / selection (`finePointer()`); phones keep the bottom sheet.
 - Smoke: tools/smoke.mjs "Google-style popup" block (notes, All day ⇄ timed back to 9:00, color, Duplicate).
+
+## Full-screen calendar (2026-11-14, Julius)
+
+- Ask: "slide over again from the half-screen calendar → full-screen calendar with all the information; use the calendar button's (pop-out) features". Answers: starts Day, remembers Day / Week; backlog beside it, full text visible; works with the computer mouse too; 📅 button stays the old pop-out (for comparison).
+- Calendar IIFE: `openFull()` (needs `canFull()` = built, docked, closed, `#workspace.ws-halves`) adds `#calPanel.cp-full` + `body.cal-full`, calls `open()` (same panel, undocks), then `full = true`, `changeView(fw.calFullView || Day, docked date)`, backlog shown unless `fw.calFullBl` = '0' (state before kept in `fullBlWas`, restored by `close()`). `datesSet` writes `fw.calFullView` while full; `blToggle` writes `fw.calFullBl`. `swDay` / mount swipe work in full too (sideways swipe on the grid = next / previous day or week).
+- Ways in (`initWorkspaceHorizontalSwipe`): touch swipe left (> 70 px, started with the app already at the end, not on `#calMount`); wheel / Shift + wheel > 150 px in a gesture that started at the end (`__startEnd`, so a slide that only just arrived doesn't overshoot); header drag > 80 px started at the end.
+- Ways out: ✕ / Esc (`close()`), touch swipe right starting < 30 px from the left edge, sideways wheel > 150 px outside the time grid (`.fc-view-harness` — the toolbar is inside `#calMount`). Wheel ignored for 700 ms after opening (coasting). Close re-docks via `fwCeRedraw`.
+- CSS: `.cp-full` 100vw, no backdrop / resize grip; backlog absolute left `--blw` (clamp 150–320 px; phone 120–220) with names wrapping; phone gets the compact toolbar. Smoke (calendar suite, both): wheel slide to the calendar must not overshoot; slide in → full width, Day, backlog, wrapping; Week → Esc → docked Day → reopen = Week; slide back closes.

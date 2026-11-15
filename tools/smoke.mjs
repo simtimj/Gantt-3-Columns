@@ -1871,7 +1871,56 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         await pg.waitForTimeout(900);
         const ws = await pg.evaluate(() => { const w = document.getElementById('workspace'); return [w.scrollLeft, w.scrollWidth - w.clientWidth]; });
         if (ws[0] < ws[1] - 3) errs.push('wheel slide right did not reach the calendar: ' + ws.join(' / '));
+        if (await pg.evaluate(() => document.body.classList.contains('cal-full'))) errs.push('wheel slide to the calendar overshot into full screen');
         await pg.evaluate(() => { document.getElementById('workspace').scrollLeft = 0; }); await pg.waitForTimeout(300);
+      }
+      // Full-screen calendar (2026-11-14, Julius): at the half-screen calendar, one more slide left → big calendar
+      // full screen; starts in Day, remembers Day / Week; backlog beside it with full task names; ✕ / Esc / slide back.
+      {
+        const prep = async () => { await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)); window.fwCalendar.close(); await w(900); if (window.fwCeRedraw) window.fwCeRedraw(); await w(500); const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; await w(400); }); };
+        const st = () => pg.evaluate(() => { const p = document.getElementById('calPanel'), bl = p.querySelector('.cp-bl'), t = p.querySelector('.cp-bl .cp-blt');
+          return { full: document.body.classList.contains('cal-full'), w: Math.round(p.getBoundingClientRect().width), vw: innerWidth, view: window.fwCalendar.api().view.type,
+            bl: !!bl && !bl.hidden && !!bl.closest('#calPanel') && bl.getBoundingClientRect().width > 100, wrap: t ? getComputedStyle(t).whiteSpace : 'normal', docked: window.fwCalendar.isDocked() }; });
+        await pg.evaluate(() => { localStorage.removeItem('fw.calFullView'); localStorage.removeItem('fw.calFullBl'); });
+        await prep();
+        const slideIn = async () => {
+          if (name === 'phone') {
+            const cdp = await pg.context().newCDPSession(pg);
+            const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+            await T('touchStart', 100, 120); for (let i = 1; i <= 10; i++) { await T('touchMove', 100 - 15 * i, 120); await pg.waitForTimeout(16); } await T('touchEnd');
+          } else { await pg.mouse.move(view.width * 0.25, view.height / 2); for (let i = 0; i < 5; i++) { await pg.mouse.wheel(60, 0); await pg.waitForTimeout(16); } }
+          await pg.waitForTimeout(700);
+        };
+        await slideIn();
+        let a = await st();
+        if (!a.full) errs.push('full screen: one more slide left at the calendar did not open it');
+        else {
+          if (Math.abs(a.w - a.vw) > 2) errs.push('full screen: not the whole width (' + a.w + ' / ' + a.vw + ')');
+          if (a.view !== 'timeGridDay') errs.push('full screen: did not start in Day view (' + a.view + ')');
+          if (!a.bl) errs.push('full screen: backlog not beside the calendar');
+          if (a.wrap !== 'normal') errs.push('full screen: backlog names are cut off (' + a.wrap + ')');
+          await pg.evaluate(() => window.fwCalendar.api().changeView('timeGridWeek')); await pg.waitForTimeout(200);
+          await pg.keyboard.press('Escape'); await pg.waitForTimeout(1200);
+          a = await st();
+          if (a.full) errs.push('full screen: Esc did not close it');
+          if (!a.docked || a.view !== 'timeGridDay') errs.push('full screen: closing did not go back to the half-screen Day calendar (' + a.view + ')');
+          await prep(); await slideIn(); a = await st();
+          if (!a.full) errs.push('full screen: did not reopen');
+          else if (a.view !== 'timeGridWeek') errs.push('full screen: Week view not remembered (' + a.view + ')');
+          // Slide back: a swipe in from the left edge (phone) / sideways wheel over the toolbar (computer).
+          if (name === 'phone') {
+            const cdp = await pg.context().newCDPSession(pg);
+            const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+            await T('touchStart', 8, 300); for (let i = 1; i <= 10; i++) { await T('touchMove', 8 + 15 * i, 300); await pg.waitForTimeout(16); } await T('touchEnd');
+          } else {
+            await pg.waitForTimeout(800);
+            const h = await pg.evaluate(() => { const r = document.querySelector('#calPanel .fc-header-toolbar').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+            await pg.mouse.move(h.x, h.y); for (let i = 0; i < 5; i++) { await pg.mouse.wheel(-60, 0); await pg.waitForTimeout(16); }
+          }
+          await pg.waitForTimeout(1200);
+          if ((await st()).full) errs.push('full screen: sliding back did not close it');
+        }
+        await pg.evaluate(() => { localStorage.removeItem('fw.calFullView'); localStorage.removeItem('fw.calFullBl'); window.fwCalendar.close(); document.getElementById('workspace').scrollLeft = 0; }); await pg.waitForTimeout(900);
       }
       // Docked calendar (2026-11-13, Julius): with the pop-out closed, the same calendar sits in the right column
       // (Day view); Backlog opens as a column left of it and slides the app left (columns) / the left half (phone).

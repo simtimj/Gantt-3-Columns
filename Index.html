@@ -15736,15 +15736,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   html[data-theme=dark] #calPanel.cp-full{--cp-line:#80868b;}
   #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{border-top:3px solid var(--cp-sep);}
   #calPanel.cp-full .cp-plan:not(.folded){border-bottom:3px solid var(--cp-sep);border-bottom-left-radius:0;border-bottom-right-radius:0;}
-  /* Sun colors (2026-11-14 night, Julius): full screen only. --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
+  /* Sun colors (2026-11-14 night, Julius): full screen + half-screen docked calendar (2026-11-15, Julius). --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
   #calPanel{--sun-a:.13;}
-  #calPanel.cp-full .fc .fc-timegrid-col{background-image:var(--sun-bg,none);}
-  html[data-theme=dark] #calPanel.cp-full .fc .fc-timegrid-col{background-image:var(--sun-bgd,var(--sun-bg,none));}
-  #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-cl,var(--cp-muted))!important;}
-  html[data-theme=dark] #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-c,var(--cp-muted))!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-col{background-image:var(--sun-bg,none);}
+  html[data-theme=dark] #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-col{background-image:var(--sun-bgd,var(--sun-bg,none));}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-cl,var(--cp-muted))!important;}
+  html[data-theme=dark] #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-c,var(--cp-muted))!important;}
   #calPanel .cp-sunmk{display:none;}
-  #calPanel.cp-full .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dashed rgb(242 113 28 / .55);pointer-events:none;z-index:0;}
-  #calPanel.cp-full .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:9px;line-height:1;color:var(--cp-muted);opacity:.85;}
+  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dashed rgb(242 113 28 / .55);pointer-events:none;z-index:0;}
+  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:9px;line-height:1;color:var(--cp-muted);opacity:.85;}
   /* Tight cells (2026-11-14 night, Julius: "squeeze more room out, get rid of empty space and margin, text can go
      under the checkbox"): full screen only; font size unchanged for now (he wants to see this first). */
   #calPanel.cp-full .cp-fadh,#calPanel.cp-full .cp-blh{padding:2px 4px 1px;}
@@ -17176,7 +17176,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const m = zoomMode(zoomPx);
     panel.classList.toggle('cp-zfine', m !== 60);
     panel.style.setProperty('--cp-slot', (m === 15 ? zoomPx / 2 : zoomPx) + 'px');
-    if(cal && zoomCur && m !== zoomCur){ const o = zoomOpts(m); cal.setOption('slotDuration', o.slotDuration); cal.setOption('slotLabelInterval', o.slotLabelInterval); }
+    if(cal && zoomCur && m !== zoomCur){ const o = zoomOpts(m); cal.setOption('slotDuration', o.slotDuration); cal.setOption('slotLabelInterval', o.slotLabelInterval); if(typeof sunPaint === 'function') requestAnimationFrame(sunPaint); }
     zoomCur = m;
   }
   let zoomPx = Math.min(Z_MAX, Math.max(Z_MIN, Number(lsGet('fw.calZoom')) || 24)), zoomT = 0;
@@ -17648,7 +17648,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       else if(date && cal.view.currentStart && luxon.DateTime.fromJSDate(cal.view.currentStart, {zone: 'UTC'}).toISODate() !== date) cal.gotoDate(date);
       cal.updateSize();
     } catch (e) {}
-    restoreDockTop(); setTimeout(restoreDockTop, 0);
+    restoreDockTop(); setTimeout(restoreDockTop, 0); requestAnimationFrame(sunPaint);
     blPlace();
     return true;
   }
@@ -17810,7 +17810,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const k = b.getAttribute('data-fnav');
     if(k === 'today') cal.today(); else setZoom(k === 'in' ? zoomPx * 1.35 : zoomPx / 1.35);
   });
-  function fadSoon(){ if(full && !fadT) fadT = requestAnimationFrame(() => { fadT = 0; fadRender(); }); }
+  function fadSoon(){ if(full && !fadT) fadT = requestAnimationFrame(() => { fadT = 0; fadRender(); }); else if(docked && !full) requestAnimationFrame(sunPaint); }
   /* Sun colors (2026-11-14 night, Julius): full screen only — the time grid + hour numbers follow the day's light
      around Vallejo / Benicia: night purple → yellow at sunrise → yellow (morning) → yellow-orange (afternoon) → orange at
      sunset → fades to purple. Sunrise / sunset worked out per day (NOAA formula, no network). Event cards keep their colors. */
@@ -17849,7 +17849,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const sunWarm = c => c[0] > c[2] + 60; // yellow / orange stops (not purple)
   const sunHm = m => { const h = Math.floor(m / 60), mi = Math.round(m % 60); return ((h + 11) % 12 + 1) + ':' + String(mi).padStart(2, '0'); };
   function sunPaint(){
-    if(!full) return;
+    if(!full && !docked) return; // 2026-11-15 (Julius): the half-screen docked calendar gets the day colors too
     let first = null;
     mount.querySelectorAll('.fc-timegrid-col[data-date]').forEach(col => {
       const iso = col.getAttribute('data-date'), s = sunStops(iso); if(!first) first = s;

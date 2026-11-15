@@ -840,3 +840,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - See-through: `eventClassNames` adds `cp-see` to timed events ≥ 2 h; `eventDidMount` sets `--cp-evbg` from the event color. CSS: 12 % tint + 1.5 px outline, `.fc-event-main` sticky top, `.cp-evc` a solid chip.
 - Smoke: the old "drag the split line" test now checks the fixed half / half split doesn't move (split fixed 2026-11-15).
 - 08:21 (Julius: "less transparent, no color behind the text, keep the font white"): `.cp-see` tint 12 % → 32 %, title chip removed; `.cp-evc` / `.cp-ev-t` / `.cp-ev-m` white, opacity 1, soft text-shadow.
+- 08:31 (Julius: "put the day gradient into the side / halfway calendar"): sun CSS now `#calPanel:is(.cp-full,.cp-docked)`; `sunPaint` runs when full or docked; triggers: `fadSoon` (eventsSet / datesSet) in docked mode, `dockTo`, and `applyZoomMode` after slot labels change. Smoke: docked column has a gradient.

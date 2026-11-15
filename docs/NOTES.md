@@ -855,3 +855,10 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Day / Week button label via `data-label` + `::after` (textContent doubled on FullCalendar re-render).
 - New event: `selectable: finePointer()`; `dateClick` (touch only) opens the form when the press was < 400 ms and no card was open at pointerdown (`gridDown`).
 - Keep In Mind / Thinking: title count `0/0 ✓` with no tasks; checkbox hold menu on a `data-tl` title: 🗑 Delete section (title + `titleCovered`, captureBeforeEdit / finishEditorEdit).
+
+## Nested title lines (2026-11-15 10:34, Julius: PLANNING, not built)
+- Any line can become a title, including inside another title (e.g. Crabbing trip → Due day of trip → Check gear).
+- A nested title folds only its own lines; folding the outer title hides everything under it, nested titles included.
+- Everywhere: Keep In Mind, Focus / Thinking, Today, History.
+- Folded look, chosen from the fold button: **Hidden** (title + count) or **Compact** (all task names in a row, open and done; multiple columns when there's room are part of Compact).
+- Open: does each title remember its own Hidden / Compact choice, or is it one app-wide setting? (asked 10:34)

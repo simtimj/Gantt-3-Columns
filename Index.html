@@ -17367,6 +17367,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const cpCat = x => { try { return typeof calRowCat === 'function' ? calRowCat({cat: x.cat || '', title: x.title || ''}) : ''; } catch (e) { return ''; } };
   const cpCatColor = k => { try { return k && CARD_CAT_BY_KEY[k] ? CARD_CAT_BY_KEY[k].color : ''; } catch (e) { return ''; } };
   const CP_GROUPS = {1: 'Urgent', 2: 'Next', 3: 'Later', 4: 'Not set', done: 'Done'};
+  /* Full time range on every timed card (2026-11-15 12:54, Julius: "Chill says 12 AM — show the complete range, even
+     when it's cut off from yesterday / runs past tonight"): built from the event's real start / end, not the day piece.
+     A side that's on another day gets its weekday ("Sat 10 PM – 7:45 AM"), and a cut-off card never hides its end. */
+  function cpRangeHtml(a){
+    const ev = a.event, cal = a.view.calendar;
+    if(!ev.start) return esc(a.timeText || '');
+    const fmt = {hour: 'numeric', minute: '2-digit', omitZeroMinute: true, meridiem: 'short'};
+    const one = (d, other) => { let s = cal.formatDate(d, fmt); if(other) s = cal.formatDate(d, {weekday: 'short'}) + ' ' + s; return esc(s); };
+    if(!ev.end) return one(ev.start, !a.isStart);
+    const cut = !a.isStart || !a.isEnd;
+    const endTxt = ' – ' + one(ev.end, !a.isEnd);
+    return one(ev.start, !a.isStart) + (cut ? '<span class="cp-tfull">' + endTxt + '</span>' : '<span class="cp-tend">' + endTxt + '</span>');
+  }
   function cpEvAttrs(ev){
     const x = ev.extendedProps || {}, k = cpCat(x), a = (n, v) => v ? ' data-' + n + '="' + esc(v) + '"' : '';
     return a('ce-id', x.eventId) + a('ce-cal', x.calId) + a('ce-start', String(x.startMs || '')) + ' data-ce-rec="' + (x.recurring ? 1 : 0) + '"' +
@@ -17590,7 +17603,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Gantt cards); tap = done (Graphite), hold = the Gantt hold menu (urgency, subject, due…). Holding the card
       // itself still moves it.
       eventContent: a => {
-        const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : esc(a.timeText || '').replace(/ – (.+)$/, '<span class="cp-tend"> – $1</span>');
+        const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : cpRangeHtml(a);
         const short = !a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 30 * 60000;
         const body = a.event.allDay ? '<span class="cp-ev-t">' + t + '</span>'
           : short ? '<span class="cp-ev-t">' + t + '</span><span class="cp-ev-m">, ' + tm + '</span>'

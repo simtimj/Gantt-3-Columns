@@ -1983,6 +1983,14 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         // Day colors are full screen only (half-screen tried + reverted 2026-11-15, Julius: "too much").
         { const sun = await pg.evaluate(() => { const c = document.querySelector('#calPanel.cp-docked .fc-timegrid-col[data-date]'); return c ? getComputedStyle(c).backgroundImage : 'no docked col'; });
           if (!/gradient/.test(sun)) errs.push('docked calendar: day colors missing (2026-11-15 12:21): ' + sun); }
+        // Full time range on a card cut off by midnight (2026-11-15 12:54, Julius): "Sat 10 PM – 7:45 AM", not "12 AM".
+        { const r = await pg.evaluate(async () => { const api = window.fwCalendar.api(), d0 = api.view.currentStart.toISOString().slice(0, 10);
+            const y = new Date(api.view.currentStart.getTime() - 864e5).toISOString().slice(0, 10);
+            const ev = api.addEvent({ id: 'smk-x', title: 'Chill X', start: y + 'T22:00:00', end: d0 + 'T07:45:00' });
+            await new Promise(r => setTimeout(r, 300));
+            const c = [...document.querySelectorAll('#calPanel .fc-timegrid-event')].find(x => /Chill X/.test(x.textContent));
+            const t = c ? c.querySelector('.cp-ev-m').textContent : 'no card'; ev.remove(); return t; });
+          if (!/^\w{3} 10\s?PM – 7:45\s?AM$/i.test(r.replace(/ /g, ' '))) errs.push('cut-off card time range: ' + JSON.stringify(r)); }
         // Tap outside the event card closes it (2026-11-14, Julius), e.g. on the column left of the calendar.
         {
           const ev = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .fc-timegrid-event')].find(x => /Dentist/.test(x.textContent)); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return { x: r.x + r.width * 0.7, y: r.y + r.height / 2 }; });

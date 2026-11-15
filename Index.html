@@ -16230,6 +16230,20 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-etitle [data-cal-edit]{cursor:pointer;overflow-wrap:anywhere;}
   #calPanel .cp-etitle .cp-edone{text-decoration:line-through;color:var(--cp-muted);}
   #calPanel .cp-ewhen{font-size:14px;color:var(--cp-text);padding-left:34px;margin:2px 0 8px;}
+  /* Edit in the card (2026-11-15 13:08): fields look like the card's text until tapped. */
+  #calPanel .cp-qform{margin:0;}
+  #calPanel .cp-etin{flex:1 1 auto;min-width:0;font:inherit;color:inherit;background:transparent;border:0;border-bottom:1px solid transparent;border-radius:0;padding:0 0 1px;margin:0;outline:none;}
+  #calPanel .cp-etin:hover{border-bottom-color:var(--cp-line,var(--border));}
+  #calPanel .cp-etin:focus{border-bottom-color:var(--cp-accent,#1a73e8);}
+  #calPanel .cp-ewin{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;}
+  #calPanel .cp-ewin .cp-wpart{display:inline-flex;gap:2px;}
+  #calPanel .cp-ewin input{font:inherit;font-size:13px;color:inherit;background:transparent;border:1px solid transparent;border-radius:6px;padding:2px 3px;min-width:0;}
+  #calPanel .cp-ewin input:hover,#calPanel .cp-ewin input:focus{border-color:var(--cp-line,var(--border));background:var(--cp-soft,transparent);outline:none;}
+  #calPanel .cp-ewin .cp-emuted{flex-basis:100%;}
+  #calPanel .cp-qform.allday .cp-ewin input[type=time]{display:none;}
+  #calPanel .cp-qsave{display:none;padding-left:34px;margin:-2px 0 8px;}
+  #calPanel .cp-qform.dirty .cp-qsave{display:block;}
+  #calPanel .cp-qsave .cp-da{display:flex;gap:8px;margin-top:4px;}
   #calPanel .cp-emuted{color:var(--cp-muted);font-size:13px;}
   #calPanel .cp-er{display:flex;gap:14px;align-items:flex-start;font-size:14px;margin:6px 6px 0 0;}
   #calPanel .cp-ei{flex:0 0 20px;color:var(--cp-muted);line-height:0;}
@@ -16655,6 +16669,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(detail.hidden || !detail.classList.contains('cp-evcard') || !detail.classList.contains('cp-pop')) return;
     if(detail.contains(e.target) || (e.target.closest && e.target.closest('.fc-event,.urg-picker'))) return;
     if(pending) return; // an action is saving: the card re-opens when it's done
+    const qf = detail.querySelector('[data-cal-qform].dirty'); if(qf){ qsave(qf); return; } // tap outside = keep the edit (2026-11-15)
     detail.hidden = true; sheetEv = null;
   }, true);
   /* Google Calendar-style event pop-up (2026-11-14, Julius: "as close to the functionality and look of Google
@@ -16693,8 +16708,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(cardMore) h += '<div class="cp-emenu" role="menu">' +
       (ed ? '<button type="button" role="menuitem" data-cal-act="dup">' + ico('copy') + 'Duplicate</button>' : '') +
       (x.link ? '<a role="menuitem" href="' + esc(x.link) + '" target="_blank" rel="noopener">' + ico('open') + 'Open in Google Calendar</a>' : '') + '</div>';
-    h += '<div class="cp-etitle"><span class="cp-dot" style="background:' + esc(x.done ? '#808080' : x.color) + '"></span><span' + (ed ? ' data-cal-edit title="Edit"' : '') + (x.done ? ' class="cp-edone"' : '') + '>' + esc(ev.title) + '</span></div>';
-    h += '<div class="cp-ewhen">' + esc(fmtWhen(ev)) + (x.recurring ? '<br><span class="cp-emuted">Repeats</span>' : '') + '</div>';
+    const dotH = '<span class="cp-dot" style="background:' + esc(x.done ? '#808080' : x.color) + '"></span>';
+    if(ed && !x.done){
+      /* Edit right in the card (2026-11-15 13:08, Julius: "edit it right on the window I'm looking at", no second
+         window): title and times are fields; Save / Cancel show once something changes; tapping outside saves. */
+      const f = formFromRange(!!x.allDay, x.start, x.end);
+      h += '<form class="cp-qform' + (f.allDay ? ' allday' : '') + '" data-cal-qform data-op="' + newOp() + '" novalidate>' +
+        '<div class="cp-etitle">' + dotH + '<input type="text" name="title" class="cp-etin" maxlength="300" autocomplete="off" enterkeyhint="done" aria-label="Title" value="' + esc(ev.title) + '"></div>' +
+        '<input type="checkbox" name="allDay" hidden' + (f.allDay ? ' checked' : '') + '>' +
+        '<div class="cp-ewhen cp-ewin"><span class="cp-wpart"><input type="date" name="sd" value="' + f.sd + '" aria-label="Start date"><input type="time" name="st" step="300" value="' + f.st + '" aria-label="Start time"></span>' +
+        '<span class="cp-wsep">–</span><span class="cp-wpart"><input type="time" name="et" step="300" value="' + f.et + '" aria-label="End time"><input type="date" name="ed" value="' + f.ed + '" aria-label="End date"></span>' +
+        (x.recurring ? '<div class="cp-emuted">Repeats</div>' : '') + '</div>' +
+        '<div class="cp-qsave">' + (x.recurring ? scopeHtml() : '') + '<div class="cp-ferr" data-cal-qerr></div>' +
+        '<div class="cp-da"><button type="submit" class="cp-primary" data-cal-qsave>Save</button><button type="button" data-cal-qcancel>Cancel</button></div></div></form>';
+    } else {
+      h += '<div class="cp-etitle">' + dotH + '<span' + (x.done ? ' class="cp-edone"' : '') + '>' + esc(ev.title) + '</span></div>';
+      h += '<div class="cp-ewhen">' + esc(fmtWhen(ev)) + (x.recurring ? '<br><span class="cp-emuted">Repeats</span>' : '') + '</div>';
+    }
     if(x.location) h += row('place', linkify(x.location));
     if(x.desc) h += row('notes', '<div class="cp-desc' + (cardDescOpen ? ' open' : '') + '" data-cal-act="desc">' + linkify(x.desc) + '</div>');
     h += row('cal', esc(x.cal || '') + (x.done ? ' · done' : ''));
@@ -16843,6 +16873,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const finePointer = () => { try { return matchMedia('(pointer: fine)').matches; } catch (e) { return false; } };
   function editEvent(ev){
     const x = ev.extendedProps, wasPop = detail.classList.contains('cp-pop');
+    // The open card is already editable (2026-11-15 13:08): ✎ / e just puts the cursor in its title.
+    const qt = !detail.hidden && sheetEv === ev && detail.querySelector('[data-cal-qform] input[name=title]');
+    if(qt){ try { qt.focus({preventScroll: true}); qt.select(); } catch (e) {} return; }
     openForm(formFromRange(!!x.allDay, x.start, x.end), ev);
     if(wasPop && finePointer()) popAt(cardAnchor && cardAnchor.isConnected ? cardAnchor : null); // like Google's quick edit (mouse); phones keep the sheet
   }
@@ -16877,6 +16910,50 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       errEl.textContent = 'Not saved: ' + errText(err) + '. Your text is still here — tap Retry save.';
     })[x ? 'calPanelUpdateEvent' : 'calPanelCreateEvent'](req);
   }
+  // In-card edit save: same request as the Edit form; the card stays open on the saved event.
+  function qsave(form){
+    if(pending || !sheetEv) return;
+    const r = readForm(form), errEl = form.querySelector('[data-cal-qerr]'), btn = form.querySelector('[data-cal-qsave]');
+    if(r.err){ form.classList.add('dirty'); errEl.textContent = r.err; return; }
+    const x = sheetEv.extendedProps, sc = form.querySelector('input[name=scope]:checked');
+    const req = Object.assign({opId: form.dataset.op, eventId: x.eventId, startMs: x.startMs, calId: x.calId}, r, sc ? {scope: sc.value} : {});
+    const ms = L().fromISO(r.start, {zone: TZ}).toMillis();
+    pending = true; btn.disabled = true; btn.textContent = 'Saving…'; errEl.textContent = ''; detail.classList.add('cp-busy');
+    google.script.run.withSuccessHandler(() => {
+      pending = false; detail.classList.remove('cp-busy');
+      keepOpen = {eventId: x.eventId, startMs: ms, at: Date.now()};
+      flash('Saved ✓'); refetchFresh(); loadPlan(true);
+    }).withFailureHandler(err => {
+      pending = false; detail.classList.remove('cp-busy'); btn.disabled = false; btn.textContent = 'Retry save';
+      form.classList.add('dirty'); errEl.textContent = 'Not saved: ' + errText(err) + '. Your changes are still here.';
+    }).calPanelUpdateEvent(req);
+  }
+  const qformOf = () => detail.hidden ? null : detail.querySelector('[data-cal-qform]');
+  detail.addEventListener('input', e => { const f = e.target.form; if(f && f.matches('[data-cal-qform]')) f.classList.add('dirty'); });
+  // Moving the start keeps the length (like Google); the end never lands before the start.
+  detail.addEventListener('focusin', e => {
+    const f = e.target.form; if(!f || !f.matches('[data-cal-qform]') || !/^(sd|st)$/.test(e.target.name)) return;
+    const g = n => f.elements[n].value, a = L().fromISO(g('sd') + 'T' + (g('st') || '00:00'), {zone: TZ}), b = L().fromISO(g('ed') + 'T' + (g('et') || '00:00'), {zone: TZ});
+    f.dataset.len = a.isValid && b.isValid ? Math.max(0, Math.round(b.diff(a, 'minutes').minutes)) : '';
+  });
+  detail.addEventListener('change', e => {
+    const f = e.target.form; if(!f || !f.matches('[data-cal-qform]')) return;
+    f.classList.add('dirty');
+    if(!/^(sd|st)$/.test(e.target.name) || f.dataset.len === '') return;
+    const g = n => f.elements[n], a = L().fromISO(g('sd').value + 'T' + (g('st').value || '00:00'), {zone: TZ});
+    if(!a.isValid) return;
+    const b = a.plus({minutes: Number(f.dataset.len) || 0});
+    g('ed').value = b.toISODate(); if(!f.classList.contains('allday')) g('et').value = b.toFormat('HH:mm');
+    f.dataset.len = String(Number(f.dataset.len) || 0);
+  });
+  detail.addEventListener('click', e => {
+    if(!e.target.closest || !e.target.closest('[data-cal-qcancel]') || !sheetEv || pending) return;
+    e.preventDefault(); showDetail(sheetEv, cardAnchor); // back to what's saved
+  });
+  detail.addEventListener('keydown', e => {
+    const f = e.target.form; if(!f || !f.matches('[data-cal-qform]')) return;
+    if(e.key === 'Enter' && !e.isComposing && e.target.tagName === 'INPUT'){ e.preventDefault(); if(f.classList.contains('dirty')) qsave(f); else e.target.blur(); }
+  });
   function askDelete(ev){
     sheetEv = ev; pending = false; detail.classList.remove('cp-evcard', 'cp-pop');
     detail.innerHTML = '<div class="cp-dt">Delete “' + esc(ev.title) + '”?</div><div class="cp-dm">' + esc(fmtWhen(ev)) + '</div>' +
@@ -17632,7 +17709,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       events: fetchRange,
       eventsSet: () => { setTimeout(adLayout, 0); if(typeof fadSoon === 'function') fadSoon(); },
       // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
-      loading: b => { busy = b; if(!b && keepOpen) setTimeout(reopenKept, 60); if(b){ if(!keepOpen && !detail.querySelector('[data-cal-form],[data-cal-del-yes],[data-cal-scope]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
+      loading: b => { busy = b; if(!b && keepOpen) setTimeout(reopenKept, 60); if(b){ if(!keepOpen && !detail.querySelector('[data-cal-form],[data-cal-del-yes],[data-cal-scope],[data-cal-qform].dirty,[data-cal-qform]:focus-within')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
       eventClick: info => { info.jsEvent.preventDefault();
         if(Date.now() - evHoldOpenAt < 600) return; // the hold already opened its menu
@@ -18096,7 +18173,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     else if(t.hasAttribute('data-cal-del-yes')) doDelete(t);
     else retry();
   });
-  detail.addEventListener('submit', e => { e.preventDefault(); if(e.target.matches('[data-cal-form]')) save(e.target); });
+  detail.addEventListener('submit', e => { e.preventDefault(); if(e.target.matches('[data-cal-form]')) save(e.target); else if(e.target.matches('[data-cal-qform]')) qsave(e.target); });
   detail.addEventListener('change', e => {
     const f = e.target.form;
     if(!f || !f.matches('[data-cal-form]')) return;

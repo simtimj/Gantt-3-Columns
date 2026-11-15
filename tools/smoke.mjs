@@ -1447,24 +1447,31 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         window.__calFailWrite = 0; form().querySelector('[data-cal-save]').click();
         await until(() => det.hidden && evEl('Fails first'));
         if (byTitle('Fails first').length !== 1) out.push('save after failure: ' + byTitle('Fails first').length + ' events');
-        // Edit: same event id, new title, switched to all-day.
+        // Edit right in the card (2026-11-15 13:08, Julius): no second window; same event id, new title + time
+        // (end keeps the length), the card stays open on the saved event; ✎ just focuses the title.
         const id0 = byTitle('Test lunch')[0].eventId;
         const nCreate = calls('calPanelCreateEvent').length;
         evEl('Test lunch').click(); await wait(60);
-        const eb = det.querySelector('[data-cal-edit]');
-        if (!eb) out.push('no Edit on a main-calendar event');
+        const qf = () => det.querySelector('[data-cal-qform]');
+        if (!det.querySelector('[data-cal-edit]') || !qf()) out.push('no in-card edit on a main-calendar event');
         else {
-          eb.click(); await wait(60);
-          if (form().elements.title.value !== 'Test lunch' || form().elements.st.value !== '11:00') out.push('edit form not prefilled');
-          set('title', 'Lunch moved'); set('allDay', true);
-          if (!form().classList.contains('allday')) out.push('all-day box did not hide the times');
-          form().querySelector('[data-cal-save]').click();
-          await until(() => det.hidden && evEl('Lunch moved'));
+          det.querySelector('.cp-etop [data-cal-edit]').click(); await wait(60);
+          if (det.querySelector('[data-cal-form]')) out.push('✎ still opened a second edit window');
+          if (document.activeElement !== qf().elements.title) out.push('✎ did not focus the title');
+          if (qf().elements.title.value !== 'Test lunch' || qf().elements.st.value !== '11:00') out.push('card fields not prefilled');
+          if (getComputedStyle(qf().querySelector('.cp-qsave')).display !== 'none') out.push('Save shows before any change');
+          const q = (n, v) => { const el = qf().elements[n]; el.dispatchEvent(new FocusEvent('focusin', { bubbles: true })); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+          q('title', 'Lunch moved'); q('st', '12:00');
+          if (qf().elements.et.value !== '13:00') out.push('moving the start did not keep the length: end ' + qf().elements.et.value);
+          if (getComputedStyle(qf().querySelector('.cp-qsave')).display === 'none') out.push('no Save after a change');
+          qf().querySelector('[data-cal-qsave]').click();
+          await until(() => byTitle('Lunch moved').length && !det.hidden && qf() && qf().elements.title.value === 'Lunch moved');
           const e = byTitle('Lunch moved')[0];
-          if (!e || e.eventId !== id0) out.push('edit changed the event id (or lost it)');
-          else if (!e.allDay || e.start !== day) out.push('edit did not make it an all-day event on ' + day + ': ' + e.start);
-          if (!panel.querySelector('.fc-daygrid-event') || ![...panel.querySelectorAll('.fc-daygrid-event')].some(x => /Lunch moved/.test(x.textContent))) out.push('edited all-day event not in the all-day row');
-          if (calls('calPanelCreateEvent').length !== nCreate || calls('calPanelUpdateEvent').length !== 1) out.push('edit did not update in place (create calls ' + (calls('calPanelCreateEvent').length - nCreate) + ', updates ' + calls('calPanelUpdateEvent').length + ')');
+          if (!e || e.eventId !== id0) out.push('in-card edit changed the event id (or lost it)');
+          else if (!/T12:00/.test(e.start)) out.push('in-card edit did not move the start to 12:00: ' + e.start);
+          if (det.hidden || !qf()) out.push('card did not stay open after saving');
+          if (calls('calPanelCreateEvent').length !== nCreate || calls('calPanelUpdateEvent').length !== 1) out.push('in-card edit did not update in place (create calls ' + (calls('calPanelCreateEvent').length - nCreate) + ', updates ' + calls('calPanelUpdateEvent').length + ')');
+          det.querySelector('[data-cal-detail-close]').click(); await wait(60);
         }
         // Delete: asks first; Cancel keeps it; Delete removes it.
         evEl('Lunch moved').click(); await wait(60);

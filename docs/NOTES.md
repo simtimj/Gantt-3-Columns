@@ -861,4 +861,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - A nested title folds only its own lines; folding the outer title hides everything under it, nested titles included.
 - Everywhere: Keep In Mind, Focus / Thinking, Today, History.
 - Folded look, chosen from the fold button: **Hidden** (title + count) or **Compact** (all task names in a row, open and done; multiple columns when there's room are part of Compact).
-- Open: does each title remember its own Hidden / Compact choice, or is it one app-wide setting? (asked 10:34)
+- Q7 answered 10:36: **per title** — each title keeps its own Hidden / Compact choice, saved with the title so it's the same across the whole app (every device); Hidden is the default for titles not set yet.

@@ -146,6 +146,7 @@ When he asks to organize his calendar tasks:
 - Backlog → All day box (2026-11-15, Julius)
 - Backlog bulk select (2026-11-15, Julius)
 - All day → Scheduled (2026-11-15, Julius)
+- All day quick add (2026-11-15, Julius)
 
 ## IT study log (2026-11-04)
 

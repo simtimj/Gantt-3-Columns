@@ -2215,6 +2215,24 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
               }
               await pg.evaluate(() => window.fwCalendar.api().today());
             }
+            // Quick add in the All day box (2026-11-15, Julius): + → blank row → type → Enter = all-day task on the day shown.
+            {
+              await pg.evaluate(async () => { const cal = window.fwCalendar.api(); cal.changeView('timeGridDay', '2026-11-21'); await new Promise(r => setTimeout(r, 400)); });
+              const add = await pg.evaluate(() => { const b = document.querySelector('#calPanel [data-fad-add]'); if (!b || !b.getClientRects().length) return null; const q = b.getBoundingClientRect(); return { x: q.x + q.width / 2, y: q.y + q.height / 2 }; });
+              if (!add) errs.push('quick add: + not shown');
+              else {
+                await pg.mouse.click(add.x, add.y); await pg.waitForTimeout(150);
+                await pg.keyboard.type('Quick task Q'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(900);
+                const r = await pg.evaluate(() => ({ e: Object.values(window.__cal.ev).find(e => e.title === 'Quick task Q'), open: !document.querySelector('#calPanel [data-fad-new]').hidden, val: document.querySelector('#calPanel [data-fad-in]').value,
+                  row: [...document.querySelectorAll('#calPanel .cp-fad .cp-fai')].some(x => /Quick task Q/.test(x.textContent)) }));
+                if (!r.e || !r.e.allDay || r.e.start !== '2026-11-21') errs.push('quick add: saved ' + JSON.stringify(r.e));
+                if (!r.open || r.val) errs.push('quick add: blank row not ready for the next one');
+                if (!r.row) errs.push('quick add: new task not listed in the All day box');
+                await pg.keyboard.press('Escape'); await pg.waitForTimeout(100);
+                if (!(await pg.evaluate(() => document.querySelector('#calPanel [data-fad-new]').hidden))) errs.push('quick add: Esc did not close the row');
+              }
+              await pg.evaluate(() => window.fwCalendar.api().today());
+            }
             await pg.evaluate(() => { if (window.__calSrvOrig) window.__calSrv = window.__calSrvOrig; });
           }
           // Half / half, and the line between drags (2026-11-14, Julius).

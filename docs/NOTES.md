@@ -889,3 +889,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Full screen: `fadRender` lists copies per day under `.cp-fasg` "Scheduled · n" (`.cp-fasch` rows). All day box rows (open, editable, not repeating) carry `data-fa-drag` → FullCalendar Draggable on `fadEl` → `dropFad` (15 min; Scheduled row keeps its length). A Scheduled row let go over the box but not over a `.cp-fasch` row → unschedule (`fadDrag.sch`). A timed card dragged onto the box → `dragStopped` → unschedule.
 - Fix: full-screen slide-back (`fsw`) ignores touches that were held before moving (drags).
 - Smoke: "scheduled" — drag All-day A onto 11:00 (15 min, listed under Scheduled · 1), drag back onto the All day header (all-day, tag gone).
+
+## All day quick add (2026-11-15 14:46, Julius)
+- `[data-fad-add]` + in `.cp-fadh` toggles `.cp-fadnew[data-fad-new]` (outside `[data-fad-body]`, so `fadRender` never wipes the typing): `.cp-chk` + `input[data-fad-in]` + ➤ `[data-fad-go]` + ✕ `[data-fad-x]`. `fadAddSend()` → `calPanelCreateEvent({opId, title, allDay, start: viewStart, end: +1})`, stand-in `fqtmp-<opId>` until the re-read (2.5 s), input cleared and kept focused for the next one; failure puts the text back. The calendar's capture Esc handler closes only the row when focus is in it.
+- Smoke: "quick add" (+, type, Enter → all-day on 11-21, listed, blank row ready, Esc closes the row and keeps full screen).

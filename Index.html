@@ -15842,6 +15842,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-fad{display:flex;flex-direction:column;position:absolute;left:6px;top:6px;width:calc(var(--blw) - 12px);height:var(--fad-h);
     border:1px solid var(--cp-line);border-radius:10px;background:var(--cp-bg);overflow:hidden;z-index:2;}
   #calPanel.cp-full .cp-body:not(.bl-open) .cp-fad{height:auto;bottom:8px;}
+  #calPanel .cp-fadh{display:flex;align-items:center;gap:4px;}
+  #calPanel .cp-fadadd{margin-left:auto;appearance:none;border:1px solid var(--cp-line);background:transparent;color:inherit;border-radius:999px;width:24px;height:22px;line-height:1;font-size:16px;padding:0;cursor:pointer;}
+  #calPanel .cp-fadnew{display:flex;align-items:center;gap:4px;padding:3px 4px;margin:2px 2px 3px;border:1px solid #1a73e8;border-radius:6px;background:var(--cp-soft);}
+  #calPanel .cp-fadnew[hidden]{display:none;}
+  #calPanel .cp-fadnew .cp-chk{flex:none;}
+  #calPanel .cp-fadin{flex:1;min-width:0;border:0;outline:0;background:transparent;color:inherit;font:inherit;font-size:16px;padding:2px 0;}
+  #calPanel .cp-fadgo,#calPanel .cp-fadx{appearance:none;border:0;background:transparent;color:inherit;font-size:15px;padding:2px 5px;cursor:pointer;}
+  #calPanel .cp-fadgo{color:#1a73e8;}
   #calPanel .cp-scht{font-weight:400;opacity:.85;white-space:nowrap;}
   #calPanel .fc-event.cp-schc{opacity:.92;border-style:dashed!important;}
   #calPanel.cp-full .cp-fai.cp-fasch{border:1px dashed currentColor;}
@@ -18132,7 +18140,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }, {passive: false});
   // ── Full screen: all-day tasks in the left column (2026-11-14, Julius) ──
   const fadEl = document.createElement('div'); fadEl.className = 'cp-fad'; fadEl.setAttribute('aria-label', 'All-day tasks');
-  fadEl.innerHTML = '<div class="cp-fadh">All day <span class="cp-fadn" data-fad-n></span></div><div class="cp-fadb" data-fad-body></div>';
+  fadEl.innerHTML = '<div class="cp-fadh">All day <span class="cp-fadn" data-fad-n></span><button type="button" class="cp-fadadd" data-fad-add title="New all-day task" aria-label="New all-day task">+</button></div><div class="cp-fadnew" data-fad-new hidden></div><div class="cp-fadb" data-fad-body></div>';
   const fadGrip = document.createElement('div'); fadGrip.className = 'cp-fadgrip'; fadGrip.title = 'Drag to share the column between all-day tasks and the backlog (double-tap = default)';
   cpBodyEl.insertBefore(fadEl, cpBodyEl.firstChild); cpBodyEl.insertBefore(fadGrip, fadEl.nextSibling);
   // Left column ⇆ calendar line (2026-11-14, Julius: "half left, half right — let's resize it"): drag it; remembered
@@ -18266,6 +18274,35 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!pending) showDetail(ev, it);
   });
   fadEl.addEventListener('pointerdown', () => { fadEl.__downAt = Date.now(); }, true);
+  /* Quick add (2026-11-15, Julius: "a button on the all-day section to make a task quickly — an empty cell with a
+     checkbox, I fill it and send, it saves"): + in the All day header → a blank row (box + text + ➤) above the list.
+     Enter / ➤ = all-day event on the day shown (main calendar, reminders off), drawn at once; a fresh blank row
+     stays open for the next one. Esc or ✕ closes it. Lives outside the re-rendered list so typing survives redraws. */
+  const fadNew = fadEl.querySelector('[data-fad-new]');
+  function fadAddOpen(){
+    fadNew.hidden = false;
+    if(!fadNew.firstChild) fadNew.innerHTML = '<span class="cp-chk" aria-hidden="true"></span><input class="cp-fadin" data-fad-in type="text" placeholder="New task…" enterkeyhint="send" autocomplete="off"><button type="button" class="cp-fadgo" data-fad-go title="Save" aria-label="Save">➤</button><button type="button" class="cp-fadx" data-fad-x title="Close" aria-label="Close">✕</button>';
+    const i = fadNew.querySelector('[data-fad-in]'); i.value = ''; i.focus();
+  }
+  const fadAddClose = () => { fadNew.hidden = true; const i = fadNew.querySelector('[data-fad-in]'); if(i) i.blur(); };
+  function fadAddSend(){
+    const i = fadNew.querySelector('[data-fad-in]'), title = (i && i.value || '').replace(/\s+/g, ' ').trim(), day = viewStart;
+    if(!title || !day || !canRun()) { if(i) i.focus(); return; }
+    const opId = 'fq' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    let tmp = null;
+    if(cal) try { tmp = cal.addEvent({id: 'fqtmp-' + opId, title: title, start: day, allDay: true, editable: false, extendedProps: {fqTmp: true}}); } catch (e) {}
+    i.value = ''; i.focus(); flash('Saved ✓');
+    const drop = () => { if(tmp) try { tmp.remove(); } catch (e) {} };
+    google.script.run.withSuccessHandler(() => { refetchFresh(); setTimeout(drop, 2500); })
+      .withFailureHandler(err => { drop(); if(!i.value) i.value = title; moveFail('Couldn’t save — ' + errText(err)); })
+      .calPanelCreateEvent({opId: opId, title: title, allDay: true, start: day, end: L().fromISO(day, {zone: TZ}).plus({days: 1}).toISODate()});
+  }
+  fadEl.addEventListener('click', e => {
+    if(e.target.closest('[data-fad-add]')){ e.stopPropagation(); fadNew.hidden ? fadAddOpen() : fadAddClose(); }
+    else if(e.target.closest('[data-fad-go]')){ e.stopPropagation(); fadAddSend(); }
+    else if(e.target.closest('[data-fad-x]')){ e.stopPropagation(); fadAddClose(); }
+  }, true);
+  fadNew.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); fadAddSend(); } else if(e.key === 'Escape'){ e.preventDefault(); fadAddClose(); } });
   /* Backlog → All day box (2026-11-15, Julius: "in the full calendar view I should be able to drag things from the
      backlog box to the all day box"). The all-day list isn't part of FullCalendar's grid, so the drop is caught here:
      a backlog drag (mouse: moved; touch: held first, then moved — same rule FullCalendar uses) let go over `.cp-fad`
@@ -18331,6 +18368,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(e.key !== 'Escape' || !isOpen()) return;
     e.preventDefault(); e.stopPropagation();
     if(pending) return;
+    if(typeof fadNew !== 'undefined' && !fadNew.hidden && fadNew.contains(e.target)){ fadAddClose(); return; } // quick-add row: Esc closes just the row
     if(!detail.hidden){ detail.hidden = true; sheetEv = null; } else close();
   }, true);
   // Swipes / holds inside the panel never reach the workspace's own swipe and hold-to-zoom handlers.

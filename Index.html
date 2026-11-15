@@ -15974,7 +15974,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      very narrow cards (phone Week) drop the time and the box and wrap the title small. */
   #calPanel .fc .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-daygrid-event .fc-event-main{overflow:hidden;} /* not the card itself: its resize handle sits on the edge */
   #calPanel .fc .fc-timegrid-event .fc-event-main{height:100%;box-sizing:border-box;}
-  @container cpev (max-height:34px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{display:none;} }
+  /* Time always shows (2026-11-14 night, Julius: "even if the font is small, include the time with the title; no room
+     below → put it to the right"): short cards and 30-min events = one line, title truncates, start time kept on the right. */
+  #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-evb{display:flex;align-items:baseline;}
+  #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-ev-t{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-ev-m{flex:0 0 auto;white-space:nowrap;}
+  @container cpev (max-height:34px){
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1){align-items:center;}
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-evb{display:flex;align-items:baseline;gap:4px;white-space:nowrap;}
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{display:block;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{flex:0 0 auto;overflow:visible;}
+    #calPanel .fc .fc-timegrid-event .cp-tend{display:none;}
+  }
   @container cpev (max-height:21px){
     #calPanel .fc .fc-timegrid-event .fc-event-main{padding-top:0!important;padding-bottom:0!important;}
     #calPanel .fc .fc-timegrid-event .cp-ev{font-size:10px!important;line-height:1.05;}
@@ -15983,7 +15994,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   @container cpev (max-height:13px){ #calPanel .fc .fc-timegrid-event .cp-ev{font-size:9px!important;line-height:1;} #calPanel .fc .fc-timegrid-event .cp-chk{width:8px!important;height:8px!important;} }
   @container cpev (max-width:44px){
-    #calPanel .fc .fc-timegrid-event .cp-ev-m,#calPanel .fc .fc-timegrid-event .cp-chk{display:none!important;}
+    #calPanel .fc .fc-timegrid-event .cp-chk{display:none!important;}
+    #calPanel .fc .fc-timegrid-event .cp-evb{display:block!important;white-space:normal!important;}
+    #calPanel .fc .fc-timegrid-event .cp-ev-m{display:block!important;font-size:8.5px!important;white-space:nowrap!important;overflow:hidden;} /* time under the title, tiny */
     #calPanel .fc .fc-timegrid-event .fc-event-main{padding:1px 2px!important;}
     #calPanel .fc .fc-timegrid-event .cp-ev{font-size:9px!important;line-height:1.1;}
     #calPanel .fc .fc-timegrid-event .cp-ev-1,#calPanel .fc .fc-timegrid-event .cp-ev-t{white-space:normal!important;overflow-wrap:anywhere;word-break:break-word;}

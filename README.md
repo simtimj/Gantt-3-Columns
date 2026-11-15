@@ -77,6 +77,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 ## 🧪 To be confirmed (2026-11-14)
 
 - **Fold the Done group (full-screen All day list)**: tap "▾ Done · n" to hide the finished tasks (it stays as "▸ Done · n"); tap again to show them. Remembered.
+- **Calendar cards always show the time** (2026-11-14): short cards put the start time to the right of the title on one line (the title shortens first); very narrow cards show it tiny under the title instead of hiding it.
 - **Full screen: tighter cells** (2026-11-14): inside the all-day, backlog and Plan lists the padding and gaps are trimmed and long titles wrap under the checkbox; calendar cards get thinner padding. Font size unchanged for now.
 - **Full screen: white quadrant lines** (2026-11-14): the lines splitting the full-screen calendar into its four parts (all-day | backlog on the left, Plan | calendar grid on the right, and the column split) are solid white and thicker in dark mode, near-black in light mode.
 - **Full screen: tidy Plan header + tap the Backlog bar**: on a phone the Plan header in the full-screen calendar reads "▾ Sat Nov 14" on one line beside ↻ ✕, with the count and + Add under it (no more wrapped title). When the backlog is minimized, tapping anywhere on its bar opens it.

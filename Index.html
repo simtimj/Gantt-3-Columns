@@ -15703,6 +15703,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-body.bl-open .cp-fadgrip{display:block;position:absolute;left:6px;width:calc(var(--blw) - 12px);top:calc(var(--fad-h) + 6px);height:14px;cursor:ns-resize;touch-action:none;z-index:3;}
   #calPanel.cp-full .cp-fadgrip::after{content:"";position:absolute;left:0;right:0;top:6px;height:2px;background:var(--cp-axis-line);border-radius:1px;}
   #calPanel.cp-full .cp-fadgrip::before{content:"";position:absolute;left:50%;width:36px;margin-left:-18px;top:4px;height:6px;border-radius:3px;background:var(--cp-axis-line);}
+  /* Quadrant separators (2026-11-14 night, Julius: "make them white so it's very visible"): solid white 3px lines
+     between the four parts — all-day | backlog (left), Plan | grid (right), and the column split. Light theme = near-black. */
+  #calPanel.cp-full{--cp-sep:rgba(32,33,36,.9);}
+  html[data-theme=dark] #calPanel.cp-full{--cp-sep:#fff;}
+  #calPanel.cp-full .cp-flgrip::after{left:5.5px;width:3px;background:var(--cp-sep);}
+  #calPanel.cp-full .cp-flgrip::before,#calPanel.cp-full .cp-fadgrip::before{background:var(--cp-sep);}
+  #calPanel.cp-full .cp-fadgrip::after{top:5.5px;height:3px;background:var(--cp-sep);}
+  #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{border-top:3px solid var(--cp-sep);}
+  #calPanel.cp-full .cp-plan:not(.folded){border-bottom:3px solid var(--cp-sep);border-bottom-left-radius:0;border-bottom-right-radius:0;}
+  #calPanel.cp-flresizing .cp-flgrip::after,#calPanel.cp-flresizing .cp-flgrip::before,
   #calPanel.cp-fadresizing .cp-fadgrip::after,#calPanel.cp-fadresizing .cp-fadgrip::before{background:var(--cp-blue,#1a73e8);}
   #calPanel .cp-fadh{display:flex;align-items:baseline;gap:6px;padding:6px 8px 4px;font-size:13px;font-weight:600;}
   #calPanel .cp-fadh .cp-fadn{font-weight:400;color:var(--cp-muted);}

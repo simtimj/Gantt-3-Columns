@@ -823,3 +823,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - CSS (`.cp-full` only): hides `.fc-prev/next/today/cpZoomOut/cpZoomIn` and the Day|Week button group; shows `.fc-cpView-button` (text "Wk" / "Day", everywhere); toolbar `nowrap` + `border-bottom:2px solid var(--cp-sep)`.
 - `.cp-fnav` (markup inside `.cp-body`, after `.cp-detail`): absolute bottom/right 16px, opacity .55 (.9 on press), half-transparent round buttons; click → `cal.today()` / `setZoom(zoomPx ×÷ 1.35)` (listener just above `fadSoon`).
 - 00:55 (Julius: "gradient a tiny bit more color"): `--sun-a` .12 → .13.
+- 00:57 (Julius): full screen left | right is always half / half — `--blw:50%!important`, `.cp-flgrip` pointer-events none + no `::before` pill (white `::after` line stays). Dark full screen `--cp-line` #3c4043 → #80868b so box borders read. The all-day | backlog grip is unchanged.

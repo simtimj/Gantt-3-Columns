@@ -1928,10 +1928,10 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         if (a.full) { const fb = await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), p = document.getElementById('calPanel'), out = [];
           const b = p.querySelector('.cp-fbtns'), br = b.getBoundingClientRect(), pr = p.getBoundingClientRect();
           if (br.width < 40 || br.top - pr.top > 8 || pr.right - br.right > 8) out.push('↻ ✕ not at the top right');
-          const tb = p.querySelector('#calMount .fc-header-toolbar'), tops = new Set([...tb.querySelectorAll('.fc-button,.fc-toolbar-title')].filter(x => x.offsetParent).map(x => Math.round(x.getBoundingClientRect().top / 8)));
+          const tb = p.querySelector('#calMount .fc-header-toolbar'), rowsOf = () => { const ys = [...tb.querySelectorAll('.fc-button,.fc-toolbar-title')].filter(x => x.offsetParent).map(x => { const r = x.getBoundingClientRect(); return r.top + r.height / 2; }).sort((m, n) => m - n); let n = 0, last = -99; ys.forEach(y => { if (y - last > 14) n++; last = y; }); return { size: n }; }, tops = rowsOf();
           if (tops.size > 2) out.push('toolbar still has ' + tops.size + ' rows');
           { const pl = p.querySelector('.cp-plan'), was = pl.classList.contains('folded'); pl.classList.add('folded'); await w(150);
-            const t2 = new Set([...tb.querySelectorAll('.fc-button,.fc-toolbar-title')].filter(x => x.offsetParent).map(x => Math.round(x.getBoundingClientRect().top / 8)));
+            const t2 = rowsOf();
             if (t2.size > 2) out.push('Plan folded: toolbar has ' + t2.size + ' rows');
             const cb = p.querySelector('.cp-fbtns').getBoundingClientRect(), hit = [...tb.querySelectorAll('.fc-button')].filter(x => x.offsetParent).some(x => { const r = x.getBoundingClientRect(); return r.right > cb.left && r.left < cb.right && r.bottom > cb.top && r.top < cb.bottom; });
             if (hit) out.push('Plan folded: a toolbar button sits under ↻ ✕ ' + JSON.stringify([...tb.children].map(c => { const r = c.getBoundingClientRect(); return [c.className, Math.round(r.left), Math.round(r.top), Math.round(r.width), getComputedStyle(c).marginRight]; })) + ' btns ' + JSON.stringify([Math.round(cb.left), Math.round(cb.top), Math.round(cb.bottom)]));
@@ -1940,7 +1940,11 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           const f = p.querySelector('.cp-fad'), h0 = f.getBoundingClientRect().height, bl = p.querySelector('.cp-bl').getBoundingClientRect();
           if (!p.classList.contains('cp-blmin')) out.push('backlog not minimized by default');
           if (bl.top < f.getBoundingClientRect().bottom || bl.height > 60) out.push('minimized backlog is not a bar under all-day');
-          p.querySelector('[data-bl-min]').click(); await w(200);
+          { const hd = p.querySelector('.cp-blh'), r = hd.getBoundingClientRect(), x = r.right - 30, y = r.top + r.height / 2, t = document.elementFromPoint(x, y);
+            if (!t || !hd.contains(t) || t.closest('button')) { if (!hd.contains(t)) out.push('minimized bar: nothing to tap at its right side'); p.querySelector('[data-bl-min]').click(); }
+            else t.click(); await w(200); if (p.classList.contains('cp-blmin')) out.push('tapping the minimized bar did not open the backlog'); }
+          { const pf = p.querySelector('.cp-plan:not(.folded) .cp-pfold'); if (pf && pf.offsetParent && pf.getBoundingClientRect().height > 36) out.push('Plan title wraps (' + Math.round(pf.getBoundingClientRect().height) + 'px)');
+            const cb = p.querySelector('.cp-fbtns').getBoundingClientRect(); if (pf && pf.offsetParent && pf.getBoundingClientRect().right > cb.left + 1 && pf.getBoundingClientRect().bottom > cb.top && pf.getBoundingClientRect().top < cb.bottom) out.push('Plan title runs under ↻ ✕'); }
           const h1 = f.getBoundingClientRect().height;
           if (h1 > h0 - 40) out.push('opening the backlog did not make room (' + Math.round(h0) + ' → ' + Math.round(h1) + ')');
           if (localStorage.getItem('fw.calFullBlMin') !== '0') out.push('open backlog not remembered');

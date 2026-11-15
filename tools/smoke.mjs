@@ -2102,8 +2102,10 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           {
             await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), srv = window.__calSrv;
               window.__blPlaced = null; window.__calSrvOrig = srv;
-              window.__calSrv = (m, a) => m === 'calBacklogSync' ? { items: [{ id: 'bl-1', title: 'Backlog hold B', date: '2026-11-10', urg: '1', color: '11' }] }
-                : m === 'calBacklogPlace' ? (window.__blPlaced = a[0], { ok: true }) : srv(m, a);
+              window.__calSrv = (m, a) => m === 'calBacklogSync' ? { items: [{ id: 'bl-1', title: 'Backlog hold B', date: '2026-11-10', urg: '1', color: '11' },
+                  { id: 'bl-2', title: 'Backlog bulk C', date: '2026-11-10', urg: '1', color: '9' }, { id: 'bl-3', title: 'Backlog bulk D', date: '2026-11-09', urg: '2', color: '5' }] }
+                : m === 'calBacklogPlace' ? (window.__blPlaced = a[0], { ok: true })
+                : m === 'calBacklogPlaceMany' ? (window.__blPlaced = a[0][0], window.__blPlacedMany = a[0], { ok: true, done: a[0].map(x => x.id), failed: [] }) : srv(m, a);
               window.fwCalendar.blReload(); await w(300); });
             const r = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .cp-bli')].find(x => /Backlog hold B/.test(x.textContent)); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + 30, y: b.y + b.height / 2 }; });
             if (!r) errs.push('backlog menu: test row not shown');
@@ -2148,6 +2150,30 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
                 if (await pg.evaluate(() => !!document.querySelector('[data-bl-menu]'))) errs.push('backlog → all day: dragging opened the hold menu');
               }
               await pg.evaluate(() => { document.querySelectorAll('[data-bl-menu]').forEach(m => m.remove()); window.fwCalendar.api().today(); });
+            }
+            // Bulk select (2026-11-15, Julius): Select → tick two rows → "All day" sends both in one call; ↑ Today sends to today.
+            {
+              const res = await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), out = [], cal = window.fwCalendar.api();
+                cal.changeView('timeGridDay', '2026-11-19'); window.__blPlacedMany = null; window.fwCalendar.blReload(); await w(400);
+                const sel = document.querySelector('#calPanel [data-bl-selmode]'); if (!sel) return ['no Select button'];
+                sel.click(); await w(100);
+                const rows = () => [...document.querySelectorAll('#calPanel .cp-bli')];
+                const pick = re => { const r = rows().find(x => re.test(x.textContent)); if (r) r.querySelector('.cp-blt').click(); return !!r; };
+                if (!pick(/Backlog bulk C/) || !pick(/Backlog bulk D/)) return ['bulk rows not shown'];
+                await w(100);
+                const bar = document.querySelector('#calPanel [data-bl-bar]');
+                if (!bar || bar.hidden || !bar.getClientRects().length) out.push('bar not shown');
+                if (!/2 selected/.test(bar.textContent)) out.push('count: ' + bar.textContent);
+                if (rows().filter(x => x.classList.contains('cp-blon')).length !== 2) out.push('ticks not drawn');
+                bar.querySelector('[data-bl-go="day"]').click(); await w(400);
+                const m = window.__blPlacedMany || [];
+                if (m.length !== 2 || !m.every(x => x.allDay && x.start === '2026-11-19')) out.push('All day sent ' + JSON.stringify(m));
+                if (rows().some(x => /Backlog bulk/.test(x.textContent))) out.push('sent rows still in the backlog');
+                if (!cal.getEvents().some(e => e.id === 'bltmp-bl-2')) out.push('no stand-in card shown at once');
+                document.querySelector('#calPanel [data-bl-selmode]').click(); await w(100);
+                if (!bar.hidden) out.push('bar stayed after Done');
+                cal.today(); return out; });
+              errs.push(...res.map(x => 'backlog bulk: ' + x));
             }
             await pg.evaluate(() => { if (window.__calSrvOrig) window.__calSrv = window.__calSrvOrig; });
           }

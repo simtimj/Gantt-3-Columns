@@ -3878,17 +3878,36 @@ function calBacklogSync() {
 // the row placed (or 'dropped' when cleared, which also deletes the ↪ event). Falls back to a new event if the
 // original is gone. 2026-11-12, Julius.
 function calBacklogPlace(req) {
-  const r = req || {}, id = String(r.id || '');
-  if (!id) throw new Error('Missing backlog id');
+  const r = req || {};
+  if (!String(r.id || '')) throw new Error('Missing backlog id');
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    const sh = calBacklogSheet_(), rows = calBacklogRows_(sh), i = rows.findIndex(x => x[0] === id);
+    const sh = calBacklogSheet_();
+    return calBacklogPlaceIn_(r, sh, calBacklogRows_(sh));
+  } finally { lock.releaseLock(); }
+}
+// Bulk send (2026-11-15, Julius: "select a bunch at once, then send"): one lock and one sheet read for the batch.
+// Returns {ok, done: [ids], failed: [{id, error}]} — one bad row doesn't stop the rest.
+function calBacklogPlaceMany(reqs) {
+  const list = (Array.isArray(reqs) ? reqs : []).filter(r => r && r.id).slice(0, 100);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sh = calBacklogSheet_(), rows = calBacklogRows_(sh), done = [], failed = [];
+    list.forEach(r => { try { calBacklogPlaceIn_(r, sh, rows); done.push(String(r.id)); } catch (e) { failed.push({ id: String(r.id), error: String(e && e.message || e) }); } });
+    return { ok: !failed.length, done: done, failed: failed };
+  } finally { lock.releaseLock(); }
+}
+function calBacklogPlaceIn_(r, sh, rows) {
+  const id = String(r.id || '');
+  {
+    const i = rows.findIndex(x => x[0] === id);
     if (i < 0) throw new Error('Not in the backlog any more — tap ↻');
     if (rows[i][6]) return { ok: true, already: rows[i][6] };
     const calId = EVENT_CALENDARS[0], evId = calBacklogEventId_(id);
     if (r.drop) {
-      sh.getRange(i + 2, 7).setValue('dropped');
+      sh.getRange(i + 2, 7).setValue('dropped'); rows[i][6] = 'dropped';
       try { Calendar.Events.remove(calId, evId); } catch (e) { console.error('calBacklogPlace drop: ' + e); }
       return { ok: true };
     }
@@ -3920,9 +3939,10 @@ function calBacklogPlace(req) {
       if (color) try { ev.setColor(color); } catch (e2) { console.error(e2); }
       out = calPanelOut_(ev, calId);
     }
-    sh.getRange(i + 2, 7).setValue(Utilities.formatDate(w.start, tz, 'yyyy-MM-dd'));
+    const placed = Utilities.formatDate(w.start, tz, 'yyyy-MM-dd');
+    sh.getRange(i + 2, 7).setValue(placed); rows[i][6] = placed;
     return { ok: true, event: out };
-  } finally { lock.releaseLock(); }
+  }
 }
 
 /* =========================================================

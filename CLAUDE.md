@@ -144,6 +144,7 @@ When he asks to organize his calendar tasks:
 - Full screen ↻ ✕ corner + backlog minimize (2026-11-14 evening, Julius)
 - Backlog hold menu + see-through long events (2026-11-15, Julius)
 - Backlog → All day box (2026-11-15, Julius)
+- Backlog bulk select (2026-11-15, Julius)
 
 ## IT study log (2026-11-04)
 

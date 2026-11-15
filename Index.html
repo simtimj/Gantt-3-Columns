@@ -15836,7 +15836,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-blmin-btn{display:inline-block;font:inherit;background:transparent;border:0;color:var(--cp-muted);padding:0 4px;cursor:pointer;font-size:12px;}
   #calPanel.cp-full.cp-blmin .cp-blmin-btn{transform:rotate(-90deg);}
   #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{top:auto!important;bottom:8px;}
-  #calPanel.cp-full.cp-blmin .cp-blb,#calPanel.cp-full.cp-blmin .cp-blhint,#calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-fadgrip{display:none;}
+  #calPanel.cp-full.cp-blmin .cp-blb,#calPanel.cp-full.cp-blmin .cp-blbar,#calPanel.cp-full.cp-blmin .cp-blhint,#calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-fadgrip{display:none;}
   #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-fad{height:calc(100% - 54px);}
   #calPanel.cp-full{--fad-r:.45;--fad-h:calc((100% - 26px) * var(--fad-r));}
   #calPanel.cp-full .cp-fad{display:flex;flex-direction:column;position:absolute;left:6px;top:6px;width:calc(var(--blw) - 12px);height:var(--fad-h);
@@ -17281,6 +17281,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // ── Calendar backlog (2026-11-11, Julius) ── sweep runs server side at most once a day (calBacklogSync).
   const blEl = panel.querySelector('[data-cal-bl]'), blBody = panel.querySelector('[data-bl-body]'), blCount = panel.querySelector('[data-bl-count]');
   let blData = null, blAt = 0, blBusy = false;
+  let blSel = null, blGroups = []; // Select mode (2026-11-15, Julius): a Set of ticked backlog ids, null = off
   const blById = id => ((blData && blData.items) || []).find(x => x.id === id);
   const BL_G = [['1', 'Urgent'], ['2', 'Next'], ['3', 'Later']]; // blank urgency counts as Later (2026-11-12, Julius)
   function blLoad(force){
@@ -17297,6 +17298,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // Count via data-n + CSS, never textContent: FullCalendar re-renders its own text node, so writing text doubled it ("BacklogBacklog").
     if(btn){ if(items.length) btn.dataset.n = items.length; else delete btn.dataset.n; btn.classList.toggle('fc-button-active', !blEl.hidden); }
     if(blCount) blCount.textContent = items.length ? items.length : '';
+    if(typeof blSelBar === 'function') blSelBar();
     const hb = document.querySelector('[data-ce-bl]'); if(hb){ hb.querySelector('[data-ce-bln]').textContent = items.length ? ' ' + items.length : ''; hb.classList.toggle('on', !blEl.hidden); }
     const pb = panel.querySelector('[data-bl-toggle]'); if(pb){ pb.querySelector('[data-bl-n]').textContent = items.length || ''; pb.classList.toggle('on', !blEl.hidden); }
     if(blEl.hidden) return;
@@ -17305,21 +17307,22 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // 2026-11-15 (Julius): newest first. Date button on the Backlog row switches urgency groups ⇄ date groups ("11/06 Fri").
     const byDate = lsGet('fw.blSort') === 'date', newest = (a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
     const sb = blEl.querySelector('[data-bl-sort]'); if(sb) sb.classList.toggle('on', byDate);
-    const row = (x, showDate) => { const c = softColor(x.color, false);
-      return '<div class="cp-bli" data-bl-drag data-blid="' + esc(x.id) + '" style="background:' + c.bg + ';color:' + c.fg + '" title="Hold and drag onto a day">' +
+    const row = (x, showDate) => { const c = softColor(x.color, false), on = blSel && blSel.has(x.id);
+      return '<div class="cp-bli' + (on ? ' cp-blon' : '') + '" data-bl-drag data-blid="' + esc(x.id) + '" style="background:' + c.bg + ';color:' + c.fg + '" title="Hold and drag onto a day">' +
+        (blSel ? '<span class="cp-blck" aria-hidden="true">' + (on ? '☑' : '☐') + '</span>' : '') +
         '<button type="button" class="cp-blx" data-bl-x="' + esc(x.id) + '" title="Remove from backlog" aria-label="Remove from backlog">✕</button>' +
         (showDate ? '<span class="cp-bld">' + esc(x.date.slice(5).replace('-', '/').replace(/^0/, '')) + '</span>' : '') + '<span class="cp-blt">' + esc(x.title) + '</span></div>'; };
-    let h = '';
+    let h = ''; blGroups = [];
     if(byDate){
       const all = items.slice().sort(newest), days = [...new Set(all.map(x => x.date))];
       days.forEach(d => { const g = all.filter(x => x.date === d), D = luxon.DateTime.fromISO(d);
         // 2026-11-15 (Julius): "NOV 14 Sat · 8", the date in that weekday's color (his per-day convention).
-        h += '<div class="cp-blg">' + (D.isValid ? '<span class="cp-blgd" data-dow="' + (D.weekday % 7) + '">' + esc(D.toFormat('LLL d').toUpperCase() + ' ' + D.toFormat('ccc')) + '</span>' : esc(d)) + ' · ' + g.length + '</div>';
+        h += '<div class="cp-blg" data-blgi="' + (blGroups.push(g.map(x => x.id)) - 1) + '" title="Hold = select this whole day">' + (D.isValid ? '<span class="cp-blgd" data-dow="' + (D.weekday % 7) + '">' + esc(D.toFormat('LLL d').toUpperCase() + ' ' + D.toFormat('ccc')) + '</span>' : esc(d)) + ' · ' + g.length + '</div>';
         g.forEach(x => { h += row(x, false); }); });
     } else BL_G.forEach(([u, name]) => {
       const g = items.filter(x => (BL_G.some(b => b[0] === x.urg) ? x.urg : '3') === u).sort(newest);
       if(!g.length) return;
-      h += '<div class="cp-blg">' + name + ' · ' + g.length + '</div>';
+      h += '<div class="cp-blg" data-blgi="' + (blGroups.push(g.map(x => x.id)) - 1) + '" title="Hold = select this whole group">' + name + ' · ' + g.length + '</div>';
       g.forEach(x => { h += row(x, true); });
     });
     blBody.innerHTML = h;
@@ -17332,6 +17335,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     setTimeout(() => cal && cal.updateSize(), 0);
   }
   if(blBody) blBody.addEventListener('click', e => {
+    if(blSel && !e.target.closest('[data-bl-x]')){ const r = e.target.closest('[data-bl-drag]'); if(r){ e.stopPropagation(); const id = r.dataset.blid; blSel.has(id) ? blSel.delete(id) : blSel.add(id); blRender(); } return; }
     const b = e.target.closest('[data-bl-x]'); if(!b || moveBusy) return;
     const id = b.dataset.blX; e.stopPropagation();
     google.script.run.withSuccessHandler(() => { blData.items = blData.items.filter(x => x.id !== id); blRender(); })
@@ -17340,35 +17344,73 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function dropBacklog(info){
     const id = info.draggedEl.closest('[data-blid]').dataset.blid, it = blById(id);
     if(!it) return;
-    if(moveBusy){ moveFail('Still saving — try again in a moment.'); return; }
-    moveBusy = true; setState('loading', 'Saving…');
-    google.script.run.withSuccessHandler(() => {
-      moveBusy = false; blData.items = blData.items.filter(x => x.id !== id); blRender(); flash('Scheduled ✓'); refetchFresh();
-    }).withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save — nothing changed. ' + errText(err)); })
-      .calBacklogPlace(Object.assign({id: id}, slotReq(info.allDay, info.dateStr, '', 30)));
+    // Dragging a ticked row carries every ticked row (2026-11-15, Julius). All-day → all on that day; a time → stacked 30 min each.
+    const ids = blSel && blSel.has(id) ? [id, ...[...blSel].filter(x => x !== id && blById(x))] : [id];
+    if(info.allDay){ blSendMany(ids, info.dateStr.slice(0, 10)); return; }
+    const t0 = L().fromISO(info.dateStr).setZone(TZ);
+    blSendReqs(ids.map((x, k) => Object.assign({id: x}, slotReq(false, t0.plus({minutes: 30 * k}).toISO(), '', 30))), (ids.length > 1 ? ids.length + ' ' : '') + 'Scheduled ✓');
   }
   panel.addEventListener('click', e => { if(e.target.closest('[data-bl-toggle]')){ e.stopPropagation(); blToggle(); } });
   /* Hold a backlog row and let go without moving (2026-11-15, Julius) → small menu: 📌 Send to Today (all-day task
      today). Hold + drag still places it on a day / time. "Mark complete" is next, once Julius decides what it does. */
-  // 2026-11-15 14:10 (Julius: "speed up backlog → all day"): optimistic — the row leaves the backlog and a stand-in
-  // all-day card shows at once; the save runs in the background (several can run back to back, the server lock
-  // queues them). Failure puts the row back. No "Saving…" lock-out.
-  function blSendToday(id, day){
-    const it = blById(id); if(!it) return;
-    const today = L().now().setZone(TZ).toISODate(); day = day || today;
-    blData.items = blData.items.filter(x => x.id !== id); blRender();
-    let tmp = null;
-    if(cal) try { const c = softColor(it.color, false);
-      tmp = cal.addEvent({id: 'bltmp-' + id, title: it.title, start: day, allDay: true, backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg, editable: false, extendedProps: {urg: it.urg, blTmp: true}});
-    } catch (e) { tmp = null; }
+  // 2026-11-15 14:10 (Julius: "speed up backlog → all day"): optimistic — rows leave the backlog and stand-in
+  // cards show at once; the save runs in the background (one calBacklogPlaceMany call per batch, the server lock
+  // queues back-to-back sends). Rows that fail go back. No "Saving…" lock-out.
+  // reqs = [{id, allDay, start, end}] (slotReq shape); 14:30 bulk select sends many at once.
+  function blSendReqs(reqs, msg){
+    reqs = reqs.filter(r => blById(r.id)); if(!reqs.length) return;
+    const items = reqs.map(r => blById(r.id)), ids = new Set(reqs.map(r => r.id));
+    blData.items = blData.items.filter(x => !ids.has(x.id)); if(blSel) reqs.forEach(r => blSel.delete(r.id)); blRender();
+    const tmps = [];
+    if(cal) reqs.forEach((r, k) => { try { const it = items[k], c = softColor(it.color, false);
+      tmps.push(cal.addEvent({id: 'bltmp-' + r.id, title: it.title, start: r.allDay ? r.start : r.start, end: r.allDay ? null : r.end, allDay: !!r.allDay, backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg, editable: false, extendedProps: {urg: it.urg, blTmp: true}})); } catch (e) {} });
     if(typeof fadSoon === 'function') fadSoon();
-    flash(day === today ? 'Sent to today ✓' : 'All day ✓');
+    flash(msg || 'Sent ✓');
     window.__fwBlPending = (window.__fwBlPending || 0) + 1;
-    const done = () => { window.__fwBlPending--; if(tmp) try { tmp.remove(); } catch (e) {} };
-    // Success: re-read first, drop the stand-in a moment later so the card doesn't blink out while the re-read runs.
-    google.script.run.withSuccessHandler(() => { refetchFresh(); setTimeout(done, 2500); })
-      .withFailureHandler(err => { done(); if(blData && !blById(id)) blData.items.push(it); blRender(); if(typeof fadSoon === 'function') fadSoon(); moveFail('Couldn’t save — put back in the backlog. ' + errText(err)); })
-      .calBacklogPlace(Object.assign({id: id}, slotReq(true, day, '', 0)));
+    const done = () => { window.__fwBlPending--; tmps.forEach(t => { try { t.remove(); } catch (e) {} }); };
+    const putBack = failIds => { const back = items.filter(it => failIds.includes(it.id) && !blById(it.id)); if(blData) blData.items.push(...back); blRender(); if(typeof fadSoon === 'function') fadSoon(); };
+    // Success: re-read first, drop the stand-ins a moment later so the cards don't blink out while the re-read runs.
+    google.script.run.withSuccessHandler(res => {
+      const failed = (res && res.failed) || []; refetchFresh(); setTimeout(done, 2500);
+      if(failed.length){ putBack(failed.map(f => f.id)); moveFail('Couldn’t send ' + failed.length + ' — put back in the backlog. ' + failed[0].error); }
+    }).withFailureHandler(err => { done(); putBack(reqs.map(r => r.id)); moveFail('Couldn’t save — put back in the backlog. ' + errText(err)); })
+      .calBacklogPlaceMany(reqs);
+  }
+  function blSendToday(id, day){ blSendMany([id], day); }
+  function blSendMany(ids, day){
+    const today = L().now().setZone(TZ).toISODate(); day = day || today;
+    blSendReqs(ids.map(id => Object.assign({id: id}, slotReq(true, day, '', 0))),
+      (ids.length > 1 ? ids.length + ' ' : '') + (day === today ? 'Sent to today ✓' : 'All day ✓'));
+  }
+  /* Select mode (2026-11-15, Julius): Select in the Backlog header → tap rows to tick them; the bar at the bottom sends
+     them all: ↑ = all-day today, "All day M/d" = the day the calendar shows. Hold a group header (a day or urgency
+     group) = select that whole group. Dragging a ticked row carries all ticked rows (dropBacklog / fadEnd). */
+  function blSelSet(on){ blSel = on ? (blSel || new Set()) : null; blRender(); }
+  function blSelBar(){
+    const btn = blEl.querySelector('[data-bl-selmode]'); if(btn){ btn.classList.toggle('on', !!blSel); btn.textContent = blSel ? 'Done' : 'Select'; }
+    let bar = blEl.querySelector('[data-bl-bar]');
+    if(!bar){ bar = document.createElement('div'); bar.className = 'cp-blbar'; bar.setAttribute('data-bl-bar', '');
+      bar.innerHTML = '<span class="cp-blbn" data-bl-seln></span><button type="button" data-bl-go="today" title="Send to today (all day)" aria-label="Send to today">↑ Today</button><button type="button" data-bl-go="day" title="All-day on the day shown"></button>';
+      blEl.appendChild(bar);
+      bar.addEventListener('click', e => { const g = e.target.closest('[data-bl-go]'); if(!g || !blSel) return; e.stopPropagation();
+        const ids = [...blSel].filter(x => blById(x)); if(!ids.length){ flash('Tick some rows first'); return; }
+        blSendMany(ids, g.dataset.blGo === 'today' ? '' : (viewStart || '')); }); }
+    bar.hidden = !blSel;
+    if(blSel){ const n = [...blSel].filter(x => blById(x)).length; bar.querySelector('[data-bl-seln]').textContent = n + ' selected';
+      const d = viewStart ? L().fromISO(viewStart) : null; bar.querySelector('[data-bl-go="day"]').textContent = 'All day ' + (d && d.isValid ? d.toFormat('M/d') : '');
+      bar.querySelectorAll('button').forEach(b => { b.disabled = !n; }); }
+    blEl.classList.toggle('cp-blselon', !!blSel);
+  }
+  if(blBody){
+    let gh = null;
+    blBody.addEventListener('pointerdown', e => { const g = e.target.closest('[data-blgi]'); if(!g || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      gh = {x: e.clientX, y: e.clientY, i: Number(g.dataset.blgi)}; const h = gh;
+      h.t = setTimeout(() => { if(gh !== h) return; gh = null; const ids = blGroups[h.i] || []; blSel = blSel || new Set(); const all = ids.every(x => blSel.has(x));
+        ids.forEach(x => all ? blSel.delete(x) : blSel.add(x)); if(navigator.vibrate) try { navigator.vibrate(15); } catch (err) {} blRender(); }, window.fwHoldMs ? window.fwHoldMs() : 500); });
+    const gEnd = () => { if(gh){ clearTimeout(gh.t); gh = null; } };
+    blBody.addEventListener('pointermove', e => { if(gh && Math.hypot(e.clientX - gh.x, e.clientY - gh.y) > 10) gEnd(); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => blBody.addEventListener(n, gEnd));
+    blBody.addEventListener('contextmenu', e => { if(e.target.closest('[data-blgi]')) e.preventDefault(); });
   }
   function blMenu(id, x, y){
     if(typeof hideUrgencyPicker !== 'function' || typeof placeUrgPicker !== 'function') return;
@@ -17382,7 +17424,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   if(blBody){
     let bh = null;
     const bhEnd = () => { const h = bh; bh = null; if(!h) return; clearTimeout(h.t);
-      if(h.held && !h.moved && !document.querySelector('[data-bl-menu]')) blMenu(h.id, h.x, h.y); };
+      if(h.held && !h.moved && !blSel && !document.querySelector('[data-bl-menu]')) blMenu(h.id, h.x, h.y); };
     blBody.addEventListener('pointerdown', e => {
       const r = e.target.closest('[data-bl-drag]'); if(!r || e.target.closest('[data-bl-x]') || (e.pointerType === 'mouse' && e.button !== 0)) { bh = null; return; }
       bh = {id: r.dataset.blid, x: e.clientX, y: e.clientY, held: false, moved: false};
@@ -17936,10 +17978,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   if(blEl){
     const bh = blEl.querySelector('.cp-blh');
     if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('afterbegin', '<button type="button" class="cp-blmin-btn" data-bl-min title="Minimize / open the backlog" aria-label="Minimize the backlog">▾</button>');
+    if(bh && !bh.querySelector('[data-bl-selmode]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blsort" data-bl-selmode title="Tick several rows, then send them together">Select</button>');
     if(bh && !bh.querySelector('[data-bl-sort]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blsort" data-bl-sort title="Group by date (newest first) / by urgency">Date</button>');
     if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blside" data-bl-side title="Phone: show the backlog on the left or under the calendar"></button><button type="button" class="cp-blclose" data-bl-close title="Close the backlog" aria-label="Close the backlog">✕</button>');
     blEl.addEventListener('click', e => {
-      if(e.target.closest('[data-bl-sort]')){ e.stopPropagation(); lsSet('fw.blSort', lsGet('fw.blSort') === 'date' ? 'urg' : 'date'); blRender(); }
+      if(e.target.closest('[data-bl-selmode]')){ e.stopPropagation(); blSelSet(!blSel); }
+      else if(e.target.closest('[data-bl-sort]')){ e.stopPropagation(); lsSet('fw.blSort', lsGet('fw.blSort') === 'date' ? 'urg' : 'date'); blRender(); }
       else if(e.target.closest('[data-bl-side]')){ e.stopPropagation(); lsSet('fw.blPhone', lsGet('fw.blPhone') === 'below' ? 'left' : 'below'); blPlace(); setTimeout(() => cal && cal.updateSize(), 0); }
       else if(full && (e.target.closest('[data-bl-min],.cp-blh > b') || (panel.classList.contains('cp-blmin') && e.target.closest('.cp-blh') && !e.target.closest('button')))){ // minimized: the whole bar opens it (option B)
         e.stopPropagation(); const m = panel.classList.toggle('cp-blmin'); lsSet('fw.calFullBlMin', m ? '1' : '0'); }
@@ -18179,7 +18223,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!d.live && Math.hypot(x - d.x0, y - d.y0) > 10){ if(d.mouse || Date.now() - d.t0 >= window.fwHoldMs()) d.live = true; else { fadDrag = null; return; } }
     if(d.live) fadEl.classList.toggle('cp-fad-over', fadOver(x, y)); };
   const fadEnd = () => { const d = fadDrag; fadDrag = null; fadEl.classList.remove('cp-fad-over');
-    if(d && d.live && fadOver(d.x, d.y) && viewStart){ window.__fwFadDrop = (window.__fwFadDrop || 0) + 1; blSendToday(d.id, viewStart); } };
+    if(d && d.live && fadOver(d.x, d.y) && viewStart){ window.__fwFadDrop = (window.__fwFadDrop || 0) + 1; blSendMany(blSel && blSel.has(d.id) ? [d.id, ...[...blSel].filter(x => x !== d.id && blById(x))] : [d.id], viewStart); } };
   document.addEventListener('pointermove', e => fadMove(e.clientX, e.clientY), true);
   document.addEventListener('touchmove', e => { if(e.touches[0]) fadMove(e.touches[0].clientX, e.touches[0].clientY); }, {capture: true, passive: true});
   document.addEventListener('pointerup', fadEnd, true);
@@ -18511,6 +18555,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .cp-blside{margin-left:4px;}
   .cp-blsort{appearance:none;margin-left:6px;border:1px solid var(--cp-line);background:transparent;color:inherit;font:inherit;font-size:11px;border-radius:999px;padding:0 8px;cursor:pointer;opacity:.75;}
   .cp-blsort.on{opacity:1;background:var(--cp-soft);font-weight:600;}
+  .cp-blck{margin-right:4px;font-size:14px;line-height:1;}
+  .cp-bli.cp-blon{outline:2px solid #1a73e8;outline-offset:-2px;}
+  .cp-blselon .cp-blx{display:none;}
+  .cp-blbar{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;gap:6px;padding:5px 6px;background:var(--cp-bg,#fff);border-top:2px solid #1a73e8;font-size:12px;}
+  .cp-blbar[hidden]{display:none;}
+  .cp-blbar .cp-blbn{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cp-blbar button{appearance:none;border:0;border-radius:999px;padding:4px 10px;background:#1a73e8;color:#fff;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .cp-blbar button:disabled{opacity:.45;cursor:default;}
   body:not(.bl-phone) .cp-blside{display:none;}
   #calPanel:not(.cp-blout) .cp-blclose{display:none;}
   /* Only the center handle drags (2026-11-11, Julius): the line itself ignores touches so scrolling past it is safe. */

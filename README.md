@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-14)
 
+- **Full screen ↻ ✕ top right + backlog minimize**: in the full-screen calendar, Reload and Close sit in the top-right corner (no more third toolbar line with just ✕ on a phone). The ▾ on the Backlog header (or tapping "Backlog") folds it to a bar at the bottom so all-day tasks get the room; tap again to open. Remembered.
 - **Full screen half / half, resizable**: the full-screen calendar opens with the left column (all-day + backlog) and the calendar each taking half the screen. Drag the white line between them to resize; it's remembered, and double-tap goes back to half.
 - **Event text stays inside its box** (calendar, every zoom / view): cards clip their own text; as a card gets shorter the time line goes first, then the text and box shrink to one tight line; very narrow cards (phone Week) show just the title, small and wrapped.
 - **Tap outside closes the event card**: with an event's card open, a tap anywhere outside it (other columns, the backlog, Plan, header, empty calendar) closes it. Tapping another event opens that one instead.

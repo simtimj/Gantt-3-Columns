@@ -1924,6 +1924,21 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         };
         await slideIn();
         let a = await st();
+        // ↻ ✕ top right, no 3rd toolbar row; backlog ▾ minimizes it so all-day grows (2026-11-14, Julius).
+        if (a.full) { const fb = await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), p = document.getElementById('calPanel'), out = [];
+          const b = p.querySelector('.cp-fbtns'), br = b.getBoundingClientRect(), pr = p.getBoundingClientRect();
+          if (br.width < 40 || br.top - pr.top > 8 || pr.right - br.right > 8) out.push('↻ ✕ not at the top right');
+          const tb = p.querySelector('#calMount .fc-header-toolbar'), tops = new Set([...tb.querySelectorAll('.fc-button,.fc-toolbar-title')].filter(x => x.offsetParent).map(x => Math.round(x.getBoundingClientRect().top / 8)));
+          if (tops.size > 2) out.push('toolbar still has ' + tops.size + ' rows');
+          const f = p.querySelector('.cp-fad'), h0 = f.getBoundingClientRect().height; p.querySelector('[data-bl-min]').click(); await w(200);
+          const h1 = f.getBoundingClientRect().height, bl = p.querySelector('.cp-bl').getBoundingClientRect();
+          if (h1 < h0 + 40) out.push('minimizing the backlog did not grow all-day (' + Math.round(h0) + ' → ' + Math.round(h1) + ')');
+          if (bl.top < f.getBoundingClientRect().bottom || bl.height > 60) out.push('minimized backlog is not a bar under all-day');
+          if (localStorage.getItem('fw.calFullBlMin') !== '1') out.push('minimize not remembered');
+          window.__shotMin = 1; return out; });
+          errs.push(...fb.map(x => 'full screen: ' + x));
+          if (process.env.CAL_SHOT) await pg.screenshot({ path: path.join(process.env.CAL_SHOT, 'calfull-' + name + '.png') });
+          await pg.evaluate(async () => { document.querySelector('#calPanel [data-bl-min]').click(); localStorage.removeItem('fw.calFullBlMin'); await new Promise(r => setTimeout(r, 200)); }); }
         if (!a.full) errs.push('full screen: one more slide left at the calendar did not open it');
         else {
           if (Math.abs(a.w - a.vw) > 2) errs.push('full screen: not the whole width (' + a.w + ' / ' + a.vw + ')');

@@ -15668,6 +15668,21 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-flgrip::before{content:"";position:absolute;top:50%;margin-top:-18px;height:36px;left:4px;width:6px;border-radius:3px;background:var(--cp-axis-line);}
   #calPanel.cp-flresizing .cp-flgrip::after,#calPanel.cp-flresizing .cp-flgrip::before{background:var(--cp-blue,#1a73e8);}
   #calPanel.cp-full .cp-body{padding-left:var(--blw)!important;}
+  /* Full screen ↻ ✕ top right (2026-11-14, Julius): pinned to the corner instead of wrapping onto a 3rd toolbar row. */
+  #calPanel .cp-fbtns{display:none;}
+  #calPanel.cp-full .cp-fbtns{display:flex;gap:2px;position:absolute;top:4px;right:4px;z-index:6;}
+  #calPanel .cp-fbtns button{font:inherit;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:var(--cp-bg);color:var(--cp-muted);font-size:17px;cursor:pointer;}
+  #calPanel .cp-fbtns button:hover,#calPanel .cp-fbtns button:active{background:var(--cp-hover);}
+  #calPanel.cp-full .fc-cpRefresh-button,#calPanel.cp-full .fc-cpClose-button{display:none!important;}
+  #calPanel.cp-full .cp-plan .cp-ph{padding-right:70px;}
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:70px;}
+  /* Minimize the backlog (2026-11-14, Julius): ▾ on its header folds it to a bar at the bottom, all-day gets the room. */
+  #calPanel .cp-blmin-btn{display:none;}
+  #calPanel.cp-full .cp-blmin-btn{display:inline-block;font:inherit;background:transparent;border:0;color:var(--cp-muted);padding:0 4px;cursor:pointer;font-size:12px;}
+  #calPanel.cp-full.cp-blmin .cp-blmin-btn{transform:rotate(-90deg);}
+  #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{top:auto!important;bottom:8px;}
+  #calPanel.cp-full.cp-blmin .cp-blb,#calPanel.cp-full.cp-blmin .cp-blhint,#calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-fadgrip{display:none;}
+  #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-fad{height:calc(100% - 54px);}
   #calPanel.cp-full{--fad-r:.45;--fad-h:calc((100% - 26px) * var(--fad-r));}
   #calPanel.cp-full .cp-fad{display:flex;flex-direction:column;position:absolute;left:6px;top:6px;width:calc(var(--blw) - 12px);height:var(--fad-h);
     border:1px solid var(--cp-line);border-radius:10px;background:var(--cp-bg);overflow:hidden;z-index:2;}
@@ -16151,6 +16166,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     </section>
     <div class="cp-detail" data-cal-detail hidden></div>
   </div>
+  <div class="cp-fbtns"><button type="button" data-cal-refresh title="Reload events from Google Calendar" aria-label="Reload events">↻</button><button type="button" data-cal-close title="Close (Esc) and go back to the Gantt" aria-label="Close calendar">✕</button></div>
 </aside>
 <script>
 (function(){
@@ -17509,9 +17525,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   [blCol, blLeft].forEach(h => h && ['touchstart','pointerdown','keydown','keyup','input'].forEach(n => h.addEventListener(n, e => e.stopPropagation(), {passive: true})));
   if(blEl){
     const bh = blEl.querySelector('.cp-blh');
+    if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('afterbegin', '<button type="button" class="cp-blmin-btn" data-bl-min title="Minimize / open the backlog" aria-label="Minimize the backlog">▾</button>');
     if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blside" data-bl-side title="Phone: show the backlog on the left or under the calendar"></button><button type="button" class="cp-blclose" data-bl-close title="Close the backlog" aria-label="Close the backlog">✕</button>');
     blEl.addEventListener('click', e => {
       if(e.target.closest('[data-bl-side]')){ e.stopPropagation(); lsSet('fw.blPhone', lsGet('fw.blPhone') === 'below' ? 'left' : 'below'); blPlace(); setTimeout(() => cal && cal.updateSize(), 0); }
+      else if(full && e.target.closest('[data-bl-min],.cp-blh > b')){ e.stopPropagation(); const m = panel.classList.toggle('cp-blmin'); lsSet('fw.calFullBlMin', m ? '1' : '0'); }
       else if(e.target.closest('[data-bl-close]')){ e.stopPropagation(); if(!blEl.hidden) blToggle(); }
     });
   }
@@ -17570,6 +17588,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     try { const v = lsGet('fw.calFullView') === 'timeGridWeek' ? 'timeGridWeek' : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
     fadRender();
     blEl.hidden = lsGet('fw.calFullBl') === '0';
+    panel.classList.toggle('cp-blmin', lsGet('fw.calFullBlMin') === '1');
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     blPlace(); blRender(); if(!blEl.hidden) blLoad(false);
     setTimeout(() => { try { cal.updateSize(); } catch (e) {} }, 0);

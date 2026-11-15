@@ -15641,6 +15641,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-bld{flex:0 0 auto;font-size:11px;opacity:.8;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{flex:0 0 auto;border:0;background:transparent;color:inherit;opacity:.7;font-size:14px;padding:0 2px;cursor:pointer;}
+  /* No wasted columns (2026-11-14, Julius): the full name wraps across the whole row; the date and ✕ sit small in the
+     top-right corner and the text flows under them, instead of each keeping its own column down the row. */
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli{display:block;padding:5px 6px 5px 8px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli::after{content:"";display:block;clear:both;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{float:right;line-height:1.1;margin:0 -2px 0 2px;padding:0 2px;font-size:12px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-bld{float:right;font-size:10px;line-height:1.6;margin-left:4px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blt{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blh{flex-wrap:wrap;row-gap:0;} /* the drag hint drops under the title when narrow */
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blhint{white-space:nowrap;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-blmsg{padding:10px 4px;font-size:13px;color:var(--cp-muted);}
   /* Full-screen calendar (2026-11-14, Julius): one more slide left from the half-screen calendar. Same panel as the
      📅 pop-out, stretched to the whole screen, with the backlog beside it and its task names shown in full. */
@@ -15650,8 +15659,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full{--blw:clamp(150px,30vw,320px);}
   #calPanel.cp-full .cp-body.bl-open{padding-left:var(--blw)!important;}
   #calPanel.cp-full .cp-body.bl-open .cp-bl{position:absolute;left:6px;top:6px;bottom:8px;width:calc(var(--blw) - 12px);margin:0;border:1px solid var(--cp-line);border-radius:10px;display:flex;flex-direction:column;}
-  #calPanel.cp-full .cp-bli{align-items:flex-start;}
-  #calPanel.cp-full .cp-bli .cp-blt{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
   #calPanel.cp-full .cp-blside,#calPanel.cp-full .cp-blclose{display:none;}
   /* Phone: narrower backlog and a compact toolbar (wrapping onto 2 rows) so the calendar keeps its room. */
   @media (max-width:720px){
@@ -16907,8 +16914,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       h += '<div class="cp-blg">' + name + ' · ' + g.length + '</div>';
       g.forEach(x => { const c = softColor(x.color, false);
         h += '<div class="cp-bli" data-bl-drag data-blid="' + esc(x.id) + '" style="background:' + c.bg + ';color:' + c.fg + '" title="Hold and drag onto a day">' +
-          '<span class="cp-blt">' + esc(x.title) + '</span><span class="cp-bld">' + esc(x.date.slice(5).replace('-', '/')) + '</span>' +
-          '<button type="button" class="cp-blx" data-bl-x="' + esc(x.id) + '" title="Remove from backlog" aria-label="Remove from backlog">✕</button></div>'; });
+          '<button type="button" class="cp-blx" data-bl-x="' + esc(x.id) + '" title="Remove from backlog" aria-label="Remove from backlog">✕</button>' +
+          '<span class="cp-bld">' + esc(x.date.slice(5).replace('-', '/').replace(/^0/, '')) + '</span><span class="cp-blt">' + esc(x.title) + '</span></div>'; });
     });
     blBody.innerHTML = h;
   }

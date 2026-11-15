@@ -845,8 +845,8 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## Urgent tab in the middle column (2026-11-15 08:46, Julius: "for now just put the urgent stuff")
 - 🔴 `data-ctab="urgent"` + `#urgTabScroll`. `window.urgTabSync()` (called from the center tab `set()`) moves the real `#urgentPanel` into the tab (a comment node `urgHome` marks its Reference spot) and back when leaving; `renderUrgent` also moves it there on first build while the tab is open, and skips the fold check (`urgInTab()`). CSS shows only `.urg-group[data-urg="1"]` with its add line. Smoke: red row shown, Soon row hidden, panel returns on leaving.
 
-## Indented subtask cells (2026-11-15 08:48, Julius)
-- `.check-line[data-tc]` margin = (`--tch` + `--tcr`) × 24px, no extra left padding. `refreshCards` sets render-only `data-tcstep` (levels deeper / shallower than the card row above, ±6; in CARD_ATTRS so it's stripped on save) → `--tcs` / `--tcsn`; `::before` draws the top step edge in `--tc-edge` (transparent unless the card outline shows: tc-subtleline subject cards, History white).
+## Indented subtask cells (2026-11-15 08:48, Julius; reworked 11:43)
+- 11:43 Julius: the card outline must stay one rounded box; only the clicked subtask gets the indented shape. Card back to `margin-left = --tch × 24px` + `padding-left += --tcr × 22px`; step edges removed (`data-tcstep` still computed, no CSS). Focused subtask (`[data-tcrel][data-tcfocus]`, not a title) drops the row box-shadow and draws its ring with `::before` from its checkbox (`8px × --side-k + --tcr × 22px − 5px`) to the right edge; non-subtask focus unchanged.
 
 ## 2026-11-15 morning batch (Julius)
 - 08:58 "reduce it back": half-screen day colors reverted (sun CSS back to `.cp-full`, `sunPaint` full only; smoke checks docked has none).

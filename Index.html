@@ -11897,20 +11897,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fl,0) * 1%),transparent);--tc-bd:rgba(0,0,0,.14);--tc-mix:24%;}
   .check-line[data-tc]{
     position:relative;box-sizing:border-box;
-    /* Subtask cells are indented themselves (2026-11-15, Julius: "no empty cell area left of a subtask's checkbox"):
-       the row moves in by its level; a short top edge (::before, data-tcstep = levels deeper / shallower than the row
-       above) closes each step so the card outline stays one shape. */
-    margin-left:calc((var(--tch,0) + var(--tcr,0)) * 24px)!important;
-    padding:2px calc(8px * var(--side-k,1)) 2px calc(8px * var(--side-k,1));
+    /* Card outline stays one rounded box (2026-11-15 11:43, Julius); subtasks indent inside it with padding. */
+    margin-left:calc(var(--tch,0) * 24px)!important;
+    padding:2px calc(8px * var(--side-k,1)) 2px calc(8px * var(--side-k,1) + var(--tcr,0) * 22px);
     background:linear-gradient(var(--tc-tint,transparent),var(--tc-tint,transparent)),var(--tc-base);
     border-left:1px solid var(--tc-bd);border-right:1px solid var(--tc-bd);
   }
-  .check-line[data-tc][data-tcstep]::before{content:"";position:absolute;top:-1px;height:0;border-top:var(--tc-stw,1px) solid var(--tc-edge,transparent);pointer-events:none;
-    left:calc(-1 * var(--tcs,0) * 24px - var(--tc-stw,1px));width:calc((var(--tcs,0) + var(--tcsn,0)) * 24px);}
-  body.tc-subtleline{--tc-stw:var(--sl-w,1.5px);}
-  /* The step edge only shows where the card outline does (Quiet cards keep it transparent otherwise). */
-  body.tc-subtleline .check-line[data-tccat][data-tc]{--tc-edge:var(--tc-bd);}
-  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc]:not([data-tccat]){--tc-edge:#fff;}
+  /* A tapped / typed-in subtask gets its own indented cell ring (starts at its checkbox), not the full card width. */
+  .check-line[data-tc][data-tcrel][data-tcfocus]:not([data-tlon]){box-shadow:none;}
+  .check-line[data-tc][data-tcrel][data-tcfocus]:not([data-tlon])::before{content:"";position:absolute;top:0;bottom:0;right:0;
+    left:calc(8px * var(--side-k,1) + var(--tcr,0) * 22px - 5px);border:1px solid var(--urg,#8a8f98);border-radius:5px;pointer-events:none;}
   .check-line[data-tc^="f"]{border-top:1px solid var(--tc-bd);border-top-left-radius:8px;border-top-right-radius:8px;margin-top:5px;padding-top:4px;}
   .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
   .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
@@ -11930,7 +11926,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     box-shadow:0 1px 3px rgba(0,0,0,.15);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;}
   #tcGrip[hidden]{display:none;}
   @media (prefers-color-scheme: dark){#tcGrip{color:#ccc;background:rgba(30,30,30,.92);border-color:rgba(255,255,255,.2);}}
-  .check-line[data-tc][data-tcfocus]{border-radius:5px!important;}
+  .check-line[data-tc][data-tcfocus]:not([data-tcrel]){border-radius:5px!important;}
   /* Day sections (Julius, 2026-10-27): Morning / Afternoon / Evening separators in the Today cell. */
   .editor > [data-sec]{margin:10px 0 4px;padding:0 0 2px;border-bottom:2px solid var(--note-line-adj,var(--border));font-size:.82em;letter-spacing:.06em;text-transform:uppercase;color:var(--note-line-adj,var(--muted));}
   .editor > [data-sec]:first-child{margin-top:0;}
@@ -12144,7 +12140,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 
   (function(){
     let css = '';
-    for(let i = 1; i <= 6; i++) css += `.check-line[data-tchead="${i}"]{--tch:${i};}.check-line[data-tcrel="${i}"]{--tcr:${i};}.check-line[data-tcstep="${i}"]{--tcs:${i};}.check-line[data-tcstep="-${i}"]{--tcsn:${i};}`;
+    for(let i = 1; i <= 6; i++) css += `.check-line[data-tchead="${i}"]{--tch:${i};}.check-line[data-tcrel="${i}"]{--tcr:${i};}`;
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   })();
 

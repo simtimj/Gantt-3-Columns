@@ -82,7 +82,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **Tap, not hold, for New event** (calendar, phone): a quick tap on empty space opens New event; holding or scrolling doesn't. Mouse drag-to-select still works.
 - **Keep In Mind title with no tasks shows 0/0 ✓**; a title line's hold menu has **🗑 Delete section** (title + everything under it).
 - Fixed: the Day / Week button no longer shows "DayWk".
-- **Subtask cells are indented**: in a task card, each subtask's cell starts at its own indent (no empty card area left of its checkbox); short edges close each step so the card outline stays one shape.
+- **Subtask cells are indented** (reworked 11:43): the card stays one rounded box; tapping or typing in a subtask rings just its own cell, starting at its checkbox (not the full card width).
 - **🔴 Urgent tab** (middle column, next to 📋): shows the red (Urgent) Next Steps tasks — the real rows, so ticking, the hold menu and the add line work. The other levels stay in Next Steps. More to figure out later.
 - ~~Day colors in the half-screen calendar~~: tried, reverted the same morning (Julius: "too much"); day colors stay full screen only.
 - **Backlog hold menu → Send to Today**: hold a backlog row and let go without moving → a small menu with 📌 Send to Today, which puts it on today as an all-day task. Hold + drag still places it on a day / time.

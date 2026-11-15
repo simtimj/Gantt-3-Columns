@@ -829,3 +829,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## Backlog newest first + Date grouping (2026-11-15 01:01, Julius)
 - `blRender()`: both modes sort newest first. `lsGet('fw.blSort') === 'date'` → groups by day, header `MM/dd ccc` ("11/06 Fri") + count, rows without the date chip; otherwise urgency groups as before.
 - `.cp-blsort` "Date" button added to `.cp-blh` (beforeend, before the side / ✕ buttons); click toggles `fw.blSort` and re-renders (`.on` when date mode).
+- 01:02 (Julius: "a bit more space between the cards"): full screen all-day `.cp-fai` and backlog `.cp-bli` gap → 4px (was ~1–2px).

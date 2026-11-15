@@ -816,3 +816,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - 23:29 (Julius): sun tint back to `--sun-a` .10 (the .14 was too much).
 - 00:47 (Julius): halfway point, `--sun-a` .12.
 - 00:49 (Julius: "dark yellow comes out brown"): yellows recolored in HSL instead of darkened. `SUN_Y` → 250,214,60 (more lemon). Dark mode tint uses `--sun-bgd`: warm stops at lightness .66, full saturation, alpha ×1.25; purple unchanged. Light-mode hour numbers on warm stops = `sunHsl(c,.95,.4)` (deep gold) instead of ×.62. Helpers `sunHsl()`, `sunWarm()`.
+- 00:52 (Julius: "dark background too dark, a touch more brightness"): full screen dark `--cp-bg` #161616 → #1c1c1c, `--cp-soft` #232323 → #282828 (full screen only; side panel unchanged).

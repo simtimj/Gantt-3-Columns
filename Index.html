@@ -15706,7 +15706,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Quadrant separators (2026-11-14 night, Julius: "make them white so it's very visible"): solid white 3px lines
      between the four parts — all-day | backlog (left), Plan | grid (right), and the column split. Light theme = near-black. */
   #calPanel.cp-full{--cp-sep:rgba(32,33,36,.9);}
-  html[data-theme=dark] #calPanel.cp-full{--cp-sep:#fff;}
+  html[data-theme=dark] #calPanel.cp-full{--cp-sep:#fff;--cp-bg:#1c1c1c;--cp-soft:#282828;} /* bg a touch brighter in full screen (was #161616 / #232323) */
   #calPanel.cp-full .cp-flgrip::after{left:5.5px;width:3px;background:var(--cp-sep);}
   #calPanel.cp-full .cp-flgrip::before,#calPanel.cp-full .cp-fadgrip::before{background:var(--cp-sep);}
   #calPanel.cp-full .cp-fadgrip::after{top:5.5px;height:3px;background:var(--cp-sep);}

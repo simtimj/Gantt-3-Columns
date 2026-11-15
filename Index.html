@@ -16012,9 +16012,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-event .fc-event-main{height:100%;box-sizing:border-box;}
   /* See-through long events (2026-11-15, Julius): faint tint + colored outline, grid lines visible; the title sits on a
      solid chip in the event color. */
-  #calPanel .fc .fc-timegrid-event.cp-see{background:color-mix(in srgb,var(--cp-evbg,#1a73e8) 12%,transparent)!important;border:1.5px solid var(--cp-evbg,#1a73e8)!important;box-shadow:none!important;}
+  #calPanel .fc .fc-timegrid-event.cp-see{background:color-mix(in srgb,var(--cp-evbg,#1a73e8) 32%,transparent)!important;border:1.5px solid var(--cp-evbg,#1a73e8)!important;box-shadow:none!important;}
   #calPanel .fc .fc-timegrid-event.cp-see .fc-event-main{height:auto;position:sticky;top:0;} /* title stays in view while the event runs past the top */
-  #calPanel .fc .fc-timegrid-event.cp-see .cp-evc{display:inline-flex;max-width:100%;background:var(--cp-evbg,#1a73e8);border-radius:4px;padding:1px 5px 2px 3px;box-sizing:border-box;}
+  /* 2026-11-15 08:21 (Julius): no chip behind the title, a stronger tint instead (12 % → 32 %); the text is solid white
+     with a soft shadow so it reads over the grid. */
+  #calPanel .fc .fc-timegrid-event.cp-see .cp-evc,#calPanel .fc .fc-timegrid-event.cp-see .cp-ev-t,#calPanel .fc .fc-timegrid-event.cp-see .cp-ev-m{color:#fff!important;opacity:1!important;text-shadow:0 1px 2px rgba(0,0,0,.6);}
   /* Time always shows (2026-11-14 night, Julius: "even if the font is small, include the time with the title; no room
      below → put it to the right"): short cards and 30-min events = one line, title truncates, start time kept on the right. */
   #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-evb{display:flex;align-items:baseline;}

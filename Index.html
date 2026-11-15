@@ -15821,6 +15821,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-axis{border:0;}
   #calPanel .fc .fc-timegrid-axis-cushion{font-size:10px;color:var(--cp-muted);}
   #calPanel .fc .fc-timegrid-col{border-left:1px solid var(--cp-line);}
+  /* Clearer line between the hour numbers and the day (2026-11-14, Julius: "they look way too close"): a 2px line
+     a bit darker than the grid, with a few px of air after the numbers. */
+  #calPanel{--cp-axis-line:color-mix(in srgb,var(--cp-muted) 45%,var(--cp-line));}
+  #calPanel .fc .fc-timegrid-slot-label,#calPanel .fc .fc-timegrid-axis{border-right:2px solid var(--cp-axis-line)!important;}
   #calPanel .fc .fc-timegrid-divider{display:none;}
   /* All-day cap (2026-11-10, Julius): a long all-day list stops at half the calendar height (saved ratio, fw.calAllDayMax)
      and scrolls; drag the small bar under it to change the cap, double-click / double-tap it = back to half. */
@@ -17750,11 +17754,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-weight:500;font-size:11px;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-style:normal;font-size:8px;opacity:.85;}
-  #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 3px 0 1px;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 4px 0 1px;}
   /* Docked: narrower time column, no FRI 13 badge (the date is on the header line) (2026-11-13 evening, Julius). */
   #calPanel.cp-docked .cp-corner{display:none!important;}
   #calPanel.cp-docked .fc .fc-timegrid-axis-cushion{padding:0!important;min-width:0!important;}
-  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion{padding:0 1px 0 0!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion{padding:0 4px 0 0!important;}
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:10px;}
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-size:7px;}
   #calPanel.cp-docked .fc .fc-daygrid-body-natural .fc-daygrid-day-events{margin-bottom:0;}

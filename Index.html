@@ -15690,6 +15690,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     #calPanel.cp-full .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:wrap;}
     #calPanel.cp-full .fc .fc-toolbar-title{font-size:13px;margin:0 2px;white-space:nowrap;}
     #calPanel.cp-full .fc .fc-button{padding:0 6px!important;min-height:24px;height:24px;font-size:12px;margin:0!important;}
+    #calPanel.cp-full .fc .fc-button-group{gap:2px;}
   }
   @media (min-width:721px){
     #calPanel .cp-body.bl-open{padding-left:248px;}
@@ -15900,6 +15901,25 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   @container cpev (max-height:62px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:2;} }
   @container cpev (max-height:46px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:1;} }
   @container cpev (max-width:72px){ #calPanel .cp-tend{display:none;} }
+  /* Nothing spills out of a card (2026-11-14, Julius: "some text is spilling out"): the card clips its own content, and
+     as it gets shorter (zoomed out / 15-min events) the time line goes first, then text + box shrink to one tight line;
+     very narrow cards (phone Week) drop the time and the box and wrap the title small. */
+  #calPanel .fc .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-daygrid-event .fc-event-main{overflow:hidden;} /* not the card itself: its resize handle sits on the edge */
+  #calPanel .fc .fc-timegrid-event .fc-event-main{height:100%;box-sizing:border-box;}
+  @container cpev (max-height:34px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{display:none;} }
+  @container cpev (max-height:21px){
+    #calPanel .fc .fc-timegrid-event .fc-event-main{padding-top:0!important;padding-bottom:0!important;}
+    #calPanel .fc .fc-timegrid-event .cp-ev{font-size:10px!important;line-height:1.05;}
+    #calPanel .fc .fc-timegrid-event .cp-ev-m{font-size:9.5px!important;}
+    #calPanel .fc .fc-timegrid-event .cp-chk{width:10px!important;height:10px!important;border-width:1px;margin-top:0;}
+  }
+  @container cpev (max-height:13px){ #calPanel .fc .fc-timegrid-event .cp-ev{font-size:9px!important;line-height:1;} #calPanel .fc .fc-timegrid-event .cp-chk{width:8px!important;height:8px!important;} }
+  @container cpev (max-width:44px){
+    #calPanel .fc .fc-timegrid-event .cp-ev-m,#calPanel .fc .fc-timegrid-event .cp-chk{display:none!important;}
+    #calPanel .fc .fc-timegrid-event .fc-event-main{padding:1px 2px!important;}
+    #calPanel .fc .fc-timegrid-event .cp-ev{font-size:9px!important;line-height:1.1;}
+    #calPanel .fc .fc-timegrid-event .cp-ev-1,#calPanel .fc .fc-timegrid-event .cp-ev-t{white-space:normal!important;overflow-wrap:anywhere;word-break:break-word;}
+  }
   /* Day headers stay inside their column on narrow screens. */
   #calPanel .fc .fc-col-header-cell-cushion{width:100%;box-sizing:border-box;overflow:hidden;}
   #calPanel .fc-timeGridWeek-view .cp-dh-n{max-width:100%;}

@@ -76,6 +76,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-14)
 
+- **All-day tasks in the full-screen left column**: in the full-screen calendar the all-day strip moves off the grid into the left column — all-day tasks on top (Week view: every day, grouped by day), backlog below, with a draggable line between them (double-tap = default; remembered). Tap a task = its card, tap its box = done, hold the box = the usual menu. The half-screen calendar keeps its all-day strip.
+- **White dividing lines + always-draggable all-day line** (calendar): the hour-numbers line and the line under the all-day tasks are white in dark mode (near-black in light); the all-day / timeline line can always be dragged, not only when the list overflows.
 - **Scrolling no longer picks up tasks** (calendar, backlog, Plan): if your finger moves before the hold time is up, it's a scroll — nothing gets picked up, even if you then rest your finger. Hold still to pick something up, same as before. A selected event still moves / resizes right away.
 - **Clearer hour-column line** (calendar): a slightly darker 2px line between the hour numbers and the day, with a little more space after the numbers.
 - **Backlog rows use the full width**: the task name wraps across the whole row; the date and ✕ sit small in the top-right corner with the text flowing under them (no tall date / ✕ columns). The drag hint drops under the Backlog title when it's narrow.

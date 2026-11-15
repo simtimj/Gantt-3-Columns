@@ -15660,6 +15660,29 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-body.bl-open{padding-left:var(--blw)!important;}
   #calPanel.cp-full .cp-body.bl-open .cp-bl{position:absolute;left:6px;top:6px;bottom:8px;width:calc(var(--blw) - 12px);margin:0;border:1px solid var(--cp-line);border-radius:10px;display:flex;flex-direction:column;}
   #calPanel.cp-full .cp-blside,#calPanel.cp-full .cp-blclose{display:none;}
+  /* Full screen left column (2026-11-14, Julius): all-day tasks on top (Week = grouped by day), backlog below, with a
+     draggable line between them; the calendar grid keeps no all-day strip. --fad-r = the all-day share (fw.calFullAdR). */
+  #calPanel .cp-fad,#calPanel .cp-fadgrip{display:none;}
+  #calPanel.cp-full .cp-body{padding-left:var(--blw)!important;}
+  #calPanel.cp-full{--fad-r:.45;--fad-h:calc((100% - 26px) * var(--fad-r));}
+  #calPanel.cp-full .cp-fad{display:flex;flex-direction:column;position:absolute;left:6px;top:6px;width:calc(var(--blw) - 12px);height:var(--fad-h);
+    border:1px solid var(--cp-line);border-radius:10px;background:var(--cp-bg);overflow:hidden;z-index:2;}
+  #calPanel.cp-full .cp-body:not(.bl-open) .cp-fad{height:auto;bottom:8px;}
+  #calPanel.cp-full .cp-body.bl-open .cp-bl{top:calc(var(--fad-h) + 20px)!important;}
+  #calPanel.cp-full .cp-body.bl-open .cp-fadgrip{display:block;position:absolute;left:6px;width:calc(var(--blw) - 12px);top:calc(var(--fad-h) + 6px);height:14px;cursor:ns-resize;touch-action:none;z-index:3;}
+  #calPanel.cp-full .cp-fadgrip::after{content:"";position:absolute;left:0;right:0;top:6px;height:2px;background:var(--cp-axis-line);border-radius:1px;}
+  #calPanel.cp-full .cp-fadgrip::before{content:"";position:absolute;left:50%;width:36px;margin-left:-18px;top:4px;height:6px;border-radius:3px;background:var(--cp-axis-line);}
+  #calPanel.cp-fadresizing .cp-fadgrip::after,#calPanel.cp-fadresizing .cp-fadgrip::before{background:var(--cp-blue,#1a73e8);}
+  #calPanel .cp-fadh{display:flex;align-items:baseline;gap:6px;padding:6px 8px 4px;font-size:13px;font-weight:600;}
+  #calPanel .cp-fadh .cp-fadn{font-weight:400;color:var(--cp-muted);}
+  #calPanel .cp-fadb{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 8px;}
+  #calPanel .cp-fadd{font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--cp-muted);margin:8px 2px 3px;text-transform:uppercase;}
+  #calPanel .cp-fadd.cp-today{color:var(--cp-blue,#1a73e8);}
+  #calPanel .cp-fai{display:flex;align-items:flex-start;gap:6px;padding:5px 6px 5px 6px;margin:2px 0;border-radius:6px;font-size:13px;line-height:1.25;cursor:pointer;}
+  #calPanel .cp-fai .cp-chk{flex:0 0 auto;margin-top:1px;}
+  #calPanel .cp-fai .cp-ev-t{flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;font-weight:500;}
+  #calPanel .cp-fai.cp-done .cp-ev-t{text-decoration:line-through;opacity:.8;}
+  #calPanel .cp-fadmsg{padding:6px 4px;font-size:12px;color:var(--cp-muted);}
   /* Phone: narrower backlog and a compact toolbar (wrapping onto 2 rows) so the calendar keeps its room. */
   @media (max-width:720px){
     #calPanel.cp-full{--blw:clamp(120px,32vw,220px);}
@@ -15823,15 +15846,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-col{border-left:1px solid var(--cp-line);}
   /* Clearer line between the hour numbers and the day (2026-11-14, Julius: "they look way too close"): a 2px line
      a bit darker than the grid, with a few px of air after the numbers. */
-  #calPanel{--cp-axis-line:color-mix(in srgb,var(--cp-muted) 45%,var(--cp-line));}
+  /* Dividing lines stand out (2026-11-14, Julius: "make all those lines white"): white in dark mode, near-black in
+     light mode — the hour-numbers line and the all-day / timeline line. */
+  #calPanel{--cp-axis-line:rgba(32,33,36,.7);}
+  html[data-theme=dark] #calPanel{--cp-axis-line:rgba(255,255,255,.85);}
   #calPanel .fc .fc-timegrid-slot-label,#calPanel .fc .fc-timegrid-axis{border-right:2px solid var(--cp-axis-line)!important;}
-  #calPanel .fc .fc-timegrid-divider{display:none;}
+  #calPanel .fc .fc-timegrid-divider{display:table-cell;padding:0!important;height:2px;line-height:0;font-size:0;border:0!important;background:var(--cp-axis-line)!important;}
   /* All-day cap (2026-11-10, Julius): a long all-day list stops at half the calendar height (saved ratio, fw.calAllDayMax)
      and scrolls; drag the small bar under it to change the cap, double-click / double-tap it = back to half. */
   #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-scroller{max-height:var(--cp-ad-max,none);overflow-x:hidden !important;overflow-y:auto !important;}
   #calPanel .cp-adgrip{position:absolute;left:50%;width:64px;margin-left:-32px;height:18px;z-index:6;cursor:ns-resize;touch-action:none;display:none;}
   #calPanel .cp-adgrip.on{display:block;}
-  #calPanel .cp-adgrip::after{content:"";position:absolute;left:18px;right:18px;top:7px;height:4px;border-radius:2px;background:var(--cp-muted);opacity:.55;}
+  #calPanel .cp-adgrip::after{content:"";position:absolute;left:14px;right:14px;top:6px;height:6px;border-radius:3px;background:var(--cp-axis-line);opacity:1;box-shadow:0 0 0 1px var(--cp-bg);}
   #calPanel .cp-adgrip:hover::after,#calPanel.cp-adresizing .cp-adgrip::after{background:var(--cp-blue,#1a73e8);opacity:1;}
   #calPanel.cp-adresizing{user-select:none;}
   #calPanel .fc .fc-daygrid-body,#calPanel .fc .fc-timegrid-body{border-top:0;}
@@ -17154,7 +17180,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!h || !sc || !cpBody){ adGrip.classList.remove('on'); return; }
     const cap = Math.max(40, Math.round(h.clientHeight * adRatio)) + 'px';
     if(panel.style.getPropertyValue('--cp-ad-max') !== cap) panel.style.setProperty('--cp-ad-max', cap);
-    if(!adDrag && sc.scrollHeight <= sc.clientHeight + 1){ adGrip.classList.remove('on'); return; }
+    // 2026-11-14 (Julius: "I still want to drag the dividing line"): always draggable, not only once the list overflows.
     adGrip.style.top = Math.round(sc.getBoundingClientRect().bottom - cpBody.getBoundingClientRect().top - 9) + 'px';
     adGrip.classList.add('on');
   }
@@ -17254,7 +17280,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       select: info => { if(!pending){ const at = finePointer() ? mount.querySelector('.fc-event-mirror,.fc-highlight') : null; openForm(formFromRange(info.allDay, info.startStr, info.endStr)); if(at) popAt(at); } cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       events: fetchRange,
-      eventsSet: () => setTimeout(adLayout, 0),
+      eventsSet: () => { setTimeout(adLayout, 0); if(typeof fadSoon === 'function') fadSoon(); },
       // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
       loading: b => { busy = b; if(!b && keepOpen) setTimeout(reopenKept, 60); if(b){ if(!keepOpen && !detail.querySelector('[data-cal-form],[data-cal-del-yes],[data-cal-scope]')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
@@ -17266,7 +17292,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
         if(!pending) showDetail(info.event, info.el); },
       eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
-      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); }
+      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); }
     });
     cal.render();
     window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
@@ -17317,6 +17343,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!isOpen()) return;
     if(full){
       full = false; panel.classList.remove('cp-full'); document.body.classList.remove('cal-full');
+      try { if(cal) cal.setOption('allDaySlot', true); } catch (e) {}
       blEl.hidden = fullBlWas; panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     }
     document.body.classList.remove('cal-open');
@@ -17512,7 +17539,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     fullBlWas = blEl.hidden;
     panel.classList.add('cp-full'); document.body.classList.add('cal-full');
     open(); full = true; fullAt = Date.now();
+    try { cal.setOption('allDaySlot', false); } catch (e) {} // all-day tasks live in the left column here
     try { const v = lsGet('fw.calFullView') === 'timeGridWeek' ? 'timeGridWeek' : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
+    fadRender();
     blEl.hidden = lsGet('fw.calFullBl') === '0';
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     blPlace(); blRender(); if(!blEl.hidden) blLoad(false);
@@ -17533,7 +17562,56 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(e.target.closest && e.target.closest('#calMount .fc-view-harness')){ if(Math.abs(fwAcc) > 60){ swDay(fwAcc > 0 ? 1 : -1); fwAcc = 0; } return; }
     if(fwAcc < -150){ fwAcc = 0; close(); }
   }, {passive: false});
-  window.fwCalendar = { canFull, openFull, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  // ── Full screen: all-day tasks in the left column (2026-11-14, Julius) ──
+  const fadEl = document.createElement('div'); fadEl.className = 'cp-fad'; fadEl.setAttribute('aria-label', 'All-day tasks');
+  fadEl.innerHTML = '<div class="cp-fadh">All day <span class="cp-fadn" data-fad-n></span></div><div class="cp-fadb" data-fad-body></div>';
+  const fadGrip = document.createElement('div'); fadGrip.className = 'cp-fadgrip'; fadGrip.title = 'Drag to share the column between all-day tasks and the backlog (double-tap = default)';
+  cpBodyEl.insertBefore(fadEl, cpBodyEl.firstChild); cpBodyEl.insertBefore(fadGrip, fadEl.nextSibling);
+  const FAD_KEY = 'fw.calFullAdR';
+  let fadR = Number(lsGet(FAD_KEY)) || .45, fadList = [], fadT = 0, fadTap = 0;
+  const fadApply = () => panel.style.setProperty('--fad-r', String(fadR));
+  fadApply();
+  function fadSoon(){ if(full && !fadT) fadT = requestAnimationFrame(() => { fadT = 0; fadRender(); }); }
+  function fadRender(){
+    if(!full || !cal) return;
+    const body = fadEl.querySelector('[data-fad-body]'), n = fadEl.querySelector('[data-fad-n]');
+    const days = []; let d = luxon.DateTime.fromISO(viewStart, {zone: 'UTC'}); const end = luxon.DateTime.fromISO(viewEnd, {zone: 'UTC'});
+    for(let i = 0; d < end && i < 14; i++, d = d.plus({days: 1})) days.push(d.toISODate());
+    const today = luxon.DateTime.now().setZone(TZ).toISODate();
+    const evs = cal.getEvents().filter(e => e.allDay);
+    const ord = (a, b) => { const x = a.extendedProps || {}, y = b.extendedProps || {}; return (x.done ? 1 : 0) - (y.done ? 1 : 0) || urgRank(x) - urgRank(y) || String(a.title).localeCompare(String(b.title)); };
+    fadList = []; let h = '', total = 0;
+    days.forEach(day => {
+      const list = evs.filter(e => { const s0 = (e.startStr || '').slice(0, 10), e0 = (e.endStr || '').slice(0, 10) || s0; return s0 <= day && (e0 > day || (e0 === s0 && s0 === day)); }).sort(ord);
+      if(days.length > 1) h += '<div class="cp-fadd' + (day === today ? ' cp-today' : '') + '">' + esc(luxon.DateTime.fromISO(day).toFormat('ccc M/d')) + (list.length ? ' · ' + list.length : '') + '</div>';
+      if(!list.length && days.length > 1) return;
+      list.forEach(e => { const x = e.extendedProps || {}, i = fadList.push(e) - 1; total++;
+        h += '<div class="cp-ev cp-fai' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '"' + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
+          cpChk(e) + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + '</span></div>'; });
+    });
+    if(!total && days.length === 1) h = '<div class="cp-fadmsg">No all-day tasks.</div>';
+    body.innerHTML = h; n.textContent = total ? total : '';
+  }
+  fadEl.addEventListener('click', e => {
+    const it = e.target.closest('[data-fa]'); if(!it) return; const ev = fadList[Number(it.dataset.fa)]; if(!ev) return;
+    e.stopPropagation();
+    if(e.target.closest('.cp-chk')){ if(!document.querySelector('.urg-picker') && Date.now() - (fadEl.__downAt || 0) < 450) { toggleDone(ev); fadSoon(); } return; }
+    if(!pending) showDetail(ev, it);
+  });
+  fadEl.addEventListener('pointerdown', () => { fadEl.__downAt = Date.now(); }, true);
+  fadGrip.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation(); fadGrip.setPointerCapture(e.pointerId); panel.classList.add('cp-fadresizing');
+    const r = cpBodyEl.getBoundingClientRect(), y0 = e.clientY; let moved = false;
+    const move = ev => { if(Math.abs(ev.clientY - y0) > 4) moved = true; if(!moved) return; fadR = Math.max(.1, Math.min(.9, (ev.clientY - r.top - 6) / Math.max(1, r.height - 26))); fadApply(); };
+    const up = () => {
+      fadGrip.removeEventListener('pointermove', move); fadGrip.removeEventListener('pointerup', up); fadGrip.removeEventListener('pointercancel', up);
+      panel.classList.remove('cp-fadresizing');
+      if(!moved){ const t = Date.now(); if(t - fadTap < 350){ fadTap = 0; fadR = .45; try { localStorage.removeItem(FAD_KEY); } catch (err) {} fadApply(); } else fadTap = t; return; }
+      lsSet(FAD_KEY, fadR.toFixed(3));
+    };
+    fadGrip.addEventListener('pointermove', move); fadGrip.addEventListener('pointerup', up); fadGrip.addEventListener('pointercancel', up);
+  });
+  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

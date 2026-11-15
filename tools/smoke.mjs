@@ -1290,7 +1290,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           window.__calls = window.__calls.filter(c => c[0] !== 'setCalendarEventDone'); window.__mDone = {};
         }
         window.__calManyAllDay = 0; panel.querySelector('[data-cal-refresh]').click();
-        if (!await until(() => !panel.querySelector('.cp-adgrip.on') && panel.querySelectorAll('.fc-daygrid-event').length < 10)) out.push('all-day cap: grip still shown for a short list');
+        if (!await until(() => panel.querySelectorAll('.fc-daygrid-event').length < 10)) out.push('all-day cap: short list did not come back'); // grip always shown since 2026-11-14 (Julius)
         panel.querySelector('[data-cal-close]').click(); await wait(320);
         // Workspace + header unchanged; Options still opens; only reads went to the server.
         if ([...document.querySelectorAll('#todayScroll .day-editor, #todayScroll .plan-editor')].map(x => x.innerHTML).join('') !== ws) out.push('Gantt workspace changed while the calendar was open');
@@ -1917,11 +1917,25 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           if (a.view !== 'timeGridDay') errs.push('full screen: did not start in Day view (' + a.view + ')');
           if (!a.bl) errs.push('full screen: backlog not beside the calendar');
           if (a.wrap !== 'normal') errs.push('full screen: backlog names are cut off (' + a.wrap + ')');
+          // All-day tasks in the left column (2026-11-14): no all-day strip on the grid; Day = a plain list, Week = by day.
+          const fa = await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), p = document.getElementById('calPanel'), out = [];
+            await w(300);
+            if (p.querySelector('#calMount .fc-daygrid-body')) out.push('all-day strip still on top of the grid');
+            const f = p.querySelector('.cp-fad'), fr = f.getBoundingClientRect(), br = p.querySelector('.cp-bl').getBoundingClientRect();
+            if (fr.width < 80) out.push('all-day list not shown');
+            if (!/All-day A/.test(f.textContent)) out.push('all-day task missing from the left column');
+            if (br.top < fr.bottom) out.push('backlog not below the all-day list');
+            window.fwCalendar.api().changeView('timeGridWeek'); await w(400);
+            const dh = p.querySelectorAll('.cp-fad .cp-fadd').length; if (dh !== 7) out.push('week: ' + dh + ' day groups, not 7');
+            window.fwCalendar.api().changeView('timeGridDay'); await w(300);
+            return out; });
+          errs.push(...fa.map(x => 'full screen: ' + x));
           await pg.evaluate(() => window.fwCalendar.api().changeView('timeGridWeek')); await pg.waitForTimeout(200);
           await pg.keyboard.press('Escape'); await pg.waitForTimeout(1200);
           a = await st();
           if (a.full) errs.push('full screen: Esc did not close it');
           if (!a.docked || a.view !== 'timeGridDay') errs.push('full screen: closing did not go back to the half-screen Day calendar (' + a.view + ')');
+          if (!(await pg.evaluate(() => !!document.querySelector('#calPanel #calMount .fc-daygrid-body')))) errs.push('full screen: all-day strip not back after closing');
           await prep(); await slideIn(); a = await st();
           if (!a.full) errs.push('full screen: did not reopen');
           else if (a.view !== 'timeGridWeek') errs.push('full screen: Week view not remembered (' + a.view + ')');

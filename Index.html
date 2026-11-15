@@ -15712,6 +15712,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-fadgrip::after{top:5.5px;height:3px;background:var(--cp-sep);}
   #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{border-top:3px solid var(--cp-sep);}
   #calPanel.cp-full .cp-plan:not(.folded){border-bottom:3px solid var(--cp-sep);border-bottom-left-radius:0;border-bottom-right-radius:0;}
+  /* Sun colors (2026-11-14 night, Julius): full screen only. --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
+  #calPanel{--sun-a:.10;}
+  #calPanel.cp-full .fc .fc-timegrid-col{background-image:var(--sun-bg,none);}
+  #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-cl,var(--cp-muted))!important;}
+  html[data-theme=dark] #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-c,var(--cp-muted))!important;}
+  #calPanel .cp-sunmk{display:none;}
+  #calPanel.cp-full .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dashed rgb(242 113 28 / .55);pointer-events:none;z-index:0;}
+  #calPanel.cp-full .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:9px;line-height:1;color:var(--cp-muted);opacity:.85;}
   /* Tight cells (2026-11-14 night, Julius: "squeeze more room out, get rid of empty space and margin, text can go
      under the checkbox"): full screen only; font size unchanged for now (he wants to see this first). */
   #calPanel.cp-full .cp-fadh,#calPanel.cp-full .cp-blh{padding:2px 4px 1px;}
@@ -17706,8 +17714,49 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const fadApply = () => panel.style.setProperty('--fad-r', String(fadR));
   fadApply();
   function fadSoon(){ if(full && !fadT) fadT = requestAnimationFrame(() => { fadT = 0; fadRender(); }); }
+  /* Sun colors (2026-11-14 night, Julius): full screen only — the time grid + hour numbers follow the day's light
+     around Vallejo / Benicia: night purple → yellow at sunrise → yellow (morning) → yellow-orange (afternoon) → orange at
+     sunset → fades to purple. Sunrise / sunset worked out per day (NOAA formula, no network). Event cards keep their colors. */
+  const SUN_LAT = 38.08, SUN_LON = -122.2;
+  const SUN_P = [123,92,214], SUN_Y = [242,201,76], SUN_YO = [245,166,35], SUN_O = [242,113,28];
+  function sunTimes(iso){ // minutes after local midnight
+    const day = luxon.DateTime.fromISO(iso, {zone: 'America/Los_Angeles'}).set({hour: 12});
+    const g = 2 * Math.PI / 365 * (day.ordinal - 1), r = Math.PI / 180;
+    const eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+    const dec = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+    const ha = Math.acos(Math.max(-1, Math.min(1, Math.cos(90.833 * r) / (Math.cos(SUN_LAT * r) * Math.cos(dec)) - Math.tan(SUN_LAT * r) * Math.tan(dec)))) / r;
+    const off = day.offset;
+    return {rise: 720 - 4 * (SUN_LON + ha) - eq + off, set: 720 - 4 * (SUN_LON - ha) - eq + off};
+  }
+  function sunStops(iso){
+    const t = sunTimes(iso), noon = (t.rise + t.set) / 2;
+    return {t, stops: [[0, SUN_P], [t.rise - 60, SUN_P], [t.rise, SUN_Y], [noon, SUN_Y], [(noon + t.set) / 2, SUN_YO], [t.set, SUN_O], [t.set + 75, SUN_P], [1440, SUN_P]]};
+  }
+  function sunAt(stops, m){
+    for(let i = 1; i < stops.length; i++) if(m <= stops[i][0]){ const [a, ca] = stops[i - 1], [b, cb] = stops[i], f = b > a ? (m - a) / (b - a) : 0; return ca.map((v, k) => Math.round(v + (cb[k] - v) * f)); }
+    return stops[stops.length - 1][1];
+  }
+  const sunHm = m => { const h = Math.floor(m / 60), mi = Math.round(m % 60); return ((h + 11) % 12 + 1) + ':' + String(mi).padStart(2, '0'); };
+  function sunPaint(){
+    if(!full) return;
+    let first = null;
+    mount.querySelectorAll('.fc-timegrid-col[data-date]').forEach(col => {
+      const iso = col.getAttribute('data-date'), s = sunStops(iso); if(!first) first = s;
+      col.style.setProperty('--sun-bg', 'linear-gradient(to bottom,' + s.stops.map(([m, c]) => 'rgb(' + c.join(' ') + ' / var(--sun-a)) ' + (m / 14.4).toFixed(2) + '%').join(',') + ')');
+      const fr = col.querySelector('.fc-timegrid-col-frame'); if(!fr) return;
+      fr.querySelectorAll(':scope > .cp-sunmk').forEach(x => x.remove());
+      [['sunrise', s.t.rise], ['sunset', s.t.set]].forEach(([k, m]) => { const d = document.createElement('div'); d.className = 'cp-sunmk'; d.style.top = (m / 14.4) + '%'; d.innerHTML = '<span>' + k + ' ' + sunHm(m) + '</span>'; fr.appendChild(d); });
+    });
+    if(!first) return;
+    mount.querySelectorAll('.fc-timegrid-slot-label[data-time]').forEach(td => {
+      const [h, mi] = td.getAttribute('data-time').split(':').map(Number), c = sunAt(first.stops, h * 60 + mi);
+      td.style.setProperty('--sun-c', 'rgb(' + c.join(' ') + ')');
+      td.style.setProperty('--sun-cl', 'rgb(' + c.map(v => Math.round(v * .62)).join(' ') + ')');
+    });
+  }
   function fadRender(){
     if(!full || !cal) return;
+    requestAnimationFrame(sunPaint);
     const body = fadEl.querySelector('[data-fad-body]'), n = fadEl.querySelector('[data-fad-n]');
     const days = []; let d = luxon.DateTime.fromISO(viewStart, {zone: 'UTC'}); const end = luxon.DateTime.fromISO(viewEnd, {zone: 'UTC'});
     for(let i = 0; d < end && i < 14; i++, d = d.plus({days: 1})) days.push(d.toISODate());

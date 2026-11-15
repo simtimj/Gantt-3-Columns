@@ -847,3 +847,11 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 ## Indented subtask cells (2026-11-15 08:48, Julius)
 - `.check-line[data-tc]` margin = (`--tch` + `--tcr`) × 24px, no extra left padding. `refreshCards` sets render-only `data-tcstep` (levels deeper / shallower than the card row above, ±6; in CARD_ATTRS so it's stripped on save) → `--tcs` / `--tcsn`; `::before` draws the top step edge in `--tc-edge` (transparent unless the card outline shows: tc-subtleline subject cards, History white).
+
+## 2026-11-15 morning batch (Julius)
+- 08:58 "reduce it back": half-screen day colors reverted (sun CSS back to `.cp-full`, `sunPaint` full only; smoke checks docked has none).
+- Full-screen Week: `fullWkSync()` (openFull + datesSet while full) toggles `#calPanel.cp-fullwk` (left column / grips / backlog hidden, no left padding) and `allDaySlot` (true in Week, false in Day full; true when not full).
+- Weekday colors: `--dowc-0..6` (= day rows' `--note-line`, light / dark) + `[data-dow]` → `--dowc`. datesSet tags `.fc-toolbar-title` and `[data-ce-title]` with the Day view's weekday (cleared in Week); backlog date headers `.cp-blgd` "NOV 14 Sat".
+- Day / Week button label via `data-label` + `::after` (textContent doubled on FullCalendar re-render).
+- New event: `selectable: finePointer()`; `dateClick` (touch only) opens the form when the press was < 400 ms and no card was open at pointerdown (`gridDown`).
+- Keep In Mind / Thinking: title count `0/0 ✓` with no tasks; checkbox hold menu on a `data-tl` title: 🗑 Delete section (title + `titleCovered`, captureBeforeEdit / finishEditorEdit).

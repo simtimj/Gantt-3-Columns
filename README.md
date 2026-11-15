@@ -76,9 +76,15 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-15)
 
+- **Full-screen Week = full width**: in Week view the calendar fills the screen, the left column (all-day + backlog) hides, and the all-day tasks sit on top of the grid again. Day view keeps the left column.
+- **Day title in its weekday color** (half + full calendar, Day view): e.g. "Nov 15, Sun" uses Sunday's color from the day rows.
+- **Backlog date headers**: "NOV 14 Sat · 8", the date in that weekday's color.
+- **Tap, not hold, for New event** (calendar, phone): a quick tap on empty space opens New event; holding or scrolling doesn't. Mouse drag-to-select still works.
+- **Keep In Mind title with no tasks shows 0/0 ✓**; a title line's hold menu has **🗑 Delete section** (title + everything under it).
+- Fixed: the Day / Week button no longer shows "DayWk".
 - **Subtask cells are indented**: in a task card, each subtask's cell starts at its own indent (no empty card area left of its checkbox); short edges close each step so the card outline stays one shape.
 - **🔴 Urgent tab** (middle column, next to 📋): shows the red (Urgent) Next Steps tasks — the real rows, so ticking, the hold menu and the add line work. The other levels stay in Next Steps. More to figure out later.
-- **Day colors in the half-screen calendar**: the docked calendar (next to Dailies / Focus) now has the same sunrise → day → sunset gradient, colored hour numbers and sunrise / sunset lines as the full-screen one.
+- ~~Day colors in the half-screen calendar~~: tried, reverted the same morning (Julius: "too much"); day colors stay full screen only.
 - **Backlog hold menu → Send to Today**: hold a backlog row and let go without moving → a small menu with 📌 Send to Today, which puts it on today as an all-day task. Hold + drag still places it on a day / time.
 - **See-through long events** (calendar): timed events of 2 h or more (e.g. Sleep 1 – 7:45 am) are a faint tint with a colored outline, so the grid shows through; a stronger tint (no chip behind the title, 2026-11-15 08:21), the title in solid white, and it stays at the top of the view while the event runs past it.
 

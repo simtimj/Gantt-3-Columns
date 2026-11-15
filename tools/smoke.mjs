@@ -130,6 +130,25 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     });
     if (!renamed) { fails++; console.error('✗ Next Steps heading/counts missing: ' + name); }
   }
+  // Keep In Mind title with every task deleted shows 0/0; Delete section removes title + lines (2026-11-15, Julius).
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      document.querySelector('[data-ctab="focus"]').click(); await wait(400);
+      const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
+      const L = (t, lv, tl) => '<div class="check-line" data-level="' + lv + '"' + (tl ? ' data-tl="1"' : '') + '><input type="checkbox"><span class="check-text">' + t + '</span></div>';
+      ed.insertAdjacentHTML('beforeend', L('Empty title Q', 0, true));
+      refreshCards(ed); await wait(200);
+      const t = [...ed.querySelectorAll('.check-line')].find(l => /Empty title Q/.test(l.textContent));
+      if (t.dataset.tlcnt !== '0/0 ✓') out.push('empty title count: ' + t.dataset.tlcnt);
+      t.insertAdjacentHTML('afterend', L('Under Q', 1)); refreshCards(ed); await wait(200);
+      const n0 = ed.querySelectorAll('.check-line').length;
+      // Run the same removal the 🗑 Delete section button does.
+      const cov = titleCovered(t); captureBeforeEdit(ed); cov.forEach(x => x.remove()); t.remove(); finishEditorEdit(ed);
+      if (ed.querySelectorAll('.check-line').length !== n0 - 2) out.push('delete section did not remove title + its line');
+      document.querySelector('[data-ctab="notes"]').click(); await wait(200);
+      return out; });
+    k.forEach(x => errs.push('Keep In Mind section: ' + x));
+  }
   // Urgent tab in the middle column (2026-11-15, Julius): 🔴 shows the red Next Steps group (real rows), others hidden;
   // leaving the tab puts the panel back in Reference.
   {
@@ -1874,6 +1893,17 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (sl < 150) errs.push('half view: swipe on the calendar slid the app (' + sl + ')');
             await pg.evaluate(() => window.fwCalendar.api().today()); await pg.waitForTimeout(200);
           }
+          // Empty grid (2026-11-15, Julius): a quick tap opens New event, a hold doesn't (no fight with scrolling).
+          {
+            await pg.evaluate(() => { const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; window.fwCalendar.api().today(); window.fwCalendar.api().scrollToTime('05:00:00'); const d = document.querySelector('#calPanel [data-cal-detail]'); d.hidden = true; }); await pg.waitForTimeout(500);
+            const pt = await pg.evaluate(() => { const c = document.querySelector('#calPanel .fc-timegrid-col[data-date] .fc-timegrid-col-frame'), r = c.getBoundingClientRect(), sl = [...document.querySelectorAll('#calPanel .fc-timegrid-slot-lane[data-time="05:30:00"],#calPanel .fc-timegrid-slot-lane[data-time="05:00:00"]')][0].getBoundingClientRect(); return { x: r.x + r.width * 0.85, y: sl.y + sl.height / 2 }; });
+            const formOpen = () => pg.evaluate(() => { const d = document.querySelector('#calPanel [data-cal-detail]'); return !d.hidden && !!d.querySelector('[data-cal-form]'); });
+            await T('touchStart', pt.x, pt.y); await pg.waitForTimeout(900); await T('touchEnd'); await pg.waitForTimeout(500);
+            if (await formOpen()) errs.push('empty grid: holding opened New event');
+            await T('touchStart', pt.x, pt.y); await pg.waitForTimeout(60); await T('touchEnd'); await pg.waitForTimeout(500);
+            if (!(await formOpen())) errs.push('empty grid: a quick tap did not open New event');
+            await pg.evaluate(() => { const c = document.querySelector('#calPanel [data-cal-detail] [data-cal-detail-close]'); if (c) c.click(); else document.querySelector('#calPanel [data-cal-detail]').hidden = true; }); await pg.waitForTimeout(400);
+          }
           // Scroll ≠ pick up (2026-11-14, Julius): a finger that starts on an event and moves right away is a scroll
           // (nothing picked up, even if it then rests past the hold time); holding still first still picks it up.
           {
@@ -1920,9 +1950,9 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             bl: !!bl && !bl.hidden && !!bl.closest('#calPanel') && bl.getBoundingClientRect().width > 100, wrap: t ? getComputedStyle(t).whiteSpace : 'normal', docked: window.fwCalendar.isDocked() }; });
         await pg.evaluate(() => { localStorage.removeItem('fw.calFullView'); localStorage.removeItem('fw.calFullBl'); });
         await prep();
-        // Day colors in the half-screen docked calendar too (2026-11-15, Julius).
+        // Day colors are full screen only (half-screen tried + reverted 2026-11-15, Julius: "too much").
         { const sun = await pg.evaluate(() => { const c = document.querySelector('#calPanel.cp-docked .fc-timegrid-col[data-date]'); return c ? getComputedStyle(c).backgroundImage : 'no docked col'; });
-          if (!/gradient/.test(sun)) errs.push('docked calendar: no day-color gradient (' + sun.slice(0, 60) + ')'); }
+          if (/gradient/.test(sun)) errs.push('docked calendar: day colors should be full screen only (reverted 2026-11-15)'); }
         // Tap outside the event card closes it (2026-11-14, Julius), e.g. on the column left of the calendar.
         {
           const ev = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .fc-timegrid-event')].find(x => /Dentist/.test(x.textContent)); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return { x: r.x + r.width * 0.7, y: r.y + r.height / 2 }; });
@@ -1985,6 +2015,8 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           const fa = await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), p = document.getElementById('calPanel'), out = [];
             await w(300);
             if (p.querySelector('#calMount .fc-daygrid-body')) out.push('all-day strip still on top of the grid');
+            { const t = p.querySelector('.fc-toolbar-title'), want = String(luxon.DateTime.fromJSDate(window.fwCalendar.api().view.currentStart, {zone: 'UTC'}).weekday % 7);
+              if (!t || t.dataset.dow !== want) out.push('day title not tagged with its weekday color (' + (t && t.dataset.dow) + ' vs ' + want + ')'); }
             const f = p.querySelector('.cp-fad'), fr = f.getBoundingClientRect(), br = p.querySelector('.cp-bl').getBoundingClientRect();
             if (fr.width < 80) out.push('all-day list not shown');
             if (!/All-day A/.test(f.textContent)) out.push('all-day task missing from the left column');
@@ -1998,8 +2030,14 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
               if (!/Done all-day Z/.test(f.textContent)) out.push('all-day list: tapping Done again did not show them');
               tmp.remove(); await w(300); }
             window.fwCalendar.api().changeView('timeGridWeek'); await w(400);
-            const dh = p.querySelectorAll('.cp-fad .cp-fadd').length; if (dh !== 7) out.push('week: ' + dh + ' day groups, not 7');
-            window.fwCalendar.api().changeView('timeGridDay'); await w(300);
+            // Week (2026-11-15, Julius: "too narrow"): full width, left column hidden, all-day strip back on top.
+            { const g = p.querySelector('#calMount').getBoundingClientRect(), b = p.querySelector('.cp-body').getBoundingClientRect();
+              if (g.width < b.width * 0.9) out.push('week: calendar not full width (' + Math.round(g.width) + ' of ' + Math.round(b.width) + ')');
+              if (p.querySelector('.cp-fad').getClientRects().length) out.push('week: left column still shown');
+              if (!p.querySelector('#calMount .fc-daygrid-body')) out.push('week: all-day strip not on top'); }
+            window.fwCalendar.api().changeView('timeGridDay'); await w(400);
+            if (p.querySelector('#calMount .fc-daygrid-body')) out.push('day after week: all-day strip came back on the grid');
+            if (!p.querySelector('.cp-fad').getClientRects().length) out.push('day after week: left column not back');
             return out; });
           errs.push(...fa.map(x => 'full screen: ' + x));
           // Backlog hold menu (2026-11-15, Julius): hold a row, let go without moving → 📌 Send to Today = all-day today.
@@ -2019,6 +2057,9 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
               } else { await pg.mouse.move(r.x, r.y); await pg.mouse.down(); await pg.waitForTimeout(900); await pg.mouse.up(); }
               await pg.waitForTimeout(300);
               const btn = await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-bl-menu] button')].find(x => /Send to Today/.test(x.textContent)); if (!b) return null; const q = b.getBoundingClientRect(); return { x: q.x + q.width / 2, y: q.y + q.height / 2 }; });
+              { const dh = await pg.evaluate(async () => { localStorage.setItem('fw.blSort', 'date'); window.fwCalendar.blReload(); await new Promise(r => setTimeout(r, 300));
+                  const g = document.querySelector('#calPanel .cp-blg .cp-blgd'); const t = g ? g.textContent + '|' + g.dataset.dow : 'none'; localStorage.removeItem('fw.blSort'); window.fwCalendar.blReload(); await new Promise(r => setTimeout(r, 300)); return t; });
+                if (dh !== 'NOV 10 Tue|2') errs.push('backlog date header: ' + dh); }
               if (!btn) errs.push('backlog menu: holding a row did not open the menu');
               else {
                 await pg.mouse.click(btn.x, btn.y); await pg.waitForTimeout(500);

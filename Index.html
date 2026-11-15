@@ -11140,6 +11140,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       tb.addEventListener('pointerdown',e => e.preventDefault());
       tb.addEventListener('click',() => { hideUrgencyPicker(); toggleTitleLine(line,owner); });
       p.appendChild(tb);
+      // Delete the whole section (2026-11-15, Julius): the title line + everything it covers, in one undoable edit.
+      if(line.dataset.tl === '1' && typeof titleCovered === 'function'){
+        const xb = document.createElement('button');
+        xb.type = 'button'; xb.className = 'urg-goto urg-del';
+        const n = titleCovered(line).length;
+        xb.textContent = '🗑 Delete section (title' + (n ? ' + ' + n + ' line' + (n > 1 ? 's' : '') : '') + ')';
+        xb.addEventListener('pointerdown',e => e.preventDefault());
+        xb.addEventListener('click',() => { hideUrgencyPicker(); const cov = titleCovered(line); captureBeforeEdit(owner); cov.forEach(x => x.remove()); line.remove(); finishEditorEdit(owner); urgChanged(owner); setStatus('Section deleted'); });
+        p.appendChild(xb);
+      }
     }
     // Archive / unarchive the task + its subtasks (2026-10-27, Julius).
     // Delete a calendar event (2026-11-13, Julius): hold it → 🗑 Delete; asks once, then removes it from Google Calendar too.
@@ -13060,7 +13070,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const fold = (histForced(n,ed) ? !histIsOpen(ed,histKey(n)) : n.dataset.fold === '1') && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', cnt:tasks.length && ed.matches('.thought-editor,.kim-editor') ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : '', info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden', sum:fold && !HIST_SHUT() ? titleSummary(cov) : ''});
+      on.set(n,{state:fold ? 'c' : 'o', cnt:ed.matches('.thought-editor,.kim-editor') ? (!tasks.length ? '0/0 ✓' : done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : '', /* 0/0 once every task under it is deleted (2026-11-15, Julius) */ info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden', sum:fold && !HIST_SHUT() ? titleSummary(cov) : ''});
       if(fold){
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);
@@ -15702,6 +15712,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Full screen left column (2026-11-14, Julius): all-day tasks on top (Week = grouped by day), backlog below, with a
      draggable line between them; the calendar grid keeps no all-day strip. --fad-r = the all-day share (fw.calFullAdR). */
   #calPanel .cp-fad,#calPanel .cp-fadgrip,#calPanel .cp-flgrip{display:none;}
+  #calPanel.cp-full.cp-fullwk .cp-body,#calPanel.cp-full.cp-fullwk .cp-body.bl-open{padding-left:0!important;}
+  #calPanel.cp-full.cp-fullwk :is(.cp-fad,.cp-fadgrip,.cp-flgrip,.cp-bl){display:none!important;}
   #calPanel.cp-full .cp-flgrip{display:block;position:absolute;top:6px;bottom:8px;left:calc(var(--blw) - 8px);width:14px;cursor:ew-resize;touch-action:none;z-index:4;}
   #calPanel.cp-full .cp-flgrip::after{content:"";position:absolute;top:0;bottom:0;left:6px;width:2px;background:var(--cp-axis-line);border-radius:1px;}
   #calPanel.cp-full .cp-flgrip::before{content:"";position:absolute;top:50%;margin-top:-18px;height:36px;left:4px;width:6px;border-radius:3px;background:var(--cp-axis-line);}
@@ -15775,15 +15787,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   html[data-theme=dark] #calPanel.cp-full{--cp-line:#80868b;}
   #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{border-top:3px solid var(--cp-sep);}
   #calPanel.cp-full .cp-plan:not(.folded){border-bottom:3px solid var(--cp-sep);border-bottom-left-radius:0;border-bottom-right-radius:0;}
-  /* Sun colors (2026-11-14 night, Julius): full screen + half-screen docked calendar (2026-11-15, Julius). --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
+  /* Sun colors (2026-11-14 night, Julius): full screen only (half-screen tried 2026-11-15, Julius: "too much", reverted). --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
   #calPanel{--sun-a:.13;}
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-col{background-image:var(--sun-bg,none);}
-  html[data-theme=dark] #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-col{background-image:var(--sun-bgd,var(--sun-bg,none));}
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-cl,var(--cp-muted))!important;}
-  html[data-theme=dark] #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-c,var(--cp-muted))!important;}
+  #calPanel.cp-full .fc .fc-timegrid-col{background-image:var(--sun-bg,none);}
+  html[data-theme=dark] #calPanel.cp-full .fc .fc-timegrid-col{background-image:var(--sun-bgd,var(--sun-bg,none));}
+  #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-cl,var(--cp-muted))!important;}
+  html[data-theme=dark] #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-c,var(--cp-muted))!important;}
   #calPanel .cp-sunmk{display:none;}
-  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dashed rgb(242 113 28 / .55);pointer-events:none;z-index:0;}
-  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:9px;line-height:1;color:var(--cp-muted);opacity:.85;}
+  #calPanel.cp-full .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dashed rgb(242 113 28 / .55);pointer-events:none;z-index:0;}
+  #calPanel.cp-full .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:9px;line-height:1;color:var(--cp-muted);opacity:.85;}
   /* Tight cells (2026-11-14 night, Julius: "squeeze more room out, get rid of empty space and margin, text can go
      under the checkbox"): full screen only; font size unchanged for now (he wants to see this first). */
   #calPanel.cp-full .cp-fadh,#calPanel.cp-full .cp-blh{padding:2px 4px 1px;}
@@ -16263,6 +16275,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:8px 4px 6px 8px;}
   #calPanel .fc .fc-cpClose-button:focus,#calPanel .fc .fc-cpRefresh-button:focus{outline:0;box-shadow:none;}
   #calPanel .fc .fc-cpView-button{display:none;align-items:center;}
+  #calPanel .fc .fc-cpView-button[data-label]{font-size:0!important;}
+  /* Weekday colors (2026-11-15, Julius: "match my per-day color convention"): the same title colors the day rows use
+     (--note-line per weekday, light / dark). [data-dow] = 0 Sun … 6 Sat. Used by the calendar day title and the
+     backlog's date headers. */
+  :root{--dowc-0:#a3870a;--dowc-1:#4d4d4d;--dowc-2:#b06a2c;--dowc-3:#3f74a6;--dowc-4:#7d5630;--dowc-5:#9a7a12;--dowc-6:#6e4a24;}
+  html[data-theme=dark]{--dowc-0:#c2b562;--dowc-1:#ababab;--dowc-2:#c29f7b;--dowc-3:#87a4c0;--dowc-4:#b09b82;--dowc-5:#c0ae62;--dowc-6:#b59d79;}
+  [data-dow="0"]{--dowc:var(--dowc-0);} [data-dow="1"]{--dowc:var(--dowc-1);} [data-dow="2"]{--dowc:var(--dowc-2);} [data-dow="3"]{--dowc:var(--dowc-3);}
+  [data-dow="4"]{--dowc:var(--dowc-4);} [data-dow="5"]{--dowc:var(--dowc-5);} [data-dow="6"]{--dowc:var(--dowc-6);}
+  #calPanel .fc .fc-toolbar-title[data-dow],[data-ce-title][data-dow],#calPanel .cp-blgd[data-dow]{color:var(--dowc)!important;font-weight:600;}
+  #calPanel .fc .fc-cpView-button[data-label]::after{content:attr(data-label);font-size:12px;}
   /* Week header: smaller date circles to save height. */
   #calPanel .fc .fc-col-header-cell-cushion{padding:2px 0 4px;}
   #calPanel .fc-timeGridWeek-view .cp-dh-n{font-size:18px;width:32px;height:32px;line-height:32px;}
@@ -17133,7 +17155,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(byDate){
       const all = items.slice().sort(newest), days = [...new Set(all.map(x => x.date))];
       days.forEach(d => { const g = all.filter(x => x.date === d), D = luxon.DateTime.fromISO(d);
-        h += '<div class="cp-blg">' + esc(D.isValid ? D.toFormat('MM/dd ccc') : d) + ' · ' + g.length + '</div>';
+        // 2026-11-15 (Julius): "NOV 14 Sat · 8", the date in that weekday's color (his per-day convention).
+        h += '<div class="cp-blg">' + (D.isValid ? '<span class="cp-blgd" data-dow="' + (D.weekday % 7) + '">' + esc(D.toFormat('LLL d').toUpperCase() + ' ' + D.toFormat('ccc')) + '</span>' : esc(d)) + ' · ' + g.length + '</div>';
         g.forEach(x => { h += row(x, false); }); });
     } else BL_G.forEach(([u, name]) => {
       const g = items.filter(x => (BL_G.some(b => b[0] === x.urg) ? x.urg : '3') === u).sort(newest);
@@ -17510,7 +17533,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       eventDragStart: () => { dropSeen = false; }, eventDragStop: info => { dragStopped(info); unselSoon(); }, eventResizeStop: () => unselSoon(),
       eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: info => moveEvent(info), drop: info => (info.draggedEl && info.draggedEl.closest('[data-blid]') ? dropBacklog(info) : dropPlan(info)),
       // Phase 2: drag (desktop) or hold + drag (touch) on empty grid → New event form. Moving / resizing events is phase 3.
-      selectable: true, selectMirror: true, selectLongPressDelay: 500, unselectAuto: true,
+      /* 2026-11-15 (Julius: "holding on empty calendar space shouldn't open New event — only a single tap; it fights
+         scrolling"): touch → no hold-to-select at all; a quick tap on empty space (dateClick, < 400 ms, nothing open)
+         opens New event (1 h, or all-day in the all-day row). Mouse keeps drag-to-select too. */
+      selectable: finePointer(), selectMirror: true, selectLongPressDelay: 500, unselectAuto: true,
+      dateClick: info => { const t0 = gridDown; gridDown = null;
+        if(finePointer() || !t0 || t0.cardOpen || Date.now() - t0.at > 400 || pending || moveBusy) return; // mouse: select handles clicks
+        openForm(formFromRange(info.allDay, info.dateStr, '')); },
       select: info => { if(!pending){ const at = finePointer() ? mount.querySelector('.fc-event-mirror,.fc-highlight') : null; openForm(formFromRange(info.allDay, info.startStr, info.endStr)); if(at) popAt(at); } cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       events: fetchRange,
@@ -17526,7 +17555,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
         if(!pending) showDetail(info.event, info.el); },
       eventDidMount: a => { if(a.el.classList.contains('cp-see')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
-      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Wk' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); }
+      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = info.view.type === 'timeGridDay' ? 'Wk' : 'Day'; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
     });
     cal.render();
     window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
@@ -17580,7 +17609,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function close(){
     if(!isOpen()) return;
     if(full){
-      full = false; panel.classList.remove('cp-full'); document.body.classList.remove('cal-full');
+      full = false; panel.classList.remove('cp-full', 'cp-fullwk'); document.body.classList.remove('cal-full');
       try { if(cal) cal.setOption('allDaySlot', true); } catch (e) {}
       blEl.hidden = fullBlWas; panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     }
@@ -17591,6 +17620,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(lastFocus && lastFocus.focus && document.contains(lastFocus)) try { lastFocus.focus({preventScroll: true}); } catch (e) {}
     setTimeout(() => { if(!isOpen() && window.fwCeRedraw) window.fwCeRedraw(); }, 260); // back into the right column
   }
+  // Tap vs hold on empty grid (dateClick above): when the finger / button went down, and whether a card was open then
+  // (that tap only closes the card).
+  let gridDown = null;
+  mount.addEventListener('pointerdown', e => { gridDown = e.target.closest && e.target.closest('.fc-event') ? null : {at: Date.now(), cardOpen: !detail.hidden}; }, true);
   let unselT = 0;
   function unselEv(){ clearTimeout(unselT); try { const d = cal && cal.getCurrentData && cal.getCurrentData(); if(d && d.dispatch && d.eventSelection) d.dispatch({type: 'UNSELECT_EVENT'}); } catch (e) {} }
   function unselSoon(){ clearTimeout(unselT); unselT = setTimeout(() => { if(!moveBusy && !mount.querySelector('.fc-event-dragging,.fc-event-resizing')) unselEv(); }, 3000); }
@@ -17776,14 +17809,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      remembers Day / Week (fw.calFullView); backlog beside it unless closed there (fw.calFullBl). ✕, Esc, or a swipe
      in from the left edge → back to the half-screen calendar. The 📅 button keeps the old pop-out. */
   const canFull = () => !!cal && docked && !isOpen() && !!(ws && ws.classList.contains('ws-halves'));
+  /* Full-screen Week (2026-11-15, Julius: "too narrow"): the calendar takes the whole width, the left column (all-day
+     + backlog) hides, and the all-day strip goes back on top of the grid. Day view keeps the left column. */
+  function fullWkSync(){
+    if(!cal) return;
+    const wk = full && cal.view && cal.view.type === 'timeGridWeek';
+    panel.classList.toggle('cp-fullwk', wk);
+    const want = !full || wk;
+    try { if(cal.getOption('allDaySlot') !== want) setTimeout(() => { try { cal.setOption('allDaySlot', want); cal.updateSize(); } catch (e) {} }, 0); else cal.updateSize(); } catch (e) {}
+  }
   function openFull(){
     if(!canFull()) return false;
     let d = null; try { d = cal.getDate(); } catch (e) {}
     fullBlWas = blEl.hidden;
     panel.classList.add('cp-full'); document.body.classList.add('cal-full');
     open(); full = true; fullAt = Date.now();
-    try { cal.setOption('allDaySlot', false); } catch (e) {} // all-day tasks live in the left column here
     try { const v = lsGet('fw.calFullView') === 'timeGridWeek' ? 'timeGridWeek' : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
+    fullWkSync(); // Day: all-day tasks in the left column; Week: full width with the all-day strip on top
     fadRender();
     blEl.hidden = false; // always in the left column in full screen (no BL button there); ▾ minimizes it
     panel.classList.toggle('cp-blmin', lsGet('fw.calFullBlMin') !== '0'); // minimized by default (2026-11-14, Julius)
@@ -17888,7 +17930,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const sunWarm = c => c[0] > c[2] + 60; // yellow / orange stops (not purple)
   const sunHm = m => { const h = Math.floor(m / 60), mi = Math.round(m % 60); return ((h + 11) % 12 + 1) + ':' + String(mi).padStart(2, '0'); };
   function sunPaint(){
-    if(!full && !docked) return; // 2026-11-15 (Julius): the half-screen docked calendar gets the day colors too
+    if(!full) return; // half-screen tried and reverted 2026-11-15 (Julius: "too much")
     let first = null;
     mount.querySelectorAll('.fc-timegrid-col[data-date]').forEach(col => {
       const iso = col.getAttribute('data-date'), s = sunStops(iso); if(!first) first = s;

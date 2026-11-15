@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-14)
 
+- **Fold the Done group (full-screen All day list)**: tap "▾ Done · n" to hide the finished tasks (it stays as "▸ Done · n"); tap again to show them. Remembered.
 - **Full screen: tidy Plan header + tap the Backlog bar**: on a phone the Plan header in the full-screen calendar reads "▾ Sat Nov 14" on one line beside ↻ ✕, with the count and + Add under it (no more wrapped title). When the backlog is minimized, tapping anywhere on its bar opens it.
 - **Full screen: backlog minimized by default, no BL button, two button rows**: the full-screen calendar opens with the backlog folded to its bar (tap ▾ Backlog to open; remembered). The BL button is gone there (the backlog always sits in the left column), so Week fits on the second row and there are only two rows of buttons above the calendar.
 - **All-day list: to-do / Done split**: in the full-screen All day list, finished tasks sit under a "Done · n" divider below the open ones (per day in Week). In the half-screen calendar's all-day strip, the Done group now starts with a line across.

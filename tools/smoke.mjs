@@ -1970,6 +1970,10 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             { const api = window.fwCalendar.api(), d0 = api.view.currentStart, tmp = api.addEvent({ title: 'Done all-day Z', allDay: true, start: d0, extendedProps: { done: true } }); await w(400);
               const kids = [...f.querySelectorAll('.cp-fadb > *')], si = kids.findIndex(k => k.classList.contains('cp-fads')), zi = kids.findIndex(k => /Done all-day Z/.test(k.textContent)), ai = kids.findIndex(k => /All-day A/.test(k.textContent));
               if (si < 0 || !(ai < si && si < zi)) out.push('all-day list: no Done divider between to-do and done (' + [ai, si, zi] + ')');
+              f.querySelector('[data-fad-done]').click(); await w(200);
+              if (/Done all-day Z/.test(f.textContent) || !/Done · 1/.test(f.textContent) || !/All-day A/.test(f.textContent)) out.push('all-day list: tapping Done did not fold the finished tasks');
+              f.querySelector('[data-fad-done]').click(); await w(200);
+              if (!/Done all-day Z/.test(f.textContent)) out.push('all-day list: tapping Done again did not show them');
               tmp.remove(); await w(300); }
             window.fwCalendar.api().changeView('timeGridWeek'); await w(400);
             const dh = p.querySelectorAll('.cp-fad .cp-fadd').length; if (dh !== 7) out.push('week: ' + dh + ' day groups, not 7');

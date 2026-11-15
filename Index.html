@@ -15709,6 +15709,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-fadb{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 8px;}
   #calPanel .cp-fadd{font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--cp-muted);margin:8px 2px 3px;text-transform:uppercase;}
   #calPanel .cp-fads{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--cp-muted);margin:8px 2px 3px;}
+  #calPanel .cp-fads{cursor:pointer;padding:3px 0;user-select:none;}
   #calPanel .cp-fads::after{content:"";flex:1;height:1px;background:var(--cp-line);}
   /* Half-screen all-day strip: the Done group starts with a line across, so to-do and done read as two lists. */
   #calPanel .fc-daygrid-event-harness[data-cpgl="Done"]::before{border-top:1px solid var(--cp-axis-line,var(--cp-line));margin-top:5px;}
@@ -17667,7 +17668,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const today = luxon.DateTime.now().setZone(TZ).toISODate();
     const evs = cal.getEvents().filter(e => e.allDay);
     const ord = (a, b) => { const x = a.extendedProps || {}, y = b.extendedProps || {}; return (x.done ? 1 : 0) - (y.done ? 1 : 0) || urgRank(x) - urgRank(y) || String(a.title).localeCompare(String(b.title)); };
-    fadList = []; let h = '', total = 0;
+    fadList = []; let h = '', total = 0; const doneFold = lsGet('fw.calFadDoneFold') === '1';
     days.forEach(day => {
       const list = evs.filter(e => { const s0 = (e.startStr || '').slice(0, 10), e0 = (e.endStr || '').slice(0, 10) || s0; return s0 <= day && (e0 > day || (e0 === s0 && s0 === day)); }).sort(ord);
       if(days.length > 1) h += '<div class="cp-fadd' + (day === today ? ' cp-today' : '') + '">' + esc(luxon.DateTime.fromISO(day).toFormat('ccc M/d')) + (list.length ? ' · ' + list.length : '') + '</div>';
@@ -17675,7 +17676,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // To do first, then a "Done" divider (2026-11-14, Julius: split incomplete / done).
       const nDone = list.filter(e => (e.extendedProps || {}).done).length; let sep = false;
       list.forEach(e => { const x = e.extendedProps || {}, i = fadList.push(e) - 1; total++;
-        if(x.done && !sep){ sep = true; h += '<div class="cp-fads">Done · ' + nDone + '</div>'; }
+        if(x.done && !sep){ sep = true; h += '<div class="cp-fads" data-fad-done role="button" title="Hide / show finished tasks">' + (doneFold ? '▸' : '▾') + ' Done · ' + nDone + '</div>'; }
+        if(x.done && doneFold) return; // folded (2026-11-14, Julius): only the "Done · n" line stays
         h += '<div class="cp-ev cp-fai' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '"' + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
           cpChk(e) + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + '</span></div>'; });
     });
@@ -17683,6 +17685,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     body.innerHTML = h; n.textContent = total ? total : '';
   }
   fadEl.addEventListener('click', e => {
+    if(e.target.closest('[data-fad-done]')){ lsSet('fw.calFadDoneFold', lsGet('fw.calFadDoneFold') === '1' ? '0' : '1'); fadRender(); return; }
     const it = e.target.closest('[data-fa]'); if(!it) return; const ev = fadList[Number(it.dataset.fa)]; if(!ev) return;
     e.stopPropagation();
     if(e.target.closest('.cp-chk')){ if(!document.querySelector('.urg-picker') && Date.now() - (fadEl.__downAt || 0) < 450) { toggleDone(ev); fadSoon(); } return; }

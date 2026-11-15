@@ -2200,6 +2200,15 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #todayScroll .ts-it::before{content:"• ";}
 #todayScroll .ts-type > b{display:block;}
 [data-tlon="c"][data-tlsum]:not([data-due-label])::after{white-space:pre-line;overflow-wrap:anywhere;min-width:0;max-width:100%;box-sizing:border-box;}
+/* Compact folded look (2026-11-15): every task name, flowing into columns when there's room. */
+[data-tlmode="c"][data-tlon="c"][data-tlsum]:not([data-due-label])::after{column-width:9.5em;column-gap:14px;column-fill:balance;}
+[data-tlmode="c"] > .tl-sum .hx-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5em,1fr));column-gap:14px;}
+#todayScroll [data-tlmode="c"] > .tl-sum .ts-it::before{content:none;}
+.tl-mode-menu{position:fixed;z-index:10050;min-width:180px;padding:6px;border-radius:10px;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc);box-shadow:0 6px 22px rgba(0,0,0,.22);display:flex;flex-direction:column;gap:4px;}
+.tl-mode-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#777);padding:2px 6px;}
+.tl-mode-opt{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;padding:7px 9px;border:1px solid transparent;border-radius:7px;background:transparent;color:inherit;font:inherit;font-size:13px;cursor:pointer;}
+.tl-mode-opt span{font-size:11px;color:var(--muted,#777);}
+.tl-mode-opt.on{border-color:var(--border,#ccc);background:color-mix(in srgb,var(--text,#222) 6%,transparent);}
 /* History detail button (2026-11-04): small, next to the HISTORY / LOG title; narrow panes drop "/ LOG" so it stays one line. */
 #todayPane.pane-narrow .hl-log{display:none;}
 #todayPane .pane-header .today-jump{white-space:nowrap;}
@@ -11140,6 +11149,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       tb.addEventListener('pointerdown',e => e.preventDefault());
       tb.addEventListener('click',() => { hideUrgencyPicker(); toggleTitleLine(line,owner); });
       p.appendChild(tb);
+      // Folded look (2026-11-15, Julius): same choice as holding the fold button.
+      if(line.dataset.tl === '1' && typeof setTitleMode === 'function'){
+        const fb = document.createElement('button');
+        fb.type = 'button'; fb.className = 'urg-goto';
+        const c = line.dataset.tlmode === 'c';
+        fb.textContent = '▾ Folded look: ' + (c ? 'Compact (tap → Hidden)' : 'Hidden (tap → Compact)');
+        fb.addEventListener('pointerdown',e => e.preventDefault());
+        fb.addEventListener('click',() => { hideUrgencyPicker(); setTitleMode(line,owner,c ? 'h' : 'c'); });
+        p.appendChild(fb);
+      }
       // Delete the whole section (2026-11-15, Julius): the title line + everything it covers, in one undoable edit.
       if(line.dataset.tl === '1' && typeof titleCovered === 'function'){
         const xb = document.createElement('button');
@@ -12594,11 +12613,42 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       for(let n = t.nextElementSibling; n && !n.hasAttribute('data-tsec'); n = n.nextElementSibling) if(!isEmptyLine(n)) out.push(n);
       return out;
     }
+    /* Nested title lines (2026-11-15, Julius): a title stops at a blank line or at a title on its own level or
+       shallower, so a deeper (indented) title sits inside it and folds with it. When the line right under a title is
+       indented deeper, the title covers only its deeper lines (stops at the first line back on its level); otherwise
+       (flat list) it stops at a line shallower than itself. Level-0 flat titles behave exactly as before. */
+    const lv = x => Number(x.dataset && x.dataset.level) || 0, tl = lv(t), first = t.nextElementSibling;
+    const deep = !!(first && !isEmptyLine(first) && lv(first) > tl);
     for(let n = t.nextElementSibling; n; n = n.nextElementSibling){
-      if(isEmptyLine(n) || isTitleLine(n) || n.hasAttribute('data-tsec') || n.hasAttribute('data-secend')) break;
+      if(isEmptyLine(n) || n.hasAttribute('data-tsec') || n.hasAttribute('data-secend')) break;
+      const l = lv(n);
+      if(isTitleLine(n) && l <= tl) break;
+      if(deep ? l <= tl : l < tl) break;
       out.push(n);
     }
     return out;
+  }
+  /* Folded look per title (2026-11-15, Julius): saved data-tlmode="c" = Compact (every task name under it, open and
+     done, in columns when there's room); no attribute = Hidden (title + count). Saved with the title, so it's the
+     same on every device. Chosen by holding the fold button (or from the checkbox hold menu). */
+  function titleCompactSum(cov){
+    const labs = [];
+    cov.forEach(x => {
+      if(x.tagName === 'TABLE' || x.hasAttribute('data-cgrp')) return;
+      const isT = x.dataset && x.dataset.tl === '1';
+      if(!isT && !x.classList.contains('check-line')) return;
+      const lab = titleItemLabel(x,true); if(!lab) return;
+      const done = x.classList.contains('done') || !!(x.querySelector(':scope > input[type=checkbox]') || {}).checked;
+      labs.push((isT ? '▸ ' : done ? '✓ ' : '○ ') + lab);
+    });
+    return labs.join('\n');
+  }
+  function setTitleMode(n,ed,mode){
+    captureBeforeEdit(ed);
+    if(mode === 'c') n.dataset.tlmode = 'c'; else delete n.dataset.tlmode;
+    if(!histForced(n,ed)) n.dataset.fold = '1'; // picking a look shows it
+    titleEditDone(ed);
+    setStatus('Folded look: ' + (mode === 'c' ? 'Compact (task names)' : 'Hidden (title + count)'));
   }
   /* Day sections (Julius, 2026-10-27): every day's Today cell gets Morning / Afternoon / Evening
      title lines (data-tl="1" data-sec="…", saved) so tasks can be sorted into the day's blocks;
@@ -13070,7 +13120,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const fold = (histForced(n,ed) ? !histIsOpen(ed,histKey(n)) : n.dataset.fold === '1') && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', cnt:ed.matches('.thought-editor,.kim-editor') ? (!tasks.length ? '0/0 ✓' : done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : '', /* 0/0 once every task under it is deleted (2026-11-15, Julius) */ info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden', sum:fold && !HIST_SHUT() ? titleSummary(cov) : ''});
+      on.set(n,{state:fold ? 'c' : 'o', cnt:ed.matches('.thought-editor,.kim-editor') ? (!tasks.length ? '0/0 ✓' : done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : '', /* 0/0 once every task under it is deleted (2026-11-15, Julius) */ info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden',
+        // History list modes, Done Log project groups (3-row box) and IT study entries keep their summary; every other title uses its own look (Hidden by default).
+        sum:!fold ? '' : (histForced(n,ed) || n.dataset.study || n.hasAttribute('data-cgrp')) ? (HIST_SHUT() ? '' : titleSummary(cov)) : n.dataset.tlmode === 'c' ? titleCompactSum(cov) : ''});
       if(fold){
         cov.forEach(x => hide.add(x));
         // A folded day section also hides its empty lines (Julius, 2026-10-27: folded Morning still showed blank space);
@@ -13150,6 +13202,28 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(n.dataset.fold === '1') delete n.dataset.fold; else n.dataset.fold = '1';
     titleEditDone(ed);
   }
+  // Folded-look menu (hold the − / +): Hidden or Compact, ✓ on the current one.
+  function hideTitleModeMenu(){ const m = document.getElementById('tlModeMenu'); if(m) m.remove(); }
+  function showTitleModeMenu(t,x,y){
+    hideTitleModeMenu();
+    const ed = t.parentElement, cur = t.dataset.tlmode === 'c' ? 'c' : 'h';
+    const m = document.createElement('div'); m.id = 'tlModeMenu'; m.className = 'tl-mode-menu';
+    const head = document.createElement('div'); head.className = 'tl-mode-head'; head.textContent = 'Folded look'; m.appendChild(head);
+    [['h','Hidden','title + count'],['c','Compact','all task names']].forEach(([k,name,sub]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.mode = k;
+      b.className = 'tl-mode-opt' + (k === cur ? ' on' : '');
+      b.innerHTML = '<b>' + (k === cur ? '✓ ' : '') + name + '</b><span>' + sub + '</span>';
+      b.addEventListener('pointerdown',e => { e.preventDefault(); e.stopPropagation(); });
+      b.addEventListener('click',e => { e.preventDefault(); e.stopPropagation(); hideTitleModeMenu(); window.__tlFoldAt = Date.now(); setTitleMode(t,ed,k); });
+      m.appendChild(b);
+    });
+    document.body.appendChild(m);
+    const r = m.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight;
+    m.style.left = Math.max(8,Math.min(W - r.width - 8,x - r.width / 2)) + 'px';
+    m.style.top = (y + 14 + r.height > H - 8 ? Math.max(8,y - r.height - 14) : y + 14) + 'px';
+    if(navigator.vibrate) try{ navigator.vibrate(15); }catch(e){}
+  }
+  document.addEventListener('pointerdown',e => { if(document.getElementById('tlModeMenu') && !(e.target.closest && e.target.closest('#tlModeMenu'))) hideTitleModeMenu(); },true);
   // Tap the − / + (a ::before at the line's right end): measured from the right edge.
   (function(){
     const meas = document.createElement('span');
@@ -13185,16 +13259,20 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const t = hit(e); if(!t) return;
       e.preventDefault(); e.stopPropagation();
       suppress = t;
-      press = {t,id:e.pointerId,x:e.clientX,y:e.clientY,at:Date.now(),moved:false};
+      const pr = press = {t,id:e.pointerId,x:e.clientX,y:e.clientY,at:Date.now(),moved:false,held:false};
+      // Hold the fold button → choose the folded look (2026-11-15, Julius).
+      pr.timer = setTimeout(() => { if(press === pr && !pr.moved){ pr.held = true; showTitleModeMenu(t,pr.x,pr.y); } },450);
     },true);
     document.addEventListener('pointermove',e => {
       if(press && press.id === e.pointerId && Math.hypot(e.clientX - press.x,e.clientY - press.y) > 6) press.moved = true;
     },true);
-    document.addEventListener('pointercancel',() => { press = null; },true);
-    document.addEventListener('dragstart',() => { press = null; },true);
+    document.addEventListener('contextmenu',e => { if((press && press.t.contains(e.target)) || document.getElementById('tlModeMenu')){ e.preventDefault(); e.stopPropagation(); } },true);
+    document.addEventListener('pointercancel',() => { if(press) clearTimeout(press.timer); press = null; },true);
+    document.addEventListener('dragstart',() => { if(press) clearTimeout(press.timer); press = null; },true);
     document.addEventListener('pointerup',e => {
       if(!press || press.id !== e.pointerId) return;
-      const p = press; press = null;
+      const p = press; press = null; clearTimeout(p.timer);
+      if(p.held){ e.preventDefault(); e.stopPropagation(); return; }
       if(p.moved || Math.hypot(e.clientX - p.x,e.clientY - p.y) > 6 || Date.now() - p.at > 350 || hit(e) !== p.t) return;
       e.preventDefault(); e.stopPropagation();
       window.__tlFoldAt = Date.now();
@@ -13226,7 +13304,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       list.forEach(refreshCards);
       obs.takeRecords(); // our own attribute changes aren't edits
     }
-    obs.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-level','data-cat','class','data-tl','data-fold']});
+    obs.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-level','data-cat','class','data-tl','data-fold','data-tlmode']});
     refreshAllCards();
   })();
 

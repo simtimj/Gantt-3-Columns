@@ -149,6 +149,36 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Keep In Mind section: ' + x));
   }
+  // Nested title lines + per-title folded look (2026-11-15, Julius).
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      document.querySelector('[data-ctab="focus"]').click(); await wait(400);
+      const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
+      const L = (t, lv, tl, done) => '<div class="check-line' + (done ? ' done' : '') + '" data-level="' + lv + '"' + (tl ? ' data-tl="1"' : '') + '><input type="checkbox"' + (done ? ' checked' : '') + '><span class="check-text">' + t + '</span></div>';
+      ed.insertAdjacentHTML('beforeend', '<div><br></div>' + L('Crab trip', 0, true) + L('Due day of trip', 1, true) + L('Check gear', 2) + L('Pack bait', 2, false, true) + L('Book boat', 1) + '<div><br></div>' + L('After gap', 0));
+      refreshCards(ed); await wait(200);
+      const f = t => [...ed.querySelectorAll('.check-line')].find(l => l.textContent.trim() === t);
+      const names = a => a.map(x => x.textContent.trim()).join(',');
+      const outer = f('Crab trip'), inner = f('Due day of trip');
+      if (names(titleCovered(inner)) !== 'Check gear,Pack bait') out.push('inner covers: ' + names(titleCovered(inner)));
+      if (names(titleCovered(outer)) !== 'Due day of trip,Check gear,Pack bait,Book boat') out.push('outer covers: ' + names(titleCovered(outer)));
+      toggleTitleFold(inner, ed); refreshTitleLines(ed);
+      if (!f('Check gear').hasAttribute('data-tlhid') || f('Book boat').hasAttribute('data-tlhid') || inner.hasAttribute('data-tlhid')) out.push('inner fold hid the wrong lines');
+      if (inner.hasAttribute('data-tlsum')) out.push('Hidden look still shows a list');
+      toggleTitleFold(outer, ed); refreshTitleLines(ed);
+      if (!['Due day of trip', 'Check gear', 'Book boat'].every(t => f(t).hasAttribute('data-tlhid')) || f('After gap').hasAttribute('data-tlhid')) out.push('outer fold hid the wrong lines');
+      setTitleMode(outer, ed, 'c'); refreshTitleLines(ed);
+      const sum = outer.dataset.tlsum || '';
+      if (outer.dataset.tlmode !== 'c' || !/▸ Due day of trip/.test(sum) || !/✓ Pack bait/.test(sum) || !/○ Book boat/.test(sum)) out.push('Compact list: ' + JSON.stringify(sum));
+      const saved = cardCleanHtml(ed);
+      if (!/data-tlmode="c"[^>]*>[\s\S]{0,80}Crab trip|Crab trip/.test(saved) || !/data-tlmode="c"/.test(saved)) out.push('look not saved with the title');
+      if (/data-tlsum/.test(saved)) out.push('render-only list leaked into the saved cell');
+      const gaps = [outer.previousElementSibling, f('After gap').previousElementSibling]; // the two blank lines added above
+      captureBeforeEdit(ed); [outer, ...titleCovered(outer), f('After gap'), ...gaps].forEach(x => x.remove()); finishEditorEdit(ed);
+      document.querySelector('[data-ctab="notes"]').click(); await wait(200);
+      return out; });
+    k.forEach(x => errs.push('Nested titles: ' + x));
+  }
   // Urgent tab in the middle column (2026-11-15, Julius): 🔴 shows the red Next Steps group (real rows), others hidden;
   // leaving the tab puts the panel back in Reference.
   {

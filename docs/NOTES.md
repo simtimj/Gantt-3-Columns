@@ -856,7 +856,9 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - New event: `selectable: finePointer()`; `dateClick` (touch only) opens the form when the press was < 400 ms and no card was open at pointerdown (`gridDown`).
 - Keep In Mind / Thinking: title count `0/0 ✓` with no tasks; checkbox hold menu on a `data-tl` title: 🗑 Delete section (title + `titleCovered`, captureBeforeEdit / finishEditorEdit).
 
-## Nested title lines (2026-11-15 10:34, Julius: PLANNING, not built)
+## Nested title lines (2026-11-15 10:34, Julius: built 2026-11-15)
+- Built: `titleCovered()` generic branch — a title stops at a blank line, a section header, or a title at its own `data-level` or shallower. If the line under it is deeper, it covers only deeper lines (stops at the first line back on its level); flat lists stop at a shallower line. Level-0 flat titles unchanged.
+- Look: saved `data-tlmode="c"` = Compact (`titleCompactSum`: ○ open / ✓ done / ▸ nested title, CSS `column-width` on the ::after, grid in History `.tl-sum`); none = Hidden. History list modes (`histForced`) and IT study entries keep the old summary. `setTitleMode()` also folds the title. Hold the − / + 450 ms → `showTitleModeMenu` (#tlModeMenu); also in the checkbox hold menu. Smoke: "Nested titles".
 - Any line can become a title, including inside another title (e.g. Crabbing trip → Due day of trip → Check gear).
 - A nested title folds only its own lines; folding the outer title hides everything under it, nested titles included.
 - Everywhere: Keep In Mind, Focus / Thinking, Today, History.

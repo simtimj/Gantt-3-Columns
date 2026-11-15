@@ -84,7 +84,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Fixed: the Day / Week button no longer shows "DayWk".
 - **Subtask cells are indented** (reworked 11:43): the card stays one rounded box; tapping or typing in a subtask rings just its own cell, starting at its checkbox (not the full card width).
 - **🔴 Urgent tab** (middle column, next to 📋): shows the red (Urgent) Next Steps tasks — the real rows, so ticking, the hold menu and the add line work. The other levels stay in Next Steps. More to figure out later.
-- ~~Day colors in the half-screen calendar~~: tried, reverted the same morning (Julius: "too much"); day colors stay full screen only.
+- **Day colors in the half-screen calendar** (back on 12:21): the sunrise / sunset gradient and hour colors now show in the docked calendar next to Focus / Thinking too, same strength as full screen.
 - **Backlog hold menu → Send to Today**: hold a backlog row and let go without moving → a small menu with 📌 Send to Today, which puts it on today as an all-day task. Hold + drag still places it on a day / time.
 - **Nested title lines** (everywhere: Keep In Mind, Focus / Thinking, Today, History): an indented title inside another title folds only its own lines; folding the outer one hides everything, nested titles included (e.g. Crab trip → Due day of trip → Check gear).
 - **Folded look per title**: hold a title's − / + (or the checkbox hold menu → ▾ Folded look) → **Hidden** (title + count, the default) or **Compact** (every task name under it, ○ open / ✓ done / ▸ nested title, in columns when there's room). Saved with the title, so it's the same on every device.

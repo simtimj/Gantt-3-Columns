@@ -850,6 +850,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 ## 2026-11-15 morning batch (Julius)
 - 08:58 "reduce it back": half-screen day colors reverted (sun CSS back to `.cp-full`, `sunPaint` full only; smoke checks docked has none).
+- 12:21 Julius asked for the day gradient in the half calendar / half Focus view again: sun CSS on `:is(.cp-full,.cp-docked)`, `sunPaint` runs when `full || docked`; smoke now checks the docked grid has the gradient.
 - Full-screen Week: `fullWkSync()` (openFull + datesSet while full) toggles `#calPanel.cp-fullwk` (left column / grips / backlog hidden, no left padding) and `allDaySlot` (true in Week, false in Day full; true when not full).
 - Weekday colors: `--dowc-0..6` (= day rows' `--note-line`, light / dark) + `[data-dow]` → `--dowc`. datesSet tags `.fc-toolbar-title` and `[data-ce-title]` with the Day view's weekday (cleared in Week); backlog date headers `.cp-blgd` "NOV 14 Sat".
 - Day / Week button label via `data-label` + `::after` (textContent doubled on FullCalendar re-render).

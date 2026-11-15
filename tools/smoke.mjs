@@ -1982,7 +1982,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         await prep();
         // Day colors are full screen only (half-screen tried + reverted 2026-11-15, Julius: "too much").
         { const sun = await pg.evaluate(() => { const c = document.querySelector('#calPanel.cp-docked .fc-timegrid-col[data-date]'); return c ? getComputedStyle(c).backgroundImage : 'no docked col'; });
-          if (/gradient/.test(sun)) errs.push('docked calendar: day colors should be full screen only (reverted 2026-11-15)'); }
+          if (!/gradient/.test(sun)) errs.push('docked calendar: day colors missing (2026-11-15 12:21): ' + sun); }
         // Tap outside the event card closes it (2026-11-14, Julius), e.g. on the column left of the calendar.
         {
           const ev = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .fc-timegrid-event')].find(x => /Dentist/.test(x.textContent)); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return { x: r.x + r.width * 0.7, y: r.y + r.height / 2 }; });

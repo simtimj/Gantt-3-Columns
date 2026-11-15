@@ -17763,8 +17763,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return {rise: 720 - 4 * (SUN_LON + ha) - eq + off, set: 720 - 4 * (SUN_LON - ha) - eq + off};
   }
   function sunStops(iso){
-    const t = sunTimes(iso), noon = (t.rise + t.set) / 2;
-    return {t, stops: [[0, SUN_P], [t.rise - 60, SUN_P], [t.rise, SUN_Y], [noon, SUN_Y], [(noon + t.set) / 2, SUN_YO], [t.set, SUN_O], [t.set + 75, SUN_P], [1440, SUN_P]]};
+    // 2026-11-15 (Julius): short transitions — purple → full yellow in ~40 min around sunrise, yellow holds until
+    // ~80 min before sunset, then yellow-orange → orange at sunset → purple 40 min after.
+    const t = sunTimes(iso);
+    return {t, stops: [[0, SUN_P], [t.rise - 30, SUN_P], [t.rise + 10, SUN_Y], [t.set - 80, SUN_Y], [t.set - 30, SUN_YO], [t.set, SUN_O], [t.set + 40, SUN_P], [1440, SUN_P]]};
   }
   function sunAt(stops, m){
     for(let i = 1; i < stops.length; i++) if(m <= stops[i][0]){ const [a, ca] = stops[i - 1], [b, cb] = stops[i], f = b > a ? (m - a) / (b - a) : 0; return ca.map((v, k) => Math.round(v + (cb[k] - v) * f)); }
@@ -17791,7 +17793,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       col.style.setProperty('--sun-bg', 'linear-gradient(to bottom,' + s.stops.map(([m, c]) => 'rgb(' + c.join(' ') + ' / var(--sun-a)) ' + (m / 14.4).toFixed(2) + '%').join(',') + ')');
       // Dark mode: a faint yellow over dark grey reads as olive / brown, so the warm stops use a lighter, fully
       // saturated version (lightness .66) at a touch more strength (×1.25); purple stays as is.
-      col.style.setProperty('--sun-bgd', 'linear-gradient(to bottom,' + s.stops.map(([m, c]) => { const w = sunWarm(c); return 'rgb(' + (w ? sunHsl(c, 1, .66) : c).join(' ') + ' / calc(var(--sun-a) * ' + (w ? 1.25 : 1) + ')) ' + (m / 14.4).toFixed(2) + '%'; }).join(',') + ')');
+      col.style.setProperty('--sun-bgd', 'linear-gradient(to bottom,' + s.stops.map(([m, c]) => { const w = sunWarm(c); return 'rgb(' + (w ? sunHsl(c, 1, .66) : c).join(' ') + ' / calc(var(--sun-a) * ' + (w ? 1.45 : 1) + ')) ' + (m / 14.4).toFixed(2) + '%'; }).join(',') + ')');
       const fr = col.querySelector('.fc-timegrid-col-frame'); if(!fr) return;
       fr.querySelectorAll(':scope > .cp-sunmk').forEach(x => x.remove());
       [['sunrise', s.t.rise], ['sunset', s.t.set]].forEach(([k, m]) => { const d = document.createElement('div'); d.className = 'cp-sunmk'; d.style.top = (m / 14.4) + '%'; d.innerHTML = '<span>' + k + ' ' + sunHm(m) + '</span>'; fr.appendChild(d); });

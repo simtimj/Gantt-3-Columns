@@ -1943,6 +1943,18 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             window.fwCalendar.api().changeView('timeGridDay'); await w(300);
             return out; });
           errs.push(...fa.map(x => 'full screen: ' + x));
+          // Half / half, and the line between drags (2026-11-14, Julius).
+          {
+            const g = await pg.evaluate(() => { localStorage.removeItem('fw.calFullLw'); const p = document.getElementById('calPanel'); p.style.removeProperty('--fl-w');
+              const b = p.querySelector('.cp-body').getBoundingClientRect(), f = p.querySelector('.cp-fad').getBoundingClientRect(), gr = p.querySelector('.cp-flgrip').getBoundingClientRect();
+              return { bw: b.width, bl: b.left, fw: f.width, gx: gr.x + gr.width / 2, gy: gr.y + gr.height / 2 }; });
+            if (Math.abs(g.fw + 12 - g.bw / 2) > 6) errs.push('full screen: left column not half (' + Math.round(g.fw) + ' of ' + Math.round(g.bw) + ')');
+            await pg.mouse.move(g.gx, g.gy); await pg.mouse.down(); await pg.mouse.move(g.bl + g.bw * 0.3, g.gy, { steps: 6 }); await pg.mouse.up(); await pg.waitForTimeout(300);
+            const f2 = await pg.evaluate(() => ({ w: document.querySelector('#calPanel .cp-fad').getBoundingClientRect().width, saved: localStorage.getItem('fw.calFullLw'), cal: document.querySelector('#calMount .fc-view-harness').getBoundingClientRect().width }));
+            if (Math.abs(f2.w + 12 - g.bw * 0.3) > 8) errs.push('full screen: dragging the line did not resize (' + Math.round(f2.w) + ')');
+            if (!f2.saved) errs.push('full screen: column width not remembered');
+            await pg.evaluate(() => { localStorage.removeItem('fw.calFullLw'); document.getElementById('calPanel').style.setProperty('--fl-w', '50%'); }); await pg.waitForTimeout(200);
+          }
           await pg.evaluate(() => window.fwCalendar.api().changeView('timeGridWeek')); await pg.waitForTimeout(200);
           await pg.keyboard.press('Escape'); await pg.waitForTimeout(1200);
           a = await st();

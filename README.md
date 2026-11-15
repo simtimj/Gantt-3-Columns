@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-14)
 
+- **Full screen half / half, resizable**: the full-screen calendar opens with the left column (all-day + backlog) and the calendar each taking half the screen. Drag the white line between them to resize; it's remembered, and double-tap goes back to half.
 - **Event text stays inside its box** (calendar, every zoom / view): cards clip their own text; as a card gets shorter the time line goes first, then the text and box shrink to one tight line; very narrow cards (phone Week) show just the title, small and wrapped.
 - **Tap outside closes the event card**: with an event's card open, a tap anywhere outside it (other columns, the backlog, Plan, header, empty calendar) closes it. Tapping another event opens that one instead.
 - **All-day tasks in the full-screen left column**: in the full-screen calendar the all-day strip moves off the grid into the left column — all-day tasks on top (Week view: every day, grouped by day), backlog below, with a draggable line between them (double-tap = default; remembered). Tap a task = its card, tap its box = done, hold the box = the usual menu. The half-screen calendar keeps its all-day strip.

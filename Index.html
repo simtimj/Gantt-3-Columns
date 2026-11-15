@@ -15656,13 +15656,17 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full{width:100vw!important;max-width:100vw!important;left:0;border-left:0;box-shadow:none;}
   body.cal-full #calPanelBackdrop{display:none;}
   #calPanel.cp-full .cp-resize{display:none;}
-  #calPanel.cp-full{--blw:clamp(150px,30vw,320px);}
+  #calPanel.cp-full{--blw:var(--fl-w,50%);} /* half / half by default, drag the line between (2026-11-14, Julius) */
   #calPanel.cp-full .cp-body.bl-open{padding-left:var(--blw)!important;}
   #calPanel.cp-full .cp-body.bl-open .cp-bl{position:absolute;left:6px;top:6px;bottom:8px;width:calc(var(--blw) - 12px);margin:0;border:1px solid var(--cp-line);border-radius:10px;display:flex;flex-direction:column;}
   #calPanel.cp-full .cp-blside,#calPanel.cp-full .cp-blclose{display:none;}
   /* Full screen left column (2026-11-14, Julius): all-day tasks on top (Week = grouped by day), backlog below, with a
      draggable line between them; the calendar grid keeps no all-day strip. --fad-r = the all-day share (fw.calFullAdR). */
-  #calPanel .cp-fad,#calPanel .cp-fadgrip{display:none;}
+  #calPanel .cp-fad,#calPanel .cp-fadgrip,#calPanel .cp-flgrip{display:none;}
+  #calPanel.cp-full .cp-flgrip{display:block;position:absolute;top:6px;bottom:8px;left:calc(var(--blw) - 8px);width:14px;cursor:ew-resize;touch-action:none;z-index:4;}
+  #calPanel.cp-full .cp-flgrip::after{content:"";position:absolute;top:0;bottom:0;left:6px;width:2px;background:var(--cp-axis-line);border-radius:1px;}
+  #calPanel.cp-full .cp-flgrip::before{content:"";position:absolute;top:50%;margin-top:-18px;height:36px;left:4px;width:6px;border-radius:3px;background:var(--cp-axis-line);}
+  #calPanel.cp-flresizing .cp-flgrip::after,#calPanel.cp-flresizing .cp-flgrip::before{background:var(--cp-blue,#1a73e8);}
   #calPanel.cp-full .cp-body{padding-left:var(--blw)!important;}
   #calPanel.cp-full{--fad-r:.45;--fad-h:calc((100% - 26px) * var(--fad-r));}
   #calPanel.cp-full .cp-fad{display:flex;flex-direction:column;position:absolute;left:6px;top:6px;width:calc(var(--blw) - 12px);height:var(--fad-h);
@@ -15685,7 +15689,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .cp-fadmsg{padding:6px 4px;font-size:12px;color:var(--cp-muted);}
   /* Phone: narrower backlog and a compact toolbar (wrapping onto 2 rows) so the calendar keeps its room. */
   @media (max-width:720px){
-    #calPanel.cp-full{--blw:clamp(120px,32vw,220px);}
     #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;flex-wrap:wrap;}
     #calPanel.cp-full .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:wrap;}
     #calPanel.cp-full .fc .fc-toolbar-title{font-size:13px;margin:0 2px;white-space:nowrap;}
@@ -17591,6 +17594,30 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   fadEl.innerHTML = '<div class="cp-fadh">All day <span class="cp-fadn" data-fad-n></span></div><div class="cp-fadb" data-fad-body></div>';
   const fadGrip = document.createElement('div'); fadGrip.className = 'cp-fadgrip'; fadGrip.title = 'Drag to share the column between all-day tasks and the backlog (double-tap = default)';
   cpBodyEl.insertBefore(fadEl, cpBodyEl.firstChild); cpBodyEl.insertBefore(fadGrip, fadEl.nextSibling);
+  // Left column ⇆ calendar line (2026-11-14, Julius: "half left, half right — let's resize it"): drag it; remembered
+  // per device (fw.calFullLw, a share of the width), double-tap = back to half.
+  const flGrip = document.createElement('div'); flGrip.className = 'cp-flgrip'; flGrip.title = 'Drag to resize the left column and the calendar (double-tap = half)';
+  cpBodyEl.insertBefore(flGrip, cpBodyEl.firstChild);
+  const FL_KEY = 'fw.calFullLw';
+  let flW = Number(lsGet(FL_KEY)) || .5, flTap = 0;
+  const flApply = () => panel.style.setProperty('--fl-w', (flW * 100).toFixed(2) + '%');
+  flApply();
+  flGrip.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation(); flGrip.setPointerCapture(e.pointerId); panel.classList.add('cp-flresizing');
+    const r = cpBodyEl.getBoundingClientRect(), x0 = e.clientX; let moved = false;
+    const move = ev => { if(Math.abs(ev.clientX - x0) > 4) moved = true; if(!moved) return;
+      flW = Math.max(.15, Math.min(.8, (ev.clientX - r.left) / Math.max(1, r.width))); flApply(); };
+    const up = () => {
+      flGrip.removeEventListener('pointermove', move); flGrip.removeEventListener('pointerup', up); flGrip.removeEventListener('pointercancel', up);
+      panel.classList.remove('cp-flresizing');
+      if(!moved){ const t = Date.now(); if(t - flTap < 350){ flTap = 0; flW = .5; try { localStorage.removeItem(FL_KEY); } catch (err) {} flApply(); } else { flTap = t; return; } }
+      else lsSet(FL_KEY, flW.toFixed(3));
+      try { if(cal) cal.updateSize(); } catch (err) {}
+    };
+    flGrip.addEventListener('pointermove', move); flGrip.addEventListener('pointerup', up); flGrip.addEventListener('pointercancel', up);
+  });
+  // The calendar re-measures while the line moves (its width changes).
+  if(window.ResizeObserver) new ResizeObserver(() => { if(full && cal) try { cal.updateSize(); } catch (e) {} }).observe(mount);
   const FAD_KEY = 'fw.calFullAdR';
   let fadR = Number(lsGet(FAD_KEY)) || .45, fadList = [], fadT = 0, fadTap = 0;
   const fadApply = () => panel.style.setProperty('--fad-r', String(fadR));

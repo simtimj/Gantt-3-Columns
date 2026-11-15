@@ -869,3 +869,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Everywhere: Keep In Mind, Focus / Thinking, Today, History.
 - Folded look, chosen from the fold button: **Hidden** (title + count) or **Compact** (all task names in a row, open and done; multiple columns when there's room are part of Compact).
 - Q7 answered 10:36: **per title** — each title keeps its own Hidden / Compact choice, saved with the title so it's the same across the whole app (every device); Hidden is the default for titles not set yet.
+
+## Backlog → All day box (2026-11-15 14:00, Julius: "in the full calendar view, drag from the backlog box to the all day box")
+- Full screen sets `allDaySlot:false`, so FullCalendar never sees a drop on `.cp-fad`. A capture-phase tracker after `fadEl`'s pointerdown listener (`fadDrag`) follows `[data-bl-drag]` drags: live once moved > 10 px (mouse at once; touch only after `fwHoldMs()`, else it's a scroll); `touchmove` keeps coordinates when pointer events cancel. Over the box → `.cp-fad-over` (blue dashed outline); let go there → `blSendToday(id, viewStart)` (now takes a day) = all-day on the shown day. Week hides the left column, so Day only. Counter `window.__fwFadDrop`.
+- Smoke (calendar suite, both): Day 2026-11-18, drag "Backlog hold B" onto the box → `calBacklogPlace` all-day 11-18, no hold menu.

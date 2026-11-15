@@ -15842,6 +15842,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-fad{display:flex;flex-direction:column;position:absolute;left:6px;top:6px;width:calc(var(--blw) - 12px);height:var(--fad-h);
     border:1px solid var(--cp-line);border-radius:10px;background:var(--cp-bg);overflow:hidden;z-index:2;}
   #calPanel.cp-full .cp-body:not(.bl-open) .cp-fad{height:auto;bottom:8px;}
+  #calPanel.cp-full .cp-fad.cp-fad-over{outline:3px dashed #1a73e8;outline-offset:-3px;background:rgba(26,115,232,.12);}
   #calPanel.cp-full .cp-body.bl-open .cp-bl{top:calc(var(--fad-h) + 20px)!important;}
   #calPanel.cp-full .cp-body.bl-open .cp-fadgrip{display:block;position:absolute;left:6px;width:calc(var(--blw) - 12px);top:calc(var(--fad-h) + 6px);height:14px;cursor:ns-resize;touch-action:none;z-index:3;}
   #calPanel.cp-full .cp-fadgrip::after{content:"";position:absolute;left:0;right:0;top:6px;height:2px;background:var(--cp-axis-line);border-radius:1px;}
@@ -17349,14 +17350,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   panel.addEventListener('click', e => { if(e.target.closest('[data-bl-toggle]')){ e.stopPropagation(); blToggle(); } });
   /* Hold a backlog row and let go without moving (2026-11-15, Julius) → small menu: 📌 Send to Today (all-day task
      today). Hold + drag still places it on a day / time. "Mark complete" is next, once Julius decides what it does. */
-  function blSendToday(id){
+  function blSendToday(id, day){
     const it = blById(id); if(!it) return;
     if(moveBusy){ moveFail('Still saving — try again in a moment.'); return; }
+    const today = L().now().setZone(TZ).toISODate(); day = day || today;
     moveBusy = true; setState('loading', 'Saving…');
     google.script.run.withSuccessHandler(() => {
-      moveBusy = false; blData.items = blData.items.filter(x => x.id !== id); blRender(); flash('Sent to today ✓'); refetchFresh();
+      moveBusy = false; blData.items = blData.items.filter(x => x.id !== id); blRender(); flash(day === today ? 'Sent to today ✓' : 'All day ✓'); refetchFresh();
     }).withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save — nothing changed. ' + errText(err)); })
-      .calBacklogPlace(Object.assign({id: id}, slotReq(true, L().now().setZone(TZ).toISODate(), '', 0)));
+      .calBacklogPlace(Object.assign({id: id}, slotReq(true, day, '', 0)));
   }
   function blMenu(id, x, y){
     if(typeof hideUrgencyPicker !== 'function' || typeof placeUrgPicker !== 'function') return;
@@ -18152,6 +18154,27 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!pending) showDetail(ev, it);
   });
   fadEl.addEventListener('pointerdown', () => { fadEl.__downAt = Date.now(); }, true);
+  /* Backlog → All day box (2026-11-15, Julius: "in the full calendar view I should be able to drag things from the
+     backlog box to the all day box"). The all-day list isn't part of FullCalendar's grid, so the drop is caught here:
+     a backlog drag (mouse: moved; touch: held first, then moved — same rule FullCalendar uses) let go over `.cp-fad`
+     = all-day task on the day shown (Day view; the left column is hidden in Week). `.cp-fad-over` highlights it. */
+  let fadDrag = null;
+  const fadOver = (x, y) => { if(!full || !fadEl.getClientRects().length) return false; const r = fadEl.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
+  document.addEventListener('pointerdown', e => {
+    const r = e.target.closest && e.target.closest('#calPanel [data-bl-drag]');
+    fadDrag = (!full || !r || e.target.closest('[data-bl-x]') || (e.pointerType === 'mouse' && e.button !== 0)) ? null
+      : {id: r.dataset.blid, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t0: Date.now(), mouse: e.pointerType === 'mouse', live: false};
+  }, true);
+  const fadMove = (x, y) => { const d = fadDrag; if(!d) return; d.x = x; d.y = y;
+    if(!d.live && Math.hypot(x - d.x0, y - d.y0) > 10){ if(d.mouse || Date.now() - d.t0 >= window.fwHoldMs()) d.live = true; else { fadDrag = null; return; } }
+    if(d.live) fadEl.classList.toggle('cp-fad-over', fadOver(x, y)); };
+  const fadEnd = () => { const d = fadDrag; fadDrag = null; fadEl.classList.remove('cp-fad-over');
+    if(d && d.live && fadOver(d.x, d.y) && viewStart){ window.__fwFadDrop = (window.__fwFadDrop || 0) + 1; blSendToday(d.id, viewStart); } };
+  document.addEventListener('pointermove', e => fadMove(e.clientX, e.clientY), true);
+  document.addEventListener('touchmove', e => { if(e.touches[0]) fadMove(e.touches[0].clientX, e.touches[0].clientY); }, {capture: true, passive: true});
+  document.addEventListener('pointerup', fadEnd, true);
+  document.addEventListener('touchend', fadEnd, true);
+  document.addEventListener('pointercancel', () => { if(fadDrag && !fadDrag.live) fadDrag = null; }, true);
   fadGrip.addEventListener('pointerdown', e => {
     e.preventDefault(); e.stopPropagation(); fadGrip.setPointerCapture(e.pointerId); panel.classList.add('cp-fadresizing');
     const r = cpBodyEl.getBoundingClientRect(), y0 = e.clientY; let moved = false;

@@ -2126,6 +2126,29 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
                 if (res.left) errs.push('backlog menu: row still in the backlog after Send to Today');
               }
             }
+            // Drag a backlog row onto the All day box (2026-11-15, Julius) → all-day task on the day shown.
+            {
+              const g = await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), cal = window.fwCalendar.api();
+                cal.changeView('timeGridDay', '2026-11-18'); window.__blPlaced = null; window.fwCalendar.blReload(); await w(400);
+                const e = [...document.querySelectorAll('#calPanel .cp-bli')].find(x => /Backlog hold B/.test(x.textContent)), f = document.querySelector('#calPanel .cp-fad');
+                if (!e || !f || !f.getClientRects().length) return null; const b = e.getBoundingClientRect(), q = f.getBoundingClientRect();
+                return { x: b.x + 30, y: b.y + b.height / 2, fx: q.x + q.width / 2, fy: q.y + Math.min(40, q.height / 2) }; });
+              if (!g) errs.push('backlog → all day: row or all-day box not shown');
+              else {
+                if (name === 'phone') {
+                  const cdp = await pg.context().newCDPSession(pg);
+                  const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+                  await T('touchStart', g.x, g.y); await pg.waitForTimeout(900);
+                  for (let i = 1; i <= 8; i++) { await T('touchMove', g.x + (g.fx - g.x) * i / 8, g.y + (g.fy - g.y) * i / 8); await pg.waitForTimeout(30); }
+                  await T('touchEnd');
+                } else { await pg.mouse.move(g.x, g.y); await pg.mouse.down(); await pg.mouse.move(g.fx, g.fy, { steps: 10 }); await pg.mouse.up(); }
+                await pg.waitForTimeout(500);
+                const p = await pg.evaluate(() => window.__blPlaced);
+                if (!p || !p.allDay || p.start !== '2026-11-18' || p.id !== 'bl-1') errs.push('backlog → all day: sent ' + JSON.stringify(p));
+                if (await pg.evaluate(() => !!document.querySelector('[data-bl-menu]'))) errs.push('backlog → all day: dragging opened the hold menu');
+              }
+              await pg.evaluate(() => { document.querySelectorAll('[data-bl-menu]').forEach(m => m.remove()); window.fwCalendar.api().today(); });
+            }
             await pg.evaluate(() => { if (window.__calSrvOrig) window.__calSrv = window.__calSrvOrig; });
           }
           // Half / half, and the line between drags (2026-11-14, Julius).

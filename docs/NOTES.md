@@ -841,3 +841,6 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Smoke: the old "drag the split line" test now checks the fixed half / half split doesn't move (split fixed 2026-11-15).
 - 08:21 (Julius: "less transparent, no color behind the text, keep the font white"): `.cp-see` tint 12 % → 32 %, title chip removed; `.cp-evc` / `.cp-ev-t` / `.cp-ev-m` white, opacity 1, soft text-shadow.
 - 08:31 (Julius: "put the day gradient into the side / halfway calendar"): sun CSS now `#calPanel:is(.cp-full,.cp-docked)`; `sunPaint` runs when full or docked; triggers: `fadSoon` (eventsSet / datesSet) in docked mode, `dockTo`, and `applyZoomMode` after slot labels change. Smoke: docked column has a gradient.
+
+## Urgent tab in the middle column (2026-11-15 08:46, Julius: "for now just put the urgent stuff")
+- 🔴 `data-ctab="urgent"` + `#urgTabScroll`. `window.urgTabSync()` (called from the center tab `set()`) moves the real `#urgentPanel` into the tab (a comment node `urgHome` marks its Reference spot) and back when leaving; `renderUrgent` also moves it there on first build while the tab is open, and skips the fold check (`urgInTab()`). CSS shows only `.urg-group[data-urg="1"]` with its add line. Smoke: red row shown, Soon row hidden, panel returns on leaving.

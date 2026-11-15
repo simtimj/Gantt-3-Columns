@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-15)
 
+- **🔴 Urgent tab** (middle column, next to 📋): shows the red (Urgent) Next Steps tasks — the real rows, so ticking, the hold menu and the add line work. The other levels stay in Next Steps. More to figure out later.
 - **Day colors in the half-screen calendar**: the docked calendar (next to Dailies / Focus) now has the same sunrise → day → sunset gradient, colored hour numbers and sunrise / sunset lines as the full-screen one.
 - **Backlog hold menu → Send to Today**: hold a backlog row and let go without moving → a small menu with 📌 Send to Today, which puts it on today as an all-day task. Hold + drag still places it on a day / time.
 - **See-through long events** (calendar): timed events of 2 h or more (e.g. Sleep 1 – 7:45 am) are a faint tint with a colored outline, so the grid shows through; a stronger tint (no chip behind the title, 2026-11-15 08:21), the title in solid white, and it stays at the top of the view while the event runs past it.

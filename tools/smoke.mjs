@@ -130,6 +130,25 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     });
     if (!renamed) { fails++; console.error('✗ Next Steps heading/counts missing: ' + name); }
   }
+  // Urgent tab in the middle column (2026-11-15, Julius): 🔴 shows the red Next Steps group (real rows), others hidden;
+  // leaving the tab puts the panel back in Reference.
+  {
+    const ut = await pg.evaluate(async () => {
+      const wait = ms => new Promise(r => setTimeout(r, ms)), out = [], vis = el => !!el && el.getClientRects().length > 0;
+      const b = document.querySelector('.center-tabs [data-ctab="urgent"]'); if (!b) return ['no 🔴 tab'];
+      b.click(); await wait(300);
+      const host = document.getElementById('urgTabScroll'), panel = document.getElementById('urgentPanel');
+      if (!panel || panel.parentNode !== host) out.push('Next Steps panel not in the tab');
+      if (!vis(host)) out.push('tab area not shown');
+      const rows = [...host.querySelectorAll('.urg-row')].filter(vis).map(r => r.querySelector('.urg-text')?.textContent.trim());
+      if (!rows.includes('Pay rent')) out.push('red task missing: ' + rows.join(' / '));
+      if (rows.includes('Paid bill')) out.push('non-red task shown: ' + rows.join(' / '));
+      document.querySelector('.center-tabs [data-ctab="notes"]').click(); await wait(300);
+      if (document.getElementById('urgentPanel').closest('#urgTabScroll')) out.push('panel not put back after leaving the tab');
+      return out;
+    });
+    ut.forEach(x => errs.push('Urgent tab: ' + x));
+  }
   // Urgent checkmarks + two-way sync with the real task (2026-11-04).
   const urg = await pg.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));

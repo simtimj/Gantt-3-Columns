@@ -15712,6 +15712,29 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-fadgrip::after{top:5.5px;height:3px;background:var(--cp-sep);}
   #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{border-top:3px solid var(--cp-sep);}
   #calPanel.cp-full .cp-plan:not(.folded){border-bottom:3px solid var(--cp-sep);border-bottom-left-radius:0;border-bottom-right-radius:0;}
+  /* Tight cells (2026-11-14 night, Julius: "squeeze more room out, get rid of empty space and margin, text can go
+     under the checkbox"): full screen only; font size unchanged for now (he wants to see this first). */
+  #calPanel.cp-full .cp-fadh,#calPanel.cp-full .cp-blh{padding:2px 4px 1px;}
+  #calPanel.cp-full .cp-fadb,#calPanel.cp-full .cp-blb{padding:0 2px 2px;}
+  #calPanel.cp-full .cp-fadd,#calPanel.cp-full .cp-fads{margin:3px 2px 1px;}
+  #calPanel.cp-full .cp-fads{padding:1px 0;}
+  #calPanel.cp-full .cp-fai{display:block;padding:2px 3px;margin:1px 0;}
+  #calPanel.cp-full .cp-fai::after,#calPanel.cp-full .cp-pi::after{content:"";display:block;clear:both;}
+  #calPanel.cp-full .cp-fai .cp-chk{float:left;margin:2px 4px 0 0;}
+  #calPanel.cp-full .cp-fai .cp-ev-t{display:inline;}
+  #calPanel.cp-full .cp-bli{padding:2px 3px;margin:1px 0;}
+  #calPanel.cp-full .cp-plan{margin:0 2px 4px 2px;}
+  #calPanel.cp-full .cp-pbody{padding:0 3px 2px;}
+  #calPanel.cp-full .cp-pg{margin-top:1px;}
+  #calPanel.cp-full .cp-pgh{padding:1px 0;}
+  #calPanel.cp-full .cp-pi{display:block;padding:2px 0;}
+  #calPanel.cp-full .cp-pi input[type=checkbox]{float:left;margin:1px 4px 0 0;}
+  #calPanel.cp-full .cp-pi .cp-pbtn{float:right;margin-left:4px;}
+  #calPanel.cp-full .cp-pi .cp-pbtn button{min-width:24px;min-height:24px;}
+  #calPanel.cp-full .cp-pt2{display:block;}
+  #calPanel.cp-full .cp-pt2 > .cp-pm,#calPanel.cp-full .cp-pt2 > .cp-tg{display:block;}
+  #calPanel.cp-full .fc .fc-timegrid-event .fc-event-main{padding:1px 3px;}
+  #calPanel.cp-full .cp-evc{gap:3px;}
   #calPanel.cp-flresizing .cp-flgrip::after,#calPanel.cp-flresizing .cp-flgrip::before,
   #calPanel.cp-fadresizing .cp-fadgrip::after,#calPanel.cp-fadresizing .cp-fadgrip::before{background:var(--cp-blue,#1a73e8);}
   #calPanel .cp-fadh{display:flex;align-items:baseline;gap:6px;padding:6px 8px 4px;font-size:13px;font-weight:600;}

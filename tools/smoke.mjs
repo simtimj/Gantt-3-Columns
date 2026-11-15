@@ -1161,7 +1161,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
       // Phase 3b: move / resize in place (same id); Graphite (done) is locked; plan links follow the new start.
       const relink=e=>{const link=e.eventId+'@'+e.startMs;(S.plan||[]).forEach(x=>{if(String(x.event).split('@')[0]===e.eventId)x.event=link;});if(e.tag){S.planEv=S.planEv||{};S.planEv['tid:'+e.tag]=link;}return link;};
       if(m==='calPanelMoveEvent'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');if(e.recurring||!e.editable)throw new Error('read-only');if(e.colorId==='8')throw new Error('Done events stay where they are');
-        delete S.ev[r.eventId];e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);put(e);relink(e);return Object.assign({},e);}
+        delete S.ev[r.eventId];if(!r.allDay&&e.allDay)e.sched=true;if(r.allDay)delete e.sched;e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);put(e);relink(e);return Object.assign({},e);}
       if(m==='calPanelDeleteEvent'){const e=S.ev[r.eventId];if(e&&(e.recurring||!e.editable))throw new Error('read-only');delete S.ev[r.eventId];return {ok:true};}
       // Phase 3a plan (same rules as Code.gs: one row per ref, Big / Stretch ≤ 3 per day, Schedule = one all-day event per task).
       S.plan=S.plan||[];const P=S.plan,MAX={big:3,stretch:3,next:500,backlog:500},DATED={stretch:1};
@@ -2174,6 +2174,46 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
                 if (!bar.hidden) out.push('bar stayed after Done');
                 cal.today(); return out; });
               errs.push(...res.map(x => 'backlog bulk: ' + x));
+            }
+            // All day → Scheduled (2026-11-15, Julius): drag an All day box row onto a time = timed 15 min, listed under
+            // "Scheduled" in the box; drag that row back onto the all-day part = all-day again.
+            {
+              const day = '2026-11-20';
+              const pt = async () => pg.evaluate(async d => { const w = ms => new Promise(r => setTimeout(r, ms)); const cal = window.fwCalendar.api();
+                if (cal.view.type !== 'timeGridDay' || cal.view.currentStart.toISOString().slice(0, 10) !== d) { cal.changeView('timeGridDay', d); await w(500); }
+                const p = document.getElementById('calPanel');
+                const row = [...p.querySelectorAll('.cp-fad .cp-fai')].find(x => /All-day A/.test(x.textContent) && !x.classList.contains('cp-fasch'));
+                const sch = [...p.querySelectorAll('.cp-fad .cp-fasch')].find(x => /All-day A/.test(x.textContent));
+                const lane = p.querySelector('.fc-timegrid-slot-lane[data-time="11:00:00"]'), col = p.querySelector('.fc-timegrid-col[data-date="' + d + '"]');
+                if (lane) lane.scrollIntoView({block: 'center'}); await w(150);
+                const c = r => { if (!r) return null; const b = r.getBoundingClientRect(); return { x: b.x + Math.min(30, b.width / 2), y: b.y + b.height / 2 }; };
+                const lb = lane && lane.getBoundingClientRect(), cb = col && col.getBoundingClientRect(), fh = p.querySelector('.cp-fadh').getBoundingClientRect();
+                return { row: c(row), sch: c(sch), slot: lb && cb ? { x: cb.x + cb.width / 2, y: lb.y + 3 } : null, head: { x: fh.x + fh.width / 2, y: fh.y + fh.height / 2 } }; }, day);
+              const drag = async (a, b) => {
+                if (name === 'phone') {
+                  const cdp = await pg.context().newCDPSession(pg);
+                  const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+                  await T('touchStart', a.x, a.y); await pg.waitForTimeout(900);
+                  for (let i = 1; i <= 10; i++) { await T('touchMove', a.x + (b.x - a.x) * i / 10, a.y + (b.y - a.y) * i / 10); await pg.waitForTimeout(30); }
+                  await T('touchEnd');
+                } else { await pg.mouse.move(a.x, a.y); await pg.mouse.down(); await pg.mouse.move(b.x, b.y, { steps: 12 }); await pg.mouse.up(); }
+                await pg.waitForTimeout(900); };
+              let g = await pt();
+              if (!g.row || !g.slot) errs.push('scheduled: all-day row or 11:00 slot not found ' + JSON.stringify(g));
+              else {
+                await drag(g.row, g.slot);
+                const e1 = await pg.evaluate(d => { const e = window.__cal.ev['a-' + d]; return e && Object.assign({}, e, { min: luxon.DateTime.fromISO(e.end).diff(luxon.DateTime.fromISO(e.start), 'minutes').minutes }); }, day);
+                if (!e1 || e1.allDay || !/T11:00/.test(e1.start) || e1.min !== 15) errs.push('scheduled: drop onto 11:00 gave ' + JSON.stringify(e1 && { allDay: e1.allDay, start: e1.start, end: e1.end }));
+                g = await pt();
+                if (!g.sch) errs.push('scheduled: not listed under Scheduled in the All day box');
+                else {
+                  if (!(await pg.evaluate(() => /Scheduled · 1/.test(document.querySelector('#calPanel .cp-fasg')?.textContent || '')))) errs.push('scheduled: group header missing');
+                  await drag(g.sch, g.head);
+                  const e2 = await pg.evaluate(d => window.__cal.ev['a-' + d], day);
+                  if (!e2 || !e2.allDay || e2.sched) errs.push('scheduled: dragging back to all day gave ' + JSON.stringify(e2 && { allDay: e2.allDay, sched: e2.sched }));
+                }
+              }
+              await pg.evaluate(() => window.fwCalendar.api().today());
             }
             await pg.evaluate(() => { if (window.__calSrvOrig) window.__calSrv = window.__calSrvOrig; });
           }

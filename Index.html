@@ -15842,6 +15842,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-fad{display:flex;flex-direction:column;position:absolute;left:6px;top:6px;width:calc(var(--blw) - 12px);height:var(--fad-h);
     border:1px solid var(--cp-line);border-radius:10px;background:var(--cp-bg);overflow:hidden;z-index:2;}
   #calPanel.cp-full .cp-body:not(.bl-open) .cp-fad{height:auto;bottom:8px;}
+  #calPanel .cp-scht{font-weight:400;opacity:.85;white-space:nowrap;}
+  #calPanel .fc-event.cp-schc{opacity:.92;border-style:dashed!important;}
+  #calPanel.cp-full .cp-fai.cp-fasch{border:1px dashed currentColor;}
+  #calPanel.cp-full .cp-fasg{cursor:default;}
   #calPanel.cp-full .cp-fad.cp-fad-over{outline:3px dashed #1a73e8;outline-offset:-3px;background:rgba(26,115,232,.12);}
   #calPanel.cp-full .cp-body.bl-open .cp-bl{top:calc(var(--fad-h) + 20px)!important;}
   #calPanel.cp-full .cp-body.bl-open .cp-fadgrip{display:block;position:absolute;left:6px;width:calc(var(--blw) - 12px);top:calc(var(--fad-h) + 6px);height:14px;cursor:ns-resize;touch-action:none;z-index:3;}
@@ -16558,9 +16562,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return { bg: '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1), fg: lum > 0.62 ? '#1f1f1f' : '#fff' };
   };
   const urgRank = x => ({1: 1, 2: 2, 3: 3})[x.urg] || 4; // checkbox order (2026-11-11): Urgent → Next → Later → not set
-  const toFc = x => { const c = softColor(x.color, x.done); x.urgRank = urgRank(x); return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
+  const toFc = x => { const c = softColor(x.color, x.done); x.urgRank = urgRank(x); x.cpSch = 0; return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
     backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg,
     classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x }; };
+  /* Scheduled (2026-11-15, Julius: "drag an all-day task into my calendar but keep it in the all-day section… when
+     it's scheduled, make it its own category below"): a timed event that came from an all-day task (`sched`, a private
+     tag set by calPanelMoveEvent) also gets an all-day stand-in copy (`schCopy`, id 'sch|<id>') in the all-day row /
+     the full-screen All day box, grouped "Scheduled" (after the open tasks, before Done). Dragging the copy onto a
+     time reschedules the real event; onto the all-day row / box = back to all-day (unscheduled). */
+  function addSch(list){
+    const out = list.slice();
+    list.forEach(f => { const x = f.extendedProps || {}; if(f.allDay || !x.sched) return;
+      const d = String(x.start || '').slice(0, 10); if(!d) return;
+      out.push({id: 'sch|' + f.id, title: f.title, start: d, allDay: true, backgroundColor: f.backgroundColor, borderColor: f.borderColor, textColor: f.textColor,
+        classNames: (f.classNames || []).concat('cp-schc'), editable: f.editable, durationEditable: false, extendedProps: Object.assign({}, x, {schCopy: true, origId: f.id, cpSch: 1})}); });
+    return out;
+  }
+  const schOrig = ev => { const x = (ev && ev.extendedProps) || {}; return x.schCopy && cal ? (cal.getEventById(x.origId) || ev) : ev; };
   const canRun = () => !!(window.google && google.script && google.script.run);
   // Quiet re-read of the window around [s, e). Redraws only when the dates on screen changed, and never under an
   // open card / form, a drag or a save (the cache is updated either way, so the next view uses the new copy).
@@ -16600,7 +16618,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function fetchRange(info, ok, fail){
     const s = info.startStr.slice(0, 10), e = info.endStr.slice(0, 10);
     if(!forceNext && covered(s, e)){
-      ok(cacheGet(s, e).map(toFc));
+      ok(addSch(cacheGet(s, e).map(toFc)));
       partial = cacheFailed; loadErr = false;
       setTimeout(refreshState, 0);
       const [ws, we] = windowFor(s, e);
@@ -16617,7 +16635,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(seq !== loadSeq) return;
       if(g === gen) cacheApply(r, ws, we, at);
       else cacheApply(r, ws, we, 0);
-      ok(((r && r.events) || []).filter(x => overlaps(x, s, e)).map(toFc));
+      ok(addSch(((r && r.events) || []).filter(x => overlaps(x, s, e)).map(toFc)));
       partial = ((r && r.failed) || []).length; loadErr = false;
       setTimeout(refreshState, 0);
       if(force) setTimeout(() => bgRefresh(s, e), 300);
@@ -17223,10 +17241,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const hit = document.elementsFromPoint(p.x, p.y).map(el => el.closest && el.closest('.fc-daygrid-body .fc-daygrid-day[data-date]')).find(Boolean);
     return hit && mount.contains(hit) ? hit : null;
   }
+  // Move the real event behind a Scheduled copy / All day row: `req` = slotReq shape. Drawn at once, then re-read.
+  function schMove(orig, req, msg){
+    const x = (orig && orig.extendedProps) || {};
+    if(!orig || !x.editable || x.done){ moveFail('That one can’t be moved here.'); return; }
+    if(x.recurring){ moveFail('Repeating event — move it on the calendar itself.'); return; }
+    try { if(req.allDay) orig.setDates(req.start, null, {allDay: true}); else orig.setDates(L().fromISO(req.start, {zone: TZ}).toJSDate(), L().fromISO(req.end, {zone: TZ}).toJSDate(), {allDay: false});
+      orig.setExtendedProp('sched', !req.allDay); } catch (e) {}
+    if(typeof fadSoon === 'function') fadSoon();
+    flash(msg);
+    google.script.run.withSuccessHandler(() => { refetchFresh(); loadPlan(true); })
+      .withFailureHandler(err => { moveFail('Couldn’t save the move — put it back. ' + errText(err)); refetchFresh(); })
+      .calPanelMoveEvent(Object.assign({eventId: x.eventId, startMs: x.startMs, calId: x.calId, scope: 'one'}, req));
+  }
+  const evMinutes = ev => ev && ev.start && ev.end && !ev.allDay ? Math.max(15, Math.round((ev.end - ev.start) / 60000)) : 15;
+  function unschedule(orig){ const x = (orig && orig.extendedProps) || {}; const d = String(x.start || '').slice(0, 10) || viewStart;
+    schMove(orig, slotReq(true, d, '', 0), 'Back to all day ✓'); }
+  function dropSchCopy(info){
+    const ev = info.event, allDay = ev.allDay, st = ev.startStr, orig = schOrig(ev); info.revert();
+    if(allDay) unschedule(orig); else schMove(orig, slotReq(false, st, '', evMinutes(orig)), 'Rescheduled ✓');
+  }
   function dragStopped(info){
     const ev = info.event, p = ptOf(info.jsEvent);
     setTimeout(() => {
       if(dropSeen || ev.allDay) return;
+      if(full && p && typeof fadOver === 'function' && fadOver(p.x, p.y)){ unschedule(ev); return; } // full screen: onto the All day box
       const cell = allDayCellAt(p), x = ev.extendedProps || {};
       if(!cell || moveBusy || !x.editable || x.done) return;
       const d = cell.dataset.date;
@@ -17341,6 +17380,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     google.script.run.withSuccessHandler(() => { blData.items = blData.items.filter(x => x.id !== id); blRender(); })
       .withFailureHandler(err => moveFail('Couldn’t remove — ' + errText(err))).calBacklogPlace({id: id, drop: true});
   });
+  // Full screen: an All day box row dropped on the timeline = scheduled (15 min; a Scheduled row keeps its length).
+  function dropFad(info){
+    const r = info.draggedEl.closest('[data-fa]'), ev = r && typeof fadList !== 'undefined' ? fadList[Number(r.dataset.fa)] : null; if(!ev) return;
+    const orig = schOrig(ev);
+    if(info.allDay){ unschedule(orig); return; }
+    schMove(orig, slotReq(false, info.dateStr, '', orig.allDay ? 15 : evMinutes(orig)), orig.allDay ? 'Scheduled ✓' : 'Rescheduled ✓');
+  }
   function dropBacklog(info){
     const id = info.draggedEl.closest('[data-blid]').dataset.blid, it = blById(id);
     if(!it) return;
@@ -17503,7 +17549,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // ── Event checkboxes (2026-11-11, Julius) ──
   const cpCat = x => { try { return typeof calRowCat === 'function' ? calRowCat({cat: x.cat || '', title: x.title || ''}) : ''; } catch (e) { return ''; } };
   const cpCatColor = k => { try { return k && CARD_CAT_BY_KEY[k] ? CARD_CAT_BY_KEY[k].color : ''; } catch (e) { return ''; } };
-  const CP_GROUPS = {1: 'Urgent', 2: 'Next', 3: 'Later', 4: 'Not set', done: 'Done'};
+  const CP_GROUPS = {1: 'Urgent', 2: 'Next', 3: 'Later', 4: 'Not set', done: 'Done', sched: 'Scheduled'};
   /* Full time range on every timed card (2026-11-15 12:54, Julius: "Chill says 12 AM — show the complete range, even
      when it's cut off from yesterday / runs past tonight"): built from the event's real start / end, not the day piece.
      A side that's on another day gets its weekday ("Sat 10 PM – 7:45 AM"), and a cut-off card never hides its end. */
@@ -17520,7 +17566,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   function cpEvAttrs(ev){
     const x = ev.extendedProps || {}, k = cpCat(x), a = (n, v) => v ? ' data-' + n + '="' + esc(v) + '"' : '';
     return a('ce-id', x.eventId) + a('ce-cal', x.calId) + a('ce-start', String(x.startMs || '')) + ' data-ce-rec="' + (x.recurring ? 1 : 0) + '"' +
-      a('urg', x.urg) + a('due', x.due) + a('dur', x.dur) + a('cat', x.cat) + a('tccat', k) + ' data-cpg="' + (x.done ? 'done' : urgRank(x)) + '"';
+      a('urg', x.urg) + a('due', x.due) + a('dur', x.dur) + a('cat', x.cat) + a('tccat', k) + ' data-cpg="' + (x.done ? 'done' : x.schCopy ? 'sched' : urgRank(x)) + '"' + (x.schCopy ? ' data-sch="1"' : '');
   }
   function cpChk(ev){
     const x = ev.extendedProps || {}, c = cpCatColor(cpCat(x));
@@ -17587,7 +17633,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      Covers calendar events, backlog rows and Plan rows. */
   (() => {
     let tg = null;
-    const SEL = '#calPanel .fc-event, [data-bl-drag], [data-plan-drag]';
+    const SEL = '#calPanel .fc-event, [data-bl-drag], [data-plan-drag], [data-fa-drag]';
     document.addEventListener('touchstart', e => {
       // A selected event (or its resize handle) moves right away by design (FullCalendar: no hold once it's selected).
       const t = e.touches.length === 1 && e.target.closest && e.target.closest(SEL) && !e.target.closest('.fc-event-selected,.fc-event-resizer,.fc-event-mirror');
@@ -17684,7 +17730,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     cal = new FullCalendar.Calendar(mount, {
       // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
       timeZone: TZ,
-      eventOrder: 'done,start,urgRank,-duration,allDay,title', // completed events last (2026-11-10), then by urgency (2026-11-11, Julius)
+      eventOrder: 'done,cpSch,start,urgRank,-duration,allDay,title', // completed events last (2026-11-10), then by urgency (2026-11-11, Julius)
       initialView: saved === 'timeGridDay' || saved === 'timeGridWeek' ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
       // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
       // One toolbar line (2026-11-08, Julius): Today · date · ‹ › … Plan · Day|Week · ↻ · ✕. The old header row and
@@ -17742,7 +17788,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       eventContent: a => {
         const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : cpRangeHtml(a);
         const short = !a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 30 * 60000;
-        const body = a.event.allDay ? '<span class="cp-ev-t">' + t + '</span>'
+        const sx = a.event.extendedProps || {}, st = sx.schCopy ? L().fromISO(String(sx.start || '')).setZone(TZ) : null;
+        const body = a.event.allDay ? '<span class="cp-ev-t">' + t + (st && st.isValid ? '<span class="cp-scht"> · ' + esc(st.toFormat('h:mm a').replace(':00', '')) + '</span>' : '') + '</span>'
           : short ? '<span class="cp-ev-t">' + t + '</span><span class="cp-ev-m">, ' + tm + '</span>'
           : '<div class="cp-ev-t">' + t + '</div><div class="cp-ev-m">' + tm + '</div>';
         return { html: '<div class="cp-ev cp-evc' + (short ? ' cp-ev-1' : '') + '"' + cpEvAttrs(a.event) + '>' + cpChk(a.event) + '<div class="cp-evb">' + body + '</div></div>' };
@@ -17753,9 +17800,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // ways. Per event `editable` = main calendar, not repeating, not done (Graphite stays put). Plan rows drop in too.
       editable: true, eventStartEditable: true, eventDurationEditable: true, eventResizableFromStart: false,
       eventLongPressDelay: window.fwHoldMs(), snapDuration: '00:15:00', defaultTimedEventDuration: '00:15:00', defaultAllDayEventDuration: {days: 1},
-      eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag],[data-bl-drag]',
+      eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag],[data-bl-drag],[data-fa-drag]',
       eventDragStart: () => { dropSeen = false; }, eventDragStop: info => { dragStopped(info); unselSoon(); }, eventResizeStop: () => unselSoon(),
-      eventDrop: info => { dropSeen = true; moveEvent(info); }, eventResize: info => moveEvent(info), drop: info => (info.draggedEl && info.draggedEl.closest('[data-blid]') ? dropBacklog(info) : dropPlan(info)),
+      eventDrop: info => { dropSeen = true; if((info.event.extendedProps || {}).schCopy) dropSchCopy(info); else moveEvent(info); }, eventResize: info => moveEvent(info), drop: info => (info.draggedEl && info.draggedEl.closest('[data-fa-drag]') ? dropFad(info) : info.draggedEl && info.draggedEl.closest('[data-blid]') ? dropBacklog(info) : dropPlan(info)),
       // Phase 2: drag (desktop) or hold + drag (touch) on empty grid → New event form. Moving / resizing events is phase 3.
       /* 2026-11-15 (Julius: "holding on empty calendar space shouldn't open New event — only a single tap; it fights
          scrolling"): touch → no hold-to-select at all; a quick tap on empty space (dateClick, < 400 ms, nothing open)
@@ -17776,8 +17823,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         // A press on the box can redraw the card before the release, so the click lands on the card: use the press (2026-11-11 fix).
         const x = info.event.extendedProps || {}, dn = cpDown; cpDown = null;
         const onBox = (info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')) || (dn && dn.id === x.eventId && dn.ms === String(x.startMs) && Date.now() - dn.t < 1200);
-        if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
-        if(!pending) showDetail(info.event, info.el); },
+        if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(schOrig(info.event)); return; }
+        if(!pending) showDetail(schOrig(info.event), info.el); },
       eventDidMount: a => { if(a.el.classList.contains('cp-see')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
       datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = info.view.type === 'timeGridDay' ? 'Wk' : 'Day'; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
     });
@@ -17808,6 +17855,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       eventData: el => { const it = blById(el.dataset.blid); return {title: it ? it.title : '', duration: {minutes: 30}, create: false}; }
     });
     blRender();
+    if(FullCalendar.Draggable && typeof fadEl !== 'undefined') new FullCalendar.Draggable(fadEl, {
+      itemSelector: '[data-fa-drag]', longPressDelay: window.fwHoldMs(), minDistance: 5,
+      eventData: el => { const r = el.closest('[data-fa]'), ev = r && fadList[Number(r.dataset.fa)], o = schOrig(ev); return {title: ev ? ev.title : '', duration: {minutes: o && !o.allDay ? evMinutes(o) : 15}, create: false}; }
+    });
     if(FullCalendar.Draggable && planBody) planDrag = new FullCalendar.Draggable(planBody, {
       itemSelector: '[data-plan-drag]', longPressDelay: window.fwHoldMs(), minDistance: 5,
       eventData: el => { const r = el.closest('[data-pid]'), it = r && planById(r.dataset.pid); return {title: it ? planView(it).title : '', duration: {minutes: it ? planMinutes(it) : 30}, create: false}; }
@@ -18065,8 +18116,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // 2026-11-14 night (Julius): a sideways swipe right anywhere on the left column (all-day / backlog) goes back too;
   // up / down still scrolls the lists (needs dx > 60 and 1.5× more sideways than vertical).
   const fswLeft = t => t && t.closest && t.closest('.cp-fad, .cp-bl') && !t.closest('.cp-fadgrip, .cp-flgrip');
-  panel.addEventListener('touchstart', e => { fsw = full && e.touches.length === 1 && (e.touches[0].clientX < 30 || fswLeft(e.target)) ? {x: e.touches[0].clientX, y: e.touches[0].clientY} : null; }, {passive: true, capture: true});
-  panel.addEventListener('touchend', e => { const p = fsw; fsw = null; if(!p || !full) return; const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y; if(dx > 60 && dx > Math.abs(dy) * 1.5) close(); }, {passive: true, capture: true});
+  panel.addEventListener('touchstart', e => { fsw = full && e.touches.length === 1 && (e.touches[0].clientX < 30 || fswLeft(e.target)) ? {x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), drag: false} : null; }, {passive: true, capture: true});
+  // Held before moving = a drag (backlog / All day row onto the timeline, 2026-11-15), not the slide-back swipe.
+  panel.addEventListener('touchmove', e => { const p = fsw, t = e.touches[0]; if(p && t && !p.moved && Math.hypot(t.clientX - p.x, t.clientY - p.y) > 10){ p.moved = true; p.drag = Date.now() - p.t >= window.fwHoldMs(); } }, {passive: true, capture: true});
+  panel.addEventListener('touchend', e => { const p = fsw; fsw = null; if(!p || !full || p.drag) return; const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y; if(dx > 60 && dx > Math.abs(dy) * 1.5) close(); }, {passive: true, capture: true});
   panel.addEventListener('wheel', e => {
     if(!full || e.ctrlKey || e.metaKey) return;
     if(Date.now() - fullAt < 700){ e.preventDefault(); return; } // the slide that opened it is still coasting
@@ -18182,27 +18235,32 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const days = []; let d = luxon.DateTime.fromISO(viewStart, {zone: 'UTC'}); const end = luxon.DateTime.fromISO(viewEnd, {zone: 'UTC'});
     for(let i = 0; d < end && i < 14; i++, d = d.plus({days: 1})) days.push(d.toISODate());
     const today = luxon.DateTime.now().setZone(TZ).toISODate();
-    const evs = cal.getEvents().filter(e => e.allDay);
+    const evs = cal.getEvents().filter(e => e.allDay && !(e.extendedProps || {}).schCopy), schs = cal.getEvents().filter(e => (e.extendedProps || {}).schCopy);
     const ord = (a, b) => { const x = a.extendedProps || {}, y = b.extendedProps || {}; return (x.done ? 1 : 0) - (y.done ? 1 : 0) || urgRank(x) - urgRank(y) || String(a.title).localeCompare(String(b.title)); };
     fadList = []; let h = '', total = 0; const doneFold = lsGet('fw.calFadDoneFold') === '1';
     days.forEach(day => {
       const list = evs.filter(e => { const s0 = (e.startStr || '').slice(0, 10), e0 = (e.endStr || '').slice(0, 10) || s0; return s0 <= day && (e0 > day || (e0 === s0 && s0 === day)); }).sort(ord);
       if(days.length > 1) h += '<div class="cp-fadd' + (day === today ? ' cp-today' : '') + '">' + esc(luxon.DateTime.fromISO(day).toFormat('ccc M/d')) + (list.length ? ' · ' + list.length : '') + '</div>';
-      if(!list.length && days.length > 1) return;
+      const sl = schs.filter(e => (e.startStr || '').slice(0, 10) === day).sort((a, b) => String((a.extendedProps || {}).start).localeCompare(String((b.extendedProps || {}).start)));
+      if(!list.length && !sl.length && days.length > 1) return;
       // To do first, then a "Done" divider (2026-11-14, Julius: split incomplete / done).
       const nDone = list.filter(e => (e.extendedProps || {}).done).length; let sep = false;
       list.forEach(e => { const x = e.extendedProps || {}, i = fadList.push(e) - 1; total++;
         if(x.done && !sep){ sep = true; h += '<div class="cp-fads" data-fad-done role="button" title="Hide / show finished tasks">' + (doneFold ? '▸' : '▾') + ' Done · ' + nDone + '</div>'; }
         if(x.done && doneFold) return; // folded (2026-11-14, Julius): only the "Done · n" line stays
-        h += '<div class="cp-ev cp-fai' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '"' + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
+        h += '<div class="cp-ev cp-fai' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '"' + (!x.done && x.editable && !x.recurring ? ' data-fa-drag' : '') + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
           cpChk(e) + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + '</span></div>'; });
+      if(sl.length){ h += '<div class="cp-fads cp-fasg" data-fa-sch>Scheduled · ' + sl.length + '</div>';
+        sl.forEach(e => { const x = e.extendedProps || {}, i = fadList.push(e) - 1, t = L().fromISO(String(x.start || '')).setZone(TZ); total++;
+          h += '<div class="cp-ev cp-fai cp-fasch" data-fa="' + i + '" data-fa-sch' + (x.editable && !x.recurring ? ' data-fa-drag' : '') + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
+            cpChk(e) + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + (t.isValid ? '<span class="cp-scht"> · ' + esc(t.toFormat('h:mm a').replace(':00', '')) + '</span>' : '') + '</span></div>'; }); }
     });
     if(!total && days.length === 1) h = '<div class="cp-fadmsg">No all-day tasks.</div>';
     body.innerHTML = h; n.textContent = total ? total : '';
   }
   fadEl.addEventListener('click', e => {
     if(e.target.closest('[data-fad-done]')){ lsSet('fw.calFadDoneFold', lsGet('fw.calFadDoneFold') === '1' ? '0' : '1'); fadRender(); return; }
-    const it = e.target.closest('[data-fa]'); if(!it) return; const ev = fadList[Number(it.dataset.fa)]; if(!ev) return;
+    const it = e.target.closest('[data-fa]'); if(!it) return; const ev = schOrig(fadList[Number(it.dataset.fa)]); if(!ev) return;
     e.stopPropagation();
     if(e.target.closest('.cp-chk')){ if(!document.querySelector('.urg-picker') && Date.now() - (fadEl.__downAt || 0) < 450) { toggleDone(ev); fadSoon(); } return; }
     if(!pending) showDetail(ev, it);
@@ -18215,14 +18273,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   let fadDrag = null;
   const fadOver = (x, y) => { if(!full || !fadEl.getClientRects().length) return false; const r = fadEl.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
   document.addEventListener('pointerdown', e => {
-    const r = e.target.closest && e.target.closest('#calPanel [data-bl-drag]');
+    const sr = e.target.closest && e.target.closest('#calPanel .cp-fasch[data-fa-drag]');
+    const r = sr || (e.target.closest && e.target.closest('#calPanel [data-bl-drag]'));
     fadDrag = (!full || !r || e.target.closest('[data-bl-x]') || (e.pointerType === 'mouse' && e.button !== 0)) ? null
-      : {id: r.dataset.blid, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t0: Date.now(), mouse: e.pointerType === 'mouse', live: false};
+      : {id: r.dataset.blid, sch: sr ? Number(sr.dataset.fa) : -1, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t0: Date.now(), mouse: e.pointerType === 'mouse', live: false};
   }, true);
   const fadMove = (x, y) => { const d = fadDrag; if(!d) return; d.x = x; d.y = y;
     if(!d.live && Math.hypot(x - d.x0, y - d.y0) > 10){ if(d.mouse || Date.now() - d.t0 >= window.fwHoldMs()) d.live = true; else { fadDrag = null; return; } }
     if(d.live) fadEl.classList.toggle('cp-fad-over', fadOver(x, y)); };
   const fadEnd = () => { const d = fadDrag; fadDrag = null; fadEl.classList.remove('cp-fad-over');
+    if(d && d.live && d.sch >= 0){ // a Scheduled row let go over the all-day part of the box = unscheduled
+      const hit = document.elementsFromPoint(d.x, d.y).some(el => el.closest && el.closest('.cp-fasch') && fadEl.contains(el)); // over a Scheduled row = stays
+      if(fadOver(d.x, d.y) && !hit){ const ev = fadList[d.sch]; if(ev) unschedule(schOrig(ev)); }
+      return; }
     if(d && d.live && fadOver(d.x, d.y) && viewStart){ window.__fwFadDrop = (window.__fwFadDrop || 0) + 1; blSendMany(blSel && blSel.has(d.id) ? [d.id, ...[...blSel].filter(x => x !== d.id && blById(x))] : [d.id], viewStart); } };
   document.addEventListener('pointermove', e => fadMove(e.clientX, e.clientY), true);
   document.addEventListener('touchmove', e => { if(e.touches[0]) fadMove(e.touches[0].clientX, e.touches[0].clientY); }, {capture: true, passive: true});

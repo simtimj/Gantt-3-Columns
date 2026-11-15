@@ -2905,6 +2905,7 @@ const CAL_PANEL_COLORS_ = { '1': '#7986cb', '2': '#59af80', '3': '#8e24aa', '4':
   '7': '#5398cf', '8': '#808080', '9': '#7577c4', '10': '#0b8043', '11': '#de583d' };
 const CAL_PANEL_UNASSIGNED_COLOR_ = '#8a8f98'; // No priority/color: neutral, never calendar background.
 // One event in the panel's shape. editable = main calendar and not repeating (phase 2: repeating stay read-only).
+const CAL_SCHED_TAG = 'fwSched'; // private extended property: timed event that came from an all-day task
 function calPanelEventOut_(ev, calId, calName, calColor, tz) {
   const allDay = ev.isAllDayEvent();
   let colorId = '';
@@ -2920,7 +2921,8 @@ function calPanelEventOut_(ev, calId, calName, calColor, tz) {
     start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
     color: CAL_PANEL_COLORS_[colorId] || (calId === EVENT_CALENDARS[0] ? CAL_PANEL_UNASSIGNED_COLOR_ : calColor), colorId: colorId, done: colorId === '8',
     location: ev.getLocation() || '', desc: calPanelDesc_(ev.getDescription()), recurring: recurring, link: link,
-    editable: calWritable_(calId) // any calendar he can edit; repeating too, with a This day / All days choice (2026-11-11)
+    editable: calWritable_(calId), // any calendar he can edit; repeating too, with a This day / All days choice (2026-11-11)
+    sched: !allDay && (function () { try { return ev.getTag(CAL_SCHED_TAG) === '1'; } catch (e) { return false; } })()
   };
 }
 // Event popup notes (2026-11-14, Julius: "like Google Calendar's pop-up"): the description as plain text, short
@@ -2985,7 +2987,7 @@ function calPanelRangeApi_(from, to, tz) {
       let token = null;
       do {
         const q = { timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: true, maxResults: 2500,
-          fields: 'nextPageToken,items(id,iCalUID,status,summary,description,start,end,colorId,location,recurringEventId,htmlLink)' };
+          fields: 'nextPageToken,items(id,iCalUID,status,summary,description,start,end,colorId,location,recurringEventId,htmlLink,extendedProperties)' };
         if (token) q.pageToken = token;
         const r = Calendar.Events.list(id, q);
         (r.items || []).forEach(it => {
@@ -3002,7 +3004,8 @@ function calPanelRangeApi_(from, to, tz) {
             start: Utilities.formatDate(st, tz, fmt), end: Utilities.formatDate(en, tz, fmt),
             color: CAL_PANEL_COLORS_[colorId] || (isMain ? CAL_PANEL_UNASSIGNED_COLOR_ : meta.color), colorId: colorId, done: colorId === '8',
             location: it.location || '', desc: calPanelDesc_(it.description), recurring: recurring, link: it.htmlLink || '',
-            editable: canEdit
+            editable: canEdit,
+            sched: !allDay && !!(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_SCHED_TAG] === '1')
           });
         });
         token = r.nextPageToken;
@@ -3132,8 +3135,15 @@ function calPanelMoveEvent(req) {
   if (String(ev.getColor() || '') === '8') throw new Error('Done events stay where they are');
   const w = calPanelWhen_(Object.assign({}, r, { title: ev.getTitle() || 'Event' }));
   if (ev.isRecurringEvent()) { w.title = ''; return calRecurringEdit_(calId, r, w, r.scope); }
+  const wasAllDay = ev.isAllDayEvent();
   if (w.allDay) { if (w.oneDay) ev.setAllDayDate(w.start); else ev.setAllDayDates(w.start, w.end); }
   else ev.setTime(w.start, w.end);
+  // Scheduled (2026-11-15, Julius): an all-day task dragged onto a time keeps a private tag, so it's also listed
+  // under "Scheduled" with the all-day tasks; dragged back to all-day = tag gone (unscheduled).
+  try {
+    if (!w.allDay && wasAllDay) ev.setTag(CAL_SCHED_TAG, '1');
+    else if (w.allDay && ev.getTag(CAL_SCHED_TAG)) ev.deleteTag(CAL_SCHED_TAG);
+  } catch (e) { console.error('calPanelMoveEvent tag: ' + e); }
   planRelinkLocked_(ev);
   return calPanelOut_(ev, calId);
 }

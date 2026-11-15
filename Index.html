@@ -17076,6 +17076,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y;
     if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.6 && Date.now() - p.at < 700) swDay(dx < 0 ? 1 : -1);
   }, {passive: true});
+  /* Scroll ≠ pick up (2026-11-14, Julius: "I'm just trying to scroll and it ends up picking up a task"). FullCalendar
+     lets a finger wander during the hold delay and still starts the drag when the delay ends (unless it noticed a scroll
+     event). Here: if the finger moves more than 10 px before the hold time is up, that touch is a scroll — FullCalendar
+     gets a touchcancel for it (its own "finger lifted"), so nothing is picked up. Hold still to pick up, as before.
+     Covers calendar events, backlog rows and Plan rows. */
+  (() => {
+    let tg = null;
+    const SEL = '#calPanel .fc-event, [data-bl-drag], [data-plan-drag]';
+    document.addEventListener('touchstart', e => {
+      // A selected event (or its resize handle) moves right away by design (FullCalendar: no hold once it's selected).
+      const t = e.touches.length === 1 && e.target.closest && e.target.closest(SEL) && !e.target.closest('.fc-event-selected,.fc-event-resizer,.fc-event-mirror');
+      tg = t ? {el: e.target, x: e.touches[0].clientX, y: e.touches[0].clientY, at: Date.now(), done: false} : null;
+    }, {capture: true, passive: true});
+    document.addEventListener('touchmove', e => {
+      const g = tg; if(!g || g.done || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if(Math.hypot(t.clientX - g.x, t.clientY - g.y) <= 10) return;
+      g.done = true;
+      const hold = window.fwHoldMs ? window.fwHoldMs() : 500;
+      if(Date.now() - g.at >= hold || document.querySelector('.fc-event-dragging,.fc-event-mirror,.fc-event-resizing')) return; // a real hold-and-drag
+      try { g.el.dispatchEvent(new TouchEvent('touchcancel', {bubbles: true, cancelable: false, touches: [], targetTouches: [], changedTouches: [...e.changedTouches]})); } catch (err) {}
+      window.__fwScrollNotDrag = (window.__fwScrollNotDrag || 0) + 1;
+    }, {capture: true, passive: true});
+    document.addEventListener('touchend', () => { tg = null; }, {capture: true, passive: true});
+  })();
   let evHold = null, evHoldOpenAt = 0;
   mount.addEventListener('pointerdown', e => {
     if(evHold){ clearTimeout(evHold.timer); evHold = null; }

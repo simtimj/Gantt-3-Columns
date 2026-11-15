@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-14)
 
+- **Scrolling no longer picks up tasks** (calendar, backlog, Plan): if your finger moves before the hold time is up, it's a scroll — nothing gets picked up, even if you then rest your finger. Hold still to pick something up, same as before. A selected event still moves / resizes right away.
 - **Clearer hour-column line** (calendar): a slightly darker 2px line between the hour numbers and the day, with a little more space after the numbers.
 - **Backlog rows use the full width**: the task name wraps across the whole row; the date and ✕ sit small in the top-right corner with the text flowing under them (no tall date / ✕ columns). The drag hint drops under the Backlog title when it's narrow.
 - **Full-screen calendar**: at the half-screen calendar, slide left once more (finger, trackpad, Shift + wheel, or drag a column header) → the big calendar fills the screen with the backlog beside it, task names shown in full. Starts in Day view and remembers Day / Week; the backlog remembers open / closed. ✕, Esc, or a swipe in from the left edge (computer: sideways wheel over the toolbar or backlog) goes back. The 📅 button still opens the old pop-out.

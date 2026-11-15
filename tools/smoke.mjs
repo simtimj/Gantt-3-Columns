@@ -1855,6 +1855,24 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (sl < 150) errs.push('half view: swipe on the calendar slid the app (' + sl + ')');
             await pg.evaluate(() => window.fwCalendar.api().today()); await pg.waitForTimeout(200);
           }
+          // Scroll ≠ pick up (2026-11-14, Julius): a finger that starts on an event and moves right away is a scroll
+          // (nothing picked up, even if it then rests past the hold time); holding still first still picks it up.
+          {
+            await pg.evaluate(() => { const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; window.fwCalendar.api().today(); window.__fwScrollNotDrag = 0; }); await pg.waitForTimeout(400);
+            const ev = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .fc-timegrid-event')].find(x => /Dentist/.test(x.textContent)); if (!e) return null; e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + Math.min(14, r.height / 2) }; });
+            if (!ev) errs.push('scroll vs drag: Dentist event not found');
+            else {
+              await pg.waitForTimeout(200);
+              let picked = false;
+              await T('touchStart', ev.x, ev.y);
+              for (let i = 1; i <= 6; i++) { await T('touchMove', ev.x, ev.y - 12 * i); await pg.waitForTimeout(20); }
+              await pg.waitForTimeout(900);
+              for (let i = 1; i <= 4; i++) { await T('touchMove', ev.x, ev.y - 72 - 10 * i); await pg.waitForTimeout(20); picked = picked || await pg.evaluate(() => !!document.querySelector('.fc-event-mirror,.fc-event-dragging')); }
+              await T('touchEnd'); await pg.waitForTimeout(600);
+              if (picked) errs.push('scroll vs drag: scrolling from an event picked it up');
+              if (!(await pg.evaluate(() => window.__fwScrollNotDrag))) errs.push('scroll vs drag: the early move was not treated as a scroll');
+            }
+          }
           for (const [x, y] of [[300, 60], [100, 450]]) {
             await pg.evaluate(() => { const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; }); await pg.waitForTimeout(100);
             const sl = await swipe(x, y, 260);

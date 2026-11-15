@@ -17071,15 +17071,24 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(blEl.hidden) return;
     if(!blData){ blBody.innerHTML = '<div class="cp-blmsg">Loading…</div>'; return; }
     if(!items.length){ blBody.innerHTML = '<div class="cp-blmsg">Nothing in the backlog.</div>'; return; }
+    // 2026-11-15 (Julius): newest first. Date button on the Backlog row switches urgency groups ⇄ date groups ("11/06 Fri").
+    const byDate = lsGet('fw.blSort') === 'date', newest = (a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
+    const sb = blEl.querySelector('[data-bl-sort]'); if(sb) sb.classList.toggle('on', byDate);
+    const row = (x, showDate) => { const c = softColor(x.color, false);
+      return '<div class="cp-bli" data-bl-drag data-blid="' + esc(x.id) + '" style="background:' + c.bg + ';color:' + c.fg + '" title="Hold and drag onto a day">' +
+        '<button type="button" class="cp-blx" data-bl-x="' + esc(x.id) + '" title="Remove from backlog" aria-label="Remove from backlog">✕</button>' +
+        (showDate ? '<span class="cp-bld">' + esc(x.date.slice(5).replace('-', '/').replace(/^0/, '')) + '</span>' : '') + '<span class="cp-blt">' + esc(x.title) + '</span></div>'; };
     let h = '';
-    BL_G.forEach(([u, name]) => {
-      const g = items.filter(x => (BL_G.some(b => b[0] === x.urg) ? x.urg : '3') === u).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    if(byDate){
+      const all = items.slice().sort(newest), days = [...new Set(all.map(x => x.date))];
+      days.forEach(d => { const g = all.filter(x => x.date === d), D = luxon.DateTime.fromISO(d);
+        h += '<div class="cp-blg">' + esc(D.isValid ? D.toFormat('MM/dd ccc') : d) + ' · ' + g.length + '</div>';
+        g.forEach(x => { h += row(x, false); }); });
+    } else BL_G.forEach(([u, name]) => {
+      const g = items.filter(x => (BL_G.some(b => b[0] === x.urg) ? x.urg : '3') === u).sort(newest);
       if(!g.length) return;
       h += '<div class="cp-blg">' + name + ' · ' + g.length + '</div>';
-      g.forEach(x => { const c = softColor(x.color, false);
-        h += '<div class="cp-bli" data-bl-drag data-blid="' + esc(x.id) + '" style="background:' + c.bg + ';color:' + c.fg + '" title="Hold and drag onto a day">' +
-          '<button type="button" class="cp-blx" data-bl-x="' + esc(x.id) + '" title="Remove from backlog" aria-label="Remove from backlog">✕</button>' +
-          '<span class="cp-bld">' + esc(x.date.slice(5).replace('-', '/').replace(/^0/, '')) + '</span><span class="cp-blt">' + esc(x.title) + '</span></div>'; });
+      g.forEach(x => { h += row(x, true); });
     });
     blBody.innerHTML = h;
   }
@@ -17621,9 +17630,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   if(blEl){
     const bh = blEl.querySelector('.cp-blh');
     if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('afterbegin', '<button type="button" class="cp-blmin-btn" data-bl-min title="Minimize / open the backlog" aria-label="Minimize the backlog">▾</button>');
+    if(bh && !bh.querySelector('[data-bl-sort]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blsort" data-bl-sort title="Group by date (newest first) / by urgency">Date</button>');
     if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blside" data-bl-side title="Phone: show the backlog on the left or under the calendar"></button><button type="button" class="cp-blclose" data-bl-close title="Close the backlog" aria-label="Close the backlog">✕</button>');
     blEl.addEventListener('click', e => {
-      if(e.target.closest('[data-bl-side]')){ e.stopPropagation(); lsSet('fw.blPhone', lsGet('fw.blPhone') === 'below' ? 'left' : 'below'); blPlace(); setTimeout(() => cal && cal.updateSize(), 0); }
+      if(e.target.closest('[data-bl-sort]')){ e.stopPropagation(); lsSet('fw.blSort', lsGet('fw.blSort') === 'date' ? 'urg' : 'date'); blRender(); }
+      else if(e.target.closest('[data-bl-side]')){ e.stopPropagation(); lsSet('fw.blPhone', lsGet('fw.blPhone') === 'below' ? 'left' : 'below'); blPlace(); setTimeout(() => cal && cal.updateSize(), 0); }
       else if(full && (e.target.closest('[data-bl-min],.cp-blh > b') || (panel.classList.contains('cp-blmin') && e.target.closest('.cp-blh') && !e.target.closest('button')))){ // minimized: the whole bar opens it (option B)
         e.stopPropagation(); const m = panel.classList.toggle('cp-blmin'); lsSet('fw.calFullBlMin', m ? '1' : '0'); }
       else if(e.target.closest('[data-bl-close]')){ e.stopPropagation(); if(!blEl.hidden) blToggle(); }
@@ -18145,6 +18156,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   :is(#blCol,#calBlLeft) > .cp-bl{flex:1 1 auto;margin:0;border-top:0;font-size:13px;}
   .cp-blside,.cp-blclose{appearance:none;border:1px solid var(--cp-line);background:transparent;color:inherit;font:inherit;font-size:11px;border-radius:6px;padding:1px 6px;cursor:pointer;}
   .cp-blside{margin-left:4px;}
+  .cp-blsort{appearance:none;margin-left:6px;border:1px solid var(--cp-line);background:transparent;color:inherit;font:inherit;font-size:11px;border-radius:999px;padding:0 8px;cursor:pointer;opacity:.75;}
+  .cp-blsort.on{opacity:1;background:var(--cp-soft);font-weight:600;}
   body:not(.bl-phone) .cp-blside{display:none;}
   #calPanel:not(.cp-blout) .cp-blclose{display:none;}
   /* Only the center handle drags (2026-11-11, Julius): the line itself ignores touches so scrolling past it is safe. */

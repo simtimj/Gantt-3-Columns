@@ -825,3 +825,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - 00:55 (Julius: "gradient a tiny bit more color"): `--sun-a` .12 → .13.
 - 00:57 (Julius): full screen left | right is always half / half — `--blw:50%!important`, `.cp-flgrip` pointer-events none + no `::before` pill (white `::after` line stays). Dark full screen `--cp-line` #3c4043 → #80868b so box borders read. The all-day | backlog grip is unchanged.
 - 00:58 (Julius: "7 am is already bright; transitions shorter; yellow until ~3:30–4; more color"): stops now purple → rise − 30, full yellow rise + 10, yellow holds to set − 80, yellow-orange set − 30, orange at set, purple set + 40 (no more solar-noon blend). Dark warm alpha ×1.25 → ×1.45. Checked 11-15: rise 6:49, set 4:58 → yellow by ~7:00, holds to ~3:40.
+
+## Backlog newest first + Date grouping (2026-11-15 01:01, Julius)
+- `blRender()`: both modes sort newest first. `lsGet('fw.blSort') === 'date'` → groups by day, header `MM/dd ccc` ("11/06 Fri") + count, rows without the date chip; otherwise urgency groups as before.
+- `.cp-blsort` "Date" button added to `.cp-blh` (beforeend, before the side / ✕ buttons); click toggles `fw.blSort` and re-renders (`.on` when date mode).

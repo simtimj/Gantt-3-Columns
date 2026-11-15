@@ -832,3 +832,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - 01:02 (Julius: "a bit more space between the cards"): full screen all-day `.cp-fai` and backlog `.cp-bli` gap → 4px (was ~1–2px).
 - 01:04 (Julius): halfway, card gap 1px → 2.5px (4px was too much).
 - 01:06 (Julius: "buttons overlap top right"; "Nov 15, Sun"): full screen toolbar (one line, nowrap) now keeps `padding-right` 64px / 56px phone for the ↻ ✕ corner when Plan is folded (old first-chunk margin off); title chunk shrinks with ellipsis. Day title is a function `titleFormat` → luxon `MMM d, ccc` (wide `MMM d, yyyy, ccc`).
+- 01:10 (Julius: "12 a.m. on the timeline is cut off"): `.fc-timegrid-slot-label[data-time="00:00:00"]` cushion `top:4px` (others stay `top:-7px` on their line).

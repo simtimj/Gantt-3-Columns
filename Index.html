@@ -18114,6 +18114,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-weight:500;font-size:11px;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-style:normal;font-size:8px;opacity:.85;}
   #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 4px 0 1px;}
+  /* 12 AM sits at the very top edge, so its label (centered on the line) was cut off (2026-11-15, Julius): drop it below the line. */
+  #calPanel .fc .fc-timegrid-slot-label[data-time="00:00:00"] .fc-timegrid-slot-label-cushion{top:4px;}
   /* Docked: narrower time column, no FRI 13 badge (the date is on the header line) (2026-11-13 evening, Julius). */
   #calPanel.cp-docked .cp-corner{display:none!important;}
   #calPanel.cp-docked .fc .fc-timegrid-axis-cushion{padding:0!important;min-width:0!important;}

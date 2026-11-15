@@ -831,3 +831,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - `.cp-blsort` "Date" button added to `.cp-blh` (beforeend, before the side / ✕ buttons); click toggles `fw.blSort` and re-renders (`.on` when date mode).
 - 01:02 (Julius: "a bit more space between the cards"): full screen all-day `.cp-fai` and backlog `.cp-bli` gap → 4px (was ~1–2px).
 - 01:04 (Julius): halfway, card gap 1px → 2.5px (4px was too much).
+- 01:06 (Julius: "buttons overlap top right"; "Nov 15, Sun"): full screen toolbar (one line, nowrap) now keeps `padding-right` 64px / 56px phone for the ↻ ✕ corner when Plan is folded (old first-chunk margin off); title chunk shrinks with ellipsis. Day title is a function `titleFormat` → luxon `MMM d, ccc` (wide `MMM d, yyyy, ccc`).

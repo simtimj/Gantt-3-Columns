@@ -15683,6 +15683,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .fc .fc-button-group:has(.fc-timeGridDay-button){display:none!important;}
   #calPanel.cp-full .fc .fc-cpView-button{display:inline-flex!important;align-items:center;border:1px solid var(--cp-line);border-radius:999px!important;padding:0 8px!important;}
   #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar,#calPanel.cp-full .fc .fc-toolbar-chunk{flex-wrap:nowrap!important;}
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:0!important;}
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:64px!important;}
+  @media (max-width:699px){ #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:56px!important;} }
+  #calPanel.cp-full .fc .fc-toolbar-chunk:first-child{min-width:0;flex:1 1 auto;}
+  #calPanel.cp-full .fc .fc-toolbar-title{overflow:hidden;text-overflow:ellipsis;}
   #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar{margin-bottom:0!important;padding-bottom:4px;border-bottom:2px solid var(--cp-sep);}
   @media (max-width:699px){ #calPanel.cp-full .cp-fbtns{right:2px;gap:0;} #calPanel.cp-full .cp-fbtns button{width:27px;height:26px;border-radius:13px;font-size:15px;} #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:56px;} #calPanel.cp-full .cp-plan .cp-ph{padding-right:6px;flex-wrap:wrap;row-gap:0;}
     /* Plan header in the narrow column (2026-11-14, Julius: option A): title on its own line beside ↻ ✕, count + Add under it. */
@@ -17371,7 +17376,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       buttonText: { today: '◉', day: 'Day', week: phone ? 'Wk' : 'Week' }, // ◉ = Today (2026-11-13, Julius: room)
       buttonHints: { today: 'Today' },
       buttonIcons: { prev: 'chevron-left', next: 'chevron-right' },
-      views: { timeGridDay: { titleFormat: phone ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' } } }, // "Nov 13, 2026"
+      // Day title with the weekday after it (2026-11-15, Julius): "Nov 15, Sun" (wide: "Nov 15, 2026, Sun").
+      views: { timeGridDay: { titleFormat: a => { const d = a.date, D = luxon.DateTime.fromObject({year: d.year, month: d.month + 1, day: d.day}); return D.toFormat(phone ? 'MMM d, ccc' : 'MMM d, yyyy, ccc'); } } },
       titleFormat: { month: 'short', year: 'numeric' },
       titleRangeSeparator: ' – ',
       allDayText: '',

@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-14
+Last updated: 2026-11-15
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -73,6 +73,11 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-15)
+
+- **Backlog hold menu → Send to Today**: hold a backlog row and let go without moving → a small menu with 📌 Send to Today, which puts it on today as an all-day task. Hold + drag still places it on a day / time.
+- **See-through long events** (calendar): timed events of 2 h or more (e.g. Sleep 1 – 7:45 am) are a faint tint with a colored outline, so the grid shows through; only the title chip is solid, and it stays at the top of the view while the event runs past it.
 
 ## 🧪 To be confirmed (2026-11-14)
 
@@ -649,6 +654,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+
+- **Backlog hold menu: Mark complete** (2026-11-15, Julius): add to the backlog hold menu once he decides what "complete" does (e.g. Graphite + Done Log, or just drop it).
 
 - **Blocks timer next (2026-11-12):** child item timers + Break polish; Quick Add while a block runs (comma-split into lines).
 - **Calendar backlog (2026-11-12, captured):** pop-out events panel that covers the middle column for long titles; Cal Events always shows Soon + Later lines (drag in = set priority); small calendar = 1:1 mini of the big calendar, with hold-drag move, top/bottom resize handles and Google Calendar sync.

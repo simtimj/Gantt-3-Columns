@@ -1980,16 +1980,43 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             window.fwCalendar.api().changeView('timeGridDay'); await w(300);
             return out; });
           errs.push(...fa.map(x => 'full screen: ' + x));
+          // Backlog hold menu (2026-11-15, Julius): hold a row, let go without moving → 📌 Send to Today = all-day today.
+          {
+            await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), srv = window.__calSrv;
+              window.__blPlaced = null; window.__calSrvOrig = srv;
+              window.__calSrv = (m, a) => m === 'calBacklogSync' ? { items: [{ id: 'bl-1', title: 'Backlog hold B', date: '2026-11-10', urg: '1', color: '11' }] }
+                : m === 'calBacklogPlace' ? (window.__blPlaced = a[0], { ok: true }) : srv(m, a);
+              window.fwCalendar.blReload(); await w(300); });
+            const r = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .cp-bli')].find(x => /Backlog hold B/.test(x.textContent)); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + 30, y: b.y + b.height / 2 }; });
+            if (!r) errs.push('backlog menu: test row not shown');
+            else {
+              if (name === 'phone') {
+                const cdp = await pg.context().newCDPSession(pg);
+                const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+                await T('touchStart', r.x, r.y); await pg.waitForTimeout(900); await T('touchEnd');
+              } else { await pg.mouse.move(r.x, r.y); await pg.mouse.down(); await pg.waitForTimeout(900); await pg.mouse.up(); }
+              await pg.waitForTimeout(300);
+              const btn = await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-bl-menu] button')].find(x => /Send to Today/.test(x.textContent)); if (!b) return null; const q = b.getBoundingClientRect(); return { x: q.x + q.width / 2, y: q.y + q.height / 2 }; });
+              if (!btn) errs.push('backlog menu: holding a row did not open the menu');
+              else {
+                await pg.mouse.click(btn.x, btn.y); await pg.waitForTimeout(500);
+                const res = await pg.evaluate(() => ({ p: window.__blPlaced, left: [...document.querySelectorAll('#calPanel .cp-bli')].some(x => /Backlog hold B/.test(x.textContent)), today: luxon.DateTime.now().setZone('America/Los_Angeles').toISODate() }));
+                if (!res.p || !res.p.allDay || res.p.start !== res.today || res.p.id !== 'bl-1') errs.push('backlog menu: Send to Today sent ' + JSON.stringify(res.p));
+                if (res.left) errs.push('backlog menu: row still in the backlog after Send to Today');
+              }
+            }
+            await pg.evaluate(() => { if (window.__calSrvOrig) window.__calSrv = window.__calSrvOrig; });
+          }
           // Half / half, and the line between drags (2026-11-14, Julius).
           {
             const g = await pg.evaluate(() => { localStorage.removeItem('fw.calFullLw'); const p = document.getElementById('calPanel'); p.style.removeProperty('--fl-w');
               const b = p.querySelector('.cp-body').getBoundingClientRect(), f = p.querySelector('.cp-fad').getBoundingClientRect(), gr = p.querySelector('.cp-flgrip').getBoundingClientRect();
               return { bw: b.width, bl: b.left, fw: f.width, gx: gr.x + gr.width / 2, gy: gr.y + gr.height / 2 }; });
             if (Math.abs(g.fw + 12 - g.bw / 2) > 6) errs.push('full screen: left column not half (' + Math.round(g.fw) + ' of ' + Math.round(g.bw) + ')');
+            // 2026-11-15 (Julius): the split is fixed half / half now — dragging the line must not move it.
             await pg.mouse.move(g.gx, g.gy); await pg.mouse.down(); await pg.mouse.move(g.bl + g.bw * 0.3, g.gy, { steps: 6 }); await pg.mouse.up(); await pg.waitForTimeout(300);
-            const f2 = await pg.evaluate(() => ({ w: document.querySelector('#calPanel .cp-fad').getBoundingClientRect().width, saved: localStorage.getItem('fw.calFullLw'), cal: document.querySelector('#calMount .fc-view-harness').getBoundingClientRect().width }));
-            if (Math.abs(f2.w + 12 - g.bw * 0.3) > 8) errs.push('full screen: dragging the line did not resize (' + Math.round(f2.w) + ')');
-            if (!f2.saved) errs.push('full screen: column width not remembered');
+            const f2 = await pg.evaluate(() => document.querySelector('#calPanel .cp-fad').getBoundingClientRect().width);
+            if (Math.abs(f2 + 12 - g.bw / 2) > 6) errs.push('full screen: the fixed half / half split moved (' + Math.round(f2) + ')');
             await pg.evaluate(() => { localStorage.removeItem('fw.calFullLw'); document.getElementById('calPanel').style.setProperty('--fl-w', '50%'); }); await pg.waitForTimeout(200);
           }
           await pg.evaluate(() => window.fwCalendar.api().changeView('timeGridWeek')); await pg.waitForTimeout(200);

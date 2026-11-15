@@ -833,3 +833,9 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - 01:04 (Julius): halfway, card gap 1px → 2.5px (4px was too much).
 - 01:06 (Julius: "buttons overlap top right"; "Nov 15, Sun"): full screen toolbar (one line, nowrap) now keeps `padding-right` 64px / 56px phone for the ↻ ✕ corner when Plan is folded (old first-chunk margin off); title chunk shrinks with ellipsis. Day title is a function `titleFormat` → luxon `MMM d, ccc` (wide `MMM d, yyyy, ccc`).
 - 01:10 (Julius: "12 a.m. on the timeline is cut off"): `.fc-timegrid-slot-label[data-time="00:00:00"]` cushion `top:4px` (others stay `top:-7px` on their line).
+
+## Backlog hold menu + see-through long events (2026-11-15, Julius)
+
+- Backlog: capture-phase pointer / touch listeners on `blBody` rows (`[data-bl-drag]`, not ✕): held ≥ `fwHoldMs()` and released within 10 px → `blMenu()` (an `.urg-picker.fx-menu` with `[data-bl-menu]`, reusing `placeUrgPicker` / `hideUrgencyPicker`). 📌 Send to Today → `blSendToday()` = `calBacklogPlace({id, …slotReq(true, today)})` (all-day today). FullCalendar's hold-drag still starts at the same hold; letting go without moving just drops nothing. `fwCalendar.blReload()` forces a backlog reload (tests). Mark complete: To do, Julius to define.
+- See-through: `eventClassNames` adds `cp-see` to timed events ≥ 2 h; `eventDidMount` sets `--cp-evbg` from the event color. CSS: 12 % tint + 1.5 px outline, `.fc-event-main` sticky top, `.cp-evc` a solid chip.
+- Smoke: the old "drag the split line" test now checks the fixed half / half split doesn't move (split fixed 2026-11-15).

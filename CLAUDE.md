@@ -141,6 +141,7 @@ When he asks to organize his calendar tasks:
 - Scroll ≠ pick up (2026-11-14, Julius)
 - Full-screen left column: all-day tasks + backlog (2026-11-14, Julius)
 - Full screen ↻ ✕ corner + backlog minimize (2026-11-14 evening, Julius)
+- Backlog hold menu + see-through long events (2026-11-15, Julius)
 
 ## IT study log (2026-11-04)
 

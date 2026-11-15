@@ -16010,6 +16010,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      very narrow cards (phone Week) drop the time and the box and wrap the title small. */
   #calPanel .fc .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-daygrid-event .fc-event-main{overflow:hidden;} /* not the card itself: its resize handle sits on the edge */
   #calPanel .fc .fc-timegrid-event .fc-event-main{height:100%;box-sizing:border-box;}
+  /* See-through long events (2026-11-15, Julius): faint tint + colored outline, grid lines visible; the title sits on a
+     solid chip in the event color. */
+  #calPanel .fc .fc-timegrid-event.cp-see{background:color-mix(in srgb,var(--cp-evbg,#1a73e8) 12%,transparent)!important;border:1.5px solid var(--cp-evbg,#1a73e8)!important;box-shadow:none!important;}
+  #calPanel .fc .fc-timegrid-event.cp-see .fc-event-main{height:auto;position:sticky;top:0;} /* title stays in view while the event runs past the top */
+  #calPanel .fc .fc-timegrid-event.cp-see .cp-evc{display:inline-flex;max-width:100%;background:var(--cp-evbg,#1a73e8);border-radius:4px;padding:1px 5px 2px 3px;box-sizing:border-box;}
   /* Time always shows (2026-11-14 night, Julius: "even if the font is small, include the time with the title; no room
      below → put it to the right"): short cards and 30-min events = one line, title truncates, start time kept on the right. */
   #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-evb{display:flex;align-items:baseline;}
@@ -17121,6 +17126,43 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       .calBacklogPlace(Object.assign({id: id}, slotReq(info.allDay, info.dateStr, '', 30)));
   }
   panel.addEventListener('click', e => { if(e.target.closest('[data-bl-toggle]')){ e.stopPropagation(); blToggle(); } });
+  /* Hold a backlog row and let go without moving (2026-11-15, Julius) → small menu: 📌 Send to Today (all-day task
+     today). Hold + drag still places it on a day / time. "Mark complete" is next, once Julius decides what it does. */
+  function blSendToday(id){
+    const it = blById(id); if(!it) return;
+    if(moveBusy){ moveFail('Still saving — try again in a moment.'); return; }
+    moveBusy = true; setState('loading', 'Saving…');
+    google.script.run.withSuccessHandler(() => {
+      moveBusy = false; blData.items = blData.items.filter(x => x.id !== id); blRender(); flash('Sent to today ✓'); refetchFresh();
+    }).withFailureHandler(err => { moveBusy = false; moveFail('Couldn’t save — nothing changed. ' + errText(err)); })
+      .calBacklogPlace(Object.assign({id: id}, slotReq(true, L().now().setZone(TZ).toISODate(), '', 0)));
+  }
+  function blMenu(id, x, y){
+    if(typeof hideUrgencyPicker !== 'function' || typeof placeUrgPicker !== 'function') return;
+    hideUrgencyPicker();
+    const m = document.createElement('div'); m.className = 'urg-picker fx-menu'; m.setAttribute('data-bl-menu', '');
+    const item = (label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'urg-goto'; b.textContent = label;
+      b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('click', e => { e.stopPropagation(); hideUrgencyPicker(); fn(); }); m.appendChild(b); };
+    item('📌 Send to Today', () => blSendToday(id));
+    document.body.appendChild(m); placeUrgPicker(m, x, y); urgPicker = m;
+  }
+  if(blBody){
+    let bh = null;
+    const bhEnd = () => { const h = bh; bh = null; if(!h) return; clearTimeout(h.t);
+      if(h.held && !h.moved && !document.querySelector('[data-bl-menu]')) blMenu(h.id, h.x, h.y); };
+    blBody.addEventListener('pointerdown', e => {
+      const r = e.target.closest('[data-bl-drag]'); if(!r || e.target.closest('[data-bl-x]') || (e.pointerType === 'mouse' && e.button !== 0)) { bh = null; return; }
+      bh = {id: r.dataset.blid, x: e.clientX, y: e.clientY, held: false, moved: false};
+      const h = bh; h.t = setTimeout(() => { h.held = true; if(navigator.vibrate) try { navigator.vibrate(15); } catch (err) {} }, window.fwHoldMs ? window.fwHoldMs() : 500);
+    }, true);
+    const mv = (x, y) => { if(bh && Math.hypot(x - bh.x, y - bh.y) > 10){ bh.moved = true; clearTimeout(bh.t); } };
+    document.addEventListener('pointermove', e => mv(e.clientX, e.clientY), true);
+    document.addEventListener('touchmove', e => { if(e.touches[0]) mv(e.touches[0].clientX, e.touches[0].clientY); }, {capture: true, passive: true});
+    document.addEventListener('pointerup', bhEnd, true);
+    document.addEventListener('touchend', bhEnd, true);
+    document.addEventListener('pointercancel', () => { if(bh && !bh.held){ clearTimeout(bh.t); bh = null; } }, true);
+    blBody.addEventListener('contextmenu', e => { if(e.target.closest('[data-bl-drag]')) e.preventDefault(); });
+  }
   // ── Zoom ──
   /* Zoom guides (2026-11-11, Julius): zoomed in → 30-minute lines + labels (10:30, 11, 11:30); further → 15-minute
      slots (11:15, 11:30, 11:45). zoomPx = height of 30 minutes. */
@@ -17403,7 +17445,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       dayHeaderContent: a => { const L = luxon.DateTime.fromJSDate(a.date, {zone: 'UTC'});
         return { html: '<span class="cp-dh-w">' + L.toFormat('ccc').toUpperCase() + '</span><span class="cp-dh-n">' + L.day + '</span>' }; },
       // Event: title first (bold), time under it, like Google.
-      eventClassNames: a => (!a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 20 * 60000) ? ['cp-tiny'] : [],
+      // 2026-11-15 (Julius): long timed events (2 h+, e.g. Sleep 1 – 7:45) are see-through, so the grid shows behind
+      // them; only the title chip keeps the event color.
+      eventClassNames: a => { const d = !a.event.allDay && a.event.end ? a.event.end - a.event.start : 0; return d && d <= 20 * 60000 ? ['cp-tiny'] : d >= 120 * 60000 ? ['cp-see'] : []; },
       // Checkbox on every card (2026-11-11, Julius): filled with the subject color (saved, else auto-guessed like
       // Gantt cards); tap = done (Graphite), hold = the Gantt hold menu (urgency, subject, due…). Holding the card
       // itself still moves it.
@@ -17440,7 +17484,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const onBox = (info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')) || (dn && dn.id === x.eventId && dn.ms === String(x.startMs) && Date.now() - dn.t < 1200);
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
         if(!pending) showDetail(info.event, info.el); },
-      eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
+      eventDidMount: a => { if(a.el.classList.contains('cp-see')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
       datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Wk' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); }
     });
     cal.render();
@@ -17867,7 +17911,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     };
     fadGrip.addEventListener('pointermove', move); fadGrip.addEventListener('pointerup', up); fadGrip.addEventListener('pointercancel', up);
   });
-  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), blReload: () => blLoad(true), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

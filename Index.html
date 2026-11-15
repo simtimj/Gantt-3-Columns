@@ -17671,7 +17671,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   // Leave full screen: a swipe that starts at the left edge and goes right, or a sideways wheel (not over the grid).
   let fsw = null, fwAcc = 0, fwAt = 0, fullAt = 0;
-  panel.addEventListener('touchstart', e => { fsw = full && e.touches.length === 1 && e.touches[0].clientX < 30 ? {x: e.touches[0].clientX, y: e.touches[0].clientY} : null; }, {passive: true, capture: true});
+  // 2026-11-14 night (Julius): a sideways swipe right anywhere on the left column (all-day / backlog) goes back too;
+  // up / down still scrolls the lists (needs dx > 60 and 1.5× more sideways than vertical).
+  const fswLeft = t => t && t.closest && t.closest('.cp-fad, .cp-bl') && !t.closest('.cp-fadgrip, .cp-flgrip');
+  panel.addEventListener('touchstart', e => { fsw = full && e.touches.length === 1 && (e.touches[0].clientX < 30 || fswLeft(e.target)) ? {x: e.touches[0].clientX, y: e.touches[0].clientY} : null; }, {passive: true, capture: true});
   panel.addEventListener('touchend', e => { const p = fsw; fsw = null; if(!p || !full) return; const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y; if(dx > 60 && dx > Math.abs(dy) * 1.5) close(); }, {passive: true, capture: true});
   panel.addEventListener('wheel', e => {
     if(!full || e.ctrlKey || e.metaKey) return;

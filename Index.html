@@ -15671,6 +15671,19 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Full screen ↻ ✕ top right (2026-11-14, Julius): pinned to the corner instead of wrapping onto a 3rd toolbar row. */
   #calPanel .cp-fbtns{display:none;}
   #calPanel.cp-full .cp-fbtns{display:flex;gap:2px;position:absolute;top:3px;right:4px;z-index:6;}
+  /* Full screen, one toolbar line (2026-11-15, Julius): no ‹ › (swipe changes days), ◉ − + float subtly at the bottom
+     right of the timeline, Day|Week pill → one Wk / Day toggle, clear line between the toolbar and the timeline. */
+  #calPanel .cp-fnav{display:none;}
+  #calPanel.cp-full .cp-fnav{display:flex;gap:4px;position:absolute;right:16px;bottom:16px;z-index:5;opacity:.55;transition:opacity .15s;}
+  #calPanel.cp-full .cp-fnav:hover,#calPanel.cp-full .cp-fnav:active{opacity:.9;}
+  #calPanel .cp-fnav button{font:inherit;width:32px;height:32px;padding:0;border:1px solid var(--cp-line);border-radius:50%;background:color-mix(in srgb,var(--cp-bg) 55%,transparent);color:var(--cp-muted);font-size:16px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);touch-action:manipulation;}
+  #calPanel .cp-fnav button:focus{outline:0;}
+  #calPanel.cp-full .fc .fc-prev-button,#calPanel.cp-full .fc .fc-next-button,#calPanel.cp-full .fc .fc-today-button,
+  #calPanel.cp-full .fc .fc-cpZoomOut-button,#calPanel.cp-full .fc .fc-cpZoomIn-button,
+  #calPanel.cp-full .fc .fc-button-group:has(.fc-timeGridDay-button){display:none!important;}
+  #calPanel.cp-full .fc .fc-cpView-button{display:inline-flex!important;align-items:center;border:1px solid var(--cp-line);border-radius:999px!important;padding:0 8px!important;}
+  #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar,#calPanel.cp-full .fc .fc-toolbar-chunk{flex-wrap:nowrap!important;}
+  #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar{margin-bottom:0!important;padding-bottom:4px;border-bottom:2px solid var(--cp-sep);}
   @media (max-width:699px){ #calPanel.cp-full .cp-fbtns{right:2px;gap:0;} #calPanel.cp-full .cp-fbtns button{width:27px;height:26px;border-radius:13px;font-size:15px;} #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:56px;} #calPanel.cp-full .cp-plan .cp-ph{padding-right:6px;flex-wrap:wrap;row-gap:0;}
     /* Plan header in the narrow column (2026-11-14, Julius: option A): title on its own line beside ↻ ✕, count + Add under it. */
     #calPanel.cp-full .cp-plan .cp-pfold{flex:1 1 100%;margin-right:56px;min-width:0;padding:0 2px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -16240,6 +16253,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       <div class="cp-blb" data-bl-body></div>
     </section>
     <div class="cp-detail" data-cal-detail hidden></div>
+    <div class="cp-fnav"><button type="button" data-fnav="today" title="Today" aria-label="Today">◉</button><button type="button" data-fnav="out" title="Zoom out (or pinch)" aria-label="Zoom out">−</button><button type="button" data-fnav="in" title="Zoom in (or pinch)" aria-label="Zoom in">+</button></div>
   </div>
   <div class="cp-fbtns"><button type="button" data-cal-refresh title="Reload events from Google Calendar" aria-label="Reload events">↻</button><button type="button" data-cal-close title="Close (Esc) and go back to the Gantt" aria-label="Close calendar">✕</button></div>
 </aside>
@@ -17335,7 +17349,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         cpBacklog: { text: 'BL', hint: 'Show / hide past unfinished tasks', click: () => blToggle() },
         cpPlan: { text: 'Plan', hint: 'Show / hide the plan (Big Three, Waiting list)', click: () => { lsSet('fw.calPlanFold', planFolded() ? '0' : '1'); renderPlan(); setTimeout(() => cal && cal.updateSize(), 0); } },
         // Phones: one Day ⇄ Week toggle instead of the two-button pill (saves a button's width on the single line).
-        cpView: { text: 'Week', hint: 'Switch Day / Week', click: () => cal.changeView(cal.view.type === 'timeGridDay' ? 'timeGridWeek' : 'timeGridDay') },
+        cpView: { text: 'Wk', hint: 'Switch Day / Week', click: () => cal.changeView(cal.view.type === 'timeGridDay' ? 'timeGridWeek' : 'timeGridDay') },
         cpRefresh: { text: '↻', hint: 'Reload events from Google Calendar', click: () => {} }, // handled by the [data-cal-refresh] listener
         cpClose: { text: '✕', hint: 'Close (Esc) and go back to the Gantt', click: () => {} } // handled by [data-cal-close]
       },
@@ -17406,7 +17420,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(info.event); return; }
         if(!pending) showDetail(info.event, info.el); },
       eventDidMount: () => cpGroupsSoon(), eventWillUnmount: () => cpGroupsSoon(),
-      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Week' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); }
+      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.textContent = info.view.type === 'timeGridDay' ? 'Wk' : 'Day'; viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); }
     });
     cal.render();
     window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
@@ -17720,6 +17734,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   let fadR = Number(lsGet(FAD_KEY)) || .45, fadList = [], fadT = 0, fadTap = 0;
   const fadApply = () => panel.style.setProperty('--fad-r', String(fadR));
   fadApply();
+  // Full screen ◉ − + at the bottom right of the timeline (2026-11-15).
+  const fnav = panel.querySelector('.cp-fnav');
+  if(fnav) fnav.addEventListener('click', e => {
+    const b = e.target.closest('[data-fnav]'); if(!b || !cal) return;
+    const k = b.getAttribute('data-fnav');
+    if(k === 'today') cal.today(); else setZoom(k === 'in' ? zoomPx * 1.35 : zoomPx / 1.35);
+  });
   function fadSoon(){ if(full && !fadT) fadT = requestAnimationFrame(() => { fadT = 0; fadRender(); }); }
   /* Sun colors (2026-11-14 night, Julius): full screen only — the time grid + hour numbers follow the day's light
      around Vallejo / Benicia: night purple → yellow at sunrise → yellow (morning) → yellow-orange (afternoon) → orange at

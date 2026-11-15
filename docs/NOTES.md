@@ -817,3 +817,8 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - 00:47 (Julius): halfway point, `--sun-a` .12.
 - 00:49 (Julius: "dark yellow comes out brown"): yellows recolored in HSL instead of darkened. `SUN_Y` → 250,214,60 (more lemon). Dark mode tint uses `--sun-bgd`: warm stops at lightness .66, full saturation, alpha ×1.25; purple unchanged. Light-mode hour numbers on warm stops = `sunHsl(c,.95,.4)` (deep gold) instead of ×.62. Helpers `sunHsl()`, `sunWarm()`.
 - 00:52 (Julius: "dark background too dark, a touch more brightness"): full screen dark `--cp-bg` #161616 → #1c1c1c, `--cp-soft` #232323 → #282828 (full screen only; side panel unchanged).
+
+## Full screen: one toolbar line (2026-11-15 00:54, Julius)
+- Ask: clear line between the timeline and the header; drop ‹ › (swipe works); ◉ − + to the bottom right of the timeline, transparent and subtle; Week → "Wk" on the top line so there's one line above the timeline.
+- CSS (`.cp-full` only): hides `.fc-prev/next/today/cpZoomOut/cpZoomIn` and the Day|Week button group; shows `.fc-cpView-button` (text "Wk" / "Day", everywhere); toolbar `nowrap` + `border-bottom:2px solid var(--cp-sep)`.
+- `.cp-fnav` (markup inside `.cp-body`, after `.cp-detail`): absolute bottom/right 16px, opacity .55 (.9 on press), half-transparent round buttons; click → `cal.today()` / `setZoom(zoomPx ×÷ 1.35)` (listener just above `fadSoon`).

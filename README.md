@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-15)
 
+- **Subtask cells are indented**: in a task card, each subtask's cell starts at its own indent (no empty card area left of its checkbox); short edges close each step so the card outline stays one shape.
 - **🔴 Urgent tab** (middle column, next to 📋): shows the red (Urgent) Next Steps tasks — the real rows, so ticking, the hold menu and the add line work. The other levels stay in Next Steps. More to figure out later.
 - **Day colors in the half-screen calendar**: the docked calendar (next to Dailies / Focus) now has the same sunrise → day → sunset gradient, colored hour numbers and sunrise / sunset lines as the full-screen one.
 - **Backlog hold menu → Send to Today**: hold a backlog row and let go without moving → a small menu with 📌 Send to Today, which puts it on today as an all-day task. Hold + drag still places it on a day / time.

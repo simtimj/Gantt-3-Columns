@@ -5646,7 +5646,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.addEventListener('input',later,true);
   })();
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
-  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn','data-blkph'];
+  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tcstep','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn','data-blkph'];
   function cardCleanHtml(el){
     if(!el.querySelector('input[data-wired],[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
@@ -11868,11 +11868,20 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fl,0) * 1%),transparent);--tc-bd:rgba(0,0,0,.14);--tc-mix:24%;}
   .check-line[data-tc]{
     position:relative;box-sizing:border-box;
-    margin-left:calc(var(--tch,0) * 24px)!important;
-    padding:2px calc(8px * var(--side-k,1)) 2px calc(8px * var(--side-k,1) + var(--tcr,0) * 22px);
+    /* Subtask cells are indented themselves (2026-11-15, Julius: "no empty cell area left of a subtask's checkbox"):
+       the row moves in by its level; a short top edge (::before, data-tcstep = levels deeper / shallower than the row
+       above) closes each step so the card outline stays one shape. */
+    margin-left:calc((var(--tch,0) + var(--tcr,0)) * 24px)!important;
+    padding:2px calc(8px * var(--side-k,1)) 2px calc(8px * var(--side-k,1));
     background:linear-gradient(var(--tc-tint,transparent),var(--tc-tint,transparent)),var(--tc-base);
     border-left:1px solid var(--tc-bd);border-right:1px solid var(--tc-bd);
   }
+  .check-line[data-tc][data-tcstep]::before{content:"";position:absolute;top:-1px;height:0;border-top:var(--tc-stw,1px) solid var(--tc-edge,transparent);pointer-events:none;
+    left:calc(-1 * var(--tcs,0) * 24px - var(--tc-stw,1px));width:calc((var(--tcs,0) + var(--tcsn,0)) * 24px);}
+  body.tc-subtleline{--tc-stw:var(--sl-w,1.5px);}
+  /* The step edge only shows where the card outline does (Quiet cards keep it transparent otherwise). */
+  body.tc-subtleline .check-line[data-tccat][data-tc]{--tc-edge:var(--tc-bd);}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc]:not([data-tccat]){--tc-edge:#fff;}
   .check-line[data-tc^="f"]{border-top:1px solid var(--tc-bd);border-top-left-radius:8px;border-top-right-radius:8px;margin-top:5px;padding-top:4px;}
   .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
   .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
@@ -12106,7 +12115,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 
   (function(){
     let css = '';
-    for(let i = 1; i <= 6; i++) css += `.check-line[data-tchead="${i}"]{--tch:${i};}.check-line[data-tcrel="${i}"]{--tcr:${i};}`;
+    for(let i = 1; i <= 6; i++) css += `.check-line[data-tchead="${i}"]{--tch:${i};}.check-line[data-tcrel="${i}"]{--tcr:${i};}.check-line[data-tcstep="${i}"]{--tcs:${i};}.check-line[data-tcstep="-${i}"]{--tcsn:${i};}`;
     const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   })();
 
@@ -12247,7 +12256,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       members.forEach((m,i) => {
         cardHeadOf.set(m,head);
         const first = i === 0, last = i === members.length - 1;
-        plan.set(m,{tc:(first ? 'f' : 'm') + (last ? 'l' : ''), head:headLvl, rel:tcLvl(m) - headLvl, cat});
+        const rel = tcLvl(m) - headLvl, prevRel = first ? 0 : tcLvl(members[i - 1]) - headLvl;
+        plan.set(m,{tc:(first ? 'f' : 'm') + (last ? 'l' : ''), head:headLvl, rel, step:first ? 0 : Math.max(-6, Math.min(6, rel - prevRel)), cat});
       });
       members = [];
     };
@@ -12265,11 +12275,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       }
       flush();
     }
-    for(const n of ed.querySelectorAll(':scope > [data-tc]')) if(!plan.has(n)){ ['data-tc','data-tchead','data-tcrel','data-tccat'].forEach(a => n.removeAttribute(a)); changed = true; }
+    for(const n of ed.querySelectorAll(':scope > [data-tc]')) if(!plan.has(n)){ ['data-tc','data-tchead','data-tcrel','data-tcstep','data-tccat'].forEach(a => n.removeAttribute(a)); changed = true; }
     plan.forEach((p,n) => {
       if(setAttr(n,'data-tc',p.tc)) changed = true;
       if(setAttr(n,'data-tchead',p.head || '')) changed = true;
       if(setAttr(n,'data-tcrel',p.rel > 0 ? Math.min(6,p.rel) : '')) changed = true;
+      if(setAttr(n,'data-tcstep',p.step || '')) changed = true;
       setAttr(n,'data-tccat',p.cat);
     });
     if(refreshTitleLines(ed)) changed = true;

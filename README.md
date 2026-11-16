@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-15
+Last updated: 2026-11-16
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -73,6 +73,10 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-16)
+
+- **Title count on the title row**: titleizing a checkbox line in ⭐ Keep In Mind (or any column) keeps its "− 6/7 ✓" count on the same line as the title when it fits, instead of dropping under it. Long titles wrap inside; the count stays beside them.
 
 ## 🧪 To be confirmed (2026-11-15)
 - **All day order** (full + half calendar, 2026-11-15): hold an all-day task and drag it up or down within the all-day area (blue line = where it lands); the order is saved on the event, so it stays on every device. New tasks (+, backlog, back from Scheduled) go to the very bottom. Done stays last; a hand-ordered day shows one "To do" group instead of urgency labels.

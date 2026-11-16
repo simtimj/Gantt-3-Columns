@@ -1481,7 +1481,8 @@
     /* Too narrow for both: the button drops under the title (whole), words never break into letters. */
     [data-tlon]{flex-wrap:wrap;row-gap:2px;}
     [data-tlon] > .check-text,[data-tlon] > b{flex:0 1 auto;min-width:min-content;overflow-wrap:normal;word-break:normal;}
-    [data-tlon] > .check-text{flex:1 1 60%;} /* stays beside the checkbox, uses the free width; wraps inside */
+    /* 2026-11-16 (Julius): basis 0 (was 60%) so the "− 6/7 ✓" count stays on the title row whenever the title fits; long titles wrap inside. */
+    [data-tlon] > .check-text{flex:1 1 0%;} /* stays beside the checkbox, uses the free width; wraps inside */
     [data-tlon]::before{flex:0 0 auto;min-width:2.2em;white-space:nowrap!important;overflow-wrap:normal!important;line-height:1.2!important;}
     #urgentPanel.wrap .urg-row .urg-box{margin-top:2px;}
     #urgentPanel.wrap .urg-text,#urgentPanel.wrap .urg-subtask{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}

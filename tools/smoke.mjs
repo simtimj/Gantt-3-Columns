@@ -140,6 +140,8 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       refreshCards(ed); await wait(200);
       const t = [...ed.querySelectorAll('.check-line')].find(l => /Empty title Q/.test(l.textContent));
       if (t.dataset.tlcnt !== '0/0 ✓') out.push('empty title count: ' + t.dataset.tlcnt);
+      // Titleized checkbox line: the count sits on the title row, not under it (2026-11-16, Julius).
+      { const u = [...ed.querySelectorAll('.check-line:not([data-tlon])')].find(l => l.offsetHeight); if (u && t.offsetHeight > u.offsetHeight + 6) out.push('title count wrapped under the title (' + t.offsetHeight + ' vs ' + u.offsetHeight + 'px)'); }
       t.insertAdjacentHTML('afterend', L('Under Q', 1)); refreshCards(ed); await wait(200);
       const n0 = ed.querySelectorAll('.check-line').length;
       // Run the same removal the 🗑 Delete section button does.

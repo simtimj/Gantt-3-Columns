@@ -2905,6 +2905,17 @@ const CAL_PANEL_COLORS_ = { '1': '#7986cb', '2': '#59af80', '3': '#8e24aa', '4':
   '7': '#5398cf', '8': '#808080', '9': '#7577c4', '10': '#0b8043', '11': '#de583d' };
 const CAL_PANEL_UNASSIGNED_COLOR_ = '#8a8f98'; // No priority/color: neutral, never calendar background.
 // One event in the panel's shape. editable = main calendar and not repeating (phase 2: repeating stay read-only).
+const CAL_ORD_TAG = 'fwOrd'; // private extended property: all-day order (2026-11-15, Julius: "rearrange the all day area, keep the positions"; new = bottom)
+// Saves the all-day order: [{eventId, startMs, calId, ord}] → tag each (one lock). Returns {ok, failed}.
+function calPanelSetOrder(list) {
+  const items = (Array.isArray(list) ? list : []).filter(x => x && x.eventId).slice(0, 200), failed = [];
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    items.forEach(x => { try { calEventAt_(String(x.calId || EVENT_CALENDARS[0]), x.eventId, x.startMs).setTag(CAL_ORD_TAG, String(Number(x.ord) || 0)); } catch (e) { failed.push(String(x.eventId)); } });
+  } finally { lock.releaseLock(); }
+  return { ok: !failed.length, failed: failed };
+}
 const CAL_SCHED_TAG = 'fwSched'; // private extended property: timed event that came from an all-day task
 function calPanelEventOut_(ev, calId, calName, calColor, tz) {
   const allDay = ev.isAllDayEvent();
@@ -2922,7 +2933,8 @@ function calPanelEventOut_(ev, calId, calName, calColor, tz) {
     color: CAL_PANEL_COLORS_[colorId] || (calId === EVENT_CALENDARS[0] ? CAL_PANEL_UNASSIGNED_COLOR_ : calColor), colorId: colorId, done: colorId === '8',
     location: ev.getLocation() || '', desc: calPanelDesc_(ev.getDescription()), recurring: recurring, link: link,
     editable: calWritable_(calId), // any calendar he can edit; repeating too, with a This day / All days choice (2026-11-11)
-    sched: !allDay && (function () { try { return ev.getTag(CAL_SCHED_TAG) === '1'; } catch (e) { return false; } })()
+    sched: !allDay && (function () { try { return ev.getTag(CAL_SCHED_TAG) === '1'; } catch (e) { return false; } })(),
+    ord: allDay ? (function () { try { return Number(ev.getTag(CAL_ORD_TAG)) || 0; } catch (e) { return 0; } })() : 0
   };
 }
 // Event popup notes (2026-11-14, Julius: "like Google Calendar's pop-up"): the description as plain text, short
@@ -3005,7 +3017,8 @@ function calPanelRangeApi_(from, to, tz) {
             color: CAL_PANEL_COLORS_[colorId] || (isMain ? CAL_PANEL_UNASSIGNED_COLOR_ : meta.color), colorId: colorId, done: colorId === '8',
             location: it.location || '', desc: calPanelDesc_(it.description), recurring: recurring, link: it.htmlLink || '',
             editable: canEdit,
-            sched: !allDay && !!(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_SCHED_TAG] === '1')
+            sched: !allDay && !!(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_SCHED_TAG] === '1'),
+            ord: allDay ? Number(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_ORD_TAG]) || 0 : 0
           });
         });
         token = r.nextPageToken;
@@ -3114,6 +3127,7 @@ function calPanelCreateEvent(req) {
     const ev = w.allDay ? (w.oneDay ? cal.createAllDayEvent(w.title, w.start) : cal.createAllDayEvent(w.title, w.start, w.end))
       : cal.createEvent(w.title, w.start, w.end);
     try { ev.removeAllReminders(); } catch (e) { console.error(e); }
+    if (w.allDay) try { ev.setTag(CAL_ORD_TAG, String(Number(req.ord) || Date.now())); } catch (e) { console.error('create ord: ' + e); } // new all-day = bottom
     const out = calPanelOut_(ev, calId);
     if (key) cache.put(key, JSON.stringify({ eventId: out.eventId, startMs: out.startMs, calId: calId }), 21600);
     return out;
@@ -3143,6 +3157,7 @@ function calPanelMoveEvent(req) {
   try {
     if (!w.allDay && wasAllDay) ev.setTag(CAL_SCHED_TAG, '1');
     else if (w.allDay && ev.getTag(CAL_SCHED_TAG)) ev.deleteTag(CAL_SCHED_TAG);
+    if (w.allDay && !wasAllDay) ev.setTag(CAL_ORD_TAG, String(Date.now())); // back to all-day = bottom of the day
   } catch (e) { console.error('calPanelMoveEvent tag: ' + e); }
   planRelinkLocked_(ev);
   return calPanelOut_(ev, calId);
@@ -3933,6 +3948,7 @@ function calBacklogPlaceIn_(r, sh, rows) {
       if (w.allDay) {
         body.start = { date: Utilities.formatDate(w.start, tz, 'yyyy-MM-dd'), dateTime: null };
         body.end = { date: Utilities.formatDate(w.end, tz, 'yyyy-MM-dd'), dateTime: null }; // w.end is already exclusive
+        body.extendedProperties = { private: {} }; body.extendedProperties.private[CAL_ORD_TAG] = String(Number(r.ord) || Date.now()); // bottom of the day
       } else {
         body.start = { dateTime: w.start.toISOString(), date: null };
         body.end = { dateTime: w.end.toISOString(), date: null };

@@ -893,3 +893,13 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## All day quick add (2026-11-15 14:46, Julius)
 - `[data-fad-add]` + in `.cp-fadh` toggles `.cp-fadnew[data-fad-new]` (outside `[data-fad-body]`, so `fadRender` never wipes the typing): `.cp-chk` + `input[data-fad-in]` + ➤ `[data-fad-go]` + ✕ `[data-fad-x]`. `fadAddSend()` → `calPanelCreateEvent({opId, title, allDay, start: viewStart, end: +1})`, stand-in `fqtmp-<opId>` until the re-read (2.5 s), input cleared and kept focused for the next one; failure puts the text back. The calendar's capture Esc handler closes only the row when focus is in it.
 - Smoke: "quick add" (+, type, Enter → all-day on 11-21, listed, blank row ready, Esc closes the row and keeps full screen).
+
+## All day order (2026-11-15 17:20, Julius)
+- Ask: rearrange the all-day area and keep the positions; from the backlog or added = very bottom.
+- Stored as private tag `CAL_ORD_TAG` ('fwOrd', number) on the event: `calPanelCreateEvent` (all-day: `req.ord` or now), `calBacklogPlaceIn_` (all-day patch `extendedProperties.private`, `r.ord` or now), `calPanelMoveEvent` (timed → all-day = now). New `calPanelSetOrder([{eventId, startMs, calId, ord}])`. Output `ord` on all-day events.
+- Client: `ordKey` on every event; `eventOrder` 'done,cpSch,start,ordKey,urgRank,…'; `adCmp` (fad + lists): done last, then ordKey (0 = never ordered → first, by urgency), so new (ord = now) is last. `adReorder(ev, target, after, day)` renumbers the day's open all-day list (base = now − n s, 1 s apart, always below "now"), updates the events + local cache, one `calPanelSetOrder`. Match events by id (`getEvents()` returns fresh wrappers).
+- Full box: `fadDrag.ad` (open row) → `fadAdTarget` (blue line `.cp-fa-ins` / `-b`) → `adReorder` on release. Half calendar: `dragStopped` → `adDropHalf` when an all-day event is let go in its own day's cell (FullCalendar has no reorder).
+- `cpGroups`: a day with any hand-ordered open task (`data-cpo`) shows one "To do" group (no urgency labels).
+- Stand-ins (`bltmp-`, `fqtmp-`) now go when the real event arrives (`dropWhenReal`, ≤ 5 s) instead of a fixed 2.5 s, so no doubles.
+- Fix: `fadRender` waits while a row of the box is held (`fadDrag.fad`), since replacing the row mid-drag loses the touchend.
+- Smoke: "order" (two quick adds land last; drag "Order two" above "All-day A" → kept after a re-read).

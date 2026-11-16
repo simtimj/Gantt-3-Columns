@@ -1156,7 +1156,8 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         return {start:a[0],end:a[1],events:window.__calEmpty?[]:Object.values(S.ev).concat(window.__calManyAllDay&&(window.__mDay=window.fwCalendar.api().view.activeStart.toISOString().slice(0,10))?Array.from({length:30},(_,i)=>({id:'m'+i+'|x',eventId:'m'+i,title:'Many '+i,allDay:true,start:window.__mDay,end:L.fromISO(window.__mDay).plus({days:1}).toISODate(),startMs:ms(window.__mDay),color:'#3f51b5',colorId:(window.__mDone||{})['m'+i]??i%5===4?'8':'9',done:(window.__mDone||{})['m'+i]??i%5===4,urg:['1','2','3',''][i%4]||undefined,cat:i%2?'code':'',cal:'Main',calId:'main',editable:true})):[]).filter(e=>e.start.slice(0,10)<a[1]&&(e.allDay?e.end:e.end.slice(0,10))>=a[0]).map(e=>Object.assign({},e)),failed:[]};}
       const r=a[0]||{},shape=e=>{e.title=r.title;e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);return e;};
       if(m==='calPanelCreateEvent'){ if(S.ops[r.opId])return Object.assign({repeat:true},S.ev[S.ops[r.opId]]);
-        const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));S.ops[r.opId]=e.eventId;return e;}
+        const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));if(r.allDay)e.ord=r.ord||Date.now();S.ops[r.opId]=e.eventId;return e;}
+      if(m==='calPanelSetOrder'){(a[0]||[]).forEach(x=>{if(S.ev[x.eventId])S.ev[x.eventId].ord=x.ord;});return {ok:true,failed:[]};}
       if(m==='calPanelUpdateEvent'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');if(e.recurring||!e.editable)throw new Error('Repeating events are read-only here');delete S.ev[r.eventId];return put(shape(e));}
       // Phase 3b: move / resize in place (same id); Graphite (done) is locked; plan links follow the new start.
       const relink=e=>{const link=e.eventId+'@'+e.startMs;(S.plan||[]).forEach(x=>{if(String(x.event).split('@')[0]===e.eventId)x.event=link;});if(e.tag){S.planEv=S.planEv||{};S.planEv['tid:'+e.tag]=link;}return link;};
@@ -2212,6 +2213,38 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
                   const e2 = await pg.evaluate(d => window.__cal.ev['a-' + d], day);
                   if (!e2 || !e2.allDay || e2.sched) errs.push('scheduled: dragging back to all day gave ' + JSON.stringify(e2 && { allDay: e2.allDay, sched: e2.sched }));
                 }
+              }
+              await pg.evaluate(() => window.fwCalendar.api().today());
+            }
+            // All-day order (2026-11-15, Julius): new = bottom; drag a row above another in the box = new order, kept after a re-read.
+            {
+              const D = '2026-11-22';
+              const names = () => pg.evaluate(() => [...document.querySelectorAll('#calPanel .cp-fad .cp-fai:not(.cp-fasch):not(.cp-done)')].map(x => x.querySelector('.cp-ev-t').textContent));
+              await pg.evaluate(async d => { const w = ms => new Promise(r => setTimeout(r, ms)), cal = window.fwCalendar.api(); cal.changeView('timeGridDay', d); await w(400);
+                const b = document.querySelector('#calPanel [data-fad-add]'); b.click(); await w(100);
+                const i = document.querySelector('#calPanel [data-fad-in]');
+                for (const t of ['Order one', 'Order two']) { i.value = t; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(700); }
+                document.querySelector('#calPanel [data-fad-x]').click(); await w(200); }, D);
+              let n = await names();
+              if (n.join('|') !== 'All-day A|Order one|Order two') errs.push('order: new tasks not at the bottom: ' + n.join('|'));
+              const g = await pg.evaluate(() => { const rs = [...document.querySelectorAll('#calPanel .cp-fad .cp-fai:not(.cp-fasch)')], c = r => { const b = r.getBoundingClientRect(); return { x: b.x + Math.min(40, b.width / 2), y: b.y + b.height / 2, t: b.y + 3 }; };
+                const two = rs.find(r => /Order two/.test(r.textContent)), a = rs.find(r => /All-day A/.test(r.textContent)); return two && a ? { from: c(two), to: c(a) } : null; });
+              if (!g) errs.push('order: rows not found');
+              else {
+                const to = { x: g.to.x, y: g.to.t };
+                if (name === 'phone') {
+                  const cdp = await pg.context().newCDPSession(pg);
+                  const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+                  await T('touchStart', g.from.x, g.from.y); await pg.waitForTimeout(900);
+                  for (let i = 1; i <= 8; i++) { await T('touchMove', g.from.x + (to.x - g.from.x) * i / 8, g.from.y + (to.y - g.from.y) * i / 8); await pg.waitForTimeout(30); }
+                  await T('touchEnd');
+                } else { await pg.mouse.move(g.from.x, g.from.y); await pg.mouse.down(); await pg.mouse.move(to.x, to.y, { steps: 10 }); await pg.mouse.up(); }
+                await pg.waitForTimeout(600);
+                n = await names();
+                if (n.join('|') !== 'Order two|All-day A|Order one') errs.push('order: drag gave ' + n.join('|'));
+                await pg.evaluate(async () => { window.fwCalendar.api().refetchEvents(); await new Promise(r => setTimeout(r, 600)); });
+                n = await names();
+                if (n.join('|') !== 'Order two|All-day A|Order one') errs.push('order: not kept after a re-read: ' + n.join('|'));
               }
               await pg.evaluate(() => window.fwCalendar.api().today());
             }

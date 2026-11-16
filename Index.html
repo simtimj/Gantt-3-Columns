@@ -17713,6 +17713,23 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }, {capture: true, passive: true});
     document.addEventListener('touchend', () => { tg = null; }, {capture: true, passive: true});
   })();
+  /* Safety net (2026-11-16): a floating drag copy left behind ~1 s after every finger / mouse is up is cleared, so
+     nothing can keep floating over the app. */
+  (() => {
+    let down = 0, t = 0;
+    // FullCalendar's copy = class fc-event-dragging + inline position fixed + pointer-events none. A fake "animation ended"
+    // lets FullCalendar finish its own drop cleanup (so the next drag isn't broken); removed outright if it stays.
+    const stuck = () => [...document.querySelectorAll('.fc-event-dragging')].filter(el => el.style.position === 'fixed' && el.style.pointerEvents === 'none');
+    const sweep = () => { if(down > 0) return;
+      const a = stuck(); if(!a.length) return;
+      a.forEach(el => { try{ el.dispatchEvent(new Event('transitionend')); }catch(e){} });
+      setTimeout(() => { if(down <= 0) stuck().forEach(el => el.remove()); }, 150); };
+    const up = e => { down = e.touches ? e.touches.length : 0; clearTimeout(t); if(!down) t = setTimeout(sweep, 900); };
+    document.addEventListener('touchstart', e => { down = e.touches.length; }, {capture: true, passive: true});
+    document.addEventListener('mousedown', () => { down = 1; }, true);
+    ['touchend', 'touchcancel', 'mouseup'].forEach(k => document.addEventListener(k, up, {capture: true, passive: true}));
+    window.fwSweepDragCopies = sweep;
+  })();
   let evHold = null, evHoldOpenAt = 0;
   mount.addEventListener('pointerdown', e => {
     if(evHold){ clearTimeout(evHold.timer); evHold = null; }
@@ -17863,6 +17880,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Phase 3b: hold + drag (touch) or drag (mouse) moves an event, its bottom edge resizes it; timed ↔ all-day both
       // ways. Per event `editable` = main calendar, not repeating, not done (Graphite stays put). Plan rows drop in too.
       editable: true, eventStartEditable: true, eventDurationEditable: true, eventResizableFromStart: false,
+      // 2026-11-16 (Julius: a dragged event kept floating after letting go): no slide-back animation — FullCalendar only
+      // removes the floating copy when that animation ends, and it never ends if nothing moves or the calendar is off screen.
+      dragRevertDuration: 0,
       eventLongPressDelay: window.fwHoldMs(), snapDuration: '00:15:00', defaultTimedEventDuration: '00:15:00', defaultAllDayEventDuration: {days: 1},
       eventAllow: () => !moveBusy, droppable: true, dropAccept: '[data-plan-drag],[data-bl-drag],[data-fa-drag]',
       eventDragStart: () => { dropSeen = false; }, eventDragStop: info => { dragStopped(info); unselSoon(); }, eventResizeStop: () => unselSoon(),

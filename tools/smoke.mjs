@@ -1962,6 +1962,24 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
               if (!(await pg.evaluate(() => window.__fwScrollNotDrag))) errs.push('scroll vs drag: the early move was not treated as a scroll');
             }
           }
+          // Dragged out and let go (2026-11-16, Julius: "it floats, even after I let go"): no floating copy stays behind.
+          {
+            const ev = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .fc-timegrid-event')].find(x => /Dentist/.test(x.textContent)); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + Math.min(14, r.height / 2) }; });
+            if (ev) {
+              await T('touchStart', ev.x, ev.y); await pg.waitForTimeout(800);
+              let picked = false;
+              for (let i = 1; i <= 8; i++) { await T('touchMove', ev.x - 4 * i, ev.y - (ev.y - 8) * i / 8); await pg.waitForTimeout(30); picked = picked || await pg.evaluate(() => !!document.querySelector('.fc-event-dragging')); }
+              await T('touchEnd'); await pg.waitForTimeout(1400);
+              const left = await pg.evaluate(() => [...document.querySelectorAll('.fc-event-dragging')].filter(el => el.style.position === 'fixed').length);
+              if (!picked) errs.push('drag out: holding the event did not pick it up');
+              if (left) errs.push('drag out: ' + left + ' floating copy stayed after letting go');
+              // A stuck copy from any other path is swept too.
+              await pg.evaluate(() => { const m = document.createElement('div'); m.className = 'fc-event fc-event-dragging'; m.style.cssText = 'position:fixed;pointer-events:none;top:10px;left:10px'; document.querySelector('#calPanel .fc').appendChild(m); });
+              await T('touchStart', 20, 300); await T('touchEnd'); await pg.waitForTimeout(1300);
+              if (await pg.evaluate(() => !!document.querySelector('.fc-event-dragging'))) errs.push('drag out: stuck copy was not swept');
+              await pg.evaluate(() => window.fwCalendar.api().refetchEvents()); await pg.waitForTimeout(500);
+            }
+          }
           for (const [x, y] of [[300, 60], [100, 450]]) {
             await pg.evaluate(() => { const ws = document.getElementById('workspace'); ws.scrollLeft = ws.scrollWidth; }); await pg.waitForTimeout(100);
             const sl = await swipe(x, y, 260);

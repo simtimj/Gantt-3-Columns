@@ -76,6 +76,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-16)
 
+- **No floating event after a drag**: holding and dragging a calendar event off the calendar, then letting go, no longer leaves a copy floating over the app. The event just snaps back, with no slide-back animation. A leftover copy is cleared about 1 s after your finger is up.
 - **Opens on the calendar half**: the app now opens on the right half: tabs on the upper left, Focus / Thinking on the lower left, calendar on the right. Slide left for History. A new device starts on ⭐ Keep In Mind (your last tab is still remembered). The 🔴 Urgent tab moved to the right of ⭐.
 - **Title count on the title row**: titleizing a checkbox line in ⭐ Keep In Mind (or any column) keeps its "− 6/7 ✓" count on the same line as the title when it fits, instead of dropping under it. Long titles wrap inside; the count stays beside them.
 

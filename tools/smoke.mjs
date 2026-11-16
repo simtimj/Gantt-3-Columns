@@ -2126,6 +2126,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
               window.__calSrv = (m, a) => m === 'calBacklogSync' ? { items: [{ id: 'bl-1', title: 'Backlog hold B', date: '2026-11-10', urg: '1', color: '11' },
                   { id: 'bl-2', title: 'Backlog bulk C', date: '2026-11-10', urg: '1', color: '9' }, { id: 'bl-3', title: 'Backlog bulk D', date: '2026-11-09', urg: '2', color: '5' }] }
                 : m === 'calBacklogPlace' ? (window.__blPlaced = a[0], { ok: true })
+                : m === 'calBacklogComplete' ? (window.__blDone = a[0], { ok: true })
                 : m === 'calBacklogPlaceMany' ? (window.__blPlaced = a[0][0], window.__blPlacedMany = a[0], { ok: true, done: a[0].map(x => x.id), failed: [] }) : srv(m, a);
               window.fwCalendar.blReload(); await w(300); });
             const r = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .cp-bli')].find(x => /Backlog hold B/.test(x.textContent)); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + 30, y: b.y + b.height / 2 }; });
@@ -2147,6 +2148,35 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
                 const res = await pg.evaluate(() => ({ p: window.__blPlaced, left: [...document.querySelectorAll('#calPanel .cp-bli')].some(x => /Backlog hold B/.test(x.textContent)), today: luxon.DateTime.now().setZone('America/Los_Angeles').toISODate() }));
                 if (!res.p || !res.p.allDay || res.p.start !== res.today || res.p.id !== 'bl-1') errs.push('backlog menu: Send to Today sent ' + JSON.stringify(res.p));
                 if (res.left) errs.push('backlog menu: row still in the backlog after Send to Today');
+              }
+            }
+            // Mark complete (2026-11-16, Julius): hold → ✓ Done · Archive on a picked day; Undo puts it back; otherwise it saves.
+            {
+              const hold = async () => { const q = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .cp-bli')].find(x => /Backlog bulk C/.test(x.textContent)); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + 30, y: b.y + b.height / 2 }; });
+                if (!q) return false;
+                if (name === 'phone') { const cdp = await pg.context().newCDPSession(pg); const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+                  await T('touchStart', q.x, q.y); await pg.waitForTimeout(900); await T('touchEnd'); }
+                else { await pg.mouse.move(q.x, q.y); await pg.mouse.down(); await pg.waitForTimeout(900); await pg.mouse.up(); }
+                await pg.waitForTimeout(300); return true; };
+              const pick = (label, day) => pg.evaluate(([label, day]) => { const m = document.querySelector('[data-bl-menu]'); if (!m) return 'no menu';
+                const d = m.querySelector('[data-bl-dday]'); if (!d) return 'no date'; if (day) d.value = day;
+                const b = [...m.querySelectorAll('button')].find(x => x.textContent.includes(label)); if (!b) return 'no ' + label; b.click(); return ''; }, [label, day]);
+              const gone = () => pg.evaluate(() => ![...document.querySelectorAll('#calPanel .cp-bli')].some(x => /Backlog bulk C/.test(x.textContent)));
+              if (!await hold()) errs.push('backlog done: row not shown');
+              else {
+                let e = await pick('Done · Archive', '2026-11-14'); if (e) errs.push('backlog done: ' + e);
+                await pg.waitForTimeout(200);
+                const t = await pg.evaluate(() => { const x = document.querySelector('[data-bl-undo]'); return x && !x.hidden ? x.textContent : ''; });
+                if (!await gone()) errs.push('backlog done: row still shown');
+                if (!/archived \(11\/14\)/.test(t)) errs.push('backlog done: toast ' + JSON.stringify(t));
+                await pg.evaluate(() => document.querySelector('[data-bl-undo-b]').click()); await pg.waitForTimeout(200);
+                if (await gone()) errs.push('backlog done: Undo did not put it back');
+                if (await pg.evaluate(() => window.__blDone)) errs.push('backlog done: saved despite Undo');
+                await hold(); e = await pick('Done · Delete'); if (e) errs.push('backlog done: ' + e);
+                await pg.evaluate(() => window.fwBlDone.flush()); await pg.waitForTimeout(300);
+                const d = await pg.evaluate(() => window.__blDone), today = await pg.evaluate(() => luxon.DateTime.now().setZone('America/Los_Angeles').toISODate());
+                if (!d || d.id !== 'bl-2' || d.mode !== 'delete' || d.day !== today) errs.push('backlog done: sent ' + JSON.stringify(d));
+                if (await pg.evaluate(() => { const x = document.querySelector('[data-bl-undo]'); return x && !x.hidden; })) errs.push('backlog done: toast still up after save');
               }
             }
             // Drag a backlog row onto the All day box (2026-11-15, Julius) → all-day task on the day shown.

@@ -3970,6 +3970,41 @@ function calBacklogPlaceIn_(r, sh, rows) {
     return { ok: true, event: out };
   }
 }
+/* Mark complete (2026-11-16, Julius): hold a backlog row → ✓ Done · Archive (default) or ✓ Done · Delete, on a
+   chosen day (default today; a date picker for tasks he finished earlier but never ticked).
+   - archive: the ↪ event moves to that day as an all-day "[x] Title" in Graphite (= done, already accounted for,
+     so Graphite transfers skip it), row marked 'done', and a Done Log row on that day (Project Backlog, by Julius).
+   - delete: the event is removed, row marked 'deleted', nothing logged.
+   The client holds the call ~6 s for Undo, so the server never needs to reverse it. */
+function calBacklogComplete(req) {
+  const r = req || {}, id = String(r.id || ''), mode = r.mode === 'delete' ? 'delete' : 'archive';
+  if (!id) throw new Error('Missing backlog id');
+  const tz = Session.getScriptTimeZone();
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(r.day || '')) ? String(r.day) : Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = calBacklogSheet_(), rows = calBacklogRows_(sh), i = rows.findIndex(x => x[0] === id);
+    if (i < 0) throw new Error('Not in the backlog any more — tap ↻');
+    if (rows[i][6]) return { ok: true, already: rows[i][6] };
+    const calId = EVENT_CALENDARS[0], evId = calBacklogEventId_(id);
+    const title = String(rows[i][2] || '').replace(/^↪\s*/, '').trim() || '(no title)';
+    if (mode === 'delete') {
+      try { Calendar.Events.remove(calId, evId); } catch (e) { console.error('calBacklogComplete delete: ' + e); }
+      sh.getRange(i + 2, 7).setValue('deleted');
+      return { ok: true, mode: mode };
+    }
+    try {
+      Calendar.Events.patch({ summary: '[x] ' + title, colorId: '8',
+        start: { date: day, dateTime: null }, end: { date: addDaysToDateString_(day, 1), dateTime: null } }, calId, evId);
+    } catch (e) { console.error('calBacklogComplete patch: ' + e); } // event gone → still logged
+    sh.getRange(i + 2, 7).setValue('done');
+    const log = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
+    log.getRange(log.getLastRow() + 1, 1, 1, DONE_LOG_HEADERS.length)
+      .setValues([[day, 'Backlog', title, 'Marked done from the calendar backlog', 'Julius', '']]);
+    return { ok: true, mode: mode, day: day };
+  } finally { lock.releaseLock(); }
+}
 
 /* =========================================================
    KEEP IN MIND — one shared list (2026-11-13, Julius: "shared between all days, should not change its contents";

@@ -843,11 +843,18 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 ## Backlog hold menu + see-through long events (2026-11-15, Julius)
 
-- Backlog: capture-phase pointer / touch listeners on `blBody` rows (`[data-bl-drag]`, not ✕): held ≥ `fwHoldMs()` and released within 10 px → `blMenu()` (an `.urg-picker.fx-menu` with `[data-bl-menu]`, reusing `placeUrgPicker` / `hideUrgencyPicker`). 📌 Send to Today → `blSendToday()` = `calBacklogPlace({id, …slotReq(true, today)})` (all-day today). FullCalendar's hold-drag still starts at the same hold; letting go without moving just drops nothing. `fwCalendar.blReload()` forces a backlog reload (tests). Mark complete: To do, Julius to define.
+- Backlog: capture-phase pointer / touch listeners on `blBody` rows (`[data-bl-drag]`, not ✕): held ≥ `fwHoldMs()` and released within 10 px → `blMenu()` (an `.urg-picker.fx-menu` with `[data-bl-menu]`, reusing `placeUrgPicker` / `hideUrgencyPicker`). 📌 Send to Today → `blSendToday()` = `calBacklogPlace({id, …slotReq(true, today)})` (all-day today). FullCalendar's hold-drag still starts at the same hold; letting go without moving just drops nothing. `fwCalendar.blReload()` forces a backlog reload (tests). Mark complete: built 2026-11-16 (see below).
 - See-through: `eventClassNames` adds `cp-see` to timed events ≥ 2 h; `eventDidMount` sets `--cp-evbg` from the event color. CSS: 12 % tint + 1.5 px outline, `.fc-event-main` sticky top, `.cp-evc` a solid chip.
 - Smoke: the old "drag the split line" test now checks the fixed half / half split doesn't move (split fixed 2026-11-15).
 - 08:21 (Julius: "less transparent, no color behind the text, keep the font white"): `.cp-see` tint 12 % → 32 %, title chip removed; `.cp-evc` / `.cp-ev-t` / `.cp-ev-m` white, opacity 1, soft text-shadow.
 - 08:31 (Julius: "put the day gradient into the side / halfway calendar"): sun CSS now `#calPanel:is(.cp-full,.cp-docked)`; `sunPaint` runs when full or docked; triggers: `fadSoon` (eventsSet / datesSet) in docked mode, `dockTo`, and `applyZoomMode` after slot labels change. Smoke: docked column has a gradient.
+
+## Backlog mark complete (2026-11-16, Julius)
+- Answers: Archive is the default, Delete second; Archive logs to the Done Log and shows checked on that day; a date picker moves the done day (tasks finished earlier, never ticked); Undo.
+- Menu (`blMenu`): `.cp-bldday` date input `[data-bl-dday]` (default / max today), ✓ Done · Archive, 🗑 Done · Delete, 📌 Send to Today.
+- `blDone(id, mode, day)`: row out at once, `.cp-bltoast[data-bl-undo]` with Undo for 6 s, then `blDoneSend` → `calBacklogComplete({id, mode, day})`. A newer Done, `pagehide` or a hidden tab sends the waiting one at once. Failure puts the row back. `window.fwBlDone` {done, undo, flush} for tests.
+- Server `calBacklogComplete`: archive = patch the ↪ event to all-day on `day`, title `[x] Title`, Graphite `8` (so Graphite transfers skip it; the calendar archiver can fold it), row G `done`, Done Log row `[day, 'Backlog', title, …, 'Julius', '']`. Delete = `Events.remove`, row G `deleted`, no log.
+- Smoke (calendar suite): archive on 11/14 → toast "(11/14)", Undo restores + nothing sent; Delete + flush sends `{id, mode:'delete', day: today}`.
 
 ## Urgent tab in the middle column (2026-11-15 08:46, Julius: "for now just put the urgent stuff")
 - 🔴 `data-ctab="urgent"` + `#urgTabScroll`. `window.urgTabSync()` (called from the center tab `set()`) moves the real `#urgentPanel` into the tab (a comment node `urgHome` marks its Reference spot) and back when leaving; `renderUrgent` also moves it there on first build while the tab is open, and skips the fold check (`urgInTab()`). CSS shows only `.urg-group[data-urg="1"]` with its add line. Smoke: red row shown, Soon row hidden, panel returns on leaving.

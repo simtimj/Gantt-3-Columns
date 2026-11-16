@@ -17526,9 +17526,59 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const m = document.createElement('div'); m.className = 'urg-picker fx-menu'; m.setAttribute('data-bl-menu', '');
     const item = (label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'urg-goto'; b.textContent = label;
       b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('click', e => { e.stopPropagation(); hideUrgencyPicker(); fn(); }); m.appendChild(b); };
+    // 2026-11-16 (Julius): mark complete. "Done on" date (default today) for tasks finished earlier but never ticked.
+    const today = L().now().setZone(TZ).toISODate();
+    const dr = document.createElement('label'); dr.className = 'cp-bldday'; dr.innerHTML = '<span>Done on</span>';
+    const di = document.createElement('input'); di.type = 'date'; di.value = today; di.max = today; di.setAttribute('data-bl-dday', '');
+    dr.appendChild(di); m.appendChild(dr);
+    const day = () => /^\d{4}-\d{2}-\d{2}$/.test(di.value) ? di.value : today;
+    item('✓ Done · Archive', () => blDone(id, 'archive', day()));
+    item('🗑 Done · Delete', () => blDone(id, 'delete', day()));
     item('📌 Send to Today', () => blSendToday(id));
     document.body.appendChild(m); placeUrgPicker(m, x, y); urgPicker = m;
   }
+  /* Done with Undo (2026-11-16, Julius): the row leaves at once, a toast offers Undo for 6 s, then the save runs
+     (calBacklogComplete). A newer Done, or leaving the page, sends the waiting one right away. */
+  let blDoneJob = null;
+  function blDoneToast(job){
+    let t = document.querySelector('[data-bl-undo]');
+    if(!t){ t = document.createElement('div'); t.className = 'cp-bltoast'; t.setAttribute('data-bl-undo', '');
+      t.innerHTML = '<span data-bl-undo-t></span><button type="button" data-bl-undo-b>Undo</button>'; document.body.appendChild(t);
+      t.querySelector('[data-bl-undo-b]').addEventListener('click', e => { e.stopPropagation(); blDoneUndo(); }); }
+    const d = L().fromISO(job.day), today = L().now().setZone(TZ).toISODate();
+    t.querySelector('[data-bl-undo-t]').textContent = (job.mode === 'delete' ? '🗑 Deleted' : '✓ Done · archived') +
+      (job.mode === 'delete' || job.day === today ? '' : ' (' + (d.isValid ? d.toFormat('M/d') : job.day) + ')');
+    t.hidden = false;
+  }
+  function blDoneHide(){ const t = document.querySelector('[data-bl-undo]'); if(t) t.hidden = true; }
+  function blDoneSend(job){
+    if(!job || job.sent) return; job.sent = true; clearTimeout(job.t);
+    if(blDoneJob === job){ blDoneJob = null; blDoneHide(); }
+    window.__fwBlPending = (window.__fwBlPending || 0) + 1;
+    google.script.run.withSuccessHandler(() => { window.__fwBlPending--; if(cal) refetchFresh(); })
+      .withFailureHandler(err => { window.__fwBlPending--;
+        if(blData && !blById(job.it.id)){ blData.items.push(job.it); blRender(); if(typeof fadSoon === 'function') fadSoon(); }
+        moveFail('Couldn’t mark done — put back in the backlog. ' + errText(err)); })
+      .calBacklogComplete({id: job.it.id, mode: job.mode, day: job.day});
+  }
+  function blDone(id, mode, day){
+    const it = blById(id); if(!it) return;
+    if(blDoneJob) blDoneSend(blDoneJob);
+    blData.items = blData.items.filter(x => x.id !== id); if(blSel) blSel.delete(id); blRender();
+    if(typeof fadSoon === 'function') fadSoon();
+    const job = {it: it, mode: mode, day: day}; blDoneJob = job;
+    job.t = setTimeout(() => blDoneSend(job), 6000);
+    blDoneToast(job);
+  }
+  function blDoneUndo(){
+    const job = blDoneJob; if(!job || job.sent) return;
+    clearTimeout(job.t); blDoneJob = null; blDoneHide();
+    if(blData && !blById(job.it.id)) blData.items.push(job.it);
+    blRender(); if(typeof fadSoon === 'function') fadSoon(); flash('Undone');
+  }
+  window.addEventListener('pagehide', () => { if(blDoneJob) blDoneSend(blDoneJob); });
+  document.addEventListener('visibilitychange', () => { if(document.hidden && blDoneJob) blDoneSend(blDoneJob); });
+  window.fwBlDone = {done: blDone, undo: blDoneUndo, flush: () => blDoneJob && blDoneSend(blDoneJob)};
   if(blBody){
     let bh = null;
     const bhEnd = () => { const h = bh; bh = null; if(!h) return; clearTimeout(h.t);
@@ -18750,6 +18800,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   .cp-blck{margin-right:4px;font-size:14px;line-height:1;}
   .cp-bli.cp-blon{outline:2px solid #1a73e8;outline-offset:-2px;}
   .cp-blselon .cp-blx{display:none;}
+  .cp-bldday{flex:1 0 100%;display:flex;align-items:center;gap:6px;margin-top:2px;font-size:12px;}
+  .cp-bldday input{flex:1;min-width:0;font:inherit;padding:2px 4px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;}
+  .cp-bltoast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9500;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:8px 10px 8px 14px;border-radius:10px;background:#323232;color:#fff;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.3);}
+  .cp-bltoast[hidden]{display:none;}
+  .cp-bltoast button{border:0;background:transparent;color:#8ab4f8;font:inherit;font-weight:700;padding:4px 6px;cursor:pointer;}
   .cp-blbar{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;gap:6px;padding:5px 6px;background:var(--cp-bg,#fff);border-top:2px solid #1a73e8;font-size:12px;}
   .cp-blbar[hidden]{display:none;}
   .cp-blbar .cp-blbn{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}

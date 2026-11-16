@@ -2482,9 +2482,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         <!-- Center Up tabs (2026-11-01, Julius): small symbols switch what Center Up shows. -->
         <span class="center-tabs" role="tablist">
           <button type="button" data-ctab="notes" class="on" title="Dailies" aria-label="Dailies">📋</button>
-          <button type="button" data-ctab="urgent" title="Urgent (red Next Steps)" aria-label="Urgent">🔴</button>
           <button type="button" data-ctab="weather" title="Weather (next 24 h + 7 days)" aria-label="Weather">☁️</button>
           <button type="button" data-ctab="focus" title="Keep In Mind" aria-label="Keep In Mind">⭐</button>
+          <button type="button" data-ctab="urgent" title="Urgent (red Next Steps)" aria-label="Urgent">🔴</button>
           <button type="button" data-ctab="review" title="Day Review" aria-label="Day Review">📊</button>
           <button type="button" data-ctab="fun" title="Fun + New things" aria-label="Fun and New things">🌴</button>
         </span>
@@ -2651,7 +2651,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Swipe to the hidden third column in 2-column view — paused (Julius, 2026-10-27):
   // it broke things in 2-column mode. Set PEEK_ENABLED true to bring it back.
   var PEEK_ENABLED=false, PEEK_SIDE_KEY='fw.peekSide', lastPeekKey='', peekRevealing=false;
-  var lastHalfW=0;
+  var lastHalfW=0, halfFirst=true; // 2026-11-16 (Julius): opens on the middle column + calendar half
   /* Computer slide (2026-11-13): the one-swipe-flips-all handler was replaced the same day (Julius: magnetize only when
      close) — sideways trackpad / Shift + wheel pans freely (the pan below) and proximity snap pulls in near a half. */
   function halvesOn(){ try{ return localStorage.getItem('fw.halves')!=='0'; }catch(e){ return true; } }
@@ -2659,7 +2659,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   document.addEventListener('DOMContentLoaded',()=>{
     const sel=document.getElementById('halvesMode'); if(!sel)return;
     sel.value=halvesOn()?'1':'0';
-    sel.addEventListener('change',()=>{ try{ localStorage.setItem('fw.halves',sel.value); }catch(e){} lastHalfW=0; const ws=document.getElementById('workspace'); if(ws)ws.scrollLeft=0; updateWorkspaceLayout(); });
+    sel.addEventListener('change',()=>{ try{ localStorage.setItem('fw.halves',sel.value); }catch(e){} lastHalfW=0; const ws=document.getElementById('workspace'); if(ws)ws.scrollLeft=0; halfFirst=true; updateWorkspaceLayout(); });
   });
   const COLUMN_STORAGE_KEY = 'focusWorkspaceColumnsV1';
   const FOCUS_STORAGE_KEY = 'focusWorkspaceFocusV1';
@@ -7068,7 +7068,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(peek && peekChanged && !peekRevealing)
         workspace.scrollLeft=peekSide==='left' ? peekWidth : 0;
       // Half view: keep whichever half pair was showing when the window size changes (calendar side stays put).
-      if(halfChanged && !document.body.classList.contains('bl-push'))workspace.scrollLeft=wasRight ? halfW+1 : 0;
+      if(halfChanged && !document.body.classList.contains('bl-push'))workspace.scrollLeft=(wasRight || halfFirst) ? halfW+1 : 0;
+      if(halves)halfFirst=false;
       syncDayHeights();restoreDayScroll();
     });
   }
@@ -7580,7 +7581,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(window.renderDayReview) renderDayReview();
       if(window.urgTabSync) urgTabSync();
     };
-    let t = 'notes'; try{ t = localStorage.getItem('fw.centerTab') || 'notes'; }catch(e){}
+    let t = 'focus'; try{ t = localStorage.getItem('fw.centerTab') || 'focus'; }catch(e){} // new device opens on ⭐ Keep In Mind (2026-11-16)
     if(t === 'wxdaily') t = 'weather'; // daily tab merged into Weather (2026-11-07)
     if(t === 'new') t = 'fun'; // New things merged into the Fun tab (cleanup 2026-11-09)
     set(t === 'weather' || t === 'focus' || t === 'review' || t === 'fun' || t === 'urgent' ? t : 'notes');

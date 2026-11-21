@@ -791,6 +791,9 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 - 2026-11-21 later (Julius: "a bit much"): `--sky` is now a 3 px stripe on the label strip's right edge (`background-size:3px 100%`, alpha .75); label text back to the default color.
 
+- 2026-11-21 (Julius: backlog ✕ didn't remove): client + server path fine (real-tap smoke passes in full screen and docked); fix = bigger invisible touch area (`.cp-blx::after`, ~32 px). If it still fails on the phone, ask whether the row disappears and comes back, or nothing happens.
+- 2026-11-21 OPEN (Julius): back-to-back events look like they run through each other — Meditate 11:50 pm–1 am then Sleep 1–7:45 am overlap in the docked calendar even zoomed in. Want: touching events sit cleanly one after the other. Leads to check: FullCalendar `slotEventOverlap` (unset = true), `eventMinHeight` (default 15 px) at compact zoom, the midnight-split segment of Meditate, the see-through `cp-glass` border. First step: seed both events in the calStub (`put(...)` next to Dentist; my quick try didn't render, check why) and screenshot with `CAL_SHOT`.
+
 ## Full-screen calendar (2026-11-14, Julius)
 
 - Ask: "slide over again from the half-screen calendar → full-screen calendar with all the information; use the calendar button's (pop-out) features". Answers: starts Day, remembers Day / Week; backlog beside it, full text visible; works with the computer mouse too; 📅 button stays the old pop-out (for comparison).

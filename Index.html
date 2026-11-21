@@ -15785,6 +15785,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli{display:block;padding:5px 6px 5px 8px;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli::after{content:"";display:block;clear:both;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{float:right;line-height:1.1;margin:0 -2px 0 2px;padding:0 2px;font-size:12px;}
+  /* 2026-11-21 (Julius: "pressing X in the backlog doesn't get rid of them"): the ✕ was ~10 px wide, so finger taps
+     landed on the row. Invisible bigger touch area (about 32 × 32) around it; looks the same. */
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{position:relative;font-size:14px;opacity:.85;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx::after{content:'';position:absolute;inset:-9px -10px -9px -8px;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-bld{float:right;font-size:10px;line-height:1.6;margin-left:4px;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blt{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
   :is(#calPanel,#blCol,#calBlLeft) .cp-blh{flex-wrap:wrap;row-gap:0;} /* the drag hint drops under the title when narrow */

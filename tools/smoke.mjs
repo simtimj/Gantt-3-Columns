@@ -2183,6 +2183,19 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
                 if (res.left) errs.push('backlog menu: row still in the backlog after Send to Today');
               }
             }
+            // ✕ on a backlog row removes it — real tap / click (2026-11-21, Julius: "pressing X doesn't get rid of them").
+            {
+              await pg.evaluate(() => { window.__blPlaced = null; });
+              const x = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .cp-bli, #blCol .cp-bli, #calBlLeft .cp-bli')].find(r => /Backlog bulk D/.test(r.textContent) && r.getBoundingClientRect().width); const b = e && e.querySelector('[data-bl-x]'); if (!b) return null; b.scrollIntoView({block: 'center'}); const q = b.getBoundingClientRect(); return { x: q.x + q.width / 2, y: q.y + q.height / 2, where: e.parentElement.closest('[id]').id }; });
+              if (!x) errs.push('backlog ✕: no ✕ on the test row');
+              else {
+                if (view.hasTouch) await pg.touchscreen.tap(x.x, x.y); else await pg.mouse.click(x.x, x.y);
+                await pg.waitForTimeout(600);
+                const r2 = await pg.evaluate(() => ({ p: window.__blPlaced, left: [...document.querySelectorAll('.cp-bli')].some(r => /Backlog bulk D/.test(r.textContent)), menu: !!document.querySelector('[data-bl-menu]:not([hidden])') }));
+                if (!r2.p || r2.p.id !== 'bl-3' || !r2.p.drop) errs.push('backlog ✕ (' + x.where + '): tap did not remove — sent ' + JSON.stringify(r2.p) + (r2.menu ? ', opened the hold menu' : ''));
+                else if (r2.left) errs.push('backlog ✕: row still shown after removing');
+              }
+            }
             // Mark complete (2026-11-16, Julius): hold → ✓ Done · Archive on a picked day; Undo puts it back; otherwise it saves.
             {
               const hold = async () => { const q = await pg.evaluate(() => { const e = [...document.querySelectorAll('#calPanel .cp-bli')].find(x => /Backlog bulk C/.test(x.textContent)); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + 30, y: b.y + b.height / 2 }; });

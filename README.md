@@ -83,6 +83,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **Calendar: end time always shown**: every timed event shows start – end (e.g. "3pm – 3:15pm"), even on one-line or narrow cards; the title shortens first. Small cards' text is centered top-to-bottom (no clipped top).
 - **Calendar: every timed event see-through**: short and medium events now use the same see-through look as long ones (faint tint + outline in the event's color, white text), so the grid shows through.
 - **Speed: reload diagnosis**: each app start now records in the Speed Log whether it was a return after the phone cleared the page or a fresh open (plan: docs/EFFICIENCY_HANDOFF.md → Speed plan).
+- **Backlog ✕ easier to hit**: the ✕ on a backlog row has a much bigger (invisible) touch area, so a finger tap removes the task instead of landing on the row.
 - **🌴 Fun tab: plain white cards**: the purple border / tint is gone.
 - **Phone: tap outside the pop-up only closes it**: on a touch screen, with an event pop-up open, a tap anywhere outside it just closes the pop-up and nothing else happens (e.g. tapping Focus / Thinking doesn't pop the keyboard). Scrolling is unaffected; an unsaved title/time edit still saves. A computer mouse click works as before (closes and lands).
 
@@ -693,6 +694,8 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+
+- **Back-to-back events side by side cleanly** (2026-11-21): e.g. Meditate 11:50 pm–1 am then Sleep 1–7:45 am shouldn't look like they run through each other. Notes: docs/NOTES.md → Google-style event pop-up section.
 
 - **Backlog hold menu: Mark complete** (2026-11-15, Julius): add to the backlog hold menu once he decides what "complete" does (e.g. Graphite + Done Log, or just drop it).
 

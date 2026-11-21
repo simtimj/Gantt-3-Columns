@@ -1,0 +1,17 @@
+// Gantt API router (2026-11-21). Built from tools/pwa-api/ in the Gantt-3-Columns repo; don't edit in the IDE.
+// The hosted Gantt app (GitHub Pages) POSTs here. "Gantt" is the main project as a library in development
+// mode, so it always runs the latest pushed code. The key check lives in Gantt.apiCall.
+function doPost(e) {
+  return Gantt.apiCall(e && e.postData ? e.postData.contents : '');
+}
+
+function doGet() {
+  return ContentService.createTextOutput('{"ok":true,"api":"gantt"}').setMimeType(ContentService.MimeType.JSON);
+}
+
+// Run once from the editor (▶ authorize) so Google asks for every permission the app needs.
+function authorize() {
+  Logger.log(JSON.stringify(Gantt.apiPing()));
+  CalendarApp.getDefaultCalendar();
+  Logger.log('Authorized ✓');
+}

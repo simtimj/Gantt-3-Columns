@@ -2929,6 +2929,80 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
     }
   }
 }
+// PWA (2026-11-21, docs/NOTES.md H): the static build opens, talks to the API through the shim with the key,
+// opens from cache on the next visit (then syncs), and is read-only offline. API = a stub at https://api.test/.
+if (only('pwa')) {
+  const { execFileSync } = await import('child_process');
+  const http = await import('http');
+  const dist = path.join(os.tmpdir(), 'gantt-pwa-smoke');
+  execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec' }, stdio: 'pipe' });
+  const types = { html: 'text/html', js: 'text/javascript', webmanifest: 'application/manifest+json', png: 'image/png' };
+  const srv = http.createServer((q, r) => {
+    let f = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (f.endsWith('/')) f += 'index.html';
+    const fp = path.join(dist, f);
+    if (!fp.startsWith(dist) || !fs.existsSync(fp)) { r.writeHead(404); return r.end(); }
+    r.writeHead(200, { 'Content-Type': types[fp.split('.').pop()] || 'application/octet-stream' }); r.end(fs.readFileSync(fp));
+  });
+  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const errs = [], calls = []; let netOff = false;
+  const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'allow' });
+  await ctx.route('https://api.test/**', async route => {
+    if (netOff) return route.abort('internetdisconnected');
+    const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
+    if (req.k !== 'smokekey') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: false, auth: true, e: 'Wrong or missing app key' }) });
+    const r = req.fn === 'getWorkspaceData' ? data : req.fn === 'runImports' || req.fn === 'getSyncState' ? imported : req.fn === 'getFocus' ? focus
+      : req.fn === 'getKim' ? { html: '', h: 'k0', fresh: true }
+      : req.fn === 'trackerSync' ? { accepted: [], recs: [], seq: 0 }
+      : req.fn === 'getMainCalendarEvents' ? { date: req.a[0], events: [{ id: 'e1', calId: 'c', start: 0, title: 'Sample event', allDay: true, done: false }] } : null;
+    route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
+  });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => errs.push('page error: ' + e.message + (process.env.SMOKE_DEBUG ? '\n' + e.stack : '')));
+  // 1) First open with the setup link: key saved + stripped, data loaded through the API.
+  await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(2500);
+  const first = await pg.evaluate(() => ({ key: localStorage.getItem('pwa.key'), hash: location.hash, text: document.body.innerText,
+    keyBox: !!document.getElementById('pwaKeyBox'), title: document.title }));
+  if (first.key !== 'smokekey' || first.hash) errs.push('setup link: key not saved / not stripped from the URL');
+  if (first.keyBox) errs.push('key box shown even though the key was given');
+  if (!/Pay rent/.test(first.text)) errs.push('first open: today\'s tasks did not show');
+  if (!calls.includes('getWorkspaceData')) errs.push('first open: getWorkspaceData was not called through the API');
+  if (first.title !== 'Gantt') errs.push('title is ' + first.title);
+  await pg.evaluate(() => navigator.serviceWorker.ready);
+  // Store a copy as the background refresh would (it waits 20 s), then reopen: it must open from that copy and sync.
+  await pg.evaluate(() => new Promise(ok => google.script.run.withSuccessHandler(ok).getWorkspaceData({ fast: true })));
+  calls.length = 0;
+  await pg.reload(); await pg.waitForTimeout(2500);
+  const second = await pg.evaluate(() => ({ cache: !!(window.__PWA__ && window.__PWA__.fromCache), sw: !!navigator.serviceWorker.controller, text: document.body.innerText }));
+  if (!second.sw) errs.push('service worker is not controlling the page on the second open');
+  if (!second.cache) errs.push('second open did not start from the stored data');
+  if (calls.includes('getWorkspaceData')) errs.push('second open still waited on getWorkspaceData');
+  if (!calls.some(c => c === 'runImports' || c === 'getSyncState')) errs.push('second open did not sync after the stored data');
+  if (!/Pay rent/.test(second.text)) errs.push('second open: tasks missing');
+  // 2) Offline: opens from the service worker, banner shows, typing is blocked.
+  await ctx.setOffline(true); netOff = true;
+  await pg.reload(); await pg.waitForTimeout(2000);
+  const off = await pg.evaluate(async () => {
+    const out = { banner: !!document.getElementById('pwaOffline'), text: document.body.innerText };
+    const span = [...document.querySelectorAll('[contenteditable="true"] .check-text')].find(s => s.offsetWidth);
+    if (span) { const ed = span.closest('[contenteditable="true"]'); const before = ed.innerHTML;
+      const ev = new InputEvent('beforeinput', { inputType: 'insertText', data: 'x', bubbles: true, cancelable: true });
+      out.blocked = !span.dispatchEvent(ev); out.same = ed.innerHTML === before; }
+    return out;
+  });
+  if (!/Pay rent/.test(off.text)) errs.push('offline: the app did not open from cache');
+  if (!off.banner) errs.push('offline: no "Offline · read-only" banner');
+  if (off.blocked === false) errs.push('offline: typing was not blocked');
+  await ctx.setOffline(false); netOff = false;
+  // 3) Wrong key → key box. 4) Time Tracker page opens.
+  await pg.evaluate(() => localStorage.setItem('pwa.key', 'nope')); await pg.reload(); await pg.waitForTimeout(1500);
+  if (!(await pg.evaluate(() => !!document.getElementById('pwaKeyBox')))) errs.push('wrong key: no key box');
+  await pg.evaluate(() => localStorage.setItem('pwa.key', 'smokekey'));
+  await pg.goto(base + 'tracker.html'); await pg.waitForTimeout(1500);
+  if (!(await pg.evaluate(() => document.title === 'Time Tracker' && !!document.getElementById('tabs')))) errs.push('tracker.html did not open');
+  await ctx.close(); srv.close();
+  if (errs.length) { fails += errs.length; console.error('✗ pwa:\n  ' + errs.join('\n  ')); }
+  else console.log('✓ pwa: setup link + API shim + opens from stored data then syncs + offline read-only + key box + tracker');
+}
 await b.close();
 process.exit(fails ? 1 : 0);
-

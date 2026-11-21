@@ -41,6 +41,9 @@ Where things live, so a session can jump straight there. **Grep the quoted text;
 
 `SETUP` · `WEB APP DATA` (getWorkspaceData) · `DAY SAVING` · `REFERENCE` · `ARCHIVE —` · `DATE HELPERS` · `INITIAL DATE RANGE` · `SHEET HELPERS` · `INBOX` · `DONE WITH CLAUDE` (Done Log, To Confirm, New Tasks intake) · `CLAUDE NOTES` · `CALENDAR EVENTS` (calPanel* server calls) · `DAILY PLAN` · `DAILY COMPLETED-TASK ARCHIVE` · `CALENDAR BACKLOG` · `KEEP IN MIND`
 
+## PWA (2026-11-21, NOTES H)
+`tools/build-pwa.mjs` (static build) · `tools/pwa/shim.js.txt` (google.script.run → fetch, cache open, offline, update button) · `tools/pwa/sw.js.txt` · `tools/pwa-api/` (router project + deploy.sh) · Code.gs `PWA API` banner (`apiCall`, `ss_`, `pwaSetupPage_`). Smoke: `SMOKE_ONLY=pwa`.
+
 ## Tests
 
 `tools/check.mjs` = syntax. `tools/smoke.mjs` suites: `main`, `snap`, `drafts`, `tracker`, `calendar` (run one with `SMOKE_ONLY=calendar`). The calendar suite's fake server is `calStub` (seeded events: Dentist 9:00, Standup, Gig, All-day A…). Main suite runs in Pacific time like Julius's browser.

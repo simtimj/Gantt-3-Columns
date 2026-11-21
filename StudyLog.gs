@@ -253,7 +253,7 @@ function studyPutBlock_(html, key, block, window) {
 }
 
 function syncStudyLog_(timer) {
-  const sheet = speedPart_(timer, 'study.lookup', () => SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STUDY_TAB));
+  const sheet = speedPart_(timer, 'study.lookup', () => ss_().getSheetByName(STUDY_TAB));
   if (!sheet) return;
   const last = speedPart_(timer, 'study.bounds', () => sheet.getLastRow());
   if (last < 2) return;

@@ -1,0 +1,189 @@
+/* Gantt PWA shim (2026-11-21, docs/NOTES.md H). Injected first in the hosted page by tools/build-pwa.mjs.
+   - google.script.run → fetch to the "Gantt API" router (POST text/plain, so no CORS preflight), with the app key.
+   - Main page: the last data seen on this device opens at once (if it's for today), then fwSync(true) catches up.
+   - Offline: read-only + banner. Service worker updates: "↻ Update ready" button, never an auto-reload. */
+(function () {
+  'use strict';
+  var API = '__API__', PAGE = '__PAGE__', BUILD = '__BUILD__';
+  var KEY_LS = 'pwa.key', DATA_LS = 'pwa.initial.v1';
+  var ls = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
+  };
+  window.__PWA__ = { build: BUILD, page: PAGE };
+
+  // Key from the setup link (#k=…): the fragment never reaches a server; save it, then strip it from the URL.
+  var m = location.hash.match(/[#&]k=([^&]+)/);
+  if (m) {
+    ls.set(KEY_LS, decodeURIComponent(m[1]));
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  }
+  function key() { return ls.get(KEY_LS) || ''; }
+
+  /* ---------- offline / read-only ---------- */
+  var offline = !navigator.onLine;
+  function setOffline(on) {
+    on = !!on;
+    if (on === offline && document.body && document.body.classList.contains('pwa-offline') === on) return;
+    offline = on;
+    if (!document.body) return;
+    document.body.classList.toggle('pwa-offline', on);
+    var bar = document.getElementById('pwaOffline');
+    if (on && !bar) {
+      bar = document.createElement('div');
+      bar.id = 'pwaOffline';
+      bar.textContent = 'Offline · read-only';
+      document.body.appendChild(bar);
+    } else if (!on && bar) bar.remove();
+  }
+  window.addEventListener('online', function () { setOffline(false); if (typeof window.fwSync === 'function') try { window.fwSync(true); } catch (e) {} });
+  window.addEventListener('offline', function () { setOffline(true); });
+  document.addEventListener('DOMContentLoaded', function () { if (offline) { offline = !offline; setOffline(true); } });
+  function block(e) {
+    if (!offline) return;
+    if (e.target && e.target.closest && e.target.closest('#pwaKeyBox')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    flash();
+  }
+  ['beforeinput', 'paste', 'drop', 'cut'].forEach(function (t) { document.addEventListener(t, block, true); });
+  document.addEventListener('click', function (e) {
+    if (offline && e.target && e.target.matches && e.target.matches('input[type=checkbox]')) block(e);
+  }, true);
+  var flashT = 0;
+  function flash() {
+    var bar = document.getElementById('pwaOffline'); if (!bar) return;
+    bar.classList.add('pwa-flash'); clearTimeout(flashT);
+    flashT = setTimeout(function () { bar.classList.remove('pwa-flash'); }, 600);
+  }
+
+  /* ---------- key prompt ---------- */
+  function needKey(msg) {
+    if (document.getElementById('pwaKeyBox')) return;
+    var show = function () {
+      var box = document.createElement('div');
+      box.id = 'pwaKeyBox';
+      box.innerHTML = '<div><b>App key needed</b><p>' + (msg || 'This device has no key yet.') +
+        ' Easiest: open your private /dev link with <code>?app=pwa</code> at the end, then tap “Open the Gantt app”.</p>' +
+        '<input id="pwaKeyIn" type="password" autocomplete="off" placeholder="…or paste the key"><button id="pwaKeyOk">Save</button></div>';
+      document.body.appendChild(box);
+      document.getElementById('pwaKeyOk').onclick = function () {
+        var v = document.getElementById('pwaKeyIn').value.trim();
+        if (v) { ls.set(KEY_LS, v); location.reload(); }
+      };
+    };
+    if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+  }
+  if (!key()) needKey();
+
+  /* ---------- google.script.run → fetch ---------- */
+  function call(fn, args) {
+    return fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ k: key(), fn: fn, a: args })
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Server error ' + res.status);
+      return res.json();
+    }, function () {
+      setOffline(true);
+      throw new Error('Offline (can’t reach the server)');
+    }).then(function (j) {
+      if (offline) setOffline(false);
+      if (!j || !j.ok) {
+        if (j && j.auth) { ls.del(KEY_LS); needKey('That key didn’t work.'); }
+        throw new Error((j && j.e) || 'Server error');
+      }
+      return j.r;
+    });
+  }
+  function runner(ok, bad, user) {
+    return new Proxy({}, {
+      get: function (_, name) {
+        if (name === 'withSuccessHandler') return function (f) { return runner(f, bad, user); };
+        if (name === 'withFailureHandler') return function (f) { return runner(ok, f, user); };
+        if (name === 'withUserObject') return function (u) { return runner(ok, bad, u); };
+        if (typeof name !== 'string') return undefined;
+        return function () {
+          var args = Array.prototype.slice.call(arguments);
+          call(name, args).then(function (r) {
+            if (name === 'getWorkspaceData' && PAGE === 'index') saveData(r);
+            if (ok) ok(r, user);
+          }, function (err) {
+            if (bad) bad(err, user); else console.error(name + ': ' + err.message);
+          });
+        };
+      }
+    });
+  }
+  window.google = window.google || {};
+  window.google.script = {
+    run: runner(null, null, undefined),
+    host: { close: function () {}, setHeight: function () {}, setWidth: function () {}, editor: { focus: function () {} }, origin: location.origin },
+    url: { getLocation: function (cb) { cb({ hash: location.hash.slice(1), parameter: {}, parameters: {} }); } }
+  };
+
+  /* ---------- main page: open from the last data on this device ---------- */
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function saveData(r) {
+    if (!r || !Array.isArray(r.days) || !r.today) return;
+    try {
+      var copy = Object.assign({}, r); delete copy.timing;
+      if (!ls.set(DATA_LS, JSON.stringify({ at: Date.now(), data: copy }))) ls.del(DATA_LS);
+    } catch (e) {}
+  }
+  window.__PWA_INITIAL__ = null;
+  if (PAGE === 'index') {
+    var cached = null;
+    try { cached = JSON.parse(ls.get(DATA_LS) || 'null'); } catch (e) {}
+    if (cached && cached.data && (cached.data.today === today() || offline)) {
+      window.__PWA_INITIAL__ = cached.data;
+      window.__PWA__.fromCache = cached.at;
+      window.addEventListener('load', function () {
+        // Catch up right away (days, Reference, imports); the stored copy refreshes a bit later.
+        setTimeout(function () { if (!offline && typeof window.fwSync === 'function') try { window.fwSync(true); } catch (e) {} }, 50);
+        setTimeout(refreshCopy, 20000);
+      });
+    } else {
+      window.addEventListener('load', function () { setTimeout(refreshCopy, 20000); });
+    }
+  }
+  function refreshCopy() {
+    if (offline || document.hidden) return;
+    call('getWorkspaceData', [{ fast: true }]).then(saveData, function () {});
+  }
+
+  /* ---------- service worker + update button ---------- */
+  if ('serviceWorker' in navigator) {
+    var reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (reloading) return; reloading = true; location.reload();
+    });
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        function offer(w) {
+          if (!w || !navigator.serviceWorker.controller || document.getElementById('pwaUpdate')) return;
+          var b = document.createElement('button');
+          b.id = 'pwaUpdate'; b.type = 'button'; b.textContent = '↻ Update ready';
+          b.onclick = function () {
+            b.textContent = 'Saving…'; b.disabled = true;
+            try { if (typeof window.fwFlushAll === 'function') window.fwFlushAll(); } catch (e) {}
+            setTimeout(function () { w.postMessage('skipWaiting'); }, 1200);
+          };
+          document.body.appendChild(b);
+        }
+        if (reg.waiting) offer(reg.waiting);
+        reg.addEventListener('updatefound', function () {
+          var w = reg.installing;
+          if (w) w.addEventListener('statechange', function () { if (w.state === 'installed') offer(w); });
+        });
+        var check = function () { if (!document.hidden && navigator.onLine) reg.update().catch(function () {}); };
+        document.addEventListener('visibilitychange', check);
+        setInterval(check, 10 * 60 * 1000);
+      }).catch(function (e) { console.warn('SW', e); });
+    });
+  }
+})();

@@ -1010,3 +1010,16 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Speed Log `load` Client: `snap`, `screen`, `snapMs`, `reqMs`, `dataMs`, `liveMs`, `snapAgeSec`, `snapKb` (ms since the page started). Status line shows `screen`.
 - Smoke: suite `snap` (save → reopen with slow data → picture, read-only, replaced, Speed Log; width change skips). The `main` suite now loads like the live app (no embedded data).
 
+## H. App upgrade — PWA step 1 (2026-11-21 14:05, Julius; Keep In Mind "Next for gantt: App upgrade": PWA first, then database)
+- PWA is now the active focus (Calendar, Timer/Blocks parked).
+- Host on **GitHub Pages** (repo is public) → https://simtimj.github.io/gantt-3-columns/ (default address). Name on home screen: **Gantt**. Main app **and** Time Tracker (tracker.html, its own install).
+- Lock: **secret key** (Script Property `PWA_KEY`), typed/linked once per device. Setup link per device: the private /dev link + `?app=pwa` → opens the PWA with the key in the URL fragment (`#k=…`, never sent to a server, saved to localStorage, stripped from the URL).
+- API: the PWA can't call /dev (needs Google login cookies) and the project hit the 200-version cap, so a **thin router project "Gantt API"** (Anyone access, runs as Julius) includes this project as a **library in development mode (HEAD)** = always the latest pushed code, no new versions per push. Router redeploys only when its own files change. Sources: `tools/pwa-api/` (.txt so this project's clasp never pushes them).
+- Library gotchas handled: `getActiveSpreadsheet()` is null inside the router → `ss_()` falls back to the sheet ID. Script properties / cache / lock are the library's own = same as now. Triggers stay on this project.
+- Opens from cache: service worker caches the page; last data from the device shows at once (only if it's for today), then `fwSync(true)` brings it up to date; the cache copy refreshes in the background ~20 s later.
+- Offline: **read-only** + "Offline · read-only" banner (edits blocked). Queued offline edits = database step.
+- Updates: new build → **"↻ Update ready"** button (never auto-reloads). The old in-page "New version" bar is off in the PWA.
+- Old Apps Script page stays as the backup, unchanged and private.
+- Devices: phone (Chrome), tablet, Windows PC.
+- BUILT H 2026-11-21: Code.gs `PWA API` banner (`ss_`, `pwaKey_`, `apiCall` = key + no `_`/native/blocked names, `apiPing`, `pwaSetupPage_` at `?app=pwa[&page=tracker]`); `tools/build-pwa.mjs` + `tools/pwa/` (shim, sw, icons); `tools/pwa-api/` (Router.gs.txt, appsscript.json.txt, deploy.sh, project.json filled by CI); deploy.yaml jobs `Gantt API router` + `pages`. Smoke suite `pwa`.
+- One-time by Julius: (1) repo Settings → Pages → Source **GitHub Actions**; (2) open the Gantt API project (link in `tools/pwa-api/project.json` → `editor`) → run `authorize` → allow. Then per device: /dev?app=pwa → Open → Install.

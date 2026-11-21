@@ -30,9 +30,66 @@ const VIEWPORT =
   'viewport-fit=cover, interactive-widget=resizes-content';
 
 
+
+/* =========================================================
+   PWA API (2026-11-21, docs/NOTES.md H)
+   The hosted app (GitHub Pages) calls the "Gantt API" router project, which runs this
+   project as a library in development mode (always the latest pushed code) and hands
+   every POST to apiCall(). Same functions google.script.run can call (no trailing _),
+   gated by the PWA_KEY script property.
+   ========================================================= */
+const GANTT_SS_ID = '1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE';
+const PWA_URL = 'https://simtimj.github.io/gantt-3-columns/';
+// Inside the router the library has no active spreadsheet, so fall back to the ID.
+function ss_() { return SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(GANTT_SS_ID); }
+
+function pwaKey_() {
+  const props = PropertiesService.getScriptProperties();
+  let k = props.getProperty('PWA_KEY');
+  if (!k) { k = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, ''); props.setProperty('PWA_KEY', k); }
+  return k;
+}
+
+const API_BLOCKED_ = { doGet: 1, doPost: 1, apiCall: 1, apiPing: 1 };
+function apiOut_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+
+// Library entry (router doPost). body = '{"k":key,"fn":name,"a":[args]}'.
+function apiCall(body) {
+  let req;
+  try { req = JSON.parse(body || '{}'); } catch (e) { return apiOut_({ ok: false, e: 'Bad request' }); }
+  const key = PropertiesService.getScriptProperties().getProperty('PWA_KEY');
+  if (!key || req.k !== key) return apiOut_({ ok: false, auth: true, e: 'Wrong or missing app key' });
+  const fn = String(req.fn || '');
+  const f = globalThis[fn];
+  if (!/^[A-Za-z]\w*$/.test(fn) || /_$/.test(fn) || API_BLOCKED_[fn] || typeof f !== 'function' || /\[native code\]/.test(Function.prototype.toString.call(f))) return apiOut_({ ok: false, e: 'Unknown function: ' + fn });
+  try {
+    const r = f.apply(null, Array.isArray(req.a) ? req.a : []);
+    return apiOut_(r === undefined ? { ok: true } : { ok: true, r: r });
+  } catch (err) {
+    console.error(err);
+    return apiOut_({ ok: false, e: (err && err.message) || String(err) });
+  }
+}
+
+// Router's authorize() calls this once so Google asks for every permission up front.
+function apiPing() { return { ok: true, sheet: ss_().getName() }; }
+
+function pwaSetupPage_(page) {
+  const url = PWA_URL + (page === 'tracker' ? 'tracker.html' : '') + '#k=' + encodeURIComponent(pwaKey_());
+  const html = '<p style="font:18px system-ui;margin:24px">' +
+    '<a id="go" href="' + url + '" target="_top" style="font-size:22px">📲 Open the Gantt app</a><br><br>' +
+    'Opens the hosted app and saves this device\'s key there. Then use your browser menu → <b>Install app</b> / <b>Add to Home screen</b>.</p>';
+  return HtmlService.createHtmlOutput(html).setTitle('Gantt app setup')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+
 function doGet(e) {
   // Time Tracker (2026-11-05): separate app in tracker/, its own spreadsheet; /dev?app=tracker.
   if (e && e.parameter && e.parameter.app === 'tracker') return trackerPage_();
+  // PWA setup (2026-11-21): /dev?app=pwa opens the hosted app with this device's key (docs/NOTES.md H).
+  if (e && e.parameter && e.parameter.app === 'pwa') return pwaSetupPage_(e.parameter.page);
   const template = HtmlService.createTemplateFromFile('Index');
 
   // Instant screen (2026-11-21, speed item L): send the page WITHOUT the data, so the phone can paint the saved
@@ -110,7 +167,7 @@ function ensureSetup_(timer) {
   // Already set up today: one property read (2026-11-05: the two sheet look-ups cost ~0.3 s every load;
   // a missing tab is still created by getOrCreateSheet_ wherever it's used).
   if (props.getProperty('lastSetupDate') === today) return;
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
 
   const lock = LockService.getScriptLock();
   if (!speedPart_(timer, 'setup.lock', () => lock.tryLock(10000))) {
@@ -1303,7 +1360,7 @@ function ensureDayRange_(sheet, pastDays, futureDays) {
 function getOrCreateSheet_(name, headers, timer) {
   // Optional nested profiling uses the same service calls as ordinary callers.
   // Only the schedule reader supplies a timer; names, IDs and data stay private.
-  const ss = speedPart_(timer, 'schedule.spreadsheet', () => SpreadsheetApp.getActiveSpreadsheet());
+  const ss = speedPart_(timer, 'schedule.spreadsheet', () => ss_());
 
   let sheet = speedPart_(timer, 'schedule.sheetLookup', () => ss.getSheetByName(name));
 
@@ -2202,7 +2259,7 @@ function confirmCardHtml_(rows) {
 }
 
 function syncConfirmCard_(timer) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
   const sheet = ss.getSheetByName('To Confirm');
   if (!sheet) return; // nothing until the tab exists
   const sources = { sheet:sheet, ref:getOrCreateSheet_('Reference', REF_HEADERS) };
@@ -3247,7 +3304,7 @@ const PLAN_GROUPS = { big: 3, stretch: 3, next: 500, backlog: 500 };
    'card:<Reference id>' = a project. Only 'stretch' keeps a date. */
 const PLAN_DATED_ = { stretch: true };
 function planSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
   let sh = ss.getSheetByName(PLAN_SHEET);
   if (!sh) {
     sh = ss.insertSheet(PLAN_SHEET);
@@ -3395,7 +3452,7 @@ function planRelink_(sh, ev) {
   return link;
 }
 function planRelinkLocked_(ev) {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(PLAN_SHEET);
+  const sh = ss_().getSheetByName(PLAN_SHEET);
   if (!sh) return;
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -3773,7 +3830,7 @@ function calBacklogEventId_(rowId) {
   return String(rowId || '').split('|')[0].replace(/@google\.com$/, '');
 }
 function calBacklogSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
   let sh = ss.getSheetByName(CAL_BACKLOG_SHEET);
   if (!sh) {
     sh = ss.insertSheet(CAL_BACKLOG_SHEET);
@@ -3898,7 +3955,7 @@ function calBacklogRoll_() {
   } finally { lock.releaseLock(); }
 }
 function calBacklogList_() {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CAL_BACKLOG_SHEET);
+  const sh = ss_().getSheetByName(CAL_BACKLOG_SHEET);
   if (!sh) return [];
   return calBacklogRows_(sh).filter(r => r[0] && !r[6]).map(r => ({
     id: r[0], date: r[1], title: r[2], colorId: r[3], urg: r[4],

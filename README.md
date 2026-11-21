@@ -79,6 +79,9 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **📲 Gantt app (PWA step 1)**: the app is also hosted at https://simtimj.github.io/gantt-3-columns/ (Time Tracker at …/tracker.html) and installs to your home screen / desktop as **Gantt** and **Time Tracker**. It opens from the phone's cache with the last data you saw (today only), then catches up in the background. Offline it opens read-only with an "Offline · read-only" pill. New versions show a **↻ Update ready** button instead of reloading on you. Setup per device: open your /dev link with `?app=pwa` (or `?app=pwa&page=tracker`) → 📲 Open the Gantt app → browser menu → Install. Locked with a private key; the old Apps Script page stays as the backup. Server side: a small "Gantt API" router project runs this code as a library (always the latest push).
+- **Urgent panel when data loads late**: no longer errors if the calendar panel has already moved to the docked calendar.
+
 - **Keep In Mind border color**: hold a title (or any line in its box) → 🎨 Border color. Pick a quick swatch, 🎨 Any color (the full color wheel), or Reset. The box around that title takes the color, and it syncs across devices.
 - **Hide the top button row**: hold an empty spot of the top row (not a button) to hide it, giving more room. A small tab stays at the top center; tap it to bring the row back. Remembered per device.
 - **Keep In Mind pin**: hold an item → 📌 Pin to top. Its title box (or task + subtasks) moves to the top with a small 📌; several pins stay in pin order. Hold it again → 📌 Unpin puts it just below the pinned ones. Syncs across devices.

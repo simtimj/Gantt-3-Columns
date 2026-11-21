@@ -9,6 +9,10 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # commits the Gantt API router ids back once (tools/pwa-api/project.json)
+    outputs:
+      api_url: ${{ steps.api.outputs.url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,3 +43,39 @@ jobs:
       # Julius uses the /dev test link (always the latest pushed code), so no
       # versioned deployment update here (it hit the 200-version cap, 2026-10-27).
 
+      # PWA (2026-11-21, docs/NOTES.md H): the "Gantt API" router project the hosted app calls.
+      # Redeploys only when tools/pwa-api/ changes; a failure here never blocks the Apps Script push above.
+      - name: Gantt API router
+        id: api
+        continue-on-error: true
+        run: bash tools/pwa-api/deploy.sh
+
+  # PWA front end → GitHub Pages (https://simtimj.github.io/gantt-3-columns/).
+  pages:
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build PWA
+        run: node tools/build-pwa.mjs dist
+        env:
+          PWA_API_URL: ${{ needs.deploy.outputs.api_url }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: pages
+        uses: actions/deploy-pages@v4

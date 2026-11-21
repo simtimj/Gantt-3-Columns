@@ -1,0 +1,31 @@
+/* Gantt PWA service worker (2026-11-21). Built by tools/build-pwa.mjs; BUILD changes with every page change.
+   The app shell opens from cache (fast, works offline). Server calls go to script.google.com and are never
+   cached. A new version waits until the page's "↻ Update ready" button says go. */
+var BUILD = '__BUILD__';
+var CACHE = 'gantt-' + BUILD;
+var SHELL = __SHELL__;
+
+self.addEventListener('install', function (e) {
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL.map(function (u) { return new Request(u, { cache: 'reload' }); })); }));
+});
+
+self.addEventListener('activate', function (e) {
+  e.waitUntil(caches.keys().then(function (keys) {
+    return Promise.all(keys.filter(function (k) { return k.indexOf('gantt-') === 0 && k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+  }).then(function () { return self.clients.claim(); }));
+});
+
+self.addEventListener('message', function (e) { if (e.data === 'skipWaiting') self.skipWaiting(); });
+
+self.addEventListener('fetch', function (e) {
+  var req = e.request, url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (req.mode === 'navigate') {
+    var page = /tracker(\.html)?$/.test(url.pathname) ? 'tracker.html' : 'index.html';
+    e.respondWith(caches.open(CACHE).then(function (c) {
+      return c.match(page).then(function (hit) { return hit || fetch(req); });
+    }));
+    return;
+  }
+  e.respondWith(caches.match(req, { ignoreSearch: true }).then(function (hit) { return hit || fetch(req); }));
+});

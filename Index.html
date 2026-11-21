@@ -16246,7 +16246,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      drawn solid with a page-colored outline (cp-ovl, set in cpGroups; FullCalendar's -inset class only means "has events stacked over it"); a short event is at least one text line tall (eventMinHeight is 1 so it
      doesn't push the next event sideways) and sits on top, covering a sliver of the next one. */
   #calPanel .fc .fc-timegrid-event-harness>.fc-timegrid-event{bottom:2px;margin-bottom:0;}
-  #calPanel .fc .fc-timegrid-event-harness.cp-ovl>.fc-timegrid-event.cp-glass{background:color-mix(in srgb,var(--cp-evbg,#1a73e8) 45%,var(--cp-bg))!important;box-shadow:0 0 0 1.5px var(--cp-bg)!important;}
+  #calPanel .fc .fc-timegrid-event-harness.cp-ovl>.fc-timegrid-event.cp-glass{background:var(--cp-evbg,#1a73e8)!important;box-shadow:0 0 0 1.5px var(--cp-bg)!important;}
   #calPanel .fc .fc-timegrid-event.fc-timegrid-event-short{min-height:22px;}
   #calPanel .fc .fc-timegrid-event.cp-tiny{min-height:17px;}
   #calPanel .fc .fc-timegrid-event-harness:has(>.fc-timegrid-event-short){z-index:4!important;}
@@ -16282,11 +16282,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* See-through long events (2026-11-15, Julius): faint tint + colored outline, grid lines visible; the title sits on a
      solid chip in the event color. */
   /* 2026-11-21 (Julius): every timed event is see-through in its own color (cp-glass), not only the long ones. */
-  #calPanel .fc .fc-timegrid-event.cp-glass{background:color-mix(in srgb,var(--cp-evbg,#1a73e8) 32%,transparent)!important;border:1.5px solid var(--cp-evbg,#1a73e8)!important;box-shadow:none!important;}
+  /* 2026-11-21 11:30 (Julius: "transparent isn't doing it for me"): solid block color like Google Calendar — full event color,
+     no outline, white text; overlapping ones keep a page-colored outline (cp-ovl). */
+  #calPanel .fc .fc-timegrid-event.cp-glass{background:var(--cp-evbg,#1a73e8)!important;border:0!important;box-shadow:none!important;border-radius:4px;}
   #calPanel .fc .fc-timegrid-event.cp-see .fc-event-main{height:auto;position:sticky;top:0;} /* title stays in view while the event runs past the top */
   /* 2026-11-15 08:21 (Julius): no chip behind the title, a stronger tint instead (12 % → 32 %); the text is solid white
      with a soft shadow so it reads over the grid. */
-  #calPanel .fc .fc-timegrid-event.cp-glass .cp-evc,#calPanel .fc .fc-timegrid-event.cp-glass .cp-ev-t,#calPanel .fc .fc-timegrid-event.cp-glass .cp-ev-m{color:#fff!important;opacity:1!important;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+  #calPanel .fc .fc-timegrid-event.cp-glass .cp-evc,#calPanel .fc .fc-timegrid-event.cp-glass .cp-ev-t,#calPanel .fc .fc-timegrid-event.cp-glass .cp-ev-m{color:#fff!important;opacity:1!important;text-shadow:none;}
   /* Time always shows (2026-11-14 night, Julius: "even if the font is small, include the time with the title; no room
      below → put it to the right"): short cards and 30-min events = one line, title truncates, start time kept on the right. */
   #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-evb{display:flex;align-items:baseline;}

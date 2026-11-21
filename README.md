@@ -122,7 +122,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - 🧪 **Title cells** (2026-11-21, everywhere titles exist except Blocks): a title and its lines sit in one rounded box; a nested title gets its own box inside. Dragging a title moves the whole box, archiving it (Next Steps) archives the whole box, and tapping a title rings the whole box.
 - **Nested title lines** (everywhere: Keep In Mind, Focus / Thinking, Today, History): an indented title inside another title folds only its own lines; folding the outer one hides everything, nested titles included (e.g. Crab trip → Due day of trip → Check gear).
 - **Folded look per title**: hold a title's − / + (or the checkbox hold menu → ▾ Folded look) → **Hidden** (title + count, the default) or **Compact** (every task name under it, ○ open / ✓ done / ▸ nested title, in columns when there's room). Saved with the title, so it's the same on every device.
-- **See-through long events** (calendar): timed events of 2 h or more (e.g. Sleep 1 – 7:45 am) are a faint tint with a colored outline, so the grid shows through; a stronger tint (no chip behind the title, 2026-11-15 08:21), the title in solid white, and it stays at the top of the view while the event runs past it.
+- 🧪 **Solid event colors** (calendar, 2026-11-21): timed events are full block color like Google Calendar (no see-through, no outline, plain white text); long events' titles still stay in view while they run past the top. Replaces see-through events.
 
 ## 🧪 To be confirmed (2026-11-14)
 

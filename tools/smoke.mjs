@@ -1297,7 +1297,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (Math.abs(r(S).left - r(M).left) > 1 || Math.abs(r(S).right - r(M).right) > 1) out.push('touching events offset like an overlap');
             if (!off(W)) out.push('overlap not Google-style (offset over Sleep)');
             if (!/color\(srgb [\d.]+ [\d.]+ [\d.]+\)$|^rgb\(/.test(getComputedStyle(W).backgroundColor)) out.push('overlapping event not solid: ' + getComputedStyle(W).backgroundColor);
-            if (/^rgb\(|color\(srgb [\d.]+ [\d.]+ [\d.]+\)$/.test(getComputedStyle(S).backgroundColor)) out.push('plain event lost its see-through: ' + ins(S));
+            if (!/^rgb\(|color\(srgb [\d.]+ [\d.]+ [\d.]+\)$/.test(getComputedStyle(S).backgroundColor)) out.push('plain event not solid (Google style, 2026-11-21): ' + getComputedStyle(S).backgroundColor);
             if (r(P).height < 16) out.push('10-minute event too short for its text: ' + r(P).height.toFixed(1));
             if (off(B) || off(P)) out.push('event after a short one got offset: ' + ins(B));
             const zi = x => Number(getComputedStyle(x.parentElement).zIndex) || 0;
@@ -1322,7 +1322,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (!timed) out.push('timed event missing: ' + evText());
             else {
               if (!/(^|[^\d:])9(:00)?\s?am/i.test(timed.textContent)) out.push('timed event not at 9:00 Los Angeles time: ' + timed.textContent);
-              if (getComputedStyle(timed).borderTopColor !== 'rgb(213, 0, 0)' || !/^rgba\(213, 0, 0, 0\.3/.test(getComputedStyle(timed).backgroundColor.replace(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+) \/ ([\d.]+)\)/, (m, r, g, b, al) => 'rgba(' + Math.round(r * 255) + ', ' + Math.round(g * 255) + ', ' + Math.round(b * 255) + ', ' + al + ')'))) out.push('timed event not see-through in its color (2026-11-21): ' + getComputedStyle(timed).borderTopColor + ' / ' + getComputedStyle(timed).backgroundColor);
+              if (getComputedStyle(timed).backgroundColor !== 'rgb(213, 0, 0)') out.push('timed event not solid in its color (2026-11-21 11:30): ' + getComputedStyle(timed).backgroundColor);
             }
             const allDay = [...panel.querySelectorAll('.fc-daygrid-event')].find(x => /All-day A/.test(x.textContent));
             if (!allDay) out.push('all-day event not in the all-day row');

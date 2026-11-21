@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-16
+Last updated: 2026-11-21
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -73,6 +73,11 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-21)
+
+- **Event pop-up border in the event's color**: tapping a calendar event opens its pop-up with a 2 px border in that event's color (e.g. light blue for Meditate); grey when done; changes right away when you pick a new color.
+- **Phone: tap outside the pop-up only closes it**: on a touch screen, with an event pop-up open, a tap anywhere outside it just closes the pop-up and nothing else happens (e.g. tapping Focus / Thinking doesn't pop the keyboard). Scrolling is unaffected; an unsaved title/time edit still saves. A computer mouse click works as before (closes and lands).
 
 ## 🧪 To be confirmed (2026-11-16)
 

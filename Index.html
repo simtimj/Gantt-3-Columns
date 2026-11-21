@@ -16228,6 +16228,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Popup card (2026-11-11): beside the event, with a clear border so it stands out from the grid. */
   #calPanel .cp-detail{border:1.5px solid #9aa0a6!important;}
   html[data-theme=dark] #calPanel .cp-detail{border-color:#c4c7c5!important;}
+  /* Event card border = the event's color (2026-11-21, Julius: "meditate is light blue → blue border"). */
+  #calPanel .cp-detail.cp-evcard,html[data-theme=dark] #calPanel .cp-detail.cp-evcard{border:2px solid var(--evc,#9aa0a6)!important;}
   #calPanel .cp-detail.cp-pop.cp-popfix{position:fixed;z-index:3000;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);}
   #calPanel .cp-detail.cp-pop{left:var(--pop-x);top:var(--pop-y);right:auto;bottom:auto;width:var(--pop-w);box-sizing:border-box;max-height:calc(100% - 16px);z-index:30;
     box-shadow:0 8px 28px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.18);}
@@ -16811,6 +16813,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!ed) h += '<div class="cp-note">View-only calendar — read-only here.</div>';
     h += '<div class="cp-ferr" data-cal-ferr></div>';
     detail.classList.add('cp-evcard');
+    detail.style.setProperty('--evc', x.done ? '#808080' : (x.color || '#9aa0a6'));
     detail.innerHTML = h;
     detail.dataset.pid = '';
     detail.hidden = false;
@@ -16868,6 +16871,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(c === (x.colorId || '')) return;
     detail.querySelectorAll('.cp-ecolors button').forEach(b => b.classList.toggle('on', b.dataset.c === c));
     const dot = detail.querySelector('.cp-etitle .cp-dot'); if(dot && sw) dot.style.background = sw[2];
+    if(sw) detail.style.setProperty('--evc', sw[2]);
     if(sw){ const k = softColor(sw[2], false); ev.setProp('backgroundColor', k.bg); ev.setProp('borderColor', k.bg); ev.setProp('textColor', k.fg); }
     cardRun('calPanelSetColor', {calId: x.calId, eventId: x.eventId, startMs: x.startMs, recurring: !!x.recurring, colorId: c}, (sw ? sw[1] : 'Calendar color') + ' ✓', {eventId: x.eventId, startMs: x.startMs});
   }
@@ -17975,6 +17979,25 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const t = e.target; if(!t || !t.closest || !document.contains(t)) return;
       if(t.closest('.cp-detail,.fc-event,.cp-ev,.urg-picker,.urg-cal,[role=dialog]:not(#calPanel)')) return;
       detail.hidden = true; sheetEv = null; }, true);
+    // Touch only (2026-11-21, Julius): with the card open, a tap outside it ONLY closes it — it doesn't also land on
+    // what's underneath (no keyboard popping up in Focus / Thinking). Mouse clicks keep working as before.
+    // preventDefault on touchend cancels the tap's click + focus; scrolls (finger moved) are left alone.
+    let swallow = null;
+    document.addEventListener('pointerdown', e => {
+      swallow = null;
+      if(e.pointerType !== 'touch' || detail.hidden || !detail.classList.contains('cp-evcard') || pending) return;
+      const t = e.target; if(!t || !t.closest || t.closest('.cp-detail,.fc-event,.cp-ev,.urg-picker,.urg-cal,[role=dialog]:not(#calPanel)')) return;
+      swallow = {x: e.clientX, y: e.clientY};
+    }, true);
+    document.addEventListener('touchend', e => {
+      const s = swallow; swallow = null; const tc = e.changedTouches && e.changedTouches[0];
+      if(!s || !tc || Math.abs(tc.clientX - s.x) > 10 || Math.abs(tc.clientY - s.y) > 10) return;
+      if(e.cancelable) e.preventDefault();
+      window.__fwTapSwallowed = (window.__fwTapSwallowed || 0) + 1;
+      if(detail.hidden) return; // the calendar's own pointerdown already closed it
+      const qf = detail.querySelector('[data-cal-qform].dirty'); if(qf){ qsave(qf); return; }
+      detail.hidden = true; sheetEv = null;
+    }, {capture: true, passive: false});
     loadCals(false);
     // Toolbar buttons take over the old header's jobs; the header (only needed while the calendar loads) goes.
     const tb = b => panel.querySelector('.fc-' + b + '-button');

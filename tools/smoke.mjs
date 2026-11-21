@@ -1375,6 +1375,30 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         return out;
       }, !!view.isMobile);
       errs.push(...res);
+      // Event card border = event color; a real tap outside the open card only closes it on touch (no focus →
+      // no phone keyboard), while a mouse click still lands (2026-11-21, Julius).
+      {
+        const r0 = await pg.evaluate(async () => { const p = document.getElementById('calPanel'); if (!document.body.classList.contains('cal-open')) document.querySelector('#toolbar [data-cal-open]').click();
+          for (let i = 0; i < 80 && !p.querySelector('.fc-timegrid-event .cp-ev'); i++) await new Promise(r => setTimeout(r, 50));
+          await new Promise(r => setTimeout(r, 400));
+          const ev = p.querySelector('.fc-timegrid-event:not(.fc-event-mirror)'); if (!ev) return { err: 'no event' };
+          ev.click(); await new Promise(r => setTimeout(r, 120));
+          const det = p.querySelector('[data-cal-detail]'); if (det.hidden) return { err: 'card did not open' };
+          const evc = det.style.getPropertyValue('--evc'), bc = getComputedStyle(det).borderTopColor;
+          const ta = document.createElement('textarea'); ta.id = '__tapTa'; ta.style.cssText = 'position:fixed;left:0;bottom:0;width:60px;height:40px;z-index:99999';
+          document.body.appendChild(ta); const r = ta.getBoundingClientRect();
+          return { evc, bc, x: r.left + 20, y: r.top + 20 }; });
+        if (r0.err) errs.push('card tap-outside: ' + r0.err);
+        else {
+          if (!r0.evc || /154, 160, 166/.test(r0.bc)) errs.push('card border not the event color (' + r0.evc + ' / ' + r0.bc + ')');
+          if (view.hasTouch) await pg.touchscreen.tap(r0.x, r0.y); else await pg.mouse.click(r0.x, r0.y);
+          await pg.waitForTimeout(300);
+          const r1 = await pg.evaluate(() => { const ta = document.getElementById('__tapTa'), f = document.activeElement === ta; ta.remove(); return { hidden: document.querySelector('#calPanel [data-cal-detail]').hidden, focused: f }; });
+          if (!r1.hidden) errs.push('card tap-outside: card stayed open');
+          if (view.hasTouch && r1.focused) errs.push('card tap-outside: touch tap also focused the field (keyboard would open)');
+          if (!view.hasTouch && !r1.focused) errs.push('card click-outside: mouse click no longer reaches the field');
+        }
+      }
       // Real input on an event checkbox (2026-11-11 bug: element.click() passed, a real tap didn't toggle).
       {
         await pg.evaluate(async () => { const p = document.getElementById('calPanel'); if (!document.body.classList.contains('cal-open')) document.querySelector('#toolbar [data-cal-open]').click();

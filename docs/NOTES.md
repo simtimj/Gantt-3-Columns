@@ -783,6 +783,8 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Mouse only: `e` edit, Delete / Backspace delete; edit / drag-to-create forms pop at the event / selection (`finePointer()`); phones keep the bottom sheet.
 - Smoke: tools/smoke.mjs "Google-style popup" block (notes, All day ⇄ timed back to 9:00, color, Duplicate).
 
+- 2026-11-21 (Julius): card border = event color (`--evc` set in `showDetail` / `cardColor`, CSS `.cp-evcard` 2 px). Touch only: a tap outside the open card is swallowed (document `pointerdown` capture records touch taps outside `.cp-detail,.fc-event,.cp-ev,.urg-picker,.urg-cal,dialogs`; `touchend` < 10 px moved → `preventDefault` = no click / focus, then dirty quick-edit saves or card closes; counter `__fwTapSwallowed`). Mouse unchanged. Smoke: calendar suite "card tap-outside" (phone: not focused; desktop: focused).
+
 ## Full-screen calendar (2026-11-14, Julius)
 
 - Ask: "slide over again from the half-screen calendar → full-screen calendar with all the information; use the calendar button's (pop-out) features". Answers: starts Day, remembers Day / Week; backlog beside it, full text visible; works with the computer mouse too; 📅 button stays the old pop-out (for comparison).

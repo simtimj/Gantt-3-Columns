@@ -78,7 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
-- **Calendar: bolder all-day / timeline line**: the line under the all-day tasks is wider (5 px), full white in dark mode (near-black in light) with a soft glow, so it stands out; the drag handle sits centered on it.
+- **Calendar: bolder all-day / timeline line**: the line under the all-day tasks is full white in dark mode (near-black in light) with a soft glow, so it stands out (3 px). No visible drag handle; dragging the line still resizes.
 - **Calendar: subtler sky stripe**: the sun / night color stripe by the hour labels is thinner (3 px) and about half as bright, and the hour text ("4 AM") has room so the stripe no longer cuts into it.
 - **Calendar: drag the all-day / timeline line to any height**: dragging the line under the day's all-day tasks now sets that area's real height, bigger or smaller, even with only one task (before, it only set a maximum). Double-tap the grip = back to auto. Remembered per device.
 - **Calendar: back-to-back events stay apart**: events that touch (Meditate ends 1 am, Sleep starts 1 am) sit one under the other with a small 2 px gap, so two same-colored events no longer look like one. A real overlap is Google-style: the later event is shifted right over the other and drawn solid with a dark outline. Very short events (e.g. 10 min) are always tall enough for one line of text and sit on top, covering a sliver of the next event. Docked + full-screen calendar.

@@ -308,6 +308,62 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Reference archive: ' + x));
   }
+  // Reference → Keep In Mind (2026-11-21, Julius; NOTES "E."): hold a card's title, drag onto Keep In Mind → a copy lands
+  // as a title line + its lines (task stays a task, child card = nested title); Reference keeps the card.
+  {
+    const setup = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms));
+      document.querySelector('[data-ctab="focus"]').click(); await wait(300);
+      state.reference.push({ id: 'rk1', parentId: '', type: 'item', title: '', content: '<h2>Drag card</h2><p>rk line</p><div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">rk task</span></div>', expanded: true, sort: 0 });
+      state.reference.push({ id: 'rk2', parentId: 'rk1', type: 'item', title: '', content: '<h2>Kid card</h2><p>kid line</p>', expanded: true, sort: 1 });
+      renderReference();
+      document.getElementById('journalPane').scrollIntoView({ inline: 'start', block: 'nearest' }); await wait(300);
+      fwRefDrawer.open(); await wait(350);
+      const h = document.querySelector('#referenceTree .ref-cell-wrapper[data-id="rk1"] > .ref-cell > h2');
+      if (!h) return { err: 'test card did not render' };
+      h.scrollIntoView({ block: 'center' }); await wait(100);
+      const hr = h.getBoundingClientRect();
+      const ed = document.querySelector('#kimScroll .kim-editor'), last = [...ed.children].filter(c => c.getBoundingClientRect().height > 0).pop();
+      return { hx: hr.left + 20, hy: hr.top + hr.height / 2, hold: fwHoldMs() };
+    });
+    if (setup.err) errs.push('Ref → Keep In Mind: ' + setup.err);
+    else {
+      const target = () => pg.evaluate(() => { const sc = document.getElementById('kimScroll').getBoundingClientRect(); return { x: Math.max(sc.left, 0) + Math.min(sc.width, innerWidth) / 3, y: sc.top + Math.min(sc.height, innerHeight - sc.top) - 30 }; });
+      if (view.hasTouch) {
+        await pg.evaluate(async ({ hx, hy, hold }) => { const wait = ms => new Promise(r => setTimeout(r, ms));
+          const tgt = document.elementFromPoint(hx, hy), T = (x, y) => new Touch({ identifier: 3, target: tgt, clientX: x, clientY: y });
+          tgt.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [T(hx, hy)], changedTouches: [T(hx, hy)] }));
+          await wait(hold + 120);
+          const sc = document.getElementById('kimScroll').getBoundingClientRect(), tx = Math.max(sc.left, 0) + 40, ty = Math.min(sc.bottom, innerHeight) - 30;
+          for (let i = 1; i <= 8; i++) { const x = hx + (tx - hx) * i / 8, y = hy + (ty - hy) * i / 8; tgt.dispatchEvent(new TouchEvent('touchmove', { bubbles: true, cancelable: true, touches: [T(x, y)], changedTouches: [T(x, y)] })); await wait(30); }
+          tgt.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], changedTouches: [T(tx, ty)] })); await wait(200);
+        }, setup);
+      } else {
+        await pg.mouse.move(setup.hx, setup.hy); await pg.mouse.down(); await pg.waitForTimeout(setup.hold + 120);
+        await pg.mouse.move(setup.hx - 30, setup.hy, { steps: 3 });
+        const t = await target(); await pg.mouse.move(t.x, t.y, { steps: 8 }); await pg.mouse.up(); await pg.waitForTimeout(200);
+      }
+      const k = await pg.evaluate(async () => { const out = [], ed = document.querySelector('#kimScroll .kim-editor');
+        const all = [...ed.children], ti = all.findIndex(n => n.dataset.tl === '1' && n.textContent.trim() === 'Drag card');
+        if (ti < 0) out.push('no "Drag card" title line in Keep In Mind');
+        else {
+          const want = [['rk line', '1', false], ['rk task', '1', true], ['Kid card', '1', false], ['kid line', '2', false]];
+          want.forEach(([t, lv, task], i) => { const n = all[ti + 1 + i];
+            if (!n || n.textContent.trim() !== t) out.push('line ' + (i + 1) + ' is "' + (n && n.textContent.trim()) + '", wanted "' + t + '"');
+            else { if (n.dataset.level !== lv) out.push('"' + t + '" at level ' + n.dataset.level + ', wanted ' + lv);
+              if (task !== n.classList.contains('check-line')) out.push('"' + t + '" ' + (task ? 'lost its checkbox' : 'became a task')); } });
+          if (all[ti + 3] && all[ti + 3].dataset.tl !== '1') out.push('child card is not a nested title');
+          const bl = n => n && !n.textContent.trim() && !n.querySelector('input'), rm = all.slice(ti, ti + 5);
+          if (bl(all[ti - 1])) rm.push(all[ti - 1]); if (bl(all[ti + 5])) rm.push(all[ti + 5]);
+          captureBeforeEdit(ed); rm.forEach(n => n.remove()); finishEditorEdit(ed);
+        }
+        if (!document.querySelector('#referenceTree .ref-cell-wrapper[data-id="rk1"]')) out.push('card left Reference (should be a copy)');
+        if (document.querySelector('.rk-ghost')) out.push('drag ghost left behind');
+        state.reference = state.reference.filter(x => !/^rk/.test(x.id)); renderReference(); fwRefDrawer.close();
+        document.querySelector('[data-ctab="notes"]').click(); await new Promise(r => setTimeout(r, 200));
+        return out; });
+      k.forEach(x => errs.push('Ref → Keep In Mind: ' + x));
+    }
+  }
   // Title cells (2026-11-21, Julius): a title + its lines sit in one box (nested box inside), archive takes the whole box.
   {
     const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];

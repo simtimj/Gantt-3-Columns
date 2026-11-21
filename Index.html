@@ -19089,6 +19089,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* 2026-11-11 (Julius): the blue "Ref" tag was too much — back to the quiet edge tab, just a little wider; the
      toolbar Ref button (next to Cols) is the visible way in. */
   #rdTab{width:24px;}
+  /* Reference → Keep In Mind drag (2026-11-21) */
+  .rk-ghost{position:fixed;z-index:3300;pointer-events:none;max-width:70vw;padding:6px 10px;border-radius:8px;background:var(--panel);
+    color:inherit;border:2px solid var(--urg,#3b82f6);box-shadow:0 6px 18px rgba(0,0,0,.3);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ref-cell-wrapper.rk-armed{outline:2px solid var(--urg,#3b82f6);outline-offset:1px;}
+  body.rk-dragging,body.rk-dragging *{user-select:none!important;-webkit-user-select:none!important;}
+  #kimScroll .kim-editor > .rk-drop-before{box-shadow:0 -3px 0 0 var(--urg,#3b82f6);}
+  #kimScroll .kim-editor > .rk-drop-after{box-shadow:0 3px 0 0 var(--urg,#3b82f6);}
+  #journalPane button[data-ctab="focus"].rk-drop-tab{outline:2px solid var(--urg,#3b82f6);}
   /* Reference = right half (2026-11-21, Julius; NOTES "C. Reference = right half"): exactly half the screen like every
      other column (phone: full width), no drag-to-size, and no dimming, so the left half stays visible + usable and
      the drawer doesn't look lighter than the columns. */
@@ -19354,6 +19362,165 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   mirror();
   new MutationObserver(mirror).observe(ref, {attributes:true, attributeFilter:['class','style']});
+})();
+/* Reference → Keep In Mind (2026-11-21, Julius; NOTES "E. Reference → Keep In Mind drag"): hold a card's title, then
+   drag. The drawer slides away, a ghost follows the finger, and dropping on Keep In Mind (or on its ⭐ tab) puts a COPY
+   there: the card title as a title line, its lines under it (tasks stay tasks), cards inside it as nested titles.
+   Reference is not changed. Mouse: hold the title still for the hold time, then drag. */
+(function initRefToKim(){
+  const tree = document.getElementById('referenceTree');
+  if(!tree) return;
+  const holdMs = () => (window.fwHoldMs ? window.fwHoldMs() : 500);
+  const kimEd = () => document.querySelector('#kimScroll .kim-editor');
+  const kimShown = () => { const sc = document.getElementById('kimScroll'); if(!sc) return false; const r = sc.getBoundingClientRect(); return r.width > 40 && r.height > 40 && getComputedStyle(sc).display !== 'none'; };
+  const lvSet = (el, lv) => { lv = Math.max(0, Math.min(6, lv)); el.dataset.level = String(lv); el.style.marginLeft = lv ? (24 * lv) + 'px' : ''; return el; };
+  const blank = n => !(n.textContent || '').replace(/[\s​ ]/g, '') && !(n.querySelector && n.querySelector('input,img'));
+  function cardLines(wrap, base){
+    const cell = wrap.querySelector(':scope > .ref-cell'), out = [];
+    const tmp = document.createElement('div');
+    tmp.innerHTML = cell ? (typeof cardCleanHtml === 'function' ? cardCleanHtml(cell) : cell.innerHTML) : '';
+    const kids = [...tmp.childNodes];
+    let titleDone = false;
+    const push = (el, lv) => { if(!blank(el)) out.push(lvSet(el, lv)); };
+    const lineFrom = (html, lv) => { const d = document.createElement('div'); d.innerHTML = html; push(d, lv); };
+    kids.forEach(n => {
+      if(n.nodeType === 3){ if(n.data.trim()) lineFrom(n.data.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]), base + 1); return; }
+      if(n.nodeType !== 1) return;
+      if(!titleDone && n.tagName === 'H2'){
+        titleDone = true;
+        const t = document.createElement('div'); t.dataset.tl = '1';
+        t.innerHTML = '<b>' + (n.textContent.trim() ? n.innerHTML.replace(/<\/?b>/gi, '') : 'Reference') + '</b>';
+        out.push(lvSet(t, base)); return;
+      }
+      titleDone = true;
+      if(n.matches('.check-line')){ const c = n.cloneNode(true); c.removeAttribute('data-tl'); c.querySelectorAll('input').forEach(i => i.removeAttribute('data-wired')); push(c, (Number(n.dataset.level) || 0) + base + 1); return; }
+      if(n.matches('ul,ol')){ n.querySelectorAll(':scope > li').forEach(li => lineFrom(li.innerHTML, base + 1)); return; }
+      if(n.matches('pre')){ (n.textContent || '').split('\n').forEach(t => { if(t.trim()){ const d = document.createElement('div'); d.textContent = t; push(d, base + 1); } }); return; }
+      if(n.matches('hr,br')) return;
+      lineFrom(n.innerHTML, (Number(n.dataset.level) || 0) + base + 1);
+    });
+    if(!out.length || out[0].dataset.tl !== '1'){ const t = document.createElement('div'); t.dataset.tl = '1'; t.innerHTML = '<b>Reference</b>'; out.unshift(lvSet(t, base)); }
+    wrap.querySelectorAll(':scope > .ref-children > .ref-cell-wrapper').forEach(w => out.push(...cardLines(w, base + 1)));
+    return out;
+  }
+  // Insert the copy into Keep In Mind: before / after a top-level line (or at the end), blank lines around it.
+  function dropInto(wrap, at){
+    const ed = kimEd(); if(!ed) return false;
+    const lines = cardLines(wrap, 0);
+    if(typeof captureBeforeEdit === 'function') captureBeforeEdit(ed);
+    const frag = document.createDocumentFragment();
+    const gap = () => { const d = document.createElement('div'); d.innerHTML = '<br>'; return d; };
+    const ref = at && at.line && at.line.parentNode === ed ? (at.after ? at.line.nextSibling : at.line) : null;
+    const prev = ref ? ref.previousElementSibling : ed.lastElementChild;
+    if(prev && !blank(prev)) frag.appendChild(gap());
+    lines.forEach(l => frag.appendChild(l));
+    if(!ref || !blank(ref)) frag.appendChild(gap());
+    ed.insertBefore(frag, ref);
+    ed.querySelectorAll('input[type="checkbox"]').forEach(cb => { if(typeof wireCheckbox === 'function') wireCheckbox(cb); });
+    if(typeof refreshCards === 'function') try{ refreshCards(ed); }catch(e){}
+    if(typeof refreshTitleLines === 'function') try{ refreshTitleLines(ed); }catch(e){}
+    if(typeof finishEditorEdit === 'function') finishEditorEdit(ed);
+    if(typeof saveEditorOwner === 'function') saveEditorOwner(ed);
+    try{ lines[0].scrollIntoView({block:'nearest'}); }catch(e){}
+    return true;
+  }
+  window.fwRefToKim = dropInto; // (wrap, {line, after}) — smoke + other callers
+  let g = null; // {wrap, x, y, timer, armed, drag, ghost, target, touch}
+  const clearMarks = () => document.querySelectorAll('.rk-drop-before,.rk-drop-after,.rk-drop-tab').forEach(n => n.classList.remove('rk-drop-before','rk-drop-after','rk-drop-tab'));
+  function arm(){
+    if(!g) return;
+    g.armed = true;
+    g.wrap.classList.add('rk-armed');
+    if(typeof cancelLongPress === 'function') cancelLongPress();
+    if(navigator.vibrate) try{ navigator.vibrate(12); }catch(e){}
+  }
+  function startDrag(){
+    g.drag = true;
+    try{ window.getSelection().removeAllRanges(); }catch(e){}
+    if(document.activeElement && g.wrap.contains(document.activeElement)) document.activeElement.blur();
+    if(typeof hideContextMenu === 'function') hideContextMenu();
+    const h2 = g.wrap.querySelector(':scope > .ref-cell > h2');
+    const n = g.wrap.querySelectorAll('.ref-cell-wrapper').length;
+    g.ghost = document.createElement('div'); g.ghost.className = 'rk-ghost';
+    g.ghost.textContent = '⭐ ' + ((h2 && h2.textContent.trim()) || 'Reference card') + (n ? '  +' + n : '');
+    document.body.appendChild(g.ghost);
+    document.body.classList.add('rk-dragging');
+    if(window.fwRefDrawer && window.fwRefDrawer.isOpen()){ g.reopen = true; window.fwRefDrawer.close(); }
+  }
+  function move(x, y){
+    g.ghost.style.left = (x + 12) + 'px'; g.ghost.style.top = (y - 18) + 'px';
+    clearMarks(); g.target = null;
+    const el = document.elementFromPoint(x, y);
+    if(!el) return;
+    const tab = el.closest('#journalPane button[data-ctab="focus"]');
+    if(tab){ tab.classList.add('rk-drop-tab'); g.target = {tab:true}; return; }
+    const ed = kimEd();
+    if(ed && kimShown() && el.closest('#kimScroll')){
+      const kids = [...ed.children].filter(c => c.getBoundingClientRect().height > 0);
+      let line = kids.find(c => c.getBoundingClientRect().bottom > y) || kids[kids.length - 1] || null;
+      let after = !line || y > line.getBoundingClientRect().top + line.getBoundingClientRect().height / 2;
+      if(!kids.find(c => c.getBoundingClientRect().bottom > y)) after = true;
+      if(line) line.classList.add(after ? 'rk-drop-after' : 'rk-drop-before');
+      g.target = {line, after};
+    }
+  }
+  function finish(drop){
+    if(!g) return;
+    const d = g; g = null;
+    clearTimeout(d.timer);
+    d.wrap.classList.remove('rk-armed');
+    if(!d.drag) return;
+    clearMarks();
+    d.ghost && d.ghost.remove();
+    document.body.classList.remove('rk-dragging');
+    let ok = false;
+    if(drop && d.target){
+      if(d.target.tab){
+        const b = document.querySelector('#journalPane button[data-ctab="focus"]'); if(b) b.click();
+        ok = dropInto(d.wrap, null);
+      } else ok = dropInto(d.wrap, d.target);
+    }
+    if(ok){ if(typeof setStatus === 'function') setStatus('Copied to Keep In Mind'); }
+    else if(d.reopen && window.fwRefDrawer) window.fwRefDrawer.open();
+  }
+  const titleOf = t => { const el = t instanceof Element ? t : t && t.parentElement; const h = el && el.closest && el.closest('#referenceTree .ref-cell > h2'); return h && h.parentElement.firstElementChild === h ? h : null; };
+  // Touch
+  tree.addEventListener('touchstart', e => {
+    if(e.touches.length !== 1){ finish(false); return; }
+    const h = titleOf(e.target); if(!h) return;
+    const t = e.touches[0];
+    g = {wrap:h.closest('.ref-cell-wrapper'), x:t.clientX, y:t.clientY, touch:true};
+    g.timer = setTimeout(arm, holdMs());
+  }, {passive:true});
+  window.addEventListener('touchmove', e => {
+    if(!g || !g.touch) return;
+    const t = e.touches[0];
+    if(!g.armed){ if(Math.abs(t.clientX - g.x) + Math.abs(t.clientY - g.y) > 8) finish(false); return; }
+    e.preventDefault(); e.stopPropagation();
+    if(!g.drag) startDrag();
+    move(t.clientX, t.clientY);
+  }, {capture:true, passive:false});
+  window.addEventListener('touchend', () => { if(g && g.touch) finish(true); }, true);
+  window.addEventListener('touchcancel', () => { if(g && g.touch) finish(false); }, true);
+  // Mouse / pen
+  tree.addEventListener('pointerdown', e => {
+    if(e.pointerType === 'touch' || e.button !== 0) return;
+    const h = titleOf(e.target); if(!h) return;
+    g = {wrap:h.closest('.ref-cell-wrapper'), x:e.clientX, y:e.clientY, touch:false};
+    g.timer = setTimeout(arm, holdMs());
+  });
+  window.addEventListener('pointermove', e => {
+    if(!g || g.touch || e.pointerType === 'touch') return;
+    if(!g.armed){ if(Math.abs(e.clientX - g.x) + Math.abs(e.clientY - g.y) > 6) finish(false); return; }
+    e.preventDefault();
+    if(!g.drag) startDrag();
+    move(e.clientX, e.clientY);
+  }, true);
+  window.addEventListener('pointerup', e => { if(g && !g.touch && e.pointerType !== 'touch') finish(true); }, true);
+  window.addEventListener('keydown', e => { if(e.key === 'Escape' && g) finish(false); }, true);
+  // While armed / dragging, the hold menu and text selection stay out of the way.
+  document.addEventListener('contextmenu', e => { if(g && g.armed){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+  document.addEventListener('selectstart', e => { if(g && g.armed) e.preventDefault(); }, true);
 })();
 </script>
 </body>

@@ -78,6 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **Keep In Mind border color**: hold a title (or any line in its box) → 🎨 Border color. Pick a quick swatch, 🎨 Any color (the full color wheel), or Reset. The box around that title takes the color, and it syncs across devices.
 - **Hide the top button row**: hold an empty spot of the top row (not a button) to hide it, giving more room. A small tab stays at the top center; tap it to bring the row back. Remembered per device.
 - **Keep In Mind pin**: hold an item → 📌 Pin to top. Its title box (or task + subtasks) moves to the top with a small 📌; several pins stay in pin order. Hold it again → 📌 Unpin puts it just below the pinned ones. Syncs across devices.
 - **Reference → Keep In Mind drag**: hold a Reference card's title, then drag. The drawer slides away; drop on Keep In Mind (or its ⭐ tab) and a copy lands there as a title with its lines under it: tasks stay tasks, and cards inside it become nested titles. Reference keeps the card.

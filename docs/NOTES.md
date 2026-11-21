@@ -992,3 +992,8 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 ## G. Keep In Mind title border color (2026-11-21 13:43, Julius; defaults, no questions asked — he wants speed)
 - Hold a title (e.g. "Weekend") → 🎨 Border color: a few quick swatches (red / yellow / blue / green / purple) + a full color picker (the phone's color wheel) + Reset. Saved on the title line (`data-tbc="#rrggbb"`, syncs); the title box border uses it.
+- BUILT G 2026-11-21: `kimColorPicker` (before `runEditAction`), ctx `data-ctx="kimColor"` (Keep In Mind, shown when the held line's unit head is a title — any line in the box works). `data-tbc` read by `tboxPaint` draw (stroke 2) and `paintGroups` (`.kg-box` border 2px); `window.kimRepaintGroups`.
+- BUILT A 2026-11-21: `initToolbarHide` (last script), `body.tb-hidden`, `#tbStrip` top-center tab, `fw.tbHidden`.
+- BUILT E 2026-11-21: `initRefToKim` (last script): hold the card's first `<h2>` for `fwHoldMs()`, then drag; `window.fwRefToKim(wrap, {line, after})`.
+- BUILT D 2026-11-21: ctx `data-ctx="refArchive"`; `editorFromTarget` maps a hold on a card's frame to its `.ref-cell`; `deleteReference(id, {archive:true})` = no confirm.
+- BUILT F 2026-11-21: `placeCaretInsideCheckbox(text, at)` (<br> + 3 tries), `checkCharOffset` / `checkRangeAt`, global `checkCaretGuard` (selectionchange + input).

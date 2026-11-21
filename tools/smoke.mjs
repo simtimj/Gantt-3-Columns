@@ -419,6 +419,47 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Hide top row: ' + x));
   }
+  // Keep In Mind border color (2026-11-21, Julius; NOTES "G."): hold a title → 🎨 Border color → swatch / color wheel /
+  // Reset; saved on the title (data-tbc), the group box + title box use it; not offered on non-title lines.
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      document.querySelector('[data-ctab="focus"]').click(); await wait(300);
+      const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
+      ed.insertAdjacentHTML('beforeend', '<div><br></div><div data-tl="1">ColT</div><div class="check-line" data-level="1" style="margin-left: 24px;"><input type="checkbox"><span class="check-text">ColT kid</span></div><div><br></div><div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">ColLone</span></div><div><br></div>');
+      refreshCards(ed); refreshTitleLines(ed); await wait(150);
+      const f = t => [...ed.children].find(l => l.textContent.trim() === t);
+      const open = t => { const n = f(t), tx = n.querySelector('.check-text') || n, r = document.createRange(); r.setStart(tx.firstChild || tx, 0); r.collapse(true);
+        getSelection().removeAllRanges(); getSelection().addRange(r); ed.focus(); rememberSelection(ed); showContextMenu(ed, 60, 60, false);
+        return document.querySelector('#contextMenu [data-ctx="kimColor"]'); };
+      let b = open('ColLone'); if (b && !b.hidden) out.push('Border color offered on a task with no title'); hideContextMenu();
+      b = open('ColT kid'); if (!b || b.hidden) out.push('no Border color when holding a line inside a title box'); hideContextMenu();
+      b = open('ColT');
+      if (!b || b.hidden) { out.push('no 🎨 Border color when holding a title'); hideContextMenu(); }
+      else {
+        b.click(); await wait(100);
+        const pop = document.querySelector('.kc-pop'); if (!pop) out.push('no color picker opened');
+        else {
+          if (!pop.querySelector('input[type=color]')) out.push('no full color picker (wheel)');
+          pop.querySelector('[data-c="#fdd835"]').click(); await wait(200);
+          if (f('ColT').getAttribute('data-tbc') !== '#fdd835') out.push('yellow not saved on the title');
+          if (!/data-tbc="#fdd835"/.test(cardCleanHtml(ed))) out.push('color dropped from the saved cell');
+          if (!/fdd835/i.test(decodeURIComponent(ed.style.backgroundImage || ''))) out.push('title box not drawn in the color');
+          const box = [...document.querySelectorAll('#kimScroll .kg-box')].find(x => /253, 216, 53/.test(getComputedStyle(x).borderTopColor));
+          if (!box) out.push('group box not in the color');
+          b = open('ColT'); b.click(); await wait(100);
+          const inp = document.querySelector('.kc-pop input[type=color]'); inp.value = '#123abc'; inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); await wait(100);
+          if (f('ColT').getAttribute('data-tbc') !== '#123abc') out.push('color wheel value not applied');
+          document.querySelector('.kc-pop [data-reset]').click(); await wait(100);
+          if (f('ColT').hasAttribute('data-tbc')) out.push('Reset left the color');
+          if (document.querySelector('.kc-pop')) out.push('picker stayed open after Reset');
+        }
+      }
+      captureBeforeEdit(ed); ['ColT', 'ColT kid', 'ColLone'].forEach(t => { const n = f(t); n && n.remove(); });
+      while (ed.lastElementChild && isEmptyLine(ed.lastElementChild) && ed.lastElementChild.previousElementSibling && isEmptyLine(ed.lastElementChild.previousElementSibling)) ed.lastElementChild.remove();
+      finishEditorEdit(ed); document.querySelector('[data-ctab="notes"]').click(); await wait(200);
+      return out; });
+    k.forEach(x => errs.push('Keep In Mind color: ' + x));
+  }
   // Title cells (2026-11-21, Julius): a title + its lines sit in one box (nested box inside), archive takes the whole box.
   {
     const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];

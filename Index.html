@@ -2600,6 +2600,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <button class="btn" type="button" tabindex="-1" data-ctx="title" title="Make this line a title: − / + folds the lines under it, down to the next empty line">▤ Title</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="lineAbove" title="Insert an empty line above this one">↑ Line above</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="lineBelow" title="Insert an empty line below this one">↓ Line below</button>
+  <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="kimColor" title="Pick this title's border color" hidden>🎨 Border color</button>
   <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="kimPin" title="Pin this item (and the lines under it) to the top of Keep In Mind" hidden>📌 Pin to top</button>
   <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="refArchive" title="Archive this Reference card (and the cards inside it); restore it from Arc" hidden>🗄 Archive card</button>
 </div>
@@ -4850,6 +4851,44 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     saveEditorOwner(ed);
     setStatus(pin ? 'Pinned to the top of Keep In Mind' : 'Unpinned');
   }
+  /* Keep In Mind border color (2026-11-21, Julius; NOTES "G."): hold a title → 🎨 Border color → swatches, the full
+     color picker (the phone's color wheel) or Reset. Saved on the title line as data-tbc="#rrggbb" (syncs); the group
+     box and the title box use it. */
+  function kimColorPicker(ed, title, at){
+    document.querySelectorAll('.kc-pop').forEach(p => p.remove());
+    const SW = ['#e53935','#fb8c00','#fdd835','#43a047','#00acc1','#1e88e5','#8e24aa','#ec407a','#9e9e9e'];
+    const pop = document.createElement('div'); pop.className = 'kc-pop'; pop.setAttribute('role','dialog'); pop.setAttribute('aria-label','Border color');
+    const cur = title.getAttribute('data-tbc') || '';
+    pop.innerHTML = '<div class="kc-sw">' + SW.map(c => '<button type="button" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>').join('') + '</div>'
+      + '<div class="kc-row"><label class="kc-wheel">🎨 Any color<input type="color" value="' + (cur || '#fdd835') + '"></label>'
+      + '<button type="button" class="btn tiny" data-reset>Reset</button><button type="button" class="btn tiny" data-done>Done</button></div>';
+    document.body.appendChild(pop);
+    const vw = window.innerWidth, vh = window.innerHeight, r = pop.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(at.x, vw - r.width - 8)) + 'px';
+    pop.style.top = Math.max(8, Math.min(at.y, vh - r.height - 8)) + 'px';
+    let snap = false;
+    const apply = (c, final) => {
+      if(!snap){ captureBeforeEdit(ed); snap = true; }
+      if(c) title.setAttribute('data-tbc', c); else title.removeAttribute('data-tbc');
+      if(window.tboxPaint) try{ tboxPaint(ed); }catch(e){}
+      if(window.kimRepaintGroups) try{ kimRepaintGroups(); }catch(e){}
+      if(final){ finishEditorEdit(ed); saveEditorOwner(ed); snap = false; setStatus(c ? 'Border color set' : 'Border color reset'); }
+    };
+    const close = () => { pop.remove(); document.removeEventListener('pointerdown', outside, true); };
+    const outside = e => { if(!pop.contains(e.target)) close(); };
+    setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
+    pop.addEventListener('click', e => {
+      const b = e.target.closest('button'); if(!b) return;
+      if(b.dataset.c){ apply(b.dataset.c, true); close(); }
+      else if(b.hasAttribute('data-reset')){ apply('', true); close(); }
+      else if(b.hasAttribute('data-done')) close();
+    });
+    const inp = pop.querySelector('input[type=color]');
+    inp.addEventListener('input', () => apply(inp.value, false));
+    inp.addEventListener('change', () => apply(inp.value, true));
+    return pop;
+  }
+  window.fwKimColor = kimColorPicker;
   function runEditAction(action, ed){
     if(!ed || !ed.isConnected){
       setStatus('Select text or a task first');
@@ -4859,6 +4898,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const u = kimPinUnit(ed, savedRange && savedRange.startContainer);
       if(!u){ setStatus('Tap an item first'); return; }
       kimTogglePin(ed, u);
+      return;
+    }
+    if(action === 'kimColor'){
+      const u = kimPinUnit(ed, savedRange && savedRange.startContainer);
+      if(!u || !isTitleLine(u[0])){ setStatus('Hold a title first'); return; }
+      kimColorPicker(ed, u[0], window.fwCtxLastAt || {x:60, y:120});
       return;
     }
     if(action === 'refArchive'){
@@ -5070,8 +5115,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       kp.hidden = !isKim;
       if(isKim){ const sel = window.getSelection(), u = sel && sel.rangeCount ? kimPinUnit(ed, sel.anchorNode) : null;
         kp.textContent = u && u[0].hasAttribute('data-kpin') ? '📌 Unpin' : '📌 Pin to top'; }
+      const kc = ctxMenu.querySelector('[data-ctx="kimColor"]');
+      if(kc){ const sel = window.getSelection(), u = isKim && sel && sel.rangeCount ? kimPinUnit(ed, sel.anchorNode) : null;
+        kc.hidden = !(u && isTitleLine(u[0])); }
     }
-    ctxAnchor = {x,y,touch:!!touch};
+    ctxAnchor = {x,y,touch:!!touch}; window.fwCtxLastAt = {x,y}; // pop-ups opened from a menu item go here
     rememberSelection(ed);
     activeEditor = ed;
     ctxMenu.classList.toggle('ctx-touch',!!touch);
@@ -14871,6 +14919,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       groups.forEach(([a,b]) => {
         const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
         const box = document.createElement('div'); box.className = 'kg-box';
+        const tbc = a.getAttribute('data-tbc'); // title border color (2026-11-21)
+        if(/^#[0-9a-f]{6}$/i.test(tbc || '')){ box.style.borderColor = tbc; box.style.borderWidth = '2px'; }
         box.style.left = (er.left - sr.left + scroller.scrollLeft) + 'px';
         box.style.width = er.width + 'px';
         box.style.top = (ra.top - sr.top + scroller.scrollTop - 2) + 'px';
@@ -14879,6 +14929,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       });
     }
     const repaint = () => { if(!kgRaf) kgRaf = requestAnimationFrame(paintGroups); };
+    window.kimRepaintGroups = repaint;
     new MutationObserver(repaint).observe(ed,{childList:true,subtree:true,characterData:true});
     window.addEventListener('resize', repaint);
     new MutationObserver(repaint).observe(document.getElementById('journalPane'),{attributes:true,attributeFilter:['data-ctab']});
@@ -15336,8 +15387,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const bottom = lr.bottom - oy + 3 + inner * 4;
       const w = Math.max(10,W - 2 - b.depth * 5 - x), h = Math.max(10,bottom - top);
       const on = b.t.hasAttribute('data-tcfocus');
+      const tbc = /^#[0-9a-f]{6}$/i.test(b.t.getAttribute('data-tbc') || '') ? b.t.getAttribute('data-tbc') : ''; // chosen color (2026-11-21)
       rects += '<rect x="' + (x + .75) + '" y="' + (top + .75) + '" width="' + (w - 1.5) + '" height="' + (h - 1.5) + '" rx="9" fill="none" stroke="' +
-        (on ? urg : ink) + '" stroke-opacity="' + (on ? '1' : '.8') + '" stroke-width="' + (on ? 2 : 1.5) + '"/>'; // brighter (2026-11-21 12:44, Julius: "barely see it")
+        (on ? urg : tbc || ink) + '" stroke-opacity="' + (on || tbc ? '1' : '.8') + '" stroke-width="' + (on || tbc ? 2 : 1.5) + '"/>'; // brighter (2026-11-21 12:44, Julius: "barely see it")
     });
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
     Object.assign(ed.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',
@@ -19160,6 +19212,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   body.tb-hidden #tbStrip{display:block;position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2420;width:64px;height:10px;padding:0;
     border:1px solid var(--border);border-top:0;border-radius:0 0 8px 8px;background:var(--panel);opacity:.85;cursor:pointer;touch-action:manipulation;}
   body.tb-hidden #tbStrip::after{content:'';position:absolute;inset:-8px -10px -10px;} /* bigger tap area */
+  /* Keep In Mind border color picker (2026-11-21) */
+  .kc-pop{position:fixed;z-index:3250;padding:8px;border-radius:10px;background:var(--panel);color:inherit;border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:calc(100vw - 16px);}
+  .kc-pop .kc-sw{display:grid;grid-template-columns:repeat(9,28px);gap:6px;}
+  .kc-pop .kc-sw button{width:28px;height:28px;border-radius:50%;border:2px solid rgba(0,0,0,.15);padding:0;cursor:pointer;}
+  .kc-pop .kc-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .kc-pop .kc-wheel{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;flex:1;}
+  .kc-pop .kc-wheel input{width:40px;height:30px;padding:0;border:0;background:none;cursor:pointer;}
+  @media (max-width:420px){ .kc-pop .kc-sw{grid-template-columns:repeat(5,34px);} .kc-pop .kc-sw button{width:34px;height:34px;} }
   /* Keep In Mind pin (2026-11-21): a small 📌 before a pinned item. */
   #kimScroll .kim-editor > [data-kpin].check-line > .check-text::before,
   #kimScroll .kim-editor > [data-kpin]:not(.check-line)::before{content:'📌';font-size:.8em;margin-right:4px;}

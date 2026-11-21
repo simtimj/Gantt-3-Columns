@@ -785,6 +785,8 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 - 2026-11-21 (Julius): card border = event color (`--evc` set in `showDetail` / `cardColor`, CSS `.cp-evcard` 2 px). Touch only: a tap outside the open card is swallowed (document `pointerdown` capture records touch taps outside `.cp-detail,.fc-event,.cp-ev,.urg-picker,.urg-cal,dialogs`; `touchend` < 10 px moved → `preventDefault` = no click / focus, then dirty quick-edit saves or card closes; counter `__fwTapSwallowed`). Mouse unchanged. Smoke: calendar suite "card tap-outside" (phone: not focused; desktop: focused).
 
+- 2026-11-21 (Julius: "too much going on"): sun tint removed from `.fc-timegrid-col`; `sunPaint` now paints `--sky` on each `.fc-timegrid-slot-label` (gradient from its time to the next label's, `skyStops()` = navy / purple / pink / orange / yellow / blue / red, alpha .42), so the hour strip reads as one gradient. `.cp-sunmk` = 1 px dotted at .35, label 8.5 px. End time: removed the two `.cp-tend{display:none}` container rules; ≤ 34 px cards center `.fc-event-main` (flex). Fun cards: `--border` + `--panel` (white), no #b47be0.
+
 ## Full-screen calendar (2026-11-14, Julius)
 
 - Ask: "slide over again from the half-screen calendar → full-screen calendar with all the information; use the calendar button's (pop-out) features". Answers: starts Day, remembers Day / Week; backlog beside it, full text visible; works with the computer mouse too; 📅 button stays the old pop-out (for comparison).

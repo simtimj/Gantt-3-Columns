@@ -1377,6 +1377,9 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         return out;
       }, !!view.isMobile);
       errs.push(...res);
+      // End time always visible on timed events, even one-line / narrow ones (2026-11-21, Julius).
+      { const hid = await pg.evaluate(() => [...document.querySelectorAll('#calPanel .fc-timegrid-event:not(.fc-event-mirror) .cp-tend')].filter(e => getComputedStyle(e).display === 'none').map(e => e.closest('.fc-event').textContent.slice(0, 30)));
+        if (hid.length) errs.push('end time hidden on: ' + hid.join(' | ')); }
       // Event card border = event color; a real tap outside the open card only closes it on touch (no focus →
       // no phone keyboard), while a mouse click still lands (2026-11-21, Julius).
       {
@@ -2035,8 +2038,12 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         await pg.evaluate(() => { localStorage.removeItem('fw.calFullView'); localStorage.removeItem('fw.calFullBl'); });
         await prep();
         // Day colors are full screen only (half-screen tried + reverted 2026-11-15, Julius: "too much").
-        { const sun = await pg.evaluate(() => { const c = document.querySelector('#calPanel.cp-docked .fc-timegrid-col[data-date]'); return c ? getComputedStyle(c).backgroundImage : 'no docked col'; });
-          if (!/gradient/.test(sun)) errs.push('docked calendar: day colors missing (2026-11-15 12:21): ' + sun); }
+        // 2026-11-21 (Julius): no tint on the timeline; the sky gradient runs down the hour-label strip instead.
+        { const sun = await pg.evaluate(() => { const c = document.querySelector('#calPanel.cp-docked .fc-timegrid-col[data-date]'), l = document.querySelector('#calPanel.cp-docked .fc-timegrid-slot-label[data-time]'); return c && l ? { col: getComputedStyle(c).backgroundImage, lab: getComputedStyle(l).backgroundImage, mk: !!document.querySelector('#calPanel.cp-docked .cp-sunmk') } : null; });
+          if (!sun) errs.push('docked calendar: no column / hour label');
+          else { if (/gradient/.test(sun.col)) errs.push('docked calendar: timeline still tinted');
+            if (!/gradient/.test(sun.lab)) errs.push('docked calendar: hour labels have no sky gradient');
+            if (!sun.mk) errs.push('docked calendar: no sunrise / sunset line'); } }
         // Full time range on a card cut off by midnight (2026-11-15 12:54, Julius): "Sat 10 PM – 7:45 AM", not "12 AM".
         { const r = await pg.evaluate(async () => { const api = window.fwCalendar.api(), d0 = api.view.currentStart.toISOString().slice(0, 10);
             const y = new Date(api.view.currentStart.getTime() - 864e5).toISOString().slice(0, 10);

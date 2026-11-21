@@ -644,7 +644,7 @@
     .fun-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
     .fun-add{display:flex;gap:6px;margin:0 0 8px;}
     .fun-add input{flex:1;min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
-    .fun-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid color-mix(in srgb,#b47be0 45%,var(--border,#ccc));border-radius:7px;background:color-mix(in srgb,#b47be0 6%,transparent);}
+    .fun-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid var(--border,#ccc);border-radius:7px;background:var(--panel,#fff);} /* 2026-11-21 Julius: no purple, plain white */
     .fun-item input[type=checkbox]{margin-top:3px;flex:none;}
     .fun-item .fun-t{flex:1;min-width:0;outline:none;word-break:break-word;}
     .fun-item.done .fun-t{text-decoration:line-through;color:var(--muted,#888);}
@@ -668,8 +668,8 @@
     .fun-item input[type=checkbox]{-webkit-user-select:none;user-select:none;}
     .fun-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 6px 22px rgba(0,0,0,.3);margin:0;}
     .fun-item.fun-dragging{opacity:.35;}
-    .fun-item.fun-drop-b{box-shadow:0 -3px 0 0 var(--accent,#b47be0);} .fun-item.fun-drop-a{box-shadow:0 3px 0 0 var(--accent,#b47be0);}
-    .fun-cat-h.fun-drop-in{outline:2px solid var(--accent,#b47be0);outline-offset:1px;border-radius:5px;}
+    .fun-item.fun-drop-b{box-shadow:0 -3px 0 0 var(--accent,#1a73e8);} .fun-item.fun-drop-a{box-shadow:0 3px 0 0 var(--accent,#1a73e8);}
+    .fun-cat-h.fun-drop-in{outline:2px solid var(--accent,#1a73e8);outline-offset:1px;border-radius:5px;}
     .fun-done-head{margin:10px 0 4px;font-size:.85em;color:var(--muted,#777);cursor:pointer;user-select:none;}
     .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);display:flex;align-items:center;gap:8px;}
     .dr-lv{display:inline-flex;gap:3px;margin-left:auto;}
@@ -15880,13 +15880,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-plan:not(.folded){border-bottom:3px solid var(--cp-sep);border-bottom-left-radius:0;border-bottom-right-radius:0;}
   /* Sun colors (2026-11-14 night, Julius): full screen + half-screen docked calendar (asked again 2026-11-15 12:21, Julius). --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
   #calPanel{--sun-a:.13;}
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-col{background-image:var(--sun-bg,none);}
-  html[data-theme=dark] #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-col{background-image:var(--sun-bgd,var(--sun-bg,none));}
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-cl,var(--cp-muted))!important;}
-  html[data-theme=dark] #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--sun-c,var(--cp-muted))!important;}
+  /* 2026-11-21 (Julius: "too much going on"): the timeline itself has no tint any more; the day's sky (night navy →
+     dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label
+     strip instead, one smooth gradient (each label cell paints its own slice). Sunrise / sunset = a faint dotted line. */
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{color:var(--cp-text,#3c4043)!important;}
   #calPanel .cp-sunmk{display:none;}
-  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dashed rgb(242 113 28 / .55);pointer-events:none;z-index:0;}
-  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:9px;line-height:1;color:var(--cp-muted);opacity:.85;}
+  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dotted rgb(242 113 28 / .35);pointer-events:none;z-index:0;}
+  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:8.5px;line-height:1;color:var(--cp-muted);opacity:.6;}
   /* Tight cells (2026-11-14 night, Julius: "squeeze more room out, get rid of empty space and margin, text can go
      under the checkbox"): full screen only; font size unchanged for now (he wants to see this first). */
   #calPanel.cp-full .cp-fadh,#calPanel.cp-full .cp-blh{padding:2px 4px 1px;}
@@ -16146,7 +16147,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   @container cpev (max-height:62px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:2;} }
   @container cpev (max-height:46px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:1;} }
-  @container cpev (max-width:72px){ #calPanel .cp-tend{display:none;} }
   /* Nothing spills out of a card (2026-11-14, Julius: "some text is spilling out"): the card clips its own content, and
      as it gets shorter (zoomed out / 15-min events) the time line goes first, then text + box shrink to one tight line;
      very narrow cards (phone Week) drop the time and the box and wrap the title small. */
@@ -16169,7 +16169,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-evb{display:flex;align-items:baseline;gap:4px;white-space:nowrap;}
     #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{display:block;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{flex:0 0 auto;overflow:visible;}
-    #calPanel .fc .fc-timegrid-event .cp-tend{display:none;}
+    /* 2026-11-21 (Julius): end time always shows (title truncates first); short cards sit centered, nothing cut at the top. */
+    #calPanel .fc .fc-timegrid-event .fc-event-main{display:flex;align-items:center;padding-top:0!important;padding-bottom:0!important;}
+    #calPanel .fc .fc-timegrid-event .fc-event-main > .cp-ev{flex:1 1 auto;min-width:0;}
   }
   @container cpev (max-height:21px){
     #calPanel .fc .fc-timegrid-event .fc-event-main{padding-top:0!important;padding-bottom:0!important;}
@@ -18364,26 +18366,29 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return [a, bb, cc].map(v => Math.round((v + m) * 255));
   }
   const sunWarm = c => c[0] > c[2] + 60; // yellow / orange stops (not purple)
+  // Sky colors for the hour-label strip (2026-11-21, Julius: "a variety of colors").
+  const SKY_N = [40,52,110], SKY_P = [123,92,214], SKY_K = [238,130,170], SKY_O = [245,150,60], SKY_Y = [250,214,60], SKY_B = [120,185,240], SKY_R = [225,85,95];
+  function skyStops(t){
+    const mid = (t.rise + t.set) / 2;
+    return [[0, SKY_N], [t.rise - 80, SKY_N], [t.rise - 35, SKY_P], [t.rise - 10, SKY_K], [t.rise + 15, SKY_O], [t.rise + 75, SKY_Y], [mid, SKY_B],
+      [t.set - 90, SKY_Y], [t.set - 25, SKY_O], [t.set + 5, SKY_R], [t.set + 35, SKY_P], [t.set + 90, SKY_N], [1440, SKY_N]];
+  }
   const sunHm = m => { const h = Math.floor(m / 60), mi = Math.round(m % 60); return ((h + 11) % 12 + 1) + ':' + String(mi).padStart(2, '0'); };
   function sunPaint(){
     if(!full && !docked) return; // full screen + half-screen docked calendar (2026-11-15 12:21, Julius)
     let first = null;
     mount.querySelectorAll('.fc-timegrid-col[data-date]').forEach(col => {
       const iso = col.getAttribute('data-date'), s = sunStops(iso); if(!first) first = s;
-      col.style.setProperty('--sun-bg', 'linear-gradient(to bottom,' + s.stops.map(([m, c]) => 'rgb(' + c.join(' ') + ' / var(--sun-a)) ' + (m / 14.4).toFixed(2) + '%').join(',') + ')');
-      // Dark mode: a faint yellow over dark grey reads as olive / brown, so the warm stops use a lighter, fully
-      // saturated version (lightness .66) at a touch more strength (×1.25); purple stays as is.
-      col.style.setProperty('--sun-bgd', 'linear-gradient(to bottom,' + s.stops.map(([m, c]) => { const w = sunWarm(c); return 'rgb(' + (w ? sunHsl(c, 1, .66) : c).join(' ') + ' / calc(var(--sun-a) * ' + (w ? 1.45 : 1) + ')) ' + (m / 14.4).toFixed(2) + '%'; }).join(',') + ')');
       const fr = col.querySelector('.fc-timegrid-col-frame'); if(!fr) return;
       fr.querySelectorAll(':scope > .cp-sunmk').forEach(x => x.remove());
       [['sunrise', s.t.rise], ['sunset', s.t.set]].forEach(([k, m]) => { const d = document.createElement('div'); d.className = 'cp-sunmk'; d.style.top = (m / 14.4) + '%'; d.innerHTML = '<span>' + k + ' ' + sunHm(m) + '</span>'; fr.appendChild(d); });
     });
     if(!first) return;
-    mount.querySelectorAll('.fc-timegrid-slot-label[data-time]').forEach(td => {
-      const [h, mi] = td.getAttribute('data-time').split(':').map(Number), c = sunAt(first.stops, h * 60 + mi);
-      td.style.setProperty('--sun-c', 'rgb(' + c.join(' ') + ')');
-      td.style.setProperty('--sun-cl', 'rgb(' + (sunWarm(c) ? sunHsl(c, .95, .4) : c.map(v => Math.round(v * .62))).join(' ') + ')'); // light mode: deep gold, not brown
-    });
+    const sky = skyStops(first.t), tds = [...mount.querySelectorAll('.fc-timegrid-slot-label[data-time]')];
+    const mOf = td => { const [h, mi] = td.getAttribute('data-time').split(':').map(Number); return h * 60 + mi; };
+    const rgba = m => 'rgb(' + sunAt(sky, m).join(' ') + ' / .42)';
+    tds.forEach((td, i) => { const a = mOf(td), b = i + 1 < tds.length ? mOf(tds[i + 1]) : 1440;
+      td.style.setProperty('--sky', 'linear-gradient(to bottom,' + rgba(a) + ',' + rgba(b > a ? b : 1440) + ')'); });
   }
   let fadHeld = false;
   function fadRender(){

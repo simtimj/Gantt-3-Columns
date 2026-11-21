@@ -2,7 +2,20 @@
 
 Where things live, so a session can jump straight there. **Grep the quoted text; don't trust line numbers** (they drift; the ones here are only rough). Update this file when you add or move a big section.
 
-## Index.html (~19k lines)
+## Index.html (split 2026-11-21, speed item G)
+
+`Index.html` is now a small shell (head, theme script, page markup, start-up scriptlets) that pulls in six parts with `<?!= HtmlService.createHtmlOutputFromFile('Index_X').getContent() ?>`. Parts are raw HTML (no scriptlets: anything with `<?= ?>` must stay in the shell). Order in the page = order below. Tools read the joined page with `tools/index-html.mjs` → `readIndexHtml()`; the part list also lives in Code.gs `INDEX_PARTS_` (build hash). Line numbers below are of the **joined** page.
+
+| File | Holds |
+|---|---|
+| `Index.html` | head, theme script, `<body>` markup, `__FW_INITIAL__` / build scriptlets, WeekdayIcons + Drafts includes |
+| `Index_Css.html` | base CSS + light / dark theme |
+| `Index_Main.html` | main app script (`STATE` banner) |
+| `Index_Cards.html` | side space slider, task cards + subject colors, theme select, card fill, saved looks |
+| `Index_Extras.html` | task mirrors, block borders, title cells, block timer, header swipe, pull tabs, long-press panes |
+| `Index_Calendar.html` | calendar module (FullCalendar) + Big Three strip |
+| `Index_Layout.html` | 4-panel layout / Reference drawer |
+
 
 | Area | Grep for | ~Line |
 |---|---|---|

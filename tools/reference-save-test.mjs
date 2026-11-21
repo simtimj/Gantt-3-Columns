@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import { readIndexHtml } from './index-html.mjs';
 const src = fs.readFileSync('Code.gs','utf8');
 const row = ['r1','new-parent','item','New title','same',true,9000];
 const sheet = { rows:[[],row], getLastRow(){return this.rows.length;},
@@ -50,7 +51,7 @@ assert.equal(save({baseHash:null,expectedExisting:false}).deleted,true,'older ta
 assert.equal(sheet.rows.length,rowsBefore,'a stale save must not recreate a deleted card');
 console.log('✓ server: untouched fields preserved; text conflict protected; explicit collapse/move, stale move conflict and retry checked');
 
-const html=fs.readFileSync('Index.html','utf8');
+const html=readIndexHtml();
 const extract=(start,end)=>html.slice(html.indexOf(start),html.indexOf(end,html.indexOf(start)));
 const calls=[],statuses=[];
 const run={withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(fn){this.fail=fn;return this;},

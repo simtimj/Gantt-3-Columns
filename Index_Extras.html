@@ -1,0 +1,1123 @@
+<script>
+  /* Task mirrors (2026-11-01, Julius; spec phase 1). One task, several places: every live copy
+     carries the same data-tid. Ticking any copy ticks the others (Reference, Plan / think, Today,
+     Notes; Urgent is drawn from those cells, so it follows). A ticked Plan / think copy moves into
+     that day's Today ("Completed") as a history line with data-htid (not data-tid, so it never
+     re-syncs). Details: docs/NOTES.md → "Task mirrors". */
+  (function(){
+    let syncing = false;
+    const q = s => '"' + CSS.escape(String(s)) + '"';
+    const ED = '.day-editor,.journal-editor,.plan-editor,.ref-cell,.thought-editor,.kim-editor';
+    const ownerOf = l => l && l.closest ? l.closest(ED) : null;
+    const boxOf = l => l.querySelector(':scope > input[type=checkbox]') || l.querySelector('input[type=checkbox]');
+    const isOn = l => { const b = boxOf(l); return !!(b && b.checked); };
+    function setOn(l,on){
+      const b = boxOf(l); if(!b) return;
+      b.checked = on; b.toggleAttribute('checked',on); l.classList.toggle('done',on);
+    }
+    function newTid(){ return 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+    // The live copies of a task: the first line with this tid in each other editor.
+    function copies(tid,exceptEd){
+      const out = [];
+      cardEditors().forEach(ed => {
+        if(ed === exceptEd) return;
+        const l = ed.querySelector('.check-line[data-tid=' + q(tid) + ']');
+        if(l && ownerOf(l) === ed) out.push(l);
+      });
+      return out;
+    }
+    function edit(ed,fn){ captureBeforeEdit(ed); fn(); finishEditorEdit(ed); urgChanged(ed); }
+    // Completed Plan / think copy → history line at the end of that day's Today cell.
+    function toHistory(pl){
+      const pad = ownerOf(pl), date = pad && pad.dataset.date;
+      if(!date || !pl.isConnected || !isOn(pl)) return;
+      const day = document.querySelector('#todayScroll .day-editor[data-date=' + q(date) + ']');
+      if(!day) return;
+      const tx = pl.querySelector('.check-text');
+      addHistory(day, pl.dataset.tid, tx ? tx.innerHTML : '', pl.dataset.cat);
+      edit(pad,() => { pl.remove(); if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren(); });
+    }
+    // Checked data-htid line at the end of a Today cell — never twice per tid per day.
+    function addHistory(day,tid,html,cat){
+      if(!day || day.querySelector('.check-line[data-htid=' + q(tid) + ']')) return;
+      const h = document.createElement('div');
+      h.className = 'check-line done'; h.dataset.level = '0'; h.dataset.htid = tid;
+      if(cat) h.dataset.cat = cat;
+      h.innerHTML = '<input type="checkbox" checked><span class="check-text"></span>';
+      h.querySelector('.check-text').innerHTML = html || '';
+      edit(day,() => {
+        if(!day.textContent.trim() && !day.querySelector('input,img,hr')) day.replaceChildren();
+        day.appendChild(h);
+        wireCheckbox(h.querySelector('input'));
+      });
+    }
+    const todayStr = () => (typeof state !== 'undefined' && state.today) || localToday();
+    function sweepPlans(tid){
+      document.querySelectorAll('#todayScroll .plan-editor .check-line[data-tid' + (tid ? '=' + q(tid) : '') + ']')
+        .forEach(pl => { if(isOn(pl)) toHistory(pl); });
+    }
+    // Called from wireCheckbox's change handler after a real tick.
+    window.tidToggled = function(line,on,root){
+      const tid = line && line.dataset && line.dataset.tid;
+      if(syncing || !tid) return;
+      syncing = true;
+      try{
+        copies(tid,root).forEach(l => { if(isOn(l) !== on) edit(ownerOf(l),() => setOn(l,on)); });
+        if(window.focusTidToggled) try{ focusTidToggled(tid,on); }catch(e){}
+      } finally { syncing = false; }
+      // Short pause so the tick is seen before the line moves to Completed.
+      if(on) setTimeout(() => sweepPlans(tid),350);
+    };
+    // Load-time catch-up: a Plan / think copy whose task was ticked elsewhere while that
+    // day wasn't loaded (or a ticked copy left behind) moves to history now. Done wins.
+    function reconcile(){
+      document.querySelectorAll('#todayScroll .plan-editor .check-line[data-tid]').forEach(pl => {
+        if(isOn(pl)){ toHistory(pl); return; }
+        if(copies(pl.dataset.tid,ownerOf(pl)).some(isOn)){ edit(ownerOf(pl),() => setOn(pl,true)); toHistory(pl); }
+      });
+      if(window.focusReconcile) focusReconcile(window.tidAnyOn);
+    }
+    // Focus Tracking phase 2 (2026-11-01): focus tasks live in focusData, not in a cell, so they
+    // reach their copies through these. Focus is the source of the task's title.
+    window.tidAnyOn = tid => copies(tid,null).some(isOn);
+    /* Daily plan bridge (Calendar panel phase 3a, 2026-11-08): the 📅 panel links plan rows to tasks by tid, never
+       copies them. candidates() = open tasks in loaded lists (Urgent lines in day / Plan / Notes cells, Undated Tasks,
+       Keep In Mind); ensureTid() gives a line a tid the first time it's planned (saved like a mirror); setDone() ticks
+       the task the normal way (one real checkbox change → time sections, mirrors, Keep In Mind, Urgent, save). */
+    const PRI = l => { const o = ownerOf(l); return !o ? 9 : o.classList.contains('day-editor') ? 0 : o.classList.contains('plan-editor') ? 1 : isBacklogCell(o) ? 2 : o.classList.contains('journal-editor') ? 3 : 4; };
+    const liveLines = tid => [...document.querySelectorAll('.check-line[data-tid=' + q(tid) + ']')].filter(l => ownerOf(l) && l.closest('#todayScroll,#journalScroll,#referenceTree,#kimScroll')).sort((a,b) => PRI(a) - PRI(b));
+    window.fwTasks = {
+      candidates(){
+        const out = [], seen = new Set(), text = l => (typeof lineText === 'function' ? lineText(l) : l.textContent).replace(/\s+/g,' ').trim();
+        const add = (src,where,l) => {
+          if(!l || seen.has(l) || isOn(l) || l.dataset.arch || l.dataset.htid) return;
+          const t = text(l); if(!t) return;
+          if(l.dataset.tid){ if(seen.has('t:' + l.dataset.tid)) return; seen.add('t:' + l.dataset.tid); }
+          seen.add(l); out.push({src, where, text:t, tid:l.dataset.tid || '', line:l, urg:Number(l.dataset.urg) || 0});
+        };
+        const back = typeof backlogCell === 'function' ? backlogCell() : null;
+        document.querySelectorAll('#todayScroll .day-editor,#todayScroll .plan-editor,#journalScroll .journal-editor').forEach(ed =>
+          ed.querySelectorAll('.check-line[data-urg]').forEach(l => { if(/^[123]$/.test(l.dataset.urg) && ownerOf(l) === ed) add('urgent', ed.dataset.date ? (typeof shortDate === 'function' ? shortDate(ed.dataset.date) : ed.dataset.date) : '', l); }));
+        if(back) back.querySelectorAll('.check-line').forEach(l => { if((Number(l.dataset.level) || 0) === 0 || /^[123]$/.test(l.dataset.urg || '')) add(/^[123]$/.test(l.dataset.urg || '') ? 'urgent' : 'undated', 'Undated', l); });
+        document.querySelectorAll('#kimScroll .kim-editor .check-line').forEach(l => add('kim','Keep In Mind',l));
+        (window.focusOpenItems ? window.focusOpenItems() : []).forEach(t => {
+          if(seen.has('t:' + t.id)) return; seen.add('t:' + t.id);
+          out.push({src:'kim', where:t.cat, text:t.t, tid:t.id, line:null, urg:0});
+        });
+        return out;
+      },
+      ensureTid(c){
+        if(c.tid) return c.tid;
+        const l = c.line, o = ownerOf(l); if(!l || !o) return '';
+        const tid = newTid();
+        edit(o,() => { l.dataset.tid = tid; });
+        c.tid = tid;
+        return tid;
+      },
+      // {text, done, where} from the first live copy, else from Keep In Mind; null when it isn't loaded.
+      info(tid){
+        const l = liveLines(tid)[0];
+        if(l){ const t = l.querySelector('.check-text'); return {text:(t ? t.textContent : l.textContent).replace(/\s+/g,' ').trim(), done:isOn(l), dur:Math.round(Number(l.dataset.dur)) || 0}; }
+        const f = window.focusFindItem ? window.focusFindItem(tid) : null;
+        return f ? {text:f.t, done:!!f.d} : null;
+      },
+      setDone(tid,on){
+        const l = liveLines(tid)[0];
+        if(l){
+          const b = boxOf(l); if(!b) return false;
+          if(b.checked !== on){ b.checked = on; b.dispatchEvent(new Event('change',{bubbles:true})); }
+          return true;
+        }
+        if(window.focusFindItem && window.focusFindItem(tid)){ window.focusTidToggled(tid,on); return true; }
+        return false;
+      }
+    };
+    window.tidSet = function(tid,on,html){
+      if(syncing || !tid) return;
+      syncing = true;
+      try{ copies(tid,null).forEach(l => { if(isOn(l) !== on) edit(ownerOf(l),() => setOn(l,on)); }); }
+      finally { syncing = false; }
+      if(!on) return; // unticking keeps the history line
+      const day = document.querySelector('#todayScroll .day-editor[data-date=' + q(todayStr()) + ']');
+      if(day) addHistory(day,tid,html); else setStatus('Today isn’t loaded — the Completed line comes when you tick it there');
+      setTimeout(() => sweepPlans(tid),350);
+    };
+    window.tidRetitle = function(tid,html){
+      copies(tid,null).forEach(l => {
+        const tx = l.querySelector(':scope > .check-text') || l.querySelector('.check-text');
+        if(tx && tx.innerHTML !== html) edit(ownerOf(l),() => { tx.innerHTML = html; });
+      });
+    };
+    // 📌 on a focus task → a copy in Plan / think of the selected day (same rules as Send to Today).
+    window.tidPlace = function(tid,html,done){
+      if(done){ setStatus('That task is done — untick it first'); return; }
+      const date = window.odDate || todayStr();
+      const pad = urgEditor(date,'plan');
+      if(!pad){ setStatus('That day isn’t loaded — open it, then try again'); return; }
+      const have = pad.querySelector('.check-line[data-tid=' + q(tid) + ']');
+      if(have){
+        setStatus('Already in Plan / think for ' + shortDate(date));
+        have.classList.add('urg-flash'); setTimeout(() => have.classList.remove('urg-flash'),1300);
+        return;
+      }
+      const n = createCheckboxLine(0);
+      n.dataset.tid = tid;
+      n.querySelector('.check-text').innerHTML = html || '<br>';
+      edit(pad,() => {
+        if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren();
+        pad.appendChild(n);
+      });
+      setStatus('Sent to Plan / think · ' + shortDate(date));
+    };
+    let rt = 0;
+    const later = () => { clearTimeout(rt); rt = setTimeout(() => { try{ reconcile(); }catch(e){} },800); };
+    function watch(){
+      ['todayScroll','referenceTree'].forEach(id => { const el = document.getElementById(id); if(el) new MutationObserver(later).observe(el,{childList:true}); });
+      later();
+    }
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded',watch); else watch();
+
+    /* Mirror in Blocks (2026-11-04, Julius). Tasks from any section (Today, Notes, Dailies, Reference,
+       Scratch Pad, Urgent, Due) land in the Blocks pad of the day shown as linked copies: same data-tid, so a
+       tick on either side ticks both. The original never moves. Done lines are skipped. Cal Events have no
+       cell to link to, so they come over as a plain copy of the title (calTaskLine). */
+    const blocksPad = () => urgEditor(window.odDate || todayStr(),'plan');
+    window.tidMirror = function(nodes,src,pad,before,shift){
+      pad = pad || blocksPad();
+      if(!pad){ setStatus('Blocks isn’t loaded — open that day, then try again'); return false; }
+      const head = nodes && nodes[0];
+      if(!head || !src) return false;
+      if(isOn(head)){ setStatus('That task is done — untick it first'); return false; }
+      const live = nodes.filter(n => n.classList && n.classList.contains('check-line') && !isOn(n));
+      // No id yet, or a stray duplicate in the same cell → a fresh stable id, saved with the source cell.
+      const need = live.filter(n => !n.dataset.tid || src.querySelectorAll('.check-line[data-tid=' + q(n.dataset.tid) + ']').length > 1);
+      if(need.length) edit(src,() => need.forEach(n => { n.dataset.tid = newTid(); }));
+      const have = pad.querySelector('.check-line[data-tid=' + q(head.dataset.tid) + ']');
+      if(have){
+        setStatus('Already in Blocks');
+        have.classList.add('urg-flash'); setTimeout(() => have.classList.remove('urg-flash'),1300);
+        return false;
+      }
+      const lvl = n => Math.max(0,Math.min(6,Math.floor(Number(n.dataset.level) || 0)));
+      const made = live.filter(n => !pad.querySelector('.check-line[data-tid=' + q(n.dataset.tid) + ']')).map(n => {
+        const c = createCheckboxLine(Math.max(0,Math.min(6,lvl(n) + (shift || 0))));
+        c.dataset.tid = n.dataset.tid;
+        if(n.dataset.cat) c.dataset.cat = n.dataset.cat;
+        const tx = n.querySelector(':scope > .check-text') || n.querySelector('.check-text');
+        c.querySelector('.check-text').innerHTML = tx && tx.textContent.trim() ? tx.innerHTML : '<br>';
+        return c;
+      });
+      edit(pad,() => {
+        if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren();
+        if(before && before.parentElement !== pad) before = null;
+        made.forEach(c => { if(before) pad.insertBefore(c,before); else pad.appendChild(c); });
+      });
+      if(typeof refreshCards === 'function') refreshCards(pad);
+      made[0].classList.add('urg-flash'); setTimeout(() => made[0].classList.remove('urg-flash'),1400);
+      setStatus('Mirrored in Blocks' + (made.length > 1 ? ' (with ' + (made.length - 1) + ' subtask' + (made.length > 2 ? 's' : '') + ')' : ''));
+      return true;
+    };
+    window.calTaskLine = function(row){
+      const title = row && (row.dataset.ceTitle || (row.querySelector('.ce-title') || {}).textContent || '').trim();
+      if(!title) return null;
+      const n = createCheckboxLine(0);
+      n.querySelector('.check-text').textContent = title;
+      if(row.dataset.cat && row.dataset.cat !== 'none') n.dataset.cat = row.dataset.cat;
+      if(row.dataset.ceId) n.dataset.ceid = row.dataset.ceId + '|' + row.dataset.ceStart; // Cal Events box 3 (Schedule) finds it by this
+      return n;
+    };
+    function calToBlocks(row){
+      const pad = blocksPad();
+      if(!pad){ setStatus('Blocks isn’t loaded — open that day, then try again'); return; }
+      const n = calTaskLine(row); if(!n) return;
+      edit(pad,() => {
+        if(!pad.textContent.trim() && !pad.querySelector('input,img,hr')) pad.replaceChildren();
+        pad.appendChild(n);
+      });
+      if(typeof refreshCards === 'function') refreshCards(pad);
+      n.classList.add('urg-flash'); setTimeout(() => n.classList.remove('urg-flash'),1400);
+      setStatus('Copied to Blocks');
+    }
+    window.calToBlocks = calToBlocks;
+    // Hold-menu button on every task outside Blocks (2026-11-04, Julius); replaces Reference's Send to Today.
+    window.tidMenuRow = function(p,line,owner,isCal){
+      if(!isCal && (!owner || !owner.classList || owner.classList.contains('plan-pad'))) return;
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'urg-goto'; b.textContent = isCal ? '🧱 Copy to Blocks' : '🧱 Mirror in Blocks';
+      b.addEventListener('pointerdown',e => e.preventDefault());
+      b.addEventListener('click',() => {
+        hideUrgencyPicker();
+        if(isCal) calToBlocks(line);
+        else window.tidMirror(urgSubtree(line),owner,null,null,-(Number(line.dataset.level) || 0));
+      });
+      p.appendChild(b);
+    };
+  })();
+</script>
+<style>
+  /* Block borders (2026-11-04, Julius): see the script below. */
+  .plan-pad{position:relative;}
+  .plan-pad > [data-blk]{position:relative;left:7px;margin-right:14px;}
+  .plan-pad > [data-blk^="f"]{margin-top:9px;}
+  .plan-pad > [data-blk$="l"],.plan-pad > .check-line[data-blk$="l"]{margin-bottom:10px;}
+  .plan-pad > [data-blkn]{margin-top:21px;}
+  .plan-pad > [data-blkph] > .check-text:empty::before{content:'Tasks for your next block · ▶ starts it';color:var(--muted,#999);font-style:italic;opacity:.8;pointer-events:none;} /* room for the line above Next Block */
+</style>
+<script>
+/* Block borders (2026-11-04, Julius): each block in Blocks (its title line plus the task cells under it, down
+   to the next title or an empty line) sits inside one rounded border, so it's clear what a block contains.
+   Next Block placeholders get a dashed border in the same soft color (yellow until 2026-11-05). Render-only: the border is
+   an SVG background on the pad (scrolls with it) and data-blk is stripped before saving (cardCleanHtml). */
+(function(){
+  const isTitle = n => n.hasAttribute('data-title');
+  const isBlank = n => !n.classList.contains('check-line') && !n.textContent.trim() && !n.querySelector('input,img,hr');
+  function groups(pad){
+    const out = []; let cur = null;
+    for(const n of pad.children){
+      if(isTitle(n)){ cur = [n]; out.push(cur); continue; }
+      if(!cur) continue;
+      if(isBlank(n)){ cur = null; continue; }
+      cur.push(n);
+    }
+    return out;
+  }
+  const pending = new Set();
+  // --divider resolved to a plain color an SVG data URL understands (it can be a color-mix()).
+  function divInk(pad){
+    const head = pad.parentElement && pad.parentElement.querySelector(':scope > .od-pad-head');
+    const c = head ? getComputedStyle(head).borderTopColor : getComputedStyle(pad).color;
+    try{ const x = document.createElement('canvas').getContext('2d'); x.fillStyle = '#888'; x.fillStyle = c; return x.fillStyle; }catch(e){ return '#888'; }
+  }
+  function draw(pad){
+    if(!pad.isConnected) return;
+    const gs = groups(pad);
+    const W = pad.clientWidth, H = pad.scrollHeight;
+    if(!gs.length || !W){ pad.style.removeProperty('background-image'); return; }
+    const ink = getComputedStyle(pad).color || '#888';
+    let rects = '';
+    gs.forEach(g => {
+      const vis = g.filter(n => n.offsetParent !== null);
+      if(!vis.length) return;
+      const first = vis[0], last = vis[vis.length - 1];
+      const top = first.offsetTop - 5, bottom = last.offsetTop + last.offsetHeight + 4;
+      const next = /^next block\b/i.test((first.textContent || '').trim());
+      // A line across the pad above Next Block (2026-11-04, Julius), so it's set apart from what's above.
+      // Same 2px line color as every other divider (2026-11-05); none when Next Block is first (the Blocks header line is right there).
+      if(next && first.previousElementSibling) rects += '<line x1="2" x2="' + Math.max(10,W - 2) + '" y1="' + (top - 6.5) + '" y2="' + (top - 6.5) + '" stroke="' + divInk(pad) + '" stroke-width="2"/>';
+      rects += '<rect x="2" y="' + (top + .75) + '" width="' + Math.max(10,W - 4) + '" height="' + Math.max(10,bottom - top - 1.5) + '" rx="8" fill="none" stroke="' +
+        ink + '" stroke-opacity=".45" stroke-width="1.5"' + (next ? ' stroke-dasharray="6 4"' : '') + '/>'; // Next Block: same soft color, dashed (2026-11-05, Julius: yellow was too bright)
+    });
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
+    Object.assign(pad.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',
+      backgroundAttachment:'local',backgroundSize:W + 'px ' + H + 'px',backgroundPosition:'0 0'});
+  }
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => schedule(e.target))) : null;
+  function schedule(pad){
+    if(pending.has(pad)) return;
+    pending.add(pad);
+    requestAnimationFrame(() => { pending.delete(pad); try{ draw(pad); }catch(e){} });
+  }
+  // Called from refreshCards for the Blocks pad.
+  const isNext = n => /^next block\b/i.test((n.textContent || '').trim());
+  window.blkPaint = function(pad){
+    const want = new Map();
+    groups(pad).forEach(g => g.forEach((n,i) => want.set(n,(i === 0 ? 'f' : 'm') + (i === g.length - 1 ? 'l' : ''))));
+    pad.querySelectorAll(':scope > [data-blk]').forEach(n => { if(!want.has(n)) n.removeAttribute('data-blk'); });
+    want.forEach((v,n) => { if(n.getAttribute('data-blk') !== v) n.setAttribute('data-blk',v); });
+    pad.querySelectorAll(':scope > [data-blkn]').forEach(n => { if(!(isTitle(n) && isNext(n))) n.removeAttribute('data-blkn'); });
+    [...pad.children].forEach(n => { if(isTitle(n) && isNext(n) && n.previousElementSibling && !n.hasAttribute('data-blkn')) n.setAttribute('data-blkn','1'); });
+    // Hint in Next Block's first empty task (2026-11-05, Julius): says what the block is for. Render-only, stripped on save.
+    let ph = null;
+    groups(pad).forEach(g => { if(!ph && isNext(g[0])) ph = g.find(n => n.classList.contains('check-line') && !n.textContent.trim()) || null; });
+    pad.querySelectorAll(':scope > [data-blkph]').forEach(n => { if(n !== ph) n.removeAttribute('data-blkph'); });
+    if(ph && !ph.hasAttribute('data-blkph')) ph.setAttribute('data-blkph','1');
+    ensureNext(pad);
+    if(ro && !pad._blkRO){ pad._blkRO = true; ro.observe(pad); }
+    schedule(pad);
+  };
+  document.addEventListener('input',e => { const pad = e.target && e.target.closest && e.target.closest('.plan-pad'); if(pad) window.blkPaint(pad); },true);
+  /* There's always a Next Block (2026-11-04, Julius): today's and later days' Blocks get a "Next Block" title plus an
+     empty task cell at the end whenever none is there (after Activate, after Remove, on load). Past days are left alone. */
+  const todayIso = () => (typeof state !== 'undefined' && state && state.today) || (typeof localToday === 'function' ? localToday() : '');
+  function ensureNext(pad){
+    if(pad._blkEnsure || !pad.isConnected || !pad.isContentEditable) return;
+    const d = pad.dataset.date, t = todayIso();
+    if(!d || !t || d < t) return;
+    if([...pad.children].some(n => isTitle(n) && isNext(n))) return;
+    pad._blkEnsure = true;
+    setTimeout(() => {
+      pad._blkEnsure = false;
+      if(!pad.isConnected || [...pad.children].some(n => isTitle(n) && isNext(n))) return;
+      if(typeof captureBeforeEdit === 'function') captureBeforeEdit(pad);
+      pad.querySelectorAll(':scope > br').forEach(n => n.remove());
+      const title = document.createElement('div');
+      title.setAttribute('data-title','1'); title.dataset.tl = '1';
+      const b = document.createElement('b'); b.textContent = 'Next Block'; title.appendChild(b);
+      const cell = typeof createCheckboxLine === 'function' ? createCheckboxLine(0) : null;
+      // Keep it at the very end, after any trailing empty lines.
+      pad.appendChild(title); if(cell) pad.appendChild(cell);
+      pad.dispatchEvent(new Event('input',{bubbles:true}));
+    },0);
+  }
+  /* Enter on a block title makes a task cell under it, checkbox included (2026-11-04, Julius). Backspace on the
+     checkbox turns it back into a plain line, as anywhere else. */
+  document.addEventListener('keydown',e => {
+    if(e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+    const pad = e.target && e.target.closest ? e.target.closest('.plan-pad') : null;
+    if(!pad) return;
+    const sel = window.getSelection(); if(!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    let n = sel.anchorNode; if(n && n.nodeType === 3) n = n.parentElement;
+    while(n && n.parentElement !== pad) n = n.parentElement;
+    if(!n || !isTitle(n)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if(typeof captureBeforeEdit === 'function') captureBeforeEdit(pad);
+    const cell = createCheckboxLine(0);
+    n.insertAdjacentElement('afterend',cell);
+    if(typeof placeCaretInsideCheckbox === 'function') placeCaretInsideCheckbox(cell.querySelector('.check-text'));
+    pad.dispatchEvent(new Event('input',{bubbles:true}));
+  },true);
+})();
+</script>
+<style>
+  /* Title cells (2026-11-21, Julius): a little room above a title box and below its last line. Render-only attrs. */
+  .editor > [data-tbf]{margin-top:7px;}
+  .editor > [data-tbl]{margin-bottom:calc(6px + var(--tbs,0) * 4px);}
+</style>
+<script>
+/* Title cells (2026-11-21, Julius: "when I titleize something, I want it to be in a cell for itself"): every marked
+   title (data-tl="1") and the lines it covers (titleCovered) sit inside one rounded box; a nested title's box sits
+   inside its parent's. A folded title is a box around the title alone. A picked title (data-tcfocus) rings its whole
+   box. Everywhere titles exist except the Blocks pad (it has its own block borders). Render-only: an SVG background on
+   the editor (scrolls with it, like blkPaint) + data-tbf / data-tbl / --tbs, stripped in cardCleanHtml. */
+(function(){
+  const boxTitle = n => n.nodeType === 1 && n.dataset.tl === '1' && !n.dataset.sec && !n.dataset.study && !n.hasAttribute('data-tsec') && !n.hasAttribute('data-cgrp');
+  const shown = n => n.offsetParent !== null && !n.hasAttribute('data-tlhid');
+  const pending = new Set();
+  function boxes(ed){
+    const out = [];
+    for(const n of ed.children){
+      if(!boxTitle(n) || !shown(n)) continue;
+      const cov = titleCovered(n), vis = cov.filter(shown);
+      out.push({t:n,cov,last:vis.length ? vis[vis.length - 1] : n});
+    }
+    // Depth = how many other boxes hold this title.
+    out.forEach(b => { b.depth = out.filter(o => o !== b && o.cov.includes(b.t)).length; });
+    return out;
+  }
+  function marks(ed,bs){
+    const f = new Set(), stack = new Map();
+    bs.forEach(b => {
+      if(!b.depth) f.add(b.t);
+      stack.set(b.last,Math.max(stack.get(b.last) || 0,bs.filter(o => o.last === b.last && o.depth > b.depth).length));
+    });
+    ed.querySelectorAll(':scope > [data-tbf]').forEach(n => { if(!f.has(n)) n.removeAttribute('data-tbf'); });
+    ed.querySelectorAll(':scope > [data-tbl]').forEach(n => { if(!stack.has(n)){ n.removeAttribute('data-tbl'); n.style.removeProperty('--tbs'); } });
+    f.forEach(n => { if(!n.hasAttribute('data-tbf')) n.setAttribute('data-tbf','1'); });
+    stack.forEach((s,n) => { if(!n.hasAttribute('data-tbl')) n.setAttribute('data-tbl','1'); if(s) n.style.setProperty('--tbs',String(s)); else n.style.removeProperty('--tbs'); });
+  }
+  function draw(ed){
+    if(!ed.isConnected) return;
+    const bs = boxes(ed);
+    const W = ed.clientWidth, H = ed.scrollHeight;
+    if(!bs.length || !W){ if(ed._tbox){ ed.style.removeProperty('background-image'); ed._tbox = false; } return; }
+    const er = ed.getBoundingClientRect(), ox = er.left + ed.clientLeft - ed.scrollLeft, oy = er.top + ed.clientTop - ed.scrollTop;
+    const ink = getComputedStyle(ed).color || '#888';
+    const urg = getComputedStyle(ed).getPropertyValue('--urg').trim() || ink;
+    let rects = '';
+    bs.sort((a,b) => a.depth - b.depth).forEach(b => {
+      const tr = b.t.getBoundingClientRect(), lr = b.last.getBoundingClientRect();
+      const inner = bs.filter(o => o.last === b.last && o.depth > b.depth).length;
+      const x = Math.max(1,tr.left - ox - 5), top = tr.top - oy - 4;
+      const bottom = lr.bottom - oy + 3 + inner * 4;
+      const w = Math.max(10,W - 2 - b.depth * 5 - x), h = Math.max(10,bottom - top);
+      const on = b.t.hasAttribute('data-tcfocus');
+      const tbc = /^#[0-9a-f]{6}$/i.test(b.t.getAttribute('data-tbc') || '') ? b.t.getAttribute('data-tbc') : ''; // chosen color (2026-11-21)
+      rects += '<rect x="' + (x + .75) + '" y="' + (top + .75) + '" width="' + (w - 1.5) + '" height="' + (h - 1.5) + '" rx="9" fill="none" stroke="' +
+        (on ? urg : tbc || ink) + '" stroke-opacity="' + (on || tbc ? '1' : '.8') + '" stroke-width="' + (on || tbc ? 2 : 1.5) + '"/>'; // brighter (2026-11-21 12:44, Julius: "barely see it")
+    });
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
+    Object.assign(ed.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',
+      backgroundAttachment:'local',backgroundSize:W + 'px ' + H + 'px',backgroundPosition:'0 0'});
+    ed._tbox = true;
+  }
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => schedule(e.target))) : null;
+  function schedule(ed){
+    if(pending.has(ed)) return;
+    pending.add(ed);
+    requestAnimationFrame(() => { pending.delete(ed); try{ draw(ed); }catch(e){} });
+  }
+  // Called from refreshTitleLines (every editor refresh) and when the picked line changes.
+  window.tboxPaint = function(ed){
+    if(!ed || ed.classList.contains('plan-pad')) return;
+    const bs = boxes(ed);
+    if(!bs.length && !ed._tbox && !ed.querySelector(':scope > [data-tbf],:scope > [data-tbl]')) return;
+    marks(ed,bs);
+    if(ro && !ed._tboxRO){ ed._tboxRO = true; ro.observe(ed); }
+    schedule(ed);
+  };
+  window.tboxTitle = boxTitle;
+})();
+</script>
+<style>
+  /* Block timer MVP (2026-11-05, Julius). Bar + chips are render-only: they live next to the Blocks pad, never in it. */
+  .tmr-bar,.tmr-layer{display:none;}
+  /* 2026-11-12: Blocks pad hidden while the Timer slot is empty, so its bar + chips stay hidden too. */
+  .tmr-bar{flex:0 0 auto;align-items:center;gap:2px 4px;flex-wrap:wrap;font-size:12px;line-height:1.25;padding:2px 2px 3px;color:var(--muted);}
+  .tmr-bar .tmr-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  .tmr-bar .tmr-name{color:var(--text,inherit);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-bar .tmr-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-bar .tmr-clock{font-variant-numeric:tabular-nums;font-weight:600;color:var(--text,inherit);cursor:pointer;}
+  .tmr-bar.run .tmr-clock{color:#1e9e4a;}
+  .tmr-bar button{font:inherit;font-size:11px;line-height:1;min-width:24px;height:22px;padding:0 5px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .tmr-bar i{font-style:normal;}
+  .tmr-bar .tmr-btns{display:flex;gap:4px;flex:0 0 auto;}
+  .tmr-bar i{display:none;} /* icons only (2026-11-05, Julius: compact); labels are in the tooltips */
+  .tmr-bar.narrow .tmr-main{flex-basis:100%;}
+  .tmr-bar.narrow .tmr-btns{margin-left:auto;}
+  .tmr-bar .tmr-sub{font-size:11px;}
+  .tmr-bar .tmr-sync{font-size:10px;opacity:.75;}
+  .tmr-layer{position:absolute;overflow:hidden;pointer-events:none;z-index:2;}
+  .tmr-chip{position:absolute;right:4px;display:flex;align-items:center;gap:2px;pointer-events:auto;font-size:11px;line-height:1;
+    font-variant-numeric:tabular-nums;color:var(--muted);}
+  .tmr-chip .tmr-t{cursor:pointer;padding:2px 1px;}
+  .tmr-chip button{font:inherit;font-size:10px;width:20px;height:18px;padding:0;border-radius:5px;border:1px solid currentColor;
+    background:transparent;color:inherit;cursor:pointer;opacity:.55;}
+  .tmr-chip.blk button{opacity:.8;}
+  .tmr-chip.on{color:#1e9e4a;font-weight:600;}
+  .tmr-chip.on button{opacity:1;}
+  .tmr-chip.pz{color:#d08a00;}
+  .plan-pad > [data-blk]{padding-right:58px;}
+  .tmr-menu{position:fixed;z-index:9500;min-width:170px;max-width:260px;display:flex;flex-direction:column;padding:4px;border-radius:9px;
+    background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc);box-shadow:0 8px 28px rgba(0,0,0,.28);}
+  .tmr-menu-t{font-size:11px;font-weight:700;opacity:.65;padding:4px 8px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-menu button{font:inherit;font-size:14px;text-align:left;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;}
+  .tmr-menu button:hover{background:color-mix(in srgb,currentColor 10%,transparent);}
+</style>
+<script>
+/* Block timer MVP (2026-11-05, Julius; design = Reference card "📜 Timer App", Nov 3 decisions).
+   - ▶ on a block title starts that block's timer; ▶ on a task in it starts that task's timer (and the block's).
+   - One block runs at a time (starting another pauses it); one task timer per block (starting another stops it).
+   - Ticking the running task stops its timer, the block keeps going. Pause pauses both; ▶ resumes both.
+   - ☕ Break is its own task in the block. Block time not on a task stays "unassigned", never spread out.
+   - Finish stops the block; unfinished tasks stay as they are.
+   - Every tap is an event with a unique op id (the timestamps are the record, not a ticking counter), so locking the
+     phone or closing the page never loses time. Events are saved on the device first, then sent to the "Timer Log"
+     tab (Timer.gs, skips op ids it already has). Totals are rebuilt from the events. Tap a time to correct it; the
+     measured time is kept, the correction is its own event. Blocks / tasks are tied to their lines by data-tmr. */
+(function(){
+  const KEY = 'fw.timer.v1', BREAK = 'break', KEEP_DAYS = 14, FORGOT_MS = 2 * 3600e3;
+  const run = () => (window.google && google.script && google.script.run) || null;
+  const today = () => (typeof state !== 'undefined' && state && state.today) || new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0,10);
+  const status = s => { try{ setStatus(s); }catch(e){} };
+  const rid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  let dev = ''; try{ dev = localStorage.getItem('fw.dev') || ''; if(!dev){ dev = rid('d'); localStorage.setItem('fw.dev',dev); } }catch(e){ dev = 'nostore'; }
+
+  /* ---- event store (device first) ---- */
+  let events = [], sent = new Set();
+  try{ const s = JSON.parse(localStorage.getItem(KEY) || '{}'); events = Array.isArray(s.events) ? s.events : []; sent = new Set(s.sent || []); }catch(e){}
+  function persist(){
+    const cut = Date.now() - KEEP_DAYS * 864e5;
+    events = events.filter(e => e.at >= cut || !sent.has(e.op));
+    const ops = new Set(events.map(e => e.op));
+    sent = new Set([...sent].filter(o => ops.has(o)));
+    try{ localStorage.setItem(KEY, JSON.stringify({events, sent:[...sent]})); }catch(e){}
+  }
+  function merge(list, fromServer){
+    const have = new Set(events.map(e => e.op));
+    let added = 0;
+    (list || []).forEach(e => {
+      if(!e || !e.op) return;
+      if(fromServer) sent.add(e.op);
+      if(have.has(e.op)) return;
+      have.add(e.op); events.push({op:e.op,date:e.date,at:Number(e.at),act:e.act,blk:e.blk||'',item:e.item||'',name:e.name||'',value:e.value === undefined ? null : e.value,dev:e.dev||''});
+      added++;
+    });
+    if(added || fromServer) persist();
+    return added;
+  }
+
+  /* ---- replay: events -> state ---- */
+  function replay(now){
+    const B = {}, fix = {};
+    let cur = null;
+    const blk = id => B[id] || (B[id] = {run:false,since:0,ms:0,child:null,cs:0,items:{},paused:false,done:false,last:0,date:''});
+    const stopChild = (b,t) => { if(b.child && b.run) b.items[b.child] = (b.items[b.child] || 0) + Math.max(0,t - b.cs); };
+    const pause = (id,t) => { const b = B[id]; if(!b || !b.run) return; stopChild(b,t); b.ms += Math.max(0,t - b.since); b.run = false; b.paused = true; if(cur === id) cur = null; };
+    const start = (id,t) => { if(cur && cur !== id) pause(cur,t); const b = blk(id); if(b.run) return b; b.run = true; b.since = t; b.paused = false; b.done = false; if(b.child) b.cs = t; cur = id; return b; };
+    [...events].sort((a,b) => a.at - b.at || (a.op < b.op ? -1 : 1)).forEach(e => {
+      const t = e.at;
+      if(e.blk){ const b = blk(e.blk); b.last = t; b.date = b.date || e.date; }
+      if(e.act === 'start') start(e.blk,t);
+      else if(e.act === 'pause') pause(e.blk,t);
+      else if(e.act === 'finish'){ const b = B[e.blk]; if(b){ pause(e.blk,t); b.child = null; b.paused = false; b.done = true; } }
+      else if(e.act === 'istart'){ const b = start(e.blk,t); if(b.child === e.item) return; stopChild(b,t); b.child = e.item; b.cs = t; }
+      else if(e.act === 'istop'){ const b = B[e.blk]; if(b && b.child === e.item){ stopChild(b,t); b.child = null; } }
+      else if(e.act === 'fix') fix[e.blk + '|' + (e.item || '')] = e.value === null || e.value === '' ? null : Number(e.value);
+    });
+    const out = {cur, blocks:{}};
+    Object.keys(B).forEach(id => {
+      const b = B[id], items = {};
+      Object.keys(b.items).forEach(k => items[k] = b.items[k]);
+      if(b.run && b.child) items[b.child] = (items[b.child] || 0) + Math.max(0, now - b.cs);
+      const raw = b.ms + (b.run ? Math.max(0, now - b.since) : 0);
+      const shown = {}; Object.keys(items).forEach(k => { const f = fix[id + '|' + k]; shown[k] = f === null || f === undefined ? items[k] : f; });
+      const f = fix[id + '|'];
+      const assigned = Object.keys(items).reduce((s,k) => s + items[k], 0);
+      out.blocks[id] = {run:b.run, paused:b.paused, done:b.done, child:b.child, raw, ms: f === null || f === undefined ? raw : f, fixed: f !== null && f !== undefined,
+        items, shown, unassigned: Math.max(0, raw - assigned), since:b.run ? b.since : 0, last:b.last, date:b.date};
+    });
+    return out;
+  }
+
+  /* ---- send queue ---- */
+  let flushing = false, flushTimer = 0, backoff = 2000, lastSync = '';
+  function flush(){
+    clearTimeout(flushTimer);
+    const r = run(); if(!r || flushing) return;
+    const todo = events.filter(e => !sent.has(e.op));
+    if(!todo.length){ lastSync = 'saved'; return; }
+    flushing = true; lastSync = 'saving…';
+    r.withSuccessHandler(res => {
+      flushing = false; backoff = 2000;
+      ((res && res.saved) || todo.map(e => e.op)).forEach(o => sent.add(o));
+      persist(); lastSync = 'saved'; paintAll();
+      if(events.some(e => !sent.has(e.op))) flushTimer = setTimeout(flush, 300);
+    }).withFailureHandler(() => {
+      flushing = false; lastSync = 'offline · kept on this device';
+      flushTimer = setTimeout(flush, backoff); backoff = Math.min(backoff * 2, 60000); paintAll();
+    }).saveTimerEvents(todo);
+  }
+  let pulling = false, lastPull = 0;
+  function pull(){
+    const r = run(); if(!r || pulling) return;
+    pulling = true; lastPull = Date.now();
+    const since = new Date(Date.now() - 7 * 864e5 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0,10);
+    r.withSuccessHandler(list => { pulling = false; merge(Array.isArray(list) ? list : [], true); paintAll(); checkForgot(); flush(); })
+     .withFailureHandler(() => { pulling = false; }).getTimerEvents(since);
+  }
+
+  /* ---- lines <-> ids ---- */
+  const isTitle = n => n.hasAttribute('data-title');
+  const isBlank = n => !n.classList.contains('check-line') && !n.textContent.trim() && !n.querySelector('input,img,hr');
+  function groups(pad){
+    const out = []; let cur = null;
+    for(const n of pad.children){
+      if(isTitle(n)){ cur = {title:n, items:[]}; out.push(cur); continue; }
+      if(!cur) continue;
+      if(isBlank(n)){ cur = null; continue; }
+      if(n.classList.contains('check-line')) cur.items.push(n);
+    }
+    return out;
+  }
+  const lineName = n => ((n.querySelector('.check-text') || n).textContent || '').replace(/\s+/g,' ').trim().slice(0,120);
+  const isDone = n => n.classList.contains('done') || !!(n.querySelector(':scope > input[type=checkbox]') || {}).checked;
+  function idFor(line, prefix, pad){
+    if(line.dataset.tmr) return line.dataset.tmr;
+    if(typeof captureBeforeEdit === 'function') captureBeforeEdit(pad);
+    line.dataset.tmr = rid(prefix);
+    pad.dispatchEvent(new Event('input',{bubbles:true}));
+    return line.dataset.tmr;
+  }
+  // Enter in a line copies its attributes to the new line: the first line keeps the id, copies lose it.
+  function dedupe(pad){
+    const seen = new Set(); let changed = false;
+    pad.querySelectorAll('[data-tmr]').forEach(n => { if(seen.has(n.dataset.tmr)){ n.removeAttribute('data-tmr'); changed = true; } else seen.add(n.dataset.tmr); });
+    if(changed && pad.isContentEditable) pad.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  function findLine(id){
+    if(!id) return null;
+    for(const pad of document.querySelectorAll('#todayScroll .plan-pad, #blocksScroll > .plan-pad')){ const n = pad.querySelector('[data-tmr="' + CSS.escape(id) + '"]'); if(n) return {pad, line:n}; }
+    return null;
+  }
+  const PLACEHOLDER = /^(?:Next Block(?:\s+\d+)?|Block name)$/i;
+
+  /* ---- actions ---- */
+  let lastTap = {k:'', el:null, t:0};
+  function record(act, blk, item, name, date, value){
+    const e = {op:rid('t'), date: date || today(), at: Date.now(), act, blk: blk || '', item: item || '', name: name || '', value: value === undefined ? null : value, dev};
+    events.push(e); persist();
+    return e;
+  }
+  function act(kind, pad, title, line){
+    const el = line || title; // same line + same button within 600 ms = one tap (names can change on start)
+    if(lastTap.k === kind && lastTap.el === el && Date.now() - lastTap.t < 600) return;
+    lastTap = {k:kind, el, t:Date.now()};
+    const date = pad.dataset.date || today();
+    const s = replay(Date.now());
+    if(kind === 'block' || kind === 'item' || kind === 'break'){
+      // Starting a Next Block placeholder names it after the start time; Blocks then adds a fresh Next Block.
+      const strong = title.querySelector(':scope > b,:scope > strong');
+      if(strong && PLACEHOLDER.test(strong.textContent.trim()) && pad.isContentEditable){
+        if(typeof captureBeforeEdit === 'function') captureBeforeEdit(pad);
+        strong.textContent = 'Block ' + new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+        pad.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    }
+    const bid = idFor(title,'b-',pad), b = s.blocks[bid];
+    if(kind === 'block'){
+      if(b && b.run) record('pause', bid, '', lineName(title), date);
+      else record('start', bid, '', lineName(title), date);
+    } else if(kind === 'item'){
+      const iid = idFor(line,'i-',pad);
+      if(b && b.run && b.child === iid) record('istop', bid, iid, lineName(line), date);
+      else record('istart', bid, iid, lineName(line), date);
+    } else if(kind === 'break'){
+      if(b && b.run && b.child === BREAK) record('istop', bid, BREAK, 'Break', date);
+      else record('istart', bid, BREAK, 'Break', date);
+    } else if(kind === 'finish'){
+      record('finish', bid, '', lineName(title), date);
+    }
+    paintAll(); flush();
+  }
+  function parseDur(v){
+    v = String(v || '').trim().toLowerCase();
+    if(!v) return null;
+    let m = v.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/);
+    if(m) return m[3] !== undefined ? ((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3])) * 1e3 : ((+m[1]) * 3600 + (+m[2]) * 60) * 1e3;
+    m = v.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+)\s*m(?:in)?)?$/);
+    if(m && (m[1] || m[2])) return Math.round(((+m[1] || 0) * 3600 + (+m[2] || 0) * 60) * 1e3);
+    if(/^\d+$/.test(v)) return (+v) * 60e3;
+    return undefined;
+  }
+  function correct(pad, title, line, itemId){
+    const bid = title.dataset.tmr; if(!bid) return;
+    const s = replay(Date.now()), b = s.blocks[bid]; if(!b) return;
+    const iid = itemId || (line && line.dataset.tmr) || '';
+    const measured = iid ? (b.items[iid] || 0) : b.raw;
+    const v = window.prompt('Correct the time for "' + (iid === BREAK ? 'Break' : lineName(line || title)) + '" (e.g. 45m, 1h 10m, 1:10).\nMeasured: ' + fmt(measured, true) + '. Leave empty to go back to the measured time.', iid ? fmt(b.shown[iid] || 0, true) : fmt(b.ms, true));
+    if(v === null) return;
+    const ms = parseDur(v);
+    if(ms === undefined){ status('Timer: could not read "' + v + '"'); return; }
+    record('fix', bid, iid, iid === BREAK ? 'Break' : lineName(line || title), pad.dataset.date, ms);
+    status(ms === null ? 'Timer: back to the measured time' : 'Timer: corrected to ' + fmt(ms, true));
+    paintAll(); flush();
+  }
+
+  /* ---- drawing ---- */
+  function fmt(ms, words){
+    const s = Math.max(0, Math.floor((ms || 0) / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    if(words) return h ? h + 'h ' + m + 'm' : m ? m + 'm' : x + 's';
+    return h ? h + ':' + String(m).padStart(2,'0') + ':' + String(x).padStart(2,'0') : m + ':' + String(x).padStart(2,'0');
+  }
+  function attach(pad){
+    if(pad._tmr && pad._tmr.bar.isConnected && pad._tmr.layer.isConnected) return pad._tmr;
+    const bar = document.createElement('div'); bar.className = 'tmr-bar'; bar.setAttribute('contenteditable','false');
+    const layer = document.createElement('div'); layer.className = 'tmr-layer'; layer.setAttribute('contenteditable','false');
+    pad.insertAdjacentElement('beforebegin', bar);
+    pad.insertAdjacentElement('afterend', layer);
+    if(!pad._tmrWired){
+      pad._tmrWired = true;
+      wireTitleMenu(pad);
+      pad.addEventListener('scroll', () => paint(pad), {passive:true});
+      pad.addEventListener('input', () => requestAnimationFrame(() => paint(pad)));
+      // Ticking the running task stops its timer; the block keeps running.
+      pad.addEventListener('change', e => {
+        const line = e.target.closest && e.target.closest('.check-line');
+        if(!line || !line.dataset.tmr) return;
+        requestAnimationFrame(() => {
+          if(!isDone(line)) return;
+          const g = groups(pad).find(x => x.items.includes(line)); if(!g || !g.title.dataset.tmr) return;
+          const b = replay(Date.now()).blocks[g.title.dataset.tmr];
+          if(b && b.child === line.dataset.tmr){ record('istop', g.title.dataset.tmr, line.dataset.tmr, lineName(line), pad.dataset.date); paintAll(); flush(); }
+        });
+      });
+    }
+    bar.addEventListener('click', e => {
+      const btn = e.target.closest('[data-tact]'); if(!btn) return;
+      e.preventDefault(); e.stopPropagation();
+      const hit = findLine(bar.dataset.blk); if(!hit) return;
+      const a = btn.dataset.tact;
+      if(a === 'fix-blk') correct(hit.pad, hit.line, null, '');
+      else if(a === 'fix-item'){ const it = bar.dataset.item === BREAK ? null : findLine(bar.dataset.item); correct(hit.pad, hit.line, it && it.line, bar.dataset.item); }
+      else act(a, hit.pad, hit.line, null);
+    });
+    layer.addEventListener('click', e => {
+      const el = e.target.closest('[data-tact]'); if(!el) return;
+      e.preventDefault(); e.stopPropagation();
+      const chip = el.closest('.tmr-chip'), line = chip && chip._line, title = chip && chip._title;
+      if(!line || !line.isConnected) return;
+      if(el.dataset.tact === 'fix') correct(pad, title, line === title ? null : line, '');
+      else act(line === title ? 'block' : 'item', pad, title, line === title ? null : line);
+    });
+    // Keep taps on the overlay from moving the caret / starting a drag in the pad underneath.
+    ['pointerdown','mousedown','touchstart'].forEach(t => layer.addEventListener(t, e => { if(e.target.closest('.tmr-chip')) e.stopPropagation(); }, {passive:true}));
+    pad._tmr = {bar, layer};
+    return pad._tmr;
+  }
+  let snap = null;
+  function paint(pad, s){
+    if(!pad.isConnected) return;
+    s = s || snap || replay(Date.now());
+    dedupe(pad);
+    const {bar, layer} = attach(pad);
+    Object.assign(layer.style, {top: pad.offsetTop + 'px', left: pad.offsetLeft + 'px', width: pad.clientWidth + 'px', height: pad.clientHeight + 'px'});
+    const gs = groups(pad), want = [];
+    gs.forEach(g => {
+      const bid = g.title.dataset.tmr, b = bid && s.blocks[bid];
+      want.push({line:g.title, title:g.title, blk:true, on: !!(b && b.run), pz: !!(b && b.paused), ms: b ? b.ms : 0, has: !!b});
+      g.items.forEach(n => {
+        const iid = n.dataset.tmr, on = !!(b && b.run && iid && b.child === iid), ms = b && iid ? (b.shown[iid] || 0) : 0;
+        if(isDone(n) && !ms) return; // finished and never timed: nothing to show
+        want.push({line:n, title:g.title, blk:false, on, pz: !!(b && b.paused && iid && b.child === iid), ms, has: ms > 0 || on, done: isDone(n)});
+      });
+    });
+    const chips = [...layer.children];
+    const padR = pad.getBoundingClientRect().left + pad.clientLeft + pad.clientWidth;
+    while(chips.length > want.length) chips.pop().remove();
+    want.forEach((w,i) => {
+      let c = chips[i];
+      if(!c){ c = document.createElement('div'); c.innerHTML = '<span class="tmr-t" data-tact="fix"></span><button type="button" data-tact="go"></button>'; layer.appendChild(c); }
+      c._line = w.line; c._title = w.title;
+      c.className = 'tmr-chip' + (w.blk ? ' blk' : '') + (w.on ? ' on' : '') + (w.pz ? ' pz' : '');
+      const t = c.firstChild, btn = c.lastChild;
+      const txt = w.has ? fmt(w.ms) : '';
+      if(t.textContent !== txt) t.textContent = txt;
+      t.title = w.has ? 'Tap to correct this time' : '';
+      btn.style.display = w.done ? 'none' : '';
+      const sym = w.on ? '❚❚' : '▶';
+      if(btn.textContent !== sym) btn.textContent = sym;
+      btn.title = w.blk ? (w.on ? 'Pause this block (and its task)' : 'Start this block') : (w.on ? 'Stop this task’s timer' : 'Time this task');
+      btn.setAttribute('aria-label', btn.title);
+      c.style.top = (w.line.offsetTop - pad.scrollTop + Math.max(0, (Math.min(w.line.offsetHeight, 24) - 18) / 2)) + 'px';
+      // Inside the line's own box (its cell border), not at the pad edge (2026-11-05, Julius).
+      c.style.right = Math.max(4, padR - w.line.getBoundingClientRect().right + 6) + 'px';
+      c.style.visibility = w.line.offsetParent === null ? 'hidden' : '';
+    });
+    // Bar: the running (or last paused) block of this pad, else today's total.
+    const ids = new Set(gs.map(g => g.title.dataset.tmr).filter(Boolean));
+    let bid = s.cur && ids.has(s.cur) ? s.cur : null;
+    if(!bid){ let last = -1; ids.forEach(id => { const b = s.blocks[id]; if(b && b.paused && !b.done && b.last > last){ last = b.last; bid = id; } }); }
+    const total = [...ids].reduce((n,id) => n + (s.blocks[id] ? s.blocks[id].ms : 0), 0);
+    const brk = [...ids].reduce((n,id) => n + (s.blocks[id] ? (s.blocks[id].shown[BREAK] || 0) : 0), 0);
+    const pending = events.some(e => !sent.has(e.op));
+    const sync = pending ? (lastSync === 'offline · kept on this device' ? lastSync : 'saving…') : '';
+    let html = '', on = false;
+    if(bid){
+      const b = s.blocks[bid], hit = gs.find(g => g.title.dataset.tmr === bid);
+      const child = b.child, cl = child && child !== BREAK ? pad.querySelector('[data-tmr="' + CSS.escape(child) + '"]') : null;
+      const cname = child === BREAK ? '☕ Break' : cl ? lineName(cl) : child ? 'task' : '';
+      bar.dataset.blk = bid; bar.dataset.item = child || '';
+      const sub = (child ? '<span data-tact="fix-item" class="tmr-clock">' + esc(cname) + ' ' + fmt(b.shown[child] || 0) + '</span> · ' : '') +
+        (b.shown[BREAK] && child !== BREAK ? '☕ ' + fmt(b.shown[BREAK], true) + ' · ' : '') + 'unassigned ' + fmt(b.unassigned, true);
+      html = '<div class="tmr-main"><div class="tmr-name">' + (b.run ? '⏱ ' : '❚❚ ') + esc(hit ? lineName(hit.title) : 'Block') + ' <span class="tmr-clock" data-tact="fix-blk" title="Tap to correct">' + fmt(b.ms) + '</span></div>' +
+        '<div class="tmr-sub">' + sub + (sync ? ' <span class="tmr-sync">· ' + sync + '</span>' : '') + '</div></div>' +
+        '<span class="tmr-btns"><button type="button" data-tact="block" title="' + (b.run ? 'Pause' : 'Resume') + '">' + (b.run ? '❚❚<i> Pause</i>' : '▶<i> Resume</i>') + '</button>' +
+        '<button type="button" data-tact="break" title="' + (child === BREAK && b.run ? 'End break' : 'Break') + '">☕<i>' + (child === BREAK && b.run ? ' End break' : ' Break') + '</i></button>' +
+        '<button type="button" data-tact="finish" title="Finish">■<i> Finish</i></button></span>';
+      on = true;
+      bar.classList.toggle('run', b.run);
+    } else if(total){
+      bar.dataset.blk = ''; bar.classList.remove('run');
+      html = '<div class="tmr-main"><div class="tmr-sub">⏱ ' + (pad.dataset.date === today() ? 'Today' : pad.dataset.date) + ': ' + fmt(total, true) + ' tracked' + (brk ? ' · ☕ ' + fmt(brk, true) : '') + (sync ? ' · ' + sync : '') + '</div></div>';
+      on = true;
+    }
+    if(bar._html !== html){ bar.innerHTML = html; bar._html = html; }
+    bar.classList.toggle('narrow', pad.clientWidth > 0 && pad.clientWidth < 300);
+    bar.classList.toggle('on', on);
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+  function paintAll(){
+    snap = replay(Date.now());
+    document.querySelectorAll('#todayScroll .plan-pad, #blocksScroll > .plan-pad').forEach(p => { try{ paint(p, snap); }catch(e){ console.error(e); } });
+    snap = null;
+  }
+  // A timer left running for hours: say so once per block, so the time can be corrected (it's never trimmed).
+  const warned = new Set();
+  function checkForgot(){
+    const s = replay(Date.now());
+    Object.keys(s.blocks).forEach(id => {
+      const b = s.blocks[id];
+      if(b.run && Date.now() - b.since > FORGOT_MS && !warned.has(id)){
+        warned.add(id);
+        const hit = findLine(id);
+        status('⏱ "' + (hit ? lineName(hit.line) : 'A block') + '" has been running ' + fmt(b.ms, true) + ' — tap its time to correct it if you forgot to stop');
+      }
+    });
+  }
+  /* Block title menu (2026-11-05, Julius): tap a block's title → Start / Pause, Finish, Rename, Remove block.
+     A tap while you're already typing in that title just edits it (so Rename, then typing, works as before). */
+  let menuEl = null;
+  function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; } }
+  document.addEventListener('pointerdown', e => { if(menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
+  window.addEventListener('scroll', closeMenu, true);
+  function topOf(pad, node){ let n = node && (node.nodeType === 3 ? node.parentElement : node); while(n && n.parentElement !== pad) n = n.parentElement; return n && n.parentElement === pad ? n : null; }
+  function wireTitleMenu(pad){
+    let press = null;
+    pad.addEventListener('pointerdown', e => {
+      const t = topOf(pad, e.target);
+      if(!t || !isTitle(t) || e.button !== 0){ press = null; return; }
+      const sel = window.getSelection();
+      const editing = document.activeElement === pad && sel && sel.rangeCount && t.contains(sel.anchorNode);
+      press = {t, at:Date.now(), x:e.clientX, y:e.clientY, editing};
+    });
+    pad.addEventListener('click', e => {
+      const p = press; press = null;
+      if(!p || p.editing || topOf(pad, e.target) !== p.t) return;
+      if(Date.now() - p.at > 450 || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 9) return; // a hold / drag, not a tap
+      openMenu(pad, p.t, e.clientX, e.clientY);
+    });
+  }
+  function openMenu(pad, title, x, y){
+    closeMenu();
+    if(document.activeElement === pad) pad.blur(); // no keyboard popping up on the phone
+    const b = title.dataset.tmr ? replay(Date.now()).blocks[title.dataset.tmr] : null;
+    const items = [[b && b.run ? '❚❚ Pause' : (b && b.paused ? '▶ Resume' : '▶ Start'), 'go']];
+    if(b && (b.run || b.paused)) items.push(['■ Finish', 'finish']);
+    items.push(['✎ Rename', 'rename'], ['🗑 Remove block', 'remove']);
+    menuEl = document.createElement('div');
+    menuEl.className = 'tmr-menu';
+    menuEl.innerHTML = '<div class="tmr-menu-t">' + esc(lineName(title) || 'Block') + '</div>' + items.map(([l,a]) => '<button type="button" data-m="' + a + '">' + esc(l) + '</button>').join('');
+    document.body.appendChild(menuEl);
+    const r = menuEl.getBoundingClientRect();
+    menuEl.style.left = Math.max(8, Math.min(x - 20, innerWidth - r.width - 8)) + 'px';
+    menuEl.style.top = Math.max(8, Math.min(y + 10, innerHeight - r.height - 8)) + 'px';
+    menuEl.addEventListener('click', e => {
+      const btn = e.target.closest('[data-m]'); if(!btn) return;
+      const m = btn.dataset.m; closeMenu();
+      if(m === 'go') act('block', pad, title, null);
+      else if(m === 'finish') act('finish', pad, title, null);
+      else if(m === 'rename'){
+        pad.focus({preventScroll:true});
+        const target = title.querySelector(':scope > b,:scope > strong') || title;
+        const r2 = document.createRange(); r2.selectNodeContents(target);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r2);
+      } else if(m === 'remove' && typeof pad._blkRemove === 'function') pad._blkRemove(title);
+    });
+  }
+  window.fwTimer = {replay: () => replay(Date.now()), events: () => events.slice(), merge: l => { const n = merge(l, false); paintAll(); return n; }, flush, pull, paintAll, parseDur, checkForgot};
+
+  setInterval(() => { if(document.visibilityState !== 'hidden') paintAll(); }, 1000);
+  window.addEventListener('resize', () => paintAll());
+  window.addEventListener('online', flush);
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState !== 'visible') return;
+    paintAll(); checkForgot(); flush(); // device-only + sending unsent: right away, never queued
+  });
+  window.fwResume && fwResume.add('timer', pull, () => lastPull); // Timer Log merge: calm-return queue
+  // After the page has drawn: show device events at once, then merge the Timer Log and send anything unsent.
+  setTimeout(() => { paintAll(); checkForgot(); }, 300);
+  setTimeout(pull, 1500);
+})();
+</script>
+<style>
+  .ref-toolbar.hs-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);}
+  .ref-toolbar.hs-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);}
+  .ref-toolbar.hs-l.hs-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
+/* Minimal time sections (2026-11-07, Julius: lines bled past the box's left edge, too much space). Applies to every
+   time section (Morn / After / Night) in History: content sits inside the box, lines and group headers packed tight. */
+#todayScroll .day-editor.sec-painted.sec-painted.sec-painted{padding-left:7px!important;padding-right:7px!important;margin-left:0!important;margin-right:0!important;}
+/* Less room outside the boxes (2026-11-07): the day row's side padding drops to 2px (boxes sit 1px inside the editor, see paintDaySecs). */
+#todayScroll .day-row.od-on.od-on,#todayScroll .day-row.today.today:has(> .sec-host){padding-left:2px!important;padding-right:2px!important;}
+#todayScroll .day-editor > [data-tsec]{margin-top:4px!important;margin-bottom:2px!important;}
+/* A little space between Morn / After / Night (2026-11-07): gap + the thin line above After and Night. */
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){margin-top:12px!important;padding-top:4px!important;}
+/* One line: icon, label, then the count as a small green cell like the group buttons (51/53 ✓ −). */
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){flex-wrap:nowrap!important;align-items:center;gap:2px;padding-left:2px!important;}
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab):has(> .ts-sum){flex-wrap:wrap!important;} /* the folded list still goes under the line */
+#todayScroll .day-editor > [data-tsec] > .ts-lab{flex:0 1 auto!important;}
+#todayScroll .day-editor > [data-tsec]::before{margin-right:1px!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{content:attr(data-tsinfo)!important;flex:0 0 auto!important;margin-left:2px;padding:0 4px;font-size:10px;font-weight:700;line-height:1.35;letter-spacing:0;text-transform:none;white-space:nowrap!important;color:#1e9e50;border:1px solid #22a55a;border-radius:5px;}
+#todayScroll .day-editor > [data-tsec][data-tsf="c"]:has(> .ts-lab)::after{content:"+\00A0" attr(data-tsinfo)!important;} /* folded: + in front; open: just the count (tap the header to fold) */
+/* Header lines (2026-11-07, Julius): the line under each time section's title is 1px in the section's own color
+   (Morn yellow, Aft orange, Eve purple), the same for all three; no extra line above Aft / Eve inside their box. */
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){border-top:0!important;padding-top:1px!important;}
+#todayScroll .day-editor > [data-tsec="morning"][data-tsf="o"]{border-bottom:1px solid var(--sec-m-bd)!important;}
+#todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="o"]{border-bottom:1px solid var(--sec-a-bd)!important;}
+#todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]{border-bottom:1px solid var(--sec-e-bd)!important;}
+/* Tighter titles (2026-11-07, Julius): less empty space in the Morn / Aft / Eve title rows. */
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){padding-top:0!important;padding-bottom:1px!important;align-items:center!important;}
+#todayScroll .day-editor > [data-tsec] > .ts-lab{line-height:1.1!important;}
+#todayScroll .day-editor > [data-tsec]::before{margin-top:0!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{line-height:1.2!important;}
+#todayScroll .day-editor > [data-tsec][data-tsec] + :is([data-cgrp],.check-line,[data-tl]){margin-top:2px!important;}
+#todayScroll .day-editor > [data-tsec][data-tsec]{margin-bottom:0!important;}
+/* Space between Morn / Aft / Eve boxes (2026-11-07, Julius: ~50px → a small, comfortable gap). The blank line(s) right
+   before a section title are squeezed to 3px (still in the cell, never removed), and the title's top margin is 8px. */
+#todayScroll .day-editor > div:not([data-tsec]):not(.check-line):not([data-cgrp]):not([data-tl]):is(:empty,:has(> br:only-child)):is(:has(+ [data-tsec]),:has(+ div:is(:empty,:has(> br:only-child)) + [data-tsec])){height:3px!important;min-height:0!important;margin:0!important;padding:0!important;font-size:0!important;line-height:0!important;overflow:hidden!important;}
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"])[data-tsec]{margin-top:8px!important;}
+/* Group names (Gantt, Userscripts…): underlined, not bold. */
+#todayScroll .day-editor > [data-cgrp] :is(b,strong){font-weight:400!important;}
+#todayScroll .day-editor > [data-tsec] ~ .check-line{margin-top:1px!important;margin-bottom:1px!important;padding-top:1px!important;padding-bottom:1px!important;}
+#todayScroll .day-editor > [data-tsec] ~ [data-cgrp]{margin-top:4px!important;margin-bottom:0!important;}
+</style>
+<script>
+/* Header rows slide left / right on the phone (2026-11-04, Julius): the rows already scroll sideways, but a swipe
+   that starts on the search box was taken by the box itself (it's the widest thing there), so the row never moved.
+   A sideways swipe starting on a text box that isn't being typed in now scrolls its row instead. */
+(function(){
+  let s = null;
+  const ROWS = '.ref-toolbar';
+  document.addEventListener('touchstart',e => {
+    s = null;
+    const t = e.target, row = t && t.closest ? t.closest(ROWS) : null;
+    if(!row || e.touches.length !== 1 || !t.matches('input,textarea') || document.activeElement === t) return;
+    if(row.scrollWidth <= row.clientWidth + 1) return;
+    s = {row,x:e.touches[0].clientX,y:e.touches[0].clientY,left:row.scrollLeft,on:false};
+  },{capture:true,passive:true});
+  document.addEventListener('touchmove',e => {
+    if(!s) return;
+    const dx = e.touches[0].clientX - s.x, dy = e.touches[0].clientY - s.y;
+    if(!s.on){
+      if(Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)){ s = null; return; }
+      if(Math.abs(dx) < 8) return;
+      s.on = true;
+    }
+    s.row.scrollLeft = s.left - dx;
+    if(e.cancelable) e.preventDefault();
+  },{capture:true,passive:false});
+  document.addEventListener('touchend',() => { s = null; },true);
+  document.addEventListener('touchcancel',() => { s = null; },true);  // A soft fade on the side that has more, so it's clear the row slides.
+  function edge(row){
+    const more = row.scrollWidth > row.clientWidth + 1;
+    row.classList.toggle('hs-l',more && row.scrollLeft > 2);
+    row.classList.toggle('hs-r',more && row.scrollLeft + row.clientWidth < row.scrollWidth - 2);
+  }
+  function wire(){
+    document.querySelectorAll(ROWS).forEach(row => {
+      if(row._hs) return; row._hs = true;
+      row.addEventListener('scroll',() => edge(row),{passive:true});
+      if(typeof ResizeObserver !== 'undefined') new ResizeObserver(() => edge(row)).observe(row);
+      edge(row);
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded',wire); else wire();
+})();
+</script>
+<script>
+/* Pull tabs (2026-11-06, Julius): a column or section squeezed to a thin strip (see tuckFrac) hides its contents and
+   gets a small tab on the strip; tap it to bring that column / section back. The line itself still drags too. */
+(function initTucks(){
+  const TH = 40, tabs = new Map();
+  const shown = el => el && el.isConnected && el.getClientRects().length && getComputedStyle(el).display !== 'none';
+  function items(){
+    const out = [], ws = document.getElementById('workspace');
+    ['today','journal','reference'].forEach(n => { const el = document.getElementById(n === 'reference' ? 'calPane' : n + 'Pane'); /* 4-panel: the right column is Cal Events */ if(el && !el.classList.contains('view-hidden') && !(ws && ws.classList.contains('view-single'))) out.push({el, axis:'x', go:() => window.tuckRestorePane && window.tuckRestorePane(n)}); });
+    const bar = (el,key) => el && out.push({el, axis:'y', go:() => window.splitBarRestore && window.splitBarRestore(key)});
+    bar(document.getElementById('refTopScroll'),'fw.refSplit'); bar(document.getElementById('referenceScroll'),'fw.refSplit');
+    ['journalScroll','weatherScroll','dayReviewScroll','funScroll','newScroll','kimScroll'].forEach(id => { const el = document.getElementById(id); if(shown(el)) bar(el,'fw.notesSplit2'); });
+    bar(document.getElementById('blocksScroll'),'fw.notesSplit2');
+    const od = document.querySelector('body.one-day #todayScroll .od-on');
+    if(od){ bar(od.querySelector(':scope > .od-top'),'fw.odSplit'); bar(od.querySelector(':scope > .timer-slot'),'fw.odSplit'); }
+    return out;
+  }
+  function scan(){
+    if(document.body.classList.contains('fw-focus-on')) return;
+    const seen = new Set();
+    items().forEach(it => {
+      if(!shown(it.el)) return;
+      const r = it.el.getBoundingClientRect(), thin = it.axis === 'x' ? r.width < TH : r.height < TH;
+      it.el.classList.toggle('fw-tucked', thin);
+      if(!thin) return;
+      seen.add(it.el);
+      let t = tabs.get(it.el);
+      if(!t){ t = document.createElement('button'); t.type = 'button'; t.className = 'fw-tuck-tab'; t.setAttribute('aria-label','Bring this back'); t.title = 'Tap to bring it back (or drag the line)'; document.body.appendChild(t); tabs.set(it.el, t); }
+      t.onclick = e => { e.preventDefault(); e.stopPropagation(); it.go(); requestAnimationFrame(() => requestAnimationFrame(scan)); };
+      t.classList.toggle('y', it.axis === 'y');
+      t.textContent = it.axis === 'x' ? (r.left + r.width / 2 > innerWidth / 2 ? '‹' : '›') : '↕';
+      const w = it.axis === 'x' ? 16 : 46, h = it.axis === 'x' ? 46 : 16;
+      t.style.left = Math.round(Math.max(0, Math.min(innerWidth - w, r.left + r.width / 2 - w / 2))) + 'px';
+      t.style.top = Math.round(Math.max(0, Math.min(innerHeight - h, r.top + r.height / 2 - h / 2))) + 'px';
+    });
+    tabs.forEach((t, el) => { if(!seen.has(el)){ t.remove(); tabs.delete(el); el.classList.remove('fw-tucked'); } });
+  }
+  let q = 0; const later = () => { if(!q) q = requestAnimationFrame(() => { q = 0; scan(); }); };
+  window.tuckScan = later;
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(later) : null;
+  const watch = () => { if(ro) items().forEach(it => ro.observe(it.el)); };
+  window.addEventListener('resize', later);
+  document.addEventListener('pointerup', () => setTimeout(() => { watch(); later(); }, 50), true);
+  document.addEventListener('scroll', later, true);
+  const start = () => { watch(); later(); setInterval(() => { watch(); later(); }, 4000); };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+<script>
+/* Long-press section labels to expand the original pane; tap backdrop to restore. */
+(function(){
+  let focused=null, timer=0, startX=0, startY=0, suppressUntil=0;
+  const backdrop=document.createElement('div');backdrop.id='fwFocusBackdrop';
+  (document.getElementById('app') || document.body).appendChild(backdrop); // inside #app's stacking context, or it covers the expanded cell
+  let home=null, anim=null;
+  const still=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // The color the cell shows right now: its own background, or the first solid one behind it.
+  function shownBg(el){
+    for(let n=el;n&&n.nodeType===1;n=n.parentElement){
+      const c=getComputedStyle(n).backgroundColor;
+      if(c && c!=='transparent' && !/rgba\([^)]*,\s*0?\.?\d*\)|\/\s*0?\.\d+\)|\/\s*0\)/.test(c))return c;
+    }
+    return '';
+  }
+  // Zoom between the cell's place and the window: scale + translate, so nothing re-wraps mid-way.
+  function zoom(el,rect,out){
+    const end=el.getBoundingClientRect();
+    if(still()||!rect||!rect.width||!rect.height||!end.width||!end.height)return null;
+    el.style.transformOrigin='0 0';
+    const from={translate:(rect.left-end.left)+'px '+(rect.top-end.top)+'px',scale:(rect.width/end.width)+' '+(rect.height/end.height)};
+    const to={translate:'0px 0px',scale:'1 1'};
+    const timing={duration:out?520:680,easing:'cubic-bezier(.22,.8,.3,1)'};
+    backdrop.animate([{opacity:out?1:0},{opacity:out?0:1}],{...timing,fill:out?'forwards':'none'});
+    return el.animate(out?[to,from]:[from,to],timing);
+  }
+  // While History is zoomed out of its row, Blocks keeps the height it had instead of filling the gap.
+  function padOf(el){ return el.classList.contains('od-top') && el.parentElement ? el.parentElement.querySelector(':scope > .timer-slot') : null; }
+  // Section outlines are drawn for the cell's size: redraw them for the zoomed / normal size.
+  function repaintSecs(el){ requestAnimationFrame(() => { const ed = el.matches('.day-editor') ? el : el.querySelector('.day-editor'); if(ed && typeof paintDaySecs === 'function') try{ paintDaySecs(ed); }catch(e){} }); }
+  // History zoomed out of its row: a same-height spacer keeps Blocks where it was (2026-11-05, Julius).
+  let spacer=null, frozen=[];
+  function settle(el){if(spacer){spacer.remove();spacer=null;}frozen.forEach(([n,f])=>{if(f)n.style.setProperty('flex',f);else n.style.removeProperty('flex');});frozen=[];repaintSecs(el);const pad=padOf(el);if(pad)pad.style.removeProperty('flex');backdrop.getAnimations().forEach(a => a.cancel());el.classList.remove('fw-focus-target');el.style.removeProperty('--fw-focus-bg');el.style.removeProperty('transform-origin');if(!focused)document.body.classList.remove('fw-focus-on');}
+  function close(){
+    if(!focused)return;
+    const el=focused;focused=null;
+    if(window.histZoom)window.histZoom(false);
+    if(anim)anim.cancel();
+    const a=anim=zoom(el,home,true);
+    if(a)a.onfinish=()=>{settle(el);anim=null;};else settle(el);
+  }
+  function open(el){
+    if(!el)return;
+    if(anim)anim.finish();
+    close();if(anim)anim.finish();
+    home=el.getBoundingClientRect();
+    const pad=padOf(el);if(pad)pad.style.setProperty('flex','0 0 '+Math.round(pad.getBoundingClientRect().height)+'px');
+    // Any cell in a flex column / row leaves a same-size spacer, so its neighbours don't stretch into the gap (2026-11-06, Julius: Blocks too).
+    const pd=el.parentElement&&getComputedStyle(el.parentElement).display;
+    if(pad||/flex/.test(pd||'')){const row=/row/.test(getComputedStyle(el.parentElement).flexDirection)&&!pad;
+      // Freeze the neighbours at their size too (flex-grow under 1 would shrink them into the freed space).
+      [...el.parentElement.children].forEach(n=>{if(n===el||n===pad||/absolute|fixed/.test(getComputedStyle(n).position))return;const r=n.getBoundingClientRect();frozen.push([n,n.style.getPropertyValue('flex')]);n.style.setProperty('flex','0 0 '+Math.round(row?r.width:r.height)+'px','important');});spacer=document.createElement('div');spacer.className='fw-focus-spacer';spacer.style.cssText=row?'flex:0 0 '+Math.round(home.width)+'px;width:'+Math.round(home.width)+'px':'flex:0 0 '+Math.round(home.height)+'px;height:'+Math.round(home.height)+'px';el.before(spacer);}
+    const bg=shownBg(el);if(bg)el.style.setProperty('--fw-focus-bg',bg);
+    focused=el;el.classList.add('fw-focus-target');document.body.classList.add('fw-focus-on');
+    if((el.classList.contains('od-top')||el.id==='todayPane')&&window.histZoom)window.histZoom(true); // History zoom = List, all open (2026-11-07)
+    const a=anim=zoom(el,home,false);
+    if(a)a.onfinish=()=>{if(anim===a)anim=null;repaintSecs(el);};else repaintSecs(el);
+  }
+  function resolve(node){
+    if(!node || !node.closest)return null;
+    if(node.closest('#refSearch'))return document.getElementById('referenceScroll');
+    // Cal Events (2026-11-11, Julius): holding its title, the ▾ Events bar or the timeline opens the big 📅 calendar.
+    if(node.closest('.ce-head strong,#centerCalendarList .ce-fold,#centerCalendarList .ce-day'))return document.getElementById('centerDownScroll');
+    if(node.closest('.urg-head'))return document.getElementById('urgentPanel');
+    // History only (2026-11-04, Julius): zooming the whole pane also stretched Blocks under it.
+    if(node.closest('.today-jump'))return (document.body.classList.contains('one-day') && document.querySelector('#todayScroll .od-on > .od-top')) || document.getElementById('todayPane');
+    if(node.closest('#blocksScroll .od-pad-head'))return document.querySelector('#blocksScroll > .thought-pad');
+    // Top-middle tab icons (2026-11-06, Julius): hold one → that tab opens, zoomed (tabs stay usable inside).
+    const tab=node.closest('#journalPane button[data-ctab]');if(tab)return document.getElementById('journalPane');
+    // Reference tab icons too (📚 Reference, 📝 Scratch Pad): the tabs live inside #referenceScroll.
+    if(node.closest('#referencePane button[data-rtab]'))return document.getElementById('referenceScroll');
+    if(node.closest('[data-nsec="must"]'))return document.getElementById('journalScroll');
+    return null;
+  }
+  document.addEventListener('pointerdown',e=>{
+    if(e.button!==0 || focused)return;
+    const target=resolve(e.target);if(!target)return;
+    startX=e.clientX;startY=e.clientY;clearTimeout(timer);
+    const tab=e.target.closest&&e.target.closest('#journalPane button[data-ctab],#referencePane button[data-rtab]');
+    timer=setTimeout(()=>{timer=0;if(target.id==='centerDownScroll'&&window.fwCalendar){suppressUntil=Date.now()+650;window.fwCalendar.open();return;}if(tab&&!tab.classList.contains('on'))tab.click();if(target.id==='urgentPanel'&&window.urgEnsureOpen)window.urgEnsureOpen();suppressUntil=Date.now()+650;open(target);if(document.activeElement?.id==='refSearch')document.activeElement.blur();},550);
+  },true);
+  document.addEventListener('pointermove',e=>{if(timer&&(Math.abs(e.clientX-startX)>12||Math.abs(e.clientY-startY)>12)){clearTimeout(timer);timer=0;}},true);
+  ['pointerup','pointercancel'].forEach(name=>document.addEventListener(name,()=>{clearTimeout(timer);timer=0;},true));
+  document.addEventListener('click',e=>{if(Date.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation();}},true);
+  backdrop.addEventListener('click',close);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&focused){e.preventDefault();close();}});
+  window.addEventListener('popstate',close);
+})();
+</script>

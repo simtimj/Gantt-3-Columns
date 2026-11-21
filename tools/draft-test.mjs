@@ -1,6 +1,7 @@
 // Local storage and save-baseline regression checks; never contacts a real app.
 import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { readIndexHtml } from './index-html.mjs';
 const script=fs.readFileSync('Drafts.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
 let serial=0;
 function page(map=new Map(),faults={}){
@@ -37,7 +38,7 @@ p=page();p.api.put('ref','r',{content:'keep'},'Card');p.map.set([...p.map.keys()
 assert.equal(reopened.api.list().length,0);assert.ok(reopened.api.problem());assert.ok(notices<3);assert.ok(reopened.api.exportData().includes('broken JSON'),'corrupt copies must remain exportable');
 // Capture an undo while a changed request is in flight. The possible written text becomes
 // the recovery merge base, so a retry cannot mistake that undo for an untouched field.
-const html=fs.readFileSync('Index.html','utf8');
+const html=readIndexHtml();
 const helper=html.slice(html.indexOf('  let fwDraftStarted=false;'),html.indexOf('  function fwDraftInit(){'));
 p=page();const c=p.c,date='2026-11-08',base={tasks:{t:'original',h:'h0'},journal:{t:'',h:'j0'}},editor={html:'sent'};
 c.daySaveState=new Map([[date,{inFlight:true,sent:{tasks:'sent',journal:'',ct:true,cj:false}}]]);

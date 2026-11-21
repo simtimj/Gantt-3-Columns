@@ -650,12 +650,16 @@ function cellHash_(s) {
   return b.slice(0, 8).map(x => ((x + 256) % 256).toString(16).padStart(2, '0')).join('');
 }
 
+// The page's parts, pulled into Index.html with createHtmlOutputFromFile (keep in step with tools/index-html.mjs).
+const INDEX_PARTS_ = ['Index_Css', 'Index_Main', 'Index_Cards', 'Index_Extras', 'Index_Calendar', 'Index_Layout'];
+
 // Version of the app's page code, so an open tab can tell a newer version was pushed.
 function appBuild_(fresh) {
   const cache = CacheService.getScriptCache();
   let b = fresh ? null : cache.get('appBuild');
   if (b) return b;
-  try { b = cellHash_(HtmlService.createHtmlOutputFromFile('Index').getContent()); } catch (e) { b = ''; }
+  // Index.html split (2026-11-21, speed item G): the shell + its Index_* parts together make the page.
+  try { b = cellHash_(['Index'].concat(INDEX_PARTS_).map(n => HtmlService.createHtmlOutputFromFile(n).getContent()).join('\n')); } catch (e) { b = ''; }
   cache.put('appBuild', b, 120);
   return b;
 }

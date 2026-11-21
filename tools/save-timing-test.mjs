@@ -1,6 +1,7 @@
 // Timing collection adds no per-save RPC and acknowledges only the submitted batch.
 import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
-const html=fs.readFileSync('Index.html','utf8');
+import { readIndexHtml } from './index-html.mjs';
+const html=readIndexHtml();
 const source=html.slice(html.indexOf('  let fwSaveSamples='),html.indexOf('  function fwSpeedLog('));
 let now=0;const logs=[];
 const run={withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(fn){this.bad=fn;return this;},logSpeed(kind,timing,client){logs.push({kind,timing,client,ok:this.ok,bad:this.bad});}};

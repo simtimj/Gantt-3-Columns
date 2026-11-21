@@ -1,0 +1,2252 @@
+  <style>
+    :root{
+      --border:#d9d9d9;
+      --divider:#1f2937; /* big section lines (2026-10-31, Julius): high contrast, set in Options */
+      --muted:#777;
+      --bg:#f6f7f8;
+      --panel:#fff;
+      --accent:#1a73e8;
+      --done:#666;
+      --paragraph-size:14px;
+      --subtitle-size:18px;
+      --title-size:28px;
+      --paragraph-font:Arial,Helvetica,sans-serif;
+      --subtitle-font:Arial,Helvetica,sans-serif;
+      --title-font:Arial,Helvetica,sans-serif;
+      --col-today:420px;
+      --col-journal:420px;
+      --col-reference:399px;
+      --pad-x:1;
+      --pad-y:1;
+    }
+    *{
+      box-sizing:border-box;
+    }
+    html,
+    body{
+      margin:0;
+      height:100%;
+      overflow:hidden;
+      font-family:Arial,Helvetica,sans-serif;
+      color:#222;
+      background:var(--bg);
+    }
+    button,
+    input,
+    select{
+      font:inherit;
+    }
+    #app{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+    }
+    #toolbar{
+      min-height:36px;
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      gap:5px;
+      padding:2px 6px;
+      background:#fff;
+      border-bottom:1px solid var(--border);
+    }
+    #title{
+      font-weight:700;
+      margin-right:8px;
+      white-space:nowrap;
+    }
+    .btn{
+      border:1px solid #c9c9c9;
+      background:#fff;
+      border-radius:6px;
+      padding:4px 8px;
+      cursor:pointer;
+    }
+    .btn:hover{
+      background:#f0f0f0;
+    }
+    .btn:disabled{
+      opacity:.45;
+      cursor:default;
+    }
+    #dateLabel{
+      color:#666;
+      font-size:12px;
+    }
+    .status{
+      margin-left:auto;
+      color:var(--muted);
+      font-size:12px;
+    }
+    #workspace{
+      flex:1;
+      min-height:0;
+      display:grid;
+      /* Keep all three columns at usable widths. On narrow screens,
+         the whole workspace pans horizontally instead of compressing
+         or stacking the columns. */
+      grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--col-reference);
+      overflow-x:auto;
+      overflow-y:hidden;
+      width:100%;
+      min-width:0;
+      overscroll-behavior-x:contain;
+      scrollbar-width:none;
+      overflow-anchor:none;
+      touch-action:pan-x pan-y;
+      -webkit-overflow-scrolling:touch;
+    }
+    /* Single-pane focus views. Hidden panes are removed from the grid and
+       the selected pane fills the visible workspace width. */
+    #workspace.view-single{
+      grid-template-columns:minmax(0,1fr);
+      overflow-x:hidden;
+    }
+    #workspace .pane.view-hidden{
+      display:none!important;
+    }
+    /* 2-column view: the third column sits just off-screen (swipe to it). */
+    #workspace .pane.peek-pane{border-left:1px solid var(--border);}
+    #workspace .pane.peek-pane.peek-left{border-left:0;border-right:1px solid var(--border);}
+    #workspace.view-single .pane:not(.view-hidden){
+      width:100%;
+      min-width:0;
+      border-right:0;
+    }
+
+    .column-resizer{
+      width:1px;
+      min-width:1px;
+      position:relative;
+      cursor:col-resize;
+      background:var(--divider-on,var(--divider));
+      box-shadow:1px 0 0 var(--divider-on,var(--divider)); /* 2px look, grid track stays 1px */
+      touch-action:none;
+      z-index:20;
+    }
+    /* Keep a comfortable invisible grab target without creating a visible gap. */
+    .column-resizer::before{
+      content:"";
+      position:absolute;
+      top:0;
+      bottom:0;
+      left:-4px;
+      right:-4px;
+      cursor:col-resize;
+    }
+    /* Square grip in the middle of each column line, same as the half-split grips (2026-10-31, Julius). */
+    .column-resizer::after{content:"";position:absolute;top:50%;left:-1px;width:3px;height:22px;margin-top:-11px;border-radius:0;background:var(--divider-on,var(--divider));pointer-events:none;}
+    .column-resizer:hover,.column-resizer.dragging{background:#9dbcf0;}
+    #workspace.view-single .column-resizer{display:none;}
+    #focusControls{
+      display:none;position:fixed;top:3px;right:8px;z-index:2000;
+      align-items:center;gap:5px;
+    }
+    #focusControls .btn,#focusControls .top-select{
+      padding:4px 7px;font-size:11px;font-weight:700;box-shadow:0 1px 5px rgba(0,0,0,.10);
+    }
+    #focusStatus{
+      display:none;
+      margin-left:auto;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:400;
+      white-space:nowrap;
+    }
+    body.focus-mode #focusStatus{display:inline-flex;}
+    .view-menu{position:relative;}
+    .view-menu-popup{
+      position:absolute;
+      top:calc(100% + 4px);
+      left:0;
+      z-index:2100;
+      min-width:220px;
+      padding:5px;
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:6px;
+      box-shadow:0 4px 14px rgba(0,0,0,.16);
+    }
+    #focusControls .view-menu-popup{left:auto;right:0;}
+    .view-menu-row{display:flex;align-items:center;gap:8px;padding:4px 5px;}
+    .view-menu-row label{display:flex;align-items:center;gap:7px;flex:1;cursor:pointer;}
+    .view-menu-row input{margin:0;}
+    .view-menu-row .btn{padding:3px 7px;font-size:11px;}
+    .view-menu-popup[hidden]{display:none;}
+    /* Cleanup (2026-11-09): Fit / Reset sizes moved into the Cols menu, Light / dark into Options. */
+    :is(#toolbar,#focusControls) > :is([data-layout="fit"],[data-layout="reset-columns"],.theme-toggle){display:none!important;}
+    body.focus-mode #toolbar{display:none;}
+    body.focus-mode #focusControls{display:flex;}
+    #todayScroll{scrollbar-width:none!important;}
+    #todayScroll::-webkit-scrollbar{width:0!important;height:0!important;}
+    .pane{
+      min-width:0;
+      min-height:0;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      background:var(--panel);
+      border-right:1px solid var(--border);
+    }
+    .pane:last-child{
+      border-right:0;
+    }
+    .pane-header{
+      flex:0 0 34px;
+      display:flex;
+      align-items:center;
+      padding:0 12px;
+      font-size:14px;
+      font-weight:700;
+      background:#fafafa;
+      border-bottom:1px solid var(--border);
+    }
+    #todayPane .pane-header{gap:8px;}
+    .today-jump{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
+    .scroll{
+      flex:1 1 0;
+      height:0;
+      min-height:0;
+      overflow-y:auto;
+      overflow-x:hidden;
+      overflow-anchor:none;
+      scrollbar-width:none;
+    }
+    /* =========================================================
+       DAY ROWS
+       ========================================================= */
+    .day-row{
+      /* Day separator (Julius, 2026-10-29): thicker + darker so the line between days is easy to see. */
+      border-bottom:3px solid color-mix(in srgb, var(--day-sep,#8a8a8a) var(--line-k,100%), transparent);
+      padding:calc(5px * var(--pad-y,1)) calc(8px * var(--pad-x,1) * var(--side-k,1)) calc(6px * var(--pad-y,1));
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      overflow:visible;
+      min-height:0;
+    }
+    .day-row.dow-1{
+      --day-bg:#eeeeee;
+    }
+    .day-row.dow-2{
+      --day-bg:#fff0df;
+    }
+    .day-row.dow-3{
+      --day-bg:#e6f1fb;
+    }
+    .day-row.dow-4{
+      --day-bg:#ead8c2;
+    }
+    .day-row.dow-5{
+      --day-bg:#fff0bd;
+    }
+    .day-row.dow-6{
+      --day-bg:#d9b98c;
+    }
+    .day-row.dow-0{
+      --day-bg:#fff4a8;
+    }
+    /* Day color brightness slider (Julius, 2026-10-27): every day-colored thing
+       goes through --dc-w (mix with white) / --dc-k (mix with black). */
+    .day-row[class*="dow-"]{background:color-mix(in srgb, color-mix(in srgb, var(--day-bg), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+    /* Match off in light mode too (Julius, 2026-10-27): plain white cells. Dark mode has its own rule. */
+    body:not(.dm-daymatch) .day-row[class*="dow-"]{background:var(--panel,#fff);}
+    .day-row{
+      --note-line-adj:color-mix(in srgb, color-mix(in srgb, var(--note-line, var(--border)), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));
+      --today-border-adj:color-mix(in srgb, color-mix(in srgb, var(--today-border, transparent), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));
+    }
+    /*
+     * Current-day border.
+     *
+     * Both Today and Journal keep their visible outer borders.
+     * The shared middle edge is drawn ONLY by the Today cell,
+     * so the divider between the two cells is one line instead
+     * of two overlapping borders.
+     */
+    .day-row.today{
+      z-index:2;
+    }
+    .day-row.today.day-pane-row{
+      box-shadow:
+        inset 0 2px 0 var(--today-border-adj),
+        inset 0 -2px 0 var(--today-border-adj),
+        inset 2px 0 0 var(--today-border-adj),
+        inset -1px 0 0 var(--today-border-adj);
+    }
+    .day-row.today.journal-pane-row{
+      box-shadow:
+        inset 0 2px 0 var(--today-border-adj),
+        inset 0 -2px 0 var(--today-border-adj),
+        inset -2px 0 0 var(--today-border-adj),
+        inset 1px 0 0 var(--today-border-adj);
+    }
+    .day-row.today.dow-1{
+      --today-border:#8a8a8a;
+    }
+    .day-row.today.dow-2{
+      --today-border:#c98545;
+    }
+    .day-row.today.dow-3{
+      --today-border:#5f8fb9;
+    }
+    .day-row.today.dow-4{
+      --today-border:#9a6f42;
+    }
+    .day-row.today.dow-5{
+      --today-border:#b9962e;
+    }
+    .day-row.today.dow-6{
+      --today-border:#8b6237;
+    }
+    .day-row.today.dow-0{
+      --today-border:#c3a51f;
+    }
+    .day-label{
+      font-size:14px;
+      font-weight:700;
+      color:#555;
+      margin-bottom:3px;
+      user-select:none;
+    }
+    .day-date{text-decoration:underline;text-underline-offset:3px;}
+    /* Today marker (2026-11-08, Julius: "save room"): today's date text takes the day's color, no extra space. */
+    #todayScroll .day-row.today .day-date{color:var(--today-border-adj,var(--accent));}
+    .day-label .day-dash{margin-left:8px;font-size:.62em;font-weight:500;color:var(--muted);white-space:nowrap;letter-spacing:0;text-decoration:none;}
+    .day-label .day-dash:empty{display:none;}
+    /* Narrow: the count drops under the date instead of being cut off (2026-11-07). */
+    #todayScroll .day-label:has(> .day-dash:not(:empty)){display:flex;flex-wrap:wrap;align-items:baseline;white-space:normal!important;row-gap:0;column-gap:8px;}
+    #todayScroll .day-label > .day-dash{margin-left:0;}
+    #todayScroll .day-label .day-date{white-space:nowrap;}
+    .day-label .wd-icon{display:inline-block;height:.9em;vertical-align:-.1em;margin-left:9px;background:var(--note-line-adj,currentColor);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;pointer-events:none;user-select:none;-webkit-user-select:none;}
+    .day-date .dd-short{display:none;}
+    .pane-narrow .day-label{white-space:nowrap;}
+    .pane-narrow .day-date .dd-long{display:none;}
+    .pane-narrow .day-date .dd-short{display:inline;}
+    .today-pill{font-size:.75em;vertical-align:.1em;
+      color:var(--accent);
+      margin-left:6px;
+    }
+    .top-select{
+      border:1px solid #c9c9c9;
+      background:#fff;
+      border-radius:6px;
+      padding:4px 6px;
+      cursor:pointer;
+    }
+    /*
+     * Today and Journal always start at Paragraph size.
+     */
+    .day-editor,
+    .journal-editor{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+      line-height:1.18;
+    }
+    .editor,
+    .ref-cell{
+      width:100%;
+      min-height:16px;
+      outline:0;
+      border:0;
+      padding:0;
+      line-height:1.18;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      min-width:0;
+      background:transparent;
+    }
+    .ref-cell{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+    }
+    .editor.day-editor,
+    .editor.journal-editor{
+      min-height:5.9em;
+    }
+    .editor:empty:before,
+    .ref-cell:empty:before{
+      content:attr(data-placeholder);
+      color:#999;
+      pointer-events:none;
+    }
+    .editor p,
+    .ref-cell p{
+      margin:0 0 1px;
+    }
+    .editor p:last-child,
+    .ref-cell p:last-child{
+      margin-bottom:0;
+    }
+    .editor h1,
+    .editor h2,
+    .editor h3,
+    .ref-cell h1,
+    .ref-cell h2,
+    .ref-cell h3{
+      margin:2px 0 1px;
+    }
+    .editor h1,
+    .ref-cell h1{
+      font-family:var(--title-font);
+      font-size:var(--title-size);
+      line-height:1.12;
+    }
+    .editor h2,
+    .ref-cell h2{
+      font-family:var(--subtitle-font);
+      font-size:var(--subtitle-size);
+      line-height:1.14;
+    }
+    .editor h3,
+    .ref-cell h3{
+      font-family:var(--paragraph-font);
+      font-size:var(--paragraph-size);
+      line-height:1.18;
+    }
+    .editor ul,
+    .editor ol,
+    .ref-cell ul,
+    .ref-cell ol{
+      margin:1px 0 1px 20px;
+      padding:0;
+    }
+    .editor blockquote,
+    .ref-cell blockquote{
+      margin:1px 0;
+      padding-left:10px;
+      border-left:3px solid #bbb;
+      color:#222;
+    }
+    .editor code,
+    .ref-cell code{
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+      background:#eee;
+      padding:1px 4px;
+      border-radius:3px;
+    }
+    /* Claude's nightly plan / wrap-up box in Notes (2026-10-26) */
+    .editor table[data-cnote]{width:100%;border-collapse:separate;border-spacing:0;margin:6px 0;border:1px solid var(--border);border-radius:10px;background:var(--panel);}
+    /* No colored left edge (Julius, 2026-10-26). Carry-over tasks get a "→ Day" send button. */
+    .editor table[data-cnote] .check-line[data-send]::after{content:"→";flex:0 0 auto;margin-left:auto;padding:0 6px;font-size:12px;line-height:1.4;font-weight:700;border:1px solid var(--border);border-radius:6px;color:var(--muted);background:var(--bg,#fff);cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
+    .send-menu{position:fixed;z-index:9999;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--panel,#fff);box-shadow:0 6px 20px rgba(0,0,0,.18);font-size:13px;max-width:calc(100vw - 32px);}
+    .send-menu button{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;}
+    .send-menu input[type=date]{font-size:13px;padding:3px;}
+    .send-menu button small{display:block;font-size:10px;line-height:1.2;color:var(--muted);}
+    .send-menu .send-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%;}
+    .send-menu .send-row + .send-row{border-top:1px solid var(--border);padding-top:6px;}
+    .send-menu select{font-size:13px;padding:3px;max-width:200px;}
+    .send-menu .send-lbl{font-size:12px;color:var(--muted);}
+    .editor table[data-cnote] td{padding:8px calc(10px * var(--side-k,1));vertical-align:top;border:none;}
+    /* Divided cells (Julius, 2026-10-26): each section of a cells-mode block is its own row */
+    /* Dividers in the day's own deeper color (Julius, 2026-10-26: Wednesday blue → deeper blue), with more room */
+    /* Deeper than the today-border so they also stand out under the phone's dark mode (Monday gray was too faint) */
+    .day-row.dow-1{--note-line:#4d4d4d;} .day-row.dow-2{--note-line:#b06a2c;} .day-row.dow-3{--note-line:#3f74a6;}
+    .day-row.dow-4{--note-line:#7d5630;} .day-row.dow-5{--note-line:#9a7a12;} .day-row.dow-6{--note-line:#6e4a24;}
+    .day-row.dow-0{--note-line:#a3870a;}
+    .editor table[data-cnote]{border-color:color-mix(in srgb, var(--note-line-adj) var(--line-k,100%), transparent);}
+    .editor table[data-cnote] tr + tr > td{border-top:1.5px solid var(--note-line-adj);padding-top:10px;padding-bottom:10px;}
+    /* Uniform 1.5px lines (between the old 2px and 1px, Julius 2026-10-27); inside shows the day's own color (Julius, 2026-10-27) */
+    .editor table[data-cnote]{border-width:1.5px;background:transparent;} /* same as the day's color (Julius, 2026-10-27) */
+    /* Underlined names (Focus areas, Priority check entries) read bold, like the Suggested day */
+    .editor table[data-cnote] u{font-weight:700;}
+    /* Block titles (Julius, 2026-10-29: the full yellow / purple banners were too much): Suggested Day and
+       Day Wrap-Up get a quiet title — colored text + thin underline, no fill, no section bars.
+       Only the Schedule cell keeps the bold filled banner (he likes how obvious it is). */
+    .editor table[data-cnote] tr:first-child > td > div:first-child{display:block;margin:-2px 0 6px;padding:2px 0 3px;font-size:1.05em;}
+    .editor table[data-cnote] tr:first-child > td > div:first-child u{text-decoration:none;}
+    .editor table[data-cnote][data-ckind="plan"] tr:first-child > td > div:first-child{color:var(--cn-acc);border-bottom:2px solid var(--cn-acc);}
+    .editor table[data-cnote][data-ckind="wrap"] tr:first-child > td > div:first-child{color:var(--cn-acc);border-bottom:2px solid var(--cn-acc);}
+    .editor table[data-cnote] tr:first-child > td > div:first-child i{color:inherit;opacity:.75;}
+    .editor table[data-cnote][data-ckind="plan"]{--cn-acc:#a87c00;}
+    .editor table[data-cnote][data-ckind="wrap"]{--cn-acc:#8a3fd1;}
+    @media (prefers-color-scheme: dark){
+      .editor table[data-cnote][data-ckind="plan"]{--cn-acc:#f0c94a;}
+      .editor table[data-cnote][data-ckind="wrap"]{--cn-acc:#c29af0;}
+    }
+    /* Schedule cell (2026-10-29): time-block tasks moved out of Today's Morning block; blue banner. */
+    .editor table[data-cnote][data-ckind="sched"] tr:first-child > td > div:first-child{background:#3b82f6;color:#fff;padding:4px 8px;border-radius:7px;}
+    .editor table[data-cnote][data-ckind="sched"][data-ccells] tr + tr > td > div:first-child{border-left:4px solid var(--cn-acc);padding-left:7px;margin-left:-2px;}
+    .editor table[data-cnote][data-ckind="sched"]{--cn-acc:#3b82f6;}
+    .editor table[data-cnote][data-ckind="sched"] .check-line{padding:2px 0;}
+    .check-line{
+      display:flex;
+      align-items:flex-start;
+      gap:5px;
+      min-height:16px;
+    }
+    .check-line input{
+      margin-top:1px;
+      flex:0 0 auto;
+    }
+    .check-text{
+      flex:1;
+      min-width:0;
+      min-height:1.18em;
+      line-height:1.18;
+      display:block;
+    }
+    .check-line.done > .check-text,
+    .check-line > input[type="checkbox"]:checked + .check-text{
+      color:var(--done);
+      opacity:.82;
+    }
+    .check-line.task-struck > .check-text{text-decoration:line-through;}
+    body.urg-pressing,body.urg-pressing *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;}
+    /* Narrow columns (Julius, 2026-10-27): the checkbox floats at the top-left and the text's
+       second line onward runs underneath it, using the full width. Due date goes under the text. */
+    /* .pane-narrow is set by initNarrowPanes() when a pane is under 420px wide. */
+    .pane-narrow .check-line:not([data-tlon]){display:flow-root;min-height:calc(18px * var(--workspace-scale,1));}
+    .pane-narrow .check-line:not([data-tlon]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
+    /* Done text is faded (opacity → own layer), which painted it over the floated box and ate taps (Julius, 2026-10-28). Keep the box on top. */
+    .check-line > input[type=checkbox]{position:relative;z-index:1;}
+    .pane-narrow .check-line:not([data-tlon]) > .check-text{display:block;}
+    .pane-narrow .check-line:not([data-tlon])[data-due-label]::after{display:block;white-space:normal;text-align:right;margin:1px 0 0;}
+    /* Notes send lines when narrow: the → button floats top-right (as ::before so it comes first), text wraps under both. */
+    .pane-narrow .editor table[data-cnote] .check-line[data-send]::after{content:none;}
+    .pane-narrow .editor table[data-cnote] .check-line[data-send]::before{content:"→";float:right;margin:0 0 -10px 4px;padding:0 6px;font-size:12px;line-height:1.4;font-weight:700;border:1px solid var(--border);border-radius:6px;color:var(--muted);background:var(--bg,#fff);cursor:pointer;-webkit-user-select:none;user-select:none;}
+    .check-line > .check-text{align-self:flex-start;}
+    .editor pre.code-block,.ref-cell pre.code-block{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;
+      font-size:.95em!important;line-height:1.4!important;
+      white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2;
+      background:#f1f3f5;border:1px solid #d9dde2;border-radius:6px;
+      padding:8px 10px;margin:5px 0;color:#20252b;min-height:1.4em;
+    }
+    .ref-cell pre.code-block *,.editor pre.code-block *{font-family:inherit!important;font-size:inherit!important;line-height:inherit!important;}
+    .editor pre.code-block code,.ref-cell pre.code-block code{background:none;padding:0;}
+    /*
+     * Indentation only changes horizontal position.
+     * It NEVER changes text color.
+     */
+    .indent-1{margin-left:24px}
+    .indent-2{margin-left:48px}
+    .indent-3{margin-left:72px}
+    .indent-4{margin-left:96px}
+    .indent-5{margin-left:120px}
+    .indent-6{margin-left:144px}
+    /* =========================================================
+       REFERENCE
+       ========================================================= */
+    #referenceScroll{
+      padding:6px 5px 40px;
+    }
+    #refTopScroll{padding:6px 5px 10px;}
+    #refTopScroll:empty{display:none;}
+    #refTopScroll{flex:var(--rs-a,1) 1 0;}
+    #referenceScroll{flex:var(--rs-b,1) 1 0;min-height:30px;} /* never fully hidden: the bar + a strip stay reachable (Julius, 2026-10-31) */
+    #refTopScroll:empty + #refSplitBar{display:none;}
+    /* Drag bar between the halves: 2px line in --divider, taller invisible grab area, grip pill. */
+    #refSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
+    #refSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
+    #refSplitBar::after{content:"";position:absolute;left:50%;top:-.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
+    /* Notes split (2026-10-31, Julius): Plan on top, Review on the bottom, same bar as Reference. */
+    #journalScroll{flex:var(--ns-a,1) 1 0;}
+    #reviewScroll{flex:var(--ns-b,1) 1 0;padding:6px 10px 24px;font-size:13px;line-height:1.4;}
+    /* Review hidden for now (Julius, 2026-10-31): Notes is one cell again. Remove these two lines to bring it back. */
+    #reviewScroll{display:none!important;}
+    /* Center Up / Down (phase 2, 2026-11-01, Julius): Center Up = tabbed (Notes | Weather) above the
+       Notes split bar, Center Down = empty cell below it (can shrink to a 30px strip). Review stays hidden. */
+    #journalScroll,#weatherScroll{flex:var(--ns-a,1) 1 0;}
+    #centerDownScroll{flex:var(--ns-b,1) 1 0;min-height:30px;}
+    #journalPane:is([data-ctab="weather"],[data-ctab="wxdaily"]) :is(#journalScroll,#journalTemplateButton),
+    #journalPane:not([data-ctab="weather"],[data-ctab="wxdaily"]) #weatherScroll{display:none!important;}
+    /* Keep In Mind tab (2026-11-03, Julius): 📋 shows the cell without that section, ⭐ shows only it.
+       View only: the section stays in the same Notes cell and saves the same way. */
+    #journalPane[data-ctab="notes"] .journal-editor > :is([data-nsec="focus"],[data-nsec="focus"] ~ :not(table,table ~ *)){display:none!important;}
+    /* Keep In Mind = one shared list (2026-11-13, Julius): ⭐ shows #kimScroll, the same on every day. The old per-day
+       Keep In Mind section inside Notes cells stays hidden (kept in the Sheet, never shown or copied forward). */
+    #journalPane .journal-editor > :is([data-nsec="focus"],[data-nsec="focus"] ~ :not(table,table ~ *)){display:none!important;}
+    #kimScroll{display:none;flex:var(--ns-a,1) 1 0;padding:3px 3px 10px;position:relative;}
+    #journalPane[data-ctab="focus"] #kimScroll{display:block;}
+    /* 2026-11-13 (Julius: "huge margins, too much empty space"): tight cards, small side room. */
+    #kimScroll > .kim-editor{position:relative;z-index:1;padding:0 3px!important;}
+    .kim-editor .check-line[data-tc^="f"]{margin-top:1px!important;padding-top:1px!important;}
+    .kim-editor .check-line[data-tc$="l"]{margin-bottom:1px!important;padding-bottom:1px!important;}
+    .kim-editor .check-line[data-tc]{padding-top:1px;padding-bottom:1px;}
+    /* Group borders (2026-11-13, Julius: "the bigger group has the border on by default"): a header line and
+       everything under it down to the next empty line = one bordered group. Drawn render-only behind the
+       editor (.kg-box in #kimScroll, never saved). */
+    #kimScroll .kg-box{position:absolute;z-index:0;pointer-events:none;border:1px solid color-mix(in srgb,var(--text,#888) 28%,transparent);border-radius:7px;}
+    #journalPane[data-ctab="focus"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    #kimScroll > .kim-editor{min-height:100%;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;word-break:break-word;}
+    .kim-editor:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;font-style:italic;}
+    .center-tabs{display:inline-flex;gap:2px;margin-left:-6px;}
+    .center-tabs button:is([data-ctab="weather"],[data-ctab="wxdaily"]){opacity:.9;}
+    .center-tabs button{border:0;background:transparent;font-size:12px;line-height:1;width:20px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;opacity:.45;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .center-tabs button.wx-chip{width:auto;padding:0 4px;font-size:11px;white-space:nowrap;opacity:.85;}
+    .center-tabs button.on{opacity:1;background:color-mix(in srgb,var(--divider) 45%,transparent);}
+    /* Reference tabs + daily Scratch Pad (2026-11-03, Julius). */
+    #dayReviewScroll{display:none;flex:var(--ns-a,1) 1 0;padding:4px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    /* Urgent tab (2026-11-15, Julius: "a tab with the urgent stuff, I'll figure out the rest later"): the real Next
+       Steps panel moves in here while the tab is open (same ticks, hold menus, add line), showing only the red group. */
+    #urgTabScroll{display:none;}
+    #journalPane[data-ctab="urgent"] #urgTabScroll{display:block;padding:4px 2px;}
+    #journalPane[data-ctab="urgent"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    #urgTabScroll #urgentPanel > :not(.urg-group[data-urg="1"]){display:none!important;}
+    #urgTabScroll #urgentPanel{border:0;background:transparent;margin:0;}
+    #urgTabScroll #urgentPanel > .urg-group[data-urg="1"] > .urg-row.urg-adder{display:flex!important;}
+    #journalPane[data-ctab="review"] #dayReviewScroll{display:block;}
+    #journalPane[data-ctab="review"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    /* Done → Dailies matches (2026-11-05, Julius): render-only prompt above the Notes cell. */
+    #dailyMatch{flex:0 0 auto;padding:1px 6px;border-bottom:1px solid var(--divider);font-size:calc(var(--paragraph-size,14px) * .82);line-height:1.3;}
+    #journalPane:not([data-ctab="notes"]) #dailyMatch{display:none!important;}
+    .dm-row{display:flex;align-items:center;gap:6px;padding:0;}
+    .dm-row > span{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
+    .dm-row small{color:var(--muted,#888);}
+    /* 2026-11-07 (Julius): ✓ / ✕ stacked in a thin column so the match text gets the width. */
+    .dm-btns{flex:0 0 auto;display:flex;flex-direction:column;gap:1px;}
+    .dm-row button{font:inherit;font-size:.72em;line-height:1;width:1.9em;padding:1px 0;min-height:0;text-align:center;border:1px solid var(--divider,#777);border-radius:4px;background:transparent;color:inherit;cursor:pointer;}
+    .dm-row button.dm-yes{border-color:#22c55e;}
+    /* Fun for later tab (2026-11-05, Julius): 🌴 its own list, not part of the Notes cell. */
+    #funScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    #journalPane[data-ctab="fun"] #funScroll{display:block;}
+    /* Cleanup (2026-11-09): New things lives in the Fun tab too — a short box on top, Fun below. */
+    #journalPane[data-ctab="fun"] #newScroll{display:block;flex:0 1 auto;max-height:42%;border-bottom:2px solid var(--divider);}
+    #journalPane[data-ctab="fun"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    /* New things (2026-11-07, Julius): ✨ tab = dated log of the last times he did something new. */
+    #newScroll{display:none;flex:var(--ns-a,1) 1 0;padding:6px 8px 12px;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    #journalPane[data-ctab="new"] #newScroll{display:block;}
+    #journalPane[data-ctab="new"] :is(#journalScroll,#journalTemplateButton){display:none!important;}
+    .nw-add{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
+    .nw-add input{min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
+    .nw-add #newInput{flex:1 1 100%;order:-1;} /* text on its own line, type / date / + under it (narrow panes) */
+    .nw-add #newDate{flex:1 1 7.5em;min-width:0;font-size:.85em;padding:4px;}
+    /* Days-since line (2026-11-07, Julius: a small muted mention, not a cell; no red). */
+    .nw-timer{margin:0 0 6px;font-size:.8em;color:var(--muted,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .nw-timer b{font-weight:600;color:var(--text,inherit);}
+    .nw-add select{flex:1 1 6em;min-width:0;font:inherit;font-size:.85em;padding:4px 2px;border:1px solid var(--border,#ccc);border-radius:6px;background:var(--panel,transparent);color:inherit;}
+    .nw-chips{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px;}
+    .nw-chip{font:inherit;font-size:.78em;padding:0 6px;line-height:1.6;border:1px solid var(--divider,#777);border-radius:10px;background:transparent;color:var(--muted,#888);cursor:pointer;}
+    .nw-chip.on{color:inherit;border-color:currentColor;}
+    .nw-view{display:flex;gap:2px;margin:0 0 4px;font-size:.78em;}
+    .nw-view button{font:inherit;border:0;background:transparent;color:var(--muted,#888);padding:0 4px;cursor:pointer;}
+    .nw-view button.on{color:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;}
+    .nw-cat{display:flex;align-items:baseline;gap:6px;}
+    .nw-cat small{font-weight:400;color:var(--muted,#888);}
+    .nw-cat-x{margin-left:auto;border:0;background:transparent;color:var(--muted,#888);cursor:pointer;font:inherit;padding:0 3px;}
+    .nw-item .nw-ic{flex:none;border:0;background:transparent;padding:0;cursor:pointer;font:inherit;line-height:1.3;}
+    .nw-month{margin:8px 0 4px;font-weight:700;font-size:.85em;border-bottom:1px solid var(--divider);padding-bottom:2px;}
+    .nw-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid color-mix(in srgb,#e0b13b 50%,var(--border,#ccc));border-radius:7px;background:color-mix(in srgb,#e0b13b 7%,transparent);}
+    .nw-item .nw-t{flex:1;min-width:0;outline:none;word-break:break-word;}
+    .nw-item .nw-d{flex:0 0 auto;font-size:.8em;color:var(--muted,#888);white-space:nowrap;margin-top:2px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px;}
+    .nw-item .nw-x{border:0;background:transparent;color:var(--muted,#888);cursor:pointer;padding:0 2px;font-size:.9em;}
+    .fun-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);}
+    .fun-add{display:flex;gap:6px;margin:0 0 8px;}
+    .fun-add input{flex:1;min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--border,#ccc);border-radius:6px;background:transparent;color:inherit;}
+    .fun-item{display:flex;align-items:flex-start;gap:6px;padding:4px 6px;margin:0 0 4px;border:1px solid var(--border,#ccc);border-radius:7px;background:var(--panel,#fff);} /* 2026-11-21 Julius: no purple, plain white */
+    .fun-item input[type=checkbox]{margin-top:3px;flex:none;}
+    .fun-item .fun-t{flex:1;min-width:0;outline:none;word-break:break-word;}
+    .fun-item.done .fun-t{text-decoration:line-through;color:var(--muted,#888);}
+    .fun-item .fun-date{flex:0 0 auto;margin-left:auto;margin-top:2px;font-size:.8em;color:var(--muted,#888);white-space:nowrap;} /* date added, far right (2026-11-05) */
+    .fun-item .fun-x{border:0;background:transparent;color:var(--muted,#888);cursor:pointer;padding:0 2px;font-size:.9em;}
+    .fun-add select{flex:0 1 auto;max-width:38%;min-width:0;font:inherit;font-size:.9em;padding:4px 2px;border:1px solid var(--border,#ccc);border-radius:6px;background:var(--panel,transparent);color:inherit;}
+    .fun-head{display:flex;align-items:center;gap:6px;}
+    .fun-newcat{margin-left:auto;font:inherit;font-weight:400;font-size:.95em;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:1px 7px;cursor:pointer;}
+    .fun-cat{margin:8px 0 4px;}
+    .fun-cat-h{display:flex;align-items:center;gap:6px;margin:0 0 4px;font-weight:700;font-size:.9em;border-bottom:1px solid var(--divider);padding-bottom:2px;}
+    .fun-cat-h small{font-weight:400;color:var(--muted,#888);}
+    .fun-cat-n{outline:none;min-width:2em;text-decoration:underline;text-underline-offset:2px;}
+    .fun-cat-h button{border:0;background:transparent;color:var(--muted,#888);cursor:pointer;font:inherit;padding:0 3px;}
+    .fun-cat-h .fun-cat-add{margin-left:auto;font-size:1.1em;}
+    .fun-cat-none .fun-cat-h{color:var(--muted,#888);font-weight:600;}
+    .fun-menu{position:fixed;z-index:9999;display:flex;flex-direction:column;min-width:150px;padding:4px;background:var(--panel,#222);color:var(--text,#eee);border:1px solid var(--border,#555);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:14px;}
+    .fun-menu-h{font-size:.8em;color:var(--muted,#888);padding:2px 6px 4px;}
+    .fun-menu button{text-align:left;border:0;background:transparent;color:inherit;font:inherit;padding:6px 8px;border-radius:5px;cursor:pointer;}
+    .fun-menu button.on{background:color-mix(in srgb,var(--divider) 45%,transparent);}
+    .fun-item{-webkit-touch-callout:none;}
+    .fun-item input[type=checkbox]{-webkit-user-select:none;user-select:none;}
+    .fun-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 6px 22px rgba(0,0,0,.3);margin:0;}
+    .fun-item.fun-dragging{opacity:.35;}
+    .fun-item.fun-drop-b{box-shadow:0 -3px 0 0 var(--accent,#1a73e8);} .fun-item.fun-drop-a{box-shadow:0 3px 0 0 var(--accent,#1a73e8);}
+    .fun-cat-h.fun-drop-in{outline:2px solid var(--accent,#1a73e8);outline-offset:1px;border-radius:5px;}
+    .fun-done-head{margin:10px 0 4px;font-size:.85em;color:var(--muted,#777);cursor:pointer;user-select:none;}
+    .dr-head{margin:2px 0 6px;font-size:.85em;font-weight:700;color:var(--muted,#777);display:flex;align-items:center;gap:8px;}
+    .dr-lv{display:inline-flex;gap:3px;margin-left:auto;}
+    .dr-sum{margin:0 0 8px;padding:2px 7px;border:1px dashed var(--divider,#999);border-radius:8px;font-size:.88em;}
+    .dr-sum > summary{cursor:pointer;font-weight:600;color:var(--muted,#777);padding:2px 0;list-style:none;user-select:none;-webkit-user-select:none;}
+    .dr-sum > summary::-webkit-details-marker{display:none;}
+    .dr-sum > summary::before{content:"▸ ";} .dr-sum[open] > summary::before{content:"▾ ";}
+    .dr-sum-body p{margin:1px 0 4px;line-height:1.35;}
+    .dr-sum-title{margin:3px 0 4px;font-size:1.05em;font-weight:700;}
+    .dr-sum-h{margin-top:4px;font-weight:600;text-decoration:underline;text-underline-offset:2px;}
+    .dr-lv button{font:inherit;font-size:.95em;line-height:1;min-width:22px;height:20px;padding:0 5px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+    .dr-lv button:disabled{opacity:.35;cursor:default;}
+    /* Category and group cells, underlined category header (2026-11-04, Julius). */
+    .dr-cat{--dr-c:#8a8f98;margin:0 0 8px;padding:3px 7px 5px;border:1px solid color-mix(in srgb,var(--dr-c) 55%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--dr-c) 7%,transparent);}
+    .dr-cat[open] > summary{margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid color-mix(in srgb,var(--dr-c) 70%,var(--border));}
+    .dr-cat summary,.dr-group summary{display:flex;align-items:center;gap:6px;cursor:pointer;padding:2px 0;list-style:none;user-select:none;-webkit-user-select:none;}
+    .dr-cat summary::-webkit-details-marker,.dr-group summary::-webkit-details-marker{display:none;}
+    .dr-cat > summary{font-weight:700;}
+    .dr-cat > summary i{flex:0 0 auto;width:10px;height:10px;border-radius:3px;}
+    .dr-cat summary b,.dr-group summary b{margin-left:auto;font-variant-numeric:tabular-nums;}
+    .dr-group{margin:4px 0 0;padding:1px 6px;border:1px solid var(--border);border-radius:6px;}
+    .dr-type{margin:4px 0 1px;font-size:.85em;font-weight:600;opacity:.8;} /* History log types (2026-11-04) */
+    /* 2026-11-07 (Julius): group header = one title line (underlined name + count), New / Fixes / Tweaks on the line under it. */
+    .dr-group > summary{flex-wrap:wrap;row-gap:1px;}
+    .dr-gname{flex:1 1 0;min-width:0;font-weight:600;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere;}
+    .dr-tcount{flex:0 0 100%;margin-left:0;font-weight:400;font-size:.85em;opacity:.75;}
+    /* Day Review lines as small cells (2026-11-04, Julius): bold main point, muted details, two lines max; tap to show all. */
+    /* 2026-11-07 (Julius): one column: the title is an underlined header, the details sit under it (2 lines, tap for all). */
+    .dr-line{display:block;margin:3px 0;padding:2px 6px;border:1px solid var(--border);border-radius:5px;font-size:.9em;line-height:1.25;overflow-wrap:anywhere;cursor:pointer;}
+    .dr-line > b{display:block;font-weight:700;text-decoration:underline;text-underline-offset:2px;}
+    .dr-line > span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--muted,#888);}
+    .dr-line.dr-full > span{display:block;}
+    .ref-tabs{margin-left:0;flex:0 0 auto;align-self:center;}
+    /* Reference toolbar scrolls sideways on narrow columns; search keeps a readable width. */
+    .ref-toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+    .ref-toolbar::-webkit-scrollbar{display:none;}
+    .ref-toolbar > *{flex-shrink:0;}
+    .ref-toolbar .ref-search{flex:1 0 7.5em;width:auto;min-width:7.5em;}
+    #scratchPad{display:none;min-height:40vh;padding:4px;outline:none;overflow-wrap:anywhere;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    #scratchPad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
+    #referencePane[data-rtab="scratch"] #scratchPad{display:block;}
+    #referencePane .ref-tabs .sp-add{display:none;width:auto;font-size:12px;padding:0 7px;}
+    #referencePane[data-rtab="scratch"] .ref-tabs .sp-add{display:inline-block;}
+    #referencePane[data-rtab="scratch"] #referenceTree,
+    #referencePane[data-rtab="scratch"] #refOptions,
+    #referencePane[data-rtab="scratch"] .ref-search,
+    #referencePane[data-rtab="scratch"] .ref-toolbar .btn{display:none!important;}
+    .center-placeholder{padding:10px 12px;color:var(--muted,#888);font-size:13px;line-height:1.4;}
+    #notesSplitBar{flex:0 0 2px;position:relative;background:var(--divider);cursor:row-resize;touch-action:none;z-index:5;}
+    #notesSplitBar::before{content:"";position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
+    #notesSplitBar::after{content:"";position:absolute;left:50%;top:-.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
+    .rv-head{font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:0 0 4px;user-select:none;-webkit-user-select:none;}
+    .rv-sec{margin:8px 0 2px;font-weight:700;font-size:12px;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
+    .rv-count{font-weight:700;}
+    .rv-line{padding:1px 0 1px 10px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .rv-line[data-urg="1"]{color:#c0392b;}
+    .rv-line[data-urg="2"]{color:#b8860b;}
+    .rv-line[data-urg="3"]{color:#2f6fb5;}
+    .rv-done{opacity:.7;}
+    .rv-empty{padding-left:10px;opacity:.6;font-style:italic;}
+    .rv-more{padding-left:10px;opacity:.6;}
+    /* Phone (2026-10-26, Julius): Delete sits at the right end of the title
+       line instead of on its own row below, so tapping a cell doesn't make
+       it taller. The title makes room for it while the cell is active. */
+    @media(max-width:900px){
+      #referenceTree .ref-actions{
+        position:absolute;right:4px;margin:0;
+        top:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1) - 3px);
+      }
+      #referenceTree .ref-actions .btn{
+        min-height:0;height:calc(var(--ref-line) + 6px);
+        padding:0 10px;display:inline-flex;align-items:center;
+      }
+      #referenceTree .ref-cell-wrapper:has(> .ref-cell:focus){padding-right:calc(72px * var(--mobile-scale,1))!important;}
+    }
+    #archiveOverlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;padding:8vh 12px;}
+    .archive-box{background:#fff;border:1px solid var(--border);border-radius:10px;width:min(520px,100%);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.2);}
+    .archive-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);}
+    .archive-sub{color:var(--muted);font-size:12px;margin-right:auto;}
+    .archive-list{overflow:auto;padding:4px 12px 10px;}
+    .archive-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+    .archive-text{flex:1;min-width:0;}
+    .archive-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+    .archive-meta,.archive-empty{color:var(--muted);font-size:12px;}
+    .ref-toolbar{
+      display:flex;
+      gap:6px;
+      margin-bottom:5px;
+      position:sticky;
+      top:0;
+      background:#fff;
+      padding-bottom:8px;
+      z-index:10;
+    }
+    .ref-search{
+      flex:1;
+      min-width:0;
+      border:1px solid #ccc;
+      border-radius:6px;
+      padding:7px 8px;
+    }
+    #referenceTree{
+      display:flex;
+      flex-direction:column;
+    }
+    .ref-cell-wrapper{
+      position:relative;
+      border-bottom:1px solid #eee;
+      padding:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1)) 4px calc(10px * var(--pad-y,1) * var(--ref-pad-y,1));
+      min-height:38px;
+    }
+    .ref-cell-wrapper:hover{
+      background:#fafafa;
+    }
+    .ref-cell-wrapper:focus-within{
+      box-shadow:inset 2px 0 0 var(--accent);
+    }
+    /* Pin (2026-11-04, Julius): faint until pinned; pinned cards get a soft accent tint. */
+    .ref-pin{position:absolute;right:2px;top:calc(6px * var(--pad-y,1) * var(--ref-pad-y,1));border:0;background:transparent;padding:2px 3px;font-size:12px;line-height:1;cursor:pointer;z-index:4;opacity:.22;filter:grayscale(1);}
+    .ref-pinned > .ref-pin{opacity:1;filter:none;}
+    .ref-b3{position:absolute;right:20px;top:calc(5px * var(--pad-y,1) * var(--ref-pad-y,1));border:0;background:transparent;padding:2px 3px;font-size:12px;line-height:1;cursor:pointer;z-index:4;opacity:.22;color:#d99a00;}
+    .ref-b3.on{opacity:1;}
+    .ref-cell-wrapper:hover:not(:has(.ref-children .ref-cell-wrapper:hover)) > .ref-b3,.ref-cell-wrapper:has(> .ref-cell:focus) > .ref-b3{right:90px;}
+    .ref-cell-wrapper:hover:not(:has(.ref-children .ref-cell-wrapper:hover)) > .ref-pin,.ref-cell-wrapper:has(> .ref-cell:focus) > .ref-pin{right:72px;} /* clear of Delete */
+    #referenceTree .ref-cell-wrapper.ref-pinned{background:color-mix(in srgb,var(--accent,#1a73e8) 7%,transparent);}
+    .ref-cell-wrapper > .ref-cell > :first-child{padding-right:20px;}
+    .ref-drag{position:absolute;left:18px;top:8px;width:18px;height:27px;border:0;background:transparent;color:#777;cursor:grab;touch-action:none;z-index:4;font-size:18px;}
+    .ref-drag:active{cursor:grabbing;}
+    .ref-drop-before{box-shadow:inset 0 3px #1a73e8!important;}
+    .ref-drop-after{box-shadow:inset 0 -3px #1a73e8!important;}
+    .ref-dragging{opacity:.5;}
+    #referenceEdgeResize{width:9px;position:absolute;right:0;top:0;bottom:0;cursor:col-resize;touch-action:none;z-index:35;background:transparent;}
+    #referenceEdgeResize:hover,#referenceEdgeResize.dragging{background:#1a73e833;}
+    body.mobile-mode #referenceEdgeResize,body.mobile-split #referenceEdgeResize{display:none;}
+    #workspace{position:relative;}
+    /* Single-column swipe (2026-10-27): next column slides in; hold mid-way for a split prompt. */
+    #workspace .pane.swipe-next{position:absolute;top:0;bottom:0;z-index:5;}
+    #workspace .pane.swipe-cur,#workspace .pane.swipe-next{will-change:transform;}
+    #workspace.swipe-anim .pane.swipe-cur,#workspace.swipe-anim .pane.swipe-next,#workspace.swipe-anim #swipeSeam{transition:transform .18s ease-out;}
+    #swipeSeam{position:absolute;top:0;bottom:0;left:0;width:3px;margin-left:-1px;z-index:6;background:var(--border);pointer-events:none;}
+    #swipeSeam.mid{background:#1a73e8;}
+    #swipeSplitMenu{position:fixed;z-index:3000;min-width:210px;padding:6px;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:4px;font-size:14px;}
+    #swipeSplitMenu .ssm-h{font-size:11px;opacity:.7;padding:0 4px 2px;}
+    #swipeSplitMenu button{text-align:left;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+    .editor hr,.ref-cell hr{border:0;border-top:1px solid #aaa;margin:7px 0;}
+    .ref-disclosure{
+      position:absolute;
+      left:2px;
+      top:9px;
+      width:20px;
+      height:24px;
+      padding:0;
+      border:0;
+      background:transparent;
+      cursor:pointer;
+      font-size:14px;
+      line-height:24px;
+      color:#666;
+      z-index:2;
+    }
+    .ref-actions{
+      display:none;
+      position:absolute;
+      right:4px;
+      top:4px;
+      gap:3px;
+    }
+    /* Own Delete only (nested cells, 2026-10-26): a parent's button stays
+       hidden while you're in one of its children. */
+    .ref-cell-wrapper:hover:not(:has(.ref-children .ref-cell-wrapper:hover)) > .ref-actions,
+    .ref-cell-wrapper:has(> .ref-cell:focus) > .ref-actions{
+      display:flex;
+    }
+    .tiny{
+      font-size:11px;
+      padding:3px 6px;
+    }
+    .format-hint{
+      color:#888;
+      font-size:11px;
+      padding:3px 2px 10px;
+    }
+    .hidden{
+      display:none!important;
+    }
+    .empty{
+      padding:14px;
+      color:#777;
+      font-size:13px;
+    }
+    .type-settings{
+      position:fixed;
+      top:48px;
+      left:8px;
+      z-index:1000;
+      width:330px;
+      max-width:calc(100vw - 16px);
+      max-height:calc(100vh - 64px);
+      max-height:calc(100dvh - 64px);
+      overflow:auto;
+      padding:8px;
+      background:#fff;
+      border:1px solid #cfcfcf;
+      border-radius:7px;
+      box-shadow:0 4px 18px rgba(0,0,0,.16);
+      font-size:11px;
+    }
+    .type-settings label{
+      display:grid;
+      grid-template-columns:62px 1fr 48px 18px;
+      align-items:center;
+      gap:5px;
+      margin:4px 0;
+    }
+    .font-size-input{
+      width:48px;
+      padding:4px;
+      border:1px solid #c9c9c9;
+      border-radius:5px;
+    }
+    /* =========================================================
+       MOBILE / NARROW SCREENS
+       ========================================================= */
+    @media(max-width:900px){
+      /* Keep the desktop three-column geometry on small screens.
+         #workspace itself becomes the horizontal viewport. */
+      #workspace{
+        grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--col-reference);
+      }
+      #workspace.view-single{
+        grid-template-columns:minmax(0,1fr);
+      }
+      .scroll{
+        overflow-y:auto;
+        overflow-x:hidden;
+      }
+    }
+    .day-row.today.day-pane-row{box-shadow:inset 0 1px 0 var(--today-border-adj),inset 0 -1px 0 var(--today-border-adj),inset 1px 0 0 var(--today-border-adj),inset -1px 0 0 var(--today-border-adj);}
+    .day-row.today.journal-pane-row{box-shadow:inset 0 1px 0 var(--today-border-adj),inset 0 -1px 0 var(--today-border-adj),inset -1px 0 0 var(--today-border-adj);}
+    #todayPane,#journalPane{border-right:0;}
+    .day-row.today .day-label{color:var(--note-line-adj);}
+    .day-row.today .today-pill{color:var(--today-border-adj);font-weight:700;}
+    .editor.day-editor,.editor.journal-editor{min-height:5.9em;flex-shrink:0;flex-grow:1;}
+    .pane,.scroll{overscroll-behavior:contain;}
+    @media(max-width:900px){
+      html,body{height:100%;height:100dvh;}
+      #app{height:100%;}
+      #toolbar{flex-wrap:wrap;gap:calc(6px * var(--mobile-scale,1));padding:calc(6px * var(--mobile-scale,1)) calc(8px * var(--mobile-scale,1));font-size:calc(14px * var(--mobile-scale,1));}
+      #title{font-size:calc(14px * var(--mobile-scale,1));}
+      #toolbar .btn,#toolbar .top-select{min-height:calc(30px * var(--mobile-scale,1));}
+      #dateLabel{display:none;}
+      .status{font-size:calc(12px * var(--mobile-scale,1));}
+      .pane-header{flex:0 0 calc(42px * var(--mobile-scale,1));padding:0 calc(12px * var(--mobile-scale,1));font-size:calc(15px * var(--mobile-scale,1));}
+      .day-row{padding:calc(8px * var(--mobile-scale,1) * var(--pad-y,1)) calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1)) calc(10px * var(--mobile-scale,1) * var(--pad-y,1));}
+      .day-label{font-size:calc(15px * var(--mobile-scale,1));line-height:1.35;margin-bottom:calc(6px * var(--mobile-scale,1));}
+      .editor.day-editor,.editor.journal-editor{min-height:6.75em;}
+      .check-line{gap:calc(8px * var(--mobile-scale,1));min-height:calc(28px * var(--mobile-scale,1));}
+      .check-line input[type=checkbox]{width:calc(22px * var(--mobile-scale,1));height:calc(22px * var(--mobile-scale,1));margin-top:calc(1px * var(--mobile-scale,1));}
+      .check-text{line-height:1.35;}
+      #workspace{scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
+      #workspace .pane{scroll-snap-align:start;}
+      /* Column lines drag on phones too (Julius, 2026-10-31); wider invisible grab area for fingers. */
+      .column-resizer::before{left:-13px;right:-13px;}
+      #focusControls{position:static;flex:0 0 auto;padding:calc(6px * var(--mobile-scale,1)) calc(8px * var(--mobile-scale,1));flex-wrap:wrap;background:#fff;}
+      #focusControls .btn{min-height:calc(30px * var(--mobile-scale,1));font-size:calc(13px * var(--mobile-scale,1));}
+      #focusStatus{margin-right:auto;}
+      .view-menu-popup{position:fixed;top:calc(54px * var(--mobile-scale,1));left:calc(8px * var(--mobile-scale,1))!important;right:calc(8px * var(--mobile-scale,1))!important;width:auto;z-index:2500;}
+      .view-menu-row .btn{min-height:calc(32px * var(--mobile-scale,1));font-size:calc(14px * var(--mobile-scale,1));}
+      .type-settings{position:fixed;top:calc(54px * var(--mobile-scale,1));left:calc(8px * var(--mobile-scale,1));right:calc(8px * var(--mobile-scale,1));width:auto;z-index:2600;}
+      .type-settings label{grid-template-columns:calc(70px * var(--mobile-scale,1)) 1fr calc(54px * var(--mobile-scale,1)) calc(18px * var(--mobile-scale,1));font-size:calc(13px * var(--mobile-scale,1));}
+      .type-settings input,.type-settings select{min-height:calc(40px * var(--mobile-scale,1));font-size:calc(16px * var(--mobile-scale,1));}
+      .ref-search{font-size:calc(16px * var(--mobile-scale,1));min-height:calc(44px * var(--mobile-scale,1));}
+      .ref-toolbar .btn{min-height:calc(44px * var(--mobile-scale,1));}
+      .ref-actions{position:static;justify-content:flex-end;margin-top:calc(5px * var(--mobile-scale,1));}
+      .ref-actions .btn{min-height:calc(36px * var(--mobile-scale,1));}
+      .format-hint{font-size:calc(12px * var(--mobile-scale,1));line-height:1.4;}
+    }
+    .reference-sort-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;}
+    /* 2026-10-26: dropdown only as wide/tall as its text. */
+    .reference-sort-bar #referenceSort{flex:0 0 auto;width:auto;max-width:100%;min-width:0;min-height:0!important;height:auto;padding:2px 6px!important;font-size:inherit!important;line-height:1.3;}
+    #mobileScale{width:100%;min-width:0;}
+    @media(max-width:900px){
+      .reference-sort-bar{font-size:calc(14px * var(--mobile-scale,1));}
+      #mobileScaleValue{font-size:13px;}
+    }
+
+    /* Mobile layout is an app state, not browser fullscreen. */
+    body.mobile-mode #workspace{scroll-snap-type:none!important;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;}
+    body.mobile-mode #workspace .pane{scroll-snap-align:start;}
+    body.mobile-mode .column-resizer{display:none!important;}
+    /* Phone: column lines are the pane edges; draw them in the divider color, 2px, without changing widths (2026-10-31). */
+    body.mobile-mode #workspace #todayPane,body.mobile-mode #workspace #journalPane{border-right:0;box-shadow:inset -2px 0 0 var(--divider);}
+    /* Split works in regular and Mobile mode (body class name kept from before). */
+    body:not(.mobile-split) #mobileSplitResizer{display:none!important;}
+    #mobileSplitResizer{display:none;background:var(--divider-on,var(--divider));height:2px;cursor:row-resize;touch-action:none;position:relative;z-index:40;}
+    #mobileSplitResizer::before{content:"";position:absolute;left:0;right:0;top:-9px;bottom:-9px;}
+    #mobileSplitResizerThird[data-dir="row"]::before{content:"";position:absolute;left:0;right:0;top:-9px;bottom:-9px;}
+    /* Square grips on the split column lines, same as the half-split bars (2026-10-31, Julius). */
+    #mobileSplitResizerThird{background:var(--divider-on,var(--divider));touch-action:none;position:relative;z-index:40;}
+    #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{content:"";position:absolute;top:0;bottom:0;left:-10px;right:-10px;}
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{content:"";position:absolute;background:var(--divider-on,var(--divider));pointer-events:none;}
+    #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{top:50%;left:50%;width:3px;height:22px;margin:-11px 0 0 -1.5px;filter:brightness(.6);}
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{left:50%;top:50%;width:22px;height:3px;margin:-1.5px 0 0 -11px;filter:brightness(.6);}
+    body.mobile-split #mobileSplitResizer{display:block;}
+    body.mobile-split #workspace{overflow:hidden;scroll-snap-type:none;}
+    /* Non-split mode must always permit horizontal overflow on both desktop and mobile. */
+    body:not(.mobile-split) #workspace:not(.view-single){overflow-x:auto!important;overflow-y:hidden;}
+    body:not(.mobile-split) #workspace .pane{min-width:0;}
+    body.mobile-split #workspace .pane{min-height:0;}
+    body.mobile-split #workspace .pane.view-hidden{display:none!important;}
+    body.mobile-split #mobileSplitResizer{touch-action:none;}
+    body.mobile-mode #toolbar{font-size:calc(14px * var(--mobile-scale,1));}
+    body.mobile-mode .pane-header{font-size:calc(15px * var(--mobile-scale,1));flex-basis:calc(42px * var(--mobile-scale,1));}
+    body.mobile-mode .day-label{font-size:calc(15px * var(--mobile-scale,1));}
+    body.mobile-mode .check-line input[type=checkbox]{width:calc(22px * var(--mobile-scale,1));height:calc(22px * var(--mobile-scale,1));}
+    body.mobile-mode .day-row{padding:calc(8px * var(--mobile-scale,1) * var(--pad-y,1)) calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1));}
+    body.mobile-mode .btn{font-size:inherit;}
+
+    /* Unified editor sizes. Reference's first line (the title) differs by weight only. */
+    .editor h1,.editor h2,.editor h3,.ref-cell h1,.ref-cell h2,.ref-cell h3{font-size:var(--paragraph-size)!important;line-height:1.25!important;}
+    .ref-cell > :first-child{font-weight:700;}
+    body.mobile-mode .day-label{font-size:calc(14px * var(--mobile-scale,1))!important;line-height:1.25!important;}
+    body.mobile-mode .check-line{min-height:calc(18px * var(--mobile-scale,1));gap:calc(6px * var(--mobile-scale,1));}
+    body.mobile-mode .check-text{line-height:1.3!important;}
+    body.mobile-mode .ref-cell > :first-child{font-weight:700;}
+
+    body.mobile-split #workspace{display:grid!important;min-width:0!important;max-width:100%;overflow:hidden!important;scroll-snap-type:none!important;}
+    body.mobile-split #workspace .pane{box-sizing:border-box;min-width:0!important;width:100%!important;max-width:100%;height:100%;min-height:0;}
+    body.mobile-split #mobileSplitResizer{min-width:2px;min-height:2px;align-self:stretch;justify-self:stretch;}
+    /* Desktop horizontal scroll is available when fixed-size panes exceed viewport. */
+    body:not(.mobile-split) #workspace:not(.view-single){overflow-x:auto!important;min-width:0;}
+    body:not(.mobile-split) #workspace:not(.view-single) .pane{min-width:0;}
+
+    body.mobile-mode #workspace{scroll-snap-type:none!important;}
+    body.mobile-mode #workspace .pane{scroll-snap-align:none!important;}
+    [data-split-mirror] .scroll{overflow-y:auto;}
+    /* No scrollbar chrome in narrow or wide windows. Keep actual overflow
+       scrollable, so horizontal trackpad swipes and touch gestures still work. */
+    *,*::before,*::after{
+      scrollbar-width:none!important;
+      -ms-overflow-style:none!important;
+    }
+    #workspace,.scroll,html,body{
+      scrollbar-width:none!important;
+      scrollbar-gutter:auto!important;
+    }
+    *::-webkit-scrollbar,
+    *::-webkit-scrollbar-track,
+    *::-webkit-scrollbar-thumb,
+    *::-webkit-scrollbar-corner{
+      width:0!important;
+      height:0!important;
+      display:none!important;
+      background:transparent!important;
+      border:0!important;
+    }
+    /* Final viewport isolation: prevent the PAGE from becoming the horizontal
+       scroller when the desktop browser window is narrowed. Only #workspace
+       is allowed to retain horizontal overflow and accept trackpad gestures. */
+    html, body {
+      width:100%!important;
+      max-width:100%!important;
+      overflow-x:clip!important;
+      overflow-y:hidden!important;
+      overscroll-behavior-x:none;
+    }
+    #app {
+      position:fixed;
+      inset:0;
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      height:100%;
+      height:100dvh;
+      overflow:clip;
+    }
+    #workspace {
+      max-width:100%;
+      scrollbar-width:none!important;
+      -ms-overflow-style:none!important;
+    }
+    #workspace::-webkit-scrollbar,
+    #workspace::-webkit-scrollbar:horizontal,
+    #workspace::-webkit-scrollbar:vertical {
+      display:none!important;
+      width:0!important;
+      height:0!important;
+      background:transparent!important;
+    }
+
+    /* 2026-10-14: shared scale and typography, regardless of editing device. */
+    :root{--workspace-scale:1;}
+    #toolbar{min-height:calc(42px * var(--workspace-scale));gap:calc(7px * var(--workspace-scale));padding:calc(4px * var(--workspace-scale)) calc(8px * var(--workspace-scale));}
+    .btn,.top-select{min-height:calc(28px * var(--workspace-scale));padding:calc(4px * var(--workspace-scale)) calc(8px * var(--workspace-scale));font-size:calc(13px * var(--workspace-scale));}
+    #focusControls .btn{min-height:calc(34px * var(--workspace-scale));font-size:calc(13px * var(--workspace-scale));}
+    .pane-header{font-size:calc(14px * var(--workspace-scale));}
+    .day-label,body.mobile-mode .day-label{font-size:calc(17px * var(--workspace-scale))!important;line-height:1.3!important;}
+    .today-pill{font-size:inherit;}
+    .editor,.ref-cell,
+    .editor :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
+    .ref-cell :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
+    .check-text,.check-text *,
+    body.mobile-mode .editor,body.mobile-mode .ref-cell,
+    body.mobile-mode .editor :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
+    body.mobile-mode .ref-cell :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
+    body.mobile-mode .check-text,body.mobile-mode .check-text *{
+      font-family:var(--paragraph-font)!important;
+      font-size:calc(var(--paragraph-size) * var(--workspace-scale))!important;
+      line-height:1.3!important;
+    }
+    .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale));height:calc(17px * var(--workspace-scale));}
+    body.mobile-mode .check-line input[type=checkbox]{width:calc(17px * var(--workspace-scale))!important;height:calc(17px * var(--workspace-scale))!important;min-width:calc(17px * var(--workspace-scale))!important;}
+    /* 2026-10-26: Reference follows the left/right padding slider like Today. */
+    #referenceScroll,#refTopScroll{padding-left:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1) * var(--side-k,1));padding-right:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--ref-pad-x,1) * var(--side-k,1));}
+    .type-settings{z-index:3100;}
+
+    /* 2026-10-15 */
+    /* Notes header: Template button sits at the far right of the header. */
+    #journalTemplateButton{margin-left:auto;min-height:calc(26px * var(--workspace-scale));padding:2px calc(9px * var(--workspace-scale));font-size:calc(12px * var(--workspace-scale));}
+    /* The save-status text must never change the toolbar's height (that shifted the
+       whole workspace, and its scroll position, every time "Saving…" changed). */
+    #status.status{flex:1 1 64px;min-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+
+    /* Scale / Fonts panel: fixed-size controls that do not scale with the Scale
+       slider itself, always fits on screen and scrolls if it must. */
+    #typeSettings{left:8px;right:auto;width:min(360px,calc(100vw - 16px));max-width:calc(100vw - 16px);overflow-x:hidden;overflow-y:auto;padding:10px 12px;font-size:13px;z-index:3100;}
+    #typeSettings .ts-head{display:flex;align-items:center;justify-content:space-between;font-size:14px;}
+    #typeSettings .ts-row{display:grid;grid-template-columns:minmax(0,1fr) 46px auto;gap:4px 8px;align-items:center;margin:10px 0;}
+    #typeSettings .ts-row.ts-font{grid-template-columns:minmax(0,1fr) 64px auto;}
+    #typeSettings .ts-label{grid-column:1 / -1;font-weight:700;font-size:13px;}
+    #typeSettings input[type=range]{width:100%;min-width:0;min-height:28px;margin:0;}
+    #typeSettings output{text-align:right;font-variant-numeric:tabular-nums;font-size:13px;}
+    #typeSettings .btn,#typeSettings .top-select,#typeSettings .font-size-input{min-height:34px;padding:4px 10px;font-size:13px;}
+    #typeSettings .top-select{min-width:0;width:100%;}
+    #typeSettings .font-size-input{width:100%;}
+
+    /* =========================================================
+       2026-10-20
+       ========================================================= */
+    /* No double-tap zoom on buttons, menus or the toolbar. */
+    #app,button,select,input,label,.ctx-menu{touch-action:manipulation;}
+    #workspace{touch-action:pan-x pan-y;}
+
+    /* Columns menu: bigger checkboxes, taller rows, Split section. */
+    .view-menu-popup{min-width:270px;max-height:calc(100dvh - 70px);overflow-y:auto;padding:8px;}
+    .view-menu-row{min-height:34px;padding:5px 6px;font-size:14px;}
+    .view-menu-row label{gap:10px;}
+    .view-menu-row input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;margin:0;}
+    .view-menu-section{border-top:1px solid var(--border);margin-top:6px;padding:8px 6px 4px;display:grid;gap:7px;}
+    .view-menu-heading{font-weight:700;font-size:13px;}
+    .split-state{font-weight:400;color:var(--accent);}
+    .split-field{display:grid;grid-template-columns:62px minmax(0,1fr);align-items:center;gap:8px;font-size:13px;}
+    .split-field select{min-width:0;width:100%;}
+    .view-menu-actions{display:flex;gap:6px;}
+    .view-menu-actions .btn{flex:1;}
+    @media(max-width:900px){
+      .view-menu-row{min-height:48px;font-size:16px;}
+      .view-menu-row input[type=checkbox]{width:24px;height:24px;flex-basis:24px;}
+      .split-field{font-size:15px;grid-template-columns:70px minmax(0,1fr);}
+      .split-field select{min-height:42px;font-size:15px;}
+      .view-menu-actions .btn{min-height:42px;font-size:15px;}
+    }
+
+    /* Right-click / long-press formatting menu. */
+    .ctx-menu{position:fixed;z-index:3200;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.2);min-width:220px;}
+    .ctx-menu[hidden]{display:none!important;}
+    .ctx-menu [hidden]{display:none!important;}
+    .ctx-menu .btn{text-align:left;white-space:nowrap;min-height:34px;padding:5px 10px;font-size:13px;}
+    .ctx-menu .ctx-wide{grid-column:1 / -1;}
+    .ctx-menu.ctx-touch .btn{min-height:36px;font-size:14px;}
+
+    /* Reference follows Scale: title line height, collapsed rows, arrow and drag handle. */
+    :root{--ref-line:calc(var(--paragraph-size) * var(--workspace-scale,1) * 1.3);}
+    #referenceTree .ref-cell-wrapper{
+      min-height:0;
+      padding-top:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1));
+      padding-bottom:calc(10px * var(--pad-y,1) * var(--ref-pad-y,1));
+      padding-right:1px;
+      padding-left:calc(var(--ref-line) * 2 + 6px)!important;
+    }
+    #referenceTree .ref-disclosure{
+      left:0;
+      top:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1));
+      width:calc(var(--ref-line) * 1.1);
+      height:var(--ref-line);
+      line-height:var(--ref-line);
+      font-size:calc(var(--paragraph-size) * var(--workspace-scale,1) * 1.25);
+      text-align:center;
+    }
+    #referenceTree .ref-drag{
+      left:calc(var(--ref-line) * 1.1 + 2px);
+      top:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1));
+      width:calc(var(--ref-line) * .8);
+      height:var(--ref-line);
+      line-height:var(--ref-line);
+      padding:0;
+      font-size:calc(var(--paragraph-size) * var(--workspace-scale,1) * 1.1);
+    }
+    #referenceTree .ref-collapsed{
+      height:auto!important;
+      min-height:0!important;
+      max-height:none!important;
+      padding-bottom:calc(8px * var(--pad-y,1) * var(--ref-pad-y,1));
+      overflow:hidden;
+    }
+    #referenceTree .ref-collapsed .ref-cell{
+      display:block;
+      height:var(--ref-line)!important;
+      min-height:var(--ref-line)!important;
+      max-height:var(--ref-line)!important;
+      line-height:var(--ref-line)!important;
+      overflow:hidden;
+      white-space:nowrap;
+      padding:0;
+      margin:0;
+    }
+    #referenceTree .ref-collapsed .ref-cell > *{margin:0!important;}
+    #referenceTree .ref-collapsed .ref-cell > :first-child{
+      height:var(--ref-line);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    #referenceTree .ref-collapsed .ref-cell > *:not(:first-child){display:none!important;}
+    /* Refresh (2026-10-26): reloads the whole app at its /exec URL — new deploys and data. */
+    .refresh-btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:inherit;font-size:16px;line-height:1;}
+    .refresh-btn.spin{animation:refresh-spin .8s linear infinite;}
+    @keyframes refresh-spin{to{transform:rotate(360deg);}}
+    /* Phone camera / notch (2026-10-26, Julius): keep the toolbars clear of it. */
+    #toolbar{
+      padding-top:max(var(--tb-pad,4px), env(safe-area-inset-top));
+      padding-left:max(8px, env(safe-area-inset-left));
+      padding-right:max(8px, env(safe-area-inset-right));
+    }
+    #focusControls{
+      top:calc(3px + env(safe-area-inset-top));
+      right:calc(8px + env(safe-area-inset-right));
+    }
+    /* Status ("Ready") on the same line as the buttons (2026-10-26, Julius):
+       on narrow screens the toolbar is one line that scrolls sideways, and the
+       status stays pinned at its right end. */
+    @media(max-width:900px){
+      #toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+      #toolbar::-webkit-scrollbar{display:none;}
+      #toolbar > *{flex-shrink:0;}
+      #dateLabel:empty{display:none;}
+      #status.status{
+        position:sticky;right:0;flex:0 0 auto;min-width:0;margin-left:auto;
+        background:#fff;padding-left:8px;box-shadow:-8px 0 8px -4px #fff;
+      }
+    }
+    /* Urgency (2026-10-26): checkbox color = urgency. 1 red, 2 yellow, 3 blue. */
+    .check-line[data-urg]{--urg:transparent;}
+    .check-line[data-urg="1"], .urg-row[data-urg="1"], .urg-pick[data-urg="1"]{--urg:#e5484d;}
+    .check-line[data-urg="2"], .urg-row[data-urg="2"], .urg-pick[data-urg="2"]{--urg:#f0b000;}
+    .check-line[data-urg="3"], .urg-row[data-urg="3"], .urg-pick[data-urg="3"]{--urg:#3b82f6;}
+    .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid var(--urg);border-radius:3px;background:#fff;display:inline-grid;place-content:center;cursor:pointer;}
+    .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]:checked{background:var(--urg);}
+    .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]:checked::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
+    .check-line > input[type=checkbox]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+    .urg-picker{position:fixed;z-index:3000;display:flex;gap:6px;padding:6px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);}
+    .urg-pick{width:34px;height:34px;border-radius:8px;border:2px solid var(--urg,#bbb);background:#fff;font-weight:700;color:var(--urg,#666);cursor:pointer;}
+    .urg-pick.on{background:var(--urg,#eee);color:#fff;}
+    .urg-pick[data-urg="0"]{--urg:#999;}
+    .urg-pick[data-urg="0"].on{color:#fff;}
+    #urgentPanel{margin:0 0 6px;padding:4px calc(7px * var(--side-k,1)) 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    /* Each urgency level gets its own left bar in its own color (2026-10-26). */
+    .urg-group{margin-top:6px;padding-left:8px;border-left:3px solid var(--urg);}
+    .urg-group[data-urg="1"]{--urg:#e5484d;}.urg-group[data-urg="2"]{--urg:#f0b000;}.urg-group[data-urg="3"]{--urg:#3b82f6;}.urg-group[data-urg="0"],.urg-row[data-urg="0"]{--urg:#8a8f98;}
+    .urg-group .urg-sub{margin-top:0;color:var(--urg);}
+    /* Boxed levels (2026-10-30, Julius): Urgent / Soon / Can be later each sit in a rounded border in their color. */
+    #urgentPanel > .urg-group:not(.urg-arch){margin-top:8px;padding:5px calc(8px * var(--side-k,1)) 4px;border:2px solid var(--urg);border-radius:10px;background:color-mix(in srgb,var(--urg) 5%,transparent);}
+    .urg-batch{display:flex;align-items:center;gap:6px;width:100%;margin:5px 0 0;padding:2px 0;background:none;border:0;text-align:left;cursor:pointer;color:var(--muted);font:inherit;font-size:11px;font-weight:700;-webkit-user-select:none;user-select:none;}
+    /* Batch title (2026-10-30, Julius): bold + underlined, in the subject's color (darkened in light mode so pale ones read). */
+    .urg-batch-name{font-weight:700;text-decoration:underline;text-underline-offset:2px;color:color-mix(in srgb,var(--bc,#8a8f98) 70%,#000);}
+    @media (prefers-color-scheme: dark){ .urg-batch-name{color:var(--bc,#9ca3af);} }
+    .urg-batch small{font-weight:600;opacity:.8;}
+    /* Batch − / + on the right (2026-10-30, Julius), like the task fold. */
+    .urg-batch .pm-box{margin:0;} /* next to the name + count, not the far edge (Julius 2026-11-01) */
+    .urg-head{display:block;width:100%;text-align:left;background:none;border:0;padding:2px 0;font-weight:700;font-size:13px;cursor:pointer;color:inherit;}
+    .urg-sub{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+    .urg-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;padding:4px 0;cursor:pointer;color:inherit;font-size:13px;}
+    .urg-box{flex:0 0 auto;width:13px;height:13px;border:2px solid var(--urg);border-radius:3px;}
+    .urg-text{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .urg-date{flex:0 0 auto;margin-left:auto;padding-left:8px;font-size:11px;color:var(--muted);}
+    .urg-made{flex:0 0 auto;margin-left:-2px;font-size:10px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;opacity:.8;}
+    .urg-made.inline{margin-left:4px;display:inline;}
+    .urg-date.overdue{color:#e5484d;font-weight:700;}
+    .urg-date.due-today{color:#c27c00;font-weight:700;}
+    .urg-picker{flex-wrap:wrap;max-width:200px;}
+    .urg-due-row{flex:1 0 100%;display:flex;align-items:center;gap:4px;}
+    .urg-due-chip{flex:1;min-width:0;text-align:left;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+    .urg-due-chip.set{color:inherit;font-weight:600;}
+    .urg-due-clear{font-size:13px;line-height:1;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);}
+    .urg-dur-row{flex-wrap:wrap;gap:3px;}
+    .urg-dur-lab{font-size:12px;color:var(--muted);margin-right:1px;}
+    .urg-dur-pick{font-size:11px;line-height:1;padding:4px 5px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);cursor:pointer;}
+    .urg-dur-pick.on{background:#1a73e8;border-color:#1a73e8;color:#fff;font-weight:600;}
+    @media (prefers-color-scheme: dark){ .urg-dur-pick{background:#1c1c1c;color:var(--dm-text);border-color:#444;} .urg-dur-pick.on{background:#1a73e8;border-color:#1a73e8;color:#fff;} }
+    body.cal-open .urg-picker{z-index:4600;} body.cal-open .urg-cal{z-index:4601;}
+    .urg-cal{position:fixed;z-index:3001;width:196px;padding:6px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-size:12px;}
+    .uc-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;margin-bottom:4px;}
+    .uc-nav{border:0;background:none;font-size:16px;line-height:1;padding:2px 8px;cursor:pointer;color:inherit;}
+    .uc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;text-align:center;}
+    .uc-wd{font-size:10px;color:var(--muted);padding:2px 0;}
+    .uc-day{border:0;background:none;border-radius:6px;padding:4px 0;font-size:12px;cursor:pointer;color:inherit;}
+    .uc-day.past{color:#aaa;}
+    .uc-day.today{box-shadow:inset 0 0 0 1px #1a73e8;}
+    .uc-day.sel{background:#1a73e8;color:#fff;}
+    .uc-today{margin-top:4px;width:100%;font-size:11px;padding:3px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;}
+    .urg-box{cursor:pointer;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+    /* Due label stacks in a narrow column (Julius, 2026-10-27): "📅 Wed" over "Oct 29", so the task text keeps the width. */
+    .check-line[data-due-label]::after{content:attr(data-due-label);flex:0 0 auto;margin-left:6px;font-size:10.5px;line-height:1.15;text-align:right;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
+    .urg-subtask{font-size:12px;color:var(--muted);padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .urg-row.done .urg-box{background:var(--urg);}
+    /* Done = a visible check, not just a filled box (2026-11-04). Drawn inside the box, so its size and spacing stay the
+       same. White on red / blue / gray; dark on yellow, where white is too faint. */
+    .urg-row.done .urg-box{position:relative;}
+    .urg-row.done .urg-box::after{content:"";position:absolute;left:2.5px;top:-.5px;width:3px;height:6.5px;border:solid var(--urg-check,#fff);border-width:0 2px 2px 0;transform:rotate(45deg);box-sizing:content-box;pointer-events:none;}
+    .urg-row.done[data-urg="2"] .urg-box{--urg-check:#1f1f1f;}
+    .urg-row.done .urg-text{text-decoration:line-through;opacity:.6;}
+    .urg-subtask.done{text-decoration:line-through;opacity:.7;}
+    .check-line.urg-flash{animation:urgflash 1.3s ease-out;}
+    @keyframes urgflash{from{background:#fff3b0;}to{background:transparent;}}
+    /* Nested Reference cells (2026-10-26): a cell can hold other cells.
+       Hold a dragged cell on another cell's title to drop it inside. */
+    #referenceTree .ref-children{margin:6px 0 0 calc(-1 * var(--ref-line));padding-left:6px;border-left:2px solid #e4e4e4;}
+    #referenceTree .ref-children:empty{display:none;}
+    #referenceTree .ref-collapsed > .ref-children{display:none!important;}
+    #referenceTree .ref-children > .ref-cell-wrapper:last-child{border-bottom:0;}
+    #referenceTree .ref-cell-wrapper:hover:has(.ref-children .ref-cell-wrapper:hover){background:transparent;}
+    .ref-drop-into > .ref-cell{background:#e8f0fe!important;box-shadow:inset 0 0 0 2px #1a73e8;border-radius:6px;}
+    .ref-hold > .ref-cell > h2:first-child{background:#f1f5ff;border-radius:4px;}
+    #typeSettings .ts-check{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:13px;}
+    #typeSettings .ts-check input{width:18px;height:18px;margin:0;}
+    #typeSettings .ts-check select{min-height:30px;padding:2px 6px;font-size:13px;}
+    /* Options grows to the right in columns instead of getting longer (Julius, 2026-10-27) */
+    #typeSettings{width:min(1000px,calc(100vw - 16px))!important;}
+    #typeSettings .ts-body{column-width:300px;column-gap:22px;column-rule:1px solid var(--border);}
+    #typeSettings .ts-row,#typeSettings .ts-check,#typeSettings .ts-sub,#typeSettings .ts-cat{break-inside:avoid;}
+    #typeSettings .ts-sub{break-after:avoid;}
+    #typeSettings .ts-row:first-child{margin-top:4px;}
+    /* Compact rows: label, slider, value and Reset on one line, smaller controls (Julius, 2026-10-27) */
+    #typeSettings .ts-row{grid-template-columns:76px minmax(60px,1fr) 38px auto!important;gap:6px!important;margin:6px 0!important;}
+    #typeSettings .ts-row.ts-font{grid-template-columns:76px minmax(0,1fr) 52px auto!important;}
+    #typeSettings .ts-label{grid-column:auto!important;font-size:12px!important;line-height:1.15;}
+    #typeSettings input[type=range]{min-height:22px!important;}
+    #typeSettings output{font-size:12px!important;}
+    #typeSettings .btn,#typeSettings .top-select,#typeSettings .font-size-input{min-height:26px!important;padding:2px 7px!important;font-size:11px!important;}
+    #typeSettings .ts-check{margin:6px 0 2px!important;font-size:12px!important;}
+    #typeSettings .ts-check input{width:16px!important;height:16px!important;}
+    #typeSettings .ts-sub{margin-top:10px!important;}
+    body #typeSettings .btn,body #typeSettings .top-select,body #typeSettings .font-size-input{min-height:26px!important;height:26px!important;padding:1px 7px!important;font-size:11px!important;line-height:1!important;}
+    body #typeSettings label.ts-check{min-height:0!important;padding:0!important;margin:5px 0!important;}
+    #typeSettings .ts-cat{grid-template-columns:28px minmax(0,1fr) 26px!important;gap:4px!important;margin:0 0 6px!important;padding-bottom:6px!important;}
+    #typeSettings .ts-cat input[type=color]{width:28px!important;height:26px!important;}
+    #typeSettings .ts-cat input[type=text]{min-height:26px!important;height:26px!important;padding:2px 6px!important;font-size:12px!important;}
+    #typeSettings .ts-cat .ts-cat-del{width:26px!important;height:26px!important;}
+    body #typeSettings .ts-check input,body #typeSettings .ts-cat input{min-height:0!important;}
+    body #typeSettings .ts-check input{height:16px!important;}
+    /* Range sliders in Options get real width (the checkbox sizing above made them 16px and stuck, 2026-10-31). */
+    body #typeSettings .ts-check input[type=range]{width:auto!important;flex:1 1 140px;min-width:120px;height:22px!important;margin:0!important;touch-action:pan-y;}
+    #lineStrengthVal{min-width:3em;text-align:right;font-variant-numeric:tabular-nums;}
+    #typeSettings .ts-hint{font-size:11px;color:var(--muted);margin:2px 0 6px;}
+    #typeSettings .ts-cat{display:grid;grid-template-columns:34px minmax(0,1fr) 28px;gap:4px 6px;align-items:center;margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+    #typeSettings .ts-cat input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;}
+    #typeSettings .ts-cat input[type=text]{min-width:0;min-height:30px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:13px;background:transparent;color:inherit;}
+    #typeSettings .ts-cat .ts-cat-name{font-weight:700;}
+    #typeSettings .ts-cat .ts-cat-words{grid-column:1 / -1;font-size:12px!important;}
+    #typeSettings .ts-cat .ts-cat-del{width:28px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;}
+    #typeSettings .ts-cat-actions{display:flex;gap:6px;flex-wrap:wrap;}
+    /* Card subjects (Julius, 2026-10-27): collapsed to a row of chips by default; tap to edit. Rows on one line. */
+    #typeSettings .ts-cats-toggle{display:block;width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;font-family:inherit;}
+    #typeSettings .ts-cats-arrow{display:inline-block;width:10px;transition:transform .15s;}
+    #typeSettings .ts-cats.open .ts-cats-arrow{transform:rotate(90deg);}
+    #typeSettings .ts-cats:not(.open) #cardCatList,#typeSettings .ts-cats:not(.open) .ts-cat-actions,#typeSettings .ts-cats.open .ts-cat-chips{display:none;}
+    #typeSettings .ts-cat-chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 2px;cursor:pointer;}
+    #typeSettings .ts-cat-chip{display:inline-flex;align-items:center;gap:4px;padding:1px 7px 1px 4px;border:1px solid var(--border);border-radius:10px;font-size:11px;line-height:16px;}
+    #typeSettings .ts-cat-chip i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+    #typeSettings .ts-cats .ts-cat{grid-template-columns:24px 76px minmax(0,1fr) 22px!important;gap:4px!important;margin:0 0 4px!important;padding-bottom:4px!important;}
+    #typeSettings .ts-cats .ts-cat input[type=color]{width:24px!important;height:22px!important;}
+    #typeSettings .ts-cats .ts-cat input[type=text]{min-height:22px!important;height:22px!important;padding:1px 5px!important;font-size:12px!important;}
+    #typeSettings .ts-cats .ts-cat .ts-cat-words{grid-column:auto!important;font-size:11px!important;}
+    #typeSettings .ts-cats .ts-cat .ts-cat-del{width:22px!important;height:22px!important;font-size:11px;}
+    #typeSettings .ts-daycols{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:2px 0 8px;}
+    #typeSettings .ts-daycols label{display:inline-flex;flex-direction:column;align-items:center;font-size:10px;color:var(--muted);gap:1px;}
+    #typeSettings .ts-daycols input[type=color]{width:24px;height:20px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;min-height:0!important;}
+    body:not(.dm-daymatch) #typeSettings .ts-daycols{opacity:.45;}
+    #typeSettings .ts-dmgroup{break-inside:avoid;}
+    #typeSettings .ts-looks{grid-template-columns:76px minmax(60px,1fr) auto auto!important;}
+    #typeSettings .ts-tint-label{display:flex;align-items:center;gap:4px;}
+    #typeSettings #dmTint{width:20px;height:18px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;flex:none;min-height:0!important;}
+    #typeSettings .ts-sub{margin-top:12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+    /* Due on this day (2026-10-26): tasks due on a day show under its label. */
+    .due-block{margin:0 0 4px;display:flex;flex-direction:column;gap:1px;}
+    .due-item{display:block;width:100%;box-sizing:border-box;text-align:left;padding:3px 0;margin:0 0 3px;color:inherit;font-family:var(--paragraph-font);font-size:calc(var(--paragraph-size) * var(--workspace-scale,1));line-height:1.3;}
+    .due-item[data-urg="1"]{--urg:#e5484d;}.due-item[data-urg="2"]{--urg:#f0b000;}.due-item[data-urg="3"]{--urg:#3b82f6;}
+    .di-line{display:flex;align-items:flex-start;gap:6px;padding:1px 0;cursor:pointer;}
+    .di-line[data-urg="1"]{--urg:#e5484d;}.di-line[data-urg="2"]{--urg:#f0b000;}.di-line[data-urg="3"]{--urg:#3b82f6;}
+    .di-box{flex:0 0 auto;width:calc(17px * var(--workspace-scale,1));height:calc(17px * var(--workspace-scale,1));margin:1px 0 0;padding:0;border:2px solid var(--urg,#8a8f98);border-radius:3px;background:transparent;cursor:pointer;display:inline-grid;place-content:center;}
+    .di-line.done > .di-box{background:var(--urg,#8a8f98);}
+    .di-line.done > .di-box::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
+    .di-text{flex:1;min-width:0;overflow-wrap:anywhere;}
+    .di-from{font-size:.75em;color:var(--muted);margin-left:4px;}
+    .di-line.done > .di-text{text-decoration:line-through;opacity:.6;}
+    /* Urgent header counts (2026-10-27): one number per level in its color. */
+    .urg-counts{display:inline-flex;gap:7px;margin-left:8px;font-variant-numeric:tabular-nums;}
+    .urg-count{font-weight:700;}
+    .urg-sub{font-weight:600;font-size:.8em;margin-left:2px;opacity:.85;}
+    .urg-count[data-urg="1"]{color:#e5484d;}.urg-count[data-urg="2"]{color:#d29e00;}.urg-count[data-urg="3"]{color:#3b82f6;}.urg-count[data-urg="0"]{color:#8a8f98;}
+    /* Mini dashboard (2026-10-27): today's tasks done, in the toolbar. */
+    .dash-chip{display:block;width:max-content;max-width:100%;box-sizing:border-box;margin:0 0 6px;padding:1px 8px;font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:999px;color:var(--muted);white-space:nowrap;}
+    .dash-chip:empty{display:none;}
+    .editor[data-dash]:not(:empty)::before{content:attr(data-dash);display:block;margin:0 0 4px;font-size:12px;font-weight:400;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
+    .dash-chip b{color:inherit;}
+    .dash-chip .dash-bar{display:inline-block;vertical-align:middle;width:46px;height:5px;margin-left:6px;border-radius:3px;background:rgba(127,127,127,.25);overflow:hidden;}
+    .dash-chip .dash-bar i{display:block;height:100%;background:#22a06b;}
+    /* Title lines (2026-10-27): − / + at the right end folds the lines under it. */
+    [data-tlon]{display:flex!important;align-items:center;}
+    [data-tlon] > .check-text{flex:0 1 auto;}
+    [data-tlon]::after{order:2;}
+    [data-tlon]::before{content:"−";order:1;flex:0 0 auto;margin-left:4px;padding:0 1px;min-width:.75em;font-size:10px;font-weight:700;line-height:1.25;text-align:center;border:1px solid var(--tc-cat,var(--border));border-radius:5px;color:var(--tc-cat,var(--muted));background:transparent;cursor:pointer;white-space:nowrap;-webkit-user-select:none;user-select:none;}
+    [data-tlon="c"]::before{content:"+  " attr(data-tlinfo);font-weight:600;}
+    [data-tlon="o"][data-tlcnt]::before{content:"−  " attr(data-tlcnt);font-weight:600;}
+    [data-tlhid]{display:none!important;}
+    /* Folded summary (2026-10-29): bold starts of the hidden lines, as one condensed block under the title. */
+    [data-tlon="c"][data-tlsum]{flex-wrap:wrap;}
+    [data-tlon="c"][data-tlsum]:not([data-due-label])::after{content:attr(data-tlsum);order:3;flex:1 0 100%;margin:2px 0 1px;padding:3px 8px;font-size:.84em;font-weight:400;line-height:1.4;font-style:normal;text-decoration:none;color:var(--muted);white-space:normal;border-left:2px solid var(--tc-cat,var(--border));border-radius:0;}
+    [data-tlon="c"][data-tlbox]::after{content:none!important;display:none!important;}
+    /* Short folded lists (2026-11-07): 3 rows, scroll inside, ⤢ shows all. */
+    .tl-sum{order:3;flex:1 0 100%;min-width:0;margin:2px 0 1px;padding:3px 8px;font-size:.84em;font-weight:400;line-height:1.4;font-style:normal;text-decoration:none;color:var(--muted);border-left:2px solid var(--tc-cat,var(--border));box-sizing:border-box;cursor:default;-webkit-user-select:none;user-select:none;}
+    .hx-box{position:relative;}
+    .hx-box > .hx-list,.ts-items.hx-cap{max-height:calc(4.2em + 2px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}
+    .hx-box.hx-open > .hx-list{max-height:none;overflow:visible;}
+    .hx-box > .hx-list{padding-right:1.6em;}
+    .hx-btn{position:absolute;right:2px;bottom:2px;font:inherit;font-size:.95em;line-height:1;padding:1px 4px;border:1px solid var(--divider,#777);border-radius:4px;background:var(--panel,var(--bg,#fff));color:var(--muted,#888);cursor:pointer;}
+    .ts-row{position:relative;}
+    .ts-row > .hx-btn{position:static;margin-left:4px;font-size:.85em;vertical-align:baseline;}
+    /* Due group in Notes (2026-10-27): its own box under the Suggested day, collapsible. */
+    .due-notes{margin:6px 0;padding:4px 8px 5px;border:1.5px solid var(--note-line-adj,var(--border));border-radius:10px;-webkit-user-select:text;user-select:text;}
+    .dn-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:.92em;cursor:pointer;-webkit-user-select:none;user-select:none;padding:1px 0;}
+    .dn-dots{display:inline-flex;gap:3px;margin-left:auto;}
+    .dn-dots i{width:8px;height:8px;border-radius:50%;background:#8a8f98;}
+    .dn-dots i[data-urg="1"]{background:#e5484d;}.dn-dots i[data-urg="2"]{background:#f0b000;}.dn-dots i[data-urg="3"]{background:#3b82f6;}
+    .due-notes .due-item{margin:2px 0 0;padding:2px 0;}
+    .due-notes .di-line{cursor:default;}
+    .due-notes .di-text{outline:none;cursor:text;border-radius:3px;}
+    .due-notes .di-text[contenteditable="true"]:focus{outline:none;box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:4px;}
+    #urgentPanel .urg-text[data-tcpick],#inboxPanel .urg-text[data-tcpick],.due-notes .di-text[data-tcpick]{outline:none;box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:4px;}
+    .due-notes .di-from{flex:0 0 auto;align-self:flex-start;display:flex;gap:.25em;align-items:flex-end;line-height:1.15;white-space:nowrap;}
+    .pane-narrow .due-notes .di-from{flex-direction:column;gap:0;}
+    .urg-goto{flex:1 0 100%;margin-top:4px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:left;}
+    /* Reference options, Urgent create, Inbox, −/+ toggles (2026-10-26, Julius). */
+    /* Sort-row buttons match the Sort dropdown's size, and the row wraps instead
+       of running off a phone screen (2026-10-26, Julius). */
+    .reference-sort-bar{flex-wrap:wrap;row-gap:4px;max-width:100%;min-width:0;box-sizing:border-box;}
+    .reference-sort-bar .btn{flex:0 0 auto;min-height:0!important;height:auto!important;padding:2px 6px!important;font-size:inherit!important;line-height:1.3!important;border-radius:4px;}
+    .reference-sort-bar .ref-collapse-all{min-width:0;width:auto;font-weight:700;}
+    .ref-options{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;}
+    .ref-options .ts-check{flex-wrap:wrap;}
+    .ref-options .ts-check select{max-width:100%;}
+    .reference-sort-bar #refOptionsBtn.on,#refOptionsBtn.on{background:#eef2ff;border-color:#1a73e8;}
+    .ref-toolbar .btn.ref-tb-sm{padding:2px 6px!important;font-size:12px;flex:0 0 auto;}
+    .ref-options .ref-collapse-all{min-width:1.6em;padding:0 6px;font-weight:700;}
+    .ref-options{margin:0 0 10px;padding:6px 10px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;}
+    /* Pop-up over the content instead of pushing it down (Julius, 2026-10-26); closes on tap outside */
+    .ref-options{position:fixed;z-index:3000;margin:0;width:min(300px,calc(100vw - 32px));max-height:70vh;overflow:auto;box-shadow:0 6px 20px rgba(0,0,0,.18);border-radius:10px;}
+    .ref-options .ts-check{display:flex;align-items:center;gap:8px;margin:8px 0 2px;}
+    .ref-options .ts-check input{width:18px;height:18px;margin:0;}
+    .ref-options .ts-check select{min-height:28px;padding:2px 6px;font-size:13px;}
+    .ref-options .ts-sub{margin-top:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+    .ref-opt-tip{margin-top:4px;font-size:12px;color:var(--muted);}
+    .pm-box{display:inline-grid;place-content:center;box-sizing:border-box;width:.95em;height:.95em;margin-right:4px;border:1px solid currentColor;border-radius:3px;font-size:.8em;line-height:1;font-weight:700;opacity:.75;vertical-align:-.15em;}
+    .urg-head{display:flex;align-items:center;}
+    .urg-head-row{display:flex;align-items:center;gap:6px;}
+    .urg-head-row .urg-head{flex:1;min-width:0;}
+    .urg-head-row .urg-add-btn{flex:0 0 auto;min-width:24px;height:22px;padding:0 6px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;font:inherit;font-weight:700;line-height:1;cursor:pointer;}
+    .urg-add{flex:0 0 auto;font-size:11px;padding:1px 7px;}
+    /* Empty add lines only on hover / focus / after tapping the level heading (cleanup 2026-11-09). */
+    #urgentPanel .urg-group:not(:hover):not(:focus-within):not(.show-add) > .urg-row.urg-adder{display:none!important;}
+    .urg-group > .urg-sub{cursor:pointer;}
+    .urg-head,.urg-sub{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
+    .urg-sub{cursor:context-menu;}
+    .urg-empty{font-size:12px;color:var(--muted);padding:4px 0 2px;}
+    #urgentPanel.wrap .urg-row{align-items:flex-start;}
+    /* Narrow panel (Julius, 2026-10-27): when text + dates don't fit on one line, the
+       dates drop to their own short line under the task instead of squeezing the text
+       into a tall column. Lines break by full (unwrapped) widths first. */
+    #urgentPanel .urg-row{gap:6px;}
+    #urgentPanel.wrap .urg-row > .urg-text{flex:1 1 0;min-width:4em;}
+    #urgentPanel .urg-meta{order:2;flex:0 0 auto;margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:0;line-height:1.15;text-align:right;}
+    #urgentPanel .urg-meta .urg-date{display:flex;flex-direction:row;gap:.3em;align-items:baseline;margin:0;padding:0;}
+    #urgentPanel .urg-meta .urg-date > .ud-rel::before{content:"· ";}
+    /* Space savers only when the Reference column is narrow (.pane-narrow, < 420px; Julius 2026-10-27):
+       weekday / date / days left stack as three short lines on the right, and the task text
+       runs under its box after the first line. */
+    .pane-narrow #urgentPanel .urg-meta .urg-date{flex-direction:column;align-items:flex-end;gap:0;}
+    .pane-narrow #urgentPanel .urg-meta .urg-date > .ud-rel::before{content:none;}
+    .pane-narrow #urgentPanel.wrap .urg-row{display:flow-root;}
+    #urgentPanel .urg-row.urg-adder{display:flex!important;align-items:center;flex-wrap:nowrap;}
+    #urgentPanel .urg-adder > .urg-addbox2{float:none!important;margin:0!important;opacity:.55;cursor:text;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-box{float:left;margin:2px 6px -10px 0;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-meta{float:right;margin:0 0 0 6px;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-text{display:block;}
+    #urgentPanel .urg-meta .urg-date > span,#urgentPanel .urg-meta .urg-made{white-space:nowrap;}
+    #urgentPanel .urg-meta .urg-made{margin:0;}
+    /* Title lines (sections like Morning): the name keeps its width, the − / + "50 out of
+       50 done" label wraps onto more lines instead of crushing the name (Julius, 2026-10-27). */
+    /* 2026-11-07 (Julius: "+ 2 hidden" broke into "hidd / en"): the − / + button stays on one line; the title text wraps instead. */
+    /* Too narrow for both: the button drops under the title (whole), words never break into letters. */
+    [data-tlon]{flex-wrap:wrap;row-gap:2px;}
+    [data-tlon] > .check-text,[data-tlon] > b{flex:0 1 auto;min-width:min-content;overflow-wrap:normal;word-break:normal;}
+    /* 2026-11-16 (Julius): basis 0 (was 60%) so the "− 6/7 ✓" count stays on the title row whenever the title fits; long titles wrap inside. */
+    [data-tlon] > .check-text{flex:1 1 0%;} /* stays beside the checkbox, uses the free width; wraps inside */
+    [data-tlon]::before{flex:0 0 auto;min-width:2.2em;white-space:nowrap!important;overflow-wrap:normal!important;line-height:1.2!important;}
+    #urgentPanel.wrap .urg-row .urg-box{margin-top:2px;}
+    #urgentPanel.wrap .urg-text,#urgentPanel.wrap .urg-subtask{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+    .urg-create-menu{position:fixed;z-index:3002;display:flex;flex-direction:column;min-width:170px;padding:4px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);}
+    .ucm-item{display:flex;align-items:center;gap:8px;text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;font-size:13px;cursor:pointer;color:inherit;}
+    .ucm-item::before{content:"";width:10px;height:10px;border-radius:3px;border:2px solid var(--urg);}
+    .ucm-item[data-urg="1"]{--urg:#e5484d;}.ucm-item[data-urg="2"]{--urg:#f0b000;}.ucm-item[data-urg="3"]{--urg:#3b82f6;}
+    .ucm-item.first{font-weight:700;}
+    .ucm-item:hover{background:#f3f4f6;}
+    #urgentPanel .urg-text[contenteditable="true"]{cursor:text;outline:none;border-radius:3px;}
+    #urgentPanel .urg-text[contenteditable="true"]:focus{white-space:normal;overflow:visible;box-shadow:0 0 0 1px var(--urg);border-radius:4px;padding:1px 4px;margin:-1px -4px;}
+    .urg-row{-webkit-user-select:text;user-select:text;}
+    .urg-arch-head{display:flex;align-items:center;gap:4px;background:none;border:0;padding:0;cursor:pointer;color:var(--muted);font:inherit;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+    .urg-arch .urg-arch-day{margin:6px 0 1px;font-size:11px;color:var(--muted);font-weight:600;}
+    .urg-arch .urg-row{opacity:.8;}
+    .editor .check-line[data-arch] > .check-text{opacity:.6;}
+    .urg-adder{cursor:text;padding:2px 0;}
+    /* Task fold − / + in Urgent (2026-10-28, Julius) */
+    #urgentPanel .urg-text:empty::before{content:attr(data-ph);opacity:.45;font-style:italic;}
+    #urgentPanel .urg-text:empty{min-width:4em;}
+    #urgentPanel .urg-text.urg-tx-hold{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+    .urg-text-menu{padding:6px;}
+    .urg-text-menu .urg-struct-row{margin-top:0;}
+    .urg-struct-row{flex:1 0 100%;display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;}
+    .urg-struct{padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;cursor:pointer;text-align:center;}
+    #urgentPanel .urg-fold{order:1;flex:0 0 auto;display:inline-flex;align-items:center;gap:3px;background:none;border:0;padding:0 2px;margin:0;cursor:pointer;color:var(--muted);font:inherit;font-size:12px;line-height:1;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+    #urgentPanel .urg-fold .pm-box{margin-right:0;}
+    #urgentPanel .urg-fold small{font-size:10.5px;font-weight:600;}
+    /* − / + sits right after the task text (Julius 2026-11-01): text stops stretching. */
+    #urgentPanel.wrap .urg-row:has(> .urg-fold) > .urg-text{flex:0 1 auto;}
+    .pane-narrow #urgentPanel.wrap .urg-row:has(> .urg-fold) > .urg-text{display:inline;}
+    .pane-narrow #urgentPanel.wrap .urg-row > .urg-fold{float:none;display:inline-flex;vertical-align:middle;margin:0 0 0 6px;}
+    .urg-addbox{flex:0 0 auto;width:13px;height:13px;border:2px dashed var(--urg);border-radius:3px;opacity:.7;}
+    #urgentPanel.wrap .urg-adder{align-items:center;}
+    .urg-adder textarea{flex:1;min-width:0;width:100%;max-width:100%;box-sizing:border-box;display:block;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:inherit;font-size:13px;line-height:1.4;color:inherit;background:transparent;border:1.5px solid transparent;padding:2px 5px;margin-left:-5px;outline:none;border-radius:4px;}
+    .urg-adder textarea:focus{border-color:var(--urg);}
+    .urg-adder textarea::placeholder{color:var(--muted);opacity:.8;}
+    .urg-create{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:4px;}
+    .urg-create input,.inbox-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;}
+    #calPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    .cal-sub.cal-today{color:var(--text,#222);}
+    .cal-row{display:flex;align-items:flex-start;gap:6px;width:100%;text-align:left;background:none;border:0;padding:3px 0;color:inherit;font-size:13px;}
+    /* Calendar event cards use the same Options typography as the rest of Gantt. */
+    #calPanel{font-size:var(--paragraph-size);font-family:var(--paragraph-font);}
+    #calPanel .cal-row{box-sizing:border-box;gap:8px;margin:4px 0;padding:7px 9px;border:1px solid color-mix(in srgb,var(--border) 75%,transparent);border-radius:7px;background:var(--panel);font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.3;}
+    #calPanel .cal-time{font-size:inherit;min-width:0;max-width:42%;overflow-wrap:anywhere;}
+    #calPanel .cal-title{font-size:inherit;overflow-wrap:anywhere;}
+    #calPanel .cal-sub.cal-block{font-size:inherit;margin-top:8px;}
+    #calPanel .cal-arch-item{font-size:inherit;}
+    #calPanel .cal-row.now{border-color:var(--accent);}
+    .cal-row .cal-box{margin-top:2px;flex:0 0 auto;}
+    .cal-row .cal-time,.cal-row .cal-title{cursor:pointer;}
+    .cal-row.done .cal-title,.cal-row.done .cal-time{text-decoration:line-through;opacity:.55;}
+    .cal-sub.cal-block{padding-left:4px;font-size:11px;opacity:.8;}
+    .cal-arch-item{padding-left:18px;font-size:12px;}
+    .cal-archive-bar{display:flex;align-items:center;gap:8px;margin:4px 0 2px;flex-wrap:wrap;}
+    .cal-auto{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--muted);}
+    .cal-sub.cal-donehead{cursor:pointer;display:flex;align-items:center;gap:4px;}
+    .cal-time{flex:0 0 auto;min-width:6.4em;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
+    .cal-title{flex:1;min-width:0;}
+    .cal-row.past{opacity:.5;}
+    .cal-row.now .cal-title{font-weight:700;}
+    .cal-now{flex:0 0 auto;font-size:10px;font-weight:700;text-transform:uppercase;color:#fff;background:#3b82f6;border-radius:4px;padding:0 5px;}
+    #inboxPanel{margin:0 0 6px;padding:4px calc(7px * var(--side-k,1)) 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+    /* Inbox rows = task rows (2026-10-27, Julius): box + always-editable text, same as Urgent. */
+    #inboxPanel .inbox-row{display:flex;align-items:flex-start;gap:6px;padding:4px 0;cursor:default;}
+    #inboxPanel .inbox-row > .urg-box{margin-top:2px;touch-action:none;}
+    #inboxPanel .inbox-text{flex:1 1 0;min-width:4em;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;cursor:text;outline:none;border-radius:3px;}
+    #inboxPanel .inbox-text:focus{box-shadow:0 0 0 1.5px var(--urg);border-radius:4px;padding:1px 4px;margin:-1px -4px;}
+    #inboxPanel .inbox-row.inbox-dragging{opacity:.3;}
+    .inbox-from{order:2;flex:0 0 auto;margin-left:auto;font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+    /* Narrow Reference: text runs under the box, the Claude tag floats right (same as Urgent). */
+    .pane-narrow #inboxPanel .inbox-row{display:flow-root;}
+    .pane-narrow #inboxPanel .inbox-row > .urg-box{float:left;margin:2px 6px -10px 0;}
+    .pane-narrow #inboxPanel .inbox-row > .inbox-from{float:right;margin:1px 0 0 6px;}
+    .pane-narrow #inboxPanel .inbox-row > .inbox-text{display:block;}
+    .urg-picker .urg-del{color:#c0392b;}
+    .inbox-add{display:flex;gap:6px;margin-top:6px;}
+    /* Reference cell toggles: boxed − / + instead of ▾ / ▸. Done in CSS so every
+       code path that sets the arrow text still works. */
+    #referenceTree .ref-disclosure{font-size:0!important;color:#777;}
+    #referenceTree .ref-disclosure::before{content:"−";display:inline-grid;place-content:center;box-sizing:border-box;width:1.05em;height:1.05em;border:1.5px solid currentColor;border-radius:4px;font-size:calc(var(--paragraph-size) * var(--workspace-scale,1) * .95);line-height:1;font-weight:700;vertical-align:middle;}
+    #referenceTree .ref-cell-wrapper.ref-collapsed > .ref-disclosure::before{content:"+";}
+  
+
+    /* (Julius, 2026-10-27) Reference: Sort / − / Options sit in the REFERENCE header
+       on the right; search row is shorter; Reference has its own padding sliders. */
+    .ref-pane-header{gap:6px;min-width:0;}
+    .ref-pane-title{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ref-pane-header .reference-sort-bar{margin:0 0 0 auto;flex-wrap:nowrap;font-weight:400;gap:5px;min-width:0;}
+    .ref-pane-header .ref-sort-label{display:none;}
+    .ref-pane-header #referenceSort{flex:0 1 auto;min-width:3.5em;max-width:42vw;text-overflow:ellipsis;}
+    .ref-pane-header .reference-sort-bar .btn{flex:0 0 auto;}
+    .ref-toolbar .btn{white-space:nowrap;}
+    .ref-toolbar{padding-bottom:4px;margin-bottom:2px;gap:5px;}
+    .ref-toolbar .ref-search{padding:3px 8px;min-height:0;}
+    .ref-toolbar .btn{padding:2px 8px;min-height:0;}
+    @media(max-width:900px){
+      .ref-toolbar .ref-search{min-height:calc(30px * var(--mobile-scale,1))!important;font-size:calc(15px * var(--mobile-scale,1));}
+      .ref-toolbar .btn{min-height:calc(30px * var(--mobile-scale,1))!important;}
+    }
+    .ref-pad-row{display:grid!important;grid-template-columns:6.6em 1fr 3.2em;align-items:center;gap:8px;}
+    .ref-pad-row input[type=range]{flex:1;min-width:0;width:auto!important;height:auto!important;}
+    .ref-pad-row output{min-width:3.2em;text-align:right;font-variant-numeric:tabular-nums;}
+    /* =========================================================
+       DARK MODE (Julius, 2026-10-27): our own, so the phone doesn't auto-invert.
+       Black background; the day colors stay exactly as in light mode
+       (Wednesday stays blue) with dark text on them. Adjust from here.
+       ========================================================= */
+    @media (prefers-color-scheme: dark){
+      :root{--dm-cell-l:11;--dm-tint:#ffffff;--dm-cell:color-mix(in srgb,var(--dm-tint) calc(var(--dm-cell-l) * 1%),#000);--dm-l:52;--dm-text:hsl(0 0% calc(var(--dm-l) * 1%));--dm-muted:hsl(0 0% calc(var(--dm-l) * .82%));--muted:var(--dm-muted);--done:hsl(0 0% calc(var(--dm-l) * .75%));--text:var(--dm-text);--bg:#000;--panel:#000;--border:#3a3a3a;--divider:#e5e7eb;color-scheme:dark;}
+      html,body{background:#121212;color:var(--dm-text);}
+      #toolbar,#focusControls,.pane-header,.pane{background:#121212;color:var(--dm-text);}
+      .btn,.top-select,.send-menu button,.urg-due-clear,.uc-today{background:#1c1c1c;color:var(--dm-text);border-color:#444;}
+      .btn:hover{background:#2a2a2a;}
+      #urgentPanel,#calPanel,#inboxPanel,.ref-options{background:#111;color:var(--dm-text);}
+      .ref-cell{color:var(--dm-text);}
+      .ref-hold > .ref-cell > h2:first-child{background:#1d2738;}
+      .ucm-item:hover{background:#222;}
+      /* Pop-ups and menus: dark too */
+      .ctx-menu,.urg-picker,.urg-cal,.urg-create-menu,.send-menu,.archive-box,.view-menu-popup,.type-settings{background:#161616;color:var(--dm-text);}
+      .urg-pick{background:#1c1c1c;}
+      input,select,textarea{background:#1c1c1c;color:var(--dm-text);}
+      /* Day cells (Julius, 2026-10-27): back to dark day colors like the phone's
+         original dark mode (light ones were too bright), light text; the lines
+         (note boxes, today outline) use the day's LIGHT color. */
+      .day-row{color:var(--dm-text);--day-sep:#6a6a6a;}
+      .day-row .day-label{color:#969696;}
+      .day-row.dow-1{background:var(--dm-cell);--note-line:#ababab;}
+      .day-row.dow-2{background:var(--dm-cell);--note-line:#c29f7b;}
+      .day-row.dow-3{background:var(--dm-cell);--note-line:#87a4c0;}
+      .day-row.dow-4{background:var(--dm-cell);--note-line:#b09b82;}
+      .day-row.dow-5{background:var(--dm-cell);--note-line:#c0ae62;}
+      .day-row.dow-6{background:var(--dm-cell);--note-line:#b59d79;}
+      .day-row.dow-0{background:var(--dm-cell);--note-line:#c2b562;}
+      /* Day-colored dark cells (Julius, 2026-10-27): each day's cell = black → that day's color,
+         same Dark cells slider. Colors per day in Options (defaults = the light day colors). */
+      /* (Julius, 2026-10-27) no inversion: the cell is the picker color as-is (defaults = the LIGHT day colors),
+         then the Day colors slider makes it darker / lighter, same as in light mode. */
+      body.dm-daymatch .day-row.dow-1{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-1,#eeeeee), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-2{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-2,#fff0df), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-3{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-3,#e6f1fb), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-4{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-4,#ead8c2), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-5{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-5,#fff0bd), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-6{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-6,#d9b98c), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      body.dm-daymatch .day-row.dow-0{--dm-cell:color-mix(in srgb, color-mix(in srgb, var(--dmd-c-0,#fff4a8), #fff var(--dc-w,0%)), #000 var(--dc-k,0%));}
+      /* Match off (Julius, 2026-10-27): plain dark cells, whatever else sets a day background. */
+      body:not(.dm-daymatch) .day-row[class*="dow-"]{background:var(--dm-cell)!important;}
+      .day-row.today[class*="dow-"]{--today-border:var(--note-line);}
+      /* (Julius, 2026-10-27) every cell the same #121212 as the column headers; text var(--dm-text) (pure white was too bright). Every cell dark gray (not black); the day name in the day's light color */
+      .day-row[class*="dow-"] .day-label{color:var(--note-line-adj);}
+      .pane,#toolbar,#focusControls,.pane-header{background:#121212;}
+      .ref-cell-wrapper{background:var(--dm-cell);border-bottom-color:#333;}
+      .ref-cell-wrapper:hover{background:#1a1a1a;}
+      .ref-toolbar{background:#121212;}
+      .ref-search{background:#1e1e1e;color:var(--dm-text);border-color:#444;}
+      .day-row .editor table[data-cnote] .check-line[data-send]::after,.day-row .editor table[data-cnote] .check-line[data-send]::before{background:#1c1c1c;color:#bbb;border-color:#555;}
+      /* (Julius, 2026-10-27) text that ignored the brightness slider: fixed grays and
+         dark inline colors (e.g. pasted text) now follow --dm-text / --dm-muted. */
+      body,.ref-cell blockquote{color:var(--dm-text);}
+      #dateLabel,.format-hint,.empty,.ref-drag,#referenceTree .ref-disclosure,.uc-day.past,.editor:empty:before,.ref-cell:empty:before{color:var(--dm-muted);}
+      .editor pre.code-block,.ref-cell pre.code-block{background:#1a1a1a;border-color:#333;color:var(--dm-text);}
+      [data-dkc]{color:var(--dm-text)!important;}
+      /* Urgency checkboxes: dark inside with the colored border, not white (Julius, 2026-10-27) */
+      .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{background:#121212;}
+      .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]:checked{background:var(--urg);}
+      .urg-pick:not(.on){background:#1c1c1c;}
+      .reference-sort-bar #refOptionsBtn.on{background:#1d2738;border-color:#3f74a6;}
+      .urg-picker,.urg-due-chip,.uc-today,#calPanel,#inboxPanel{background:#161616;}
+    }
+
+    /* One-day view (2026-10-29, Julius): only one day shows; ▲ ▼ in the Today header change day.
+       Today row = Completed (top, the day's Today cell) + Plan pad (bottom, Days column D),
+       each half scrolling on its own. */
+    .od-nav{display:none;gap:4px;margin-left:2px;flex:0 0 auto;}
+    .od-nav .btn{min-width:28px;padding:0 6px;line-height:1.4;}
+    body.one-day .od-nav{display:inline-flex;}
+    .od-head,.plan-pad{display:none;}
+    /* The Today: 70/72 done chip already says it (2026-11-03, Julius). */
+    body.one-day #todayScroll .od-on .od-head:not(.od-pad-head){display:none!important;}
+    /* Keep In Mind cells (2026-11-06, Julius): category = a full bordered cell, each task (+ its subtasks) a cell inside. */
+    .fx-cat{border:1.5px solid color-mix(in srgb,var(--fx-category-color,#70baff) 70%,transparent);border-radius:8px;padding:3px 6px 5px;}
+    .fx-cell{border:1px solid color-mix(in srgb,var(--fx-category-color,#70baff) 40%,var(--border,#999));border-radius:6px;padding:2px 6px;margin:4px 0 0;}
+    .fx-cat>.fx-ch .fx-name{color:var(--fx-category-color,#70baff);}
+
+    /* Reference header (2026-11-03, Julius): just the Urgent numbers, always one line; fitUrgCounts() shrinks them to fit. */
+    #referencePane .ref-pane-header{display:flex;align-items:center;padding-left:6px;padding-right:6px;}
+    #referencePane .ref-pane-header .urg-head-row{flex:1;width:100%;min-width:0;margin:0;}
+    #referencePane .ref-pane-header .urg-head{width:100%;display:flex;align-items:center;flex-wrap:nowrap;padding:0;text-align:left;}
+    .next-steps-label{flex:0 0 auto;margin-right:.55em;white-space:nowrap;}
+    #referencePane .ref-pane-header .urg-counts{flex:1;min-width:0;margin:0;gap:.45em;overflow:hidden;white-space:nowrap;}
+
+    .od-pad-head .blocks-add,.od-pad-head .blocks-task,.od-pad-head .blocks-remove{font:inherit;letter-spacing:normal;text-transform:none;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:3px 7px;margin-left:5px;cursor:pointer;}
+
+    body.one-day #todayScroll .day-row:not(.od-on),
+    body.one-day #journalScroll .day-row:not(.od-on){display:none;}
+    body.one-day #todayScroll{overflow:hidden;}
+    body.one-day #todayScroll .day-row.od-on{height:var(--od-h,100%);min-height:0;border-bottom:0;}
+    body.one-day #journalScroll .day-row.od-on{min-height:var(--od-hj,100%);border-bottom:0;}
+    body.one-day #todayScroll .day-row.od-on > *{flex:0 0 auto;}
+    body.one-day #todayScroll .od-on .od-head{display:block;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;}
+    body.one-day #todayScroll .od-on > .od-pad-head{border-top:2px solid var(--divider);padding-top:5px;margin-top:6px;position:relative;cursor:row-resize;touch-action:none;user-select:none;-webkit-user-select:none;}
+    body.one-day #todayScroll .od-on > .od-pad-head::before{content:"";position:absolute;left:0;right:0;top:-15px;bottom:0;}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{content:"";position:absolute;left:50%;top:-2.5px;width:22px;height:3px;margin-left:-11px;border-radius:0;background:var(--divider);}
+    .split-dragging,.split-dragging *{cursor:row-resize!important;}
+    /* Time sections in Today (2026-10-31): small labeled lines; the in-between one is a short half line. */
+    .editor > [data-tsec]{margin:8px 0 3px;padding:0 0 1px;border-bottom:1px solid var(--divider);font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);user-select:none;-webkit-user-select:none;}
+    .editor > [data-tsec]:first-child{margin-top:2px;}
+    /* Short time headers (Julius, 2026-11-01): rounded icon (sun / setting sun / filled moon) + short name + times, one line, no am / pm. */
+    .editor > [data-tsec="morning"],.editor > [data-tsec="afternoon"],.editor > [data-tsec="evening"]{white-space:nowrap;font-size:0!important;letter-spacing:0;}
+    .editor > [data-tsec="morning"]::before,.editor > [data-tsec="afternoon"]::before,.editor > [data-tsec="evening"]::before{content:"";display:inline-block;width:calc(var(--paragraph-size,14px) * 1.05);height:calc(var(--paragraph-size,14px) * 1.05);vertical-align:-.2em;margin-right:.35em;-webkit-mask:var(--ts-ic) center/contain no-repeat;mask:var(--ts-ic) center/contain no-repeat;background:var(--ts-c);font-size:calc(var(--paragraph-size,14px) * .75);}
+    .editor > [data-tsec="morning"]::after,.editor > [data-tsec="afternoon"]::after,.editor > [data-tsec="evening"]::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:600;letter-spacing:.02em;opacity:1;text-transform:none;}
+    .editor > [data-tsec="morning"]{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill-rule="evenodd" d="M17.60 11.86L17.46 10.77L17.12 9.73L16.58 8.78L15.86 7.94L15.00 7.27L14.02 6.78L12.96 6.48L11.86 6.40L10.77 6.54L9.73 6.88L8.78 7.42L7.94 8.14L7.27 9.00L6.78 9.98L6.48 11.04L6.40 12.14L6.54 13.23L6.88 14.27L7.42 15.22L8.14 16.06L9.00 16.73L9.98 17.22L11.04 17.52L12.14 17.60L13.23 17.46L14.27 17.12L15.22 16.58L16.06 15.86L16.73 15.00L17.22 14.02L17.52 12.96L17.60 11.86ZM1.62 11.24L1.37 11.47L1.23 11.78L1.21 12.13L1.37 12.53L1.62 12.76L3.88 14.17L2.57 16.69L2.53 16.94L2.56 17.20L2.78 17.57L3.06 17.77L3.31 17.84L6.06 17.94L6.16 20.69L6.31 21.09L6.64 21.37L6.97 21.47L7.40 21.40L9.83 20.12L11.29 22.45L11.62 22.72L11.96 22.80L12.38 22.72L12.71 22.45L14.17 20.12L16.69 21.43L17.12 21.46L17.36 21.37L17.57 21.22L17.73 21.02L17.84 20.69L17.94 17.94L20.69 17.84L21.09 17.69L21.37 17.36L21.47 17.03L21.40 16.60L20.12 14.17L22.45 12.71L22.72 12.38L22.80 12.04L22.72 11.62L22.45 11.29L20.12 9.83L21.43 7.31L21.46 6.88L21.37 6.64L21.22 6.43L21.02 6.27L20.69 6.16L17.94 6.06L17.84 3.31L17.69 2.91L17.36 2.63L16.94 2.53L16.60 2.60L14.17 3.88L12.71 1.55L12.46 1.32L12.04 1.20L11.62 1.28L11.29 1.55L9.83 3.88L7.31 2.57L6.88 2.54L6.64 2.63L6.43 2.78L6.23 3.06L6.16 3.31L6.06 6.06L3.31 6.16L2.91 6.31L2.63 6.64L2.53 7.06L2.60 7.40L3.88 9.83L1.62 11.24ZM18.89 12.34L18.83 13.01L18.69 13.68L18.50 14.32L18.24 14.95L17.92 15.55L17.54 16.11L17.11 16.63L16.63 17.11L16.11 17.54L15.55 17.92L14.95 18.24L14.32 18.50L13.68 18.69L13.01 18.83L12.34 18.89L11.66 18.89L10.99 18.83L10.32 18.69L9.68 18.50L9.05 18.24L8.45 17.92L7.89 17.54L7.37 17.11L6.89 16.63L6.46 16.11L6.08 15.55L5.76 14.95L5.50 14.32L5.31 13.68L5.17 13.01L5.11 12.34L5.11 11.66L5.17 10.99L5.31 10.32L5.50 9.68L5.76 9.05L6.08 8.45L6.46 7.89L6.89 7.37L7.37 6.89L7.89 6.46L8.45 6.08L9.05 5.76L9.68 5.50L10.32 5.31L10.99 5.17L11.66 5.11L12.34 5.11L13.01 5.17L13.68 5.31L14.32 5.50L14.95 5.76L15.55 6.08L16.11 6.46L16.63 6.89L17.11 7.37L17.54 7.89L17.92 8.45L18.24 9.05L18.50 9.68L18.69 10.32L18.83 10.99L18.89 11.66L18.89 12.34Z" fill="%23000"/%3E%3C/svg%3E');--ts-c:#f4b400;}
+    .editor > [data-tsec="morning"]::after{content:"Morn 6–2";}
+    .editor > [data-tsec="afternoon"]{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill-rule="evenodd" d="M1.49 16.54L1.32 16.74L1.22 17.00L5.10 17.00L5.15 16.36L5.27 15.69L5.45 15.04L5.69 14.40L6.00 13.80L6.36 13.23L6.78 12.69L7.24 12.20L7.75 11.76L8.31 11.37L8.90 11.04L9.52 10.76L10.16 10.55L10.82 10.40L11.49 10.32L12.17 10.30L12.84 10.35L13.51 10.47L14.64 10.83L15.25 11.11L15.83 11.46L16.38 11.87L16.88 12.32L17.64 13.23L18.00 13.80L18.31 14.40L18.55 15.04L18.73 15.69L18.85 16.36L18.90 17.00L22.78 17.00L22.68 16.74L22.45 16.49L20.12 15.03L21.40 12.60L21.47 12.17L21.37 11.84L21.09 11.51L20.69 11.36L17.94 11.26L17.84 8.51L17.73 8.18L17.57 7.98L17.20 7.76L16.94 7.73L16.69 7.77L14.17 9.08L12.71 6.75L12.38 6.48L12.04 6.40L11.62 6.48L11.29 6.75L9.83 9.08L7.31 7.77L7.06 7.73L6.80 7.76L6.43 7.98L6.23 8.26L6.16 8.51L6.06 11.26L3.31 11.36L2.91 11.51L2.63 11.84L2.53 12.17L2.60 12.60L3.88 15.03L1.49 16.54ZM17.57 16.65L17.36 15.57L16.94 14.56L16.41 13.75L15.66 12.96L14.76 12.33L13.89 11.93L12.96 11.68L11.86 11.60L10.77 11.74L9.73 12.08L8.89 12.54L8.04 13.24L7.42 13.98L6.88 14.93L6.54 15.97L6.40 17.00L17.60 17.00L17.57 16.65ZM1.90 19.61L1.68 19.71L1.52 19.95L1.50 21.10L1.54 21.29L1.65 21.45L1.95 21.60L22.00 21.60L22.32 21.49L22.44 21.34L22.50 21.15L22.48 19.95L22.32 19.71L22.05 19.60L1.90 19.61Z" fill="%23000"/%3E%3C/svg%3E');--ts-c:#fb8c00;}
+    .editor > [data-tsec="afternoon"]::after{content:"Aft 2–8";}
+    .editor > [data-tsec="evening"]{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M15.5 2.5A9.5 9.5 0 1 0 21.5 17.5A8 8 0 0 1 15.5 2.5z" fill="%23000"/%3E%3C/svg%3E');--ts-c:#bf97e8;}
+    .editor > [data-tsec="evening"]::after{content:"Eve 8–6";}
+    .editor > [data-tsec="gap"]{width:50%;height:0;overflow:hidden;margin:6px 0 4px;padding:0;border-bottom:1px dashed var(--divider);font-size:0;}
+    /* Lines, not boxes (Julius, 2026-10-31): note blocks and today's cell drop their side borders; only the
+       top / bottom lines stay, so the text gets the side room back. Today + Notes columns. */
+    .editor table[data-cnote]{border-left:0!important;border-right:0!important;border-radius:0!important;}
+    .editor table[data-cnote] td{padding-left:2px!important;padding-right:2px!important;}
+    .day-row.today.day-pane-row,.day-row.today.journal-pane-row{box-shadow:inset 0 2px 0 var(--today-border-adj),inset 0 -2px 0 var(--today-border-adj)!important;}
+    /* Grips stick out (Julius, 2026-10-31): drag notches on every resize line are thicker, longer and
+       full strength (--grip = divider color, not faded by Line strength). */
+    .column-resizer::after{left:-1.5px!important;width:5px!important;height:30px!important;margin-top:-15px!important;border-radius:2px!important;background:var(--grip,var(--divider))!important;}
+    #refSplitBar::after,#notesSplitBar::after{top:-1.5px!important;height:5px!important;width:30px!important;margin-left:-15px!important;border-radius:2px!important;background:var(--grip,var(--divider))!important;}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{top:-3.5px!important;height:5px!important;width:30px!important;margin-left:-15px!important;border-radius:2px!important;background:var(--grip,var(--divider))!important;}
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{background:var(--grip,var(--divider))!important;filter:none!important;border-radius:2px;}
+    /* Quiet grips (Julius, 2026-11-01): faint until pressed, full strength while dragging. */
+    .column-resizer::after,#refSplitBar::after,#notesSplitBar::after,body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{opacity:.75;transition:opacity .15s;} /* .18 → .5 → .75 (Julius 2026-11-02: easier to see at rest) */
+    body.split-dragging #refSplitBar::after,body.split-dragging #notesSplitBar::after,body.split-dragging.one-day #todayScroll .od-on > .od-pad-head::after,
+    .column-resizer.dragging::after,.column-resizer:active::after,#mobileSplitResizer:active::after,#mobileSplitResizerThird:active::after{opacity:1;}
+    /* Make sure you do (Julius, 2026-11-01): section header at the top of today's Notes cell, same look as Today's time sections. */
+    /* Tight Urgent (Julius, 2026-11-01): Urgent panel + its group boxes reach the column edges. */
+    #refTopScroll{padding-left:1px!important;padding-right:1px!important;}
+    #urgentPanel{padding-left:1px!important;padding-right:1px!important;}
+    #urgentPanel > .urg-group:not(.urg-arch){margin-left:0!important;margin-right:0!important;}
+    /* Notes sections (Julius, 2026-11-01): no fill, colored text + colored line, line runs edge to edge (--rowpx bleed). */
+    .editor > [data-nsec]{margin:2px calc(-1 * var(--rowpx,8px)) 3px;padding:0 var(--rowpx,8px) 1px;border-bottom:1px solid;font-size:.75em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;user-select:none;-webkit-user-select:none;}
+    .editor > [data-nsec]:first-child{margin-top:0;}
+    .editor > [data-nsec="must"]{color:#b55a56!important;border-bottom:1px solid #b55a56!important;}
+    /* Center Up stays put (Julius, 2026-11-01): scrolling inside Notes / Weather / Center Down never drags the pane or page. */
+    #journalPane{overflow:hidden;}
+    #journalScroll,#weatherScroll,#centerDownScroll{overscroll-behavior:contain;}
+    .ce-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+    .ce-head strong{font-size:.85em;}
+    .ce-head button{font-size:12px;padding:2px 6px;}
+    .ce-date,.ce-empty{font-size:.8em;color:var(--muted);margin:4px 0;}
+    .ce-group{margin:7px 0 3px;font-size:.8em;font-weight:600;color:var(--muted);}
+    .ce-event{padding:2px 0;font-size:.85em;line-height:1.3;overflow-wrap:anywhere;}
+    .ce-scheduled{margin:5px 0;}
+    .ce-time{display:block;width:fit-content;max-width:100%;padding-bottom:1px;border-bottom:1px solid currentColor;font-size:.85em;color:var(--muted);}
+    .ce-title{display:block;margin-top:2px;}
+    #centerCalendarList{min-width:0;max-width:100%;}
+    .ce-head{flex-wrap:wrap;}
+    .ce-head strong{min-width:0;overflow-wrap:anywhere;}
+    .ce-head button{min-width:32px;min-height:32px;flex:0 0 auto;}
+    @media (max-width:600px){
+      .ce-event{font-size:.95em;line-height:1.4;padding:4px 0;}
+      .ce-group{margin-top:12px;}
+      .ce-scheduled{margin:6px 0;}
+    }
+    /* Center calendar: compact cards, Options typography and comfortable phone insets. */
+    #centerDownScroll{padding-inline:clamp(8px,2.5vw,16px);box-sizing:border-box;}
+    #centerCalendarList{font-family:var(--paragraph-font);font-size:var(--fw-text);}
+    /* Calendar cell contents follow Options font family and size, not card defaults. */
+    #centerCalendarList .ce-event,
+    #centerCalendarList .ce-event .ce-title,
+    #centerCalendarList .ce-event .ce-time,
+    #centerCalendarList .ce-group,
+    #centerCalendarList .ce-date,
+    #centerCalendarList .ce-empty{
+      font-family:var(--paragraph-font);
+      font-size:var(--fw-text);
+    }
+    #centerCalendarList .ce-date,#centerCalendarList .ce-group,#centerCalendarList .ce-event,#centerCalendarList .ce-time{font-size:inherit;}
+    #centerCalendarList .ce-event{box-sizing:border-box;margin:5px 0;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--panel);line-height:1.35;overflow-wrap:anywhere;}
+    #centerCalendarList .ce-scheduled{margin:6px 0;}
+    #centerCalendarList .ce-time{color:var(--muted);}
+    .ce-head [data-ce-refresh]{box-sizing:border-box;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:15px;line-height:1;border-radius:6px;}
+    @media(max-width:600px){
+      #centerDownScroll{padding-inline:10px;}
+      #centerCalendarList .ce-event{padding:9px 10px;}
+      .ce-head [data-ce-refresh]{width:28px;height:28px;min-width:28px;min-height:28px;}
+    }
+    /* Keep the calendar heading left-aligned and its refresh action truly compact. */
+    #centerDownScroll{container-type:inline-size;}
+    #centerDownScroll .ce-head{display:flex;flex-wrap:nowrap;justify-content:space-between;align-items:center;width:100%;gap:6px;}
+    #centerDownScroll .ce-head strong{flex:1 1 auto;min-width:0;font-size:var(--fw-text);text-align:left;}
+    #centerDownScroll .ce-head [data-ce-refresh]{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px;padding:0!important;margin:0;font-size:14px;line-height:1;}
+    #centerCalendarList .ce-date{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #centerCalendarList .ce-date-short{display:none;}
+    @container(max-width:360px){
+      #centerCalendarList .ce-date-long{display:none;}
+      #centerCalendarList .ce-date-short{display:inline;}
+    }
+    /* Calendar follows the same Options font and padding controls as editable cells. */
+    #centerDownScroll{padding-inline:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--side-k,1));font-family:var(--paragraph-font);font-size:var(--fw-text);line-height:1.18;}
+    #centerDownScroll .ce-head{gap:calc(4px * var(--pad-x,1));margin-bottom:calc(3px * var(--pad-y,1));}
+    #centerDownScroll .ce-head strong{font:inherit;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #centerDownScroll .ce-head > strong{flex:0 0 auto;} /* 2026-11-07 (Julius): the title stays; the 🔍 box shrinks instead */
+    #centerCalendarList{font:inherit;line-height:inherit;}
+    #centerCalendarList .ce-date,#centerCalendarList .ce-group,#centerCalendarList .ce-event,#centerCalendarList .ce-time,#centerCalendarList .ce-title{font-family:inherit;font-size:inherit;line-height:inherit;}
+    #centerCalendarList .ce-date{margin:calc(2px * var(--pad-y,1)) 0;}
+    #centerCalendarList .ce-group{margin:calc(5px * var(--pad-y,1)) 0 calc(2px * var(--pad-y,1));}
+    #centerCalendarList .ce-event{margin:calc(2px * var(--pad-y,1)) 0;padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}
+    #centerCalendarList .ce-scheduled{margin:calc(2px * var(--pad-y,1)) 0;}
+    #centerCalendarList .ce-title{margin-top:calc(1px * var(--pad-y,1));}
+    #centerDownScroll .ce-head :is([data-ce-refresh],[data-ce-opt]){font-size:12px;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;max-width:22px;max-height:22px;}
+    @media(max-width:600px){#centerDownScroll{padding-inline:calc(8px * var(--pad-x,1) * var(--side-k,1));}#centerCalendarList .ce-event{padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}}
+    /* Plan / Think-like separation; graphite is the completion signal. */
+    #centerDownScroll .ce-head{margin-bottom:calc(7px * var(--pad-y,1));}
+    #centerCalendarList .ce-group{margin:calc(9px * var(--pad-y,1)) 0 calc(4px * var(--pad-y,1));}
+    #centerCalendarList .ce-event{border:1px solid #fff;color:var(--text);margin:calc(5px * var(--pad-y,1)) 0;}
+    #centerCalendarList .ce-event.ce-done{border-color:#666;color:#666;}
+    #centerCalendarList .ce-event.ce-done .ce-time{color:#666;}
+    #centerCalendarList .ce-scheduled{margin:calc(8px * var(--pad-y,1)) 0;}
+    #centerCalendarList .ce-scheduled .ce-time{margin-bottom:1px;}
+    /* Today time-section lines reach the column walls like the Notes section lines. */
+    .editor > [data-tsec]:not([data-tsec="gap"]){margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;}
+    /* Day-color lines (Options toggle, Julius 2026-11-01): every line in the day color, all 2px. */
+    body.day-lines .editor > [data-tsec]:not([data-tsec="gap"]){border-bottom:2px solid var(--note-line-adj)!important;}
+    body.day-lines .editor > [data-nsec]{border-bottom:1px solid var(--note-line-adj)!important;}
+    /* One line between split columns (Julius, 2026-11-01): the split bar is the line; panes drop their own inset line. */
+    body.mobile-split #workspace #todayPane,body.mobile-split #workspace #journalPane{box-shadow:none!important;}
+    /* Header lines (Julius, 2026-11-01): a visible line under every column header (Notes, Reference, Today). */
+    .pane-header{border-bottom:1px solid var(--divider)!important;}
+    body.day-lines .pane-header{border-bottom-width:2px!important;}
+    body.day-lines .editor > [data-tsec="gap"]{border-bottom:2px dashed var(--note-line-adj)!important;}
+    body.day-lines .editor table[data-cnote]{border-top:2px solid var(--note-line-adj)!important;border-bottom:2px solid var(--note-line-adj)!important;}
+    body.day-lines .editor table[data-cnote] tr + tr > td{border-top:2px solid var(--note-line-adj)!important;}
+    .editor > [data-nsec="focus"]{color:#70baff!important;border-bottom:1px solid #70baff!important;margin-top:10px;}
+    /* Fixes (Julius, 2026-11-01 pm) ------------------------------------------------------------ */
+    /* One line between Notes and Reference (Julius): the Urgent box's own outline sat a few px in from the
+       column line (double line with a gap). No outline, like the Notes side; the 3 urgency boxes stay. */
+    #urgentPanel{border:0!important;border-radius:0!important;}
+    /* No empty band above Urgent (2026-11-04, Julius). */
+    #refTopScroll{padding-top:2px!important;}
+    #urgentPanel{padding-top:0!important;}
+    #urgentPanel > .urg-group:first-child{margin-top:0!important;}
+    /* Tight Notes lines (Julius, 2026-11-01): Make sure you do lines had the full card gap (5px margin + 4px
+       padding each side). Notes check-lines get 1px margin + 2px padding, like the rest of the cell. */
+    .journal-editor > .check-line[data-tc^="f"]{margin-top:1px!important;padding-top:2px!important;}
+    .journal-editor > .check-line[data-tc$="l"]{margin-bottom:1px!important;padding-bottom:2px!important;}
+    /* Section lines a bit thicker (1px was too thin, 2px too thick). */
+    .editor > [data-nsec="must"]{border-bottom:1.5px solid #b55a56!important;}
+    .editor > [data-nsec="focus"]{border-bottom:1.5px solid #70baff!important;}
+    .editor > [data-nsec="focus"]{border-top:1.5px solid var(--note-line-adj,var(--note-line,var(--divider)))!important;padding-top:5px!important;}
+    body.day-lines .editor > [data-nsec]{border-bottom:1.5px solid var(--note-line-adj)!important;}
+    /* No double line under the header: the header keeps its line, today's row drops its top line. */
+    .day-row.today.day-pane-row,.day-row.today.journal-pane-row{box-shadow:inset 0 -2px 0 var(--today-border-adj)!important;}
+    /* Active tab icon: soft see-through white, not the day color. */
+    /* Lit tab (2026-11-04, Julius): a lighter, wider glow around it; the spread doesn't move the other tabs. */
+    .center-tabs button.on,.center-tabs button:active{opacity:1;position:relative;background:rgba(255,255,255,.62)!important;box-shadow:0 0 0 2px rgba(255,255,255,.62);}
+    html:not([data-theme="dark"]) .center-tabs button.on{outline:1px solid rgba(0,0,0,.14);outline-offset:2px;}
+    @media (prefers-color-scheme: dark){html:not([data-theme="light"]) .center-tabs button.on{outline:0;}}
+    /* One thin header line across all three columns (2026-11-03, Julius). */
+    .pane-header,body.mobile-mode .pane-header{flex:0 0 calc(28px * var(--mobile-scale,1))!important;min-height:0;}
+    /* Completed stays inside its area while scrolling: the editor spans the row edge to edge (so the
+       section lines fit without overflowing) and never scrolls sideways. */
+    body.one-day #todayScroll .od-on .day-editor{margin-left:calc(-1 * var(--rowpx,8px))!important;margin-right:calc(-1 * var(--rowpx,8px))!important;padding-left:var(--rowpx,8px)!important;padding-right:var(--rowpx,8px)!important;overflow-x:hidden!important;touch-action:pan-y;}
+    #journalScroll{overflow-x:hidden;}
+    .journal-editor > [data-daily-group]{margin:12px 0 4px;font-size:.88em;font-weight:700;}
+    .journal-editor > [data-daily-group="physical"]{color:#ec4899;}
+    .journal-editor > [data-daily-group="mental"]{color:#a78bfa;}
+    .urg-hydration{display:flex;gap:5px;flex:1 0 100%;}
+    .urg-hydration input{min-width:0;width:100%;font:inherit;padding:5px;}
+    .urg-hydration button{white-space:nowrap;}
+    /* Explicit SVG images keep both recurrence states visible on mobile.
+       Render-only; hold the checkbox to change recurrence. */
+    .journal-editor .check-line:is([data-rep="daily"],[data-rep="off"]) > .check-text::after{
+      content:"";display:inline-block;width:.7em;height:.7em;min-width:8px;min-height:8px;
+      margin-left:4px;vertical-align:-.03em;pointer-events:none;
+      background:transparent center/contain no-repeat;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='5' y='10' width='14' height='12' rx='2' fill='%23ffffff'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 8 0v3' fill='none' stroke='%23ffffff' stroke-width='2.5'/%3E%3C/svg%3E");
+      -webkit-mask:none;mask:none;filter:drop-shadow(0 0 .4px rgba(0,0,0,.65));
+    }
+    .journal-editor .check-line[data-rep="off"] > .check-text::after{
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='5' y='10' width='14' height='12' rx='2' fill='%2385858b'/%3E%3Cpath d='M8 10V7a4 4 0 0 1 7.5-2' fill='none' stroke='%2385858b' stroke-width='2.5'/%3E%3C/svg%3E");
+    }
+    /* Focus Tracking dashboard (phase 1). Render-only, fits ~350px, no sideways scroll. */
+    .fx{margin:2px 0 6px;font-size:calc(var(--paragraph-size,14px) * .95);-webkit-user-select:text;user-select:text;max-width:100%;overflow:hidden;}
+    .fx-cat{margin:4px 0;}
+    .fx-cat + .fx-cat{margin-top:14px;}
+    .fx-ch{display:flex;align-items:center;gap:4px;font-weight:700;font-size:.85em;letter-spacing:.04em;text-transform:uppercase;color:#1565c0;padding:2px 0;}
+    .fx-tg{border:0;background:transparent;color:inherit;padding:0 2px;width:1.4em;cursor:pointer;font:inherit;flex:0 0 auto;}
+    .fx-name,.fx-title,.fx-why{outline:none;min-width:2em;word-break:break-word;overflow-wrap:anywhere;}
+    .fx-name{flex:1 1 auto;}
+    .fx-proj{margin:3px 0 3px 6px;padding:3px 6px 4px;border-left:2px solid color-mix(in srgb,#1565c0 45%,transparent);}
+    .fx-ph{display:flex;align-items:center;gap:4px;font-weight:600;}
+    .fx-title{flex:1 1 auto;}
+    .fx-name,.fx-title{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;}
+    .fx-cat.fx-ungrouped > .fx-ch{display:none;}
+    .fx-cat.fx-ungrouped > .fx-body{display:block;}
+    .fx-why{font-size:.88em;color:var(--muted,#777);margin:1px 0 0 1.8em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .fx-why:focus{display:block;-webkit-line-clamp:unset;}
+    [data-fph]:empty::before{content:attr(data-fph);color:var(--muted,#999);font-weight:400;font-style:italic;}
+    .fx-proj.fx-col .fx-why{display:none;}
+    .fx-add{border:0;background:transparent;color:var(--muted,#888);font:inherit;font-size:.82em;padding:2px 4px;cursor:pointer;}
+    .fx-cat.fx-col > .fx-body{display:none;}
+    .fx-sub{font-weight:400;color:var(--muted,#888);font-size:.85em;}
+    .fx-tasks{margin:2px 0 0 1.8em;}
+    .fx-proj.fx-col .fx-tasks{display:none;}
+    .fx-task{display:flex;align-items:flex-start;gap:5px;padding:1px 0;}
+    .fx-task input{margin:.2em 0 0;flex:0 0 auto;accent-color:#1565c0;}
+    .fx-tt{flex:1 1 auto;outline:none;min-width:2em;word-break:break-word;overflow-wrap:anywhere;}
+    .fx-done .fx-tt{text-decoration:line-through;color:var(--muted,#888);}
+    /* Free list (2026-11-05, Julius: use the space): no card borders or deep margins; 14px per nesting level. */
+    .fx-ch{gap:2px;}
+    .fx-tg{width:1.1em;padding:0;}
+    .fx-body{padding-left:2px;}
+    .fx .fx-task{padding:1px 0 1px calc(var(--lv,0) * 14px);gap:4px;}
+    .fx-tt{word-break:normal;overflow-wrap:break-word;}
+    .fx-note .fx-tt{font-style:italic;color:var(--muted,#888);font-size:.92em;}
+    .fx-ago{flex:0 0 auto;margin-left:.35em;font-size:.72em;color:var(--muted,#888);opacity:.75;align-self:center;white-space:nowrap;}
+    .fx-tools{display:none;flex:0 0 auto;gap:1px;align-self:center;}
+    .fx-task:focus-within .fx-tools,.fx-task:hover .fx-tools{display:inline-flex;}
+    .fx-tools button{border:1px solid var(--border,#999);background:transparent;color:inherit;border-radius:5px;font:inherit;font-size:.85em;line-height:1;min-width:22px;height:22px;padding:0 3px;cursor:pointer;}
+    .fx-tools .fx-send{border:0;opacity:.6;}
+    .fx-body > .fx-add{padding-left:2px;}
+    .fx-send{border:0;background:transparent;padding:0 2px;cursor:pointer;font-size:.8em;opacity:.35;flex:0 0 auto;}
+    .fx-task:focus-within .fx-send,.fx-send:hover{opacity:1;}
+    .fx-tasks > .fx-add{padding-left:0;}
+    /* A color set from the hold menu covers everything inside (2026-11-03, Julius); finished subtasks stay gray. */
+    .fx-colored :is(.fx-ch,.fx-ph,.fx-name,.fx-title,.fx-why,.fx-tt,.fx-tg,.fx-add,.fx-sub),.fx-colored .fx-task:not(.fx-done) .fx-tt{color:var(--fx-category-color);}
+    .fx-colored .fx-done .fx-tt{color:var(--muted,#888);}
+    .fx-colored .fx-task input{accent-color:var(--fx-category-color);}
+    .fx-colored .fx-proj,.fx-proj.fx-colored{border-left-color:var(--fx-category-color);}
+    .fx-menu{width:216px;max-width:216px;}
+    .fx-swatches{display:flex;flex-wrap:wrap;gap:6px;flex:1 0 100%;}
+    .fx-swatch{width:26px;height:26px;padding:0;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;line-height:1;cursor:pointer;}
+    .fx-swatch.on{box-shadow:0 0 0 2px var(--accent,#1a73e8);}
+    .fx-well{width:26px;height:26px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;}
+    .fx-hue{flex:1 0 100%;width:100%;height:22px;margin:4px 0 0;padding:0;-webkit-appearance:none;appearance:none;border-radius:6px;background:linear-gradient(to right,#ff7070,#ffd166,#7ee081,#6fe3e3,#70a0ff,#d38cff,#ff7070);cursor:pointer;touch-action:none;}
+    /* Hourly weather (☁️ tab). */
+    .wx-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 4px;font-size:12px;color:var(--muted,#888);}
+    .wx-head button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:2px 4px;}
+    .wx-row{display:grid;grid-template-columns:4.1em 1.6em 3.8em minmax(0,1fr);align-items:center;gap:4px;padding:3px 8px;white-space:nowrap;font-size:13px;border-bottom:1px solid color-mix(in srgb,var(--border,#ddd) 60%,transparent);}
+    .wx-row.wx-now{font-weight:700;}
+    .wx-row .wx-t{color:var(--muted,#888);font-size:12px;}
+    .wx-row .wx-p{color:#1e88e5;font-size:12px;}
+    /* Daily rows fit the cell (2026-11-04, Julius): tight columns; a narrow cell drops the date and the 💧. */
+    #weatherScroll{container-type:inline-size;}
+    /* Hourly + daily share one grid (2026-11-07, Julius: same styling). Mode buttons like History's; 7 days sits apart. */
+    .wx-modes{display:inline-flex;gap:3px;margin-left:auto;margin-right:4px;}
+    .wx-head .wx-modes button{font:inherit;font-size:11px;line-height:1;padding:2px 6px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+    .wx-head .wx-modes button[aria-pressed="true"]{background:var(--text,#333);color:var(--bg,#fff);border-color:var(--text,#333);}
+    .wx-sec{margin-top:14px;border-top:2px solid var(--divider,#999);padding-top:8px;}
+    @container (max-width:190px){.wx-row{grid-template-columns:2.6em 1.3em 3.4em minmax(0,1fr);gap:1px;padding-inline:2px;font-size:12px;}.wx-row .wx-t,.wx-row .wx-p{font-size:11px;}.wx-d .wx-date,.wx-row .wx-drop{display:none;}.wx-head .wx-modes button{padding:2px 3px;}}
+    .wx-row.wx-d .wx-lo{color:var(--muted,#888);}
+    .wx-day{padding:6px 8px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#888);}
+    #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:30px!important;margin:-15px 0 0 -2.5px!important;}
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:30px!important;height:5px!important;margin:-2.5px 0 0 -15px!important;}
+    /* Grips at the edges (Julius, 2026-11-01): same size, just moved out of the way. Today's line grip sits at
+       the left edge, Reference's at the right edge, column-line grips at the top. Only the grip area drags:
+       the wide invisible grab area (::before) now covers only the grip; the Today / Reference lines themselves
+       ignore touches (pointer-events:none; ::before hits still target the bar, so drag code is unchanged).
+       Column / split lines keep their own 1–3px line (their drag code relies on pointer capture). */
+    #refSplitBar,#notesSplitBar,body.one-day #todayScroll .od-on > .od-pad-head{pointer-events:none!important;cursor:default!important;}
+    /* The Blocks header ignores touches so only its grip drags; its buttons must still take them (2026-11-04, Julius). */
+    body.one-day #todayScroll .od-on > .od-pad-head{border-bottom:2px solid var(--divider);padding-bottom:4px;margin-bottom:3px;}
+    body.one-day #todayScroll .od-on > .plan-pad{padding-top:6px!important;}
+    #centerDownScroll .ce-tools{position:relative;z-index:6;display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;}
+    #centerDownScroll .ce-head [data-ce-sort]{min-width:0;min-height:22px;height:22px;padding:0 6px;font-size:12px;line-height:1;}
+    #centerDownScroll .ce-head{border-bottom:2px solid var(--divider);padding-bottom:3px;margin-bottom:3px;}
+    /* Hold the BLOCKS word to zoom (2026-11-06, Julius): the label takes touches, the grip's upper half still drags. */
+    body.one-day #todayScroll .od-on > .od-pad-head .od-pad-lab{pointer-events:auto!important;position:relative;z-index:1;cursor:default;}
+    body.one-day #todayScroll .od-on > .od-pad-head button{pointer-events:auto!important;position:relative;z-index:1;cursor:pointer!important;}
+    #refSplitBar::before,#notesSplitBar::before,body.one-day #todayScroll .od-on > .od-pad-head::before{pointer-events:auto!important;}
+    .column-resizer::after{top:0!important;margin-top:0!important;}
+    .column-resizer::before{top:0!important;bottom:auto!important;height:46px!important;left:-13px!important;right:-13px!important;cursor:col-resize!important;}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{left:0!important;margin-left:0!important;}
+    body.one-day #todayScroll .od-on > .od-pad-head::before{left:0!important;right:auto!important;width:46px!important;top:-15px!important;bottom:auto!important;height:30px!important;cursor:row-resize!important;}
+    #refSplitBar::after{left:auto!important;right:0!important;margin-left:0!important;}
+    #refSplitBar::before{left:auto!important;right:0!important;width:46px!important;cursor:row-resize!important;}
+    #notesSplitBar::after{left:0!important;margin-left:0!important;}
+    #notesSplitBar::before{right:auto!important;width:46px!important;cursor:row-resize!important;}
+    #mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{top:0!important;margin-top:0!important;}
+    #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{bottom:auto!important;height:46px!important;cursor:col-resize!important;}
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{left:0!important;margin-left:0!important;}
+    #mobileSplitResizer[data-dir="row"]::before,#mobileSplitResizerThird[data-dir="row"]::before{right:auto!important;width:46px!important;cursor:row-resize!important;}
+    /* Even lines (Julius, 2026-11-02): every drag line is 2px and edge to edge, grips a touch squarer.
+       The day row's bottom accent sat right on the Notes split line and made it 4px, so one-day rows drop it;
+       Today's line reaches the column edges like the Notes and Reference lines. */
+    .column-resizer::after,#refSplitBar::after,#notesSplitBar::after,body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{border-radius:1px!important;}
+    body.one-day #todayScroll .day-row.today.od-on,body.one-day #journalScroll .day-row.today.od-on{box-shadow:none!important;}
+    body.one-day #todayScroll .od-on > .od-pad-head{margin-left:calc(-1 * var(--rowpx));margin-right:calc(-1 * var(--rowpx));padding-left:var(--rowpx);padding-right:var(--rowpx);}
+    /* Suggested Day + Day wrap-up are cells again (Julius, 2026-10-31), stretched edge to edge so the
+       column lines are their left / right sides: negative margins = the day row's side padding (--rowpx). */
+    .day-row{--rowpx:calc(8px * var(--pad-x,1) * var(--side-k,1));}
+    @media(max-width:900px){ .day-row{--rowpx:calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1));} }
+    body.mobile-mode .day-row{--rowpx:calc(12px * var(--mobile-scale,1) * var(--pad-x,1) * var(--side-k,1));}
+    .day-row .editor table[data-cnote][data-ckind="plan"],.day-row .editor table[data-cnote][data-ckind="wrap"]{width:calc(100% + 2 * var(--rowpx))!important;max-width:none!important;margin-left:calc(-1 * var(--rowpx))!important;margin-right:calc(-1 * var(--rowpx))!important;border-top-width:2px!important;border-bottom-width:2px!important;}
+    .day-row .editor table[data-cnote][data-ckind="plan"] td,.day-row .editor table[data-cnote][data-ckind="wrap"] td{padding-left:var(--rowpx)!important;padding-right:var(--rowpx)!important;}
+    /* Center phase 1 (2026-11-01, Julius): Notes column has no day label (Today keeps its label + weekday icon);
+       Suggested Day + Day Wrap-Up paused = hidden, never deleted (remove these two lines to bring them back). */
+    .journal-pane-row > .day-label{display:none!important;}
+    .day-row .editor table[data-cnote][data-ckind="plan"],.day-row .editor table[data-cnote][data-ckind="wrap"]{display:none!important;}
+    body.one-day #todayScroll .od-on > .od-top{display:flex;flex-direction:column;flex:var(--od-a,1) 1 0 !important;min-height:0 !important;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;}
+    body.one-day #todayScroll .od-on > .od-top > *{flex:0 0 auto;}
+    body.one-day #todayScroll .od-on > .od-top > .day-editor{flex:1 0 auto !important;overflow:visible !important;min-height:2em;}
+    .od-top{display:contents;}
+    body.one-day #todayScroll .od-on > .plan-pad{display:none;flex:var(--od-b,1) 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
+    .plan-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;}
+    /* Thoughts pad (2026-11-12, Julius): freeform, no rules, bottom-left slot where Blocks used to be. */
+    .thought-pad{display:none;}
+    /* Timer slot (2026-11-12): bottom-left, empty for now. */
+    .timer-slot{display:none;}
+    body.one-day #todayScroll .od-on > .timer-slot{display:block;flex:var(--od-b,1) 1 0;min-height:0;}
+    body.one-day #blocksScroll > .thought-pad{display:block;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:3px 3px 24px;word-break:break-word;}
+    .thought-pad:empty::before{content:attr(data-placeholder);color:var(--muted,#999);pointer-events:none;font-style:italic;}
+    /* Blocks docked in the middle column (2026-11-12): the active day's pad lives in #blocksScroll. */
+    body.one-day #blocksScroll > .plan-pad{display:block;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;outline:none;font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.18;padding:2px 2px 24px;word-break:break-word;}
+    #blocksScroll > .blocks-head{display:block;flex:0 0 auto;font-size:.72em;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#777);margin:3px 0 2px;padding:0 2px;border:0;cursor:default;}
+    #blocksScroll{position:relative;flex-direction:column;overflow:hidden;}
+
+    /* One text size everywhere (Julius, 2026-10-29): Reference panels (Urgent, Inbox, Calendar) and the Plan
+       pad use the same font, size and line height as the Today / Notes / Reference cells
+       (Text size × Scale). Small labels (dates, counts, sub-headers) are sized relative to it. */
+    :root{--fw-text:calc(var(--paragraph-size) * var(--workspace-scale,1));}
+    #urgentPanel,#inboxPanel,#calPanel{font-family:var(--paragraph-font);font-size:var(--fw-text);}
+    #urgentPanel :is(.urg-row,.urg-text,.urg-subtask,.urg-head),
+    #inboxPanel :is(.urg-row,.urg-text,.inbox-text,.urg-head),
+    #calPanel :is(.cal-row,.urg-head),
+    .urg-create input,.inbox-add input{font-family:var(--paragraph-font)!important;font-size:var(--fw-text)!important;line-height:1.3;}
+    #urgentPanel .urg-row,#inboxPanel .urg-row{padding-top:2px;padding-bottom:2px;}
+    #urgentPanel .urg-subtask{color:inherit;}
+    .urg-date,.cal-time,.cal-arch-item,.cal-auto,.urg-empty,.urg-due-chip{font-size:.85em;}
+    .urg-sub,.urg-arch-head,.urg-arch .urg-arch-day,.cal-sub.cal-block{font-size:.8em;}
+    .urg-made,.inbox-from,.cal-now{font-size:.72em;}
+    #urgentPanel .urg-fold{font-size:.9em;}
+    #urgentPanel .urg-fold small{font-size:.8em;}
+    .urg-head .urg-sub{font-size:.8em;}
+    .dash-chip{font-size:.85em;}
+    /* Plan / think = same spacing as Today (Julius, 2026-11-01): same text size + line height as the Today cell,
+       so checkboxes and lines sit the same. Cards always show a faint outline in their urgency color
+       (gray if none, follows light / dark); the line you're on gets the stronger ring. */
+    body.one-day #todayScroll .od-on > .plan-pad{font-size:var(--paragraph-size);line-height:1.18;}
+    .plan-pad .check-line[data-tc]:not([data-urg="1"],[data-urg="2"],[data-urg="3"]){--urg:#8a8f98;}
+    .plan-pad .check-line[data-tc]{border-color:color-mix(in srgb,var(--urg,#8a8f98) 32%,transparent)!important;}
+    .plan-pad .check-line[data-tcfocus]{box-shadow:0 0 0 1.5px var(--urg,#8a8f98);}
+    /* Resize handles (2026-11-03, Julius): one rounded gray pill, centered on its line. Column pills sit a quarter of the way down so they never land on a section line. Hit areas unchanged. */
+    .column-resizer::after,#refSplitBar::after,#notesSplitBar::after,
+    body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir]::after,#mobileSplitResizerThird[data-dir]::after{
+      left:50%!important;right:auto!important;top:50%!important;margin:0!important;transform:translate(-50%,-50%);
+      border-radius:999px!important;background:var(--grip-day,#6b7280)!important;opacity:1!important;
+      box-shadow:none!important;pointer-events:none;transition:background-color .12s,transform .12s;
+    }
+    .column-resizer::after,#mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{width:5px!important;height:28px!important;top:25%!important;}
+    #refSplitBar::after,#notesSplitBar::after,body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{width:28px!important;height:5px!important;}
+    body.one-day #todayScroll .od-on > .od-pad-head::after{top:-1px!important;}
+    html body.split-dragging :is(#refSplitBar,#notesSplitBar)::after,html body.split-dragging.one-day #todayScroll .od-on > .od-pad-head::after,
+    html .column-resizer:is(.dragging,:active)::after,html :is(#mobileSplitResizer,#mobileSplitResizerThird):active::after{background:#3b82f6!important;}
+    .column-resizer::before,#mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{
+      top:25%!important;bottom:auto!important;height:46px!important;margin-top:-23px!important;
+    }
+    #refSplitBar::before,#notesSplitBar::before,body.one-day #todayScroll .od-on > .od-pad-head::before,
+    #mobileSplitResizer[data-dir="row"]::before,#mobileSplitResizerThird[data-dir="row"]::before{
+      left:50%!important;right:auto!important;width:46px!important;margin-left:-23px!important;
+    }
+    /* Grips = 3 small dots ON the line, centered on it (2026-11-08, Julius: "no extra material, right in the middle").
+       Same hit areas, now also centered. */
+    .column-resizer::after,#mobileSplitResizer[data-dir="col"]::after,#mobileSplitResizerThird[data-dir="col"]::after{
+      width:5px!important;height:19px!important;top:50%!important;border-radius:0!important;
+      background:radial-gradient(circle,var(--grip-day,#6b7280) 1.6px,transparent 2px) center/5px 6.5px repeat-y!important;
+    }
+    #refSplitBar::after,#notesSplitBar::after,body.one-day #todayScroll .od-on > .od-pad-head::after,
+    #mobileSplitResizer[data-dir="row"]::after,#mobileSplitResizerThird[data-dir="row"]::after{
+      width:19px!important;height:5px!important;border-radius:0!important;
+      background:radial-gradient(circle,var(--grip-day,#6b7280) 1.6px,transparent 2px) center/6.5px 5px repeat-x!important;
+    }
+    .column-resizer::before,#mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::before{top:50%!important;}
+    html .column-resizer:is(.dragging,:active)::after,html :is(#mobileSplitResizer,#mobileSplitResizerThird)[data-dir="col"]:active::after{
+      background:radial-gradient(circle,#3b82f6 1.8px,transparent 2.2px) center/5px 6.5px repeat-y!important;
+    }
+    html body.split-dragging :is(#refSplitBar,#notesSplitBar)::after,html body.split-dragging.one-day #todayScroll .od-on > .od-pad-head::after,
+    html :is(#mobileSplitResizer,#mobileSplitResizerThird)[data-dir="row"]:active::after{
+      background:radial-gradient(circle,#3b82f6 1.8px,transparent 2.2px) center/6.5px 5px repeat-x!important;
+    }
+
+/* Floating Focus View: retain the live editor DOM and its autosave listeners. */
+/* Held-open cell (2026-11-04, Julius): same color as the cell it came from (set when it opens), a light dim behind it, a smaller window. */
+body{--fw-focus-bg:var(--dm-cell,var(--panel,#fff));}
+body.fw-focus-on .fw-focus-target{--panel:var(--fw-focus-bg);}
+/* Tucked strip + pull tab (2026-11-06, Julius). */
+.fw-tucked{overflow:hidden!important;} .fw-tucked > *{visibility:hidden!important;}
+.fw-tuck-tab{position:fixed;z-index:60;width:16px;height:46px;padding:0;border:1px solid var(--divider,#777);border-radius:6px;background:var(--panel,#fff);color:var(--text,#333);font:700 13px/1 system-ui,sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer;touch-action:manipulation;}
+.fw-tuck-tab.y{width:46px;height:16px;font-size:11px;}
+body.fw-focus-on .fw-tuck-tab{display:none;}
+#fwFocusBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:9000;display:none;}
+.hz-bar{position:fixed;top:calc(5dvh + 6px);right:calc(4vw + 14px);z-index:9003;display:flex;gap:3px;padding:2px;border-radius:7px;background:var(--panel,#fff);box-shadow:0 2px 8px rgba(0,0,0,.25);}
+.hz-bar button{font:inherit;font-size:12px;line-height:1;padding:3px 7px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+.hz-bar button[aria-pressed="true"]{background:var(--text,#333);color:var(--bg,#fff);border-color:var(--text,#333);}
+body.fw-focus-on #fwFocusBackdrop{display:block;}
+/* Zoomed cell on top of everything (2026-11-05): a parent with its own z-index (the day row has z-index:2) capped it, so
+   other columns drew over the zoom and its Blocks neighbour showed. While zoomed, its parents drop their z-index. */
+body.fw-focus-on :has(.fw-focus-target){z-index:auto!important;}
+body.fw-focus-on .fw-focus-target{position:fixed!important;inset:5dvh 4vw!important;width:92vw!important;height:90dvh!important;max-width:none!important;max-height:none!important;min-height:0!important;overflow:auto!important;z-index:9001!important;background:var(--fw-focus-bg)!important;color:var(--text,#222)!important;border:1px solid var(--border,#aaa)!important;border-radius:10px!important;padding:calc(12px * var(--pad-y,1)) calc(12px * var(--pad-x,1))!important;box-shadow:0 12px 48px rgba(0,0,0,.3)!important;flex:none!important;transform:none!important;}
+body.fw-focus-on .fw-focus-target.plan-pad{padding-top:36px!important;}
+body.fw-focus-on .fw-focus-target.plan-pad::before{content:'Blocks';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
+body.fw-focus-on .fw-focus-target.thought-pad{padding-top:36px!important;}
+body.fw-focus-on .fw-focus-target.thought-pad::before{content:'Focus / Thinking';position:sticky;top:0;display:block;font-weight:700;background:var(--panel,#fff);}
+@media(max-width:600px){body.fw-focus-on .fw-focus-target{inset:5dvh 3vw!important;width:94vw!important;height:90dvh!important;padding:calc(8px * var(--pad-y,1)) calc(8px * var(--pad-x,1))!important;}}
+
+#centerCalendarList .ce-event{display:flex;align-items:flex-start;gap:7px;}
+#centerCalendarList .ce-check{flex:0 0 auto;width:15px;height:15px;margin:1px 0 0;accent-color:#777;cursor:pointer;touch-action:none;}
+/* Calendar rows take urgency + subject like task lines (2026-11-03, Julius). */
+.ce-event[data-urg="1"]{--urg:#e5484d;}.ce-event[data-urg="2"]{--urg:#f0b000;}.ce-event[data-urg="3"]{--urg:#3b82f6;}
+#centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid var(--urg);border-radius:3px;background:transparent;display:inline-grid;place-content:center;}
+#centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked{background:var(--urg);}
+#centerCalendarList .ce-event:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > .ce-check:checked::after{content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-8%,-12%);}
+/* Cal Events follow Options → Task subject color (2026-11-03, Julius): checkbox / whole card / subtle / border. */
+body.tc-borderonly #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 60%,transparent);}
+body.tc-subtleline #centerCalendarList .ce-event[data-tccat]:not(.ce-done){border-color:color-mix(in srgb,var(--ce-cat) 65%,#fff);border-width:var(--sl-w,1.5px);}
+body:not(.tc-boxfill,.tc-borderonly) #centerCalendarList .ce-event[data-tccat]:not(.ce-done){background:color-mix(in srgb,var(--ce-cat) var(--tc-mix,22%),var(--panel));}
+body.tc-boxfill #centerCalendarList .ce-event[data-tccat]:not(.ce-done) > .ce-check{-webkit-appearance:none;appearance:none;box-sizing:border-box;border:2px solid color-mix(in srgb,var(--ce-cat) 55%,#555);border-radius:3px;background:var(--ce-cat);display:inline-grid;place-content:center;}
+body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done) > .ce-check{border-color:var(--urg);}
+#centerCalendarList .ce-event:has(.ce-meta:not(:empty)){flex-wrap:wrap;row-gap:1px;}
+#centerCalendarList .ce-meta{flex:1 0 100%;padding-left:22px;color:var(--muted);font-size:.85em;}
+#centerCalendarList .ce-meta:empty{display:none;}
+#centerCalendarList .ce-event-text{flex:1;min-width:0;}
+/* Tight Cal Events (2026-11-03, Julius): small margins, text runs under the checkbox like the history log. */
+#centerDownScroll{padding-inline:4px;}
+/* Tighter cells (2026-11-04, Julius): normal text spacing and a smaller checkbox. Holding the row opens the menu, so the box needn't be big. */
+#centerCalendarList .ce-event,#centerCalendarList .ce-event:has(.ce-meta:not(:empty)){display:flow-root;margin:2px 0;padding:2px 4px;line-height:1.22;}
+#centerCalendarList .ce-check{float:left;position:relative;z-index:1;width:calc(17px * var(--workspace-scale,1));height:calc(17px * var(--workspace-scale,1));margin:1px 5px -12px 0;} /* same box as task cells */
+#centerCalendarList .ce-event-text,#centerCalendarList .ce-meta{display:block;padding-left:0;}
+#centerCalendarList .ce-time{display:flow-root;}
+/* Cal Events groups (2026-11-03, Julius): more room and a line between them. */
+#centerCalendarList .ce-group{margin:14px 0 4px;padding-top:7px;border-top:1px solid var(--divider);color:var(--text);font-weight:700;}
+#centerCalendarList .ce-group:first-child{margin-top:2px;padding-top:0;border-top:0;}
+#centerCalendarList .ce-check:disabled{opacity:.5;}
+/* Cats urgency boxes (2026-11-06, Julius): red → yellow → blue → grey (not set) → done. */
+#centerCalendarList .ce-urg{--ce-u:#8a8f98;margin:6px 0 8px;padding:2px 6px 5px;border:1.5px solid color-mix(in srgb,var(--ce-u) 70%,transparent);border-radius:8px;background:color-mix(in srgb,var(--ce-u) 7%,transparent);}
+#centerCalendarList .ce-urg-1{--ce-u:#e5484d;} #centerCalendarList .ce-urg-2{--ce-u:#d99a00;} #centerCalendarList .ce-urg-3{--ce-u:#3b82f6;} #centerCalendarList .ce-urg-done{--ce-u:#5f6368;opacity:.8;}
+#centerCalendarList .ce-urg-h{font-weight:700;font-size:.85em;color:color-mix(in srgb,var(--ce-u) 80%,var(--text,#888));}
+#centerCalendarList .ce-urg-h small{font-weight:400;opacity:.75;}
+#centerCalendarList .ce-urg-h + .ce-cat{margin-top:2px;}
+/* Cal Events subjects + title editing (2026-11-04, Julius): app-side sorting only, nothing goes to Google Calendar except the title. */
+#centerCalendarList .ce-cat{margin:7px 0 2px;font-size:.8em;font-weight:700;color:color-mix(in srgb,var(--ce-cat,var(--muted)) 75%,var(--text,#888));}
+#centerCalendarList .ce-group + .ce-cat,#centerCalendarList .ce-add + .ce-cat{margin-top:2px;}
+#centerCalendarList .ce-event.ce-picked{outline:1px solid var(--accent);outline-offset:0;}
+#centerCalendarList [data-ce-editing]{outline:0;cursor:text;-webkit-user-select:text;user-select:text;}
+/* + Task in All-Day Tasks (2026-11-04, Julius). */
+#centerCalendarList .ce-group-add{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+/* Cal Events search (2026-11-06, Julius): a box on the title line filters the events as you type (title words, any order).
+   Narrow phone column (title was already cut to "Ca…"): the title hides so the box fits. */
+#centerDownScroll .ce-head .ce-search{flex:1 1 60px;min-width:44px;width:0;max-width:220px;box-sizing:border-box;height:24px;margin:0;padding:1px 6px;font:inherit;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:inherit;}
+#centerDownScroll .ce-head strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@container (max-width:260px){#centerDownScroll .ce-head{gap:3px;}#centerDownScroll .ce-head strong{font-size:0;}#centerDownScroll .ce-head strong::before{content:"📅";font-size:14px;} /* narrow: a 📅 instead of hiding the title (2026-11-07) */#centerDownScroll .ce-head .ce-search{min-width:36px;padding:1px 4px;}#centerDownScroll .ce-head:has(.ce-search:focus) :is([data-ce-sort],[data-ce-day]){display:none;}#centerDownScroll .ce-head .ce-search:focus{max-width:none;}}
+@container (max-width:175px){#centerDownScroll .ce-head strong{display:none;}} /* phone-narrow: no room even for 📅 */
+/* Mini day view in Cal Events (2026-11-11, Julius). */
+#centerDownScroll .ce-head [data-ce-opt]{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px;padding:0!important;margin:0;font-size:13px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;}
+#centerDownScroll .ce-head [data-ce-opt].on{background:var(--accent-soft,rgba(66,133,244,.18));}
+#centerCalendarList .ce-day{height:clamp(140px,38vh,300px);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--divider);border-radius:8px;margin:2px 0 6px;position:relative;}
+#centerCalendarList .ce-day-in{position:relative;}
+#centerCalendarList .ce-day-in::before{content:"";position:absolute;top:0;bottom:0;left:21px;border-left:1px solid var(--divider);} /* axis line between the hour labels and the events (2026-11-11) */
+/* Sub-hour cells (2026-11-12, Julius): the 30- / 15-minute guides are smaller tiles too — fainter fill, tighter
+   radius — so zoomed in, each hour splits into little section cells instead of lines. */
+#centerCalendarList .ce-day-hr.ce-day-sub{border-top:0;margin-top:0;border-radius:5px;background:color-mix(in srgb,var(--muted) 5%,transparent);} /* no top margin: 1px gaps inside the hour, 2px at the hour break (2026-11-12) */
+#centerCalendarList .ce-day-in[data-step="0"] .ce-day-sub{display:none;}
+#centerCalendarList .ce-day-in[data-step="30"] .ce-day-s15{display:none;}
+#centerCalendarList .ce-day-hr.ce-day-sub span{font-size:8.5px;opacity:.85;}
+#centerCalendarList .ce-day-hr{position:absolute;left:0;right:0;border-top:1px solid var(--divider);height:0;}
+#centerCalendarList .ce-day-hr span{position:absolute;left:3px;top:1px;font-size:9.5px;color:var(--muted);}
+/* Hour cells (2026-11-12, Julius: "like Google Calendar"): each hour is a soft rounded tile with a small gap, no
+   hour line; labels sit in the gutter. Sub-hour guides stay faint lines inside the tiles. */
+#centerCalendarList .ce-day-in::before{display:none;}
+#centerCalendarList .ce-day-hr:not(.ce-day-sub){border-top:0;left:22px;right:2px;height:calc(var(--ce-h,48px) - 2px);margin-top:1px;border-radius:6px;background:color-mix(in srgb,var(--muted) 9%,transparent);}
+#centerCalendarList .ce-day-hr:not(.ce-day-sub) span{left:-21px;top:-1px;width:19px;text-align:right;}
+#centerCalendarList .ce-day-hr.ce-day-sub span{left:-21px;width:19px;text-align:right;}
+#centerCalendarList .ce-day-hr.ce-day-sub{left:22px;right:2px;}
+/* Zoomed in, the hour tile shrinks to its first section and the sub tiles fill the rest of the hour. */
+#centerCalendarList .ce-day-in[data-step="30"] .ce-day-hr:not(.ce-day-sub){height:calc(var(--ce-h,48px) / 2 - 2px);}
+#centerCalendarList .ce-day-in[data-step="30"] .ce-day-hr.ce-day-sub{height:calc(var(--ce-h,48px) / 2 - 1px);}
+#centerCalendarList .ce-day-in[data-step="15"] .ce-day-hr:not(.ce-day-sub){height:calc(var(--ce-h,48px) / 4 - 2px);}
+#centerCalendarList .ce-day-in[data-step="15"] .ce-day-hr.ce-day-sub{height:calc(var(--ce-h,48px) / 4 - 1px);}
+#centerCalendarList .ce-day-now{position:absolute;left:22px;right:0;border-top:2px solid #ea4335;z-index:2;}
+#centerCalendarList .ce-day-ev{position:absolute;box-sizing:border-box;border-radius:4px;padding:1px 5px;font-size:12px;line-height:1.25;font-family:Roboto,'Segoe UI',system-ui,sans-serif;color:#1f1f1f;overflow:hidden;z-index:1;}
+#centerCalendarList .ce-day-ev b{font-weight:500;} /* Google Calendar look: medium weight, not bold (2026-11-11) */
+#centerCalendarList .ce-day-key{display:flex;flex-wrap:wrap;gap:2px 8px;margin:2px 2px 3px;font-size:10.5px;color:var(--muted);}
+#centerCalendarList .ce-day-key i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle;}
+#centerCalendarList .ce-day-ev b{font-weight:600;}
+#centerCalendarList .ce-day-ev span{opacity:.8;font-size:10px;}
+#centerCalendarList .ce-day-ev.done b{text-decoration:line-through;}
+#centerCalendarList .ce-add-btn{flex:0 0 auto;min-width:0;min-height:26px;padding:1px 7px;font-size:.85em;font-weight:600;line-height:1.2;}
+#centerCalendarList .ce-add{display:flex;align-items:center;gap:4px;margin:3px 0 5px;}
+#centerCalendarList .ce-add input{flex:1 1 auto;min-width:0;box-sizing:border-box;height:30px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);font:inherit;}
+#centerCalendarList .ce-add .btn{flex:0 0 auto;min-width:0;min-height:30px;padding:2px 7px;font-size:.85em;}
+
+/* History / Log time-of-day containers: visual grouping without wrapping editable task DOM. */
+#todayScroll .day-editor > :is([data-tsec="morning"],[data-tsec="afternoon"],[data-tsec="evening"]){display:flex;align-items:flex-start;white-space:normal;margin:10px var(--sec-mr,0px) 3px var(--sec-ml,0px)!important;padding:1px var(--sec-pr,3px) 2px var(--sec-pl,3px)!important;}
+#todayScroll .day-editor > [data-tsec] > br{display:none;}
+#todayScroll .day-editor > [data-tsf]{flex-wrap:wrap;}
+#todayScroll .day-editor > [data-tsec] > .ts-sum{order:3;flex:0 0 100%;min-width:0;margin-top:3px;font-size:calc(var(--paragraph-size,14px) * .8);font-weight:400;line-height:1.3;text-transform:none;letter-spacing:0;white-space:normal;}
+#todayScroll .ts-row{margin:3px 0;}
+#todayScroll .ts-row > .ts-tc{margin:0 6px;color:var(--muted);font-size:.95em;white-space:normal;} /* Types view counts (2026-11-11) */
+#todayScroll .day-label .day-dash{cursor:pointer;} /* tap = Mini → Types → Full (2026-11-11) */
+/* History / Log: long task text runs under the checkbox at any pane width, not only under 420px (2026-11-04, Julius). */
+#todayScroll .day-editor .check-line:not([data-tlon]){display:flow-root!important;}
+#todayScroll .day-editor .check-line:not([data-tlon]) > input[type=checkbox]{float:left;margin:1px 5px -12px 0;}
+#todayScroll .day-editor .check-line:not([data-tlon]) > .check-text{display:block;}
+/* Folded lines stay hidden (2026-11-04): the display:flow-root!important above (ID selector) beat [data-tlhid]{display:none},
+   so folded Morn / After / Night sections and groups still showed every task. */
+#todayScroll .day-editor > [data-tlhid][data-tlhid][data-tlhid]{display:none!important;} /* repeated attr = higher specificity than the rule above */
+#todayScroll .sec-host > .day-editor.sec-painted{margin-left:0!important;margin-right:0!important;padding-left:calc(15px * var(--side-k,1) + 4px)!important;}
+#todayScroll .ts-count{font:inherit;margin-left:6px;padding:1px 7px;min-height:24px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;}
+#todayScroll .ts-items{margin-top:2px;opacity:.85;overflow-wrap:anywhere;min-width:0;}
+#todayScroll .ts-it{padding-left:.9em;text-indent:-.9em;overflow-wrap:anywhere;} /* one item per line; wraps under itself */
+#todayScroll .ts-it::before{content:"• ";}
+#todayScroll .ts-type > b{display:block;}
+[data-tlon="c"][data-tlsum]:not([data-due-label])::after{white-space:pre-line;overflow-wrap:anywhere;min-width:0;max-width:100%;box-sizing:border-box;}
+/* Compact folded look (2026-11-15): every task name, flowing into columns when there's room. */
+[data-tlmode="c"][data-tlon="c"][data-tlsum]:not([data-due-label])::after{column-width:9.5em;column-gap:14px;column-fill:balance;}
+[data-tlmode="c"] > .tl-sum .hx-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5em,1fr));column-gap:14px;}
+#todayScroll [data-tlmode="c"] > .tl-sum .ts-it::before{content:none;}
+.tl-mode-menu{position:fixed;z-index:10050;min-width:180px;padding:6px;border-radius:10px;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc);box-shadow:0 6px 22px rgba(0,0,0,.22);display:flex;flex-direction:column;gap:4px;}
+.tl-mode-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#777);padding:2px 6px;}
+.tl-mode-opt{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;padding:7px 9px;border:1px solid transparent;border-radius:7px;background:transparent;color:inherit;font:inherit;font-size:13px;cursor:pointer;}
+.tl-mode-opt span{font-size:11px;color:var(--muted,#777);}
+.tl-mode-opt.on{border-color:var(--border,#ccc);background:color-mix(in srgb,var(--text,#222) 6%,transparent);}
+/* History detail button (2026-11-04): small, next to the HISTORY / LOG title; narrow panes drop "/ LOG" so it stays one line. */
+#todayPane.pane-narrow .hl-log{display:none;}
+#todayPane .pane-header .today-jump{white-space:nowrap;}
+/* 2026-11-06 (Julius): three fixed buttons side by side instead of one cycling button; the current one is filled. */
+#todayPane .hist-modes{display:none!important;} /* cleanup 2026-11-09: tap the day's date to cycle */
+#todayScroll .day-label .day-date{cursor:pointer;}
+#todayPane.pane-narrow .hist-modes{gap:1px;margin-left:3px;}
+#todayPane.pane-narrow .hist-mode{min-width:17px;padding:2px 2px;font-size:.8em;}
+#todayPane .hist-mode[aria-pressed="true"]{background:var(--divider,#777);color:var(--bg,#fff);}
+#todayPane .hist-mode{font:inherit;font-size:.85em;font-weight:700;line-height:1;margin-left:0;padding:2px 5px;min-width:22px;min-height:22px;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;cursor:pointer;flex:0 0 auto;}
+#todayScroll .ts-type > b{margin-right:5px;font-weight:600;} /* History log types (2026-11-04) */
+#todayScroll .day-editor > [data-tsec]:not([data-tsf="o"]){border-bottom:0!important;}
+/* History readability (2026-11-05, Julius): a line + room between Morn / After / Night, smaller count buttons,
+   underlined New / Fixes / Tweaks headings with space between them. */
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){margin-top:14px!important;border-top:1px solid var(--divider,#888)!important;padding-top:7px!important;}
+#todayScroll .ts-count{font-size:.82em;line-height:1.2;padding:0 6px;min-height:20px;}
+#todayScroll .ts-row + .ts-row{margin-top:7px;}
+#todayScroll .ts-type{margin-top:5px;}
+#todayScroll .ts-type > b{text-decoration:underline;text-underline-offset:2px;margin-bottom:1px;}
+#todayScroll .day-editor > [data-tsf]{cursor:pointer;}
+#todayScroll .day-editor > [data-tsec]::before{flex:0 0 auto;margin-top:.1em;}
+#todayScroll .day-editor > [data-tsec]::after{flex:1 1 0;min-width:0;white-space:pre-line;overflow-wrap:anywhere;}
+#todayScroll .day-editor > [data-tsec="morning"][data-tsf="o"]::after{content:"Morn 6–2 · " attr(data-tsinfo) "\00A0\00A0−";}
+#todayScroll .day-editor > [data-tsec="morning"][data-tsf="c"]::after{content:"Morn 6–2 · " attr(data-tsinfo) "\00A0\00A0+";}
+#todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="o"]::after{content:"Aft 2–8 · " attr(data-tsinfo) "\00A0\00A0−";}
+#todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="c"]::after{content:"Aft 2–8 · " attr(data-tsinfo) "\00A0\00A0+";}
+#todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]::after{content:"Eve 8–6 · " attr(data-tsinfo) "\00A0\00A0−";}
+#todayScroll .day-editor > [data-tsec="evening"][data-tsf="c"]::after{content:"Eve 8–6 · " attr(data-tsinfo) "\00A0\00A0+";}
+/* Full time windows (2026-11-05, Julius): label = render-only .ts-lab ("Morn 6–2"; was "Morn 8–2 (6a–2p)" until 2026-11-07), ::after keeps only the count. */
+#todayScroll .day-editor > [data-tsec] > .ts-lab{order:1;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:calc(var(--paragraph-size,14px) * .75)!important;font-weight:600;letter-spacing:.02em;text-transform:none;white-space:nowrap;}
+#todayScroll .day-editor > [data-tsec] > .ts-lab small{font-size:.8em;font-weight:500;opacity:.75;margin-left:.3em;}
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab)::after{order:2;content:""!important;flex:0 0 auto!important;white-space:nowrap!important;overflow-wrap:normal!important;}
+/* Too narrow for one line: the count moves under the label as one piece (2 lines, never 4). */
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){flex-wrap:wrap;row-gap:0;}
+#todayScroll .day-editor > [data-tsec][data-tsf="o"]:has(> .ts-lab)::after{content:"\00A0· " attr(data-tsinfo) "\00A0\00A0−"!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf="c"]:has(> .ts-lab)::after{content:"\00A0· " attr(data-tsinfo) "\00A0\00A0+"!important;}
+
+.editor [data-nsec="must"]{position:relative;}
+/* Small and inside the DAILIES lines (2026-11-03, Julius): flow-root keeps the floated button within the header. */
+.editor > [data-nsec="must"]{display:flex;align-items:center;justify-content:space-between;}
+/* DAILIES starts right at the header line, so its text and Options sit midway between the two lines. */
+.editor > [data-nsec="must"]{padding-top:2px;}
+body.one-day #journalScroll .day-row.od-on{padding-top:0!important;}
+body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!important;margin-top:0!important;}
+.editor .daily-sort-btn{flex:0 0 auto;margin:0;font:inherit;font-size:9px;line-height:1;letter-spacing:0;text-transform:none;border:1px solid currentColor;border-radius:3px;background:transparent;color:inherit;padding:0 3px;min-height:0;cursor:pointer;}
+.editor .daily-sort-menu{position:absolute;right:0;top:100%;z-index:20;background:var(--panel,#fff);border:1px solid var(--border,#888);border-radius:6px;padding:4px;box-shadow:0 5px 15px #0003;min-width:145px;}
+.editor .daily-sort-menu[hidden]{display:none!important;}
+.editor .daily-sort-menu button{display:block;width:100%;padding:7px;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;cursor:pointer;}
+</style>

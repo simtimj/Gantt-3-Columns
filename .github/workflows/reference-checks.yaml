@@ -5,6 +5,8 @@ on:
       - 'Code.gs'
       - 'StudyLog.gs'
       - 'Index.html'
+      - 'Index_*.html'
+      - 'tools/index-html.mjs'
       - 'Drafts.html'
       - 'tools/draft-test.mjs'
       - 'tools/save-timing-test.mjs'

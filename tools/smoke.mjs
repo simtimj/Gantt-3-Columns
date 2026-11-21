@@ -5,6 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { createRequire } from 'module';
+import { readIndexHtml } from './index-html.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 // Pacific dates, like Code.gs (2026-11-21: UTC dates broke the phone calendar checks every evening after 4 pm PT).
@@ -44,7 +45,7 @@ const imported = { build: 'smoke', ref: {}, inbox: [], days: { [today]: { th: 'h
 const stub = `<script>window.google={script:{run:new Proxy({},{get(t,k){let ok=null;const p=new Proxy({},{get(_,m){
   if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler'||m==='withUserObject')return()=>p;
   return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='getWorkspaceData'?${JSON.stringify(data)}:m==='runImports'||m==='getSyncState'?${JSON.stringify(imported)}:m==='getFocus'?${JSON.stringify(focus)}:m==='getKim'?{html:'',h:'k0',fresh:true}:m==='saveKim'?{h:'k1'}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),m==='getWorkspaceData'?(+localStorage.getItem('smokeWsd')||10):10);};}});return p[k];}})}};</script>`;
-let html = fs.readFileSync('Index.html', 'utf8')
+let html = readIndexHtml()
   .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
   .replace("<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>", fs.readFileSync('Drafts.html', 'utf8'))
   // Instant screen (2026-11-21): like the live doGet, the page comes without data and asks getWorkspaceData itself.
@@ -1260,7 +1261,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
     const d={today,inbox:[],cardCats:[],notesSeeds:{},urgent:[],refPins:[],timing:{total:1,steps:{},fast:false},
       days:[{date:today,tasks:'<p>'+(changed?'Other device day':'Original day')+'</p>',journal:'',th:changed?'h1':'h0',jh:'j0'}],
       reference:empty?[]:[{id:'recover-ref',parentId:'',type:'item',title:'Reference',sort:1,expanded:true,content:'<h2>Reference</h2><p>'+(changed?'Other device ref':'Original ref')+'</p>',ch:changed?'r1':'r0'}]};
-    fs.writeFileSync(file,fs.readFileSync('Index.html','utf8')
+    fs.writeFileSync(file,readIndexHtml()
       .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>",fs.readFileSync('WeekdayIcons.html','utf8'))
       .replace("<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>",fs.readFileSync('Drafts.html','utf8'))
       .replace('<?!= initialData ?>',JSON.stringify(d)).replace(/<\?= appUrl \?>/g,'https://script.google.com/macros/s/recovery-smoke/dev').replace('<?= build ?>','smoke').replace('<head>','<head>'+draftStub));
@@ -1575,7 +1576,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
     // Phase 3a: an Undated Tasks card (plus the Keep In Mind items from `focus`) so + Add has every source.
     const calData = JSON.parse(JSON.stringify(data));
     calData.reference.push({ id: 'r-und', parentId: '', type: 'item', title: 'Undated Tasks', content: '<h2>Undated Tasks</h2>' + line('Fix bike'), expanded: true, sort: 2 });
-    const cHtml = fs.readFileSync('Index.html', 'utf8')
+    const cHtml = readIndexHtml()
       .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
       .replace("<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>", fs.readFileSync('Drafts.html', 'utf8'))
       .replace('<?!= initialData ?>', JSON.stringify(calData)).replace(/<\?= appUrl \?>/g, '#').replace('<?= build ?>', 'smoke')

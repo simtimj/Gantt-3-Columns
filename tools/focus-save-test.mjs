@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { readIndexHtml } from './index-html.mjs';
 const clone=v=>JSON.parse(JSON.stringify(v));
 const fixture={v:1,cats:[{id:'c',name:'Work',items:[{id:'a',t:'First',d:0,lv:0},{id:'b',t:'Second',d:0,lv:0}]}]};
 const props={};let locked=false,generation=0;
@@ -47,7 +48,7 @@ assert.equal(locked,false);
 props[chunkKey]=savedChunk;
 console.log('✓ Focus server: independent edits/additions merge; same-field edits resolve by newest (loser logged), delete vs edit keeps the edit and legacy-tab guard checked');
 
-const html=fs.readFileSync('Index.html','utf8');
+const html=readIndexHtml();
 const start=html.indexOf('  (function initFocus(){'),end=html.indexOf('  /* Done → Dailies matches',start);
 const calls=[],storage=new Map(),timers=new Map(),statuses=[];let nextTimer=1;
 const run={withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(fn){this.fail=fn;return this;},

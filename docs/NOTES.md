@@ -1023,3 +1023,13 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Devices: phone (Chrome), tablet, Windows PC.
 - BUILT H 2026-11-21: Code.gs `PWA API` banner (`ss_`, `pwaKey_`, `apiCall` = key + no `_`/native/blocked names, `apiPing`, `pwaSetupPage_` at `?app=pwa[&page=tracker]`); `tools/build-pwa.mjs` + `tools/pwa/` (shim, sw, icons); `tools/pwa-api/` (Router.gs.txt, appsscript.json.txt, deploy.sh, project.json filled by CI); deploy.yaml jobs `Gantt API router` + `pages`. Smoke suite `pwa`.
 - One-time by Julius: (1) repo Settings → Pages → Source **GitHub Actions**; (2) open the Gantt API project (link in `tools/pwa-api/project.json` → `editor`) → run `authorize` → allow. Then per device: /dev?app=pwa → Open → Install.
+
+
+## One calm return (2026-11-21, Julius: speed item M)
+
+- **What**: `window.fwResume` (main script, banner `ONE CALM RETURN`). Modules call `fwResume.add(name, run, last?)`; one `visibilitychange` → visible runs them in `ORDER`, `GAP` 350 ms apart; a job is skipped when refreshed < 60 s ago (`last()` = the module's own time, e.g. `fwLastSync`, Timer `lastPull`, Blocks `loadedAt`; missing or 0 → when the queue last ran it, starting at page load). Hidden again → stops. A skipped job costs no gap.
+- **Order**: sync (Today/Notes, `fwSync`) → calendar (panel > 5 min old → `loadCalendar`, which includes the center list; else `loadCenterCalendar`) → timer (Timer Log pull) → blocks (b3 strip, keeps its 5-min wait) → nextSteps (`getFocus`) → kim (Keep In Mind) → reference (Reference tab `show(true)`) → newThings → fun → weather (fetch itself waits 30 min).
+- **Not queued (on purpose)**: every save-on-hide handler; resume bookkeeping for the Speed Log (J); Timer `paintAll` / `checkForgot` / `flush` (device-only + sending unsent, right away); window `focus` → `fwSync` (desktop alt-tab; its 15 s guard stops a double with the queue).
+- **Behavior change**: returns within 60 s now refresh nothing (was: sync after 15 s, Cal Events every time, Timer after 30 s). The 55 s visible sync timer still runs.
+- **Speed Log**: kind `resume`, Client = `ran`, `skipped`, `awaySec`, `stopped`, `ms`; only when at least one job ran. `window.__FW_RESUME_LAST` holds the last run.
+- **Smoke**: suite `resume` (quick return skips all + no row; 2-min return runs all in order, staggered, sync first; hide mid-queue stops).

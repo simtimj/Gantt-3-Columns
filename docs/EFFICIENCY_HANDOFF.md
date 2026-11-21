@@ -4,13 +4,13 @@ Updated 2026-11-10. This is the current engineering handoff, not a declaration t
 
 ## Speed plan — 2026-11-21 (Julius: "put it away 5 min, come back, the whole thing refreshes")
 
-Status: J, L implemented (L user-confirmed on the phone 11-21); G, K, M approved by Julius ("do all of this"), not started. One per session.
+Status: J, L, M implemented (L user-confirmed on the phone 11-21; M untested live); G, K approved by Julius ("do all of this"), not started. One per session.
 - Facts: Index.html 1.25 MB + WeekdayIcons.html 190 KB (base64); server ~5 s per full load (Speed Log 11/4); ~12 `visibilitychange` handlers each refresh on return. Return without a reload is already a light sync (`fwSync`), so the "whole refresh" is most likely the phone discarding the tab.
 - **J (implemented 11-21, untested live):** Speed Log `load` rows' Client JSON now has `navType`, `start` ('returned' = reload within 2 h of the page being hidden, i.e. discarded; 'fresh'), `awaySec`, `discarded` (Chrome `document.wasDiscarded`), `resumesBefore` (returns without reload since the last load). Limit: closing the tab yourself also sets the hidden time. **Resume step:** after a day of use, read `Speed Log` Client column for kind=load and count start=returned vs fresh.
 - **G — split Index.html:** ~6 files on existing seams (CSS, markup, main script, task cards/looks, calendar module, extras) via `<?!= include('X') ?>` like WeekdayIcons. Verify: concatenated output byte-identical to the old Index.html. Also update Code.gs build hash (`createHtmlOutputFromFile('Index')`, ~line 578), the 3 `.replace(` loaders in tools/smoke.mjs, docs/CODE_MAP.md.
 - **K — lighter page:** icons → small SVG / lighter images (190 KB); load the calendar module + FullCalendar only when the calendar column is first shown; measure KB before/after.
 - **L — instant screen (implemented 11-21, user-confirmed 11-21; details docs/NOTES.md → "Instant screen"):** doGet sends the page without data (`INSTANT_SCREEN`), the page paints the IndexedDB snapshot read-only and asks for data itself. **Resume step:** read Speed Log `load` rows: `snap` = shown share, `screen` vs `liveMs`. Original plan: on load, paint the last saved workspace snapshot from localStorage at once (read-only look until fresh data merges), then apply server data. Watch the safe-sync / recovery rules (docs/NOTES.md → "Safe sync") — never let a stale snapshot overwrite newer text.
-- **M — one calm return:** one `fwResume` queue on `visibilitychange` that runs the ~12 refreshers in order, staggered, skipping ones refreshed < 60 s ago.
+- **M — one calm return (implemented 11-21, untested live; details docs/NOTES.md → "One calm return"):** one `fwResume` queue on `visibilitychange` runs 10 jobs in order, 350 ms apart, skipping ones refreshed < 60 s ago (the 2 calendar handlers merged). **Resume step:** read Speed Log `resume` rows (ran / skipped / awaySec / ms) next to the `sync` rows after it; check returns feel calmer on the phone.
 
 ## Latest checkpoint — 2026-11-10
 

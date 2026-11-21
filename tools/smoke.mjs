@@ -3004,5 +3004,55 @@ if (only('pwa')) {
   if (errs.length) { fails += errs.length; console.error('✗ pwa:\n  ' + errs.join('\n  ')); }
   else console.log('✓ pwa: setup link + API shim + opens from stored data then syncs + offline read-only + key box + tracker');
 }
+// One calm return (2026-11-21, speed item M): coming back runs ONE queue — registered jobs in order, staggered,
+// skipping ones refreshed < 60 s ago; stops if hidden again; Speed Log 'resume' row only when something ran.
+for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
+  const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' });
+  const pg = await ctx.newPage(), errs = [];
+  pg.on('pageerror', e => errs.push(e.message));
+  try {
+    await pg.goto('file://' + out); await pg.waitForTimeout(4600);
+    const res = await pg.evaluate(async () => {
+      const R = window.fwResume, out = [], wait = ms => new Promise(r => setTimeout(r, ms));
+      if (!R) return ['fwResume missing'];
+      let vis = 'visible';
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => vis });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => vis !== 'visible' });
+      const flip = v => { vis = v; document.dispatchEvent(new Event('visibilitychange')); };
+      const missing = R.ORDER.filter(n => !R.jobs.includes(n)); if (missing.length) out.push('jobs not registered: ' + missing.join(', '));
+      // 1) Quick return (< 60 s): everything was just refreshed → all skipped, no server calls, no Speed Log row.
+      let n0 = (window.__calls || []).length; flip('hidden'); await wait(50); flip('visible'); await wait(400);
+      const q = window.__FW_RESUME_LAST || {};
+      if (!q.skipped || q.ran.length) out.push('quick return should skip all, ran: ' + (q.ran || []).join(','));
+      if ((window.__calls || []).slice(n0).some(c => c[0] === 'logSpeed')) out.push('quick return wrote a Speed Log row');
+      // 2) Two minutes away: every job runs once, in ORDER, one per GAP; first server call at once.
+      const real = Date.now; Date.now = () => real() + 120000;
+      n0 = (window.__calls || []).length; const seen = [], t0 = performance.now();
+      const tick = setInterval(() => { const c = window.__calls || []; while (n0 < c.length) seen.push([c[n0++][0], Math.round(performance.now() - t0)]); }, 10);
+      flip('hidden'); flip('visible'); await wait(R.GAP * (R.jobs.length + 1) + 300); clearInterval(tick);
+      const r = window.__FW_RESUME_LAST || {};
+      const order = R.jobs.slice().sort((a, b) => R.ORDER.indexOf(a) - R.ORDER.indexOf(b));
+      if ((r.ran || []).join() !== order.join()) out.push('ran ' + (r.ran || []).join(',') + ' — want ' + order.join(','));
+      if (r.ms < R.GAP * (r.ran.length - 1) * 0.9) out.push('not staggered: ' + r.ms + ' ms for ' + r.ran.length + ' jobs');
+      const sync = seen.find(s => s[0] === 'getSyncState' || s[0] === 'runImports');
+      if (!sync || sync[1] > 150) out.push('sync not first / not at once: ' + JSON.stringify(sync));
+      const burst = seen.filter(s => s[0] !== 'logSpeed' && s[1] < R.GAP - 50).length;
+      if (burst > 2) out.push(burst + ' server calls in the first ' + R.GAP + ' ms (want ≤ 2): ' + JSON.stringify(seen));
+      const log = seen.find(s => s[0] === 'logSpeed') && (window.__calls || []).filter(c => c[0] === 'logSpeed' && c[1][0] === 'resume').pop();
+      if (!log || !Array.isArray(log[1][2].ran) || log[1][2].awaySec == null) out.push('no Speed Log resume row with ran / awaySec');
+      // 3) Hidden again mid-queue → stops (stopped: true, not every job ran).
+      Date.now = () => real() + 240000;
+      flip('hidden'); flip('visible'); await wait(R.GAP + 50); flip('hidden'); await wait(R.GAP * 2);
+      const s = window.__FW_RESUME_LAST || {};
+      if (!s.stopped || s.ran.length >= R.jobs.length) out.push('hiding mid-queue did not stop it: ' + JSON.stringify(s));
+      Date.now = real; flip('visible');
+      return out;
+    });
+    errs.push(...res);
+  } catch (e) { errs.push(String(e)); }
+  if (errs.length) { fails += errs.length; console.error('✗ resume ' + name + ':\n  ' + errs.join('\n  ')); }
+  else console.log('✓ resume ' + name + ': quick return skips all, 2-min return runs every job in order staggered, hide stops it, Speed Log row');
+  await ctx.close();
+}
 await b.close();
 process.exit(fails ? 1 : 0);

@@ -10,6 +10,7 @@ Where things live, so a session can jump straight there. **Grep the quoted text;
 | Page markup (header, columns, panes) | `<body>` | 2324–2600 |
 | **Main app script** (one big block) | `STATE` banner | 2610–11720 |
 | Instant screen (snapshot paint / save, early data request) | `INSTANT SCREEN` | 2615 |
+| One calm return (`fwResume` queue on coming back) | `ONE CALM RETURN` | 3058 |
 | · state, helpers, first load | `BASIC HELPERS`, `LOAD` | 2750 |
 | · day rows (History / Today), editors | `DAYS`, `EDITORS`, `AUTO FORMATTING` | 2920–4700 |
 | · right-click / hold menu | `RIGHT-CLICK / LONG-PRESS MENU` | 4790 |
@@ -46,4 +47,4 @@ Where things live, so a session can jump straight there. **Grep the quoted text;
 
 ## Tests
 
-`tools/check.mjs` = syntax. `tools/smoke.mjs` suites: `main`, `snap`, `drafts`, `tracker`, `calendar` (run one with `SMOKE_ONLY=calendar`). The calendar suite's fake server is `calStub` (seeded events: Dentist 9:00, Standup, Gig, All-day A…). Main suite runs in Pacific time like Julius's browser.
+`tools/check.mjs` = syntax. `tools/smoke.mjs` suites: `main`, `snap`, `drafts`, `tracker`, `calendar`, `resume` (run one with `SMOKE_ONLY=calendar`). The calendar suite's fake server is `calStub` (seeded events: Dentist 9:00, Standup, Gig, All-day A…). Main suite runs in Pacific time like Julius's browser.

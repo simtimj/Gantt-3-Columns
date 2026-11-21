@@ -3055,6 +3055,46 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     else { localStorage.setItem('fw.resumes', String((Number(localStorage.getItem('fw.resumes')) || 0) + 1)); localStorage.removeItem('fw.hiddenAt'); }
   } catch (e) {} });
   window.addEventListener('pagehide', () => { try { localStorage.setItem('fw.hiddenAt', String(Date.now())); } catch (e) {} });
+  /* ONE CALM RETURN (2026-11-21, speed item M). Coming back to the page used to fire ~12 refreshers at the same moment.
+     Each module now registers fwResume.add(name, run, last) and this one queue runs them in ORDER, one every GAP ms,
+     skipping any refreshed < 60 s ago (last() = the module's own last-refresh time; without it, or while it is 0, when
+     the queue last ran it, starting at page load). Stops when the page is hidden again. Saves on hide stay in each module (never queued).
+     Speed Log kind 'resume' (only when something ran): ran, skipped, awaySec, stopped, ms. Details: docs/NOTES.md → "One calm return". */
+  window.fwResume = (() => {
+    const ORDER = ['sync','calendar','timer','blocks','nextSteps','kim','reference','newThings','fun','weather'];
+    const GAP = 350, FRESH = 60000, jobs = {};
+    let timer = 0, running = false, hiddenAt = 0, finish = null;
+    const pos = n => { const i = ORDER.indexOf(n); return i < 0 ? ORDER.length : i; };
+    function add(name, run, last){ jobs[name] = {run, last, ranAt: Date.now()}; }
+    function stop(){ clearTimeout(timer); if(running && finish) finish(true); running = false; }
+    function start(){
+      if(running) return;
+      running = true;
+      const list = Object.keys(jobs).sort((a,b) => pos(a) - pos(b)), ran = [], skipped = [], t0 = performance.now();
+      const awaySec = hiddenAt ? Math.round((Date.now() - hiddenAt) / 1000) : null;
+      const done = finish = stopped => {
+        running = false; finish = null;
+        const r = {ran, skipped, awaySec, stopped, ms: Math.round(performance.now() - t0), at: Date.now()};
+        window.__FW_RESUME_LAST = r;
+        if(ran.length && typeof fwSendSpeed === 'function' && window.google && google.script) try{ fwSendSpeed('resume', {total: r.ms, steps: {}}, fwSpeedContext(r)); }catch(e){}
+      };
+      const step = i => {
+        if(document.visibilityState !== 'visible') return done(true);
+        if(i >= list.length) return done(false);
+        const n = list[i], j = jobs[n];
+        let at = j.ranAt; if(j.last) try{ at = Number(j.last()) || j.ranAt; }catch(e){} // 0 = never loaded → queue time
+        if(Date.now() - at < FRESH){ skipped.push(n); return step(i + 1); }
+        j.ranAt = Date.now(); ran.push(n);
+        try{ j.run(); }catch(e){ try{ console.error('fwResume ' + n, e); }catch(_){} }
+        timer = setTimeout(() => step(i + 1), GAP);
+      };
+      step(0);
+    }
+    document.addEventListener('visibilitychange', () => {
+      if(document.visibilityState === 'visible') setTimeout(start, 0); else { hiddenAt = Date.now(); stop(); }
+    });
+    return {add, start, stop, ORDER, GAP, FRESH, get jobs(){ return Object.keys(jobs); }};
+  })();
   /* Instant screen numbers for the Speed Log (2026-11-21), all ms since the page started opening:
      screen = when something useful was on screen (the saved picture, else the live draw); snap = shown / none /
      old / width / late / nostore / embedded; snapMs, reqMs (data asked), dataMs (data arrived), liveMs, snapAgeSec, snapKb. */
@@ -6608,9 +6648,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Live updates while the app is open (2026-11-05, Julius: "update what it needs, without a reset"): a light check
   // every minute, imports every 3 minutes and whenever the tab comes back into view.
   const fwImportsDue = () => Date.now() - fwLastImport > 180000;
-  document.addEventListener('visibilitychange',() => {
-    if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 15000) fwSync(fwImportsDue() || Date.now() - fwLastSync > 60000);
-  });
+  // Back in view: first in the calm-return queue (fwResume skips it if synced < 60 s ago; the 55 s timer covers the rest).
+  fwResume.add('sync', () => fwSync(fwImportsDue() || Date.now() - fwLastSync > 60000), () => fwLastSync);
   window.addEventListener('focus',() => { if(Date.now() - fwLastSync > 15000) fwSync(fwImportsDue()); });
   setInterval(() => { if(document.visibilityState === 'visible' && Date.now() - fwLastSync > 55000) fwSync(fwImportsDue()); },15000);
   window.addEventListener('pagehide',() => { try{ fwFlushAll(); }catch(e){} });
@@ -8105,9 +8144,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       clearTimeout(timer); timer = setTimeout(send,700);
     });
     ed.addEventListener('blur',() => { if(dirty) send(); });
-    document.addEventListener('visibilitychange',() => {
-      if(document.hidden){ if(dirty) send(); } else if(!dirty && !sending) show(true);
-    });
+    document.addEventListener('visibilitychange',() => { if(document.hidden && dirty) send(); });
+    fwResume.add('reference', () => { if(!dirty && !sending) show(true); }); // back in view: calm-return queue
     const set = t => {
       pane.dataset.rtab = t;
       pane.querySelectorAll('.ref-tabs button').forEach(b => b.classList.toggle('on', b.dataset.rtab === t));
@@ -8533,7 +8571,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     load();
     render();
     // Back to the app → pull the latest list so this device starts from the newest copy (only when idle).
-    document.addEventListener && document.addEventListener('visibilitychange', () => {
+    window.fwResume && fwResume.add('nextSteps', () => { // calm-return queue
       if(document.visibilityState !== 'visible' || !data || pending || saving || conflict || !(window.google && google.script)) return;
       const host = document.querySelector('.fx'); if(host && host.contains(document.activeElement)) return;
       google.script.run.withSuccessHandler(d => {
@@ -8778,7 +8816,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     render();
     const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(idle()) render(); }).getNewThings(); };
     pull();
-    document.addEventListener('visibilitychange', () => { if(!document.hidden){ pull(); if(idle()) render(); } });
+    fwResume.add('newThings', () => { pull(); if(idle()) render(); }); // back in view: calm-return queue
     let shownDay = today(); setInterval(() => { if(today() !== shownDay && idle()){ shownDay = today(); render(); } }, 60000);
     window.fwNew = {get data(){ return data; }, render};
   })();
@@ -8955,7 +8993,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     render();
     const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(!drag && !list.contains(document.activeElement)) render(); }).getFun(); };
     pull();
-    document.addEventListener('visibilitychange', () => { if(!document.hidden) pull(); });
+    fwResume.add('fun', pull); // back in view: calm-return queue
     window.fwFun = {get data(){ return data; }, render};
   })();
   /* Hourly weather (2026-11-01, Julius): ☁️ tab. Open-Meteo (free, no key), Vallejo/Benicia area,
@@ -9031,7 +9069,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     setInterval(() => { if(!document.hidden){ load(false); chip(); } }, 10 * 60 * 1000);
     const check = () => { if(isWx()){ draw(); load(false); } else chip(); };
     new MutationObserver(check).observe(pane, {attributes:true, attributeFilter:['data-ctab']});
-    document.addEventListener('visibilitychange', () => { if(!document.hidden) check(); });
+    fwResume.add('weather', check); // back in view: calm-return queue (load() itself waits 30 min between fetches)
     check();
   })();
   /* =========================================================
@@ -10597,7 +10635,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       setStatus('Could not add that task: ' + (err && err.message || err));
     }).addAllDayTask(date,title);
   });
-  document.addEventListener('visibilitychange', () => { if(!document.hidden) loadCenterCalendar(); });
+  // Back in view (calm-return queue): one job for both calendars. Panel data older than 5 min → loadCalendar
+  // (it reloads the center list too); else just the center list. Was two handlers → two center loads.
+  fwResume.add('calendar', () => {
+    if(calLoadedAt && Date.now() - calLoadedAt > 5 * 60000) loadCalendar(); else loadCenterCalendar();
+  });
   function loadCalendar(){
     loadCenterCalendar();
     if(!CAL_PANEL_ON){ const p = document.getElementById('calPanel'); if(p) p.remove(); return; }
@@ -10608,9 +10650,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       .withFailureHandler(e => { calLoading = false; calError = e.message || String(e); renderCalendar(); })
       .getCalendarEvents();
   }
-  document.addEventListener('visibilitychange',() => {
-    if(document.visibilityState === 'visible' && calLoadedAt && Date.now() - calLoadedAt > 5 * 60000) loadCalendar();
-  });
   function calTime(ms){
     const d = new Date(ms);
     let h = d.getHours(); const m = d.getMinutes(); const ap = h < 12 ? 'a' : 'p';
@@ -15075,7 +15114,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     }, true);
     ed.addEventListener('input', schedule);
     ed.addEventListener('focusout', () => { if(pending) save(); });
-    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') load(false); });
+    window.fwResume && fwResume.add('kim', () => load(false)); // back in view: calm-return queue
     setInterval(() => { if(document.visibilityState === 'visible' && document.activeElement !== ed && !ed.contains(document.activeElement)) load(false); }, 60000);
     // Group borders: one box per run of non-empty top-level lines (a header + its tasks, down to the empty line).
     const scroller = document.getElementById('kimScroll');
@@ -16022,9 +16061,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   window.addEventListener('online', flush);
   document.addEventListener('visibilitychange', () => {
     if(document.visibilityState !== 'visible') return;
-    paintAll(); checkForgot(); flush();
-    if(Date.now() - lastPull > 30000) pull();
+    paintAll(); checkForgot(); flush(); // device-only + sending unsent: right away, never queued
   });
+  window.fwResume && fwResume.add('timer', pull, () => lastPull); // Timer Log merge: calm-return queue
   // After the page has drawn: show device events at once, then merge the Timer Log and send anything unsent.
   setTimeout(() => { paintAll(); checkForgot(); }, 300);
   setTimeout(pull, 1500);
@@ -19342,7 +19381,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // Keep ticks in step: any checkbox change re-reads done states (cheap; no server call).
   let t = 0;
   document.addEventListener('change', e => { if(e.target && e.target.type === 'checkbox' && !strip.contains(e.target)){ clearTimeout(t); t = setTimeout(render, 200); } }, true);
-  document.addEventListener('visibilitychange', () => { if(!document.hidden && Date.now() - loadedAt > 5 * 60000) load(); });
+  // Back in view: calm-return queue; keeps its own 5-min wait (the strip is a slow-changing suggestion list).
+  window.fwResume && fwResume.add('blocks', () => { if(Date.now() - loadedAt > 5 * 60000) load(); }, () => loadedAt);
   setTimeout(load, 1800);
 })();
 </script>

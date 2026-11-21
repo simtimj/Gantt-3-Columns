@@ -4,7 +4,7 @@ Google Apps Script web app (Today / Notes / Reference columns over a Google Shee
 
 ## Token-lean coding (Julius 2026-11-21: usage efficiency matters)
 - **One feature = one session.** When Julius brings a new feature idea mid-session, suggest a new session in one line; fixes to the feature in hand stay.
-- Grep for the function/section; read only that range. `docs/NOTES.md`: `grep -n "^## "` then read the one section. Vague request → one short question first.
+- Start from `docs/CODE_MAP.md` (area → grep word), then grep and read only that range. `docs/NOTES.md`: `grep -n "^## "` then read the one section. Vague request → one short question first.
 - Write decisions to NOTES / README as they're made (the next session only knows what's written).
 - Non-code jobs (Sheets rows, calendar, Done Log, Reference cards, Central Data Hub, userscripts, IT study log): rules in `docs/RULES.md`, open the section you need.
 

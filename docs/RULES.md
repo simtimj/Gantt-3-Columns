@@ -20,6 +20,8 @@ Open only the section you need: `grep -n "^## " docs/RULES.md`.
 
 ## To Confirm (2026-11-04, Julius: standing rule, every project)
 
+- **Cheap read (2026-11-21):** the `To Confirm Open` tab is a live FILTER of the open rows (Status ≠ works), oldest first. For the count + oldest 3, read `To Confirm Open!A1:C4` and `To Confirm Open!A:A` (count = rows − 1). Never read the whole `To Confirm` tab for this.
+
 - **Every shipped change gets a row in the `To Confirm` tab** of New Gantt Sheet (`1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`, Sheets connector, alongside the Done Log row): Date `YYYY-MM-DD`, Project, Change (short name), How to check (one line he can test on his phone), Status blank. One row per feature, not per commit. It shows in the pinned **To Confirm** Reference card; ticking a line there marks it `works`.
 - **Before new work in a project**, read its open rows and tell Julius how many are unchecked plus the oldest 3.
 - **When Julius says something is broken / not working**, check the tab first. If it was never confirmed, say so plainly ("shipped 11/2, never checked"). Broken → Status `broken` (stays open with ⚠). Works → Status `works` + Checked on date, and move its README item from 🧪 to ✅.

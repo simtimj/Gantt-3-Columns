@@ -6,7 +6,7 @@ Last updated: 2026-11-21
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
-**Claude session cost (Nov 21, implemented):** `CLAUDE.md` trimmed 17.4k → 3.3k characters (loaded every session); non-code rules moved verbatim to `docs/RULES.md`, NOTES index dropped (grep instead). New rule: one feature = one session.
+**Claude session cost (Nov 21, implemented):** `CLAUDE.md` trimmed 17.4k → 3.3k characters (loaded every session); non-code rules moved verbatim to `docs/RULES.md`, NOTES index dropped (grep instead). New rule: one feature = one session. Also: `docs/CODE_MAP.md` (area → grep word for `Index.html` / `Code.gs`); `To Confirm Open` sheet tab (live filter of open rows, so checks don't read the whole tab); smoke tests now run in Pacific time (the phone calendar checks failed every evening after 4 pm PT).
 
 ## Efficiency checkpoint — 2026-11-10
 

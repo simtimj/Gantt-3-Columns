@@ -7,8 +7,10 @@ import path from 'path';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
-const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-const yday = new Date(Date.now() - 864e5 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+// Pacific dates, like Code.gs (2026-11-21: UTC dates broke the phone calendar checks every evening after 4 pm PT).
+const laDate = ms => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date(ms));
+const today = laDate(Date.now());
+const yday = laDate(Date.now() - 864e5);
 const line = (t, a = '') => `<div class="check-line" data-level="0"${a}><input type="checkbox"><span class="check-text">${t}</span></div>`;
 // Keep In Mind (2026-11-05): old-shape data (Task cards with why + subtasks) that must convert to a free nested list.
 const focus = { v: 1, cats: [{ id: 'c1', name: 'Crabbing prep', col: false, projects: [
@@ -54,7 +56,7 @@ const only = part => !process.env.SMOKE_ONLY || process.env.SMOKE_ONLY.split(','
 const b = await chromium.launch();
 let fails = 0;
 for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
-  const pg = await (await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch })).newPage();
+  const pg = await (await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' })).newPage(); // Julius's browser clock
   const errs = [];
   pg.on('pageerror', e => errs.push(e.message + (process.env.STK ? ' @ ' + (e.stack || '').split('\n').slice(1,4).join(' | ') : '')));
   await pg.goto('file://' + out);

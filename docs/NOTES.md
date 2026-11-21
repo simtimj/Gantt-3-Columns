@@ -988,3 +988,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## A. Hide the top button row (2026-11-21 13:12, Julius: defaults)
 - (19) Hold an empty spot of the toolbar → hide; a thin strip stays at the top: tap / hold it → show. (20) Remembered per device. (21) The whole row hides, date and status too.
 - Julius 13:12: OK to work on these despite the Calendar-first rule ("I'm behind").
+- BUILT B 2026-11-21: `kimPinUnit` / `kimTogglePin` (before `runEditAction`), ctx button `data-ctx="kimPin"` (Keep In Mind only, label Pin / Unpin). Head line gets `data-kpin="<ms>"` (saved).
+
+## G. Keep In Mind title border color (2026-11-21 13:43, Julius; defaults, no questions asked — he wants speed)
+- Hold a title (e.g. "Weekend") → 🎨 Border color: a few quick swatches (red / yellow / blue / green / purple) + a full color picker (the phone's color wheel) + Reset. Saved on the title line (`data-tbc="#rrggbb"`, syncs); the title box border uses it.

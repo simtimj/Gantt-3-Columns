@@ -364,6 +364,39 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       k.forEach(x => errs.push('Ref → Keep In Mind: ' + x));
     }
   }
+  // Keep In Mind pin (2026-11-21, Julius; NOTES "B."): hold an item → 📌 Pin to top; pinned items stay on top in pin
+  // order with their lines; Unpin moves it just below the pinned ones; the pin is saved in the cell.
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      document.querySelector('[data-ctab="focus"]').click(); await wait(300);
+      const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
+      const L = (t, lv, tl) => '<div class="check-line" data-level="' + lv + '"' + (tl ? ' data-tl="1"' : '') + (lv ? ' style="margin-left: ' + 24 * lv + 'px;"' : '') + '><input type="checkbox"><span class="check-text">' + t + '</span></div>';
+      ed.insertAdjacentHTML('beforeend', '<div><br></div><div data-tl="1"><b>PinA</b></div>' + L('PinA kid', 1) + '<div><br></div>' + L('PinB', 0) + L('PinB sub', 1));
+      refreshCards(ed); refreshTitleLines(ed); await wait(100);
+      const f = t => [...ed.children].find(l => l.textContent.trim() === t);
+      const menu = async (t) => { const n = f(t), tx = n.querySelector('.check-text') || n, r = document.createRange(); r.setStart(tx.firstChild || tx, 0); r.collapse(true);
+        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); ed.focus(); rememberSelection(ed);
+        showContextMenu(ed, 50, 50, false); const b = document.querySelector('#contextMenu [data-ctx="kimPin"]'); const label = b && !b.hidden ? b.textContent : '';
+        if (b && !b.hidden) b.click(); await wait(80); return label; };
+      const top = () => [...ed.children].filter(n => !isEmptyLine(n)).slice(0, 4).map(n => n.textContent.trim()).join('|');
+      if (!/Pin to top/.test(await menu('PinB sub'))) out.push('no "Pin to top" in the Keep In Mind hold menu');
+      if (!top().startsWith('PinB|PinB sub|')) out.push('pinned task + subtask not on top: ' + top());
+      await menu('PinA kid');
+      if (top() !== 'PinB|PinB sub|PinA|PinA kid') out.push('second pin not right under the first: ' + top());
+      if (!f('PinA').hasAttribute('data-kpin') || !/data-kpin/.test(cardCleanHtml(ed))) out.push('pin not saved in the cell');
+      if (getComputedStyle(f('PinA'), '::before').content.indexOf('📌') < 0) out.push('no 📌 on a pinned item');
+      if (!/Unpin/.test(await menu('PinB'))) out.push('pinned item\'s menu does not say Unpin');
+      if (top() !== 'PinA|PinA kid|PinB|PinB sub' || f('PinB').hasAttribute('data-kpin')) out.push('unpin did not move it below the pinned ones: ' + top());
+      const ki = [...ed.children]; for (let i = 1; i < ki.length; i++) if (isEmptyLine(ki[i]) && isEmptyLine(ki[i - 1])) { out.push('doubled blank lines after pin moves'); break; }
+      const kim = document.querySelector('[data-ctab="focus"]');
+      showContextMenu(document.querySelector('#todayScroll .day-editor'), 40, 40, false);
+      const kb = document.querySelector('#contextMenu [data-ctx="kimPin"]'); if (kb && !kb.hidden) out.push('Pin shows outside Keep In Mind'); hideContextMenu();
+      captureBeforeEdit(ed); ['PinA','PinA kid','PinB','PinB sub'].forEach(t => { const n = f(t); if (n) { const nx = n.nextElementSibling; n.remove(); if (nx && isEmptyLine(nx) && t.endsWith('kid') || t.endsWith('sub')) nx && isEmptyLine(nx) && nx.remove(); } });
+      if (ed.firstElementChild && isEmptyLine(ed.firstElementChild)) ed.firstElementChild.remove();
+      finishEditorEdit(ed); document.querySelector('[data-ctab="notes"]').click(); await wait(200);
+      return out; });
+    k.forEach(x => errs.push('Keep In Mind pin: ' + x));
+  }
   // Title cells (2026-11-21, Julius): a title + its lines sit in one box (nested box inside), archive takes the whole box.
   {
     const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];

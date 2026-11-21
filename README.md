@@ -78,6 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **Keep In Mind pin**: hold an item → 📌 Pin to top. Its title box (or task + subtasks) moves to the top with a small 📌; several pins stay in pin order. Hold it again → 📌 Unpin puts it just below the pinned ones. Syncs across devices.
 - **Reference → Keep In Mind drag**: hold a Reference card's title, then drag. The drawer slides away; drop on Keep In Mind (or its ⭐ tab) and a copy lands there as a title with its lines under it: tasks stay tasks, and cards inside it become nested titles. Reference keeps the card.
 - **Reference archive**: hold or right-click a Reference card (its text or its frame) → 🗄 Archive card: the card and the cards inside it go to the Archive (restore from Arc), no question asked. Delete is now a small 🗑 button (still asks first).
 - **Reference = right half**: the Next Steps + Reference drawer is exactly the right half of the screen (full width on the phone), with no dimming, so the left half stays visible and usable and the drawer is the same color as the columns. Dragging the ◀ tab no longer resizes it.

@@ -2600,6 +2600,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <button class="btn" type="button" tabindex="-1" data-ctx="title" title="Make this line a title: − / + folds the lines under it, down to the next empty line">▤ Title</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="lineAbove" title="Insert an empty line above this one">↑ Line above</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="lineBelow" title="Insert an empty line below this one">↓ Line below</button>
+  <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="kimPin" title="Pin this item (and the lines under it) to the top of Keep In Mind" hidden>📌 Pin to top</button>
   <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="refArchive" title="Archive this Reference card (and the cards inside it); restore it from Arc" hidden>🗄 Archive card</button>
 </div>
 <?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>
@@ -4798,9 +4799,66 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* =========================================================
      FORMATTING ACTIONS (used by the right-click / long-press menu)
      ========================================================= */
+  /* Keep In Mind pin (2026-11-21, Julius; NOTES "B. Keep In Mind pin"): hold an item → 📌 Pin to top / Unpin. The item
+     = its title box (title + its lines, outermost title), else the task + its subtasks, else the line. Pinned heads carry
+     data-kpin="<time pinned>" (saved, so it syncs) and sit at the top in pin order, each followed by a blank line;
+     unpinning moves the item just below the pinned ones. */
+  function kimPinUnit(ed, node){
+    let n = node && (node.nodeType === 1 ? node : node.parentElement);
+    while(n && n.parentElement !== ed) n = n.parentElement;
+    if(!n || n === ed || isEmptyLine(n)) return null;
+    let head = null;
+    for(let p = n; p && !isEmptyLine(p); p = p.previousElementSibling){
+      if(isTitleLine(p) && (p === n || titleCovered(p).includes(n))) head = p;
+    }
+    if(head) return [head].concat(titleCovered(head));
+    if(n.classList.contains('check-line')){
+      let r = n;
+      while(r && (Number(r.dataset.level) || 0) > 0 && r.previousElementSibling && r.previousElementSibling.classList.contains('check-line')) r = r.previousElementSibling;
+      return urgSubtree(r);
+    }
+    return [n];
+  }
+  function kimPinnedBlockEnd(ed){
+    // The node after the last pinned unit's trailing blank line (or the first child when nothing is pinned).
+    let n = ed.firstElementChild;
+    while(n && n.hasAttribute('data-kpin')){
+      const u = kimPinUnit(ed, n) || [n];
+      n = u[u.length - 1].nextElementSibling;
+      while(n && isEmptyLine(n)) n = n.nextElementSibling;
+    }
+    return n;
+  }
+  function kimTogglePin(ed, unit){
+    captureBeforeEdit(ed);
+    const head = unit[0], pin = !head.hasAttribute('data-kpin');
+    // Take the unit out, closing the gap it leaves (no doubled blank lines).
+    const before = head.previousElementSibling, after = unit[unit.length - 1].nextElementSibling;
+    unit.forEach(x => x.remove());
+    if(before && after && isEmptyLine(before) && isEmptyLine(after)) after.remove();
+    else if(!before && after && isEmptyLine(after)) after.remove();
+    if(pin) head.setAttribute('data-kpin', String(Date.now())); else head.removeAttribute('data-kpin');
+    // Pinned: after the pinned block (newest pin last). Unpinned: first item below the pinned block.
+    const at = kimPinnedBlockEnd(ed);
+    const gap = document.createElement('div'); gap.innerHTML = '<br>';
+    const frag = document.createDocumentFragment(); unit.forEach(x => frag.appendChild(x)); frag.appendChild(gap);
+    ed.insertBefore(frag, at);
+    if(gap.nextElementSibling && isEmptyLine(gap.nextElementSibling)) gap.nextElementSibling.remove();
+    if(typeof refreshCards === 'function') try{ refreshCards(ed); }catch(e){}
+    if(typeof refreshTitleLines === 'function') try{ refreshTitleLines(ed); }catch(e){}
+    finishEditorEdit(ed);
+    saveEditorOwner(ed);
+    setStatus(pin ? 'Pinned to the top of Keep In Mind' : 'Unpinned');
+  }
   function runEditAction(action, ed){
     if(!ed || !ed.isConnected){
       setStatus('Select text or a task first');
+      return;
+    }
+    if(action === 'kimPin'){
+      const u = kimPinUnit(ed, savedRange && savedRange.startContainer);
+      if(!u){ setStatus('Tap an item first'); return; }
+      kimTogglePin(ed, u);
       return;
     }
     if(action === 'refArchive'){
@@ -5006,6 +5064,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     ctxEditor = ed;
     const isRef = !!(ed && ed.classList && ed.classList.contains('ref-cell') && ed.closest('#referenceTree .ref-cell-wrapper'));
     const ra = ctxMenu.querySelector('[data-ctx="refArchive"]'); if(ra) ra.hidden = !isRef;
+    const kp = ctxMenu.querySelector('[data-ctx="kimPin"]');
+    if(kp){
+      const isKim = !!(ed && ed.classList && ed.classList.contains('kim-editor'));
+      kp.hidden = !isKim;
+      if(isKim){ const sel = window.getSelection(), u = sel && sel.rangeCount ? kimPinUnit(ed, sel.anchorNode) : null;
+        kp.textContent = u && u[0].hasAttribute('data-kpin') ? '📌 Unpin' : '📌 Pin to top'; }
+    }
     ctxAnchor = {x,y,touch:!!touch};
     rememberSelection(ed);
     activeEditor = ed;
@@ -19089,6 +19154,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* 2026-11-11 (Julius): the blue "Ref" tag was too much — back to the quiet edge tab, just a little wider; the
      toolbar Ref button (next to Cols) is the visible way in. */
   #rdTab{width:24px;}
+  /* Keep In Mind pin (2026-11-21): a small 📌 before a pinned item. */
+  #kimScroll .kim-editor > [data-kpin].check-line > .check-text::before,
+  #kimScroll .kim-editor > [data-kpin]:not(.check-line)::before{content:'📌';font-size:.8em;margin-right:4px;}
   /* Reference → Keep In Mind drag (2026-11-21) */
   .rk-ghost{position:fixed;z-index:3300;pointer-events:none;max-width:70vw;padding:6px 10px;border-radius:8px;background:var(--panel);
     color:inherit;border:2px solid var(--urg,#3b82f6);box-shadow:0 6px 18px rgba(0,0,0,.3);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}

@@ -932,3 +932,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Stand-ins (`bltmp-`, `fqtmp-`) now go when the real event arrives (`dropWhenReal`, ≤ 5 s) instead of a fixed 2.5 s, so no doubles.
 - Fix: `fadRender` waits while a row of the box is held (`fadDrag.fad`), since replacing the row mid-drag loses the touchend.
 - Smoke: "order" (two quick adds land last; drag "Order two" above "All-day A" → kept after a re-read).
+- 2026-11-21 7:45 am (Julius): sky stripe "too bright, cuts into the 4am text" → 3 px, alpha .55, label cushion padding-right 7 px. All-day divider "resize at will" → once dragged, `.cp-adset` makes `--cp-ad-max` the scroller's real height (ratio .03–.85, min 26 px); double-tap clears it. KNOWN (pre-existing, also fails on the previous commit, likely time-of-day): calendar phone smoke "scheduled: dragging back to all day gave {allDay:false,sched:true}" — batch for maintenance.

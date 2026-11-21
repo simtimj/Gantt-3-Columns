@@ -1363,6 +1363,18 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
         window.__calEmpty = 1; panel.querySelector('[data-cal-refresh]').click();
         if (!await until(() => /No events/.test(panel.querySelector('[data-cal-state]').textContent))) out.push('no empty state');
         window.__calEmpty = 0;
+        // Divider drag (2026-11-21, Julius: "resize at will"): with a short all-day list, dragging the line down grows
+        // the all-day area and up shrinks it; double-tap goes back to auto.
+        panel.querySelector('[data-cal-refresh]').click();
+        if (!await until(() => panel.querySelector('.fc-timegrid-event') && panel.querySelector('.cp-adgrip.on'))) out.push('divider: grip not shown');
+        else { const g = panel.querySelector('.cp-adgrip'), sc = () => panel.querySelector('.fc-daygrid-body').closest('.fc-scroller'), h0 = sc().clientHeight;
+          const pe = (t, y) => g.dispatchEvent(new PointerEvent(t, {bubbles: true, cancelable: true, clientX: 10, clientY: y, pointerId: 7, pointerType: 'touch'}));
+          const y = g.getBoundingClientRect().top + 9; pe('pointerdown', y); pe('pointermove', y + 60); pe('pointermove', y + 120); pe('pointerup', y + 120); await wait(120);
+          const h1 = sc().clientHeight; if (h1 < h0 + 80) out.push('divider: drag down did not grow the all-day area (' + h0 + ' → ' + h1 + ')');
+          const y2 = g.getBoundingClientRect().top + 9; pe('pointerdown', y2); pe('pointermove', y2 - 50); pe('pointermove', y2 - 100); pe('pointerup', y2 - 100); await wait(120);
+          if (sc().clientHeight > h1 - 70) out.push('divider: drag up did not shrink it (' + h1 + ' → ' + sc().clientHeight + ')');
+          const y3 = g.getBoundingClientRect().top + 9; pe('pointerdown', y3); pe('pointerup', y3); await wait(80); pe('pointerdown', y3); pe('pointerup', y3); await wait(120);
+          if (panel.classList.contains('cp-adset') || localStorage.getItem('fw.calAllDayMax')) out.push('divider: double-tap did not reset to auto'); }
         // All-day cap (2026-11-10): a long all-day list stops at half the calendar height, scrolls, shows the grip.
         window.__calManyAllDay = 1; panel.querySelector('[data-cal-refresh]').click();
         if (!await until(() => panel.querySelectorAll('.fc-daygrid-event').length > 20 && panel.querySelector('.cp-adgrip.on'))) out.push('all-day cap: grip not shown for a long all-day list');

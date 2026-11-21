@@ -15902,7 +15902,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label
      strip instead, one smooth gradient (each label cell paints its own slice). Sunrise / sunset = a faint dotted line. */
   /* 2026-11-21 later (Julius: "a bit much, more subtle"): the sky is a thin 3 px stripe on the strip's right edge, not a fill. */
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:6px 100%;background-position:right top;background-repeat:no-repeat;}
+  /* 2026-11-21 7:43 am (Julius: "too bright, more subtle, cuts into the 4am text"): 3 px stripe at 55% strength, and
+     the hour text gets 4 px more room on the right so it never touches the stripe. */
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:3px 100%;background-position:right top;background-repeat:no-repeat;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:7px!important;}
   #calPanel .cp-sunmk{display:none;}
   #calPanel:is(.cp-full,.cp-docked) .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dotted rgb(242 113 28 / .35);pointer-events:none;z-index:0;}
   #calPanel:is(.cp-full,.cp-docked) .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:8.5px;line-height:1;color:var(--cp-muted);opacity:.6;}
@@ -16121,6 +16124,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* All-day cap (2026-11-10, Julius): a long all-day list stops at half the calendar height (saved ratio, fw.calAllDayMax)
      and scrolls; drag the small bar under it to change the cap, double-click / double-tap it = back to half. */
   #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-scroller{max-height:var(--cp-ad-max,none);overflow-x:hidden !important;overflow-y:auto !important;}
+  /* 2026-11-21 7:45 am (Julius: "make the dividing line draggable so I can resize at will"): once dragged, the line sets
+     the all-day area's real height (bigger or smaller, even with only one task); double-tap goes back to auto. */
+  #calPanel.cp-adset .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-scroller{height:var(--cp-ad-max)!important;}
+  #calPanel.cp-adset .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-daygrid-body,
+  #calPanel.cp-adset .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-scrollgrid-sync-table{min-height:100%;}
   #calPanel .cp-adgrip{position:absolute;left:50%;width:64px;margin-left:-32px;height:18px;z-index:6;cursor:ns-resize;touch-action:none;display:none;}
   #calPanel .cp-adgrip.on{display:block;}
   #calPanel .cp-adgrip::after{content:"";position:absolute;left:14px;right:14px;top:6px;height:6px;border-radius:3px;background:var(--cp-axis-line);opacity:1;box-shadow:0 0 0 1px var(--cp-bg);}
@@ -17862,9 +17870,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // All-day cap (2026-11-10, Julius): see the CSS note above. The grip only shows while the list is capped (scrolling).
   const AD_KEY = 'fw.calAllDayMax', AD_DEF = 0.5, cpBody = panel.querySelector('.cp-body');
   let adRatio = Number(lsGet(AD_KEY)) || AD_DEF, adDrag = false, adSc = null;
+  panel.classList.toggle('cp-adset', !!Number(lsGet(AD_KEY)));
   const adGrip = document.createElement('div');
   adGrip.className = 'cp-adgrip'; adGrip.setAttribute('aria-hidden', 'true');
-  adGrip.title = 'Drag to change how tall the all-day list can get (double-click = half)';
+  adGrip.title = 'Drag to resize the all-day list (double-tap = auto)';
   if(cpBody) cpBody.appendChild(adGrip);
   const adScroller = () => { const b = mount.querySelector('.fc-daygrid-body'); return b && b.closest('.fc-scroller'); };
   const adRO = window.ResizeObserver ? new ResizeObserver(() => adLayout()) : null;
@@ -17875,7 +17884,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(adRO && sc !== adSc){ if(adSc){ adRO.unobserve(adSc); if(adSc.firstElementChild) adRO.unobserve(adSc.firstElementChild); }
       adSc = sc; if(sc){ adRO.observe(sc); if(sc.firstElementChild) adRO.observe(sc.firstElementChild); } }
     if(!h || !sc || !cpBody){ adGrip.classList.remove('on'); return; }
-    const cap = Math.max(40, Math.round(h.clientHeight * adRatio)) + 'px';
+    const cap = Math.max(26, Math.round(h.clientHeight * adRatio)) + 'px';
     if(panel.style.getPropertyValue('--cp-ad-max') !== cap) panel.style.setProperty('--cp-ad-max', cap);
     // 2026-11-14 (Julius: "I still want to drag the dividing line"): always draggable, not only once the list overflows.
     adGrip.style.top = Math.round(sc.getBoundingClientRect().bottom - cpBody.getBoundingClientRect().top - 9) + 'px';
@@ -17883,10 +17892,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   adGrip.addEventListener('pointerdown', e => {
     const h = mount.querySelector('.fc-view-harness'), sc = adScroller(); if(!h || !sc) return;
-    e.preventDefault(); e.stopPropagation(); adGrip.setPointerCapture(e.pointerId); adDrag = true; panel.classList.add('cp-adresizing');
+    e.preventDefault(); e.stopPropagation(); try { adGrip.setPointerCapture(e.pointerId); } catch (x) {} adDrag = true; panel.classList.add('cp-adresizing');
     const top = sc.getBoundingClientRect().top, H = h.clientHeight || 1, y0 = e.clientY; let moved = false;
     const move = ev => { if(Math.abs(ev.clientY - y0) > 4) moved = true; if(!moved) return;
-      adRatio = Math.max(0.1, Math.min(0.85, (ev.clientY - top) / H)); adLayout(); };
+      panel.classList.add('cp-adset'); adRatio = Math.max(0.03, Math.min(0.85, (ev.clientY - top) / H)); adLayout(); if(cal) cal.updateSize(); };
     const up = () => {
       adGrip.removeEventListener('pointermove', move); adGrip.removeEventListener('pointerup', up); adGrip.removeEventListener('pointercancel', up);
       adDrag = false; panel.classList.remove('cp-adresizing');
@@ -17896,7 +17905,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     adGrip.addEventListener('pointermove', move); adGrip.addEventListener('pointerup', up); adGrip.addEventListener('pointercancel', up);
   });
   let adTap = 0;
-  function adReset(){ adRatio = AD_DEF; try { localStorage.removeItem(AD_KEY); } catch (e) {} adLayout(); if(cal) cal.updateSize(); }
+  function adReset(){ adRatio = AD_DEF; panel.classList.remove('cp-adset'); try { localStorage.removeItem(AD_KEY); } catch (e) {} adLayout(); if(cal) cal.updateSize(); }
   function build(){
     const phone = window.matchMedia('(max-width:720px)').matches;
     const saved = lsGet('fw.calView');
@@ -18427,7 +18436,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!first) return;
     const sky = skyStops(first.t), tds = [...mount.querySelectorAll('.fc-timegrid-slot-label[data-time]')];
     const mOf = td => { const [h, mi] = td.getAttribute('data-time').split(':').map(Number); return h * 60 + mi; };
-    const rgba = m => 'rgb(' + sunAt(sky, m).join(' ') + ' / .95)';
+    const rgba = m => 'rgb(' + sunAt(sky, m).join(' ') + ' / .55)'; // .95 was too bright (2026-11-21 7:43 am, Julius)
     tds.forEach((td, i) => { const a = mOf(td), b = i + 1 < tds.length ? mOf(tds[i + 1]) : 1440;
       td.style.setProperty('--sky', 'linear-gradient(to bottom,' + rgba(a) + ',' + rgba(b > a ? b : 1440) + ')'); });
   }

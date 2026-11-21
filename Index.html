@@ -2886,13 +2886,27 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     return Object.assign({pageBuild:window.__FW_BUILD__ || '',pageRelease:window.__FW_RELEASE__ || '',
       w:window.innerWidth,visibility:document.visibilityState},extra || {});
   }
+  /* Reload diagnosis (2026-11-21, Julius: "I put it away 5 min, come back, the whole thing refreshes"). Remember when
+     the page was last hidden and how often it came back WITHOUT reloading; each load's Speed Log row then says how it
+     started: start = 'returned' (a reload within 2 h of being put away → the phone discarded the page) or 'fresh'. */
+  const fwStartInfo = (() => { let hid = 0, res = 0;
+    try { hid = Number(localStorage.getItem('fw.hiddenAt')) || 0; res = Number(localStorage.getItem('fw.resumes')) || 0; localStorage.setItem('fw.resumes', '0'); } catch (e) {}
+    const away = hid ? Math.round((Date.now() - hid) / 1000) : null;
+    return { start: away != null && away < 7200 ? 'returned' : 'fresh', awaySec: away, discarded: !!document.wasDiscarded, resumesBefore: res };
+  })();
+  document.addEventListener('visibilitychange', () => { try {
+    if(document.visibilityState === 'hidden') localStorage.setItem('fw.hiddenAt', String(Date.now()));
+    else { localStorage.setItem('fw.resumes', String((Number(localStorage.getItem('fw.resumes')) || 0) + 1)); localStorage.removeItem('fw.hiddenAt'); }
+  } catch (e) {} });
+  window.addEventListener('pagehide', () => { try { localStorage.setItem('fw.hiddenAt', String(Date.now())); } catch (e) {} });
   function fwSpeedLog(kind,timing,t0){
     if(!timing) return;
     const render = Math.round(performance.now() - t0);
     setTimeout(() => {
       const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
       const client = fwSpeedContext({ render: render, drawEnd:Math.round(t0 + render), frameFirstByte: Math.round(nav.responseStart || 0), frameDone: Math.round(nav.responseEnd || 0),
-        dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()) });
+        dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()),
+        navType: nav.type || '', ...(kind === 'load' ? fwStartInfo : {}) });
       setStatus('Ready · server ' + (timing.total / 1000).toFixed(1) + 's · draw ' + (render / 1000).toFixed(1) + 's');
       fwSendSpeed(kind,timing,client);
     },1500);
@@ -15884,7 +15898,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label
      strip instead, one smooth gradient (each label cell paints its own slice). Sunrise / sunset = a faint dotted line. */
   /* 2026-11-21 later (Julius: "a bit much, more subtle"): the sky is a thin 3 px stripe on the strip's right edge, not a fill. */
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:3px 100%;background-position:right top;background-repeat:no-repeat;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:6px 100%;background-position:right top;background-repeat:no-repeat;}
   #calPanel .cp-sunmk{display:none;}
   #calPanel:is(.cp-full,.cp-docked) .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dotted rgb(242 113 28 / .35);pointer-events:none;z-index:0;}
   #calPanel:is(.cp-full,.cp-docked) .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:8.5px;line-height:1;color:var(--cp-muted);opacity:.6;}
@@ -18368,11 +18382,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   const sunWarm = c => c[0] > c[2] + 60; // yellow / orange stops (not purple)
   // Sky colors for the hour-label strip (2026-11-21, Julius: "a variety of colors").
-  const SKY_N = [40,52,110], SKY_P = [123,92,214], SKY_K = [238,130,170], SKY_O = [245,150,60], SKY_Y = [250,214,60], SKY_B = [120,185,240], SKY_R = [225,85,95];
+  // 2026-11-21 later (Julius: "what is blue? make it more obvious, more color"): night indigo → dawn purple → pink →
+  // sunrise orange → golden hour (short) → clear daytime sky blue (holds all day) → golden hour → sunset orange → red
+  // → dusk purple → night.
+  const SKY_N = [30,40,105], SKY_P = [120,80,215], SKY_K = [240,110,170], SKY_O = [250,140,40], SKY_Y = [255,205,40], SKY_B = [40,150,250], SKY_R = [230,60,80];
   function skyStops(t){
-    const mid = (t.rise + t.set) / 2;
-    return [[0, SKY_N], [t.rise - 80, SKY_N], [t.rise - 35, SKY_P], [t.rise - 10, SKY_K], [t.rise + 15, SKY_O], [t.rise + 75, SKY_Y], [mid, SKY_B],
-      [t.set - 90, SKY_Y], [t.set - 25, SKY_O], [t.set + 5, SKY_R], [t.set + 35, SKY_P], [t.set + 90, SKY_N], [1440, SKY_N]];
+    return [[0, SKY_N], [t.rise - 80, SKY_N], [t.rise - 40, SKY_P], [t.rise - 15, SKY_K], [t.rise + 10, SKY_O], [t.rise + 45, SKY_Y], [t.rise + 110, SKY_B],
+      [t.set - 110, SKY_B], [t.set - 45, SKY_Y], [t.set - 10, SKY_O], [t.set + 15, SKY_R], [t.set + 45, SKY_P], [t.set + 95, SKY_N], [1440, SKY_N]];
   }
   const sunHm = m => { const h = Math.floor(m / 60), mi = Math.round(m % 60); return ((h + 11) % 12 + 1) + ':' + String(mi).padStart(2, '0'); };
   function sunPaint(){
@@ -18387,7 +18403,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!first) return;
     const sky = skyStops(first.t), tds = [...mount.querySelectorAll('.fc-timegrid-slot-label[data-time]')];
     const mOf = td => { const [h, mi] = td.getAttribute('data-time').split(':').map(Number); return h * 60 + mi; };
-    const rgba = m => 'rgb(' + sunAt(sky, m).join(' ') + ' / .75)';
+    const rgba = m => 'rgb(' + sunAt(sky, m).join(' ') + ' / .95)';
     tds.forEach((td, i) => { const a = mOf(td), b = i + 1 < tds.length ? mOf(tds[i + 1]) : 1440;
       td.style.setProperty('--sky', 'linear-gradient(to bottom,' + rgba(a) + ',' + rgba(b > a ? b : 1440) + ')'); });
   }

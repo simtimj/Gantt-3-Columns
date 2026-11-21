@@ -2,6 +2,16 @@
 
 Updated 2026-11-10. This is the current engineering handoff, not a declaration that the whole efficiency project or actual-device verification is finished. Read the latest `main`, deployment result and confirmation queue before changing code. Keep this guide current when resuming work.
 
+## Speed plan — 2026-11-21 (Julius: "put it away 5 min, come back, the whole thing refreshes")
+
+Status: J implemented; G, K, L, M proposed and approved by Julius ("do all of this"), not started. One per session.
+- Facts: Index.html 1.25 MB + WeekdayIcons.html 190 KB (base64); server ~5 s per full load (Speed Log 11/4); ~12 `visibilitychange` handlers each refresh on return. Return without a reload is already a light sync (`fwSync`), so the "whole refresh" is most likely the phone discarding the tab.
+- **J (implemented 11-21, untested live):** Speed Log `load` rows' Client JSON now has `navType`, `start` ('returned' = reload within 2 h of the page being hidden, i.e. discarded; 'fresh'), `awaySec`, `discarded` (Chrome `document.wasDiscarded`), `resumesBefore` (returns without reload since the last load). Limit: closing the tab yourself also sets the hidden time. **Resume step:** after a day of use, read `Speed Log` Client column for kind=load and count start=returned vs fresh.
+- **G — split Index.html:** ~6 files on existing seams (CSS, markup, main script, task cards/looks, calendar module, extras) via `<?!= include('X') ?>` like WeekdayIcons. Verify: concatenated output byte-identical to the old Index.html. Also update Code.gs build hash (`createHtmlOutputFromFile('Index')`, ~line 578), the 3 `.replace(` loaders in tools/smoke.mjs, docs/CODE_MAP.md.
+- **K — lighter page:** icons → small SVG / lighter images (190 KB); load the calendar module + FullCalendar only when the calendar column is first shown; measure KB before/after.
+- **L — instant screen (big, confirm plan with Julius first):** on load, paint the last saved workspace snapshot from localStorage at once (read-only look until fresh data merges), then apply server data. Watch the safe-sync / recovery rules (docs/NOTES.md → "Safe sync") — never let a stale snapshot overwrite newer text.
+- **M — one calm return:** one `fwResume` queue on `visibilitychange` that runs the ~12 refreshers in order, staggered, skipping ones refreshed < 60 s ago.
+
 ## Latest checkpoint — 2026-11-10
 
 - Next diagnostic increment: `schedule.lookup` now nests `schedule.spreadsheet` (getActiveSpreadsheet) and `schedule.sheetLookup` (getSheetByName). The existing optional timer reaches the sheet helper only from the schedule reader. Source calls, creation/header behavior, direct callers and thrown errors are unchanged; no task data, dates, tab names or IDs are emitted. No speed gain claimed. Local/CI and deployment results are recorded below as completed.

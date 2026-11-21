@@ -79,9 +79,10 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 ## 🧪 To be confirmed (2026-11-21)
 
 - **Event pop-up border in the event's color**: tapping a calendar event opens its pop-up with a 2 px border in that event's color (e.g. light blue for Meditate); grey when done; changes right away when you pick a new color.
-- **Calendar: sky colors moved to the hour labels**: the timeline itself is no longer tinted; the day's sky (night navy → dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label strip as one thin 3 px colored stripe (was a full fill; toned down same day). Sunrise / sunset = a faint dotted line with a tiny label. Docked + full-screen calendar.
+- **Calendar: sky colors moved to the hour labels**: the timeline itself is no longer tinted; the day's sky (night navy → dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label strip as a 6 px colored stripe (was a full fill; toned down, then made brighter: blue = clear daytime sky, short golden hours, pink dawn, red sunset). Sunrise / sunset = a faint dotted line with a tiny label. Docked + full-screen calendar.
 - **Calendar: end time always shown**: every timed event shows start – end (e.g. "3pm – 3:15pm"), even on one-line or narrow cards; the title shortens first. Small cards' text is centered top-to-bottom (no clipped top).
 - **Calendar: every timed event see-through**: short and medium events now use the same see-through look as long ones (faint tint + outline in the event's color, white text), so the grid shows through.
+- **Speed: reload diagnosis**: each app start now records in the Speed Log whether it was a return after the phone cleared the page or a fresh open (plan: docs/EFFICIENCY_HANDOFF.md → Speed plan).
 - **🌴 Fun tab: plain white cards**: the purple border / tint is gone.
 - **Phone: tap outside the pop-up only closes it**: on a touch screen, with an event pop-up open, a tap anywhere outside it just closes the pop-up and nothing else happens (e.g. tapping Focus / Thinking doesn't pop the keyboard). Scrolling is unaffected; an unsaved title/time edit still saves. A computer mouse click works as before (closes and lands).
 

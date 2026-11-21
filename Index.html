@@ -15161,7 +15161,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const w = Math.max(10,W - 2 - b.depth * 5 - x), h = Math.max(10,bottom - top);
       const on = b.t.hasAttribute('data-tcfocus');
       rects += '<rect x="' + (x + .75) + '" y="' + (top + .75) + '" width="' + (w - 1.5) + '" height="' + (h - 1.5) + '" rx="9" fill="none" stroke="' +
-        (on ? urg : ink) + '" stroke-opacity="' + (on ? '1' : '.4') + '" stroke-width="' + (on ? 2 : 1.5) + '"/>';
+        (on ? urg : ink) + '" stroke-opacity="' + (on ? '1' : '.8') + '" stroke-width="' + (on ? 2 : 1.5) + '"/>'; // brighter (2026-11-21 12:44, Julius: "barely see it")
     });
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
     Object.assign(ed.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',

@@ -397,6 +397,28 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Keep In Mind pin: ' + x));
   }
+  // Hide the top row (2026-11-21, Julius; NOTES "A."): hold an empty spot of the toolbar → hidden, workspace moves up,
+  // a strip shows; tap the strip → back; remembered per device; holding a button does not hide it.
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      const bar = document.getElementById('toolbar'), ws = document.getElementById('workspace'), y0 = ws.getBoundingClientRect().top;
+      const hold = async (el, ms) => { const r = el.getBoundingClientRect(), o = { bubbles: true, pointerId: 9, pointerType: 'touch', clientX: r.left + 2, clientY: r.top + r.height / 2 };
+        el.dispatchEvent(new PointerEvent('pointerdown', o)); await wait(ms); el.dispatchEvent(new PointerEvent('pointerup', o)); await wait(150); };
+      await hold(bar.querySelector('button'), fwHoldMs() + 150);
+      if (document.body.classList.contains('tb-hidden')) { out.push('holding a button hid the row'); fwToolbarHide.set(false); await wait(150); }
+      await hold(bar, 150); if (document.body.classList.contains('tb-hidden')) out.push('a short tap hid the row');
+      await hold(bar, fwHoldMs() + 150);
+      if (!document.body.classList.contains('tb-hidden') || bar.getClientRects().length) out.push('holding the toolbar did not hide it');
+      if (!(ws.getBoundingClientRect().top < y0 - 10)) out.push('workspace did not move up (' + Math.round(y0) + ' → ' + Math.round(ws.getBoundingClientRect().top) + ')');
+      if (localStorage.getItem('fw.tbHidden') !== '1') out.push('hidden state not remembered');
+      const strip = document.getElementById('tbStrip');
+      if (!strip || !strip.getClientRects().length) out.push('no strip to bring it back');
+      else { strip.click(); await wait(150); if (document.body.classList.contains('tb-hidden') || !bar.getClientRects().length) out.push('tapping the strip did not bring the row back'); }
+      if (localStorage.getItem('fw.tbHidden') !== '0') out.push('shown state not remembered');
+      fwToolbarHide.set(false); await wait(150);
+      return out; });
+    k.forEach(x => errs.push('Hide top row: ' + x));
+  }
   // Title cells (2026-11-21, Julius): a title + its lines sit in one box (nested box inside), archive takes the whole box.
   {
     const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];

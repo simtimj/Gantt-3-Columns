@@ -963,3 +963,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Cause (reproduced with CPU throttled 4×): FullCalendar's hold timer fired late, so the first finger moves scrolled the All day box; the Scheduled row slid along under the finger and `fadEnd` read the release as "over a Scheduled row = stays". Real on slow phones, not just the test.
 - App fix: the box `touchmove` listener is non-passive and cancels scrolling once a row has been held for the hold time; the "over a Scheduled row" check ignores the dragged row itself.
 - Test fix: measure the box once it has settled after the 11:00 drop, and poll (up to 3 s) for the result instead of a fixed 900 ms.
+
+## Gap labels top-right + axis room (2026-11-21 12:37, Julius)
+- Gap labels: top-right of the empty gap (3 px from the top, 5 px from the right), hidden when they'd be cut off (fit check counts the padding).
+- Hour labels: more room before the axis / sky line (7 px; full screen + docked 10 px because of the 3 px sky bar).

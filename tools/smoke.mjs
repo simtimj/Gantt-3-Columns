@@ -1350,6 +1350,10 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           const g = [...document.querySelectorAll('#calPanel .cp-gap')].find(x => x.textContent === '3 h 45 m');
           if (g && getComputedStyle(g).pointerEvents !== 'none') out.push('gap label catches clicks');
           if (g && g.classList.contains('cp-gap-x')) out.push('3 h 45 m gap label hidden at default zoom');
+          // Top-right of the gap, fully inside it (2026-11-21 12:37, Julius: "align it to the top right", was cut off).
+          if (g && !g.classList.contains('cp-gap-x')) { const gr = g.getBoundingClientRect(), tr = g.firstChild.getBoundingClientRect();
+            if (tr.top - gr.top > 6 || gr.right - tr.right > 8) out.push('gap label not top-right');
+            if (tr.top < gr.top - 0.5 || tr.bottom > gr.bottom + 0.5 || tr.left < gr.left - 0.5 || tr.right > gr.right + 0.5) out.push('gap label cut off'); }
           const n0 = document.querySelectorAll('#calPanel .cp-gap').length; await wait(400);
           const fresh = [...document.querySelectorAll('#calPanel .cp-gap')]; if (fresh.length !== n0 || !fresh.includes(g)) out.push('gap labels keep redrawing');
           return out; });

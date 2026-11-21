@@ -16024,9 +16024,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* 2026-11-21 7:43 am (Julius: "too bright, more subtle, cuts into the 4am text"): 3 px stripe at 55% strength, and
      the hour text gets 4 px more room on the right so it never touches the stripe. */
   #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:3px 100%;background-position:right top;background-repeat:no-repeat;}
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:7px!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:10px!important;}
   /* Gap labels (2026-11-21, Julius; docs/NOTES.md → Gap labels): muted duration centered in the empty space between two timed events. */
-  #calPanel .cp-gap{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;overflow:hidden;}
+  #calPanel .cp-gap{position:absolute;left:0;right:0;display:flex;align-items:flex-start;justify-content:flex-end;padding:3px 5px 0 0;box-sizing:border-box;pointer-events:none;z-index:0;overflow:hidden;} /* top-right of the gap (2026-11-21 12:37, Julius) */
   #calPanel .cp-gap span{font-size:10px;line-height:1;color:var(--cp-muted);opacity:.7;white-space:nowrap;}
   #calPanel .cp-gap.cp-gap-x span{visibility:hidden;}
   #calPanel .cp-sunmk{display:none;}
@@ -18056,7 +18056,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     });
   }
   function gapFit(g){ const t = g.firstChild; if(!t) return; g.classList.remove('cp-gap-x'); const r = g.getBoundingClientRect();
-    if(r.height < t.offsetHeight + 4 || r.width < t.offsetWidth + 4) g.classList.add('cp-gap-x'); }
+    if(r.height < t.offsetHeight + 5 || r.width < t.offsetWidth + 7) g.classList.add('cp-gap-x'); } // + the top / right padding: never cut off
   // All-day cap (2026-11-10, Julius): see the CSS note above. The grip only shows while the list is capped (scrolling).
   const AD_KEY = 'fw.calAllDayMax', AD_DEF = 0.5, cpBody = panel.querySelector('.cp-body');
   let adRatio = Number(lsGet(AD_KEY)) || AD_DEF, adDrag = false, adSc = null;
@@ -19002,13 +19002,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-weight:500;font-size:11px;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-style:normal;font-size:8px;opacity:.85;}
-  #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 4px 0 1px;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 7px 0 1px;} /* room before the axis line (2026-11-21 12:37, Julius) */
   /* 12 AM sits at the very top edge, so its label (centered on the line) was cut off (2026-11-15, Julius): drop it below the line. */
   #calPanel .fc .fc-timegrid-slot-label[data-time="00:00:00"] .fc-timegrid-slot-label-cushion{top:4px;}
   /* Docked: narrower time column, no FRI 13 badge (the date is on the header line) (2026-11-13 evening, Julius). */
   #calPanel.cp-docked .cp-corner{display:none!important;}
   #calPanel.cp-docked .fc .fc-timegrid-axis-cushion{padding:0!important;min-width:0!important;}
-  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion{padding:0 4px 0 0!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion{padding:0 7px 0 0!important;}
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:10px;}
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-size:7px;}
   #calPanel.cp-docked .fc .fc-daygrid-body-natural .fc-daygrid-day-events{margin-bottom:0;}

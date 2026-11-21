@@ -17887,7 +17887,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     const cap = Math.max(26, Math.round(h.clientHeight * adRatio)) + 'px';
     if(panel.style.getPropertyValue('--cp-ad-max') !== cap) panel.style.setProperty('--cp-ad-max', cap);
     // 2026-11-14 (Julius: "I still want to drag the dividing line"): always draggable, not only once the list overflows.
-    adGrip.style.top = Math.round(sc.getBoundingClientRect().bottom - cpBody.getBoundingClientRect().top - 9) + 'px';
+    adGrip.style.top = Math.round(sc.getBoundingClientRect().bottom - cpBody.getBoundingClientRect().top - 6) + 'px'; // centered on the 5 px line
     adGrip.classList.add('on');
   }
   adGrip.addEventListener('pointerdown', e => {
@@ -18821,7 +18821,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      shrink the margins; get rid of the empty quadrant left of it"). The line is now a 3px border on the all-day
      section itself (axis-line color: white in dark), not the thin divider row. Docked: the empty time-axis cell left
      of the all-day tasks is gone (they start at the panel's left edge) and the cards sit tight. */
-  #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:3px solid var(--cp-axis-line)!important;box-shadow:none!important;}
+  /* 2026-11-21 10:57 (Julius: "brighter, wider, more obvious, it's hard to see"): 5 px, full-strength color + soft glow. */
+  #calPanel{--cp-ad-line:#202124;--cp-ad-glow:rgba(32,33,36,.25);}
+  html[data-theme=dark] #calPanel{--cp-ad-line:#fff;--cp-ad-glow:rgba(255,255,255,.35);}
+  #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:5px solid var(--cp-ad-line)!important;box-shadow:0 2px 6px var(--cp-ad-glow)!important;}
   #calPanel .fc .fc-timegrid-divider{display:none!important;}
   #calPanel.cp-docked .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) col:first-child{width:0!important;}
   #calPanel.cp-docked .fc .fc-daygrid-body .fc-timegrid-axis{width:0!important;min-width:0!important;max-width:0!important;padding:0!important;border:0!important;overflow:hidden;}

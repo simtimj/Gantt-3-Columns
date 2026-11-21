@@ -2116,11 +2116,11 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
               if (r.w < Math.min(380, r.vw - 16) - 1) errs.push('half calendar card: not using the room (' + r.w + ' wide, column ' + r.col + ', screen ' + r.vw + ')');
               if (r.l < 0 || r.r > r.vw + 1 || r.t < 0 || r.bt > r.vh + 1) errs.push('half calendar card: off screen ' + JSON.stringify(r));
               if (!r.onTop) errs.push('half calendar card: covered by something'); }
-            // All-day row (2026-11-15 13:21, Julius): clear 3px line under it, no empty cell left of it.
+            // All-day row (2026-11-15 13:21, Julius): clear 5px line (2026-11-21: was 3px) under it, no empty cell left of it.
             { const r = await pg.evaluate(() => { const td = [...document.querySelectorAll('#calPanel .fc-scrollgrid-section-body > td')].find(x => x.querySelector('.fc-daygrid-body')), ax = document.querySelector('#calPanel .fc-daygrid-body .fc-timegrid-axis');
                 return td ? { bw: getComputedStyle(td).borderBottomWidth, bc: getComputedStyle(td).borderBottomColor, ax: ax ? Math.round(ax.getBoundingClientRect().width) : -1 } : null; });
               if (!r) errs.push('all-day row: not found');
-              else { if (r.bw !== '3px' || /, 0\)$/.test(r.bc)) errs.push('all-day row: line under it is ' + r.bw + ' ' + r.bc);
+              else { if (r.bw !== '5px' || /, 0\)$/.test(r.bc)) errs.push('all-day row: line under it is ' + r.bw + ' ' + r.bc);
                 if (r.ax > 1) errs.push('all-day row: empty cell left of it is still ' + r.ax + 'px wide'); } }
             const jp = await pg.evaluate(() => { const r = document.getElementById('journalPane').getBoundingClientRect(); return { x: Math.max(r.left + 20, 20), y: r.top + r.height / 2 }; });
             await pg.mouse.click(jp.x, jp.y); await pg.waitForTimeout(300);

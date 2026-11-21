@@ -76,9 +76,19 @@ function apiPing() { return { ok: true, sheet: ss_().getName() }; }
 
 function pwaSetupPage_(page) {
   const url = PWA_URL + (page === 'tracker' ? 'tracker.html' : '') + '#k=' + encodeURIComponent(pwaKey_());
+  // Look + layout settings live in this browser's storage for the old app's address; the hosted app has its own,
+  // so the link carries a copy (2026-11-21, Julius: font too big, Focus colored, layout off in the PWA).
+  // Data, caches and drafts stay behind (they come from the server).
+  const script = '<script>(function(){var a=document.getElementById("go"),s={},n=0;' +
+    'var skip=/^(fw\\.calCache|fw\\.focus\\.(draft|recovery)|fw\\.timer|fw\\.resumes|fw\\.hiddenAt|fw\\.dev$|fw\\.cpTimed|fw\\.new\\.v1|fw\\.fun\\.v1|fw\\.dailyMatch)/;' +
+    'try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i),v=localStorage.getItem(k);' +
+    'if(/^(fw\\.|focusWorkspace|tt\\.ui\\.)/.test(k)&&!skip.test(k)&&v!=null&&v.length<20000){s[k]=v;n++;}}}catch(e){}' +
+    'if(n){a.href+="&s="+encodeURIComponent(JSON.stringify(s));document.getElementById("n").textContent=n+" look and layout settings from this browser come along.";}' +
+    '})();</script>';
   const html = '<p style="font:18px system-ui;margin:24px">' +
     '<a id="go" href="' + url + '" target="_top" style="font-size:22px">📲 Open the Gantt app</a><br><br>' +
-    'Opens the hosted app and saves this device\'s key there. Then use your browser menu → <b>Install app</b> / <b>Add to Home screen</b>.</p>';
+    'Opens the hosted app and saves this device\'s key there. <span id="n"></span> ' +
+    'Then use your browser menu → <b>Install app</b> / <b>Add to Home screen</b>.</p>' + script;
   return HtmlService.createHtmlOutput(html).setTitle('Gantt app setup')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);

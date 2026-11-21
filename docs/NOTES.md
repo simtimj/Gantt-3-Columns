@@ -1033,3 +1033,5 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - **Behavior change**: returns within 60 s now refresh nothing (was: sync after 15 s, Cal Events every time, Timer after 30 s). The 55 s visible sync timer still runs.
 - **Speed Log**: kind `resume`, Client = `ran`, `skipped`, `awaySec`, `stopped`, `ms`; only when at least one job ran. `window.__FW_RESUME_LAST` holds the last run.
 - **Smoke**: suite `resume` (quick return skips all + no row; 2-min return runs all in order, staggered, sync first; hide mid-queue stops).
+- 2026-11-21 14:55 Julius: PWA looked different (font too big, Focus/Thinking colored, layout) = per-device look settings live in localStorage per web address. Fix: `pwaSetupPage_` copies `fw.*` / `focusWorkspace*` / `tt.ui.*` (minus caches, drafts, data) into `&s=` on the link; shim writes them before the app reads them. Also fixed: the shim reloaded the page when the first service worker took control (jump on first open); now only after ↻ Update.
+

@@ -2960,7 +2960,10 @@ if (only('pwa')) {
   const pg = await ctx.newPage();
   pg.on('pageerror', e => errs.push('page error: ' + e.message + (process.env.SMOKE_DEBUG ? '\n' + e.stack : '')));
   // 1) First open with the setup link: key saved + stripped, data loaded through the API.
-  await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(2500);
+  const carried = encodeURIComponent(JSON.stringify({ 'fw.theme': 'dark', focusWorkspaceTypographyV1: '{"x":1}', evil: '1' }));
+  await pg.goto(base + '#k=smokekey&s=' + carried); await pg.waitForTimeout(2500);
+  const st = await pg.evaluate(() => [localStorage.getItem('fw.theme'), localStorage.getItem('focusWorkspaceTypographyV1'), localStorage.getItem('evil'), window.__PWA__.settingsCopied]);
+  if (st[0] !== 'dark' || st[1] !== '{"x":1}' || st[2] !== null || st[3] !== 2) errs.push('setup link: look settings not copied right ' + JSON.stringify(st));
   const first = await pg.evaluate(() => ({ key: localStorage.getItem('pwa.key'), hash: location.hash, text: document.body.innerText,
     keyBox: !!document.getElementById('pwaKeyBox'), title: document.title }));
   if (first.key !== 'smokekey' || first.hash) errs.push('setup link: key not saved / not stripped from the URL');

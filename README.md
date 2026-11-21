@@ -6,6 +6,8 @@ Last updated: 2026-11-21
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
+**Claude session cost (Nov 21, implemented):** `CLAUDE.md` trimmed 17.4k → 3.3k characters (loaded every session); non-code rules moved verbatim to `docs/RULES.md`, NOTES index dropped (grep instead). New rule: one feature = one session.
+
 ## Efficiency checkpoint — 2026-11-10
 
 PR49 (daily setup date coverage) and PR50 (confirmation identity digest reuse) are merged and deployed; both passed full regression and browser CI.

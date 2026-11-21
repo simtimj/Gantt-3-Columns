@@ -1,154 +1,32 @@
 # Gantt 3 Columns — notes for Claude
 
-- **Commit as Julius** (so it counts on his GitHub graph): `git -c user.name="Julius Simtim" -c user.email="juliussimtim@gmail.com" commit ...`. Never commit as "Claude <noreply@anthropic.com>"; Claude goes only in a Co-Authored-By trailer.
-- **Ship small, confirm big** (Julius 2026-11-08, replaces 11-04 "ship without asking"): small code changes go straight to `main` (merge, push, deploy) once checks pass, no question. **Big** code changes (new feature, rewrite, multi-file or risky) → one short confirmation question first (what + plan in a few bullets). Non-code (Sheets rows, calendar, docs) unchanged. He'll dial this in over time.
-- **Build your own ideas** (Julius 2026-11-07): when you see an improvement or have a suggestion, just build and ship it (mention it in one line); he'll correct what he doesn't like.
-- **Planning style** (Julius 2026-11-08): for design work, first agree the basic idea, then flesh it out, then ask **one batched list of questions** (long is fine; he answers many at once). One-at-a-time questions only when truly needed. Plain numbered questions grouped by topic (no code blocks, 2026-11-08). Save answers to `docs/NOTES.md` as they come.
-- **Wrap-up = two tables** (Julius 2026-11-15): every wrap-up is a table of **what was done** (area · what changed), then the **what's next** table below. Keep both narrow for his phone.
-- **Offer what's next** (Julius 2026-11-08): when a piece of work wraps up, give a couple of options to work on next **in a small table** (option · what it is · why now), **lettered A, B, C…**. Keep the letters stable so he can reorder by letter ("do B, A, C", "push D up"); show the current order each time.
-- **One topic per conversation** (Julius 2026-11-05, ADHD): when he jumps to a different job or app mid-session, suggest starting a new conversation for it, in one line, before diving in (Julius 2026-11-08: keep doing this). Keep replies short and skimmable: lead with the answer, a few bullets, no walls of text.
-- Google Apps Script web app (Today / Notes / Reference columns over a Google Sheet). Pushing to `main` runs `clasp push` via `.github/workflows/deploy.yaml`, so keep commits small and working. Julius opens the **/dev test link** (latest pushed code, ~30 s after a push, then tap ↻); the workflow no longer updates a versioned /exec deployment (200-version cap, 2026-10-27). Julius mostly works from his phone.
-- Files: `Code.gs` (server), `Index.html` (all UI), `WeekdayIcons.html` (header icons, base64), `appsscript.json`.
-- **Keep this file short** (Julius 2026-10-31). Detailed feature notes live in `docs/NOTES.md`; open only the section you need (`grep -n "^## " docs/NOTES.md`, then read that range). New feature notes go there, not here.
-- **"Scripts" / "user scripts" / "users"** (Julius 2026-11-06) = repo `simtimj/userscripts`, code in its `scripts/` folder (Tampermonkey: EH / EX = `eh-oldest-first.user.js`, 4chan WebM gallery). Not this app, not `apps-scripts`. Add it with `add_repo` if it isn't in the session. After every userscript push, tell Julius the new version number (e.g. "pushed v2.50.0"); the download can lag ~5 min. Read the README `## Rules` there first (EH and 4chan auto-update via live loaders).
-- **"Time section" = all of them** (Julius 2026-11-07): a change to one of Morn / After / Night (History) applies to all three.
-- Julius's words (2026-11-13): **calendar / main calendar** = the docked right-side calendar; **big calendar** = the pop-out.
-- Julius's words (2026-11-01): **task cell** = a task line / card; **urgency cell** = the Urgent area; **reference cell** = a Reference card.
-- **Before every push**: `node tools/check.mjs && node tools/smoke.mjs` (syntax + headless load, desktop and phone). Don't rebuild a test harness; extend `tools/smoke.mjs`.
-- **Reference cards** (Julius 2026-11-04): a one-line "How to use" at the top, sections, short `<b>Name</b>: details` lines, done items out of the list, machine-only notes under a bottom `🔒 DB — don't touch` heading. Back up the old HTML to the Backup tab (copyPaste, then check `=E=…`) before a rewrite. Over ~8k characters → condense.
-- Be token-lean: if a request is vague, ask Julius a short clarifying question before digging through `Index.html` (~9.8k lines); grep for the function/section instead of reading whole files.
+Google Apps Script web app (Today / Notes / Reference columns over a Google Sheet). Files: `Code.gs` (server), `Index.html` (all UI, ~19k lines: grep, never read whole), `WeekdayIcons.html`, `appsscript.json`. Push to `main` → `clasp push` (deploy.yaml); Julius tests on the **/dev link** (~30 s, tap ↻), mostly from his phone.
 
-## Central Data Hub card (2026-10-29, Julius: permanent rule)
+## Token-lean coding (Julius 2026-11-21: usage efficiency matters)
+- **One feature = one session.** When Julius brings a new feature idea mid-session, suggest a new session in one line; fixes to the feature in hand stay.
+- Grep for the function/section; read only that range. `docs/NOTES.md`: `grep -n "^## "` then read the one section. Vague request → one short question first.
+- Write decisions to NOTES / README as they're made (the next session only knows what's written).
+- Non-code jobs (Sheets rows, calendar, Done Log, Reference cards, Central Data Hub, userscripts, IT study log): rules in `docs/RULES.md`, open the section you need.
 
-- Reference card titled **Central Data Hub** (Sheet "New Gantt Sheet" → `Reference`; title in column D, HTML in column E — find it by title, never by row number) is the home for cross-AI integration: shared master instructions, source-of-truth architecture, sync between ChatGPT / Claude / Gemini / Gantt / Calendar / GitHub / Docs / Sheets.
-- Anything hub-related ("add this to the Central Data Hub", or a related idea) is appended to that card under the right section as a check-line `<b>Title</b>: details` — no new card, no `tasks.js` / Backlog entry. Reread the card first, check for duplicates, keep existing lines, done states and formatting. Stays Can be later (`data-urg="3"`) unless Julius sets urgency or a deadline; if a hub task becomes urgent, mirror only the actionable line into the urgency system and keep the details in the card.
-- Architecture: Gantt Sheet = tasks / urgency / day logs; Calendar = time; Google Docs = long-form plans + canonical shared AI instructions; Sheets = structured data; GitHub = code, deploy config, repo CLAUDE.md. Claude = coding; ChatGPT = planning and coordination.
+## Git + checks
+- **Commit as Julius**: `git -c user.name="Julius Simtim" -c user.email="juliussimtim@gmail.com" commit ...`; Claude only in Co-Authored-By.
+- **Before every push**: `node tools/check.mjs && node tools/smoke.mjs` (`SMOKE_ONLY=calendar` etc. to run one suite while iterating). Extend `tools/smoke.mjs`, don't build a new harness.
+- **Ship small, confirm big**: small changes go straight to `main` once checks pass. Big (new feature, rewrite, multi-file, risky) → one short confirm (what + plan bullets) first.
+- **Build your own ideas**: just ship them, mention in one line.
+- Every push to `main` auto-logs a Done Log row; if you write one by hand, add trailer `Done-Log: manual`.
 
-## Current component naming — 2026-11-10
+## Docs every change
+- `README.md` = feature list (✅ Working · 🧪 To be confirmed · 🔧 To be improved · 📋 To do · 💤 Shelved). Every feature change updates it in the same commit: new → 🧪 with date; Julius says works → ✅; update "Last updated".
+- Efficiency changes also update `docs/EFFICIENCY_HANDOFF.md`; planning decisions `docs/PLANNING_WORKFLOW.md`. Say proposed / implemented / tested / user-confirmed. No private task contents in the repo.
+- **To Confirm**: every shipped feature → a row in the `To Confirm` tab (details: `docs/RULES.md` → To Confirm). Before new work, tell Julius the unchecked count + oldest 3. "Broken" → check the tab first.
 
-**Next Steps** replaces the former Urgent section/top-right urgency cell. Reference (Ref/Fridge) holds full project context and backlog; Next Steps holds immediate actions; CalEvents schedules them. Preserve urgency colors, numeric/decimal ordering and all task IDs. “Urgent” still names the red priority level. Full rules: docs/PLANNING_WORKFLOW.md.
+## Talking with Julius (ADHD, phone)
+- Short, skimmable: lead with the answer, a few bullets.
+- Planning: agree the idea → flesh out → **one batched numbered list** of questions grouped by topic; save answers to `docs/NOTES.md`.
+- Wrap-up = two narrow tables: **what was done** (area · what changed), then **what's next** (option · what it is · why now), lettered A, B, C… with stable letters; show the current order.
 
-## Shared documentation — standing rule, 2026-11-10
-
-Every change updates README.md in the same commit: short outcome, status and links. Efficiency changes also update docs/EFFICIENCY_HANDOFF.md with checks, measurements, limitations, remaining work and the exact resume step. Planning decisions update docs/PLANNING_WORKFLOW.md. Distinguish proposed, implemented, tested and user-confirmed behavior. Keep private task contents, logs and recovery payloads out of the public repository. This applies to ChatGPT, Claude and other contributors.
-
-## README is the feature list — always keep it current
-
-- `README.md` lists every feature under: ✅ Working · 🧪 To be confirmed · 🔧 To be improved · 📋 To do · 💤 Shelved.
-- **Every change that adds, changes or removes a feature must update `README.md` in the same commit.** New work goes under 🧪 To be confirmed (with the date); move it to ✅ Working once Julius says it works; anything he wants tweaked goes under 🔧; ideas he mentions but hasn't asked to build go under 📋. Update the "Last updated" date.
-- Keep useful info that's removed from the screen (e.g. the shortcuts list) in the README.
-
-## To Confirm (2026-11-04, Julius: standing rule, every project)
-
-- **Every shipped change gets a row in the `To Confirm` tab** of New Gantt Sheet (`1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`, Sheets connector, alongside the Done Log row): Date `YYYY-MM-DD`, Project, Change (short name), How to check (one line he can test on his phone), Status blank. One row per feature, not per commit. It shows in the pinned **To Confirm** Reference card; ticking a line there marks it `works`.
-- **Before new work in a project**, read its open rows and tell Julius how many are unchecked plus the oldest 3.
-- **When Julius says something is broken / not working**, check the tab first. If it was never confirmed, say so plainly ("shipped 11/2, never checked"). Broken → Status `broken` (stays open with ⚠). Works → Status `works` + Checked on date, and move its README item from 🧪 to ✅.
-
-## Claude adds open tasks (2026-10-27, Julius)
-
-- "Add this to the Gantt …" = an open task, not an inbox item: append a row to the `New Tasks` tab (Sheets connector, no deploy): Date `YYYY-MM-DD` or `undated`, Title, Urgency **0/1/2** (header `Urgency 0-2`; words Urgent / Soon / Later also work), Due, Minutes, Subtasks split by ` | `, Added = current Pacific time `HH:MM` (2026-11-02: sets the Morn / After / Night section for a task dated today). `tasks.js` / `CLAUDE_TASKS` is the old route. His urgency words: "for later" / "can be later" = 2 (blue), "next" / "kind of urgent" = 1 (yellow), "must do" / "really important" = 0 (red). (Inside the app `data-urg` stays 1/2/3 = 0/1/2 shown; `intakeUrg_()` translates.) `applyClaudeTasks_()` (Code.gs, in `getWorkspaceData()` after notes) appends them once at the end of that day's Today cell (head line `data-tid` + `data-at`, subtasks level 1 with the same `data-urg`), and `tsecPlaceAi()` in Index.html sorts today's in on load (`data-ai-new`); applied ids in script property `claudeTasksApplied`. Same open-tab caveat as the done log (tap ↻ first).
-
-## Urgency = color, everywhere (2026-11-05, Julius)
-
-- When Julius sets an urgency or color ("yellow priority", "red", "can be later"…), apply it in **every place the task lives**: Gantt (`New Tasks` row Urgency 0/1/2, or `data-urg` 1/2/3 on the line), **and** its Google Calendar event color, plus anything else he names. Urgency reads **0 / 1 / 2** (2026-11-08). Mapping: 0 = red = Calendar Tomato `11`; 1 = yellow = Banana `5`; 2 = blue = Blueberry `9`; done = Graphite `8` (stored `data-urg` is still 1 / 2 / 3). The app reads urgency back from the event color (`getMainCalendarEvents`), so a colored event lands in the right Cal Events box.
-
-## Organizing Google Calendar tasks (2026-11-06, Julius: standing rule)
-
-When he asks to organize his calendar tasks:
-- **Numbers = urgency order**: titles `01 | Task name`, fresh list starts at 01, no gaps, lower first. Inserting keeps existing numbers: `00` goes ahead of 01, decimals (`1.5`) go between. Renumber the whole list only when he says reset.
-- **Exact colors**: red = Tomato `11`, orange = Pumpkin (API `6`; check on the first event), yellow = Banana `5`, blue = Blueberry `9`; a named shade wins. Default order red → orange → yellow → blue. (The app maps only 11 / 5 / 9 to urgency today; orange events land unsorted.)
-- **Blocks**: tasks sharing a workflow + color → one event with one number; description = checklist of the original tasks + useful notes. Re-read the block to verify the details saved **before** deleting the old entries.
-- **Scoped**: move / edit only the tasks he names. All-day stays all-day unless he gives a time. New task events get reminders off unless he asks.
-
-## Done-with-Claude log (2026-10-26, Julius: standing rule)
-
-- **Whenever Julius finishes something through Claude (any project), append a row to the `Done Log` tab of New Gantt Sheet (`1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`) with the Sheets connector; no clone, push or deploy (2026-11-02, Julius).** Columns: Date `YYYY-MM-DD` (**Pacific date**, not UTC: run `TZ=America/Los_Angeles date +%F`; a UTC date put 11/4-night work into 11/5), Project (group header), Title (main point of the work, never the project name again), Details, Done by (`Claude`, `ChatGPT`, or `Julius` for his own work), Type (`New`, `Fix` or `Tweak`, 2026-11-04). One row per finished task. Never edit `Days`, or edit or delete Done Log rows. `donelog.js` is the old route; don't add to it.
-- **Code changes are auto-logged** (2026-11-06): every push to `main` adds a Done Log row from the commit (`.github/scripts/build_deploy_log.py` → `applyDeployedCodeLog_`). When you write your own Done Log row for a change, add the trailer `Done-Log: manual` to its commit(s) so it isn't logged twice.
-- **"↪ " events are moved tasks, not done work** (calendar backlog, 2026-11-12): they sit on yesterday and roll forward daily until Julius drags them onto a day. **They keep their own color** (= urgency; 2026-11-13, Julius — the Grape recolor is gone). Skip them in Graphite → Done Log transfers (by the "↪ " prefix); Graphite is strictly = done.
-- Graphite transfers (2026-10-29, Julius): his own finished calendar tasks (Graphite) go in the Done Log with Done by `Julius` → `doneItemHtml_` drops the `*` and ends the line with " X". Then rename the calendar event to start with `[x] ` (the only "accounted for" marker; no trailing X, no extra words). Skip events already starting `[x] `.
-- Rows apply on the next app load via `sheetDoneRows_()` / `sheetTaskRows_()`; the id is a hash of the row text. Done Log rows older than 30 days are ignored.
-- Mechanics (applyClaudeDone_, grouping, day blocks): see `docs/NOTES.md` → "Done-with-Claude log".
-
-## Index of docs/NOTES.md
-
-- Inbox — REMOVED 2026-10-31 (Julius)
-- Done-with-Claude log (2026-10-26, Julius: standing rule)
-- Safe sync (2026-10-29, Julius: "bulletproof, never lose anything")
-- Schedule cell + calendar checkboxes + empty space (2026-10-29, Julius)
-- One-day view + Plan pad (2026-10-29, Julius)
-- Urgent panel + view stability (2026-10-26)
-- Calendar panel (2026-10-26, Julius)
-- Nightly plan + wrap-up (2026-10-26, Julius)
-- Note block markup + send button (2026-10-26, Julius)
-- Dark text, day colors, Reference header (2026-10-27, Julius)
-- Task cards + subjects (2026-10-27, Julius)
-- Single-column swipe + split prompt (2026-10-27, Julius)
-- Light / dark theme (2026-10-27, Julius)
-- Due today group in Notes (2026-10-27, Julius)
-- Title lines (2026-10-27, Julius)
-- Dark tint, subject chips, checkbox fill (2026-10-27, Julius)
-- Day sections (2026-10-27, Julius) — REMOVED 2026-10-29
-- Saved looks → defaults (2026-10-27, Julius)
-- Row + 2 columns split (2026-10-27, Julius)
-- Narrow panes + Urgent made date (2026-10-27, Julius)
-- Urgent task fold (2026-10-28, Julius)
-- Quiet cards + focus ring (2026-10-28, Julius)
-- Side space (2026-10-28, Julius)
-- Drag grip (2026-10-28, Julius)
-- Undated Tasks + tight Urgent (2026-11-01, Julius) — Backlog card renamed
-- Urgent batches (2026-10-30, Julius)
-- Reference split (2026-10-31, Julius)
-- Time sections in Today (2026-10-31, Julius)
-- Done count + short dates (2026-10-31, Julius)
-- Weekday icons (2026-10-31, Julius)
-- Notes split + Review (2026-10-31, Julius: option A) — HIDDEN 2026-10-31
-- Grips + edge-to-edge note cells (2026-10-31, Julius)
-- Edge grips (2026-11-01, Julius)
-- Task mirrors (2026-11-01, Julius: spec phase 1)
-- Center Up / Down + planning pause (2026-11-01, Julius: spec, PENDING)
-- Drag into Blocks + block borders (2026-11-04, Julius)
-- History log types (2026-11-04, Julius: option 1)
-- To Confirm card (2026-11-04, Julius)
-- Pinned Reference cards (2026-11-04, Julius)
-- IT study log (2026-11-04, Julius)
-- History detail modes + fold fixes (2026-11-04, Julius)
-- Urgent checkmarks (2026-11-04, Julius)
-- Keep In Mind free list (2026-11-05, Julius)
-- Fast start + live updates (2026-11-05, Julius)
-- Block timer MVP (2026-11-05, Julius)
-- Time windows, future-dated done lines, title menu (2026-11-05, Julius)
-- Cal Events 4-box view (2026-11-05, Julius) — REMOVED 2026-11-11 (🕒 day view)
-- Urgent tick = log + archive (2026-11-05, Julius)
-- Time Tracker app (2026-11-05, Julius: separate app in `tracker/`, `?app=tracker`)
-- Fun for later tab (2026-11-05, Julius)
-- New things tab (2026-11-07, Julius)
-- Urgent add box = real task (2026-11-05, Julius)
-- Day Review levels + Vivaldi → MISC (2026-11-05, Julius)
-- Tuck strips + pull tabs (2026-11-06, Julius)
-- Done → Dailies matching (2026-11-05, Julius: first version)
-- Calendar panel (FullCalendar) (2026-11-08, Julius: phased plan)
-- Planning model: Big Three / Biggest Return + living project containers (2026-11-08, Julius: PLANNING ONLY)
-- 4-panel layout: Cal Events = right column, Next Steps + Reference = drawer (2026-11-11, Julius)
-- Cal Events Google layout + hide list; 📅 popup; History count cycle (2026-11-11 evening, Julius)
-- Thoughts pad + Blocks in the middle column (2026-11-12, Julius)
-- Keep In Mind shared list + Focus editor + voice typing (2026-11-13, Julius)
-- Half-screen columns (2026-11-13, Julius)
-- Docked calendar + backlog column (2026-11-13, Julius)
-- Calendar hold-to-delete + Focus title fix (2026-11-13, Julius)
-- Compact calendar (2026-11-13, Julius)
-- Auto-restore, one-row calendar toolbar, half-width backlog, soft snap (2026-11-13 afternoon, Julius)
-- Google-style event pop-up (2026-11-14, Julius)
-- Full-screen calendar (2026-11-14, Julius)
-- Scroll ≠ pick up (2026-11-14, Julius)
-- Full-screen left column: all-day tasks + backlog (2026-11-14, Julius)
-- Full screen ↻ ✕ corner + backlog minimize (2026-11-14 evening, Julius)
-- Backlog hold menu + see-through long events (2026-11-15, Julius)
-- Backlog → All day box (2026-11-15, Julius)
-- Backlog bulk select (2026-11-15, Julius)
-- All day → Scheduled (2026-11-15, Julius)
-- All day quick add (2026-11-15, Julius)
-- All day order (2026-11-15, Julius)
-
-## IT study log (2026-11-04)
-
-- ChatGPT appends study sessions to the `Study Sessions` tab; `StudyLog.gs` turns them into folded History entries per Morning / Afternoon / Evening and a `Study Review` tab. Protocol + spec: `docs/IT_STUDY_HISTORY_AUTOMATION.md`; mechanics: `docs/NOTES.md` → "IT study log". Never fabricate study counts.
+## His words
+- **Time section** = Morn / After / Night (History): change one, change all three.
+- **calendar / main calendar** = docked right-side calendar; **big calendar** = pop-out.
+- **task cell** = task line / card; **urgency cell** = Urgent area (now **Next Steps**); **reference cell** = Reference card. "Urgent" still = the red level.
+- Urgency 0 / 1 / 2 = red / yellow / blue (stored `data-urg` 1 / 2 / 3); Calendar colors 11 / 5 / 9, done = 8.

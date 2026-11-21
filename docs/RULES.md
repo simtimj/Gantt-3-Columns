@@ -20,6 +20,8 @@ Open only the section you need: `grep -n "^## " docs/RULES.md`.
 
 ## To Confirm (2026-11-04, Julius: standing rule, every project)
 
+- **DROPPED 2026-11-21 (Julius: "just forget about it, there's way too many")**: Claude no longer adds rows or reports counts. The notes below are history only.
+
 - **Cheap read (2026-11-21):** the `To Confirm Open` tab is a live FILTER of the open rows (Status ≠ works), oldest first. For the count + oldest 3, read `To Confirm Open!A1:C4` and `To Confirm Open!A:A` (count = rows − 1). Never read the whole `To Confirm` tab for this.
 
 - **Every shipped change gets a row in the `To Confirm` tab** of New Gantt Sheet (`1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE`, Sheets connector, alongside the Done Log row): Date `YYYY-MM-DD`, Project, Change (short name), How to check (one line he can test on his phone), Status blank. One row per feature, not per commit. It shows in the pinned **To Confirm** Reference card; ticking a line there marks it `works`.

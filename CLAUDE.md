@@ -18,7 +18,7 @@ Google Apps Script web app (Today / Notes / Reference columns over a Google Shee
 ## Docs every change
 - `README.md` = feature list (✅ Working · 🧪 To be confirmed · 🔧 To be improved · 📋 To do · 💤 Shelved). Every feature change updates it in the same commit: new → 🧪 with date; Julius says works → ✅; update "Last updated".
 - Efficiency changes also update `docs/EFFICIENCY_HANDOFF.md`; planning decisions `docs/PLANNING_WORKFLOW.md`. Say proposed / implemented / tested / user-confirmed. No private task contents in the repo.
-- **To Confirm**: every shipped feature → a row in the `To Confirm` tab (details: `docs/RULES.md` → To Confirm). Before new work, tell Julius the unchecked count + oldest 3. "Broken" → check the tab first.
+- **To Confirm: dropped** (Julius 2026-11-21: "forget about it, way too many"): no new rows, don't report counts.
 
 ## Talking with Julius (ADHD, phone)
 - Short, skimmable: lead with the answer, a few bullets.

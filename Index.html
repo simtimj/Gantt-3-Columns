@@ -16023,8 +16023,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* 2026-11-21 later (Julius: "a bit much, more subtle"): the sky is a thin 3 px stripe on the strip's right edge, not a fill. */
   /* 2026-11-21 7:43 am (Julius: "too bright, more subtle, cuts into the 4am text"): 3 px stripe at 55% strength, and
      the hour text gets 4 px more room on the right so it never touches the stripe. */
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:3px 100%;background-position:right top;background-repeat:no-repeat;}
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:10px!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:5px 100%;background-position:right top;background-repeat:no-repeat;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:9px!important;padding-left:0!important;} /* 5 px sky bar + 4 px room (2026-11-21 12:55, Julius: tighter, more timeline) */
   /* Gap labels (2026-11-21, Julius; docs/NOTES.md → Gap labels): muted duration centered in the empty space between two timed events. */
   #calPanel .cp-gap{position:absolute;left:0;right:0;display:flex;align-items:flex-start;justify-content:flex-end;padding:3px 5px 0 0;box-sizing:border-box;pointer-events:none;z-index:0;overflow:hidden;} /* top-right of the gap (2026-11-21 12:37, Julius) */
   #calPanel .cp-gap span{font-size:10px;line-height:1;color:var(--cp-muted);opacity:.7;white-space:nowrap;}
@@ -18630,7 +18630,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!first) return;
     const sky = skyStops(first.t), tds = [...mount.querySelectorAll('.fc-timegrid-slot-label[data-time]')];
     const mOf = td => { const [h, mi] = td.getAttribute('data-time').split(':').map(Number); return h * 60 + mi; };
-    const rgba = m => 'rgb(' + sunAt(sky, m).join(' ') + ' / .55)'; // .95 was too bright (2026-11-21 7:43 am, Julius)
+    const rgba = m => 'rgb(' + sunAt(sky, m).join(' ') + ' / .62)'; // .95 was too bright (2026-11-21 7:43 am, Julius); 5 px wide + a touch brighter (12:55)
     tds.forEach((td, i) => { const a = mOf(td), b = i + 1 < tds.length ? mOf(tds[i + 1]) : 1440;
       td.style.setProperty('--sky', 'linear-gradient(to bottom,' + rgba(a) + ',' + rgba(b > a ? b : 1440) + ')'); });
   }
@@ -19005,13 +19005,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-weight:500;font-size:11px;}
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-style:normal;font-size:8px;opacity:.85;}
-  #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 7px 0 1px;} /* room before the axis line (2026-11-21 12:37, Julius) */
+  #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 5px 0 0;} /* room before the axis line, no extra margin (2026-11-21 12:37 / 12:55, Julius) */
   /* 12 AM sits at the very top edge, so its label (centered on the line) was cut off (2026-11-15, Julius): drop it below the line. */
   #calPanel .fc .fc-timegrid-slot-label[data-time="00:00:00"] .fc-timegrid-slot-label-cushion{top:4px;}
   /* Docked: narrower time column, no FRI 13 badge (the date is on the header line) (2026-11-13 evening, Julius). */
   #calPanel.cp-docked .cp-corner{display:none!important;}
   #calPanel.cp-docked .fc .fc-timegrid-axis-cushion{padding:0!important;min-width:0!important;}
-  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion{padding:0 7px 0 0!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion{padding:0 9px 0 0!important;}
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:10px;}
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-size:7px;}
   #calPanel.cp-docked .fc .fc-daygrid-body-natural .fc-daygrid-day-events{margin-bottom:0;}

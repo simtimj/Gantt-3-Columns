@@ -78,6 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **Calendar: wider sunrise / sunset line + tighter hour labels**: the sky line beside the hours is 5 px and a bit brighter; less margin around the hour labels so the timeline gets more room.
 - **Calendar: short events never merge when zoomed out**: a short event drawn over the next one keeps a thin page-colored edge, so two small events stay two.
 - **Title boxes: brighter border**: the box around a title and its lines (Keep In Mind and everywhere else) is much easier to see.
 - **Calendar: gap labels top-right + room before the time line**: gap labels sit in the top-right corner of the empty space and hide instead of getting cut off; the hour labels have more room before the line beside the timeline.

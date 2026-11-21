@@ -39,7 +39,7 @@ const VIEWPORT =
    gated by the PWA_KEY script property.
    ========================================================= */
 const GANTT_SS_ID = '1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE';
-const PWA_URL = 'https://simtimj.github.io/gantt-3-columns/';
+const PWA_URL = 'https://simtimj.github.io/Gantt-3-Columns/';
 // Inside the router the library has no active spreadsheet, so fall back to the ID.
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(GANTT_SS_ID); }
 

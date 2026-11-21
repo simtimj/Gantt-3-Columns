@@ -1012,7 +1012,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 ## H. App upgrade — PWA step 1 (2026-11-21 14:05, Julius; Keep In Mind "Next for gantt: App upgrade": PWA first, then database)
 - PWA is now the active focus (Calendar, Timer/Blocks parked).
-- Host on **GitHub Pages** (repo is public) → https://simtimj.github.io/gantt-3-columns/ (default address). Name on home screen: **Gantt**. Main app **and** Time Tracker (tracker.html, its own install).
+- Host on **GitHub Pages** (repo is public) → https://simtimj.github.io/Gantt-3-Columns/ (default address). Name on home screen: **Gantt**. Main app **and** Time Tracker (tracker.html, its own install).
 - Lock: **secret key** (Script Property `PWA_KEY`), typed/linked once per device. Setup link per device: the private /dev link + `?app=pwa` → opens the PWA with the key in the URL fragment (`#k=…`, never sent to a server, saved to localStorage, stripped from the URL).
 - API: the PWA can't call /dev (needs Google login cookies) and the project hit the 200-version cap, so a **thin router project "Gantt API"** (Anyone access, runs as Julius) includes this project as a **library in development mode (HEAD)** = always the latest pushed code, no new versions per push. Router redeploys only when its own files change. Sources: `tools/pwa-api/` (.txt so this project's clasp never pushes them).
 - Library gotchas handled: `getActiveSpreadsheet()` is null inside the router → `ss_()` falls back to the sheet ID. Script properties / cache / lock are the library's own = same as now. Triggers stay on this project.

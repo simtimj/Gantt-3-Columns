@@ -50,7 +50,7 @@ jobs:
         continue-on-error: true
         run: bash tools/pwa-api/deploy.sh
 
-  # PWA front end → GitHub Pages (https://simtimj.github.io/gantt-3-columns/).
+  # PWA front end → GitHub Pages (https://simtimj.github.io/Gantt-3-Columns/).
   pages:
     needs: deploy
     if: github.ref == 'refs/heads/main' && needs.deploy.result == 'success'

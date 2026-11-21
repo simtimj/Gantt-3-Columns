@@ -1304,6 +1304,22 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (zi(P) <= zi(B)) out.push('short event not drawn above the next one'); }
           a.today(); a.scrollToTime('08:00'); await wait(300); return out; });
         if (bb.length) errs.push(...bb); }
+      // Gap labels (2026-11-21, Julius): today's stub = Dentist 9–10, Old chore 1–1:30, Standup 3–3:15, Gig 7–9 pm →
+      // "3 h", "1 h 30 m", "3 h 45 m" between them; nothing before the first / after the last; click-through; no loop.
+      { const gl = await pg.evaluate(async () => { const out = [], a = window.fwCalendar.api(), wait = ms => new Promise(r => setTimeout(r, ms));
+          a.changeView('timeGridDay'); a.today(); a.scrollToTime('08:00');
+          const labs = () => [...document.querySelectorAll('#calPanel .cp-gap')].map(g => g.textContent);
+          for (let i = 0; i < 60 && !labs().includes('3 h 45 m'); i++) await wait(50);
+          const L = labs();
+          ['3 h', '1 h 30 m', '3 h 45 m'].forEach(t => { if (!L.includes(t)) out.push('gap label missing: ' + t + ' (have ' + L.join(' | ') + ')'); });
+          if (L.length !== 3) out.push('gap labels: want 3 today, got ' + L.length + ': ' + L.join(' | '));
+          const g = [...document.querySelectorAll('#calPanel .cp-gap')].find(x => x.textContent === '3 h 45 m');
+          if (g && getComputedStyle(g).pointerEvents !== 'none') out.push('gap label catches clicks');
+          if (g && g.classList.contains('cp-gap-x')) out.push('3 h 45 m gap label hidden at default zoom');
+          const n0 = document.querySelectorAll('#calPanel .cp-gap').length; await wait(400);
+          const fresh = [...document.querySelectorAll('#calPanel .cp-gap')]; if (fresh.length !== n0 || !fresh.includes(g)) out.push('gap labels keep redrawing');
+          return out; });
+        if (gl.length) errs.push(...gl); }
       const res = await pg.evaluate(async (phone) => {
         const out = [], wait = ms => new Promise(r => setTimeout(r, ms));
         const until = async (f, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (f()) return true; await wait(50); } return false; };

@@ -15983,7 +15983,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel.cp-full .cp-flgrip{pointer-events:none;cursor:default;}
   #calPanel.cp-full .cp-flgrip::before{display:none;}
   html[data-theme=dark] #calPanel.cp-full{--cp-line:#80868b;}
-  #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{border-top:3px solid var(--cp-sep);}
+  /* 2026-11-21 11:42 (Julius): no line between the all-day box and the backlog, just the two boxes; the grip still drags
+     (invisible, shows blue only while dragging). Was a 3 px top border on the minimized backlog + a visible grip bar. */
+  #calPanel.cp-full .cp-fadgrip:not(:active)::after,#calPanel.cp-full .cp-fadgrip:not(:active)::before{display:none;}
+  #calPanel.cp-fadresizing .cp-fadgrip::after{display:block!important;}
   #calPanel.cp-full .cp-plan:not(.folded){border-bottom:3px solid var(--cp-sep);border-bottom-left-radius:0;border-bottom-right-radius:0;}
   /* Sun colors (2026-11-14 night, Julius): full screen + half-screen docked calendar (asked again 2026-11-15 12:21, Julius). --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
   #calPanel{--sun-a:.13;}
@@ -15995,6 +15998,10 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      the hour text gets 4 px more room on the right so it never touches the stripe. */
   #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:3px 100%;background-position:right top;background-repeat:no-repeat;}
   #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:7px!important;}
+  /* Gap labels (2026-11-21, Julius; docs/NOTES.md → Gap labels): muted duration centered in the empty space between two timed events. */
+  #calPanel .cp-gap{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;overflow:hidden;}
+  #calPanel .cp-gap span{font-size:10px;line-height:1;color:var(--cp-muted);opacity:.7;white-space:nowrap;}
+  #calPanel .cp-gap.cp-gap-x span{visibility:hidden;}
   #calPanel .cp-sunmk{display:none;}
   #calPanel:is(.cp-full,.cp-docked) .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dotted rgb(242 113 28 / .35);pointer-events:none;z-index:0;}
   #calPanel:is(.cp-full,.cp-docked) .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:8.5px;line-height:1;color:var(--cp-muted);opacity:.6;}
@@ -16240,6 +16247,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* Events: rounded, title first (500), time under it, thin page-colored gap between overlaps. */
   #calPanel .fc .fc-event{border:0;border-radius:4px;box-shadow:none;}
   #calPanel .fc .fc-timegrid-col-events{margin:0 10px 0 1px;}
+  /* Week view (2026-11-21 11:40, Julius: "less margins on the side of the events"). */
+  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-col-events{margin:0 3px 0 1px;}
+  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-event .fc-event-main{padding-left:3px;padding-right:2px;}
   #calPanel .fc .fc-timegrid-event-harness-inset .fc-timegrid-event{box-shadow:0 0 0 1px var(--cp-bg);}
   /* Back-to-back (2026-11-21, Julius, job N): touching events (Meditate → 1 am → Sleep) stack with a small 2 px gap so
      two same-colored events never read as one; a real overlap stays Google-style (FullCalendar's inset) but the offset one is
@@ -16295,12 +16305,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-ev-t{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-ev-m{flex:0 0 auto;white-space:nowrap;}
   @container cpev (max-height:34px){
-    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1){align-items:center;}
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1){align-items:safe center;}
     #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-evb{display:flex;align-items:baseline;gap:4px;white-space:nowrap;}
     #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{display:block;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{flex:0 0 auto;overflow:visible;}
     /* 2026-11-21 (Julius): end time always shows (title truncates first); short cards sit centered, nothing cut at the top. */
-    #calPanel .fc .fc-timegrid-event .fc-event-main{display:flex;align-items:center;padding-top:0!important;padding-bottom:0!important;}
+    #calPanel .fc .fc-timegrid-event .fc-event-main{display:flex;align-items:safe center;padding-top:0!important;padding-bottom:0!important;} /* safe: text that doesn't fit starts at the top (2026-11-21 11:40, Julius) */
     #calPanel .fc .fc-timegrid-event .fc-event-main > .cp-ev{flex:1 1 auto;min-width:0;}
   }
   @container cpev (max-height:21px){
@@ -17946,8 +17956,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // left > 0) so CSS draws them solid; touching / lone events keep the see-through look. FullCalendar sets the left
   // in a second pass without re-mounting and resets the class on redraw, so a watcher (one rAF per burst) keeps it.
   let cpOvlT = 0;
-  const cpOvl = () => { cpOvlT = 0; mount.querySelectorAll('.fc-timegrid-event-harness').forEach(h => { const o = parseFloat(h.style.left) > 0; if(h.classList.contains('cp-ovl') !== o) h.classList.toggle('cp-ovl', o); }); };
-  new MutationObserver(ms => { if(ms.some(m => m.type === 'childList' ? m.addedNodes.length > 0 : m.target.classList && m.target.classList.contains('fc-timegrid-event-harness'))){ cancelAnimationFrame(cpOvlT); cpOvlT = requestAnimationFrame(cpOvl); } })
+  const cpOvl = () => { cpOvlT = 0; cpGapsSoon(); mount.querySelectorAll('.fc-timegrid-event-harness').forEach(h => { const o = parseFloat(h.style.left) > 0; if(h.classList.contains('cp-ovl') !== o) h.classList.toggle('cp-ovl', o); }); };
+  new MutationObserver(ms => { if(ms.some(m => m.type === 'childList' ? [...m.addedNodes].some(n => !(n.classList && n.classList.contains('cp-gap'))) : m.target.classList && m.target.classList.contains('fc-timegrid-event-harness'))){ cancelAnimationFrame(cpOvlT); cpOvlT = requestAnimationFrame(cpOvl); } })
     .observe(mount, {subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class']});
   function cpGroups(){
     mount.querySelectorAll('.fc-daygrid-body .fc-daygrid-day-events').forEach(day => {
@@ -17960,6 +17970,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if((h.dataset.cpgl || '') !== lab){ if(lab) h.dataset.cpgl = lab; else delete h.dataset.cpgl; } });
     });
   }
+  // Gap labels (2026-11-21, Julius; docs/NOTES.md → Gap labels): "3 h 45 m" centered in the empty space between two
+  // timed events of a day (overlaps: from the latest end so far). Positioned in % of the day's frame like the sun marks,
+  // so zoom keeps it in place; hidden (cp-gap-x) when the text doesn't fit. Redrawn after FullCalendar's own redraws.
+  let cpGapsT = 0;
+  function cpGapsSoon(){ if(!cpGapsT) cpGapsT = requestAnimationFrame(() => { cpGapsT = 0; cpGaps(); }); }
+  const gapFmt = m => { const h = Math.floor(m / 60), mi = Math.round(m % 60); return h && mi ? h + ' h ' + mi + ' m' : h ? h + ' h' : mi + ' m'; };
+  function cpGaps(){
+    if(!cal || !window.luxon) return;
+    const evs = cal.getEvents().filter(e => !e.allDay && e.start && e.end && e.display !== 'none' && e.display !== 'background');
+    mount.querySelectorAll('.fc-timegrid-col[data-date]').forEach(col => {
+      const fr = col.querySelector('.fc-timegrid-col-frame'); if(!fr) return;
+      const d0 = luxon.DateTime.fromISO(col.getAttribute('data-date'), {zone: TZ}), a = d0.toMillis(), b = d0.plus({days: 1}).toMillis(), span = b - a;
+      const iv = evs.map(e => [Math.max(+e.start, a), Math.min(+e.end, b)]).filter(x => x[1] > x[0]).sort((x, y) => x[0] - y[0]);
+      const gaps = []; let end = null;
+      iv.forEach(([s, e]) => { if(end !== null && s - end >= 60000) gaps.push([end, s]); end = end === null ? e : Math.max(end, e); });
+      const sig = gaps.map(g => g.join('-')).join(','), old = fr.querySelectorAll(':scope > .cp-gap');
+      if(fr.dataset.cpGaps === sig && old.length === gaps.length){ old.forEach(gapFit); return; }
+      old.forEach(x => x.remove()); fr.dataset.cpGaps = sig;
+      gaps.forEach(([s, e]) => { const g = document.createElement('div'); g.className = 'cp-gap'; g.setAttribute('aria-hidden', 'true');
+        g.style.top = ((s - a) / span * 100) + '%'; g.style.height = ((e - s) / span * 100) + '%';
+        g.innerHTML = '<span>' + gapFmt((e - s) / 60000) + '</span>'; fr.appendChild(g); gapFit(g); });
+    });
+  }
+  function gapFit(g){ const t = g.firstChild; if(!t) return; g.classList.remove('cp-gap-x'); const r = g.getBoundingClientRect();
+    if(r.height < t.offsetHeight + 4 || r.width < t.offsetWidth + 4) g.classList.add('cp-gap-x'); }
   // All-day cap (2026-11-10, Julius): see the CSS note above. The grip only shows while the list is capped (scrolling).
   const AD_KEY = 'fw.calAllDayMax', AD_DEF = 0.5, cpBody = panel.querySelector('.cp-body');
   let adRatio = Number(lsGet(AD_KEY)) || AD_DEF, adDrag = false, adSc = null;
@@ -17972,7 +18007,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const adRO = window.ResizeObserver ? new ResizeObserver(() => adLayout()) : null;
   if(adRO) adRO.observe(mount);
   function adLayout(){
-    cpGroupsSoon();
+    cpGroupsSoon(); cpGapsSoon();
     const h = mount.querySelector('.fc-view-harness'), sc = adScroller();
     if(adRO && sc !== adSc){ if(adSc){ adRO.unobserve(adSc); if(adSc.firstElementChild) adRO.unobserve(adSc.firstElementChild); }
       adSc = sc; if(sc){ adRO.observe(sc); if(sc.firstElementChild) adRO.observe(sc.firstElementChild); } }

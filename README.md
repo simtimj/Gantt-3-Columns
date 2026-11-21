@@ -78,6 +78,10 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **Calendar: gap labels**: a small muted label (e.g. "3 h 45 m") sits centered in the empty space between two timed events of a day (Day + Week, half + full screen). Overlaps count from the latest end; nothing before the first or after the last event; hidden when the gap is too short for the text; clicks pass through.
+- **Calendar (week view): text starts top-left + thinner side margins**: text that doesn't fit in a card starts at the top instead of being cut in the middle; less empty space beside events in Week view.
+- **Full screen: no line between All day and Backlog**: just the two boxes; the spot between them still drags to resize when the backlog is open (shows blue while dragging).
+
 - **Calendar: bolder all-day / timeline line**: the line under the all-day tasks is full white in dark mode (near-black in light) with a soft glow, so it stands out (3 px). No visible drag handle; dragging the line still resizes.
 - **Calendar: subtler sky stripe**: the sun / night color stripe by the hour labels is thinner (3 px) and about half as bright, and the hour text ("4 AM") has room so the stripe no longer cuts into it.
 - **Calendar: drag the all-day / timeline line to any height**: dragging the line under the day's all-day tasks now sets that area's real height, bigger or smaller, even with only one task (before, it only set a maximum). Double-tap the grip = back to auto. Remembered per device.

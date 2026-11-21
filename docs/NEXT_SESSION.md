@@ -4,7 +4,7 @@ Julius approved all of these. One job per session (CLAUDE.md). Do them in this o
 
 ## Order
 
-1. **N — Back-to-back overlap**: touching events (Meditate 11:50 pm–1 am → Sleep 1–7:45 am) look like they run through each other in the docked calendar. Leads + first step: docs/NOTES.md → "Google-style event pop-up" (2026-11-21 OPEN line).
+1. ~~**N — Back-to-back overlap**~~ DONE 2026-11-21 (answers + build notes in docs/NOTES.md).: touching events (Meditate 11:50 pm–1 am → Sleep 1–7:45 am) look like they run through each other in the docked calendar. Leads + first step: docs/NOTES.md → "Google-style event pop-up" (2026-11-21 OPEN line).
 2. **O — Follow the now line**: a setting that auto-scrolls the zoomed calendar so the current-time line stays in view.
 3. **D — To Confirm sweep**: ~254 open rows in the `To Confirm` tab (read `To Confirm Open`, see docs/RULES.md → To Confirm).
 4. **G — Split Index.html** into ~6 files (plan: docs/EFFICIENCY_HANDOFF.md → Speed plan). Approved.

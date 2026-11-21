@@ -78,6 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **Calendar: back-to-back events stay apart**: events that touch (Meditate ends 1 am, Sleep starts 1 am) sit one under the other with a small 2 px gap, so two same-colored events no longer look like one. A real overlap is Google-style: the later event is shifted right over the other and drawn solid with a dark outline. Very short events (e.g. 10 min) are always tall enough for one line of text and sit on top, covering a sliver of the next event. Docked + full-screen calendar.
 - **Event pop-up border in the event's color**: tapping a calendar event opens its pop-up with a 2 px border in that event's color (e.g. light blue for Meditate); grey when done; changes right away when you pick a new color.
 - **Calendar: sky colors moved to the hour labels**: the timeline itself is no longer tinted; the day's sky (night navy → dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label strip as a 6 px colored stripe (was a full fill; toned down, then made brighter: blue = clear daytime sky, short golden hours, pink dawn, red sunset). Sunrise / sunset = a faint dotted line with a tiny label. Docked + full-screen calendar.
 - **Calendar: end time always shown**: every timed event shows start – end (e.g. "3pm – 3:15pm"), even on one-line or narrow cards; the title shortens first. Small cards' text is centered top-to-bottom (no clipped top).
@@ -696,7 +697,6 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 ## 📋 To do
 
 - **Follow the now line** (2026-11-21, idea): a setting that keeps the calendar's current-time line in view through the day when zoomed in (auto-scroll as time passes). Open questions in docs/NOTES.md → Google-style event pop-up section.
-- **Back-to-back events side by side cleanly** (2026-11-21): e.g. Meditate 11:50 pm–1 am then Sleep 1–7:45 am shouldn't look like they run through each other. Notes: docs/NOTES.md → Google-style event pop-up section.
 
 - **Backlog hold menu: Mark complete** (2026-11-15, Julius): add to the backlog hold menu once he decides what "complete" does (e.g. Graphite + Done Log, or just drop it).
 

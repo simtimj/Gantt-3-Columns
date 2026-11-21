@@ -1156,6 +1156,15 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
           put({eventId:'b-'+d,title:'Dentist',allDay:false,start:t('09','00'),end:t('10','00'),startMs:ms(t('09','00')),color:'#d50000',colorId:'11',cal:'Main',calId:'main',location:'Main St',desc:'Bring the insurance card\\nhttps://example.com/form',editable:true});
           put({eventId:'c-'+d,title:'Old chore',allDay:false,start:t('13','00'),end:t('13','30'),startMs:ms(t('13','00')),color:'#616161',colorId:'8',done:true,cal:'Main',calId:'main',editable:true});
           put({eventId:'r-'+d,title:'Standup',allDay:false,start:t('15','00'),end:t('15','15'),startMs:ms(t('15','00')),color:'#039be5',colorId:'',cal:'Main',calId:'main',recurring:true,editable:false});
+          // Back-to-back pair (2026-11-21, job N), two days out so today's checks don't change: Meditate 11:50 pm – 1 am
+          // (crosses midnight) then Sleep 1 – 7:45 am, same color like Julius's real pair.
+          if(d===L.now().setZone(Z).plus({days:2}).toISODate()){
+          put({eventId:'mz-'+d,title:'Meditate',allDay:false,start:t('23','50'),end:iso(nx+'T01:00'),startMs:ms(t('23','50')),color:'#8e24aa',colorId:'3',cal:'Main',calId:'main',editable:true});
+          put({eventId:'sl-'+nx,title:'Sleep',allDay:false,start:iso(nx+'T01:00'),end:iso(nx+'T07:45'),startMs:ms(nx+'T01:00'),color:'#8e24aa',colorId:'3',cal:'Main',calId:'main',editable:true});
+          // A real overlap (Walk 3 – 4 am, inside Sleep) and a 10-minute event touching Sleep's end (Pills 7:45 – 7:55).
+          put({eventId:'wk-'+nx,title:'Walk',allDay:false,start:iso(nx+'T03:00'),end:iso(nx+'T04:00'),startMs:ms(nx+'T03:00'),color:'#33b679',colorId:'2',cal:'Main',calId:'main',editable:true});
+          put({eventId:'pl-'+nx,title:'Pills',allDay:false,start:iso(nx+'T07:45'),end:iso(nx+'T07:55'),startMs:ms(nx+'T07:45'),color:'#f6bf26',colorId:'5',cal:'Main',calId:'main',editable:true});
+          put({eventId:'br-'+nx,title:'Breakfast',allDay:false,start:iso(nx+'T07:55'),end:iso(nx+'T08:30'),startMs:ms(nx+'T07:55'),color:'#f4511e',colorId:'6',cal:'Main',calId:'main',editable:true});}
           put({eventId:'g-'+d,title:'Gig',allDay:false,start:t('19','00'),end:t('21','00'),startMs:ms(t('19','00')),color:'#33b679',colorId:'',cal:'Events',calId:'events',editable:false});}
         return {start:a[0],end:a[1],events:window.__calEmpty?[]:Object.values(S.ev).concat(window.__calManyAllDay&&(window.__mDay=window.fwCalendar.api().view.activeStart.toISOString().slice(0,10))?Array.from({length:30},(_,i)=>({id:'m'+i+'|x',eventId:'m'+i,title:'Many '+i,allDay:true,start:window.__mDay,end:L.fromISO(window.__mDay).plus({days:1}).toISODate(),startMs:ms(window.__mDay),color:'#3f51b5',colorId:(window.__mDone||{})['m'+i]??i%5===4?'8':'9',done:(window.__mDone||{})['m'+i]??i%5===4,urg:['1','2','3',''][i%4]||undefined,cat:i%2?'code':'',cal:'Main',calId:'main',editable:true})):[]).filter(e=>e.start.slice(0,10)<a[1]&&(e.allDay?e.end:e.end.slice(0,10))>=a[0]).map(e=>Object.assign({},e)),failed:[]};}
       const r=a[0]||{},shape=e=>{e.title=r.title;e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);return e;};
@@ -1233,7 +1242,36 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
       // CAL_SHOT=dir (2026-11-13): screenshot the docked calendar (app slid to the calendar half) for a look.
       if (process.env.CAL_SHOT) { await pg.evaluate(() => { const w = document.getElementById('workspace'); w.scrollLeft = w.scrollWidth; }); await pg.waitForTimeout(600);
         await pg.screenshot({ path: path.join(process.env.CAL_SHOT, 'cal-' + name + '.png') });
-        const cp = await pg.$('#calPane'); if (cp) await cp.screenshot({ path: path.join(process.env.CAL_SHOT, 'calpane-' + name + '.png') }); }
+        const cp = await pg.$('#calPane'); if (cp) await cp.screenshot({ path: path.join(process.env.CAL_SHOT, 'calpane-' + name + '.png') });
+        // Midnight shot (2026-11-21, job N): the Meditate → Sleep back-to-back pair.
+        if (cp) { await pg.evaluate(() => { try { const a = window.fwCalendar.api(); a.changeView('timeGridDay'); a.gotoDate(luxon.DateTime.now().setZone('America/Los_Angeles').plus({days: 3}).toISODate()); a.scrollToTime('00:00'); } catch (e) {} }); await pg.waitForTimeout(800); await pg.waitForTimeout(400);
+          await cp.screenshot({ path: path.join(process.env.CAL_SHOT, 'calpane-night-' + name + '.png') });
+          for (let z = 0; z < 4; z++) { await pg.evaluate(() => { const b = document.querySelector('#calPane .fc-cpZoomIn-button'); if (b) b.click(); }); await pg.waitForTimeout(150); }
+          await pg.waitForTimeout(300); await pg.evaluate(() => { try { window.fwCalendar.api().scrollToTime('00:00'); } catch (e) {} }); await pg.waitForTimeout(400);
+          await cp.screenshot({ path: path.join(process.env.CAL_SHOT, 'calpane-nightzoom-' + name + '.png') });
+          for (let z = 0; z < 4; z++) { await pg.evaluate(() => { const b = document.querySelector('#calPane .fc-cpZoomOut-button'); if (b) b.click(); }); await pg.waitForTimeout(150); }
+          await pg.evaluate(() => { try { const a = window.fwCalendar.api(); a.today(); a.scrollToTime('08:00'); } catch (e) {} }); await pg.waitForTimeout(300); } }
+      // Back-to-back layout (2026-11-21, job N, Julius): touching events stack with a small gap (no inset / offset),
+      // a real overlap is Google-style (inset, opaque), a 10-minute event is tall enough for its text and sits on top.
+      { const bb = await pg.evaluate(async () => { const out = [], a = window.fwCalendar.api(), wait = ms => new Promise(r => setTimeout(r, ms));
+          a.changeView('timeGridDay'); a.gotoDate(luxon.DateTime.now().setZone('America/Los_Angeles').plus({days: 3}).toISODate()); a.scrollToTime('00:00');
+          let el = t => [...document.querySelectorAll('#calPanel .fc-timegrid-event')].find(x => x.textContent.includes(t));
+          for (let i = 0; i < 60 && !(el('Meditate') && el('Sleep') && el('Walk') && el('Pills')); i++) await wait(50);
+          await wait(150);
+          const M = el('Meditate'), S = el('Sleep'), W = el('Walk'), P = el('Pills'), B = el('Breakfast');
+          if (!M || !S || !W || !P || !B) out.push('back-to-back events not drawn');
+          else { const r = x => x.getBoundingClientRect(), gap = r(S).top - r(M).bottom, ins = x => x.parentElement.getAttribute('style'), off = x => r(x).left > r(S).left + 2;
+            if (gap < 1.5 || gap > 4) out.push('touching events gap ' + gap.toFixed(1) + ' px (want a small gap)');
+            if (Math.abs(r(S).left - r(M).left) > 1 || Math.abs(r(S).right - r(M).right) > 1) out.push('touching events offset like an overlap');
+            if (!off(W)) out.push('overlap not Google-style (offset over Sleep)');
+            if (!/color\(srgb [\d.]+ [\d.]+ [\d.]+\)$|^rgb\(/.test(getComputedStyle(W).backgroundColor)) out.push('overlapping event not solid: ' + getComputedStyle(W).backgroundColor);
+            if (/^rgb\(|color\(srgb [\d.]+ [\d.]+ [\d.]+\)$/.test(getComputedStyle(S).backgroundColor)) out.push('plain event lost its see-through: ' + ins(S));
+            if (r(P).height < 16) out.push('10-minute event too short for its text: ' + r(P).height.toFixed(1));
+            if (off(B) || off(P)) out.push('event after a short one got offset: ' + ins(B));
+            const zi = x => Number(getComputedStyle(x.parentElement).zIndex) || 0;
+            if (zi(P) <= zi(B)) out.push('short event not drawn above the next one'); }
+          a.today(); a.scrollToTime('08:00'); await wait(300); return out; });
+        if (bb.length) errs.push(...bb); }
       const res = await pg.evaluate(async (phone) => {
         const out = [], wait = ms => new Promise(r => setTimeout(r, ms));
         const until = async (f, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (f()) return true; await wait(50); } return false; };

@@ -16142,6 +16142,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-event{border:0;border-radius:4px;box-shadow:none;}
   #calPanel .fc .fc-timegrid-col-events{margin:0 10px 0 1px;}
   #calPanel .fc .fc-timegrid-event-harness-inset .fc-timegrid-event{box-shadow:0 0 0 1px var(--cp-bg);}
+  /* Back-to-back (2026-11-21, Julius, job N): touching events (Meditate → 1 am → Sleep) stack with a small 2 px gap so
+     two same-colored events never read as one; a real overlap stays Google-style (FullCalendar's inset) but the offset one is
+     drawn solid with a page-colored outline (cp-ovl, set in cpGroups; FullCalendar's -inset class only means "has events stacked over it"); a short event is at least one text line tall (eventMinHeight is 1 so it
+     doesn't push the next event sideways) and sits on top, covering a sliver of the next one. */
+  #calPanel .fc .fc-timegrid-event-harness>.fc-timegrid-event{bottom:2px;margin-bottom:0;}
+  #calPanel .fc .fc-timegrid-event-harness.cp-ovl>.fc-timegrid-event.cp-glass{background:color-mix(in srgb,var(--cp-evbg,#1a73e8) 45%,var(--cp-bg))!important;box-shadow:0 0 0 1.5px var(--cp-bg)!important;}
+  #calPanel .fc .fc-timegrid-event.fc-timegrid-event-short{min-height:22px;}
+  #calPanel .fc .fc-timegrid-event.cp-tiny{min-height:17px;}
+  #calPanel .fc .fc-timegrid-event-harness:has(>.fc-timegrid-event-short){z-index:4!important;}
+  #calPanel .fc .fc-timegrid-event-harness:has(>.cp-tiny){z-index:5!important;}
   #calPanel .fc .fc-timegrid-event .fc-event-main{padding:2px 6px;}
   #calPanel .fc .fc-daygrid-event{margin:1px 10px 1px 2px!important;padding:1px 0;}
   #calPanel .fc .fc-daygrid-event .fc-event-main{padding:1px 6px;}
@@ -17831,6 +17841,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   // day's list has 2+ groups (order comes from eventOrder: done, start, urgRank).
   let cpGroupsT = 0;
   function cpGroupsSoon(){ if(!cpGroupsT) cpGroupsT = requestAnimationFrame(() => { cpGroupsT = 0; cpGroups(); }); }
+  // Google-style overlap (2026-11-21, job N): mark the events FullCalendar shifted right over another one (inline
+  // left > 0) so CSS draws them solid; touching / lone events keep the see-through look. FullCalendar sets the left
+  // in a second pass without re-mounting and resets the class on redraw, so a watcher (one rAF per burst) keeps it.
+  let cpOvlT = 0;
+  const cpOvl = () => { cpOvlT = 0; mount.querySelectorAll('.fc-timegrid-event-harness').forEach(h => { const o = parseFloat(h.style.left) > 0; if(h.classList.contains('cp-ovl') !== o) h.classList.toggle('cp-ovl', o); }); };
+  new MutationObserver(ms => { if(ms.some(m => m.type === 'childList' ? m.addedNodes.length > 0 : m.target.classList && m.target.classList.contains('fc-timegrid-event-harness'))){ cancelAnimationFrame(cpOvlT); cpOvlT = requestAnimationFrame(cpOvl); } })
+    .observe(mount, {subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class']});
   function cpGroups(){
     mount.querySelectorAll('.fc-daygrid-body .fc-daygrid-day-events').forEach(day => {
       const hs = [...day.querySelectorAll(':scope > .fc-daygrid-event-harness')].filter(h => h.querySelector('.cp-ev') && !h.classList.contains('fc-daygrid-event-harness-abs'))
@@ -17887,6 +17904,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
       timeZone: TZ,
       eventOrder: 'done,cpSch,start,ordKey,urgRank,-duration,allDay,title', // completed events last (2026-11-10), then by urgency (2026-11-11, Julius)
+      // 2026-11-21 (job N): layout by real times only; the min height for text is CSS (see "Back-to-back"), so a short
+      // event never makes the one after it look like an overlap. Real overlaps stay inset (slotEventOverlap default).
+      eventMinHeight: 1,
       initialView: saved === 'timeGridDay' || saved === 'timeGridWeek' ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
       // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
       // One toolbar line (2026-11-08, Julius): Today · date · ‹ › … Plan · Day|Week · ↻ · ✕. The old header row and

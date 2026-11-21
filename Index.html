@@ -2597,6 +2597,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <button class="btn" type="button" tabindex="-1" data-ctx="checkbox">☐ Checkbox</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="subtask">+ Subtask</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="title" title="Make this line a title: − / + folds the lines under it, down to the next empty line">▤ Title</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="lineAbove" title="Insert an empty line above this one">↑ Line above</button>
+  <button class="btn" type="button" tabindex="-1" data-ctx="lineBelow" title="Insert an empty line below this one">↓ Line below</button>
 </div>
 <?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>
 <?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>
@@ -4749,6 +4751,31 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       return;
     }
     const line = getCurrentLine(ed);
+    /* Insert line above / below (2026-11-21, Julius; NOTES "Insert line above/below"): a plain empty line next to the
+       held line, cursor in it, so the top / bottom of a list is never out of reach. Below a title = right under the
+       title (unfolded), at its lines' indent, so what's typed there joins the title's group. */
+    if(action === 'lineAbove' || action === 'lineBelow'){
+      let n = line;
+      while(n && n !== ed && n.parentElement !== ed) n = n.parentElement;
+      if(!n || n === ed){ setStatus('Tap a line first'); return; }
+      const above = action === 'lineAbove';
+      if(above && ed.classList.contains('ref-cell') && n === ed.firstElementChild && n.tagName === 'H2'){ setStatus('The card title stays on top'); return; }
+      captureBeforeEdit(ed);
+      const nl = document.createElement(ed.classList.contains('ref-cell') ? 'p' : 'div'); nl.innerHTML = '<br>';
+      if(!above && isTitleLine(n)){
+        if(n.dataset.fold === '1') delete n.dataset.fold;
+        const c = titleCovered(n)[0], lv = c ? Number(c.dataset.level) || 0 : 0;
+        if(lv){ nl.dataset.level = String(lv); nl.style.marginLeft = (24 * lv) + 'px'; }
+      }
+      n.insertAdjacentElement(above ? 'beforebegin' : 'afterend', nl);
+      const r = document.createRange(); r.setStart(nl, 0); r.collapse(true);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      finishEditorEdit(ed);
+      if(typeof refreshTitleLines === 'function') refreshTitleLines(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
+      return;
+    }
     if(action === 'indent' || action === 'outdent'){
       if(!line || line === ed){
         setStatus('Place the cursor on a text or task line');
@@ -16248,8 +16275,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-event{border:0;border-radius:4px;box-shadow:none;}
   #calPanel .fc .fc-timegrid-col-events{margin:0 10px 0 1px;}
   /* Week view (2026-11-21 11:40, Julius: "less margins on the side of the events"). */
-  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-col-events{margin:0 3px 0 1px;}
-  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-event .fc-event-main{padding-left:3px;padding-right:2px;}
+  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-col-events,#calPanel .fc .fc-timeGrid3-view .fc-timegrid-col-events,#calPanel .fc .fc-timeGrid4-view .fc-timegrid-col-events{margin:0 3px 0 1px;}
+  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-timeGrid3-view .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-timeGrid4-view .fc-timegrid-event .fc-event-main{padding-left:3px;padding-right:2px;}
   #calPanel .fc .fc-timegrid-event-harness-inset .fc-timegrid-event{box-shadow:0 0 0 1px var(--cp-bg);}
   /* Back-to-back (2026-11-21, Julius, job N): touching events (Meditate → 1 am → Sleep) stack with a small 2 px gap so
      two same-colored events never read as one; a real overlap stays Google-style (FullCalendar's inset) but the offset one is
@@ -16330,7 +16357,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   /* Day headers stay inside their column on narrow screens. */
   #calPanel .fc .fc-col-header-cell-cushion{width:100%;box-sizing:border-box;overflow:hidden;}
-  #calPanel .fc-timeGridWeek-view .cp-dh-n{max-width:100%;}
+  #calPanel .fc-timeGridWeek-view .cp-dh-n,#calPanel .fc-timeGrid3-view .cp-dh-n,#calPanel .fc-timeGrid4-view .cp-dh-n{max-width:100%;}
   /* Event checkboxes (2026-11-11, Julius): subject-colored box at the card's left; ✓ when done; smaller on short events. */
   #calPanel .cp-evc{display:flex;align-items:flex-start;gap:5px;}
   #calPanel .cp-evc.cp-ev-1{align-items:center;}
@@ -16524,7 +16551,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-cpPlan-button,#calPanel .fc .fc-cpBacklog-button{border:1px solid var(--cp-line);border-radius:999px!important;padding:0 12px;margin-right:4px;}
   #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:8px 4px 6px 8px;}
   #calPanel .fc .fc-cpClose-button:focus,#calPanel .fc .fc-cpRefresh-button:focus{outline:0;box-shadow:none;}
-  #calPanel .fc .fc-cpView-button{display:none;align-items:center;}
+  #calPanel .fc .fc-cpView-button{display:inline-flex;align-items:center;border:1px solid var(--cp-line);border-radius:999px!important;padding:0 9px;}
+  #calPanel .fc .fc-toolbar-chunk .fc-button-group:has(.fc-timeGridDay-button){display:none!important;} /* one cycle button instead (3/4-day views) */
   #calPanel .fc .fc-cpView-button[data-label]{font-size:0!important;}
   /* Weekday colors (2026-11-15, Julius: "match my per-day color convention"): the same title colors the day rows use
      (--note-line per weekday, light / dark). [data-dow] = 0 Sun … 6 Sat. Used by the calendar day title and the
@@ -16535,9 +16563,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   [data-dow="4"]{--dowc:var(--dowc-4);} [data-dow="5"]{--dowc:var(--dowc-5);} [data-dow="6"]{--dowc:var(--dowc-6);}
   #calPanel .fc .fc-toolbar-title[data-dow],[data-ce-title][data-dow],#calPanel .cp-blgd[data-dow]{color:var(--dowc)!important;font-weight:600;}
   #calPanel .fc .fc-cpView-button[data-label]::after{content:attr(data-label);font-size:12px;}
+  #calPanel .cp-vpick{position:fixed;z-index:100000;display:flex;flex-direction:column;min-width:96px;padding:4px;border-radius:10px;background:var(--cp-bg);border:1px solid var(--cp-line);box-shadow:0 6px 20px rgba(0,0,0,.25);}
+  #calPanel .cp-vpick button{all:unset;cursor:pointer;padding:8px 12px;border-radius:7px;font-size:14px;color:var(--cp-text);}
+  #calPanel .cp-vpick button.on{font-weight:700;background:var(--cp-soft);}
+  #calPanel .cp-vpick button:hover{background:var(--cp-soft);}
   /* Week header: smaller date circles to save height. */
   #calPanel .fc .fc-col-header-cell-cushion{padding:2px 0 4px;}
-  #calPanel .fc-timeGridWeek-view .cp-dh-n{font-size:18px;width:32px;height:32px;line-height:32px;}
+  #calPanel .fc-timeGridWeek-view .cp-dh-n,#calPanel .fc-timeGrid3-view .cp-dh-n,#calPanel .fc-timeGrid4-view .cp-dh-n{font-size:18px;width:32px;height:32px;line-height:32px;}
   @media (max-width:720px){
     #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:6px 2px 4px 6px;gap:2px;}
     #calPanel .fc .fc-toolbar-title{font-size:15px;margin-left:2px;flex:0 0 auto;overflow:visible;}
@@ -16593,6 +16625,35 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js',
     'https://cdn.jsdelivr.net/npm/@fullcalendar/luxon3@6.1.15/index.global.min.js'];
   const panel = document.getElementById('calPanel'), backdrop = document.getElementById('calPanelBackdrop');
+  /* 3 / 4-day views (2026-11-21, Julius; NOTES "3/4-day views"): big calendar only (pop-out + full screen; docked stays Day).
+     One button cycles Day → 3D → 4D → Wk (its label = where a tap goes); hold it / right-click = a picker. 3D / 4D start on
+     the day being looked at, and ‹ › / a sideways swipe move one day. Remembered per screen like Day / Week. */
+  const CP_VIEWS = ['timeGridDay', 'timeGrid3', 'timeGrid4', 'timeGridWeek'];
+  const CP_VLBL = {timeGridDay: 'Day', timeGrid3: '3D', timeGrid4: '4D', timeGridWeek: 'Wk'};
+  const cpvNext = v => CP_VIEWS[(Math.max(0, CP_VIEWS.indexOf(v)) + 1) % CP_VIEWS.length];
+  let cpvSkip = 0; // a hold just opened the picker: the click that follows is not a tap
+  function cpvPick(btn){
+    document.querySelectorAll('.cp-vpick').forEach(m => m.remove());
+    if(!cal) return;
+    const m = document.createElement('div'); m.className = 'cp-vpick'; m.setAttribute('role', 'menu');
+    m.innerHTML = CP_VIEWS.map(v => '<button type="button" role="menuitem" data-cpv="' + v + '"' + (cal.view.type === v ? ' class="on"' : '') + '>' + ({timeGridDay: 'Day', timeGrid3: '3 days', timeGrid4: '4 days', timeGridWeek: 'Week'})[v] + '</button>').join('');
+    panel.appendChild(m); // inside the panel so it gets the calendar's light / dark colors
+    const r = btn.getBoundingClientRect(), w = m.offsetWidth;
+    m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px'; m.style.top = (r.bottom + 4) + 'px';
+    const off = e => { if(!m.contains(e.target)){ m.remove(); document.removeEventListener('pointerdown', off, true); } };
+    setTimeout(() => document.addEventListener('pointerdown', off, true), 0);
+    m.addEventListener('click', e => { const b = e.target.closest('[data-cpv]'); if(!b) return; e.stopPropagation(); m.remove(); document.removeEventListener('pointerdown', off, true); if(b.dataset.cpv !== cal.view.type) cal.changeView(b.dataset.cpv); });
+  }
+  (() => {
+    let h = null;
+    const btnOf = e => e.target.closest && e.target.closest('#calPanel .fc-cpView-button');
+    document.addEventListener('pointerdown', e => { const b = btnOf(e); if(!b || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      const me = h = {x: e.clientX, y: e.clientY}; me.t = setTimeout(() => { if(h !== me) return; h = null; cpvSkip = Date.now() + 700; cpvPick(b); }, window.fwHoldMs ? window.fwHoldMs() : 500); }, true);
+    const stop = () => { if(h){ clearTimeout(h.t); h = null; } };
+    document.addEventListener('pointermove', e => { if(h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 10) stop(); }, true);
+    ['pointerup', 'pointercancel'].forEach(t => document.addEventListener(t, stop, true));
+    document.addEventListener('contextmenu', e => { const b = btnOf(e); if(!b) return; e.preventDefault(); stop(); cpvSkip = Date.now() + 700; cpvPick(b); }, true);
+  })();
   const mount = document.getElementById('calMount'), stateEl = panel.querySelector('[data-cal-state]'), detail = panel.querySelector('[data-cal-detail]');
   // Resizable width: drag the left edge (mouse or touch); saved per device. Double-click = default size.
   (function(){
@@ -17876,11 +17937,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   ['pointerdown', 'touchstart', 'mousedown'].forEach(t => zf.addEventListener(t, e => e.stopPropagation(), {passive: true}));
   mount.parentElement.style.position = 'relative'; mount.parentElement.appendChild(zf);
   let swp = null, swpLock = 0;
-  const swDay = dir => { if(!cal || !(docked || full) || Date.now() < swpLock) return; swpLock = Date.now() + 450; dir > 0 ? cal.next() : cal.prev(); };
+  const swOk = () => docked || full || !!(cal && /^timeGrid[34]$/.test(cal.view.type)); // pop-out: 3D / 4D swipe one day (2026-11-21)
+  const swDay = dir => { if(!cal || !swOk() || Date.now() < swpLock) return; swpLock = Date.now() + 450; dir > 0 ? cal.next() : cal.prev(); };
   window.fwCalSwipeDay = swDay;
-  mount.addEventListener('touchstart', e => { if(!(docked || full) || e.touches.length !== 1) { swp = null; return; } const t = e.touches[0]; swp = {x: t.clientX, y: t.clientY, at: Date.now()}; }, {passive: true});
+  mount.addEventListener('touchstart', e => { if(!swOk() || e.touches.length !== 1) { swp = null; return; } const t = e.touches[0]; swp = {x: t.clientX, y: t.clientY, at: Date.now()}; }, {passive: true});
   mount.addEventListener('touchend', e => {
-    const p = swp; swp = null; if(!p || !(docked || full) || document.querySelector('.fc-event-dragging,.fc-event-resizing')) return;
+    const p = swp; swp = null; if(!p || !swOk() || document.querySelector('.fc-event-dragging,.fc-event-resizing')) return;
     const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y;
     if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.6 && Date.now() - p.at < 700) swDay(dx < 0 ? 1 : -1);
   }, {passive: true});
@@ -18044,7 +18106,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // 2026-11-21 (job N): layout by real times only; the min height for text is CSS (see "Back-to-back"), so a short
       // event never makes the one after it look like an overlap. Real overlaps stay inset (slotEventOverlap default).
       eventMinHeight: 1,
-      initialView: saved === 'timeGridDay' || saved === 'timeGridWeek' ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
+      initialView: CP_VIEWS.includes(saved) ? saved : (phone ? 'timeGridDay' : 'timeGridWeek'),
       // Google Calendar look (2026-11-08, Julius): [Today] ‹ › November 2026 … [Day|Week].
       // One toolbar line (2026-11-08, Julius): Today · date · ‹ › … Plan · Day|Week · ↻ · ✕. The old header row and
       // + New are gone (hold / drag on the grid or the all-day row makes a new event).
@@ -18058,7 +18120,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         cpBacklog: { text: 'BL', hint: 'Show / hide past unfinished tasks', click: () => blToggle() },
         cpPlan: { text: 'Plan', hint: 'Show / hide the plan (Big Three, Waiting list)', click: () => { lsSet('fw.calPlanFold', planFolded() ? '0' : '1'); renderPlan(); setTimeout(() => cal && cal.updateSize(), 0); } },
         // Phones: one Day ⇄ Week toggle instead of the two-button pill (saves a button's width on the single line).
-        cpView: { text: 'Wk', hint: 'Switch Day / Week', click: () => cal.changeView(cal.view.type === 'timeGridDay' ? 'timeGridWeek' : 'timeGridDay') },
+        // 3 / 4-day views (2026-11-21, Julius): tap cycles Day → 3D → 4D → Wk; hold (or right-click) = quick picker.
+        cpView: { text: 'Wk', hint: 'Switch view: Day → 3 days → 4 days → Week (hold to pick)', click: () => { if(Date.now() < cpvSkip) return; cal.changeView(cpvNext(cal.view.type)); } },
         cpRefresh: { text: '↻', hint: 'Reload events from Google Calendar', click: () => {} }, // handled by the [data-cal-refresh] listener
         cpClose: { text: '✕', hint: 'Close (Esc) and go back to the Gantt', click: () => {} } // handled by [data-cal-close]
       },
@@ -18066,7 +18129,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       buttonHints: { today: 'Today' },
       buttonIcons: { prev: 'chevron-left', next: 'chevron-right' },
       // Day title with the weekday after it (2026-11-15, Julius): "Nov 15, Sun" (wide: "Nov 15, 2026, Sun").
-      views: { timeGridDay: { titleFormat: a => { const d = a.date, D = luxon.DateTime.fromObject({year: d.year, month: d.month + 1, day: d.day}); return D.toFormat(phone ? 'MMM d, ccc' : 'MMM d, yyyy, ccc'); } } },
+      views: { timeGrid3: { type: 'timeGrid', duration: {days: 3}, dateIncrement: {days: 1}, buttonText: '3D' }, timeGrid4: { type: 'timeGrid', duration: {days: 4}, dateIncrement: {days: 1}, buttonText: '4D' }, timeGridDay: { titleFormat: a => { const d = a.date, D = luxon.DateTime.fromObject({year: d.year, month: d.month + 1, day: d.day}); return D.toFormat(phone ? 'MMM d, ccc' : 'MMM d, yyyy, ccc'); } } },
       titleFormat: { month: 'short', year: 'numeric' },
       titleRangeSeparator: ' – ',
       allDayText: '',
@@ -18142,7 +18205,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(schOrig(info.event)); return; }
         if(!pending) showDetail(schOrig(info.event), info.el); },
       eventDidMount: a => { if(a.el.classList.contains('cp-glass')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
-      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = info.view.type === 'timeGridDay' ? 'Wk' : 'Day'; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
+      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = CP_VLBL[cpvNext(info.view.type)]; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
     });
     cal.render();
     window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
@@ -18425,7 +18488,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
      + backlog) hides, and the all-day strip goes back on top of the grid. Day view keeps the left column. */
   function fullWkSync(){
     if(!cal) return;
-    const wk = full && cal.view && cal.view.type === 'timeGridWeek';
+    const wk = full && cal.view && cal.view.type !== 'timeGridDay'; // Week, 3D and 4D: full width, all-day strip on top
     panel.classList.toggle('cp-fullwk', wk);
     const want = !full || wk;
     try { if(cal.getOption('allDaySlot') !== want) setTimeout(() => { try { cal.setOption('allDaySlot', want); cal.updateSize(); } catch (e) {} }, 0); else cal.updateSize(); } catch (e) {}
@@ -18436,7 +18499,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     fullBlWas = blEl.hidden;
     panel.classList.add('cp-full'); document.body.classList.add('cal-full');
     open(); full = true; fullAt = Date.now();
-    try { const v = lsGet('fw.calFullView') === 'timeGridWeek' ? 'timeGridWeek' : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
+    try { const s = lsGet('fw.calFullView'), v = CP_VIEWS.includes(s) ? s : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
     fullWkSync(); // Day: all-day tasks in the left column; Week: full width with the all-day strip on top
     fadRender();
     blEl.hidden = false; // always in the left column in full screen (no BL button there); ▾ minimizes it
@@ -18667,12 +18730,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   const fadEnd = () => { const d = fadDrag; fadDrag = null; if(fadHeld){ fadHeld = false; setTimeout(fadRender, 0); } fadEl.classList.remove('cp-fad-over'); fadEl.querySelectorAll('.cp-fa-ins').forEach(el => el.classList.remove('cp-fa-ins', 'cp-fa-ins-b'));
     if(d && d.live && d.ad >= 0){ const t = fadAdTarget(d), ev = fadList[d.ad]; if(t && ev) adReorder(ev, t.ev, t.after, viewStart); return; }
     if(d && d.live && d.sch >= 0){ // a Scheduled row let go over the all-day part of the box = unscheduled
-      const hit = document.elementsFromPoint(d.x, d.y).some(el => el.closest && el.closest('.cp-fasch') && fadEl.contains(el)); // over a Scheduled row = stays
+      const hit = document.elementsFromPoint(d.x, d.y).some(el => { const r = el.closest && el.closest('.cp-fasch'); return r && fadEl.contains(r) && Number(r.dataset.fa) !== d.sch; }); // over another Scheduled row = stays (never the dragged row itself)
       if(fadOver(d.x, d.y) && !hit){ const ev = fadList[d.sch]; if(ev) unschedule(schOrig(ev)); }
       return; }
     if(d && d.live && fadOver(d.x, d.y) && viewStart){ window.__fwFadDrop = (window.__fwFadDrop || 0) + 1; blSendMany(blSel && blSel.has(d.id) ? [d.id, ...[...blSel].filter(x => x !== d.id && blById(x))] : [d.id], viewStart); } };
   document.addEventListener('pointermove', e => fadMove(e.clientX, e.clientY), true);
-  document.addEventListener('touchmove', e => { if(e.touches[0]) fadMove(e.touches[0].clientX, e.touches[0].clientY); }, {capture: true, passive: true});
+  /* 2026-11-21 (phone smoke "dragging back to all day"): on a slow phone FullCalendar's own hold timer can fire late, so the
+     first finger moves scrolled the All day box and the Scheduled row slid along under the finger — let go and it
+     counted as "over a Scheduled row", nothing happened. A row held for the hold time is a drag: the box never scrolls. */
+  document.addEventListener('touchmove', e => { if(e.touches[0]) fadMove(e.touches[0].clientX, e.touches[0].clientY);
+    const d = fadDrag; if(d && !d.mouse && (d.live || Date.now() - d.t0 >= window.fwHoldMs()) && e.cancelable) e.preventDefault(); }, {capture: true, passive: false});
   document.addEventListener('pointerup', fadEnd, true);
   document.addEventListener('touchend', fadEnd, true);
   document.addEventListener('pointercancel', () => { if(fadDrag && !fadDrag.live) fadDrag = null; }, true);

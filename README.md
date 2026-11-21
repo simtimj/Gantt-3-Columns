@@ -78,6 +78,9 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **Calendar: 3-day / 4-day views** (big calendar: pop-out + full screen; the docked one stays Day): the Day/Wk button cycles Day → 3D → 4D → Wk (it shows where a tap goes); hold it (or right-click) for a picker. 3D / 4D start on the day you're looking at; ‹ › and a sideways swipe move one day. Remembered per screen.
+- **Insert line above / below**: hold (or right-click) any line in any text editor (Keep In Mind, Today, Notes, pads, Reference cards) → **↑ Line above** / **↓ Line below** adds an empty line there with the cursor in it. Below a title = right under it (unfolds it) at its lines' indent.
+- **Fix: dragging a Scheduled row back to All day (phone)**: on a slow phone the All day box could scroll under the finger instead of dragging, so the drop did nothing. A held row now never scrolls the box.
 - **Calendar: gap labels**: a small muted label (e.g. "3 h 45 m") sits centered in the empty space between two timed events of a day (Day + Week, half + full screen). Overlaps count from the latest end; nothing before the first or after the last event; hidden when the gap is too short for the text; clicks pass through.
 - **Calendar (week view): text starts top-left + thinner side margins**: text that doesn't fit in a card starts at the top instead of being cut in the middle; less empty space beside events in Week view.
 - **Full screen: no line between All day and Backlog**: just the two boxes; the spot between them still drags to resize when the backlog is open (shows blue while dragging).

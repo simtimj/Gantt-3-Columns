@@ -946,3 +946,20 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Overlaps: gap = next start − latest end so far. Only visible timed events count (all-day skipped, turned-off calendars aren't loaded); Chill / Repeat Tasks count like any other.
 - Between events only (nothing before the first / after the last). No minimum duration: hidden only when the text doesn't fit (height or width).
 - Format `3 h 45 m` · `2 h` · `45 m`. Past gaps shown the same. Always on, no toggle. Display-only (clicks pass through). Same rules in half and full.
+
+## 3/4-day views (2026-11-21 12:11, Julius)
+- Big calendar only (half + full screen); the docked side calendar stays Day-only.
+- (1) No new buttons: the Day/Wk button cycles Day → 3D → 4D → Wk; hold it for a quick picker.
+- (2) Starts on the day you're looking at (◉ = today).
+- (3) Moving: swipe left / right on the timeline = one day (instead of arrows; arrows also move one day in 3D / 4D).
+- (5) The last view is remembered per screen (half / full), like Day / Week.
+
+## Insert line above/below (2026-11-21 12:11, Julius)
+- (6) Every text editor: Keep In Mind, Today, Notes, pads, Reference cards — the hold / right-click menu gets "↑ Line above" and "↓ Line below".
+- (7) Inserts a plain empty line and puts the cursor in it.
+- (8) "Below" a title line goes inside its fold group (right under the title).
+
+## Phone smoke "dragging back to all day" (2026-11-21, Julius: older bug)
+- Cause (reproduced with CPU throttled 4×): FullCalendar's hold timer fired late, so the first finger moves scrolled the All day box; the Scheduled row slid along under the finger and `fadEnd` read the release as "over a Scheduled row = stays". Real on slow phones, not just the test.
+- App fix: the box `touchmove` listener is non-passive and cancels scrolling once a row has been held for the hold time; the "over a Scheduled row" check ignores the dragged row itself.
+- Test fix: measure the box once it has settled after the 11:00 drop, and poll (up to 3 s) for the result instead of a fixed 900 ms.

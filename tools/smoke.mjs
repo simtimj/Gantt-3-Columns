@@ -183,6 +183,40 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Nested titles: ' + x));
   }
+  // Insert line above / below (2026-11-21, Julius): hold menu → empty line above the first line / below the last one,
+  // cursor in it; below a title = right under it, unfolded, at its lines' indent.
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      document.querySelector('[data-ctab="focus"]').click(); await wait(400);
+      const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
+      const L = (t, lv, tl) => '<div class="check-line" data-level="' + lv + '"' + (tl ? ' data-tl="1"' : '') + (lv ? ' style="margin-left: ' + 24 * lv + 'px;"' : '') + '><input type="checkbox"><span class="check-text">' + t + '</span></div>';
+      ed.insertAdjacentHTML('beforeend', '<div><br></div>' + L('Ins title', 0, true) + L('Ins child', 1));
+      refreshCards(ed); await wait(150);
+      const f = t => [...ed.querySelectorAll('.check-line')].find(l => l.textContent.trim() === t);
+      const menu = async (line, act) => { const tx = line.querySelector('.check-text') || line, r = document.createRange(); r.setStart(tx.firstChild || tx, 0); r.collapse(true);
+        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); ed.focus(); rememberSelection(ed);
+        showContextMenu(ed, 50, 50, false); const b = document.querySelector('#contextMenu [data-ctx="' + act + '"]'); if (!b) return false; b.click(); await wait(100); return true; };
+      const isBlank = n => n && !n.textContent.trim() && !n.classList.contains('check-line');
+      const first = ed.firstElementChild;
+      if (!(await menu(first, 'lineAbove'))) out.push('no "Line above" in the hold menu');
+      else {
+        if (!isBlank(ed.firstElementChild) || ed.firstElementChild.nextElementSibling !== first) out.push('no empty line above the first line');
+        const a = getSelection().anchorNode; if (!(a === ed.firstElementChild || ed.firstElementChild.contains(a))) out.push('cursor not in the new top line');
+        ed.firstElementChild.remove();
+      }
+      const kid = f('Ins child'); await menu(kid, 'lineBelow');
+      if (!isBlank(kid.nextElementSibling)) out.push('no empty line below the last line'); else kid.nextElementSibling.remove();
+      const ti = f('Ins title'); toggleTitleFold(ti, ed); refreshTitleLines(ed);
+      await menu(ti, 'lineBelow');
+      const nl = ti.nextElementSibling;
+      if (!isBlank(nl)) out.push('no empty line under the title');
+      else if (nl.dataset.level !== '1') out.push('line under the title not at its lines\' indent: ' + nl.dataset.level);
+      if (ti.dataset.fold === '1') out.push('title stayed folded');
+      captureBeforeEdit(ed); [ti.previousElementSibling, ti, nl, f('Ins child')].forEach(x => x && x.remove()); finishEditorEdit(ed);
+      hideContextMenu(); document.querySelector('[data-ctab="notes"]').click(); await wait(200);
+      return out; });
+    k.forEach(x => errs.push('Insert line: ' + x));
+  }
   // Title cells (2026-11-21, Julius): a title + its lines sit in one box (nested box inside), archive takes the whole box.
   {
     const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
@@ -1372,6 +1406,28 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (panel.querySelectorAll('.fc-col-header-cell').length !== 7) out.push('week view is not 7 days');
             panel.querySelector('.fc-timeGridDay-button').click(); await wait(200);
             if (panel.querySelectorAll('.fc-col-header-cell').length !== 1) out.push('day view is not 1 day');
+            // 3 / 4-day views (2026-11-21, Julius): one button cycles Day → 3D → 4D → Wk → Day; 3D starts on the day shown;
+            // ‹ › moves one day; holding the button opens a picker; the view is remembered.
+            {
+              const api = window.fwCalendar.api(), vb = panel.querySelector('.fc-cpView-button'), st = () => api.view.currentStart.toISOString().slice(0, 10);
+              const cols = () => panel.querySelectorAll('.fc-col-header-cell').length;
+              if (!vb || !vb.getClientRects().length) out.push('3/4-day: no view button shown');
+              else {
+                api.next(); await wait(150); const shown = st();
+                const seq = []; for (let i = 0; i < 4; i++) { vb.click(); await wait(200); seq.push(api.view.type + ':' + cols()); }
+                if (seq.join(',') !== 'timeGrid3:3,timeGrid4:4,timeGridWeek:7,timeGridDay:1') out.push('3/4-day: cycle went ' + seq.join(','));
+                vb.click(); await wait(200);
+                if (st() !== shown) out.push('3/4-day: 3D did not start on the day shown (' + st() + ' vs ' + shown + ')');
+                const s0 = st(); panel.querySelector('.fc-next-button').click(); await wait(150);
+                const dd = (Date.parse(st()) - Date.parse(s0)) / 864e5; if (dd !== 1) out.push('3/4-day: › moved ' + dd + ' days');
+                if (localStorage.getItem('fw.calView') !== 'timeGrid3') out.push('3/4-day: view not remembered');
+                vb.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); await wait(50);
+                const pk = panel.querySelector('.cp-vpick [data-cpv="timeGrid4"]');
+                if (!pk) out.push('3/4-day: no picker on hold');
+                else { pk.click(); await wait(200); if (api.view.type !== 'timeGrid4') out.push('3/4-day: picker did not switch'); }
+                api.changeView('timeGridDay'); panel.querySelector('.fc-today-button').click(); await wait(200);
+              }
+            }
             await until(() => panel.querySelector('.fc-timegrid-event'));
             // Tap an event → detail card; read-only (no edit controls).
             panel.querySelector('.fc-timegrid-event').click(); await wait(80);
@@ -2399,12 +2455,13 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
                 await drag(g.row, g.slot);
                 const e1 = await pg.evaluate(d => { const e = window.__cal.ev['a-' + d]; return e && Object.assign({}, e, { min: luxon.DateTime.fromISO(e.end).diff(luxon.DateTime.fromISO(e.start), 'minutes').minutes }); }, day);
                 if (!e1 || e1.allDay || !/T11:00/.test(e1.start) || e1.min !== 15) errs.push('scheduled: drop onto 11:00 gave ' + JSON.stringify(e1 && { allDay: e1.allDay, start: e1.start, end: e1.end }));
-                g = await pt();
+                // Measure once the box has settled (the re-read after the drop redraws it; slow machines take longer).
+                for (let k = 0, prev = ''; k < 10; k++) { g = await pt(); const cur = JSON.stringify(g); if (g.sch && cur === prev) break; prev = cur; await pg.waitForTimeout(300); }
                 if (!g.sch) errs.push('scheduled: not listed under Scheduled in the All day box');
                 else {
                   if (!(await pg.evaluate(() => /Scheduled · 1/.test(document.querySelector('#calPanel .cp-fasg')?.textContent || '')))) errs.push('scheduled: group header missing');
                   await drag(g.sch, g.head);
-                  const e2 = await pg.evaluate(d => window.__cal.ev['a-' + d], day);
+                  let e2; for (let k = 0; k < 10; k++) { e2 = await pg.evaluate(d => window.__cal.ev['a-' + d], day); if (e2 && e2.allDay && !e2.sched) break; await pg.waitForTimeout(300); }
                   if (!e2 || !e2.allDay || e2.sched) errs.push('scheduled: dragging back to all day gave ' + JSON.stringify(e2 && { allDay: e2.allDay, sched: e2.sched }));
                 }
               }

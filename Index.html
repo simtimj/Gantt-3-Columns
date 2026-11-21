@@ -19072,6 +19072,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   /* 2026-11-11 (Julius): the blue "Ref" tag was too much — back to the quiet edge tab, just a little wider; the
      toolbar Ref button (next to Cols) is the visible way in. */
   #rdTab{width:24px;}
+  /* Reference = right half (2026-11-21, Julius; NOTES "C. Reference = right half"): exactly half the screen like every
+     other column (phone: full width), no drag-to-size, and no dimming, so the left half stays visible + usable and
+     the drawer doesn't look lighter than the columns. */
+  html body #workspace #referencePane.rd-drawer{width:50vw!important;box-shadow:none;}
+  body.rd-open #rdTab{right:50vw;}
+  #rdBackdrop,body.rd-open #rdBackdrop{display:none!important;}
+  @media (max-width:720px){
+    html body #workspace #referencePane.rd-drawer{width:100vw!important;border-left:0;}
+    body.rd-open #rdTab{right:auto;left:0;border-radius:0 8px 8px 0;border-left:0;border-right:1px solid var(--border);}
+  }
   /* 2026-11-11 (Julius): no pull tab on the edge — the Ref button (next to Cols) and the edge swipe open the drawer.
      The tab still shows while the drawer is open (close / drag-to-size handle). */
   body:not(.rd-open) #rdTab{display:none;}
@@ -19246,22 +19256,18 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   window.fwRefDrawer = {open:() => set(true), close:() => set(false), toggle:() => set(!isOpen()), isOpen};
   // Toolbar Ref button (2026-11-11, Julius): next to Cols, toggles the drawer.
   document.addEventListener('click', e => { if(e.target.closest && e.target.closest('[data-rd-open]')) set(!isOpen()); });
-  // Drag the tab to size the drawer (2026-11-11, Julius): left = wider, right = narrower; the width is saved on
-  // this device. Dragging a closed tab pulls the drawer open at that width. A plain tap still opens / closes.
-  const RD_KEY = 'fw.rdWidth', RD_MIN = 220;
-  const setW = px => document.documentElement.style.setProperty('--rd-w', Math.round(px) + 'px');
-  try { const w = +localStorage.getItem(RD_KEY); if(w >= RD_MIN) setW(w); } catch(_){}
+  // Tab: tap or drag opens / closes (sizing by drag removed 2026-11-21: the drawer is always half the screen).
   let size = null, skipClick = false;
   tab.addEventListener('pointerdown', e => {
     if(e.button > 0) return;
     size = {x:e.clientX, moved:false, id:e.pointerId};
     try { tab.setPointerCapture(e.pointerId); } catch(_){}
   });
+  // 2026-11-21 (Julius): locked at half — dragging the tab no longer sizes it; a drag still opens / closes it.
   tab.addEventListener('pointermove', e => {
-    if(!size) return;
-    if(!size.moved){ if(Math.abs(e.clientX - size.x) < 6) return; size.moved = true; document.body.classList.add('rd-sizing'); if(!isOpen()) set(true); }
-    e.preventDefault();
-    setW(Math.max(RD_MIN, Math.min(window.innerWidth - 32, window.innerWidth - e.clientX - tab.offsetWidth / 2)));
+    if(!size || size.moved || Math.abs(e.clientX - size.x) < 6) return;
+    size.moved = true; e.preventDefault();
+    set(e.clientX < size.x);
   });
   function endSize(){
     if(!size) return;
@@ -19269,8 +19275,6 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.body.classList.remove('rd-sizing');
     if(!moved) return;
     skipClick = true; setTimeout(() => { skipClick = false; }, 400);
-    const w = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--rd-w'), 10);
-    try { if(w >= RD_MIN) localStorage.setItem(RD_KEY, String(w)); } catch(_){}
   }
   tab.addEventListener('pointerup', endSize);
   tab.addEventListener('pointercancel', endSize);

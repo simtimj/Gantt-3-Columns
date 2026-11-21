@@ -78,6 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **Reference = right half**: the Next Steps + Reference drawer is exactly the right half of the screen (full width on the phone), with no dimming, so the left half stays visible and usable and the drawer is the same color as the columns. Dragging the ◀ tab no longer resizes it.
 - **Checkbox cursor always in the text** (every editor): making a checkbox ([] + Space, hold menu ☐ Checkbox / + Subtask, Enter, Next Steps add) puts the cursor right of the box; turning a line with text into a task keeps the cursor where it was; a cursor or letters that end up left of the box move into the task text.
 - **Calendar: wider sunrise / sunset line + tighter hour labels**: the sky line beside the hours is 5 px and a bit brighter; less margin around the hour labels so the timeline gets more room.
 - **Calendar: short events never merge when zoomed out**: a short event drawn over the next one keeps a thin page-colored edge, so two small events stay two.

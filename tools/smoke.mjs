@@ -98,17 +98,27 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       await drag(W - 6, W - 20);
       if (fwRefDrawer.isOpen()) out.push('a tiny edge drag opened the drawer');
       if (document.getElementById('referencePane').style.transform) out.push('drawer kept an inline transform');
-      // Drag the ◀ tab: pulls the drawer open at that width and saves it.
+      // Drag the ◀ tab: opens the drawer (2026-11-21: locked size — full width on the phone, no dimming).
       const tab = document.getElementById('rdTab'), pe = (type, x) => tab.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true, pointerId:7, pointerType:'touch', clientX:x, clientY:y, isPrimary:true}));
       pe('pointerdown', W - 10); for (const x of [W - 40, W - 150, W - 250]) { pe('pointermove', x); await wait(16); } pe('pointerup', W - 250); tab.click(); await wait(300);
       const dw = Math.round(document.getElementById('referencePane').getBoundingClientRect().width);
       if (!fwRefDrawer.isOpen()) out.push('dragging the tab did not open the drawer');
-      if (Math.abs(dw - 240) > 20) out.push('tab drag width ' + dw + ', wanted ~240');
-      if (+localStorage.getItem('fw.rdWidth') !== dw) out.push('drawer width not saved (' + localStorage.getItem('fw.rdWidth') + ')');
+      if (Math.abs(dw - W) > 2) out.push('phone drawer width ' + dw + ', wanted full ' + W);
+      if (getComputedStyle(document.getElementById('rdBackdrop')).display !== 'none') out.push('page behind the drawer is dimmed');
       fwRefDrawer.close(); await wait(250);
       return out;
     });
     swipe.forEach(m => errs.push('Drawer swipe: ' + m));
+  }
+  // Reference = right half (2026-11-21, Julius): desktop drawer is exactly half the screen, nothing dimmed.
+  if (!view.hasTouch) {
+    const half = await pg.evaluate(async () => { fwRefDrawer.open(); await new Promise(r => setTimeout(r, 300));
+      const r = document.getElementById('referencePane').getBoundingClientRect(), out = [];
+      if (Math.abs(r.width - innerWidth / 2) > 2 || Math.abs(r.right - innerWidth) > 2) out.push('drawer not the right half (' + Math.round(r.left) + '–' + Math.round(r.right) + ')');
+      if (getComputedStyle(document.getElementById('rdBackdrop')).display !== 'none') out.push('page behind the drawer is dimmed');
+      const el = document.elementFromPoint(innerWidth / 4, innerHeight / 2); if (!el || el.id === 'rdBackdrop') out.push('left half not usable while open');
+      fwRefDrawer.close(); await new Promise(r => setTimeout(r, 250)); return out; });
+    half.forEach(m => errs.push('Reference half: ' + m));
   }
   // The study entry stays folded: its 2 detail lines are hidden, the next task is not, and they follow it.
   const study = await pg.evaluate(() => {

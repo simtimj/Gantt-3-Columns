@@ -281,6 +281,33 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       const m = __cc.where('zq10', 'zq10zp10'); hideContextMenu(); __cc.clean(); document.querySelector('[data-ctab="notes"]').click(); return m; });
     if (stray) errs.push('Checkbox cursor: stray letters left of the box: ' + stray);
   }
+  // Reference archive (2026-11-21, Julius; NOTES "D. Reference archive"): hold / right-click a card (its text or its
+  // frame) → 🗄 Archive card → moved to the Archive with no question; Delete is a small 🗑; the menu item is Reference-only.
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      fwRefDrawer.open(); await wait(300);
+      const add = (id, t) => { state.reference.push({ id, parentId: '', type: 'item', title: '', content: '<h2>' + t + '</h2><p>x</p>', expanded: true, sort: 9 }); renderReference(); };
+      add('rArc', 'Arc me'); add('rArc2', 'Arc frame');
+      const w = id => document.querySelector('#referenceTree .ref-cell-wrapper[data-id="' + id + '"]');
+      if (!w('rArc')) return ['test card did not render'];
+      const del = w('rArc').querySelector('[data-del]'); if (!del || del.textContent.trim() !== '🗑') out.push('Delete is not a 🗑 button');
+      const ra = () => document.querySelector('#contextMenu [data-ctx="refArchive"]');
+      const kimEd = document.querySelector('#kimScroll .kim-editor'); showContextMenu(kimEd, 40, 40, false);
+      if (ra() && getComputedStyle(ra()).display !== 'none') out.push('Archive card shows outside Reference'); hideContextMenu();
+      const ev = el => { const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 5, clientY: r.top + 5 })); };
+      const before = (window.__calls || []).filter(c => c[0] === 'deleteReferenceItem').length;
+      ev(w('rArc').querySelector('.ref-cell')); await wait(80);
+      if (!ra() || getComputedStyle(ra()).display === 'none') out.push('no Archive card in a card\'s hold menu');
+      else { ra().click(); await wait(150); if (w('rArc')) out.push('card still shows after Archive'); }
+      ev(w('rArc2')); await wait(80);
+      if (!ra() || getComputedStyle(ra()).display === 'none') out.push('no Archive card when holding the card frame');
+      else { ra().click(); await wait(150); if (w('rArc2')) out.push('card (frame hold) still shows after Archive'); }
+      const calls = (window.__calls || []).filter(c => c[0] === 'deleteReferenceItem').slice(before).map(c => c[1][0]);
+      if (calls.join() !== 'rArc,rArc2') out.push('archive server calls: ' + calls.join());
+      hideContextMenu(); fwRefDrawer.close(); await wait(250);
+      return out; });
+    k.forEach(x => errs.push('Reference archive: ' + x));
+  }
   // Title cells (2026-11-21, Julius): a title + its lines sit in one box (nested box inside), archive takes the whole box.
   {
     const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];

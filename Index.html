@@ -1136,6 +1136,7 @@
     /* Right-click / long-press formatting menu. */
     .ctx-menu{position:fixed;z-index:3200;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:6px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.2);min-width:220px;}
     .ctx-menu[hidden]{display:none!important;}
+    .ctx-menu [hidden]{display:none!important;}
     .ctx-menu .btn{text-align:left;white-space:nowrap;min-height:34px;padding:5px 10px;font-size:13px;}
     .ctx-menu .ctx-wide{grid-column:1 / -1;}
     .ctx-menu.ctx-touch .btn{min-height:36px;font-size:14px;}
@@ -2599,6 +2600,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   <button class="btn" type="button" tabindex="-1" data-ctx="title" title="Make this line a title: − / + folds the lines under it, down to the next empty line">▤ Title</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="lineAbove" title="Insert an empty line above this one">↑ Line above</button>
   <button class="btn" type="button" tabindex="-1" data-ctx="lineBelow" title="Insert an empty line below this one">↓ Line below</button>
+  <button class="btn ctx-wide" type="button" tabindex="-1" data-ctx="refArchive" title="Archive this Reference card (and the cards inside it); restore it from Arc" hidden>🗄 Archive card</button>
 </div>
 <?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>
 <?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>
@@ -4801,6 +4803,11 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       setStatus('Select text or a task first');
       return;
     }
+    if(action === 'refArchive'){
+      const w = ed.closest('.ref-cell-wrapper');
+      if(w) deleteReference(w.dataset.id, {archive:true});
+      return;
+    }
     activeEditor = ed;
     ed.focus({preventScroll:true});
     if(!savedRange || !ed.contains(savedRange.startContainer) || !ed.contains(savedRange.endContainer)){
@@ -4934,7 +4941,14 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   let longPress = null;
   function editorFromTarget(target){
     const el = target instanceof Element ? target : target?.parentElement;
-    const ed = el?.closest?.('.editor,.ref-cell');
+    let ed = el?.closest?.('.editor,.ref-cell');
+    // Reference card chrome (2026-11-21, Julius: hold a card → Archive): a hold on the card's frame, not a button,
+    // opens the menu for that card.
+    if(!ed && el?.closest && !el.closest('button,input,select,a')){
+      const w = el.closest('#referenceTree .ref-cell-wrapper');
+      if(w && !el.closest('.ref-children')) ed = w.querySelector(':scope > .ref-cell');
+      else if(w){ const inner = el.closest('.ref-cell-wrapper'); ed = inner && inner.querySelector(':scope > .ref-cell'); }
+    }
     // Read-only split copies are not editable and get the normal browser menu.
     return ed && ed.isContentEditable ? ed : null;
   }
@@ -4990,6 +5004,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   });
   function showContextMenu(ed,x,y,touch){
     ctxEditor = ed;
+    const isRef = !!(ed && ed.classList && ed.classList.contains('ref-cell') && ed.closest('#referenceTree .ref-cell-wrapper'));
+    const ra = ctxMenu.querySelector('[data-ctx="refArchive"]'); if(ra) ra.hidden = !isRef;
     ctxAnchor = {x,y,touch:!!touch};
     rememberSelection(ed);
     activeEditor = ed;
@@ -6649,10 +6665,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       )}</div>
       <div class="ref-actions">
         <button
-          class="btn tiny"
-          data-del>
-          Delete
-        </button>
+          class="btn tiny ref-del"
+          data-del title="Delete (goes to the Archive)" aria-label="Delete">🗑</button>
       </div>
       <div class="ref-children"></div>`;
     (container || document.getElementById('referenceTree')).appendChild(wrap);
@@ -6919,14 +6933,16 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       .withFailureHandler(err => { list.innerHTML = '<p class="archive-empty"></p>'; list.firstChild.textContent = 'Error: ' + (err.message || err); })
       .getArchive();
   }
-  function deleteReference(id){
-    // Confirm first (2026-10-26, Julius: too easy to delete by accident).
+  function deleteReference(id, opt){
+    const archive = !!(opt && opt.archive);
+    // Confirm first (2026-10-26, Julius: too easy to delete by accident). Archive (2026-11-21, hold menu) skips the
+    // question: it is the same move into the Archive list, restorable from Arc.
     const item = (state.reference || []).find(x => x.id === id) || {};
     const tmp = document.createElement('div');
     tmp.innerHTML = stripReferenceMetadata(item.content || item.title || '');
     const name = ((tmp.firstElementChild || tmp).textContent || '').trim().slice(0, 60) || 'this cell';
     const kids = (function count(pid){ return (state.reference || []).filter(x => String(x.parentId) === String(pid)).reduce((n,x) => n + 1 + count(x.id),0); })(id);
-    if(!confirm('Delete "' + name + '"' + (kids ? ' and the ' + kids + ' cell' + (kids === 1 ? '' : 's') + ' inside it' : '')
+    if(!archive && !confirm('Delete "' + name + '"' + (kids ? ' and the ' + kids + ' cell' + (kids === 1 ? '' : 's') + ' inside it' : '')
       + '?\n\nIt goes to the Archive, so you can restore it.')) return;
     fwRefStructureStart();
     google.script.run
@@ -6940,8 +6956,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         }
         state.reference = state.reference.filter(x => !gone.has(String(x.id)));
         renderReference();
+        if(archive) setStatus('Archived "' + name + '"' + (kids ? ' + ' + kids + ' inside' : '') + ' · restore from Arc');
       })
-      .withFailureHandler(err => { fwRefStructureEnd(); setStatus('Could not delete card: ' + err.message); })
+      .withFailureHandler(err => { fwRefStructureEnd(); setStatus('Could not ' + (archive ? 'archive' : 'delete') + ' card: ' + err.message); })
       .deleteReferenceItem(id);
   }
   /* =========================================================

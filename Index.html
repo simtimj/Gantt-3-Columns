@@ -4405,6 +4405,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       }
       const level = Math.max(0, Math.min(6, Math.floor(columns / 4)));
       const checked = /^\[[xX]\]$/.test(checkboxMatch[2]);
+      const caretWas = checkCharOffset(line, sel.anchorNode, sel.anchorOffset);
+      const caretAt = Math.max(0, (caretWas == null ? text.length : caretWas) - (text.length - (checkboxMatch[3] || '').length));
       const c = document.createElement('div');
       c.className = 'check-line' + (checked ? ' done' : '');
       c.dataset.level = String(level);
@@ -4417,8 +4419,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       wireCheckbox(c.querySelector('input'));
       // Empty task: a <br> gives the phone's cursor a spot inside the text, not before the box (2026-11-01, Julius).
       const taskText = c.querySelector('.check-text');
-      if(taskText.textContent){ placeEnd(taskText); }
-      else { taskText.innerHTML = '<br>'; placeCaretInsideCheckbox(taskText); }
+      if(!taskText.textContent) taskText.innerHTML = '<br>';
+      placeCaretInsideCheckbox(taskText, caretAt);
       saveEditorOwner(el);
       return;
     }
@@ -4612,16 +4614,44 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     finishEditorEdit(editor);
     saveEditorOwner(editor);
   }
-  function placeCaretInsideCheckbox(text){
+  /* Checkbox cursor (2026-11-21, Julius; NOTES "F. Checkbox cursor"): an empty inline .check-text has no box, so the
+     phone put the caret before the checkbox. Every new checkbox now gets a <br> to stand on, the caret goes to a real
+     spot inside the text (char offset `at`, default 0 = right of the box), and it is set again after the next frame
+     and once the keyboard has settled — unless the caret has already moved into that text. */
+  function checkCharOffset(root, node, off){
+    if(!root || !node || !root.contains(node)) return null;
+    const r=document.createRange();
+    try{ r.selectNodeContents(root); r.setEnd(node, off); }catch(e){ return null; }
+    return r.toString().length;
+  }
+  function checkRangeAt(text, at){
+    const r=document.createRange();
+    let n=Math.max(0, at|0);
+    const w=document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+    let t, last=null;
+    while((t=w.nextNode())){
+      last=t;
+      if(n<=t.data.length){ r.setStart(t,n); r.collapse(true); return r; }
+      n-=t.data.length;
+    }
+    if(last && at>0){ r.setStart(last,last.data.length); }
+    else r.setStart(text,0);
+    r.collapse(true);
+    return r;
+  }
+  function placeCaretInsideCheckbox(text, at){
     const editor=text.closest('.editor,.ref-cell');
     if(!editor) return;
+    if(!text.textContent && !text.querySelector('br')) text.innerHTML='<br>';
+    const want=Math.max(0, Math.min(at|0, (text.textContent||'').length));
+    let first=true;
     const setCaret=()=>{
       if(!text.isConnected) return; // the line was replaced before the next frame
-      editor.focus({preventScroll:true});
-      const range=document.createRange();
-      range.setStart(text,0);
-      range.collapse(true);
       const sel=window.getSelection();
+      if(!first && sel.rangeCount && text.contains(sel.anchorNode)) return; // already inside (maybe typing): leave it
+      first=false;
+      editor.focus({preventScroll:true});
+      const range=checkRangeAt(text, want);
       sel.removeAllRanges();
       sel.addRange(range);
       activeEditor=editor;
@@ -4629,7 +4659,64 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     };
     setCaret();
     requestAnimationFrame(setCaret);
+    setTimeout(setCaret, 120);
   }
+  window.fwPlaceCaretInCheck = placeCaretInsideCheckbox;
+  /* Guard for every other path (keyboard quirks, paths we don't know): a collapsed caret that sits in a .check-line
+     but outside its .check-text (before / after the box) moves into the text; letters a phone typed left of the box
+     move into the text too, caret after them. */
+  (function checkCaretGuard(){
+    const lineOf = n => { const e = n && (n.nodeType === 1 ? n : n.parentElement); return e && e.closest ? e.closest('.check-line') : null; };
+    const editable = l => { const ed = l && l.closest('.editor,.ref-cell'); return ed && ed.isContentEditable ? ed : null; };
+    let composing = false;
+    document.addEventListener('compositionstart', () => { composing = true; }, true);
+    document.addEventListener('compositionend', () => { composing = false; setTimeout(fixStray, 0); }, true);
+    function fixCaret(){
+      if(composing) return;
+      const sel = window.getSelection();
+      if(!sel || !sel.rangeCount || !sel.isCollapsed) return;
+      const a = sel.anchorNode, line = lineOf(a);
+      if(!line || !editable(line)) return;
+      const text = line.querySelector(':scope > .check-text');
+      if(!text || text.contains(a)) return;
+      if(a !== line && a.parentNode !== line) return; // inside some other child (a nested widget): leave it
+      const kids = [...line.childNodes], ti = kids.indexOf(text);
+      const at = a === line ? sel.anchorOffset : kids.indexOf(a) + (sel.anchorOffset > 0 ? 1 : 0);
+      const r = document.createRange();
+      if(at <= ti) r.setStart(text, 0); else { r.selectNodeContents(text); r.collapse(false); }
+      if(at <= ti){ const w = document.createTreeWalker(text, NodeFilter.SHOW_TEXT), t = w.nextNode(); if(t) r.setStart(t, 0); }
+      r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+    function fixStray(){
+      if(composing) return;
+      const sel = window.getSelection();
+      if(!sel || !sel.rangeCount) return;
+      const line = lineOf(sel.anchorNode);
+      if(!line || !editable(line)) return;
+      const text = line.querySelector(':scope > .check-text');
+      if(!text) return;
+      const before = [], after = [];
+      let seenText = false;
+      [...line.childNodes].forEach(n => {
+        if(n === text){ seenText = true; return; }
+        if(n.nodeType === 3 && n.data.replace(/[\u200b\s]/g, '')) (seenText ? after : before).push(n);
+      });
+      if(!before.length && !after.length) return;
+      const wasIn = before.concat(after).find(n => n === sel.anchorNode);
+      const off = wasIn ? sel.anchorOffset : null;
+      const onlyBr = text.childNodes.length === 1 && text.firstChild.nodeName === 'BR';
+      if(onlyBr) text.innerHTML = '';
+      if(before.length){ const f = document.createDocumentFragment(); before.forEach(n => f.appendChild(n)); text.insertBefore(f, text.firstChild); }
+      after.forEach(n => text.appendChild(n));
+      if(wasIn){ const r = document.createRange(); r.setStart(wasIn, Math.min(off, wasIn.data.length)); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); }
+      const ed = editable(line);
+      if(ed && typeof saveEditorOwner === 'function') saveEditorOwner(ed);
+    }
+    document.addEventListener('selectionchange', fixCaret);
+    document.addEventListener('input', e => { if(!e.isComposing) fixStray(); }, true);
+    window.fwCheckCaretFix = () => { fixStray(); fixCaret(); };
+  })();
   function placeEnd(el){
     const editor =
       el.closest(
@@ -4797,6 +4884,13 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const level = line && line !== ed ? Math.max(0,Math.min(6,Number(line.dataset.level) || Math.round((parseFloat(line.style.marginLeft) || 0) / 24))) : 0;
       const task = createCheckboxLine(level);
       const text = task.querySelector('.check-text');
+      let caretAt = 0;
+      if(line && line !== ed){
+        const ws = window.getSelection();
+        let o = ws && ws.rangeCount ? checkCharOffset(line, ws.anchorNode, ws.anchorOffset) : null;
+        if(o == null && savedRange) o = checkCharOffset(line, savedRange.startContainer, savedRange.startOffset);
+        caretAt = o == null ? (line.textContent || '').length : o;
+      }
       if(line && line !== ed && line.parentNode){
         while(line.firstChild) text.appendChild(line.firstChild);
         if(text.childNodes.length === 1 && text.firstChild.nodeName === 'BR') text.innerHTML = '';
@@ -4809,8 +4903,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         ed.appendChild(task);
       }
       wireCheckbox(task.querySelector('input'));
-      if(text.textContent){ placeEnd(text); }
-      else { text.innerHTML = '<br>'; placeCaretInsideCheckbox(text); }
+      if(!text.textContent) text.innerHTML = '<br>';
+      placeCaretInsideCheckbox(text, caretAt);
       finishEditorEdit(ed);
       rememberSelection(ed);
       saveEditorOwner(ed);

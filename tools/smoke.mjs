@@ -217,6 +217,60 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Insert line: ' + x));
   }
+  // Checkbox cursor (2026-11-21, Julius; NOTES "F. Checkbox cursor"): every way of making a checkbox leaves the caret in
+  // its text (right of the box), so the next letters land inside the task. Real key presses, one case per path.
+  {
+    await pg.evaluate(async () => { document.querySelector('[data-ctab="focus"]').click(); await new Promise(r => setTimeout(r, 400));
+      const ed = () => document.querySelector('#kimScroll .kim-editor');
+      window.__cc = {
+        add(h){ ed().insertAdjacentHTML('beforeend', h); if (window.refreshCards) refreshCards(ed()); },
+        caret(tok, at, onLine){ const e = ed(), el = [...e.children].find(n => n.dataset.cc === tok || (n.textContent || '').includes(tok));
+          if (!el) return false; e.focus(); const sel = getSelection(), r = document.createRange();
+          if (onLine) { r.setStart(el, 0); r.collapse(true); } else { const tx = el.querySelector('.check-text') || el, w = document.createTreeWalker(tx, NodeFilter.SHOW_TEXT), t = w.nextNode(); if (t) r.setStart(t, Math.min(at, t.data.length)); else r.setStart(tx, 0); r.collapse(true); }
+          sel.removeAllRanges(); sel.addRange(r); rememberSelection(e); return true; },
+        menu(act){ showContextMenu(ed(), 50, 50, false); const b = document.querySelector('#contextMenu [data-ctx="' + act + '"]'); if (!b) return false; b.click(); return true; },
+        line(tok){ return [...ed().querySelectorAll('.check-line')].find(l => (l.textContent || '').includes(tok)); },
+        where(tok, want){ const l = this.line(tok); if (!l) return 'no checkbox line holds the typed text';
+          const tx = l.querySelector(':scope > .check-text'); if (!tx || !tx.textContent.includes(tok)) return 'typed text landed outside the checkbox text';
+          if (want != null && tx.textContent.trim() !== want) return 'text is "' + tx.textContent.trim() + '", wanted "' + want + '"'; return ''; },
+        clean(){ const e = ed(); captureBeforeEdit(e); [...e.children].filter(n => n.dataset.cc || /zq|zp/.test(n.textContent || '')).forEach(n => n.remove()); finishEditorEdit(e); }
+      }; });
+    const L = t => '<div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">' + t + '</span></div>';
+    const cases = [
+      ['[] + Space on an empty line', '<div data-cc="c1"><br></div>', 'c1', 0, async () => pg.keyboard.type('[] '), 'zq1', 'zq1'],
+      ['[] + Space before existing text', '<div data-cc="c2">milk</div>', 'c2', 0, async () => pg.keyboard.type('[] '), 'zq2', 'zq2milk'],
+      ['hold menu ☐ Checkbox on an empty line', '<div data-cc="c3"><br></div>', 'c3', 0, async () => pg.evaluate(() => __cc.menu('checkbox')), 'zq3', 'zq3'],
+      ['hold menu ☐ Checkbox mid-text (caret stays)', '<div data-cc="c4">abcd</div>', 'c4', 2, async () => pg.evaluate(() => __cc.menu('checkbox')), 'zq4', 'abzq4cd'],
+      ['hold menu + Subtask', L('zp5'), 'zp5', 3, async () => pg.evaluate(() => __cc.menu('subtask')), 'zq5', 'zq5'],
+      ['Enter after a task', L('zp6'), 'zp6', 3, async () => pg.keyboard.press('Enter'), 'zq6', 'zq6'],
+      ['Enter at the start of a task', L('zp7'), 'zp7', 0, async () => pg.keyboard.press('Enter'), 'zq7', 'zq7'],
+      ['Next Steps + Task (add line)', L('zp8'), 'zp8', 3, async () => pg.evaluate(() => { const l = __cc.line('zp8'); urgAddLine(l, l.closest('.editor'), 'task', false); }), 'zq8', 'zq8'],
+      ['guard: caret put before the box', L('zp9'), 'zp9', -1, null, 'zq9', 'zq9zp9'],
+    ];
+    for (const [nm, h, tok, at, act, typed, want] of cases) {
+      await pg.evaluate(h => __cc.add(h), h);
+      const ok = await pg.evaluate(([t, a]) => __cc.caret(t, a, a < 0), [tok, at]);
+      if (!ok) { errs.push('Checkbox cursor: ' + nm + ': setup line missing'); continue; }
+      if (act) await act();
+      await pg.waitForTimeout(220);
+      await pg.keyboard.type(typed);
+      await pg.waitForTimeout(60);
+      const m = await pg.evaluate(([t, w]) => __cc.where(t, w), [typed, want]);
+      if (m) errs.push('Checkbox cursor: ' + nm + ': ' + m);
+      if (nm === 'Enter at the start of a task') {
+        const order = await pg.evaluate(() => { const a = __cc.line('zq7'), b = __cc.line('zp7'); return a && b && a.compareDocumentPosition(b) & 4 ? '' : 'new task not above the old one'; });
+        if (order) errs.push('Checkbox cursor: ' + nm + ': ' + order);
+      }
+      await pg.evaluate(() => __cc.clean());
+    }
+    // Letters a keyboard dropped left of the box move into the text.
+    const stray = await pg.evaluate(async () => { __cc.add('<div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">zp10</span></div>');
+      const l = __cc.line('zp10'), t = document.createTextNode('zq10'); l.insertBefore(t, l.firstChild);
+      const r = document.createRange(); r.setStart(t, 4); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r);
+      l.closest('.editor').dispatchEvent(new InputEvent('input', {bubbles:true})); await new Promise(res => setTimeout(res, 50));
+      const m = __cc.where('zq10', 'zq10zp10'); hideContextMenu(); __cc.clean(); document.querySelector('[data-ctab="notes"]').click(); return m; });
+    if (stray) errs.push('Checkbox cursor: stray letters left of the box: ' + stray);
+  }
   // Title cells (2026-11-21, Julius): a title + its lines sit in one box (nested box inside), archive takes the whole box.
   {
     const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];

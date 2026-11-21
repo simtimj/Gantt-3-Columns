@@ -967,3 +967,24 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## Gap labels top-right + axis room (2026-11-21 12:37, Julius)
 - Gap labels: top-right of the empty gap (3 px from the top, 5 px from the right), hidden when they'd be cut off (fit check counts the padding).
 - Hour labels: more room before the axis / sky line (7 px; full screen + docked 10 px because of the 3 px sky bar).
+
+## F. Checkbox cursor (2026-11-21 13:12, Julius)
+- Bug: after making a checkbox the caret often lands LEFT of the box (phone mostly). Every editor, every creation path.
+- (1) Converting a line that already has text: caret stays where it was in the text (right of the box). (2) Empty new checkbox: caret right after the box, no exceptions. (3) Mostly phone.
+- Smoke test per creation path.
+
+## C. Reference = right half (2026-11-21 13:12, Julius)
+- (4) No dimming; the left half stays visible and usable. (5) No overlay, and the drawer has the same background as the columns (not lighter). (6) Locked at exactly half (no drag-resize). (7) Phone (one column at a time): full width.
+
+## D. Reference archive (2026-11-21 13:12, Julius)
+- Hold / right-click a Reference card or cell → Archive. (8) Goes to the existing Archive list (Restore works). (9) Child cards go with it. (10) Keep Delete too, but the button becomes a small 🗑 to save space.
+
+## E. Reference → Keep In Mind drag (2026-11-21 13:12, Julius: defaults)
+- (11) Copy (Reference stays). (12) Lands as a title line with its lines under it, at the drop spot. (13) Checkboxes stay checkboxes, plain lines plain. (14) Drawer slides out of the way once the drag starts. Holding a cell's title and dragging brings the whole card / group.
+
+## B. Keep In Mind pin (2026-11-21 13:12, Julius: defaults)
+- Hold an item → Pin / Unpin. (15) The whole group (lines under it) moves to the top. (16) Pinned keep pin order; newest pin at the bottom of the pinned block. (17) Small 📌 before the title. (18) Synced (saved in the Keep In Mind data).
+
+## A. Hide the top button row (2026-11-21 13:12, Julius: defaults)
+- (19) Hold an empty spot of the toolbar → hide; a thin strip stays at the top: tap / hold it → show. (20) Remembered per device. (21) The whole row hides, date and status too.
+- Julius 13:12: OK to work on these despite the Calendar-first rule ("I'm behind").

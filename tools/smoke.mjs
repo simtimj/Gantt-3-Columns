@@ -183,6 +183,38 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Nested titles: ' + x));
   }
+  // Title cells (2026-11-21, Julius): a title + its lines sit in one box (nested box inside), archive takes the whole box.
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      document.querySelector('[data-ctab="focus"]').click(); await wait(400);
+      const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
+      const L = (t, lv, tl) => '<div class="check-line" data-level="' + lv + '"' + (tl ? ' data-tl="1"' : '') + '><input type="checkbox"><span class="check-text">' + t + '</span></div>';
+      ed.insertAdjacentHTML('beforeend', '<div><br></div>' + L('Box A', 0, true) + L('Box sub', 1, true) + L('Box x', 2) + L('Box y', 1) + '<div><br></div>');
+      refreshCards(ed); await wait(250);
+      const f = t => [...ed.querySelectorAll('.check-line')].find(l => l.textContent.trim() === t);
+      const bg = ed.style.backgroundImage || '', n = (bg.match(/%3Crect/g) || []).length;
+      if (n < 2) out.push('boxes drawn: ' + n);
+      if (!f('Box A').hasAttribute('data-tbf') || !f('Box y').hasAttribute('data-tbl')) out.push('box marks missing');
+      const saved = cardCleanHtml(ed);
+      if (/data-tb[fl]|--tbs/.test(saved)) out.push('render-only box marks leaked into the saved cell');
+      const added = [f('Box A').previousElementSibling, f('Box A'), ...titleCovered(f('Box A')), f('Box y').nextElementSibling];
+      captureBeforeEdit(ed); added.forEach(x => x.remove()); finishEditorEdit(ed); await wait(200);
+      if (/%3Crect/.test(ed.style.backgroundImage || '') && !ed.querySelector('[data-tl="1"]')) out.push('box left behind after delete');
+      // Archive a title in Today: its whole box is archived.
+      const te = document.querySelector('#todayScroll .day-editor');
+      if (te) {
+        te.insertAdjacentHTML('beforeend', '<div><br></div>' + L('Arch T', 0, true).replace('data-level', 'data-urg="3" data-level') + L('Arch 1', 0) + '<div><br></div>');
+        refreshCards(te); await wait(150);
+        const g = t => [...te.querySelectorAll('.check-line')].find(l => l.textContent.trim() === t);
+        setArchived(g('Arch T'), te, true);
+        if (!g('Arch 1').dataset.arch) out.push('archive missed a line in the box');
+        const rm = [g('Arch T').previousElementSibling, g('Arch T'), g('Arch 1'), g('Arch 1').nextElementSibling];
+        captureBeforeEdit(te); rm.forEach(x => x.remove()); finishEditorEdit(te);
+      }
+      document.querySelector('[data-ctab="notes"]').click(); await wait(200);
+      return out; });
+    k.forEach(x => errs.push('Title cells: ' + x));
+  }
   // Urgent tab in the middle column (2026-11-15, Julius): 🔴 shows the red Next Steps group (real rows), others hidden;
   // leaving the tab puts the panel back in Reference.
   {

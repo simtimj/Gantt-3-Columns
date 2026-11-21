@@ -5538,9 +5538,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       else if(picked && !picked.isConnected) picked = null;
       if(!line && picked && !isCopy(picked)) line = picked;
       if(line !== cur){
+        const was = cur;
         if(cur) cur.removeAttribute('data-tcfocus');
         cur = line;
         if(cur) cur.setAttribute('data-tcfocus','1');
+        // Title cells: a picked title rings its whole box (2026-11-21).
+        if(window.tboxPaint) [was,cur].forEach(x => { const e = x && x.parentElement; if(e && window.tboxTitle(x)) try{ tboxPaint(e); }catch(err){} });
       }
       // Ring on a picked copy row (render-only rows, never saved).
       const pc = picked && isCopy(picked) ? picked : null;
@@ -5670,9 +5673,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     document.addEventListener('input',later,true);
   })();
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
-  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tcstep','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn','data-blkph'];
+  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tcstep','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn','data-blkph','data-tbf','data-tbl'];
   function cardCleanHtml(el){
-    if(!el.querySelector('input[data-wired],[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
+    if(!el.querySelector('input[data-wired],[data-tbf],[data-tbl],[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
     c.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
@@ -5680,6 +5683,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
     c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tbl]').forEach(n => { n.style.removeProperty('--tbs'); if(!n.getAttribute('style')) n.removeAttribute('style'); });
+    c.querySelectorAll('[data-tbf],[data-tbl]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     return c.innerHTML;
   }
   function saveDay(date){
@@ -9314,7 +9319,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   }
   function setArchived(line,owner,on){
     const day = localToday();
-    urgSubtree(line).forEach(l => { if(on) l.dataset.arch = day; else delete l.dataset.arch; });
+    // Title cells (2026-11-21): a title archives its whole box.
+    const grp = new Set(urgSubtree(line)); if(window.tboxTitle && tboxTitle(line)) titleCovered(line).forEach(l => grp.add(l));
+    grp.forEach(l => { if(l.nodeType === 1 && l.dataset){ if(on) l.dataset.arch = day; else delete l.dataset.arch; } });
     urgChanged(owner);
     setStatus(on ? 'Archived ' + md(day) + ' — in Next Steps → Archive' : 'Back in Next Steps');
   }
@@ -13161,6 +13168,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       if(v.cnt) setAttr(n,'data-tlcnt',v.cnt); else n.removeAttribute('data-tlcnt'); if(v.sum) setAttr(n,'data-tlsum',v.sum); else n.removeAttribute('data-tlsum'); });
     histSumBoxes(ed,on);
     hide.forEach(n => { if(setAttr(n,'data-tlhid','1')) changed = true; });
+    if(window.tboxPaint) try{ tboxPaint(ed); }catch(e){} // Title cells (2026-11-21)
     return changed;
   }
 
@@ -13566,6 +13574,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     },{capture:true,passive:false});
     document.addEventListener('contextmenu',e => { if(hold && hold.ready) e.preventDefault(); },true); // our own menu still opens
     function block(line){
+      // Title cells (2026-11-21, Julius): a title drags with everything in its box, nested titles included.
+      if(window.tboxTitle && tboxTitle(line)) return [line,...titleCovered(line)];
       const base = tcLvl(line), out = [line];
       for(let n = line.nextElementSibling; n && n.classList.contains('check-line') && tcLvl(n) > base; n = n.nextElementSibling) out.push(n);
       return out;
@@ -15068,6 +15078,85 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(typeof placeCaretInsideCheckbox === 'function') placeCaretInsideCheckbox(cell.querySelector('.check-text'));
     pad.dispatchEvent(new Event('input',{bubbles:true}));
   },true);
+})();
+</script>
+<style>
+  /* Title cells (2026-11-21, Julius): a little room above a title box and below its last line. Render-only attrs. */
+  .editor > [data-tbf]{margin-top:7px;}
+  .editor > [data-tbl]{margin-bottom:calc(6px + var(--tbs,0) * 4px);}
+</style>
+<script>
+/* Title cells (2026-11-21, Julius: "when I titleize something, I want it to be in a cell for itself"): every marked
+   title (data-tl="1") and the lines it covers (titleCovered) sit inside one rounded box; a nested title's box sits
+   inside its parent's. A folded title is a box around the title alone. A picked title (data-tcfocus) rings its whole
+   box. Everywhere titles exist except the Blocks pad (it has its own block borders). Render-only: an SVG background on
+   the editor (scrolls with it, like blkPaint) + data-tbf / data-tbl / --tbs, stripped in cardCleanHtml. */
+(function(){
+  const boxTitle = n => n.nodeType === 1 && n.dataset.tl === '1' && !n.dataset.sec && !n.dataset.study && !n.hasAttribute('data-tsec') && !n.hasAttribute('data-cgrp');
+  const shown = n => n.offsetParent !== null && !n.hasAttribute('data-tlhid');
+  const pending = new Set();
+  function boxes(ed){
+    const out = [];
+    for(const n of ed.children){
+      if(!boxTitle(n) || !shown(n)) continue;
+      const cov = titleCovered(n), vis = cov.filter(shown);
+      out.push({t:n,cov,last:vis.length ? vis[vis.length - 1] : n});
+    }
+    // Depth = how many other boxes hold this title.
+    out.forEach(b => { b.depth = out.filter(o => o !== b && o.cov.includes(b.t)).length; });
+    return out;
+  }
+  function marks(ed,bs){
+    const f = new Set(), stack = new Map();
+    bs.forEach(b => {
+      if(!b.depth) f.add(b.t);
+      stack.set(b.last,Math.max(stack.get(b.last) || 0,bs.filter(o => o.last === b.last && o.depth > b.depth).length));
+    });
+    ed.querySelectorAll(':scope > [data-tbf]').forEach(n => { if(!f.has(n)) n.removeAttribute('data-tbf'); });
+    ed.querySelectorAll(':scope > [data-tbl]').forEach(n => { if(!stack.has(n)){ n.removeAttribute('data-tbl'); n.style.removeProperty('--tbs'); } });
+    f.forEach(n => { if(!n.hasAttribute('data-tbf')) n.setAttribute('data-tbf','1'); });
+    stack.forEach((s,n) => { if(!n.hasAttribute('data-tbl')) n.setAttribute('data-tbl','1'); if(s) n.style.setProperty('--tbs',String(s)); else n.style.removeProperty('--tbs'); });
+  }
+  function draw(ed){
+    if(!ed.isConnected) return;
+    const bs = boxes(ed);
+    const W = ed.clientWidth, H = ed.scrollHeight;
+    if(!bs.length || !W){ if(ed._tbox){ ed.style.removeProperty('background-image'); ed._tbox = false; } return; }
+    const er = ed.getBoundingClientRect(), ox = er.left + ed.clientLeft - ed.scrollLeft, oy = er.top + ed.clientTop - ed.scrollTop;
+    const ink = getComputedStyle(ed).color || '#888';
+    const urg = getComputedStyle(ed).getPropertyValue('--urg').trim() || ink;
+    let rects = '';
+    bs.sort((a,b) => a.depth - b.depth).forEach(b => {
+      const tr = b.t.getBoundingClientRect(), lr = b.last.getBoundingClientRect();
+      const inner = bs.filter(o => o.last === b.last && o.depth > b.depth).length;
+      const x = Math.max(1,tr.left - ox - 5), top = tr.top - oy - 4;
+      const bottom = lr.bottom - oy + 3 + inner * 4;
+      const w = Math.max(10,W - 2 - b.depth * 5 - x), h = Math.max(10,bottom - top);
+      const on = b.t.hasAttribute('data-tcfocus');
+      rects += '<rect x="' + (x + .75) + '" y="' + (top + .75) + '" width="' + (w - 1.5) + '" height="' + (h - 1.5) + '" rx="9" fill="none" stroke="' +
+        (on ? urg : ink) + '" stroke-opacity="' + (on ? '1' : '.4') + '" stroke-width="' + (on ? 2 : 1.5) + '"/>';
+    });
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
+    Object.assign(ed.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',
+      backgroundAttachment:'local',backgroundSize:W + 'px ' + H + 'px',backgroundPosition:'0 0'});
+    ed._tbox = true;
+  }
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(es => es.forEach(e => schedule(e.target))) : null;
+  function schedule(ed){
+    if(pending.has(ed)) return;
+    pending.add(ed);
+    requestAnimationFrame(() => { pending.delete(ed); try{ draw(ed); }catch(e){} });
+  }
+  // Called from refreshTitleLines (every editor refresh) and when the picked line changes.
+  window.tboxPaint = function(ed){
+    if(!ed || ed.classList.contains('plan-pad')) return;
+    const bs = boxes(ed);
+    if(!bs.length && !ed._tbox && !ed.querySelector(':scope > [data-tbf],:scope > [data-tbl]')) return;
+    marks(ed,bs);
+    if(ro && !ed._tboxRO){ ed._tboxRO = true; ro.observe(ed); }
+    schedule(ed);
+  };
+  window.tboxTitle = boxTitle;
 })();
 </script>
 <style>

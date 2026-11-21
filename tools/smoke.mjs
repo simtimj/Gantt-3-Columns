@@ -1335,7 +1335,9 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (r(P).height < 16) out.push('10-minute event too short for its text: ' + r(P).height.toFixed(1));
             if (off(B) || off(P)) out.push('event after a short one got offset: ' + ins(B));
             const zi = x => Number(getComputedStyle(x.parentElement).zIndex) || 0;
-            if (zi(P) <= zi(B)) out.push('short event not drawn above the next one'); }
+            if (zi(P) <= zi(B)) out.push('short event not drawn above the next one');
+            // Zoomed out, a short event covering the next one keeps a page-colored edge (2026-11-21 12:48, Julius: "they merge into one").
+            if (!/rgb/.test(getComputedStyle(P).boxShadow || '')) out.push('short event has no edge ring: ' + getComputedStyle(P).boxShadow); }
           a.today(); a.scrollToTime('08:00'); await wait(300); return out; });
         if (bb.length) errs.push(...bb); }
       // Gap labels (2026-11-21, Julius): today's stub = Dentist 9–10, Old chore 1–1:30, Standup 3–3:15, Gig 7–9 pm →

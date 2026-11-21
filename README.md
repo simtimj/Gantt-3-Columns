@@ -78,6 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-21)
 
+- **Calendar: short events never merge when zoomed out**: a short event drawn over the next one keeps a thin page-colored edge, so two small events stay two.
 - **Title boxes: brighter border**: the box around a title and its lines (Keep In Mind and everywhere else) is much easier to see.
 - **Calendar: gap labels top-right + room before the time line**: gap labels sit in the top-right corner of the empty space and hide instead of getting cut off; the hour labels have more room before the line beside the timeline.
 - **Calendar: 3-day / 4-day views** (big calendar: pop-out + full screen; the docked one stays Day): the Day/Wk button cycles Day → 3D → 4D → Wk (it shows where a tap goes); hold it (or right-click) for a picker. 3D / 4D start on the day you're looking at; ‹ › and a sideways swipe move one day. Remembered per screen.

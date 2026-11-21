@@ -1252,7 +1252,7 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
             if (!timed) out.push('timed event missing: ' + evText());
             else {
               if (!/(^|[^\d:])9(:00)?\s?am/i.test(timed.textContent)) out.push('timed event not at 9:00 Los Angeles time: ' + timed.textContent);
-              if (getComputedStyle(timed).backgroundColor !== 'rgb(213, 0, 0)') out.push('timed event lost its color: ' + getComputedStyle(timed).backgroundColor);
+              if (getComputedStyle(timed).borderTopColor !== 'rgb(213, 0, 0)' || !/^rgba\(213, 0, 0, 0\.3/.test(getComputedStyle(timed).backgroundColor.replace(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+) \/ ([\d.]+)\)/, (m, r, g, b, al) => 'rgba(' + Math.round(r * 255) + ', ' + Math.round(g * 255) + ', ' + Math.round(b * 255) + ', ' + al + ')'))) out.push('timed event not see-through in its color (2026-11-21): ' + getComputedStyle(timed).borderTopColor + ' / ' + getComputedStyle(timed).backgroundColor);
             }
             const allDay = [...panel.querySelectorAll('.fc-daygrid-event')].find(x => /All-day A/.test(x.textContent));
             if (!allDay) out.push('all-day event not in the all-day row');

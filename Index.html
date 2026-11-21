@@ -16154,11 +16154,12 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
   #calPanel .fc .fc-timegrid-event .fc-event-main{height:100%;box-sizing:border-box;}
   /* See-through long events (2026-11-15, Julius): faint tint + colored outline, grid lines visible; the title sits on a
      solid chip in the event color. */
-  #calPanel .fc .fc-timegrid-event.cp-see{background:color-mix(in srgb,var(--cp-evbg,#1a73e8) 32%,transparent)!important;border:1.5px solid var(--cp-evbg,#1a73e8)!important;box-shadow:none!important;}
+  /* 2026-11-21 (Julius): every timed event is see-through in its own color (cp-glass), not only the long ones. */
+  #calPanel .fc .fc-timegrid-event.cp-glass{background:color-mix(in srgb,var(--cp-evbg,#1a73e8) 32%,transparent)!important;border:1.5px solid var(--cp-evbg,#1a73e8)!important;box-shadow:none!important;}
   #calPanel .fc .fc-timegrid-event.cp-see .fc-event-main{height:auto;position:sticky;top:0;} /* title stays in view while the event runs past the top */
   /* 2026-11-15 08:21 (Julius): no chip behind the title, a stronger tint instead (12 % → 32 %); the text is solid white
      with a soft shadow so it reads over the grid. */
-  #calPanel .fc .fc-timegrid-event.cp-see .cp-evc,#calPanel .fc .fc-timegrid-event.cp-see .cp-ev-t,#calPanel .fc .fc-timegrid-event.cp-see .cp-ev-m{color:#fff!important;opacity:1!important;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+  #calPanel .fc .fc-timegrid-event.cp-glass .cp-evc,#calPanel .fc .fc-timegrid-event.cp-glass .cp-ev-t,#calPanel .fc .fc-timegrid-event.cp-glass .cp-ev-m{color:#fff!important;opacity:1!important;text-shadow:0 1px 2px rgba(0,0,0,.6);}
   /* Time always shows (2026-11-14 night, Julius: "even if the font is small, include the time with the title; no room
      below → put it to the right"): short cards and 30-min events = one line, title truncates, start time kept on the right. */
   #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-evb{display:flex;align-items:baseline;}
@@ -17918,7 +17919,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       // Event: title first (bold), time under it, like Google.
       // 2026-11-15 (Julius): long timed events (2 h+, e.g. Sleep 1 – 7:45) are see-through, so the grid shows behind
       // them; only the title chip keeps the event color.
-      eventClassNames: a => { const d = !a.event.allDay && a.event.end ? a.event.end - a.event.start : 0; return d && d <= 20 * 60000 ? ['cp-tiny'] : d >= 120 * 60000 ? ['cp-see'] : []; },
+      eventClassNames: a => { const d = !a.event.allDay && a.event.end ? a.event.end - a.event.start : 0; return !d ? [] : ['cp-glass'].concat(d <= 20 * 60000 ? ['cp-tiny'] : d >= 120 * 60000 ? ['cp-see'] : []); },
       // Checkbox on every card (2026-11-11, Julius): filled with the subject color (saved, else auto-guessed like
       // Gantt cards); tap = done (Graphite), hold = the Gantt hold menu (urgency, subject, due…). Holding the card
       // itself still moves it.
@@ -17965,7 +17966,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         const onBox = (info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')) || (dn && dn.id === x.eventId && dn.ms === String(x.startMs) && Date.now() - dn.t < 1200);
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(schOrig(info.event)); return; }
         if(!pending) showDetail(schOrig(info.event), info.el); },
-      eventDidMount: a => { if(a.el.classList.contains('cp-see')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
+      eventDidMount: a => { if(a.el.classList.contains('cp-glass')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
       datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = info.view.type === 'timeGridDay' ? 'Wk' : 'Day'; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
     });
     cal.render();

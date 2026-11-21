@@ -787,6 +787,8 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 - 2026-11-21 (Julius: "too much going on"): sun tint removed from `.fc-timegrid-col`; `sunPaint` now paints `--sky` on each `.fc-timegrid-slot-label` (gradient from its time to the next label's, `skyStops()` = navy / purple / pink / orange / yellow / blue / red, alpha .42), so the hour strip reads as one gradient. `.cp-sunmk` = 1 px dotted at .35, label 8.5 px. End time: removed the two `.cp-tend{display:none}` container rules; ≤ 34 px cards center `.fc-event-main` (flex). Fun cards: `--border` + `--panel` (white), no #b47be0.
 
+- 2026-11-21 (Julius): see-through for all timed events: `eventClassNames` adds `cp-glass` to every timed event (tint 32 % + outline from `--cp-evbg`, white text); `cp-see` (≥ 2 h) now only keeps the sticky title.
+
 ## Full-screen calendar (2026-11-14, Julius)
 
 - Ask: "slide over again from the half-screen calendar → full-screen calendar with all the information; use the calendar button's (pop-out) features". Answers: starts Day, remembers Day / Week; backlog beside it, full text visible; works with the computer mouse too; 📅 button stays the old pop-out (for comparison).

@@ -997,3 +997,16 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - BUILT E 2026-11-21: `initRefToKim` (last script): hold the card's first `<h2>` for `fwHoldMs()`, then drag; `window.fwRefToKim(wrap, {line, after})`.
 - BUILT D 2026-11-21: ctx `data-ctx="refArchive"`; `editorFromTarget` maps a hold on a card's frame to its `.ref-cell`; `deleteReference(id, {archive:true})` = no confirm.
 - BUILT F 2026-11-21: `placeCaretInsideCheckbox(text, at)` (<br> + 3 tries), `checkCharOffset` / `checkRangeAt`, global `checkCaretGuard` (selectionchange + input).
+
+
+## Instant screen (2026-11-21, Julius: speed item L, plan agreed)
+
+- Plan agreed: snapshot after each load/sync, paint it read-only on open with "syncing…", swap in live data and unlock; never write the snapshot to the Sheet; Safe sync unchanged; smoke test + Speed Log time-to-screen.
+- **Server**: `INSTANT_SCREEN = true` (Code.gs top) → `doGet` no longer builds the data into the page (`initialData` = null), so the page arrives without the ~server-data wait. `getWorkspaceData({fast:true,page:true})` adds `timing.kb`, `prevPageBuild`, `build` (what doGet used to add). Set the flag `false` to go back.
+- **Client** (script right after `__FW_INITIAL__`, banner `INSTANT SCREEN`): (1) asks `getWorkspaceData` at once, before the big script; `loadWorkspace` uses that answer (`__FW_SNAP.cb`), one retry on failure. (2) reads IndexedDB `fw-snap` / store `snap` (`screen` + `css`, linked by `cssId`) and paints it in a script-less iframe (`sandbox="allow-same-origin"`, body `inert`) + `#fwSnapPill`. Skips: live drew first (`late`), width differs > 2 px (`width`), > 3 days (`old`). (3) `fwSnapLive()` at the end of `applyWorkspaceData` removes it after jumpToday. `fwSnapFail(msg)` turns the tag red + tap to reload.
+- **Saving**: `#app` outerHTML + html/body attributes + all CSS outside #app (style text, CSSOM rules for empty style tags, adoptedStyleSheets) + scroll positions (child-index paths). Weekday icon base64 swapped for `@@WDn@@`. When: 3 s after load, after a sync that changed something (`fwSnapSoon`, ≤ 1 per 20 s, idle), and on hide / pagehide. Only from a live page. IndexedDB, not localStorage, so it can't use up the space Drafts recovery needs.
+- **Safety**: the picture is a separate document with no scripts; nothing reads it back into `state`, editors, Drafts or saves. Typing during it goes nowhere (smoke checks).
+- Found + fixed on the way: `renderUrgent` used `#calPanel` as an insert anchor even when the docked calendar had moved it (late data → insertBefore error).
+- Speed Log `load` Client: `snap`, `screen`, `snapMs`, `reqMs`, `dataMs`, `liveMs`, `snapAgeSec`, `snapKb` (ms since the page started). Status line shows `screen`.
+- Smoke: suite `snap` (save → reopen with slow data → picture, read-only, replaced, Speed Log; width change skips). The `main` suite now loads like the live app (no embedded data).
+

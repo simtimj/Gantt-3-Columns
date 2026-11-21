@@ -2615,6 +2615,153 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 </script>
 <script>
   /* =========================================================
+     INSTANT SCREEN (2026-11-21, speed item L; docs/NOTES.md "Instant screen")
+     On open, show the last screen this browser saved — a read-only picture in a script-less iframe with
+     "Syncing…" on top — while the live data loads; the live page then replaces it. The picture is ONLY a
+     picture: it lives in this browser's IndexedDB ('fw-snap'), never feeds state, saves, Drafts or the Sheet,
+     so Safe sync is untouched. Saved after each load / sync and when the page is put away.
+     ========================================================= */
+  (function(){
+    const S = window.__FW_SNAP = { state: 'none' };
+    // 1) Ask for live data now, before the big script runs (doGet no longer builds it into the page).
+    if(!window.__FW_INITIAL__ && window.google && google.script && google.script.run){
+      S.reqAt = Math.round(performance.now());
+      const got = () => { S.dataAt = Math.round(performance.now()); S.got = true; if(S.cb) S.cb(); };
+      google.script.run
+        .withSuccessHandler(d => { S.data = d || null; got(); })
+        .withFailureHandler(e => { S.err = e || { message: 'failed' }; got(); })
+        .getWorkspaceData({ fast: true, page: true });
+    }
+    const DB = 'fw-snap', ST = 'snap', MAX_AGE = 3 * 864e5;
+    function idb(){
+      return new Promise((res, rej) => {
+        let r; try { r = indexedDB.open(DB, 1); } catch (e) { return rej(e); }
+        r.onupgradeneeded = () => r.result.createObjectStore(ST);
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(Error('blocked'));
+      });
+    }
+    const q = v => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    const attrs = list => (list || []).map(([k, v]) => ' ' + k + '="' + q(v) + '"').join('');
+    const ago = ms => { const m = Math.round(ms / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
+    function walk(root, path){ let el = root; for(const i of path){ el = el && el.children[i]; } return el; }
+    // 2) Paint the saved picture (skipped if live data already drew, the width changed, or it is > 3 days old).
+    function paint(sn, css, age){
+      const icons = window.WD_ICON_URL || [];
+      const app = sn.app.replace(/@@WD(\d)@@/g, (m, i) => icons[i] || '');
+      const f = document.createElement('iframe');
+      f.id = 'fwSnap'; f.setAttribute('sandbox', 'allow-same-origin'); f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
+      f.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;z-index:2147483000;transition:opacity .15s;background:' + (sn.bg || '#fff');
+      f.srcdoc = '<!doctype html><html' + attrs(sn.htmlA) + '><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + css +
+        '<style>*{caret-color:transparent!important;animation:none!important}</style></head><body' + attrs(sn.bodyA) + ' inert>' + app + '</body></html>';
+      f.onload = () => {
+        try {
+          const d = f.contentDocument, root = d.getElementById('app');
+          (sn.scroll || []).forEach(([p, t, l]) => { const el = p.length ? walk(root, p) : root; if(el){ el.scrollTop = t; el.scrollLeft = l; } });
+          d.querySelectorAll('#status,#focusStatus').forEach(n => { n.textContent = 'Syncing…'; });
+        } catch (e) {}
+        S.snapAt = Math.round(performance.now());
+      };
+      const pill = document.createElement('div');
+      pill.id = 'fwSnapPill'; pill.setAttribute('role', 'status');
+      pill.style.cssText = 'position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:2147483001;font:600 12px/1.3 system-ui,sans-serif;padding:4px 11px;border-radius:999px;background:rgba(28,28,30,.85);color:#fff;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.3);white-space:nowrap;transition:opacity .15s';
+      pill.textContent = 'Syncing… · saved ' + ago(age) + ' · read-only';
+      document.body.append(f, pill);
+      S.state = 'shown'; S.ageSec = Math.round(age / 1000); S.kb = Math.round(sn.app.length / 1024);
+    }
+    if(window.__FW_INITIAL__) S.state = 'embedded';
+    else idb().then(db => new Promise(res => {
+      const out = {}, tx = db.transaction(ST, 'readonly'), st = tx.objectStore(ST);
+      st.get('screen').onsuccess = e => { out.screen = e.target.result; };
+      st.get('css').onsuccess = e => { out.css = e.target.result; };
+      tx.oncomplete = () => { db.close(); res(out); }; tx.onerror = tx.onabort = () => { db.close(); res(out); };
+    })).then(({ screen, css }) => {
+      if(S.live) { S.state = 'late'; return; } // live data drew first
+      if(!screen || !css || screen.v !== 1 || css.id !== screen.cssId) { S.state = 'none'; return; }
+      const age = Date.now() - screen.ts;
+      if(age < 0 || age > MAX_AGE) { S.state = 'old'; return; }
+      if(Math.abs(screen.w - window.innerWidth) > 2) { S.state = 'width'; return; }
+      paint(screen, css.css, age);
+    }).catch(() => { S.state = 'nostore'; });
+
+    // 3) Live data drew: take the picture away. Called at the end of applyWorkspaceData.
+    window.fwSnapLive = function(){
+      if(S.live) return;
+      S.live = true;
+      const f = document.getElementById('fwSnap'), pill = document.getElementById('fwSnapPill');
+      if(!f && !pill) return;
+      setTimeout(() => {
+        S.goneAt = Math.round(performance.now());
+        [f, pill].forEach(n => { if(n){ n.style.opacity = '0'; setTimeout(() => n.remove(), 180); } });
+      }, 160); // after jumpToday's scroll (rAF + 120 ms)
+    };
+    // Live data could not load: keep the picture, say so, offer a reload.
+    window.fwSnapFail = function(msg){
+      const pill = document.getElementById('fwSnapPill'); if(!pill) return;
+      const a = document.querySelector('.refresh-btn');
+      pill.style.pointerEvents = 'auto'; pill.style.background = 'rgba(160,30,30,.92)';
+      pill.textContent = 'Couldn’t load (' + String(msg || 'error').slice(0, 60) + ') · saved copy · tap to reload';
+      pill.onclick = () => { if(a && a.href && a.getAttribute('href') !== '#') window.top.location.href = a.href; else location.reload(); };
+    };
+
+    // 4) Save the picture of the live page.
+    let cssMem = null, cssId = '', cssDirty = false, lastSave = 0, timer = 0;
+    function collectCss(){
+      let s = '';
+      document.querySelectorAll('style,link[rel="stylesheet"]').forEach(n => {
+        if(n.closest('#app')) return; // inside the picture already
+        if(n.tagName === 'STYLE' && !n.textContent.trim() && n.sheet) { try { s += '<style>' + [...n.sheet.cssRules].map(r => r.cssText).join('\n') + '</style>'; } catch (e) {} }
+        else s += n.outerHTML;
+      });
+      try { (document.adoptedStyleSheets || []).forEach(sh => { s += '<style>' + [...sh.cssRules].map(r => r.cssText).join('\n') + '</style>'; }); } catch (e) {}
+      return s;
+    }
+    function scrolls(root){
+      const out = [], all = root.getElementsByTagName('*');
+      const pathOf = el => { const p = []; while(el && el !== root){ const par = el.parentElement; p.unshift(Array.prototype.indexOf.call(par.children, el)); el = par; } return p; };
+      if(root.scrollTop || root.scrollLeft) out.push([[], root.scrollTop, root.scrollLeft]);
+      for(let i = 0; i < all.length; i++){ const el = all[i]; if(el.scrollTop > 0 || el.scrollLeft > 0) out.push([pathOf(el), el.scrollTop, el.scrollLeft]); }
+      return out;
+    }
+    const attrList = el => [...el.attributes].map(a => [a.name, a.value]);
+    function save(why){
+      if(!S.live || document.getElementById('fwSnap') || !window.indexedDB) return;
+      try {
+        const app = document.getElementById('app'); if(!app) return;
+        const t = performance.now();
+        let html = app.outerHTML;
+        (window.WD_ICON_URL || []).forEach((u, i) => { if(u && u.length > 200) html = html.split(u).join('@@WD' + i + '@@'); }); // icons are base64: keep them out
+        html = html.replace(/(class="[^"]*\brefresh-btn)\s+spin\b/g, '$1');
+        if(html.length > 8e6) { S.saveSkip = 'size'; return; }
+        const css = collectCss();
+        if(css !== cssMem) { cssMem = css; cssId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); cssDirty = true; }
+        const rec = { v: 1, ts: Date.now(), build: window.__FW_BUILD__ || '', w: window.innerWidth, h: window.innerHeight, cssId,
+          htmlA: attrList(document.documentElement), bodyA: attrList(document.body).filter(([k]) => k !== 'inert'),
+          bg: getComputedStyle(document.body).backgroundColor, app: html, scroll: scrolls(app), why };
+        const ms = Math.round(performance.now() - t), withCss = cssDirty;
+        lastSave = Date.now();
+        idb().then(db => {
+          const tx = db.transaction(ST, 'readwrite'), st = tx.objectStore(ST);
+          st.put(rec, 'screen'); if(withCss) st.put({ id: rec.cssId, css }, 'css');
+          tx.oncomplete = () => { db.close(); if(withCss && rec.cssId === cssId) cssDirty = false; S.saved = { at: rec.ts, kb: Math.round(html.length / 1024), ms, why }; };
+          tx.onerror = tx.onabort = () => db.close();
+        }).catch(() => {});
+      } catch (e) {}
+    }
+    // After a load / sync: soon, when the page is idle, at most every 20 s. Put away: right now.
+    window.fwSnapSoon = function(why, delay){
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const go = () => { if(Date.now() - lastSave > 20000) save(why || 'sync'); };
+        if(window.requestIdleCallback) requestIdleCallback(go, { timeout: 3000 }); else go();
+      }, delay == null ? 1500 : delay);
+    };
+    window.fwSnapSave = save;
+    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') save('hide'); });
+    window.addEventListener('pagehide', () => { if(Date.now() - lastSave > 1000) save('hide'); });
+  })();
+</script>
+<script>
+  /* =========================================================
      STATE
      ========================================================= */
   let state = {
@@ -2871,6 +3018,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     // fetch them now and merge only the changed cells.
     if(data.timing && data.timing.fast) setTimeout(() => fwSync(true),400);
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
+    // Instant screen: the saved picture goes away; save a fresh one once the page has settled.
+    if(!window.__FW_RELEASE__ && data.timing) window.__FW_RELEASE__ = data.timing.release || '';
+    if(window.fwSnapLive){ fwSnapLive(); fwSnapSoon('load',3000); }
   }
   // Speed timing (2026-11-04): sent after drawing, so it can't slow the load. See logSpeed in Code.gs.
   let fwSaveSamples=[],fwSaveSampleSeq=0,fwSpeedReportSeq=0;
@@ -2905,6 +3055,15 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     else { localStorage.setItem('fw.resumes', String((Number(localStorage.getItem('fw.resumes')) || 0) + 1)); localStorage.removeItem('fw.hiddenAt'); }
   } catch (e) {} });
   window.addEventListener('pagehide', () => { try { localStorage.setItem('fw.hiddenAt', String(Date.now())); } catch (e) {} });
+  /* Instant screen numbers for the Speed Log (2026-11-21), all ms since the page started opening:
+     screen = when something useful was on screen (the saved picture, else the live draw); snap = shown / none /
+     old / width / late / nostore / embedded; snapMs, reqMs (data asked), dataMs (data arrived), liveMs, snapAgeSec, snapKb. */
+  function fwSnapInfo(liveMs){
+    const S = window.__FW_SNAP || {};
+    return { snap: S.state || 'none', snapMs: S.snapAt != null ? S.snapAt : null, reqMs: S.reqAt != null ? S.reqAt : null,
+      dataMs: S.dataAt != null ? S.dataAt : null, liveMs: liveMs, screen: S.snapAt != null ? Math.min(S.snapAt, liveMs) : liveMs,
+      snapAgeSec: S.ageSec != null ? S.ageSec : null, snapKb: S.kb != null ? S.kb : null };
+  }
   function fwSpeedLog(kind,timing,t0){
     if(!timing) return;
     const render = Math.round(performance.now() - t0);
@@ -2912,8 +3071,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
       const client = fwSpeedContext({ render: render, drawEnd:Math.round(t0 + render), frameFirstByte: Math.round(nav.responseStart || 0), frameDone: Math.round(nav.responseEnd || 0),
         dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()),
-        navType: nav.type || '', ...(kind === 'load' ? fwStartInfo : {}) });
-      setStatus('Ready · server ' + (timing.total / 1000).toFixed(1) + 's · draw ' + (render / 1000).toFixed(1) + 's');
+        navType: nav.type || '', ...(kind === 'load' ? fwStartInfo : {}), ...(kind === 'load' ? fwSnapInfo(Math.round(t0 + render)) : {}) });
+      setStatus('Ready · screen ' + (client.screen != null ? (client.screen / 1000).toFixed(1) + 's · ' : '') + 'server ' + (timing.total / 1000).toFixed(1) + 's · draw ' + (render / 1000).toFixed(1) + 's');
       fwSendSpeed(kind,timing,client);
     },1500);
   }
@@ -2926,15 +3085,28 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
       fwSpeedLog('load',initial.timing,t0);
       return;
     }
-    google.script.run
-      .withSuccessHandler(applyWorkspaceData)
+    // Instant screen (2026-11-21): the early script already asked for the data; use its answer.
+    const S = window.__FW_SNAP || {};
+    const useLive = d => {
+      if(!(d && Array.isArray(d.days) && d.today)) return false;
+      const t0 = performance.now();
+      applyWorkspaceData(d);
+      fwSpeedLog('load',d.timing,t0);
+      return true;
+    };
+    const fallback = () => google.script.run
+      .withSuccessHandler(d => { if(!useLive(d)){ setStatus('Load error: no data'); if(window.fwSnapFail) fwSnapFail('no data'); } })
       .withFailureHandler(e => {
         setStatus(
           'Load error: ' +
           e.message
         );
+        if(window.fwSnapFail) fwSnapFail(e && e.message);
       })
-      .getWorkspaceData();
+      .getWorkspaceData({fast:true,page:true});
+    const fromEarly = () => { S.cb = null; const d = S.data; S.data = null; if(!useLive(d)) fallback(); }; // one retry
+    if(S.reqAt){ if(S.got) fromEarly(); else S.cb = fromEarly; return; }
+    fallback();
   }
   /* =========================================================
      DAYS
@@ -6426,6 +6598,7 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
         if(retry) setTimeout(() => fwSync(false),2500);
         // New AI tasks arrive with data-ai-new: sort them into today's time sections.
         if(Object.keys(out.days || {}).length && typeof tsecPlaceAi === 'function') setTimeout(() => { try{ tsecPlaceAi(); }catch(e){} },0);
+        if(Object.keys(out.days || {}).length || note) { if(window.fwSnapSoon) fwSnapSoon('sync'); }
         if(out.timing) fwSendSpeed(withImports ? 'imports' : 'sync',out.timing,
           fwSpeedContext({rpcMs,applyMs:Math.round(performance.now() - applyStarted)}));
       })
@@ -9178,7 +9351,9 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     if(!panel){
       panel = document.createElement('div');
       panel.id = 'urgentPanel';
-      refTopHost(tree).insertBefore(panel,document.getElementById('calPanel'));
+      // calPanel may already live elsewhere (docked) when data arrives late (instant screen): only use it as the anchor if it's here.
+      const top = refTopHost(tree), cp = document.getElementById('calPanel');
+      top.insertBefore(panel,cp && cp.parentNode === top ? cp : null);
     }
     { const host = document.getElementById('urgTabScroll'); // opened on the 🔴 tab → lives there (2026-11-15)
       if(host && urgInTab() && panel.parentNode !== host){ urgHome = urgHome || document.createComment('urgentPanel home'); panel.parentNode.insertBefore(urgHome, panel); host.appendChild(panel); } }

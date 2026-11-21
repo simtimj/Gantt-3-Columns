@@ -20,6 +20,8 @@ const INITIAL_PAST_DAYS = 7;
 const INITIAL_FUTURE_DAYS = 3;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Instant screen (2026-11-21): doGet serves the page without data; the page paints its saved snapshot, then loads.
+const INSTANT_SCREEN = true;
 
 // Viewport tags inside Index.html are ignored because the page runs inside
 // Google's frame; this is the one that actually applies.
@@ -33,8 +35,11 @@ function doGet(e) {
   if (e && e.parameter && e.parameter.app === 'tracker') return trackerPage_();
   const template = HtmlService.createTemplateFromFile('Index');
 
+  // Instant screen (2026-11-21, speed item L): send the page WITHOUT the data, so the phone can paint the saved
+  // read-only snapshot at once while it asks for live data (getWorkspaceData({fast:true,page:true})).
+  // Set INSTANT_SCREEN = false to go back to building the data into the page.
   let initial = null;
-  try {
+  if (!INSTANT_SCREEN) try {
     initial = getWorkspaceData({ fast: true }); // imports run after the page draws (runImports)
   } catch (err) {
     // The page falls back to loading the data itself.
@@ -188,7 +193,7 @@ function getWorkspaceData(opts) {
   const refPins = getRefPins_(); t.mark('pins');
   const notesSeeds = getNotesSeeds_(today, allDays); t.mark('seeds');
 
-  return {
+  const out = {
     days: days,
     reference: reference,
     refManifestHash: referenceManifest_(reference).hash,
@@ -200,6 +205,14 @@ function getWorkspaceData(opts) {
     today: today,
     timing: Object.assign(t.done(), { dayRows: allDays.rows.length, refRows: reference.length, fast: fast })
   };
+  // The page asked for its own first data (instant screen): add what doGet used to add for the Speed Log.
+  if (opts && opts.page) {
+    const kb = v => Math.round(JSON.stringify(v || '').length / 1024);
+    out.timing.kb = { days: kb(days), reference: kb(reference), urgent: kb(urgent), seeds: kb(notesSeeds) };
+    try { out.timing.steps.prevPageBuild = Number(CacheService.getScriptCache().get('speedPageMs')) || 0; } catch (e) {}
+    out.timing.build = appBuild_();
+  }
+  return out;
 }
 
 /* Speed timing (2026-11-04, Julius: measure, then fix). Each load's server steps + the browser's numbers go to

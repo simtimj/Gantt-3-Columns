@@ -695,6 +695,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 📋 To do
 
+- **Follow the now line** (2026-11-21, idea): a setting that keeps the calendar's current-time line in view through the day when zoomed in (auto-scroll as time passes). Open questions in docs/NOTES.md → Google-style event pop-up section.
 - **Back-to-back events side by side cleanly** (2026-11-21): e.g. Meditate 11:50 pm–1 am then Sleep 1–7:45 am shouldn't look like they run through each other. Notes: docs/NOTES.md → Google-style event pop-up section.
 
 - **Backlog hold menu: Mark complete** (2026-11-15, Julius): add to the backlog hold menu once he decides what "complete" does (e.g. Graphite + Done Log, or just drop it).

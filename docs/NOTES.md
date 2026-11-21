@@ -789,6 +789,8 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 - 2026-11-21 (Julius): see-through for all timed events: `eventClassNames` adds `cp-glass` to every timed event (tint 32 % + outline from `--cp-evbg`, white text); `cp-see` (≥ 2 h) now only keeps the sticky title.
 
+- 2026-11-21 later (Julius: "a bit much"): `--sky` is now a 3 px stripe on the label strip's right edge (`background-size:3px 100%`, alpha .75); label text back to the default color.
+
 ## Full-screen calendar (2026-11-14, Julius)
 
 - Ask: "slide over again from the half-screen calendar → full-screen calendar with all the information; use the calendar button's (pop-out) features". Answers: starts Day, remembers Day / Week; backlog beside it, full text visible; works with the computer mouse too; 📅 button stays the old pop-out (for comparison).

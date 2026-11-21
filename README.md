@@ -79,7 +79,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 ## 🧪 To be confirmed (2026-11-21)
 
 - **Event pop-up border in the event's color**: tapping a calendar event opens its pop-up with a 2 px border in that event's color (e.g. light blue for Meditate); grey when done; changes right away when you pick a new color.
-- **Calendar: sky colors moved to the hour labels**: the timeline itself is no longer tinted; the day's sky (night navy → dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label strip as one gradient. Sunrise / sunset = a faint dotted line with a tiny label. Docked + full-screen calendar.
+- **Calendar: sky colors moved to the hour labels**: the timeline itself is no longer tinted; the day's sky (night navy → dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label strip as one thin 3 px colored stripe (was a full fill; toned down same day). Sunrise / sunset = a faint dotted line with a tiny label. Docked + full-screen calendar.
 - **Calendar: end time always shown**: every timed event shows start – end (e.g. "3pm – 3:15pm"), even on one-line or narrow cards; the title shortens first. Small cards' text is centered top-to-bottom (no clipped top).
 - **Calendar: every timed event see-through**: short and medium events now use the same see-through look as long ones (faint tint + outline in the event's color, white text), so the grid shows through.
 - **🌴 Fun tab: plain white cards**: the purple border / tint is gone.

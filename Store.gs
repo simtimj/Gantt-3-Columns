@@ -11,8 +11,10 @@
    ========================================================= */
 const STORE_BACKEND = {
   kim: 'sheet',
-  days: 'sheet'
-  // ref, plan, calBacklog, timer, props, study, logs: still direct, moving in this order
+  days: 'sheet',
+  ref: 'sheet',
+  archive: 'sheet'
+  // plan, calBacklog, timer, props, study, logs: still direct, moving in this order
 };
 
 function storeBackend_(area) {
@@ -33,6 +35,21 @@ function storeLocked_(fn, ms) {
    skips a second date lookup (ref_ is opaque: a row number now, a doc id later). */
 const STORE_DAY_COLS_ = { tasks: 2, journal: 3, plan: 4, tho: 5 };
 const STORE_DAY_HEAD_ = { 4: 'Plan', 5: 'Thoughts' };
+
+const STORE_REF_COLS_ = { id: 1, parentId: 2, type: 3, title: 4, content: 5, expanded: 6, sort: 7 };
+
+// Write [[col, value], …] into one row; contiguous columns go in one call.
+function storeWriteCols_(sh, row, pairs) {
+  pairs = pairs.slice().sort((a, b) => a[0] - b[0]);
+  for (let i = 0; i < pairs.length;) {
+    let j = i;
+    while (j + 1 < pairs.length && pairs[j + 1][0] === pairs[j][0] + 1) j++;
+    const run = pairs.slice(i, j + 1);
+    if (run.length === 1) sh.getRange(row, run[0][0]).setValue(run[0][1]);
+    else sh.getRange(row, run[0][0], 1, run.length).setValues([run.map(p => p[1])]);
+    i = j + 1;
+  }
+}
 
 const Store = {
   /* Days — one row per date. Sheet: tab "Days", A date, B Today, C Notes, D Plan, E Thoughts/Scratch. */
@@ -160,6 +177,128 @@ const Store = {
     ensure(timer) { ensureSetup_(timer); }
   },
 
+
+  /* Reference cards. Record = { id, parentId, type, title, content, expanded, sort, ref_ }.
+     Sheet: tab "Reference", columns A–G in that order; ref_ = row number (opaque). */
+  ref: {
+    sheet_() { storeBackend_('ref'); return getOrCreateSheet_('Reference', REF_HEADERS); },
+    rec_(row, index, at) {
+      return { ref_: at, id: String(row[0] || ''), parentId: String(row[1] || ''), type: String(row[2] || 'item'),
+        title: String(row[3] || ''), content: String(row[4] || ''), expanded: row[5] !== false, sort: Number(row[6]) || index };
+    },
+    row_(r) {
+      return [r.id, r.parentId || '', r.type || 'item', r.title || '', r.content || '', r.expanded !== false, Number(r.sort) || 0];
+    },
+    // Every card in stored order (sort applied by the caller).
+    list() {
+      const values = this.sheet_().getDataRange().getValues();
+      return values.length <= 1 ? [] : values.slice(1).map((row, i) => this.rec_(row, i, i + 2));
+    },
+    ids() { return new Set(referenceRowMap_(this.sheet_()).keys()); },
+    get(id) {
+      const sh = this.sheet_();
+      const row = referenceRowMap_(sh).get(String(id));
+      if (!row) return { exists: false, id: String(id) };
+      return Object.assign({ exists: true }, this.rec_(sh.getRange(row, 1, 1, 7).getValues()[0], 0, row));
+    },
+    // Write only the given fields of an existing card (rec from get()/list()).
+    update(id, values, rec) {
+      const sh = this.sheet_();
+      const row = rec && rec.ref_ ? rec.ref_ : referenceRowMap_(sh).get(String(id));
+      if (!row) return false;
+      storeWriteCols_(sh, row, Object.keys(values).map(f => {
+        const c = STORE_REF_COLS_[f];
+        if (!c) throw new Error('Store.ref: unknown field ' + f);
+        return [c, values[f]];
+      }));
+      return true;
+    },
+    // New card at the bottom; sort defaults to the current row count.
+    add(r) {
+      const sh = this.sheet_();
+      const row = this.row_(r);
+      if (r.sort == null || !Number(r.sort)) row[6] = sh.getLastRow();
+      sh.appendRow(row);
+      return r.id;
+    },
+    addMany(list) {
+      if (!list.length) return;
+      const sh = this.sheet_();
+      sh.getRange(sh.getLastRow() + 1, 1, list.length, REF_HEADERS.length).setValues(list.map(r => this.row_(r)));
+    },
+    setSorts(order) {
+      const sh = this.sheet_();
+      const lastRow = sh.getLastRow();
+      if (lastRow < 2 || !Array.isArray(order)) return;
+      const rows = referenceRowMap_(sh);
+      const range = sh.getRange(2, 7, lastRow - 1, 1);
+      const sorts = range.getValues();
+      order.forEach(e => { const row = rows.get(String(e.id)); if (row) sorts[row - 2][0] = Number(e.sort) || 0; });
+      range.setValues(sorts);
+    },
+    setAllExpanded(expanded) {
+      const sh = this.sheet_();
+      const lastRow = sh.getLastRow();
+      if (lastRow < 2) return;
+      const values = [];
+      for (let i = 0; i < lastRow - 1; i++) values.push([expanded !== false]);
+      sh.getRange(2, 6, lastRow - 1, 1).setValues(values);
+    },
+    // A card and everything under it, as stored (raw values, for the Archive). Nothing is removed yet.
+    tree(id) {
+      const sh = this.sheet_();
+      const lastRow = sh.getLastRow();
+      if (lastRow < 2) return [];
+      const values = sh.getRange(1, 1, lastRow, REF_HEADERS.length).getValues();
+      const ids = new Set([String(id)]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = 1; i < values.length; i++) {
+          const childId = String(values[i][0] || ''), parentId = String(values[i][1] || '');
+          if (ids.has(parentId) && !ids.has(childId)) { ids.add(childId); changed = true; }
+        }
+      }
+      const out = [];
+      for (let i = 1; i < values.length; i++) {
+        const r = values[i];
+        if (ids.has(String(r[0]))) out.push({ ref_: i + 1, id: r[0], parentId: r[1], type: r[2], title: r[3], content: r[4], expanded: r[5], sort: r[6] });
+      }
+      return out;
+    },
+    remove(records) {
+      const sh = this.sheet_();
+      records.map(x => x.ref_).sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
+    },
+    // To Confirm card content with a cached row hint (import path).
+    peekConfirm() {
+      const r = readConfirmCard_(this.sheet_());
+      return { exists: !!r.row, content: r.content, ref_: r.row };
+    }
+  },
+
+  /* Archive — deleted Reference cards, restorable. Record = card fields + deletedAt (ISO). */
+  archive: {
+    sheet_() { storeBackend_('archive'); return getOrCreateSheet_('Archive', ARCHIVE_HEADERS); },
+    list() {
+      const values = this.sheet_().getDataRange().getValues();
+      return values.slice(1).map((row, i) => ({
+        ref_: i + 2, id: String(row[0] || ''), parentId: String(row[1] || ''), type: String(row[2] || 'item'),
+        title: String(row[3] || ''), content: String(row[4] || ''), expanded: row[5] !== false, sort: Number(row[6]) || 0,
+        deletedAt: row[7] instanceof Date ? row[7].toISOString() : String(row[7] || '')
+      })).filter(x => x.id);
+    },
+    add(records, deletedAt) {
+      if (!records.length) return;
+      const sh = this.sheet_();
+      sh.getRange(sh.getLastRow() + 1, 1, records.length, ARCHIVE_HEADERS.length)
+        .setValues(records.map(r => [r.id, r.parentId, r.type, r.title, r.content, r.expanded, r.sort, deletedAt]));
+    },
+    remove(records) {
+      const sh = this.sheet_();
+      records.map(x => x.ref_).sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
+    }
+  },
 
   /* Keep In Mind — one shared list. Sheet: tab "Keep In Mind", A2 = HTML, B2 = saved-at ms. */
   kim: {
@@ -419,3 +558,36 @@ function readDoneToday_(sheet, date) {
   return {row:row,content:content};
 }
 
+// Row number of each Reference ID, reading only the ID column.
+function referenceRowMap_(sheet) {
+  const lastRow = sheet.getLastRow();
+  const map = new Map();
+
+  if (lastRow < 2) {
+    return map;
+  }
+
+  sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach((row, i) => {
+    const id = String(row[0] || '');
+    if (id && !map.has(id)) map.set(id, i + 2);
+  });
+
+  return map;
+}
+
+// Cache only a row hint, never source rows or HTML. Validate the identity and read the live
+// content together; direct Sheet edits, moved/deleted rows and cache failures remain visible.
+function readConfirmCard_(ref) {
+  const key = 'confirm-card-row:v1'; let cache = null, hint = 0;
+  try { cache = CacheService.getScriptCache(); hint = Number(cache.get(key)); } catch (e) {}
+  if (Number.isInteger(hint) && hint >= 2) {
+    try {
+      const values = ref.getRange(hint,1,1,5).getValues()[0];
+      if (String(values[0] || '') === CONFIRM_CARD_ID) return {row:hint,content:String(values[4] || '')};
+    } catch (e) {} // a deleted row can also put the hint outside the sheet bounds
+  }
+  const row = referenceRowMap_(ref).get(CONFIRM_CARD_ID) || 0;
+  const content = row ? String(ref.getRange(row,5).getValue() || '') : '';
+  try { if (cache) { if (row) cache.put(key,String(row),3600); else cache.remove(key); } } catch (e) {}
+  return {row:row,content:content};
+}

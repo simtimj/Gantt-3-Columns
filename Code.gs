@@ -599,17 +599,11 @@ function fixUrgentBold_() {
       const f = fix(v);
       if (f !== v) Store.days.set(formatDate_(row[0]), { [field]: f }, { exists: true, ref_: all.base + i });
     }));
-    const ref = getOrCreateSheet_('Reference', REF_HEADERS);
-    const rl = ref.getLastRow();
-    if (rl >= 2) {
-      const vals = ref.getRange(2, 5, rl - 1, 1).getValues();
-      vals.forEach((row, i) => {
-        const v = String(row[0] || '');
-        if (v.indexOf('data-urg') < 0) return;
-        const f = fix(v);
-        if (f !== v) ref.getRange(i + 2, 5).setValue(f);
-      });
-    }
+    Store.ref.list().forEach(r => {
+      if (r.content.indexOf('data-urg') < 0) return;
+      const f = fix(r.content);
+      if (f !== r.content) Store.ref.update(r.id, { content: f }, r);
+    });
     props.setProperty('urgBoldFix', '1');
   } finally { lock.releaseLock(); }
   return true;
@@ -683,67 +677,29 @@ function setReferencePin(id, on) {
 }
 
 function getReference_() {
-  const sheet = getOrCreateSheet_('Reference', REF_HEADERS);
-  const values = sheet.getDataRange().getValues();
-
-  if (values.length <= 1) {
-    return [];
-  }
-
-  return values
-    .slice(1)
-    .map((row, index) => ({
-      row: index + 2,
-      id: String(row[0] || ''),
-      parentId: String(row[1] || ''),
-      type: String(row[2] || 'item'),
-      title: String(row[3] || ''),
-      content: String(row[4] || ''),
-      expanded: row[5] !== false,
-      sort: Number(row[6]) || index,
-      ch: cellHash_(row[4])
-    }))
+  return Store.ref.list()
+    .map(r => Object.assign(r, { row: r.ref_, ch: cellHash_(r.content) }))
     .sort((a, b) => a.sort - b.sort);
 }
 
 
-// Row number of each Reference ID, reading only the ID column.
-function referenceRowMap_(sheet) {
-  const lastRow = sheet.getLastRow();
-  const map = new Map();
-
-  if (lastRow < 2) {
-    return map;
-  }
-
-  sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach((row, i) => {
-    const id = String(row[0] || '');
-    if (id && !map.has(id)) map.set(id, i + 2);
-  });
-
-  return map;
-}
 
 
 // Safe save (2026-10-29), same rules as saveDay: item.fwSync + baseHash (version the app started from)
 // + contentChanged. Toggling a cell open/closed in a stale tab no longer writes old text over new text.
 function saveReferenceItem(item) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sheet = getOrCreateSheet_('Reference', REF_HEADERS);
+  return Store.locked(() => {
     const id = String(item.id || Utilities.getUuid());
-    const row = referenceRowMap_(sheet).get(id);
+    const rec = Store.ref.get(id);
     const sync = !!item.fwSync;
     let content = String(item.content || '');
     let res = sync ? { id: id, build: appBuild_(), release:deployedBuild_() } : null;
 
     // A stale tab must not recreate a card deleted on another device.
-    if (!row && sync && (item.id || item.expectedExisting || item.baseHash)) return { id:id, deleted:true, build:res.build, release:res.release };
+    if (!rec.exists && sync && (item.id || item.expectedExisting || item.baseHash)) return { id:id, deleted:true, build:res.build, release:res.release };
 
-    if (row) {
-      const currentRow = sheet.getRange(row, 1, 1, 7).getValues()[0];
-      const cur = String(currentRow[4] || '');
+    if (rec.exists) {
+      const cur = rec.content;
       if (sync) {
         const c = syncCol_(cur, content, item.baseHash || null, !!item.contentChanged, 'Reference ' + id, 'Content', item.baseText);
         content = c.value;
@@ -755,167 +711,64 @@ function saveReferenceItem(item) {
       if (sync) {
         // Content autosaves must never write stale title/order/parent/collapse snapshots.
         // Only explicit metadata edits participate, with a per-field base value.
-        if (content !== cur) sheet.getRange(row, 5).setValue(content);
-        const fields = { parentId: 2, expanded: 6 };
+        const upd = {};
+        if (content !== cur) upd.content = content;
         res.meta = {};
         res.metaConflicts = [];
-        Object.keys(fields).forEach(key => {
-          const range = sheet.getRange(row, fields[key]);
+        ['parentId', 'expanded'].forEach(key => {
           const normalize = v => key === 'expanded' ? v !== false : String(v || '');
-          let current = normalize(currentRow[fields[key] - 1]);
+          let current = normalize(rec[key]);
           const change = item.metaChanges && item.metaChanges[key];
           if (change && Object.prototype.hasOwnProperty.call(change, 'before') && Object.prototype.hasOwnProperty.call(change, 'after')) {
             const before = normalize(change.before), after = normalize(change.after);
             if (current === before || current === after) {
-              if (current !== after) range.setValue(after);
+              if (current !== after) upd[key] = after;
               current = after;
             } else res.metaConflicts.push(key);
           }
           res.meta[key] = current;
         });
-      } else sheet.getRange(row, 1, 1, 7).setValues([
-        [
-          id,
-          item.parentId || '',
-          item.type || 'item',
-          item.title || '',
-          content,
-          item.expanded !== false,
-          Number(item.sort) || row
-        ]
-      ]);
+        if (Object.keys(upd).length) Store.ref.update(id, upd, rec);
+      } else Store.ref.update(id, { id: id, parentId: item.parentId || '', type: item.type || 'item', title: item.title || '',
+        content: content, expanded: item.expanded !== false, sort: Number(item.sort) || rec.sort }, rec);
     } else {
-      sheet.appendRow([
-        id,
-        item.parentId || '',
-        item.type || 'item',
-        item.title || '',
-        content,
-        item.expanded !== false,
-        Number(item.sort) || sheet.getLastRow()
-      ]);
+      Store.ref.add({ id: id, parentId: item.parentId, type: item.type, title: item.title, content: content,
+        expanded: item.expanded, sort: Number(item.sort) || null });
     }
     if (res) { res.ch = cellHash_(content); return res; }
     return id;
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 
 // Drag-to-reorder: write every cell's position in one call.
 // order = [{ id, sort }, ...]
 function saveReferenceOrder(order) {
-  const sheet = getOrCreateSheet_('Reference', REF_HEADERS);
-  const lastRow = sheet.getLastRow();
-
-  if (lastRow < 2 || !Array.isArray(order)) {
-    return true;
-  }
-
-  const rows = referenceRowMap_(sheet);
-  const sortRange = sheet.getRange(2, 7, lastRow - 1, 1);
-  const sorts = sortRange.getValues();
-
-  order.forEach(entry => {
-    const row = rows.get(String(entry.id));
-    if (row) sorts[row - 2][0] = Number(entry.sort) || 0;
-  });
-
-  sortRange.setValues(sorts);
-
+  Store.ref.setSorts(order);
   return true;
 }
 
 
 // Expand / collapse every Reference cell in one call.
 function saveReferenceExpanded(expanded) {
-  const sheet = getOrCreateSheet_('Reference', REF_HEADERS);
-  const lastRow = sheet.getLastRow();
-
-  if (lastRow < 2) {
-    return true;
-  }
-
-  const values = [];
-  for (let i = 0; i < lastRow - 1; i++) {
-    values.push([expanded !== false]);
-  }
-
-  sheet.getRange(2, 6, lastRow - 1, 1).setValues(values);
-
+  Store.ref.setAllExpanded(expanded);
   return true;
 }
 
 
 function addReferenceItem(parentId, title, content) {
-  const sheet = getOrCreateSheet_('Reference', REF_HEADERS);
-  const id = Utilities.getUuid();
-
-  sheet.appendRow([
-    id,
-    parentId || '',
-    'item',
-    title || '',
-    content || '',
-    true,
-    Date.now() // New cards start at the end, matching the client; autosaves no longer rewrite Sort.
-  ]);
-
-  return id;
+  // New cards start at the end, matching the client; autosaves no longer rewrite Sort.
+  return Store.ref.add({ id: Utilities.getUuid(), parentId: parentId || '', type: 'item', title: title || '',
+    content: content || '', expanded: true, sort: Date.now() });
 }
 
 
 function deleteReferenceItem(id) {
-  const sheet = getOrCreateSheet_('Reference', REF_HEADERS);
-  const lastRow = sheet.getLastRow();
-
-  if (lastRow < 2) {
-    return true;
-  }
-
-  // Whole rows, so deleted cells can be archived before they go.
-  const values = sheet.getRange(1, 1, lastRow, REF_HEADERS.length).getValues();
-
-  const idsToDelete = new Set([
-    String(id)
-  ]);
-
-  let changed = true;
-
-  while (changed) {
-    changed = false;
-
-    for (let i = 1; i < values.length; i++) {
-      const childId = String(values[i][0] || '');
-      const parentId = String(values[i][1] || '');
-
-      if (
-        idsToDelete.has(parentId) &&
-        !idsToDelete.has(childId)
-      ) {
-        idsToDelete.add(childId);
-        changed = true;
-      }
-    }
-  }
-
   // Archive first (cell + its children, one timestamp), then delete.
-  const deletedAt = new Date().toISOString();
-  const archived = values.slice(1)
-    .filter(row => idsToDelete.has(String(row[0])))
-    .map(row => row.concat([deletedAt]));
-  if (archived.length) {
-    const archive = getOrCreateSheet_('Archive', ARCHIVE_HEADERS);
-    archive.getRange(archive.getLastRow() + 1, 1, archived.length, ARCHIVE_HEADERS.length).setValues(archived);
-  }
-
-  for (let i = values.length - 1; i >= 1; i--) {
-    if (idsToDelete.has(String(values[i][0]))) {
-      sheet.deleteRow(i + 1);
-    }
-  }
-
+  const tree = Store.ref.tree(id);
+  if (!tree.length) return true;
+  Store.archive.add(tree, new Date().toISOString());
+  Store.ref.remove(tree);
   return true;
 }
 
@@ -925,19 +778,7 @@ function deleteReferenceItem(id) {
    ========================================================= */
 
 function archiveRows_() {
-  const sheet = getOrCreateSheet_('Archive', ARCHIVE_HEADERS);
-  const values = sheet.getDataRange().getValues();
-  return values.slice(1).map((row, i) => ({
-    row: i + 2,
-    id: String(row[0] || ''),
-    parentId: String(row[1] || ''),
-    type: String(row[2] || 'item'),
-    title: String(row[3] || ''),
-    content: String(row[4] || ''),
-    expanded: row[5] !== false,
-    sort: Number(row[6]) || 0,
-    deletedAt: row[7] instanceof Date ? row[7].toISOString() : String(row[7] || '')
-  })).filter(x => x.id);
+  return Store.archive.list().map(x => Object.assign(x, { row: x.ref_ }));
 }
 
 // Top-level deleted cells (children ride along), newest first.
@@ -963,7 +804,6 @@ function restoreArchivedItem(id, deletedAt) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const archive = getOrCreateSheet_('Archive', ARCHIVE_HEADERS);
     const rows = archiveRows_().filter(x => x.deletedAt === String(deletedAt));
     const root = rows.find(x => x.id === String(id));
     if (!root) throw new Error('That cell is no longer in the archive.');
@@ -978,18 +818,11 @@ function restoreArchivedItem(id, deletedAt) {
     }
     const batch = rows.filter(x => ids.has(x.id));
 
-    const ref = getOrCreateSheet_('Reference', REF_HEADERS);
-    const existing = referenceRowMap_(ref);
-    const toAdd = batch.filter(x => !existing.has(x.id)).map(x => [
-      x.id,
-      x.id === root.id && x.parentId && !existing.has(x.parentId) ? '' : x.parentId,
-      x.type, x.title, x.content, x.expanded, x.sort
-    ]);
-    if (toAdd.length) {
-      ref.getRange(ref.getLastRow() + 1, 1, toAdd.length, REF_HEADERS.length).setValues(toAdd);
-    }
-
-    batch.map(x => x.row).sort((a, b) => b - a).forEach(r => archive.deleteRow(r));
+    const existing = Store.ref.ids();
+    Store.ref.addMany(batch.filter(x => !existing.has(x.id)).map(x => Object.assign({}, x, {
+      parentId: x.id === root.id && x.parentId && !existing.has(x.parentId) ? '' : x.parentId
+    })));
+    Store.archive.remove(batch);
   } finally {
     lock.releaseLock();
   }
@@ -1918,7 +1751,7 @@ function syncConfirmCard_(timer) {
   const ss = ss_();
   const sheet = ss.getSheetByName('To Confirm');
   if (!sheet) return; // nothing until the tab exists
-  const sources = { sheet:sheet, ref:getOrCreateSheet_('Reference', REF_HEADERS) };
+  const sources = { sheet:sheet };
   // Fast path (2026-11-04): most loads change nothing, so check without taking the script lock.
   if (!confirmCardWork_(true,sources,timer)) return;
   const lock = LockService.getScriptLock();
@@ -1926,31 +1759,14 @@ function syncConfirmCard_(timer) {
   try { speedPart_(timer, 'confirm.reconcile', () => confirmCardWork_(false,sources,timer)); } finally { lock.releaseLock(); }
 }
 
-// Cache only a row hint, never source rows or HTML. Validate the identity and read the live
-// content together; direct Sheet edits, moved/deleted rows and cache failures remain visible.
-function readConfirmCard_(ref) {
-  const key = 'confirm-card-row:v1'; let cache = null, hint = 0;
-  try { cache = CacheService.getScriptCache(); hint = Number(cache.get(key)); } catch (e) {}
-  if (Number.isInteger(hint) && hint >= 2) {
-    try {
-      const values = ref.getRange(hint,1,1,5).getValues()[0];
-      if (String(values[0] || '') === CONFIRM_CARD_ID) return {row:hint,content:String(values[4] || '')};
-    } catch (e) {} // a deleted row can also put the hint outside the sheet bounds
-  }
-  const row = referenceRowMap_(ref).get(CONFIRM_CARD_ID) || 0;
-  const content = row ? String(ref.getRange(row,5).getValue() || '') : '';
-  try { if (cache) { if (row) cache.put(key,String(row),3600); else cache.remove(key); } } catch (e) {}
-  return {row:row,content:content};
-}
 
 // dryRun: true → only report whether a write is needed.
 function confirmCardWork_(dryRun,sources,timer) {
   {
     const phase = dryRun ? 'confirm.check' : 'confirm.write';
     const sheet = sources ? sources.sheet : getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
-    const ref = sources ? sources.ref : getOrCreateSheet_('Reference', REF_HEADERS);
     let rows = confirmRows_(sheet,timer,phase);
-    const card = speedPart_(timer, phase + '.cardRead', () => readConfirmCard_(ref)), cardRow = card.row, cur = card.content;
+    const card = speedPart_(timer, phase + '.cardRead', () => Store.ref.peekConfirm()), cardRow = card.exists, cur = card.content;
     // Ticked lines → Status works.
     const ticked = new Set();
     (cur.match(/<div\b[^>]*\bdata-kid="[^"]+"[^>]*>/g) || []).forEach(tag => {
@@ -1972,9 +1788,9 @@ function confirmCardWork_(dryRun,sources,timer) {
     if (cur.replace(/<!--fw-modified:\d+-->/, '') === html) return;
     if (cardRow) {
       if (cur) backupCell_('Reference ' + CONFIRM_CARD_ID, 'Content', 'To Confirm sync', cur, true);
-      ref.getRange(cardRow, 5).setValue(html);
+      Store.ref.update(CONFIRM_CARD_ID, { content: html }, card);
     } else {
-      ref.appendRow([CONFIRM_CARD_ID, '', 'item', 'To Confirm', html, true, 0]);
+      Store.ref.add({ id: CONFIRM_CARD_ID, parentId: '', type: 'item', title: 'To Confirm', content: html, expanded: true, sort: 0 });
       const pins = getRefPins_().filter(x => x !== CONFIRM_CARD_ID);
       pins.unshift(CONFIRM_CARD_ID);
       PropertiesService.getScriptProperties().setProperty('refPinned', JSON.stringify(pins.slice(0, 200)));
@@ -2249,17 +2065,15 @@ function applyClaudeTasks_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const refSheet = getOrCreateSheet_('Reference', REF_HEADERS);
     fresh.forEach(x => {
-      let cell, rec;
+      let card, rec;
       if (x.date === 'backlog') {
-        const b = getReference_().find(r => /^(backlog|undated tasks)$/.test(r.title.replace(/<[^>]*>/g, '').trim().toLowerCase()));
-        if (!b) return;
-        cell = refSheet.getRange(b.row, 5);
+        card = getReference_().find(r => /^(backlog|undated tasks)$/.test(r.title.replace(/<[^>]*>/g, '').trim().toLowerCase()));
+        if (!card) return;
       } else {
         rec = Store.days.get(x.date, ['tasks']);
       }
-      let html = rec ? rec.tasks : String(cell.getValue() || '');
+      let html = rec ? rec.tasks : card.content;
       if (html.indexOf('data-tid="' + doneEsc_(x.id) + '"') < 0) {
         const u = [1, 2, 3].indexOf(Number(x.urg)) >= 0 ? ' data-urg="' + Number(x.urg) + '"' : '';
         const line = (text, level, tid) => '<div class="check-line" data-level="' + level + '"' + u +
@@ -2283,7 +2097,7 @@ function applyClaudeTasks_() {
         }
         html += head;
         (Array.isArray(x.subtasks) ? x.subtasks : []).forEach(t => { html += line(t, 1, ''); });
-        if (rec) Store.days.set(x.date, { tasks: html }, rec); else cell.setValue(html);
+        if (rec) Store.days.set(x.date, { tasks: html }, rec); else Store.ref.update(card.id, { content: html }, card);
       }
       applied.push(String(x.id));
     });

@@ -20,7 +20,9 @@ function fakeSheet() {
       getLastRow: () => rows.length,
       getMaxColumns: () => Math.max(sh.cols || 0, ...rows.map(r => r.length)),
       insertColumnsAfter: (_, n) => { sh.cols = sh.getMaxColumns() + n; },
-      deleteRows: () => {}
+      deleteRows: () => {},
+      deleteRow: r => { rows.splice(r - 1, 1); },
+      getDataRange: () => ({ getValues: () => rows.map(r => r.slice()) })
     };
     return sh;
   };
@@ -96,3 +98,35 @@ assert.equal(ctx.getDayTasks('2026-12-31').length, 0);
 vm.runInContext("STORE_BACKEND.days = 'db'", ctx);
 assert.throws(() => ctx.getDayTasks('2026-11-23'), /not built yet/);
 console.log('✓ store-test: Days through Store.days (saves, pads, range, append)');
+
+// Reference + Archive through Store.ref / Store.archive.
+vm.runInContext("STORE_BACKEND.days = 'sheet'", ctx);
+vm.runInContext('Utilities.getUuid = () => "u" + (' + 0 + ' + (globalThis.__u = (globalThis.__u || 0) + 1))', ctx);
+const parent = ctx.addReferenceItem('', 'Parent', '<div>p</div>');
+const child = ctx.addReferenceItem(parent, 'Child', '<div>c</div>');
+const other = ctx.addReferenceItem('', 'Other', '<div>o</div>');
+assert.equal(tabs.Reference.rows.length, 4);
+let refs = ctx.getReference_();
+assert.equal(refs.length, 3); assert.equal(refs[0].row, 2); assert.equal(refs[1].parentId, parent);
+// Sync save: content + explicit collapse written; title untouched; stale hash conflicts.
+const ch = ctx.cellHash_('<div>p</div>');
+let sv = ctx.saveReferenceItem({ id: parent, fwSync: 1, baseHash: ch, contentChanged: true, content: '<div>p2</div>', title: 'stale', metaChanges: { expanded: { before: true, after: false } } });
+assert.ok(!sv.conflict); assert.equal(tabs.Reference.rows[1][4], '<div>p2</div>'); assert.equal(tabs.Reference.rows[1][5], false); assert.equal(tabs.Reference.rows[1][3], 'Parent');
+sv = ctx.saveReferenceItem({ id: parent, fwSync: 1, baseHash: 'stale', contentChanged: true, content: 'x' });
+assert.equal(sv.conflict, true); assert.equal(sv.content, '<div>p2</div>');
+assert.equal(ctx.saveReferenceItem({ id: 'gone', fwSync: 1, expectedExisting: true }).deleted, true);
+// Order + expand all.
+ctx.saveReferenceOrder([{ id: other, sort: 1 }, { id: parent, sort: 2 }]);
+assert.equal(ctx.getReference_()[0].id, other);
+ctx.saveReferenceExpanded(true); assert.ok(tabs.Reference.rows.slice(1).every(r => r[5] === true));
+// Delete a card → it and its child go to the Archive with one timestamp; restore brings both back.
+ctx.deleteReferenceItem(parent);
+assert.equal(tabs.Reference.rows.length, 2); assert.equal(tabs.Archive.rows.length, 3);
+const arch = ctx.getArchive(); assert.equal(arch.length, 1); assert.equal(arch[0].children, 1);
+ctx.restoreArchivedItem(parent, arch[0].deletedAt);
+assert.equal(tabs.Reference.rows.length, 4); assert.equal(tabs.Archive.rows.length, 1);
+assert.equal(ctx.getReference_().find(r => r.id === child).parentId, parent);
+vm.runInContext("STORE_BACKEND.ref = 'db'", ctx);
+assert.throws(() => ctx.getReference_(), /not built yet/);
+console.log('✓ store-test: Reference + Archive through Store.ref / Store.archive (add, safe save, order, delete → archive → restore)');
+

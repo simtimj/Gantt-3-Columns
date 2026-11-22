@@ -427,7 +427,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
       document.querySelector('[data-ctab="focus"]').click(); await wait(300);
       const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
-      ed.insertAdjacentHTML('beforeend', '<div><br></div><div data-tl="1">ColT</div><div class="check-line" data-level="1" style="margin-left: 24px;"><input type="checkbox"><span class="check-text">ColT kid</span></div><div><br></div><div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">ColLone</span></div><div><br></div>');
+      ed.insertAdjacentHTML('beforeend', '<div><br></div><div data-tl="1">ColT</div><div class="check-line" data-level="1" style="margin-left: 24px;"><input type="checkbox"><span class="check-text">ColT kid</span></div><div><br></div><div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">ColLone</span></div><div><br></div><div><b>ColH</b></div><div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">ColH kid</span></div><div><br></div>');
       refreshCards(ed); refreshTitleLines(ed); await wait(150);
       const f = t => [...ed.children].find(l => l.textContent.trim() === t);
       const open = t => { const n = f(t), tx = n.querySelector('.check-text') || n, r = document.createRange(); r.setStart(tx.firstChild || tx, 0); r.collapse(true);
@@ -456,7 +456,14 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
           if (document.querySelector('.kc-pop')) out.push('picker stayed open after Reset');
         }
       }
-      captureBeforeEdit(ed); ['ColT', 'ColT kid', 'ColLone'].forEach(t => { const n = f(t); n && n.remove(); });
+      // Plain header line (2026-11-21 UI batch: "still not working"): holding its task offers 🎨 and colors the header's group.
+      b = open('ColH kid');
+      if (!b || b.hidden) out.push('no Border color under a plain header line');
+      else { b.click(); await wait(100); const p2 = document.querySelector('.kc-pop');
+        if (!p2) out.push('no picker for a header line'); else { p2.querySelector('[data-c="#43a047"]').click(); await wait(200);
+          if (f('ColH').getAttribute('data-tbc') !== '#43a047') out.push('header line did not get the color');
+          if (![...document.querySelectorAll('#kimScroll .kg-box')].some(x => /67, 160, 71/.test(getComputedStyle(x).borderTopColor))) out.push('header group box not in the color'); } }
+      captureBeforeEdit(ed); ['ColT', 'ColT kid', 'ColLone', 'ColH', 'ColH kid'].forEach(t => { const n = f(t); n && n.remove(); });
       while (ed.lastElementChild && isEmptyLine(ed.lastElementChild) && ed.lastElementChild.previousElementSibling && isEmptyLine(ed.lastElementChild.previousElementSibling)) ed.lastElementChild.remove();
       finishEditorEdit(ed); document.querySelector('[data-ctab="notes"]').click(); await wait(200);
       return out; });
@@ -1167,31 +1174,23 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   const after = await pg.evaluate(() => window.fwTimer && window.fwTimer.events().length);
   if (after !== before) errs.push('Timer: events lost on reload (' + before + ' → ' + after + ')');
   // Last on purpose: it changes the column widths the earlier checks measure against.
-  // Tuck (2026-11-06): drag the last column line to the right edge → Reference is a thin strip with a pull tab; tap = back.
+  // No column sliding (2026-11-21 UI batch, Julius: "remove column drag bars, no sliding"). Replaces the 2026-11-06 Tuck
+  // drag test: dragging a column line must not change the column widths.
   const tk = [];
-  // Half view (2026-11-13) turns the column lines off; tuck is tested with it off.
   await pg.evaluate(() => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); localStorage.setItem('fw.halves', '0'); dispatchEvent(new Event('resize')); });
   await pg.waitForTimeout(200);
   const hp = await pg.evaluate(() => { const hs = [...document.querySelectorAll('.column-resizer')].filter(h => h.offsetParent); if (!hs.length) return null; const r = hs[hs.length - 1].getBoundingClientRect(); return [r.left + r.width / 2, r.top + 30, innerWidth]; });
   if (hp) {
+    const widths = () => pg.evaluate(() => [...document.querySelectorAll('#workspace > .pane')].map(p => Math.round(p.getBoundingClientRect().width)).join(','));
+    const w0 = await widths();
     await pg.mouse.move(hp[0], hp[1]); await pg.mouse.down(); await pg.mouse.move(hp[0] + 60, hp[1], { steps: 3 }); await pg.mouse.move(hp[2] - 1, hp[1], { steps: 4 }); await pg.mouse.up();
     await pg.waitForTimeout(150);
-    const res = await pg.evaluate(async () => {
-      const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
-      window.tuckScan && tuckScan(); await wait(100);
-      const ref = document.getElementById('calPane') || document.getElementById('referencePane'), w = ref.getBoundingClientRect().width;
-      if (w > 30) out.push('Reference did not tuck: ' + Math.round(w) + 'px');
-      if (ref.getBoundingClientRect().right > innerWidth + 1) out.push('Reference went past the window');
-      const tab = document.querySelector('.fw-tuck-tab');
-      if (!tab) return out.concat('no pull tab on the tucked column');
-      tab.click(); await wait(200);
-      if (ref.getBoundingClientRect().width < 150) out.push('pull tab did not bring Reference back');
-      if (document.querySelector('.fw-tuck-tab')) out.push('pull tab stayed after restore');
-      return out;
-    });
-    tk.push(...res);
+    const w1 = await widths();
+    if (w0 !== w1) tk.push('dragging a column line still resized the columns: ' + w0 + ' → ' + w1);
+    const grip = await pg.evaluate(() => [...document.querySelectorAll('.column-resizer,#mobileSplitResizer[data-dir="col"]')].some(h => h.offsetParent && getComputedStyle(h, '::after').display !== 'none'));
+    if (grip) tk.push('a column drag grip is still showing');
   }
-  tk.forEach(x => errs.push('Tuck: ' + x));
+  tk.forEach(x => errs.push('Columns: ' + x));
   // Reference deltas must preserve editor nodes and defer authoritative removals during local work.
   await pg.waitForTimeout(1000);
   const refSync = await pg.evaluate(async () => {

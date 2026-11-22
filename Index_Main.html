@@ -179,7 +179,7 @@
   function setStatus(s){
     const status=document.getElementById('status');
     const focusStatus=document.getElementById('focusStatus');
-    if(status) status.textContent=s;
+    if(status){ status.textContent=s; status.classList.toggle('st-tap', /tap here/i.test(s)); } // pill is click-through unless it offers a tap (UI batch 2026-11-21)
     if(focusStatus) focusStatus.textContent=s;
   }
   function storedToHtml(v){
@@ -2339,6 +2339,20 @@
     return pop;
   }
   window.fwKimColor = kimColorPicker;
+  /* Which line holds the color (2026-11-21 UI batch, Julius: "still not working"): a title (data-tl) when the held line
+     is in a title box, else the header line of the bordered group (the first line after an empty line, when it isn't a
+     task). Before, only data-tl titles got the option, so plain header lines like "Weekend" never showed 🎨. The target
+     is picked when the hold menu opens, so a phone selection that moves before the tap can't lose it. */
+  function kimColorTarget(ed, node){
+    const u = kimPinUnit(ed, node);
+    if(u && isTitleLine(u[0])) return u[0];
+    let n = node && (node.nodeType === 1 ? node : node.parentElement);
+    while(n && n.parentElement !== ed) n = n.parentElement;
+    if(!n || isEmptyLine(n)) return null;
+    while(n.previousElementSibling && !isEmptyLine(n.previousElementSibling)) n = n.previousElementSibling;
+    return n.classList.contains('check-line') ? null : n;
+  }
+  let kimColorHeld = null;
   function runEditAction(action, ed){
     if(!ed || !ed.isConnected){
       setStatus('Select text or a task first');
@@ -2351,9 +2365,11 @@
       return;
     }
     if(action === 'kimColor'){
-      const u = kimPinUnit(ed, savedRange && savedRange.startContainer);
-      if(!u || !isTitleLine(u[0])){ setStatus('Hold a title first'); return; }
-      kimColorPicker(ed, u[0], window.fwCtxLastAt || {x:60, y:120});
+      let t = kimColorHeld && kimColorHeld.isConnected && ed.contains(kimColorHeld) ? kimColorHeld : null;
+      if(!t) t = kimColorTarget(ed, savedRange && savedRange.startContainer);
+      kimColorHeld = null;
+      if(!t){ setStatus('Hold a title or header line first'); return; }
+      kimColorPicker(ed, t, window.fwCtxLastAt || {x:60, y:120});
       return;
     }
     if(action === 'refArchive'){
@@ -2566,8 +2582,9 @@
       if(isKim){ const sel = window.getSelection(), u = sel && sel.rangeCount ? kimPinUnit(ed, sel.anchorNode) : null;
         kp.textContent = u && u[0].hasAttribute('data-kpin') ? '📌 Unpin' : '📌 Pin to top'; }
       const kc = ctxMenu.querySelector('[data-ctx="kimColor"]');
-      if(kc){ const sel = window.getSelection(), u = isKim && sel && sel.rangeCount ? kimPinUnit(ed, sel.anchorNode) : null;
-        kc.hidden = !(u && isTitleLine(u[0])); }
+      if(kc){ const sel = window.getSelection();
+        kimColorHeld = isKim && sel && sel.rangeCount ? kimColorTarget(ed, sel.anchorNode) : null;
+        kc.hidden = !kimColorHeld; }
     }
     ctxAnchor = {x,y,touch:!!touch}; window.fwCtxLastAt = {x,y}; // pop-ups opened from a menu item go here
     rememberSelection(ed);

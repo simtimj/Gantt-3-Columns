@@ -514,3 +514,56 @@
   document.addEventListener('selectstart', e => { if(g && g.armed) e.preventDefault(); }, true);
 })();
 </script>
+<style id="uiBatchCss">
+  /* UI batch (2026-11-21 maintenance session, Julius; NOTES "UI batch"). Last style block on purpose so it wins over the
+     older layers. Same file feeds the old /dev page and the PWA, so both get it. */
+  :root{--card-r:8px;--hdr-h:30px;}
+
+  /* 1. No column sliding: the column lines stay, the drag grips and drag areas are gone (desktop and phone split). */
+  .column-resizer,#mobileSplitResizer[data-dir="col"],#mobileSplitResizerThird[data-dir="col"]{pointer-events:none!important;cursor:default!important;}
+  .column-resizer::before,.column-resizer::after,
+  #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizer[data-dir="col"]::after,
+  #mobileSplitResizerThird[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::after{display:none!important;}
+  .column-resizer:hover{background:var(--divider-on,var(--divider))!important;}
+  #referenceEdgeResize{display:none!important;}
+
+  /* 2 + 4. One height for the tabs row and the calendar header so their bottom lines meet; a slimmer top button row. */
+  #toolbar{min-height:34px!important;padding:3px 6px!important;gap:4px!important;}
+  #toolbar :is(.btn,.top-select){min-height:26px!important;height:26px;padding-top:0!important;padding-bottom:0!important;padding-left:7px!important;padding-right:7px!important;box-sizing:border-box;}
+  .pane-header{flex:0 0 var(--hdr-h)!important;height:var(--hdr-h)!important;min-height:0!important;box-sizing:border-box!important;padding-left:8px!important;padding-right:8px!important;}
+  #centerDownScroll .ce-head,#centerDownScroll.ce-dkon .ce-head{box-sizing:border-box!important;height:var(--hdr-h)!important;margin:0 -3px 3px!important;padding:0 6px!important;border-bottom:2px solid var(--divider)!important;flex-wrap:nowrap!important;}
+  #centerDownScroll .ce-head :is(button,.btn){min-height:22px!important;height:22px!important;max-height:22px!important;}
+  #centerDownScroll .ce-head .ce-search{height:22px!important;}
+
+  /* 3. Calendar: no white line between the hour labels and the events; the colored sky bar is the timeline line, with a
+     little room before it (labels) and after it (events). The all-day line stays (asked for 2026-11-21 10:57). */
+  #calPanel .fc .fc-timegrid-slot-label,#calPanel .fc .fc-timegrid-axis{border-right:0!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-position:calc(100% - 3px) top!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:14px!important;}
+
+  /* 4 + 5. Cards: one corner rounding and one set of card margins everywhere (Today, Notes, Keep In Mind, Next Steps,
+     Cal Events, calendar events, title boxes). */
+  .check-line[data-tc^="f"]{border-top-left-radius:var(--card-r)!important;border-top-right-radius:var(--card-r)!important;margin-top:3px!important;padding-top:3px!important;}
+  .check-line[data-tc$="l"]{border-bottom-left-radius:var(--card-r)!important;border-bottom-right-radius:var(--card-r)!important;margin-bottom:3px!important;padding-bottom:3px!important;}
+  .check-line[data-tc][data-tcfocus]:not([data-tcrel]),body.tc-borderonly .check-line[data-tccat],
+  .check-line.tc-holdready,.urg-row.tc-holdready,.di-line.tc-holdready{border-radius:var(--card-r)!important;}
+  #urgentPanel > .urg-group,.urg-group,#kimScroll .kg-box,#calPanel .fc .fc-event,
+  #centerCalendarList .ce-urg,#centerCalendarList .ce-day,.dr-cat,.fx-cat{border-radius:var(--card-r)!important;}
+  .urg-group{margin-top:5px!important;}
+
+  /* 6. Sync / save message: a small floating pill bottom-right, above the calendar zoom buttons and the PWA update
+     button. Click-through unless it offers a tap (undo after a delete). The PWA "Offline" tag sits just above it. */
+  #status.status{position:fixed!important;top:auto!important;left:auto!important;right:calc(8px + env(safe-area-inset-right))!important;
+    bottom:calc(58px + env(safe-area-inset-bottom))!important;z-index:2147482000;flex:none!important;min-width:0!important;
+    max-width:min(62vw,340px);margin:0!important;padding:3px 9px!important;border-radius:999px;font-size:11px!important;line-height:1.35;
+    background:rgba(40,42,48,.85)!important;color:#fff!important;box-shadow:0 2px 8px rgba(0,0,0,.25)!important;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;pointer-events:none;}
+  #status.status.st-tap{pointer-events:auto;cursor:pointer;}
+  #status.status:empty{display:none;}
+  #pwaOffline{top:auto!important;left:auto!important;transform:none!important;right:calc(8px + env(safe-area-inset-right))!important;
+    bottom:calc(86px + env(safe-area-inset-bottom))!important;font-size:11px!important;padding:4px 9px!important;}
+</style>
+<script>
+/* UI batch (2026-11-21): the status pill lives on <body> so the toolbar (scrolling, hidden, slid) never clips it. */
+(function(){ const s = document.getElementById('status'); if(s && s.parentElement !== document.body) document.body.appendChild(s); })();
+</script>

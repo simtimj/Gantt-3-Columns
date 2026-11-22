@@ -1035,3 +1035,13 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - **Smoke**: suite `resume` (quick return skips all + no row; 2-min return runs all in order, staggered, sync first; hide mid-queue stops).
 - 2026-11-21 14:55 Julius: PWA looked different (font too big, Focus/Thinking colored, layout) = per-device look settings live in localStorage per web address. Fix: `pwaSetupPage_` copies `fw.*` / `focusWorkspace*` / `tt.ui.*` (minus caches, drafts, data) into `&s=` on the link; shim writes them before the app reads them. Also fixed: the shim reloaded the page when the first service worker took control (jump on first open); now only after ↻ Update.
 
+
+## UI batch (2026-11-21 maintenance session, Julius: "compare against the old /dev app; fix what's still off in the PWA")
+- Both apps run the same Index parts, so every fix lands in both. All CSS is one last block `<style id="uiBatchCss">` at the end of `Index_Layout.html` (last part) so it wins over older layers; vars `--card-r: 8px`, `--hdr-h: 30px`.
+- 1. Column drag off: `.column-resizer`, phone `#mobileSplitResizer[data-dir=col]` = pointer-events none, grips hidden; `#referenceEdgeResize` hidden. Row (horizontal) splits unchanged. Smoke "Columns" replaced the old Tuck drag test.
+- 2/4. `.pane-header` and the docked `.ce-head` both `--hdr-h` tall (bottom lines meet); toolbar 34 px, buttons 26 px.
+- 3. Calendar: hour-label `border-right` off (the white line); sky bar moved 3 px in from the events, label room 14 px. All-day white line kept (asked for at 10:57).
+- 5. Cards: first/last card lines, focus, hold, border-only, Next Steps groups, Keep In Mind boxes, title boxes (svg rx 8, Index_Extras), calendar events, Cal Events groups = 8 px; card margin/padding 3 px everywhere.
+- 6. `#status` moved to `<body>` (script after the block), fixed pill bottom-right above the zoom buttons + PWA ↻ Update; `pointer-events:none` unless `setStatus` text has "tap here" (`.st-tap`, delete undo). `#pwaOffline` sits above it.
+- 7. G fix (Index_Main): `kimColorTarget(ed,node)` = title box head if any, else the group's first line when it isn't a task; picked when the hold menu opens (`kimColorHeld`). Before, only `data-tl` titles showed 🎨. Smoke covers a plain header.
+- First attempt was cut off by usage before push (and collided with the Index split); redone on the split files the same evening.

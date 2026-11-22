@@ -79,6 +79,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 🧪 To be confirmed (2026-11-22)
 - **UI maintenance batch** (2026-11-22): half calendar ◉ Today is a rounded square (not a pill); the all-day / timeline line is one thin line and still drags · Keep In Mind: one border per section (titled sections no longer get a second box), thinner lines · pinned items show a small 📌 beside them **and** keep their − / count button; tap the 📌 to unpin (drops right below the pinned ones) · Keep In Mind tab buttons: the "on" mark stays inside its own square, even spacing.
+- **📲 Keep In Mind on the database (Firestore)**: in the Gantt app, sign in once with Google (button bottom left) and Keep In Mind saves straight to the database: works **offline** (edits wait and send when you're back online), shows edits from your other devices live, and if two devices clash the newest edit wins and the other copy lands in the Backup tab. The Sheet still gets a copy every 5 minutes. Switches on once the Firebase config is in (docs/NOTES.md → H3 has the setup click list).
 - **Reference no longer pops up on open**: the Next Steps + Reference drawer starts closed from the very first paint (it used to show as a column and slide away while the page loaded, most visible in the fast-opening PWA). Opens only from the Ref button, the ◀ tab or an edge swipe.
 
 ## 🧪 To be confirmed (2026-11-21)

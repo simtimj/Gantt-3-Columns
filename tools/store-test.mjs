@@ -65,10 +65,52 @@ assert.ok(!r.conflict); assert.equal(tabs.Backup.rows.at(-1)[3], 'big shrink'); 
 delete tabs['Keep In Mind']; ss.insertSheet('Keep In Mind').rows.push(['Keep In Mind (shared list, HTML) — edited in the app']);
 tabs['Keep In Mind'].rows.push(['<div>legacy</div>']);
 g = ctx.getKim(); assert.equal(g.html, '<div>legacy</div>'); assert.equal(g.at, 0); assert.equal(tabs['Keep In Mind'].rows[0][1], 'Saved at (ms)');
-// Unbuilt backend fails loudly instead of silently using the Sheet.
+// Database backend without a Firebase project fails loudly instead of silently using the Sheet.
 vm.runInContext("STORE_BACKEND.kim = 'db'", ctx);
-assert.throws(() => ctx.getKim(), /not built yet/);
+assert.throws(() => ctx.getKim(), /FIREBASE_PROJECT_ is empty/);
+vm.runInContext("STORE_BACKEND.days = 'db'", ctx);
+assert.throws(() => vm.runInContext("storeBackend_('days')", ctx), /not built yet/);
+vm.runInContext("STORE_BACKEND.days = 'sheet'", ctx);
 console.log('✓ store-test: Keep In Mind through Store.kim');
+
+// Database step (2026-11-22, NOTES H3): Keep In Mind on Firestore (fake REST), Sheet mirror, lost-edit backups.
+{
+  const fsDocs = {}, reqs = [];
+  const fctx = vm.createContext(Object.assign({}, ctx, {
+    ScriptApp: { getOAuthToken: () => 'tok' },
+    UrlFetchApp: { fetch(url, o) {
+      const p = decodeURIComponent(url.split('/documents/')[1].split('?')[0]); reqs.push([o.method, p, o.headers]);
+      const res = (code, body) => ({ getResponseCode: () => code, getContentText: () => body ? JSON.stringify(body) : '' });
+      if (o.method === 'get' && p === 'ganttBackup') return res(200, { documents: Object.keys(fsDocs).filter(k => k.startsWith('ganttBackup/')).map(k => ({ name: 'x/' + k, fields: fsDocs[k] })) });
+      if (o.method === 'get') return fsDocs[p] ? res(200, { name: 'x/' + p, fields: fsDocs[p] }) : res(404, { error: 1 });
+      if (o.method === 'patch') { fsDocs[p] = JSON.parse(o.payload).fields; return res(200, {}); }
+      if (o.method === 'delete') { delete fsDocs[p]; return res(200, null); }
+    } }
+  }));
+  for (const k of Object.keys(tabs)) delete tabs[k];
+  const src = fs.readFileSync('Store.gs', 'utf8').replace("const FIREBASE_PROJECT_ = '';", "const FIREBASE_PROJECT_ = 'g-test';");
+  vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + src + '\nthis.Store = Store;', fctx);
+  assert.equal(vm.runInContext('STORE_BACKEND.kim', fctx), 'db');
+  // Empty database → seeded from the Sheet copy on first read.
+  ss.insertSheet('Keep In Mind').rows.push(['h', 'Saved at (ms)'], ['<div>sheet copy</div>', 50]);
+  let g2 = fctx.getKim();
+  assert.equal(g2.html, '<div>sheet copy</div>'); assert.equal(fsDocs['gantt/kim'].html.stringValue, '<div>sheet copy</div>');
+  assert.equal(reqs[0][2]['X-Goog-User-Project'], 'g-test');
+  // Save goes to Firestore, not the Sheet; the mirror then copies it to the Sheet with the same saved-at.
+  const r2 = fctx.saveKim('<div>db edit</div>', g2.h);
+  assert.ok(!r2.conflict); assert.equal(fsDocs['gantt/kim'].html.stringValue, '<div>db edit</div>');
+  assert.equal(tabs['Keep In Mind'].rows[1][0], '<div>sheet copy</div>');
+  fsDocs['ganttBackup/b1'] = { area: { stringValue: 'kim' }, html: { stringValue: '<div>lost</div>' }, reason: { stringValue: 'older edit lost (newest wins)' }, dev: { stringValue: 'phone-1' } };
+  const m = fctx.Store.mirror();
+  assert.equal(m.kim, true); assert.equal(m.backups, 1);
+  assert.equal(tabs['Keep In Mind'].rows[1][0], '<div>db edit</div>'); assert.equal(tabs['Keep In Mind'].rows[1][1], r2.at);
+  assert.equal(tabs.Backup.rows.at(-1)[4], '<div>lost</div>'); assert.match(tabs.Backup.rows.at(-1)[3], /newest wins\) · phone-1/);
+  assert.ok(!fsDocs['ganttBackup/b1']);
+  assert.equal(fctx.Store.mirror().kim, false); // nothing new
+  // Stale base hash still conflicts on the database backend.
+  assert.equal(fctx.saveKim('<div>x</div>', 'stale').conflict, true);
+  console.log('✓ store-test: Keep In Mind on Firestore + Sheet mirror + lost-edit backups');
+}
 
 // Days through Store.days (fields tasks / journal / plan / tho).
 vm.runInContext("STORE_BACKEND.kim = 'sheet'; formatDate_ = v => v instanceof Date ? v.toISOString().slice(0, 10) : String(v || ''); parseDate_ = v => new Date(v + 'T00:00:00Z');", ctx);

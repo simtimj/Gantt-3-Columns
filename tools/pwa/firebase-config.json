@@ -1,0 +1,10 @@
+{
+  "_note": "Firebase web config (public by design; the Firestore rules lock the data to owner). Empty apiKey = database step off. projectId must equal FIREBASE_PROJECT_ in Store.gs (check.mjs). docs/NOTES.md → H3.",
+  "owner": "juliussimtim@gmail.com",
+  "apiKey": "",
+  "authDomain": "",
+  "projectId": "",
+  "storageBucket": "",
+  "messagingSenderId": "",
+  "appId": ""
+}

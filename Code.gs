@@ -69,7 +69,7 @@ function apiCall(body) {
 }
 
 // Router's authorize() calls this once so Google asks for every permission up front.
-function apiPing() { return { ok: true, sheet: ss_().getName() }; }
+function apiPing() { return { ok: true, sheet: Store.ping() }; }
 
 function pwaSetupPage_(page) {
   const url = PWA_URL + (page === 'tracker' ? 'tracker.html' : '') + '#k=' + encodeURIComponent(pwaKey_());
@@ -244,7 +244,7 @@ function speedPart_(timer, name, work) {
   return timer && typeof timer.measure === 'function' ? timer.measure(name, work) : work();
 }
 function logSpeed(kind, timing, client) {
-  const sheet = getOrCreateSheet_('Speed Log', SPEED_HEADERS);
+  const sheet = Store.sheetFirst('Speed Log');
   const t = timing || {};
   const context = Object.assign({}, client || {}, { schema:2, serverRelease:String(t.release || ''), serverBuild:String(t.build || '') });
   sheet.appendRow([new Date(), String(kind || ''), Number(t.total) || 0, JSON.stringify(t.steps || {}),
@@ -479,7 +479,7 @@ function backupCell_(where, col, reason, content, throttle) {
       if (cache.get(key)) return;
       cache.put(key, '1', 60);
     }
-    const sh = getOrCreateSheet_('Backup', ['Saved', 'Where', 'Column', 'Reason', 'Content']);
+    const sh = Store.sheetFirst('Backup');
     sh.appendRow([new Date(), String(where), col, reason, String(content).slice(0, 49000)]);
     if (sh.getLastRow() > 1200) sh.deleteRows(2, 200);
   } catch (e) { console.error(e); }
@@ -1645,7 +1645,7 @@ function applyDeployedCodeLog_() {
   if (!lock.tryLock(10000)) return;
   try {
     if (props.getProperty('deployedCodeLog') === signature) return;
-    const sheet = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
+    const sheet = Store.sheetFirst('Done Log');
     const rows = sheet.getDataRange().getValues();
     const markers = new Set();
     rows.slice(1).forEach(row => {
@@ -1748,8 +1748,7 @@ function confirmCardHtml_(rows) {
 }
 
 function syncConfirmCard_(timer) {
-  const ss = ss_();
-  const sheet = ss.getSheetByName('To Confirm');
+  const sheet = Store.sheetFirst('To Confirm', { create: false });
   if (!sheet) return; // nothing until the tab exists
   const sources = { sheet:sheet };
   // Fast path (2026-11-04): most loads change nothing, so check without taking the script lock.
@@ -1764,7 +1763,7 @@ function syncConfirmCard_(timer) {
 function confirmCardWork_(dryRun,sources,timer) {
   {
     const phase = dryRun ? 'confirm.check' : 'confirm.write';
-    const sheet = sources ? sources.sheet : getOrCreateSheet_('To Confirm', CONFIRM_HEADERS);
+    const sheet = sources ? sources.sheet : Store.sheetFirst('To Confirm');
     let rows = confirmRows_(sheet,timer,phase);
     const card = speedPart_(timer, phase + '.cardRead', () => Store.ref.peekConfirm()), cardRow = card.exists, cur = card.content;
     // Ticked lines → Status works.
@@ -1871,7 +1870,7 @@ function rowIdentityHashes_(inputs, timer, phase, scope) {
 }
 
 function sheetDoneRows_(timer) {
-  const sheet = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
+  const sheet = Store.sheetFirst('Done Log');
   const rows = speedPart_(timer, 'done.sourceRead', () => sheet.getDataRange().getValues());
   if (rows[0][5] !== 'Type') sheet.getRange(1, 6).setValue('Type');
   const oldest = addDaysToDateString_(todayString_(), -DONE_LOG_DAYS);
@@ -1891,7 +1890,7 @@ function sheetDoneRows_(timer) {
 }
 
 function sheetTaskRows_(appliedIds) {
-  const sheet = getOrCreateSheet_('New Tasks', NEW_TASKS_HEADERS);
+  const sheet = Store.sheetFirst('New Tasks');
   const range = sheet.getDataRange();
   const rows = range.getValues();
   if (rows[0][6] !== 'Added') sheet.getRange(1, 7).setValue('Added'); // tab made before this column
@@ -3167,7 +3166,7 @@ function saveLookSnapshot(slot, json, ua) {
   slot = String(slot || 'custom').slice(0, 20);
   try { JSON.parse(json); } catch (e) { return false; }
   const dev = /iPhone|Android.*Mobile/.test(ua || '') ? 'phone' : /iPad|Android|Tablet/.test(ua || '') ? 'tablet' : 'desktop';
-  const sh = getOrCreateSheet_('Looks', ['Slot', 'Device', 'Saved', 'Settings (JSON)']);
+  const sh = Store.sheetFirst('Looks');
   const vals = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 2).getValues();
   let row = 0;
   for (let i = 1; i < vals.length; i++) if (vals[i][0] === slot && vals[i][1] === dev) { row = i + 1; break; }
@@ -3444,7 +3443,7 @@ function calBacklogComplete(req) {
         start: { date: day, dateTime: null }, end: { date: addDaysToDateString_(day, 1), dateTime: null } }, calId, evId);
     } catch (e) { console.error('calBacklogComplete patch: ' + e); } // event gone → still logged
     Store.calBacklog.setPlaced(i, 'done');
-    const log = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
+    const log = Store.sheetFirst('Done Log');
     log.getRange(log.getLastRow() + 1, 1, 1, DONE_LOG_HEADERS.length)
       .setValues([[day, 'Backlog', title, 'Marked done from the calendar backlog', 'Julius', '']]);
     return { ok: true, mode: mode, day: day };

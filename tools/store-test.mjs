@@ -166,3 +166,9 @@ assert.equal(ctx.getTimerEvents('2026-11-21').map(e => e.op).join(','), 'o1,o2,o
 assert.equal(ctx.getTimerEvents('2026-11-22').length, 0);
 console.log('✓ store-test: Timer events through Store.timer');
 
+
+// Sheet-first tabs: only the listed ones, anything else must become a Store area.
+assert.throws(() => vm.runInContext("Store.sheetFirst('Days')", ctx), /not a Sheet-first tab/);
+assert.equal(vm.runInContext("Store.sheetFirst('New Tasks', { create: false })", ctx), null);
+assert.ok(vm.runInContext("Store.sheetFirst('Looks')", ctx));
+console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');

@@ -72,7 +72,29 @@ function storeProps_(scope) {
   return api;
 }
 
+/* Sheet-first tabs (2026-11-21 H2): written directly by people and other AIs (ChatGPT / Claude via the Sheets
+   connector) or plain logs, so they stay in the Sheet even after the database step. Code reaches them only through
+   Store.sheetFirst(name); any other tab name throws. */
+const STORE_SHEET_FIRST_ = {
+  'Done Log': () => DONE_LOG_HEADERS,
+  'New Tasks': () => NEW_TASKS_HEADERS,
+  'To Confirm': () => CONFIRM_HEADERS,
+  'Study Sessions': () => STUDY_HEADERS,
+  'Study Review': () => STUDY_REVIEW_HEADERS,
+  'Speed Log': () => SPEED_HEADERS,
+  'Backup': () => ['Saved', 'Where', 'Column', 'Reason', 'Content'],
+  'Looks': () => ['Slot', 'Device', 'Saved', 'Settings (JSON)']
+};
+
 const Store = {
+  // A Sheet-first tab (created with its headers when missing; opts.create === false → null when missing).
+  sheetFirst(name, opts) {
+    const head = STORE_SHEET_FIRST_[name];
+    if (!head) throw new Error('Store.sheetFirst: ' + name + ' is not a Sheet-first tab — add a Store area instead');
+    return opts && opts.create === false ? ss_().getSheetByName(name) : getOrCreateSheet_(name, head());
+  },
+  ping() { return ss_().getName(); },
+
   props: storeProps_('script'),
   userProps: storeProps_('user'),
 

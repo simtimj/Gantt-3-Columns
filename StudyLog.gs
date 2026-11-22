@@ -253,7 +253,7 @@ function studyPutBlock_(html, key, block, window) {
 }
 
 function syncStudyLog_(timer) {
-  const sheet = speedPart_(timer, 'study.lookup', () => ss_().getSheetByName(STUDY_TAB));
+  const sheet = speedPart_(timer, 'study.lookup', () => Store.sheetFirst(STUDY_TAB, { create: false }));
   if (!sheet) return;
   const last = speedPart_(timer, 'study.bounds', () => sheet.getLastRow());
   if (last < 2) return;
@@ -316,7 +316,7 @@ function syncStudyLog_(timer) {
     });
     if (logged.length) sheet.getRange(2, 13, logged.length, 1).setValues(logged);
     // Study Review tab: derived, safe to rebuild.
-    const rev = getOrCreateSheet_(STUDY_REVIEW_TAB, STUDY_REVIEW_HEADERS);
+    const rev = Store.sheetFirst(STUDY_REVIEW_TAB);
     const rows = studyReviewRows_(review);
     const last = rev.getLastRow();
     if (last > 1) rev.getRange(2, 1, last - 1, STUDY_REVIEW_HEADERS.length).clearContent();

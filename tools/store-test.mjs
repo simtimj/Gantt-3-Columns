@@ -10,11 +10,14 @@ function fakeSheet() {
     const rows = [];
     const sh = {
       rows,
-      getRange: (r, c, nr = 1, nc = 1) => ({
+      setFrozenRows: () => {},
+      getRange: (r, c, nr = 1, nc = 1) => typeof r === 'string' ? { setNumberFormat: () => {} } : ({
+        setFontWeight: () => {},
+        getDisplayValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => String((rows[r - 1 + i] || [])[c - 1 + j] ?? ''))),
         getValue: () => (rows[r - 1] || [])[c - 1] ?? '',
         setValue: v => { (rows[r - 1] ||= [])[c - 1] = v; },
         getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => (rows[r - 1 + i] || [])[c - 1 + j] ?? '')),
-        setValues: vs => vs.forEach((row, i) => row.forEach((v, j) => { (rows[r - 1 + i] ||= [])[c - 1 + j] = v; }))
+        setValues(vs) { vs.forEach((row, i) => row.forEach((v, j) => { (rows[r - 1 + i] ||= [])[c - 1 + j] = v; })); return this; }
       }),
       appendRow: row => rows.push(row),
       getLastRow: () => rows.length,
@@ -129,4 +132,27 @@ assert.equal(ctx.getReference_().find(r => r.id === child).parentId, parent);
 vm.runInContext("STORE_BACKEND.ref = 'db'", ctx);
 assert.throws(() => ctx.getReference_(), /not built yet/);
 console.log('✓ store-test: Reference + Archive through Store.ref / Store.archive (add, safe save, order, delete → archive → restore)');
+
+// Daily plan + Cal Backlog through Store.plan / Store.calBacklog (Calendar not touched by these paths).
+vm.runInContext("STORE_BACKEND.ref = 'sheet'; Utilities.formatDate = (d) => d.toISOString().slice(0, 16).replace('T', ' ');", ctx);
+assert.equal(vm.runInContext('Store.plan.exists()', ctx), false);
+let plan = ctx.planSave({ type: 'upsert', date: '2026-11-21', item: { group: 'big', ref: 'tid:aa', title: 'One' } });
+ctx.planSave({ type: 'upsert', date: '2026-11-21', item: { group: 'big', ref: 'tid:bb', title: 'Two' } });
+plan = ctx.planSave({ type: 'upsert', date: '2026-11-21', item: { group: 'next', ref: 'tid:cc', title: 'Three' } });
+assert.equal(plan.items.length, 3); assert.equal(tabs.Plan.rows.length, 4); assert.ok(!('ref_' in plan.items[0]));
+const big1 = plan.items.find(x => x.ref === 'tid:aa'), next1 = plan.items.find(x => x.ref === 'tid:cc');
+plan = ctx.planSave({ type: 'moveup', date: '2026-11-21', doneId: big1.id, upId: next1.id });
+assert.equal(tabs.Plan.rows.length, 3); assert.equal(plan.items.filter(x => x.group === 'big').length, 2);
+assert.equal(tabs.Plan.rows.find(r => r[4] === 'tid:cc')[2], 'big', 'row handles shift after a delete');
+plan = ctx.planSave({ type: 'remove', date: '2026-11-21', id: plan.items[0].id });
+assert.equal(plan.items.length, 1);
+vm.runInContext("Store.plan.setLink('aa', 'ev@1')", ctx); assert.equal(vm.runInContext("Store.plan.link('aa')", ctx), 'ev@1');
+// Backlog: rows as tuples, placed column by index.
+assert.equal(ctx.calBacklogList_().length, 0);
+vm.runInContext("Store.calBacklog.add([['u1|2026-11-01', '2026-11-01', 'Old task', '11', '0', 's', ''], ['u2|2026-11-02', '2026-11-02', 'Other', '', '', 's', '']])", ctx);
+assert.equal(ctx.calBacklogList_().length, 2);
+vm.runInContext("Store.calBacklog.setPlaced(0, 'dropped')", ctx);
+assert.equal(ctx.calBacklogList_().length, 1); assert.equal(ctx.calBacklogList_()[0].id, 'u2|2026-11-02');
+assert.equal(tabs['Cal Backlog'].rows[1][6], 'dropped');
+console.log('✓ store-test: Daily plan + Cal Backlog through Store.plan / Store.calBacklog');
 

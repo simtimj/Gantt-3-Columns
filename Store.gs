@@ -13,8 +13,10 @@ const STORE_BACKEND = {
   kim: 'sheet',
   days: 'sheet',
   ref: 'sheet',
-  archive: 'sheet'
-  // plan, calBacklog, timer, props, study, logs: still direct, moving in this order
+  archive: 'sheet',
+  plan: 'sheet',
+  calBacklog: 'sheet'
+  // calBacklog, timer, props, study, logs: still direct, moving in this order
 };
 
 function storeBackend_(area) {
@@ -298,6 +300,82 @@ const Store = {
       const sh = this.sheet_();
       records.map(x => x.ref_).sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
     }
+  },
+
+  /* Daily plan (Big Three / Stretch / Next / Backlog). Record = { id, date, group, rank, ref, title, target, event,
+     updated, ref_ }. Sheet: tab "Plan" (all text). Schedule links (task → its calendar event) live in script
+     properties planEv:<tid>. */
+  plan: {
+    sheet_(create) {
+      storeBackend_('plan');
+      const ss = ss_();
+      let sh = ss.getSheetByName(PLAN_SHEET);
+      if (!sh && create !== false) {
+        sh = ss.insertSheet(PLAN_SHEET);
+        sh.getRange(1, 1, 1, PLAN_HEAD.length).setValues([PLAN_HEAD]).setFontWeight('bold');
+        sh.getRange('A:I').setNumberFormat('@'); // dates and ids stay text
+        sh.setFrozenRows(1);
+      }
+      return sh;
+    },
+    exists() { return !!this.sheet_(false); },
+    list() {
+      const sh = this.sheet_();
+      const n = sh.getLastRow() - 1;
+      if (n < 1) return [];
+      const tz = Session.getScriptTimeZone();
+      return sh.getRange(2, 1, n, PLAN_HEAD.length).getValues().map((r, i) => ({
+        ref_: i + 2, id: String(r[0] || ''),
+        date: r[1] instanceof Date ? Utilities.formatDate(r[1], tz, 'yyyy-MM-dd') : String(r[1] || '').trim(),
+        group: String(r[2] || '').trim().toLowerCase(), rank: Number(r[3]) || 0, ref: String(r[4] || '').trim(),
+        title: String(r[5] || ''), target: String(r[6] || ''), event: String(r[7] || ''), updated: String(r[8] || '')
+      })).filter(x => x.ref && PLAN_GROUPS[x.group] !== undefined);
+    },
+    // Insert or update (x.ref_ set = existing). Stamps Updated.
+    write(x) {
+      const sh = this.sheet_();
+      const vals = [[x.id, x.date || '', x.group, String(x.rank || 0), x.ref, x.title || '', x.target || '', x.event || '',
+        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')]];
+      if (x.ref_) sh.getRange(x.ref_, 1, 1, PLAN_HEAD.length).setValues(vals);
+      else { sh.appendRow(vals[0]); x.ref_ = sh.getLastRow(); }
+    },
+    // Remove one row; others in `rows` (from list()) keep valid handles.
+    remove(x, rows) {
+      const at = x.ref_;
+      this.sheet_().deleteRow(at);
+      (rows || []).forEach(r => { if (r.ref_ > at) r.ref_--; });
+    },
+    link(tid) { return PropertiesService.getScriptProperties().getProperty('planEv:' + tid); },
+    setLink(tid, link) { PropertiesService.getScriptProperties().setProperty('planEv:' + tid, link); }
+  },
+
+  /* Calendar backlog (swept past all-day tasks). Rows are tuples of display text
+     [id, date, title, colorId, urgency, swept, placed]; a row's handle is its index in rows(). */
+  calBacklog: {
+    sheet_(create) {
+      storeBackend_('calBacklog');
+      const ss = ss_();
+      let sh = ss.getSheetByName(CAL_BACKLOG_SHEET);
+      if (!sh && create !== false) {
+        sh = ss.insertSheet(CAL_BACKLOG_SHEET);
+        sh.getRange(1, 1, 1, CAL_BACKLOG_HEAD.length).setValues([CAL_BACKLOG_HEAD]).setFontWeight('bold');
+        sh.getRange('A:G').setNumberFormat('@');
+        sh.setFrozenRows(1);
+      }
+      return sh;
+    },
+    exists() { return !!this.sheet_(false); },
+    rows() {
+      const sh = this.sheet_();
+      const n = sh.getLastRow() - 1;
+      return n > 0 ? sh.getRange(2, 1, n, CAL_BACKLOG_HEAD.length).getDisplayValues() : [];
+    },
+    add(tuples) {
+      if (!tuples.length) return;
+      const sh = this.sheet_();
+      sh.getRange(sh.getLastRow() + 1, 1, tuples.length, CAL_BACKLOG_HEAD.length).setValues(tuples);
+    },
+    setPlaced(index, value) { this.sheet_().getRange(index + 2, 7).setValue(value); }
   },
 
   /* Keep In Mind — one shared list. Sheet: tab "Keep In Mind", A2 = HTML, B2 = saved-at ms. */

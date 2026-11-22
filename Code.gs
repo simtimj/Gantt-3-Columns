@@ -2739,34 +2739,6 @@ const PLAN_GROUPS = { big: 3, stretch: 3, next: 500, backlog: 500 };
    'next' is shown as the Waiting list (ranked, no cap); 'stretch' is tabled (still read, not offered). Refs may also be
    'card:<Reference id>' = a project. Only 'stretch' keeps a date. */
 const PLAN_DATED_ = { stretch: true };
-function planSheet_() {
-  const ss = ss_();
-  let sh = ss.getSheetByName(PLAN_SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(PLAN_SHEET);
-    sh.getRange(1, 1, 1, PLAN_HEAD.length).setValues([PLAN_HEAD]).setFontWeight('bold');
-    sh.getRange('A:I').setNumberFormat('@'); // dates and ids stay text
-    sh.setFrozenRows(1);
-  }
-  return sh;
-}
-function planRead_(sh) {
-  const n = sh.getLastRow() - 1;
-  if (n < 1) return [];
-  const tz = Session.getScriptTimeZone();
-  return sh.getRange(2, 1, n, PLAN_HEAD.length).getValues().map((r, i) => ({
-    row: i + 2, id: String(r[0] || ''),
-    date: r[1] instanceof Date ? Utilities.formatDate(r[1], tz, 'yyyy-MM-dd') : String(r[1] || '').trim(),
-    group: String(r[2] || '').trim().toLowerCase(), rank: Number(r[3]) || 0, ref: String(r[4] || '').trim(),
-    title: String(r[5] || ''), target: String(r[6] || ''), event: String(r[7] || ''), updated: String(r[8] || '')
-  })).filter(x => x.ref && PLAN_GROUPS[x.group] !== undefined);
-}
-function planWrite_(sh, x) {
-  const vals = [[x.id, x.date || '', x.group, String(x.rank || 0), x.ref, x.title || '', x.target || '', x.event || '',
-    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm")]];
-  if (x.row) sh.getRange(x.row, 1, 1, PLAN_HEAD.length).setValues(vals);
-  else { sh.appendRow(vals[0]); x.row = sh.getLastRow(); }
-}
 function planEventParts_(s) {
   const m = String(s || '').match(/^(.+)@(\d+)$/);
   return m ? { eventId: m[1], startMs: Number(m[2]) } : null;
@@ -2786,8 +2758,8 @@ function planEventInfo_(s) {
 function getPlan(date) {
   const d = String(date || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error('Invalid plan date');
-  const items = planRead_(planSheet_()).filter(x => !PLAN_DATED_[x.group] || x.date === d);
-  items.forEach(x => { delete x.row; x.ev = x.event ? planEventInfo_(x.event) : null; });
+  const items = Store.plan.list().filter(x => !PLAN_DATED_[x.group] || x.date === d);
+  items.forEach(x => { delete x.ref_; x.ev = x.event ? planEventInfo_(x.event) : null; });
   items.sort((a, b) => a.rank - b.rank);
   return { date: d, cal: EVENT_CALENDARS[0], items: items };
 }
@@ -2796,10 +2768,8 @@ function getPlan(date) {
 function planSave(op) {
   const o = op || {}, d = String(o.date || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error('Invalid plan date');
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sh = planSheet_(), rows = planRead_(sh);
+  Store.locked(() => {
+    const rows = Store.plan.list();
     const inGroup = (g, except) => rows.filter(x => x.group === g && (!PLAN_DATED_[g] || x.date === d) && x !== except);
     if (o.type === 'upsert') {
       const it = o.item || {}, g = String(it.group || '');
@@ -2816,30 +2786,30 @@ function planSave(op) {
       if (it.target !== undefined) x.target = String(it.target || '').replace(/\s+/g, ' ').trim().slice(0, 200);
       if (it.event && planEventParts_(it.event)) x.event = String(it.event);
       if (moved || !x.rank) x.rank = inGroup(g, x).reduce((m, r) => Math.max(m, r.rank), 0) + 1;
-      planWrite_(sh, x);
+      Store.plan.write(x);
     } else if (o.type === 'moveup') {
       // Bubble up (confirmed by Julius): the finished Big Three item leaves; the chosen waiting item takes the slot.
       const done = rows.find(r => r.id === String(o.doneId || '') && r.group === 'big');
       const up = rows.find(r => r.id === String(o.upId || '') && r.group === 'next');
       if (!up) throw new Error('That waiting item is gone — tap ↻');
-      if (done) { sh.deleteRow(done.row); rows.forEach(r => { if (r.row > done.row) r.row--; }); rows.splice(rows.indexOf(done), 1); }
+      if (done) { Store.plan.remove(done, rows); rows.splice(rows.indexOf(done), 1); }
       if (inGroup('big', up).length >= 3) throw new Error('Big Three is full (3) — remove one first');
       up.group = 'big'; up.date = '';
       up.rank = inGroup('big', up).reduce((m, r) => Math.max(m, r.rank), 0) + 1;
-      planWrite_(sh, up);
+      Store.plan.write(up);
     } else if (o.type === 'remove') {
       const x = rows.find(r => r.id === String(o.id || ''));
-      if (x) sh.deleteRow(x.row);
+      if (x) Store.plan.remove(x, rows);
     } else if (o.type === 'order') {
       const ids = (o.ids || []).map(String);
-      ids.forEach((id, i) => { const x = rows.find(r => r.id === id && r.group === o.group); if (x && x.rank !== i + 1) { x.rank = i + 1; planWrite_(sh, x); } });
+      ids.forEach((id, i) => { const x = rows.find(r => r.id === id && r.group === o.group); if (x && x.rank !== i + 1) { x.rank = i + 1; Store.plan.write(x); } });
     } else if (o.type === 'target') {
       const x = rows.find(r => r.id === String(o.id || ''));
       if (!x) throw new Error('Plan item not found — tap ↻');
       x.target = String(o.target || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-      planWrite_(sh, x);
+      Store.plan.write(x);
     } else throw new Error('Unknown plan change');
-  } finally { lock.releaseLock(); }
+  });
   return getPlan(d);
 }
 // Schedule… a Gantt task: one all-day event per task (main calendar, reminders off, tagged with the tid). Again → move it.
@@ -2852,11 +2822,9 @@ function planSchedule(req) {
   if (!/^tid:[\w-]{2,64}$/.test(ref)) throw new Error('Only Gantt tasks can be scheduled this way');
   const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 300) || 'Task';
   const w = slot ? calPanelWhen_({ title: title, allDay: !!r.allDay, start: r.start, end: r.end }) : null;
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sh = planSheet_(), rows = planRead_(sh), props = PropertiesService.getScriptProperties(), key = 'planEv:' + ref.slice(4, 70);
-    const known = (rows.find(x => x.ref === ref && x.event) || {}).event || props.getProperty(key) || '';
+  return Store.locked(() => {
+    const rows = Store.plan.list(), tid = ref.slice(4, 70);
+    const known = (rows.find(x => x.ref === ref && x.event) || {}).event || Store.plan.link(tid) || '';
     let ev = null, moved = false;
     const p = planEventParts_(known);
     if (p) { try { ev = calEventAt_(EVENT_CALENDARS[0], p.eventId, p.startMs); } catch (e) { ev = null; } }
@@ -2872,27 +2840,24 @@ function planSchedule(req) {
       try { ev.removeAllReminders(); } catch (e) { console.error(e); }
       try { ev.setTag('ganttTid', ref.slice(4)); } catch (e) { console.error(e); }
     }
-    const link = planRelink_(sh, ev);
-    props.setProperty(key, link);
-    rows.filter(x => x.ref === ref && x.event !== link).forEach(x => { x.event = link; planWrite_(sh, x); });
+    const link = planRelink_(ev);
+    Store.plan.setLink(tid, link);
+    rows.filter(x => x.ref === ref && x.event !== link).forEach(x => { x.event = link; Store.plan.write(x); });
     return { event: link, moved: moved, date: date };
-  } finally { lock.releaseLock(); }
+  });
 }
 // After an event moves, every plan row (and the Schedule property) pointing at it gets its new eventId@startMs,
 // so later lookups (calEventAt_ searches near startMs) keep finding it and Schedule never makes a second event.
-function planRelink_(sh, ev) {
+function planRelink_(ev) {
   const st = (ev.isAllDayEvent() ? ev.getAllDayStartDate() : ev.getStartTime()).getTime(), id = ev.getId(), link = id + '@' + st;
-  planRead_(sh).forEach(x => { const p = planEventParts_(x.event); if (p && p.eventId === id && x.event !== link) { x.event = link; planWrite_(sh, x); } });
+  Store.plan.list().forEach(x => { const p = planEventParts_(x.event); if (p && p.eventId === id && x.event !== link) { x.event = link; Store.plan.write(x); } });
   let tid = ''; try { tid = ev.getTag('ganttTid') || ''; } catch (e) { tid = ''; }
-  if (tid) PropertiesService.getScriptProperties().setProperty('planEv:' + tid.slice(0, 66), link);
+  if (tid) Store.plan.setLink(tid.slice(0, 66), link);
   return link;
 }
 function planRelinkLocked_(ev) {
-  const sh = ss_().getSheetByName(PLAN_SHEET);
-  if (!sh) return;
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try { planRelink_(sh, ev); } catch (e) { console.error(e); } finally { lock.releaseLock(); }
+  if (!Store.plan.exists()) return;
+  try { Store.locked(() => planRelink_(ev)); } catch (e) { console.error(e); }
 }
 // Move an event to another day, keeping its length (all-day) or its clock times (timed).
 function planMoveEv_(ev, date) {
@@ -2915,9 +2880,7 @@ function planMoveEvent(req) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Pick a date');
   const ev = calPanelEditable_(r.eventId, r.startMs);
   planMoveEv_(ev, date);
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try { return { event: planRelink_(planSheet_(), ev), date: date }; } finally { lock.releaseLock(); }
+  return Store.locked(() => ({ event: planRelink_(ev), date: date }));
 }
 
 // One event by id + start time, so the right day of a repeating event is the one found.
@@ -3258,21 +3221,6 @@ const CAL_BACKLOG_ROLL_MS = 3 * 60000;
 function calBacklogEventId_(rowId) {
   return String(rowId || '').split('|')[0].replace(/@google\.com$/, '');
 }
-function calBacklogSheet_() {
-  const ss = ss_();
-  let sh = ss.getSheetByName(CAL_BACKLOG_SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(CAL_BACKLOG_SHEET);
-    sh.getRange(1, 1, 1, CAL_BACKLOG_HEAD.length).setValues([CAL_BACKLOG_HEAD]).setFontWeight('bold');
-    sh.getRange('A:G').setNumberFormat('@');
-    sh.setFrozenRows(1);
-  }
-  return sh;
-}
-function calBacklogRows_(sh) {
-  const n = sh.getLastRow() - 1;
-  return n > 0 ? sh.getRange(2, 1, n, CAL_BACKLOG_HEAD.length).getDisplayValues() : [];
-}
 function calBacklogSweep_() {
   const tz = Session.getScriptTimeZone(), props = PropertiesService.getScriptProperties();
   const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), yest = addDaysToDateString_(today, -1);
@@ -3301,7 +3249,7 @@ function calBacklogSweep_() {
       });
       token = r.nextPageToken;
     } while (token);
-    const sh = calBacklogSheet_(), rows = calBacklogRows_(sh), have = {};
+    const rows = Store.calBacklog.rows(), have = {};
     rows.forEach(r => { have[r[0]] = 1; });
     const stamp = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm'), add = [];
     items.forEach(it => {
@@ -3310,7 +3258,7 @@ function calBacklogSweep_() {
         // Supersede: an older open row with the same title is stale (the task was re-created on a newer day).
         rows.forEach((r, i) => {
           if (r[0] !== id && !r[6] && r[2] === title) {
-            sh.getRange(i + 2, 7).setValue('superseded');
+            Store.calBacklog.setPlaced(i, 'superseded');
             r[6] = 'superseded';
             try { Calendar.Events.remove(calId, calBacklogEventId_(r[0])); } catch (e) { console.error('calBacklogSweep_ supersede: ' + e); }
           }
@@ -3324,7 +3272,7 @@ function calBacklogSweep_() {
         start: { date: yest }, end: { date: today } }, calId, it.id); }
       catch (e) { console.error('calBacklogSweep_ patch: ' + e); }
     });
-    if (add.length) sh.getRange(sh.getLastRow() + 1, 1, add.length, CAL_BACKLOG_HEAD.length).setValues(add);
+    Store.calBacklog.add(add);
     props.setProperty('calBacklogSwept', yest);
     return { swept: add.length };
   } finally { lock.releaseLock(); }
@@ -3358,7 +3306,7 @@ function calBacklogRoll_() {
       token = r.nextPageToken;
     } while (token);
     if (!moved.length) return;
-    const sh = calBacklogSheet_(), rows = calBacklogRows_(sh);
+    const rows = Store.calBacklog.rows();
     moved.forEach(it => {
       const uid = String(it.iCalUID || it.id);
       try {
@@ -3366,7 +3314,7 @@ function calBacklogRoll_() {
         if (String(it.colorId || '') === '8') {
           const j = rows.findIndex(r => !r[6] && r[0].split('|')[0] === uid);
           Calendar.Events.patch({ summary: String(it.summary || '').slice(CAL_BACKLOG_PREFIX.length) }, calId, it.id);
-          if (j >= 0) { sh.getRange(j + 2, 7).setValue('done'); rows[j][6] = 'done'; }
+          if (j >= 0) { Store.calBacklog.setPlaced(j, 'done'); rows[j][6] = 'done'; }
           return;
         }
         calBacklogRestoreColor_(calId, it, rows); // undo the old Grape recolor first (no-op otherwise)
@@ -3377,16 +3325,15 @@ function calBacklogRoll_() {
           // Julius dragged it onto today/future → restore it as a live task.
           const i = rows.findIndex(r => !r[6] && r[0].split('|')[0] === uid);
           Calendar.Events.patch({ summary: String(it.summary || '').slice(CAL_BACKLOG_PREFIX.length) }, calId, it.id);
-          if (i >= 0) { sh.getRange(i + 2, 7).setValue(it.start.date); rows[i][6] = it.start.date; }
+          if (i >= 0) { Store.calBacklog.setPlaced(i, it.start.date); rows[i][6] = it.start.date; }
         }
       } catch (e) { console.error('calBacklogRoll_: ' + e); }
     });
   } finally { lock.releaseLock(); }
 }
 function calBacklogList_() {
-  const sh = ss_().getSheetByName(CAL_BACKLOG_SHEET);
-  if (!sh) return [];
-  return calBacklogRows_(sh).filter(r => r[0] && !r[6]).map(r => ({
+  if (!Store.calBacklog.exists()) return [];
+  return Store.calBacklog.rows().filter(r => r[0] && !r[6]).map(r => ({
     id: r[0], date: r[1], title: r[2], colorId: r[3], urg: r[4],
     color: CAL_PANEL_COLORS_[r[3]] || CAL_PANEL_UNASSIGNED_COLOR_
   }));
@@ -3407,8 +3354,7 @@ function calBacklogPlace(req) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    const sh = calBacklogSheet_();
-    return calBacklogPlaceIn_(r, sh, calBacklogRows_(sh));
+    return calBacklogPlaceIn_(r, Store.calBacklog.rows());
   } finally { lock.releaseLock(); }
 }
 // Bulk send (2026-11-15, Julius: "select a bunch at once, then send"): one lock and one sheet read for the batch.
@@ -3418,12 +3364,12 @@ function calBacklogPlaceMany(reqs) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    const sh = calBacklogSheet_(), rows = calBacklogRows_(sh), done = [], failed = [];
-    list.forEach(r => { try { calBacklogPlaceIn_(r, sh, rows); done.push(String(r.id)); } catch (e) { failed.push({ id: String(r.id), error: String(e && e.message || e) }); } });
+    const rows = Store.calBacklog.rows(), done = [], failed = [];
+    list.forEach(r => { try { calBacklogPlaceIn_(r, rows); done.push(String(r.id)); } catch (e) { failed.push({ id: String(r.id), error: String(e && e.message || e) }); } });
     return { ok: !failed.length, done: done, failed: failed };
   } finally { lock.releaseLock(); }
 }
-function calBacklogPlaceIn_(r, sh, rows) {
+function calBacklogPlaceIn_(r, rows) {
   const id = String(r.id || '');
   {
     const i = rows.findIndex(x => x[0] === id);
@@ -3431,7 +3377,7 @@ function calBacklogPlaceIn_(r, sh, rows) {
     if (rows[i][6]) return { ok: true, already: rows[i][6] };
     const calId = EVENT_CALENDARS[0], evId = calBacklogEventId_(id);
     if (r.drop) {
-      sh.getRange(i + 2, 7).setValue('dropped'); rows[i][6] = 'dropped';
+      Store.calBacklog.setPlaced(i, 'dropped'); rows[i][6] = 'dropped';
       try { Calendar.Events.remove(calId, evId); } catch (e) { console.error('calBacklogPlace drop: ' + e); }
       return { ok: true };
     }
@@ -3465,7 +3411,7 @@ function calBacklogPlaceIn_(r, sh, rows) {
       out = calPanelOut_(ev, calId);
     }
     const placed = Utilities.formatDate(w.start, tz, 'yyyy-MM-dd');
-    sh.getRange(i + 2, 7).setValue(placed); rows[i][6] = placed;
+    Store.calBacklog.setPlaced(i, placed); rows[i][6] = placed;
     return { ok: true, event: out };
   }
 }
@@ -3483,21 +3429,21 @@ function calBacklogComplete(req) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    const sh = calBacklogSheet_(), rows = calBacklogRows_(sh), i = rows.findIndex(x => x[0] === id);
+    const rows = Store.calBacklog.rows(), i = rows.findIndex(x => x[0] === id);
     if (i < 0) throw new Error('Not in the backlog any more — tap ↻');
     if (rows[i][6]) return { ok: true, already: rows[i][6] };
     const calId = EVENT_CALENDARS[0], evId = calBacklogEventId_(id);
     const title = String(rows[i][2] || '').replace(/^↪\s*/, '').trim() || '(no title)';
     if (mode === 'delete') {
       try { Calendar.Events.remove(calId, evId); } catch (e) { console.error('calBacklogComplete delete: ' + e); }
-      sh.getRange(i + 2, 7).setValue('deleted');
+      Store.calBacklog.setPlaced(i, 'deleted');
       return { ok: true, mode: mode };
     }
     try {
       Calendar.Events.patch({ summary: '[x] ' + title, colorId: '8',
         start: { date: day, dateTime: null }, end: { date: addDaysToDateString_(day, 1), dateTime: null } }, calId, evId);
     } catch (e) { console.error('calBacklogComplete patch: ' + e); } // event gone → still logged
-    sh.getRange(i + 2, 7).setValue('done');
+    Store.calBacklog.setPlaced(i, 'done');
     const log = getOrCreateSheet_('Done Log', DONE_LOG_HEADERS);
     log.getRange(log.getLastRow() + 1, 1, 1, DONE_LOG_HEADERS.length)
       .setValues([[day, 'Backlog', title, 'Marked done from the calendar backlog', 'Julius', '']]);

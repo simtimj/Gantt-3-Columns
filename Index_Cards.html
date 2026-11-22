@@ -2907,6 +2907,7 @@
     ed.addEventListener('input', schedule);
     ed.addEventListener('focusout', () => { if(pending) save(); });
     window.fwResume && fwResume.add('kim', () => load(false)); // back in view: calm-return queue
+    window.fwKimReload = () => load(false); // PWA database step (2026-11-22, NOTES H3): another device saved
     setInterval(() => { if(document.visibilityState === 'visible' && document.activeElement !== ed && !ed.contains(document.activeElement)) load(false); }, 60000);
     // Group borders: one box per run of non-empty top-level lines (a header + its tasks, down to the empty line).
     const scroller = document.getElementById('kimScroll');

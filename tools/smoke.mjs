@@ -3011,6 +3011,85 @@ if (only('pwa')) {
   if (errs.length) { fails += errs.length; console.error('✗ pwa:\n  ' + errs.join('\n  ')); }
   else console.log('✓ pwa: setup link + API shim + opens from stored data then syncs + offline read-only + key box + tracker');
 }
+// Database step (2026-11-22, NOTES H3): Keep In Mind on Firestore in the PWA, with a fake Firebase SDK.
+if (only('pwa-fb')) {
+  const { execFileSync } = await import('child_process');
+  const http = await import('http');
+  const dist = path.join(os.tmpdir(), 'gantt-pwa-fb-smoke');
+  const cfg = { owner: 'juliussimtim@gmail.com', apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
+  execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
+  const FAKE = `if (!window.firebase) window.firebase = (function () {
+    const S = window.__fs = { doc: { html: '<div>Gloves from db</div>', at: 100, base: 0, dev: 'x' }, backups: [], cb: null, sets: 0 };
+    const snap = () => ({ exists: !!S.doc, data: () => S.doc, metadata: { fromCache: false, hasPendingWrites: false } });
+    S.push = () => S.cb && S.cb(snap());
+    const docApi = {
+      get: () => Promise.resolve(snap()),
+      set: rec => { S.sets++; if (S.doc && !(rec.at > S.doc.at)) return Promise.reject({ code: 'permission-denied' }); S.doc = rec; setTimeout(S.push, 10); return Promise.resolve(); },
+      onSnapshot: (o, cb) => { S.cb = cb; setTimeout(S.push, 0); return () => {}; }
+    };
+    const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'JuliusSimtim@gmail.com' }), 0), signOut: () => {} });
+    auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
+    return { initializeApp: () => {}, auth, firestore: () => ({ enablePersistence: () => Promise.resolve(),
+      collection: n => n === 'gantt' ? { doc: () => docApi } : { add: r => { S.backups.push(r); return Promise.resolve(); } } }) };
+  })();`;
+  const srv = http.createServer((q, r) => {
+    let f = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (f.endsWith('/')) f += 'index.html';
+    if (f.startsWith('/fb/')) { r.writeHead(200, { 'Content-Type': 'text/javascript' }); return r.end(FAKE); }
+    const fp = path.join(dist, f);
+    if (!fp.startsWith(dist) || !fs.existsSync(fp)) { r.writeHead(404); return r.end(); }
+    r.writeHead(200, { 'Content-Type': f.endsWith('.html') ? 'text/html' : 'text/javascript' }); r.end(fs.readFileSync(fp));
+  });
+  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const errs = [], calls = [];
+  const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'block' });
+  await ctx.route('https://api.test/**', route => {
+    const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
+    const r = req.fn === 'getWorkspaceData' ? data : req.fn === 'runImports' || req.fn === 'getSyncState' ? imported : req.fn === 'getFocus' ? focus
+      : req.fn === 'getKim' ? { html: '<div>from server</div>', h: 'k0' }
+      : req.fn === 'getMainCalendarEvents' ? { date: req.a[0], events: [] } : null;
+    route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
+  });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => errs.push('page error: ' + e.message));
+  await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
+  const kim = () => pg.evaluate(() => (document.querySelector('#kimScroll .kim-editor') || {}).innerText || '');
+  if (!/Gloves from db/.test(await kim())) errs.push('Keep In Mind did not load from Firestore: ' + JSON.stringify((await kim()).slice(0, 80)));
+  if (calls.includes('getKim')) errs.push('getKim still went to the server');
+  if (await pg.evaluate(() => !!document.getElementById('pwaSignIn'))) errs.push('sign-in button shown while signed in');
+  // Edit → saved to Firestore with a newer `at`, never through the server.
+  await pg.evaluate(() => { const ed = document.querySelector('#kimScroll .kim-editor'); ed.insertAdjacentHTML('beforeend', '<div>Typed line</div>'); ed.dispatchEvent(new Event('input', { bubbles: true })); });
+  await pg.waitForTimeout(1800);
+  const s1 = await pg.evaluate(() => ({ html: __fs.doc.html, at: __fs.doc.at, dev: __fs.doc.dev }));
+  if (!/Typed line/.test(s1.html) || !(s1.at > 100)) errs.push('edit not saved to Firestore: ' + JSON.stringify(s1).slice(0, 120));
+  if (calls.includes('saveKim')) errs.push('saveKim went to the server');
+  // Another device saves → live sync merges it in.
+  await pg.evaluate(() => { __fs.doc = { html: __fs.doc.html + '<div>From the tablet</div>', at: __fs.doc.at + 50, base: 0, dev: 'pc' }; __fs.push(); });
+  await pg.waitForTimeout(800);
+  if (!/From the tablet/.test(await kim())) errs.push('live sync: other device\'s line did not show');
+  // Older edit refused (newest wins) → copy goes to ganttBackup.
+  await pg.evaluate(() => {
+    localStorage.setItem('pwa.kim.unconfirmed', JSON.stringify({ html: '<div>stale</div>', at: 5 }));
+    __fs.doc = Object.assign({}, __fs.doc, { at: __fs.doc.at + 1 }); __fs.push();
+  });
+  await pg.waitForTimeout(300);
+  const bk = await pg.evaluate(() => ({ n: __fs.backups.length, r: __fs.backups[0] && __fs.backups[0].reason, left: localStorage.getItem('pwa.kim.unconfirmed') }));
+  if (bk.n !== 1 || !/newest wins/.test(bk.r || '') || bk.left) errs.push('lost edit not backed up: ' + JSON.stringify(bk));
+  // Offline: Keep In Mind can still be typed in, other editors stay read-only.
+  await ctx.setOffline(true); await pg.waitForTimeout(300);
+  const off = await pg.evaluate(() => {
+    const ev = () => new InputEvent('beforeinput', { inputType: 'insertText', data: 'x', bubbles: true, cancelable: true });
+    const k = document.querySelector('#kimScroll .kim-editor');
+    const other = [...document.querySelectorAll('[contenteditable="true"]')].find(e => !e.closest('#kimScroll'));
+    return { kim: k.dispatchEvent(ev()), other: other ? other.dispatchEvent(ev()) : null, bar: (document.getElementById('pwaOffline') || {}).textContent };
+  });
+  if (!off.kim) errs.push('offline: Keep In Mind was blocked');
+  if (off.other !== false) errs.push('offline: other editors not read-only');
+  if (!/Keep In Mind saves/.test(off.bar || '')) errs.push('offline banner text: ' + off.bar);
+  await ctx.close(); srv.close();
+  if (errs.length) { fails += errs.length; console.error('✗ pwa-fb:\n  ' + errs.join('\n  ')); }
+  else console.log('✓ pwa-fb: Keep In Mind loads/saves on Firestore + live sync + newest-wins backup + offline editing');
+}
 // One calm return (2026-11-21, speed item M): coming back runs ONE queue — registered jobs in order, staggered,
 // skipping ones refreshed < 60 s ago; stops if hidden again; Speed Log 'resume' row only when something ran.
 for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {

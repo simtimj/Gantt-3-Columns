@@ -12,6 +12,11 @@ const read = f => fs.readFileSync(f, 'utf8');
 let project = {};
 try { project = JSON.parse(read('tools/pwa-api/project.json')); } catch (e) {}
 const api = process.env.PWA_API_URL || project.url || '';
+// Database step (2026-11-22, NOTES H3): Firebase web config; empty apiKey = off (no SDK shipped, Keep In Mind on the server).
+let fbCfg = null;
+try { fbCfg = JSON.parse(process.env.PWA_FIREBASE_CONFIG || read('tools/pwa/firebase-config.json')); } catch (e) {} // env: tests only
+if (!fbCfg || !fbCfg.apiKey) fbCfg = null;
+const FB_FILES = ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js'];
 if (!api) console.warn('⚠ No API URL yet (tools/pwa-api/project.json); the app will show "Offline".');
 
 const include = name => read(name.endsWith('.html') ? name : name + '.html');
@@ -29,6 +34,8 @@ const CSS = `<style id="pwaCss">
 #pwaOffline.pwa-flash{background:#d6336c}
 #pwaUpdate{position:fixed;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:2147483000;border:0;border-radius:999px;
   background:#2f6fde;color:#fff;font:600 15px/1 system-ui,sans-serif;padding:12px 16px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+#pwaSignIn{position:fixed;left:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:2147483000;border:1px solid #3a3f48;border-radius:999px;
+  background:#1b1e24;color:#e8eaed;font:600 13px/1 system-ui,sans-serif;padding:9px 13px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 #pwaKeyBox{position:fixed;inset:0;z-index:2147483001;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 #pwaKeyBox>div{background:#fff;color:#1b1d22;border-radius:14px;padding:18px;max-width:420px;width:100%;font:15px/1.4 system-ui,sans-serif}
 #pwaKeyBox input{width:100%;box-sizing:border-box;padding:10px;margin:6px 0 10px;font:inherit;border:1px solid #ccc;border-radius:8px}
@@ -45,12 +52,17 @@ const pages = [
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'icons'), { recursive: true });
 for (const f of fs.readdirSync('tools/pwa/icons')) fs.copyFileSync(path.join('tools/pwa/icons', f), path.join(out, 'icons', f));
+if (fbCfg) {
+  fs.mkdirSync(path.join(out, 'fb'), { recursive: true });
+  for (const f of FB_FILES) fs.copyFileSync(path.join('tools/pwa/vendor', f + '.txt'), path.join(out, 'fb', f));
+}
 
 const built = pages.map(p => ({ p, html: render(read(p.src)) }));
-const build = crypto.createHash('sha1').update(api + shimSrc + read('tools/pwa/sw.js.txt') + built.map(b => b.html).join('')).digest('hex').slice(0, 12);
+const build = crypto.createHash('sha1').update(api + JSON.stringify(fbCfg) + shimSrc + read('tools/pwa/sw.js.txt') + built.map(b => b.html).join('')).digest('hex').slice(0, 12);
 
 for (const { p, html } of built) {
-  const shim = shimSrc.replace('__API__', api).replace('__PAGE__', p.page).replace('__BUILD__', build);
+  const shim = shimSrc.replace('__API__', api).replace('__PAGE__', p.page).replace('__BUILD__', build)
+    .replace('__FIREBASE__', JSON.stringify(fbCfg).replace(/</g, '\\u003c'));
   const head = `
   <link rel="manifest" href="${p.manifest}">
   <link rel="icon" href="icons/${p.icon}-192.png">
@@ -75,7 +87,8 @@ for (const { p, html } of built) {
   }, null, 2));
 }
 
-const shell = ['./', 'index.html', 'tracker.html', ...pages.map(p => p.manifest), ...fs.readdirSync(path.join(out, 'icons')).map(f => 'icons/' + f)];
+const shell = ['./', 'index.html', 'tracker.html', ...pages.map(p => p.manifest), ...fs.readdirSync(path.join(out, 'icons')).map(f => 'icons/' + f),
+  ...(fbCfg ? FB_FILES.map(f => 'fb/' + f) : [])];
 fs.writeFileSync(path.join(out, 'sw.js'), read('tools/pwa/sw.js.txt').replace('__BUILD__', build).replace('__SHELL__', JSON.stringify(shell)));
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
-console.log('✓ PWA built → ' + out + ' (build ' + build + ', API ' + (api ? 'set' : 'missing') + ')');
+console.log('✓ PWA built → ' + out + ' (build ' + build + ', API ' + (api ? 'set' : 'missing') + ', Firebase ' + (fbCfg ? 'on' : 'off') + ')');

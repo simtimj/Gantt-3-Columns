@@ -24,3 +24,14 @@ console.log('✓ syntax OK');
 // Storage layer (2026-11-21 H2): no new direct Sheet/Properties calls outside Store.gs.
 if (storeGuard()) process.exit(1);
 console.log('✓ storage layer: no new direct calls');
+// Database step (2026-11-22, NOTES H3): the server's Firebase project must be the PWA config's project.
+{
+  const fsm = await import('fs');
+  const cfg = JSON.parse(fsm.readFileSync('tools/pwa/firebase-config.json', 'utf8'));
+  const m = fsm.readFileSync('Store.gs', 'utf8').match(/const FIREBASE_PROJECT_ = '([^']*)'/);
+  if (!m || m[1] !== String(cfg.projectId || '')) {
+    console.error('✗ FIREBASE_PROJECT_ in Store.gs (' + (m && m[1]) + ') ≠ projectId in tools/pwa/firebase-config.json (' + cfg.projectId + ')');
+    process.exit(1);
+  }
+  console.log('✓ Firebase project: ' + (m[1] || 'off'));
+}

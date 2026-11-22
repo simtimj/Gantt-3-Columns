@@ -1,0 +1,25 @@
+// Firestore security rules for the Gantt app (2026-11-22, docs/NOTES.md → H3).
+// Paste into Firebase console → Firestore → Rules → Publish.
+// Only Julius's Google account can read or write. "Newest edit wins": an update must carry a newer `at`
+// (saved-at ms) than the stored copy, so an old offline edit can't overwrite a newer one; the app then saves
+// the losing copy to ganttBackup, which the Sheet mirror moves into the Backup tab.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function me() {
+      return request.auth != null
+        && request.auth.token.email == 'juliussimtim@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    match /gantt/{doc} {
+      allow read: if me();
+      allow create: if me() && request.resource.data.at is int;
+      allow update: if me() && request.resource.data.at is int && request.resource.data.at > resource.data.at;
+      allow delete: if false;
+    }
+    match /ganttBackup/{id} {
+      allow create: if me();
+      allow read, update, delete: if false;
+    }
+  }
+}

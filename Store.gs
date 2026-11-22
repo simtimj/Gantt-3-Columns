@@ -9,6 +9,12 @@
    Record shape: { value, at } — at = saved-at in ms (0 = unknown / never saved),
    used later for "newest edit wins, the other version goes to Backup".
    ========================================================= */
+/* Database step (2026-11-22, docs/NOTES.md → "H3. Firestore"). FIREBASE_PROJECT_ = projectId from
+   tools/pwa/firebase-config.json (check.mjs keeps the two equal). Empty = not switched on: every area stays on the
+   Sheet. Set = the areas in STORE_DB_AREAS_ live in Firestore, and the timed trigger storeMirror() copies them
+   into the Sheet (backup mirror) and moves lost edits from Firestore into the Backup tab. */
+const FIREBASE_PROJECT_ = '';
+const STORE_DB_AREAS_ = ['kim'];
 const STORE_BACKEND = {
   kim: 'sheet',
   days: 'sheet',
@@ -21,11 +27,57 @@ const STORE_BACKEND = {
   // calBacklog, timer, props, study, logs: still direct, moving in this order
 };
 
+if (FIREBASE_PROJECT_) STORE_DB_AREAS_.forEach(a => { STORE_BACKEND[a] = 'db'; });
+const STORE_DB_BUILT_ = { kim: true };
+
 function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
+  if (b === 'db' && STORE_DB_BUILT_[area]) {
+    if (!FIREBASE_PROJECT_) throw new Error('Store: ' + area + ' is set to the database but FIREBASE_PROJECT_ is empty');
+    return b;
+  }
   if (b !== 'sheet' && b !== 'properties') throw new Error('Store: backend "' + b + '" for ' + area + ' is not built yet');
   return b;
 }
+
+/* Firestore over REST, as Julius (his OAuth token; IAM access, so security rules don't apply here — the rules
+   lock the browser side to his account). X-Goog-User-Project bills the calls to the Firebase project.
+   Plain fields only: strings and whole numbers. */
+const StoreFs = {
+  url_(path) { return 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ + '/databases/(default)/documents/' + path; },
+  req_(method, path, body) {
+    const res = UrlFetchApp.fetch(this.url_(path), {
+      method: method, contentType: 'application/json', muteHttpExceptions: true,
+      payload: body ? JSON.stringify(body) : undefined,
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken(), 'X-Goog-User-Project': FIREBASE_PROJECT_ }
+    });
+    const code = res.getResponseCode();
+    if (code === 404 && method === 'get') return null;
+    if (code >= 300) throw new Error('Firestore ' + method + ' ' + path + ': ' + code + ' ' + res.getContentText().slice(0, 300));
+    return res.getContentText() ? JSON.parse(res.getContentText()) : {};
+  },
+  dec_(doc) {
+    const out = {};
+    Object.keys((doc && doc.fields) || {}).forEach(k => {
+      const v = doc.fields[k];
+      out[k] = 'integerValue' in v ? Number(v.integerValue) : 'doubleValue' in v ? Number(v.doubleValue) : 'stringValue' in v ? v.stringValue : null;
+    });
+    if (doc && doc.name) out.id_ = doc.name.split('/').pop();
+    return out;
+  },
+  enc_(obj) {
+    const fields = {};
+    Object.keys(obj).forEach(k => {
+      const v = obj[k];
+      fields[k] = typeof v === 'number' && Math.floor(v) === v ? { integerValue: String(v) } : { stringValue: String(v == null ? '' : v) };
+    });
+    return { fields: fields };
+  },
+  get(path) { const d = this.req_('get', path); return d ? this.dec_(d) : null; },
+  set(path, obj) { this.req_('patch', path, this.enc_(obj)); return obj; },
+  list(coll) { return ((this.req_('get', coll + '?pageSize=100') || {}).documents || []).map(d => this.dec_(d)); },
+  del(path) { this.req_('delete', path); }
+};
 
 // One script lock around a read-check-write, same as the old per-feature locks.
 function storeLocked_(fn, ms) {
@@ -448,20 +500,45 @@ const Store = {
   /* Keep In Mind — one shared list. Sheet: tab "Keep In Mind", A2 = HTML, B2 = saved-at ms. */
   kim: {
     SHEET: 'Keep In Mind',
+    DOC: 'gantt/kim',
     sheet_() {
-      storeBackend_('kim');
       const sh = getOrCreateSheet_(this.SHEET, ['Keep In Mind (shared list, HTML) — edited in the app', 'Saved at (ms)']);
       if (!sh.getRange(1, 2).getValue()) sh.getRange(1, 2).setValue('Saved at (ms)');
       return sh;
     },
-    read() {
+    sheetRead_() {
       const row = this.sheet_().getRange(2, 1, 1, 2).getValues()[0];
       return { value: String(row[0] || ''), at: Number(row[1]) || 0 };
     },
+    sheetWrite_(html, at) { this.sheet_().getRange(2, 1, 1, 2).setValues([[String(html || ''), at]]); },
+    // Database: Firestore doc gantt/kim = { html, at, base, dev }. No doc yet → seeded from the Sheet copy.
+    read() {
+      if (storeBackend_('kim') === 'db') {
+        const d = StoreFs.get(this.DOC);
+        if (d) return { value: String(d.html || ''), at: Number(d.at) || 0 };
+        const s = this.sheetRead_();
+        if (s.value) StoreFs.set(this.DOC, { html: s.value, at: s.at || Date.now(), base: 0, dev: 'sheet-seed' });
+        return s;
+      }
+      return this.sheetRead_();
+    },
     write(html) {
       const at = Date.now();
-      this.sheet_().getRange(2, 1, 1, 2).setValues([[String(html || ''), at]]);
-      return { value: String(html || ''), at: at };
+      html = String(html || '');
+      if (storeBackend_('kim') === 'db') StoreFs.set(this.DOC, { html: html, at: at, base: 0, dev: 'server' });
+      else this.sheetWrite_(html, at);
+      return { value: html, at: at };
+    },
+    // Timed trigger: newest Firestore copy → Sheet (backup mirror). Returns true when the Sheet changed.
+    mirror() {
+      if (storeBackend_('kim') !== 'db') return false;
+      const d = StoreFs.get(this.DOC);
+      if (!d) { this.read(); return false; } // seeds Firestore from the Sheet
+      const s = this.sheetRead_(), at = Number(d.at) || 0;
+      if (at <= s.at && String(d.html || '') === s.value) return false;
+      if (s.at > at && s.value !== String(d.html || '')) backupCell_(this.SHEET, 'A2', 'Sheet copy newer than the database (kept database)', s.value);
+      this.sheetWrite_(d.html, at);
+      return true;
     },
     // First-copy flag: false until the list has been saved once.
     migrated() { return PropertiesService.getScriptProperties().getProperty('kimMigrated') === '1'; },
@@ -469,8 +546,40 @@ const Store = {
     backup(reason, html) { backupCell_(this.SHEET, 'A2', reason, html); }
   },
 
-  locked: storeLocked_
+  locked: storeLocked_,
+
+  /* Database mirror (timed trigger, every 5 min): each database area copied into its Sheet tab, then edits that
+     lost under "newest edit wins" (written to Firestore ganttBackup by the app) moved into the Backup tab. */
+  mirror() {
+    if (!FIREBASE_PROJECT_) return { off: true };
+    return storeLocked_(() => {
+      const out = { kim: Store.kim.mirror(), backups: 0 };
+      StoreFs.list('ganttBackup').forEach(b => {
+        backupCell_(b.area === 'kim' ? Store.kim.SHEET : 'Database: ' + b.area, b.area === 'kim' ? 'A2' : '', (b.reason || 'lost edit') + (b.dev ? ' · ' + b.dev : ''), b.html || '');
+        StoreFs.del('ganttBackup/' + b.id_);
+        out.backups++;
+      });
+      return out;
+    });
+  }
 };
+
+// Trigger target (installed by firebaseSetup). Never throws, so the trigger keeps running.
+function storeMirror() {
+  try { console.log(JSON.stringify(Store.mirror())); } catch (e) { console.error('storeMirror: ' + e.message); }
+}
+
+/* Run once from the editor after FIREBASE_PROJECT_ is set (docs/NOTES.md → "H3"): asks for the new permissions
+   (database, outside requests, triggers), replaces the mirror trigger (every 5 min), and runs the first mirror
+   (which also copies the Sheet's Keep In Mind into Firestore if the database is still empty). */
+function firebaseSetup() {
+  if (!FIREBASE_PROJECT_) throw new Error('Set FIREBASE_PROJECT_ in Store.gs first');
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'storeMirror').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('storeMirror').timeBased().everyMinutes(5).create();
+  const r = Store.mirror();
+  console.log('Firebase setup ✓ ' + JSON.stringify(r));
+  return r;
+}
 
 
 /* =========================================================

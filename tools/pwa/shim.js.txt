@@ -1,10 +1,12 @@
 /* Gantt PWA shim (2026-11-21, docs/NOTES.md H). Injected first in the hosted page by tools/build-pwa.mjs.
    - google.script.run → fetch to the "Gantt API" router (POST text/plain, so no CORS preflight), with the app key.
    - Main page: the last data seen on this device opens at once (if it's for today), then fwSync(true) catches up.
-   - Offline: read-only + banner. Service worker updates: "↻ Update ready" button, never an auto-reload. */
+   - Offline: read-only + banner. Service worker updates: "↻ Update ready" button, never an auto-reload.
+   - Database step (2026-11-22, NOTES H3): with a Firebase config, Keep In Mind reads/writes Firestore directly
+     (Google sign-in, his account only), works offline (Firestore queues the edits) and syncs live. */
 (function () {
   'use strict';
-  var API = '__API__', PAGE = '__PAGE__', BUILD = '__BUILD__';
+  var API = '__API__', PAGE = '__PAGE__', BUILD = '__BUILD__', FB_CFG = __FIREBASE__;
   var KEY_LS = 'pwa.key', DATA_LS = 'pwa.initial.v1';
   var ls = {
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -42,7 +44,7 @@
     if (on && !bar) {
       bar = document.createElement('div');
       bar.id = 'pwaOffline';
-      bar.textContent = 'Offline · read-only';
+      bar.textContent = fb.canEdit() ? 'Offline · only Keep In Mind saves' : 'Offline · read-only';
       document.body.appendChild(bar);
     } else if (!on && bar) bar.remove();
   }
@@ -52,6 +54,7 @@
   function block(e) {
     if (!offline) return;
     if (e.target && e.target.closest && e.target.closest('#pwaKeyBox')) return;
+    if (fb.canEdit() && e.target && e.target.closest && e.target.closest(fb.EDIT_SEL)) return;
     e.preventDefault(); e.stopImmediatePropagation();
     flash();
   }
@@ -85,6 +88,134 @@
   }
   if (!key()) needKey();
 
+  /* ---------- Firestore: Keep In Mind (database step, 2026-11-22, docs/NOTES.md → H3) ----------
+     getKim / saveKim go to Firestore doc gantt/kim = { html, at, base, dev } instead of the server. The SDK loads
+     after the page (no cost to the first paint) from this site (cached by the service worker, so it works offline).
+     Offline edits are queued by Firestore and sent when back online. Newest edit wins: the rules refuse an update
+     whose `at` isn't newer; the refused copy goes to ganttBackup (→ Backup tab via the Sheet mirror).
+     Not signed in, no doc yet, or the SDK not ready within 4 s → the old server path (getKim / saveKim). */
+  var fb = (function () {
+    var off = { handles: function () { return false; }, canEdit: function () { return false; }, EDIT_SEL: '#kimScroll' };
+    if (!FB_CFG || !FB_CFG.apiKey || PAGE !== 'index') return off;
+    var NAMES = { getKim: 1, saveKim: 1 }, UNCONF = 'pwa.kim.unconfirmed', DEV_LS = 'pwa.device';
+    var OWNER = String(FB_CFG.owner || '').toLowerCase(), cfg = Object.assign({}, FB_CFG);
+    delete cfg.owner; delete cfg._note;
+    var db = null, user = null, lastAt = null, watching = false;
+    var dev = ls.get(DEV_LS);
+    if (!dev) { dev = (/Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone-' : 'pc-') + Math.random().toString(36).slice(2, 8); ls.set(DEV_LS, dev); }
+
+    function load(src) {
+      return new Promise(function (ok, bad) {
+        var el = document.createElement('script'); el.src = src; el.async = false;
+        el.onload = ok; el.onerror = function () { bad(new Error('Couldn’t load ' + src)); };
+        document.head.appendChild(el);
+      });
+    }
+    var boot = new Promise(function (ok) {
+      if (document.readyState === 'complete') setTimeout(ok, 200);
+      else window.addEventListener('load', function () { setTimeout(ok, 200); });
+    }).then(function () {
+      return Promise.all(['fb/firebase-app-compat.js', 'fb/firebase-auth-compat.js', 'fb/firebase-firestore-compat.js'].map(load));
+    }).then(function () {
+      firebase.initializeApp(cfg);
+      db = firebase.firestore();
+      return db.enablePersistence({ synchronizeTabs: true }).catch(function (e) { console.warn('Firestore offline copy off: ' + (e.code || e)); });
+    }).then(function () {
+      return new Promise(function (ok) {
+        firebase.auth().onAuthStateChanged(function (u) {
+          if (u && String(u.email || '').toLowerCase() !== OWNER) { firebase.auth().signOut(); u = null; }
+          user = u || null;
+          signButton(!user);
+          if (user) watch();
+          ok();
+        });
+      });
+    });
+    boot.catch(function (e) { console.warn('Firebase: ' + (e && e.message || e)); });
+
+    function withTimeout(p, ms) {
+      return Promise.race([p, new Promise(function (_, bad) { setTimeout(function () { bad(new Error('timeout')); }, ms); })]);
+    }
+    function doc() { return db.collection('gantt').doc('kim'); }
+    function shape(snap) {
+      var d = snap && snap.exists ? snap.data() : null;
+      return d ? { html: String(d.html || ''), h: 'f' + d.at, at: Number(d.at) || 0, fresh: false, build: '' } : null;
+    }
+    function read() {
+      var cacheOnly = function () { return doc().get({ source: 'cache' }).catch(function () { return null; }); };
+      return (navigator.onLine ? doc().get({ source: 'server' }).catch(cacheOnly) : cacheOnly()).then(shape);
+    }
+    function backup(html, reason) {
+      db.collection('ganttBackup').add({ area: 'kim', html: String(html || ''), at: Date.now(), reason: reason, dev: dev })
+        .catch(function (e) { console.warn('Backup not saved: ' + (e.code || e)); });
+    }
+    function unconf() { try { return JSON.parse(ls.get(UNCONF) || 'null'); } catch (e) { return null; } }
+    function save(html, baseH) {
+      return read().then(function (cur) {
+        if (cur && cur.h !== baseH) return { conflict: true, html: cur.html, h: cur.h, build: '' };
+        html = String(html || '');
+        if (cur && cur.html.length > 400 && html.length < cur.html.length * 0.6) backup(cur.html, 'big shrink');
+        var at = Math.max(Date.now(), (cur ? cur.at : 0) + 1);
+        var rec = { html: html, at: at, base: cur ? cur.at : 0, dev: dev };
+        ls.set(UNCONF, JSON.stringify({ html: html, at: at }));
+        // Not awaited: offline, this only resolves once the queued edit reaches the server.
+        doc().set(rec).then(function () {
+          var u = unconf(); if (u && u.at === at) ls.del(UNCONF);
+        }, function (e) {
+          if (e && e.code === 'permission-denied') {
+            backup(html, 'older edit lost (newest wins)');
+            var u = unconf(); if (u && u.at === at) ls.del(UNCONF);
+            if (typeof window.fwKimReload === 'function') window.fwKimReload();
+          } else console.warn('Keep In Mind not saved to the database: ' + (e.code || e));
+        });
+        lastAt = at;
+        return { h: 'f' + at, at: at, build: '' };
+      });
+    }
+    // Live sync: another device saved → the list merges it in. Also settles an edit left over from an earlier
+    // session: confirmed → forget it; the server kept a different copy → the leftover goes to Backup.
+    function watch() {
+      if (watching) return; watching = true;
+      doc().onSnapshot({ includeMetadataChanges: true }, function (snap) {
+        if (snap.metadata.fromCache || snap.metadata.hasPendingWrites || !snap.exists) return;
+        var at = Number(snap.data().at) || 0, u = unconf();
+        if (u) { if (u.at !== at) backup(u.html, 'older edit lost (newest wins)'); ls.del(UNCONF); }
+        if (lastAt !== null && at !== lastAt && typeof window.fwKimReload === 'function') window.fwKimReload();
+        lastAt = at;
+      }, function (e) { watching = false; console.warn('Keep In Mind live sync stopped: ' + (e.code || e)); });
+    }
+    function signButton(show) {
+      if (!document.body) { document.addEventListener('DOMContentLoaded', function () { signButton(show); }); return; }
+      var b = document.getElementById('pwaSignIn');
+      if (show && !b) {
+        b = document.createElement('button');
+        b.id = 'pwaSignIn'; b.type = 'button'; b.textContent = 'Sign in · Keep In Mind sync';
+        b.onclick = signIn;
+        document.body.appendChild(b);
+      } else if (!show && b) b.remove();
+    }
+    function signIn() {
+      var p = new firebase.auth.GoogleAuthProvider();
+      p.setCustomParameters({ login_hint: OWNER, prompt: 'select_account' });
+      firebase.auth().signInWithPopup(p).catch(function (e) {
+        if (e && /popup-blocked|operation-not-supported/.test(e.code || '')) return firebase.auth().signInWithRedirect(p);
+        if (e && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') alert('Sign-in didn’t work: ' + (e.message || e));
+      });
+    }
+    return {
+      EDIT_SEL: '#kimScroll',
+      handles: function (name) { return !!NAMES[name]; },
+      canEdit: function () { return !!user; },
+      run: function (name, args) {
+        return withTimeout(boot, 4000).then(function () {
+          if (!user) return null;
+          return name === 'getKim' ? read() : save(args[0], args[1]);
+        }).catch(function (e) { console.warn('Firestore → server: ' + (e && e.message || e)); return null; })
+          .then(function (r) { return r || call(name, args); });
+      }
+    };
+  })();
+
   /* ---------- google.script.run → fetch ---------- */
   function call(fn, args) {
     return fetch(API, {
@@ -115,7 +246,7 @@
         if (typeof name !== 'string') return undefined;
         return function () {
           var args = Array.prototype.slice.call(arguments);
-          call(name, args).then(function (r) {
+          (fb.handles(name) ? fb.run(name, args) : call(name, args)).then(function (r) {
             if (name === 'getWorkspaceData' && PAGE === 'index') saveData(r);
             if (ok) ok(r, user);
           }, function (err) {

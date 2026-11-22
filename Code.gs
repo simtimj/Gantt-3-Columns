@@ -41,7 +41,7 @@ const VIEWPORT =
 const PWA_URL = 'https://simtimj.github.io/Gantt-3-Columns/';
 
 function pwaKey_() {
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   let k = props.getProperty('PWA_KEY');
   if (!k) { k = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, ''); props.setProperty('PWA_KEY', k); }
   return k;
@@ -54,7 +54,7 @@ function apiOut_(o) { return ContentService.createTextOutput(JSON.stringify(o)).
 function apiCall(body) {
   let req;
   try { req = JSON.parse(body || '{}'); } catch (e) { return apiOut_({ ok: false, e: 'Bad request' }); }
-  const key = PropertiesService.getScriptProperties().getProperty('PWA_KEY');
+  const key = Store.props.getProperty('PWA_KEY');
   if (!key || req.k !== key) return apiOut_({ ok: false, auth: true, e: 'Wrong or missing app key' });
   const fn = String(req.fn || '');
   const f = globalThis[fn];
@@ -583,7 +583,7 @@ function moveScheduleToNotes_(snapshot) {
    the new task. Unwrap urgency tasks that are bold from end to end (not Claude's lines, which have a bold
    title + plain details). The client now stops the carry-over (see "No stray bold" in Index.html). */
 function fixUrgentBold_() {
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   if (props.getProperty('urgBoldFix') === '1') return false;
   const fix = html => doneBlocks_(String(html || '')).map(b => {
     if (!/^<div\b[^>]*class="[^"]*check-line/i.test(b) || !/\sdata-urg="/.test(b) || /\sdata-cid="/.test(b)) return b;
@@ -660,7 +660,7 @@ function addToScheduleCell_(notes, date, linesHtml) {
 /* Pinned Reference cards (2026-11-04, Julius): ids in script property refPinned, so pins follow him across
    devices. Pinned cards sort to the top in every sort mode (Index.html sortedReferenceItems). */
 function getRefPins_() {
-  try { const v = JSON.parse(PropertiesService.getScriptProperties().getProperty('refPinned') || '[]'); return Array.isArray(v) ? v.map(String) : []; }
+  try { const v = JSON.parse(Store.props.getProperty('refPinned') || '[]'); return Array.isArray(v) ? v.map(String) : []; }
   catch (e) { return []; }
 }
 function setReferencePin(id, on) {
@@ -671,7 +671,7 @@ function setReferencePin(id, on) {
   try {
     const list = getRefPins_().filter(x => x !== id);
     if (on) list.unshift(id);
-    PropertiesService.getScriptProperties().setProperty('refPinned', JSON.stringify(list.slice(0, 200)));
+    Store.props.setProperty('refPinned', JSON.stringify(list.slice(0, 200)));
     return list;
   } finally { lock.releaseLock(); }
 }
@@ -933,12 +933,12 @@ function parseDate_(dateString) {
    ========================================================= */
 function inboxRead_(key, def, snapshot) {
   try {
-    const v = snapshot ? snapshot[key] : PropertiesService.getUserProperties().getProperty(key);
+    const v = snapshot ? snapshot[key] : Store.userProps.getProperty(key);
     return v ? JSON.parse(v) : def;
   } catch (e) { return def; }
 }
 function inboxWrite_(key, value) {
-  PropertiesService.getUserProperties().setProperty(key, JSON.stringify(value));
+  Store.userProps.setProperty(key, JSON.stringify(value));
 }
 // Urgent batches (2026-10-30, Julius): Music + Productivity subjects, Career shown as
 // "Career / IT". One-time upgrade of his saved list (flag cardCatsBatch1) so every
@@ -950,7 +950,7 @@ const CARD_CATS_BATCH1_ = [
 const CARD_CATS_CAREER_WORDS_ = 'help desk, helpdesk, it support, tech support, it job, it jobs, it role, certification, cert, security, cloud security, devsecops';
 function getCardCats_() {
   // One read of all user properties (2026-11-05: was up to 7 separate reads + a write on every load).
-  const props = PropertiesService.getUserProperties();
+  const props = Store.userProps;
   const all = props.getProperties();
   let list = null;
   try { list = all.cardCats ? JSON.parse(all.cardCats) : null; } catch (e) { list = null; }
@@ -1038,7 +1038,7 @@ function saveCardCats(list) {
     words: String(c.words || '').slice(0, 2000)
   }));
   inboxWrite_('cardCats', clean);
-  PropertiesService.getUserProperties().setProperty('cardCatsHealth1', '1');
+  Store.userProps.setProperty('cardCatsHealth1', '1');
   return true;
 }
 // Claude's items can't be edited in inbox.js from the app, so edits / archive
@@ -1063,7 +1063,7 @@ function focusGenerationText_(all, head) {
   return raw;
 }
 function readFocus_() {
-  const sp = PropertiesService.getScriptProperties(), all = sp.getProperties();
+  const sp = Store.props, all = sp.getProperties();
   let raw = '';
   try {
     if (all.focusDataHead !== undefined) raw = focusGenerationText_(all, JSON.parse(all.focusDataHead));
@@ -1155,7 +1155,7 @@ function saveFocus(data, opts) {
     writeFocus_(result.data);
     if(result.overwritten.length) {
       try {
-        const sp = PropertiesService.getScriptProperties();
+        const sp = Store.props;
         let log = []; try { log = JSON.parse(sp.getProperty('focusMergeLog') || '[]'); } catch (e) {}
         log = log.concat(result.overwritten.map(o => ({at:Date.now(),path:o.path,lost:JSON.stringify(o.lost === undefined ? null : o.lost).slice(0,500)}))).slice(-20);
         sp.setProperty('focusMergeLog',JSON.stringify(log));
@@ -1168,7 +1168,7 @@ function saveFocus(data, opts) {
 function writeFocus_(data) {
   const json = JSON.stringify(data || { v: 1, cats: [] });
   if (json.length > 200000) throw new Error('Focus data too big (' + json.length + ' chars)');
-  const sp = PropertiesService.getScriptProperties();
+  const sp = Store.props;
   const prior = sp.getProperties(), oldHeadRaw = prior.focusDataHead === undefined ? null : prior.focusDataHead;
   const oldHead = oldHeadRaw === null ? null : JSON.parse(oldHeadRaw);
   if (oldHeadRaw !== null) focusGenerationText_(prior,oldHead);
@@ -1211,7 +1211,7 @@ function writeFocus_(data) {
 // {v:1, items:[{id, t, d:0|1, u:ms, x?:1}]} in script property funData. saveFun merges by id with the
 // newest u winning (x = deleted tombstone), so two devices never wipe each other's items.
 function getFun() {
-  try { const raw = PropertiesService.getScriptProperties().getProperty('funData'); return raw ? JSON.parse(raw) : { v: 1, items: [], cats: [] }; }
+  try { const raw = Store.props.getProperty('funData'); return raw ? JSON.parse(raw) : { v: 1, items: [], cats: [] }; }
   catch (e) { return { v: 1, items: [], cats: [] }; }
 }
 function saveFun(data) {
@@ -1228,14 +1228,14 @@ function saveFun(data) {
     const out = { v: 1, items: mergeList(cur.items, data && data.items), cats: mergeList(cur.cats, data && data.cats) };
     const json = JSON.stringify(out);
     if (json.length > 8500) throw new Error('Fun list too big (' + json.length + ' chars)');
-    PropertiesService.getScriptProperties().setProperty('funData', json);
+    Store.props.setProperty('funData', json);
     return out;
   } finally { lock.releaseLock(); }
 }
 // New things log (2026-11-07, Julius): ✨ tab left of 🌴 Fun = "last time I did something new".
 // {v:1, items:[{id, t, w:'YYYY-MM-DD' (day it was done), g?, c, u, x?}], cats:[...]} in script property newData; merged like the Fun list.
 function getNewThings() {
-  try { const raw = PropertiesService.getScriptProperties().getProperty('newData'); return raw ? JSON.parse(raw) : { v: 1, items: [] }; }
+  try { const raw = Store.props.getProperty('newData'); return raw ? JSON.parse(raw) : { v: 1, items: [] }; }
   catch (e) { return { v: 1, items: [] }; }
 }
 function saveNewThings(data) {
@@ -1252,7 +1252,7 @@ function saveNewThings(data) {
     const out = { v: 1, items: mergeList(cur.items, data && data.items), cats: mergeList(cur.cats, data && data.cats) };
     const json = JSON.stringify(out);
     if (json.length > 8500) throw new Error('New things log too big (' + json.length + ' chars)');
-    PropertiesService.getScriptProperties().setProperty('newData', json);
+    Store.props.setProperty('newData', json);
     return out;
   } finally { lock.releaseLock(); }
 }
@@ -1260,7 +1260,7 @@ function getInbox() {
   // These three fields belong to the same user settings store. Read them once
   // per response; keep individual-read fallback if the bulk read is unavailable.
   let settings = null;
-  try { settings = PropertiesService.getUserProperties().getProperties(); } catch (e) {}
+  try { settings = Store.userProps.getProperties(); } catch (e) {}
   const done = inboxRead_('inboxDone', [], settings);
   const mine = inboxRead_('inboxItems', [], settings);
   const over = inboxRead_('inboxOver', {}, settings);
@@ -1591,7 +1591,7 @@ function stripDaySections_(html) {
     .replace(/\sdata-secend="[^"]*"/gi, '');
 }
 function removeDaySections_() {
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   if (props.getProperty('daySecsRemoved') === '1') return false;
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -1639,7 +1639,7 @@ function applyDeployedCodeLog_() {
   const entries = typeof FW_DEPLOY_LOG !== 'undefined' && Array.isArray(FW_DEPLOY_LOG) ? FW_DEPLOY_LOG : [];
   if (!entries.length) return;
   const signature = cellHash_(JSON.stringify(entries));
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   if (props.getProperty('deployedCodeLog') === signature) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return;
@@ -1793,7 +1793,7 @@ function confirmCardWork_(dryRun,sources,timer) {
       Store.ref.add({ id: CONFIRM_CARD_ID, parentId: '', type: 'item', title: 'To Confirm', content: html, expanded: true, sort: 0 });
       const pins = getRefPins_().filter(x => x !== CONFIRM_CARD_ID);
       pins.unshift(CONFIRM_CARD_ID);
-      PropertiesService.getScriptProperties().setProperty('refPinned', JSON.stringify(pins.slice(0, 200)));
+      Store.props.setProperty('refPinned', JSON.stringify(pins.slice(0, 200)));
     }
     return true;
   }
@@ -1920,7 +1920,7 @@ function applyClaudeDone_(timer) {
   let list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
   try { list = list.concat(sheetDoneRows_(timer)); } catch (e) { console.error(e); }
   if (!list.length) return;
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeDoneApplied') || '[]'); } catch (e) { applied = []; }
   const valid = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || ''));
@@ -2053,7 +2053,7 @@ function noteBlockFlatHtml_(item) {
 /* Open tasks from Claude (2026-10-27, Julius): CLAUDE_TASKS in tasks.js → open check-lines (with urgency
    and subtasks) appended once to that day's Today cell. data-tid marks the head line. */
 function applyClaudeTasks_() {
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeTasksApplied') || '[]'); } catch (e) { applied = []; }
   let list = (typeof CLAUDE_TASKS !== 'undefined' && Array.isArray(CLAUDE_TASKS)) ? CLAUDE_TASKS : [];
@@ -2108,7 +2108,7 @@ function applyClaudeTasks_() {
 function applyClaudeNotes_() {
   const list = (typeof CLAUDE_NOTES !== 'undefined' && Array.isArray(CLAUDE_NOTES)) ? CLAUDE_NOTES : [];
   if (!list.length) return;
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   let applied = [];
   try { applied = JSON.parse(props.getProperty('claudeNotesApplied') || '[]'); } catch (e) { applied = []; }
   const valid = list.filter(x => x && x.id && /^\d{4}-\d{2}-\d{2}$/.test(x.date || ''));
@@ -2213,7 +2213,7 @@ function calAccess_(fresh) {
 }
 function pickedCalendars_() {
   let ids = null;
-  try { ids = JSON.parse(PropertiesService.getScriptProperties().getProperty(CAL_PICK_PROP_) || 'null'); } catch (e) { ids = null; }
+  try { ids = JSON.parse(Store.props.getProperty(CAL_PICK_PROP_) || 'null'); } catch (e) { ids = null; }
   if (!Array.isArray(ids)) ids = EVENT_CALENDARS.slice();
   ids = ids.map(String).filter(Boolean);
   return ids.length ? ids : [EVENT_CALENDARS[0]];
@@ -2237,14 +2237,14 @@ function getCalendarPicker() {
 function setCalendarPicked(ids) {
   const acc = calAccess_();
   const clean = (Array.isArray(ids) ? ids : []).map(String).filter(id => acc[id]).slice(0, 30);
-  PropertiesService.getScriptProperties().setProperty(CAL_PICK_PROP_, JSON.stringify(clean.length ? clean : [EVENT_CALENDARS[0]]));
+  Store.props.setProperty(CAL_PICK_PROP_, JSON.stringify(clean.length ? clean : [EVENT_CALENDARS[0]]));
   return getCalendarPicker();
 }
 
 // Cal Events hide list (2026-11-11, Julius): calendars and title words kept off the Cal Events list (the timeline
 // still shows them). {cals:[{id,name}], words:[string]} in script property ceHide, same on every device.
 function getCalEventsHide() {
-  try { const raw = PropertiesService.getScriptProperties().getProperty('ceHide'); const h = raw ? JSON.parse(raw) : null;
+  try { const raw = Store.props.getProperty('ceHide'); const h = raw ? JSON.parse(raw) : null;
     return h && Array.isArray(h.cals) && Array.isArray(h.words) ? h : { cals: [], words: [] }; }
   catch (e) { return { cals: [], words: [] }; }
 }
@@ -2253,7 +2253,7 @@ function setCalEventsHide(h) {
     .map(c => ({ id: String(c.id).slice(0, 200), name: String(c.name || c.id).slice(0, 80) }));
   const words = (h && Array.isArray(h.words) ? h.words : []).map(w => String(w || '').trim().slice(0, 40)).filter(Boolean).slice(0, 60);
   const out = { cals: cals, words: words };
-  PropertiesService.getScriptProperties().setProperty('ceHide', JSON.stringify(out));
+  Store.props.setProperty('ceHide', JSON.stringify(out));
   return out;
 }
 
@@ -2288,7 +2288,7 @@ function getMainCalendarEvents(dateString) {
       time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') });
     });
   });
-  const saved = PropertiesService.getScriptProperties().getProperties();
+  const saved = Store.props.getProperties();
   events.forEach(ev => {
     try { Object.assign(ev, JSON.parse(saved[calMetaKey_(ev.id, ev.start, ev.recurring)] || '{}')); } catch (e) { console.error(e); }
     // Color = urgency both ways (2026-11-05, Julius): an event colored red / yellow / blue elsewhere (Calendar app,
@@ -2324,7 +2324,7 @@ function syncCalUrgencyColor_(calId, eventId, start, urg) {
   if (calId !== EVENT_CALENDARS[0]) return; // urgency colors: main calendar only (2026-11-11, Julius)
   const ev = calEventAt_(calId, eventId, start), color = URG_EVENT_COLOR_[urg] || '';
   if (String(ev.getColor() || '') === '8') { // done stays Graphite; unticking brings back the new urgency color
-    PropertiesService.getScriptProperties().setProperty('calPrev:' + eventId.slice(0, 60) + ':' + Number(start), color || 'default');
+    Store.props.setProperty('calPrev:' + eventId.slice(0, 60) + ':' + Number(start), color || 'default');
     return;
   }
   ev.setColor(color || '0');
@@ -2336,7 +2336,7 @@ function setCalendarEventMeta(eventId, start, recurring, meta, calId) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(m.due || '')) clean.due = m.due;
   if (/^\d{1,4}$/.test(String(m.dur || ''))) clean.dur = String(m.dur);
   if (/^[a-z]{2,12}$/.test(m.cat || '')) clean.cat = m.cat;
-  const props = PropertiesService.getScriptProperties(), key = calMetaKey_(eventId, start, recurring);
+  const props = Store.props, key = calMetaKey_(eventId, start, recurring);
   let oldUrg = '';
   try { oldUrg = (JSON.parse(props.getProperty(key) || '{}').urg) || ''; } catch (e) {}
   if ((clean.urg || '') !== oldUrg) syncCalUrgencyColor_(calId, eventId, start, clean.urg || '');
@@ -2480,7 +2480,7 @@ function getCalendarRange(startDate, endDate) {
 // Blueberry), like getMainCalendarEvents.
 function calPanelAttachMeta_(events) {
   let saved = {};
-  try { saved = PropertiesService.getScriptProperties().getProperties(); } catch (err) { console.error(err); }
+  try { saved = Store.props.getProperties(); } catch (err) { console.error(err); }
   (events || []).forEach(ev => {
     let m = {};
     try { m = JSON.parse(saved[calMetaKey_(ev.eventId, ev.startMs, ev.recurring)] || '{}'); } catch (err) { m = {}; }
@@ -2676,7 +2676,7 @@ function calPanelSetColor(req) {
   const r = req || {}, calId = String(r.calId || EVENT_CALENDARS[0]), c = String(r.colorId || '');
   if (c && !/^([1-9]|1[01])$/.test(c)) throw new Error('Unknown color');
   if (c === '8') throw new Error('Graphite = done — use Mark done');
-  const ev = calPanelEditable_(r.eventId, r.startMs, calId), props = PropertiesService.getScriptProperties();
+  const ev = calPanelEditable_(r.eventId, r.startMs, calId), props = Store.props;
   if (String(ev.getColor() || '') === '8') props.setProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs), c || 'default');
   else ev.setColor(c || '0');
   if (calId === EVENT_CALENDARS[0]) {
@@ -2703,7 +2703,7 @@ function calPanelDuplicateEvent(req) {
   } else ev = cal.createEvent(src.getTitle(), src.getStartTime(), src.getEndTime(), opts);
   try { ev.removeAllReminders(); } catch (e) { console.error(e); }
   let c = String(src.getColor() || '');
-  if (c === '8') { const p = PropertiesService.getScriptProperties().getProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs)); c = p && p !== 'default' && p !== '8' ? p : ''; }
+  if (c === '8') { const p = Store.props.getProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs)); c = p && p !== 'default' && p !== '8' ? p : ''; }
   if (c) try { ev.setColor(c); } catch (e) { console.error(e); }
   return calPanelOut_(ev, calId);
 }
@@ -2909,7 +2909,7 @@ function setCalendarEventTitle(calId, eventId, start, title) {
 function setCalendarEventDone(calId, eventId, start, done) {
   calRequireWritable_(calId);
   const ev = calEventAt_(calId, eventId, start);
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   const key = 'calPrev:' + eventId.slice(0, 60) + ':' + Number(start);
   if (done) {
     const cur = String(ev.getColor() || '');
@@ -2946,9 +2946,9 @@ const ARCHIVE_PREFIX = '✅ Completed Tasks — ';
 const ARCHIVE_DAYS_BACK = 14;
 const ARCHIVE_MIN = 3;
 
-function archiveAuto_() { return PropertiesService.getScriptProperties().getProperty('archiveAuto') === '1'; }
+function archiveAuto_() { return Store.props.getProperty('archiveAuto') === '1'; }
 function setArchiveAuto(on) {
-  PropertiesService.getScriptProperties().setProperty('archiveAuto', on ? '1' : '0');
+  Store.props.setProperty('archiveAuto', on ? '1' : '0');
   return archiveAuto_();
 }
 
@@ -3222,7 +3222,7 @@ function calBacklogEventId_(rowId) {
   return String(rowId || '').split('|')[0].replace(/@google\.com$/, '');
 }
 function calBacklogSweep_() {
-  const tz = Session.getScriptTimeZone(), props = PropertiesService.getScriptProperties();
+  const tz = Session.getScriptTimeZone(), props = Store.props;
   const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), yest = addDaysToDateString_(today, -1);
   const last = props.getProperty('calBacklogSwept') || '';
   if (last >= yest) return { swept: 0 };
@@ -3282,7 +3282,7 @@ function calBacklogSweep_() {
    in the old Grape / Graphite gets its original color back. One Calendar list over [-35, +4) days, throttled. */
 function calBacklogRoll_() {
   if (typeof Calendar === 'undefined' || !Calendar.Events) return;
-  const props = PropertiesService.getScriptProperties(), now = Date.now();
+  const props = Store.props, now = Date.now();
   if (now - Number(props.getProperty('calBacklogRollAt') || 0) < CAL_BACKLOG_ROLL_MS) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(2000)) return;

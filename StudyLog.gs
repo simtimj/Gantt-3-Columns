@@ -259,7 +259,7 @@ function syncStudyLog_(timer) {
   if (last < 2) return;
   let range = sheet.getRange(1, 1, last, STUDY_HEADERS.length);
   let values = speedPart_(timer, 'study.sourceRead', () => range.getValues());
-  const props = PropertiesService.getScriptProperties();
+  const props = Store.props;
   let sig = speedPart_(timer, 'study.signature', () => cellHash_(todayString_() + JSON.stringify(values.map(r => r.slice(0, 12)))));
   if (speedPart_(timer, 'study.appliedRead', () => props.getProperty('studySig')) === sig) return;
   const lock = LockService.getScriptLock();

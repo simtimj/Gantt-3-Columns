@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-const source = fs.readFileSync('Code.gs', 'utf8');
+const source = fs.readFileSync('Code.gs', 'utf8') + '\n' + fs.readFileSync('Store.gs', 'utf8');
 const ctx = vm.createContext({ console, Date });
 vm.runInContext(source, ctx);
 ctx.todayString_ = () => '2026-11-07';

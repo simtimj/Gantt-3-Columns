@@ -13,6 +13,7 @@ function fakeSheet() {
       setFrozenRows: () => {},
       getRange: (r, c, nr = 1, nc = 1) => typeof r === 'string' ? { setNumberFormat: () => {} } : ({
         setFontWeight: () => {},
+        setNumberFormat: () => {},
         getDisplayValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => String((rows[r - 1 + i] || [])[c - 1 + j] ?? ''))),
         getValue: () => (rows[r - 1] || [])[c - 1] ?? '',
         setValue: v => { (rows[r - 1] ||= [])[c - 1] = v; },
@@ -42,7 +43,7 @@ const ctx = vm.createContext({
   Utilities: { DigestAlgorithm: { MD5: 'MD5' }, Charset: { UTF_8: 'UTF_8' },
     computeDigest: (_, t) => [...crypto.createHash('md5').update(t, 'utf8').digest()].map(x => (x > 127 ? x - 256 : x)) }
 });
-vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + fs.readFileSync('Store.gs', 'utf8') + '\nthis.Store = Store;', ctx);
+vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + fs.readFileSync('Store.gs', 'utf8') + '\n' + fs.readFileSync('Timer.gs', 'utf8') + '\nthis.Store = Store;', ctx);
 
 // Fresh: empty + not migrated.
 let g = ctx.getKim();
@@ -155,4 +156,13 @@ vm.runInContext("Store.calBacklog.setPlaced(0, 'dropped')", ctx);
 assert.equal(ctx.calBacklogList_().length, 1); assert.equal(ctx.calBacklogList_()[0].id, 'u2|2026-11-02');
 assert.equal(tabs['Cal Backlog'].rows[1][6], 'dropped');
 console.log('✓ store-test: Daily plan + Cal Backlog through Store.plan / Store.calBacklog');
+
+// Timer events through Store.timer: append-only, op ids never doubled.
+const ev = (op, act) => ({ op, act, date: '2026-11-21', at: Date.parse('2026-11-21T18:00:00Z'), blk: 'b1', value: null });
+assert.equal(JSON.stringify(ctx.saveTimerEvents([ev('o1', 'start'), ev('o2', 'pause')]).saved), '["o1","o2"]');
+ctx.saveTimerEvents([ev('o2', 'pause'), ev('o3', 'finish')]);
+assert.equal(tabs['Timer Log'].rows.length, 4);
+assert.equal(ctx.getTimerEvents('2026-11-21').map(e => e.op).join(','), 'o1,o2,o3');
+assert.equal(ctx.getTimerEvents('2026-11-22').length, 0);
+console.log('✓ store-test: Timer events through Store.timer');
 

@@ -6,9 +6,7 @@
 const TIMER_HEADERS = ['Op', 'Date', 'At', 'Action', 'Block', 'Item', 'Name', 'Value', 'Device'];
 const TIMER_ACTIONS = { start: 1, pause: 1, finish: 1, istart: 1, istop: 1, fix: 1 };
 
-function timerSheet_() {
-  return getOrCreateSheet_('Timer Log', TIMER_HEADERS);
-}
+// Storage: Store.timer (Store.gs, 2026-11-21 H2).
 
 function timerRowToEvent_(r) {
   const at = r[2] instanceof Date ? r[2].getTime() : Date.parse(r[2]);
@@ -22,11 +20,8 @@ function timerRowToEvent_(r) {
 
 // Events for days on or after `since` (yyyy-MM-dd). Read after the page has drawn, never during the load.
 function getTimerEvents(since) {
-  const sheet = timerSheet_();
-  const n = sheet.getLastRow() - 1;
-  if (n < 1) return [];
   const from = String(since || '');
-  return sheet.getRange(2, 1, n, TIMER_HEADERS.length).getValues()
+  return Store.timer.rows()
     .map(timerRowToEvent_)
     .filter(e => e.op && TIMER_ACTIONS[e.act] && !isNaN(e.at) && (!from || e.date >= from));
 }
@@ -36,12 +31,8 @@ function getTimerEvents(since) {
 function saveTimerEvents(events) {
   const list = (Array.isArray(events) ? events : []).filter(e => e && e.op && TIMER_ACTIONS[e.act] && Number(e.at) > 0);
   if (!list.length) return { saved: [] };
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sheet = timerSheet_();
-    const n = sheet.getLastRow() - 1;
-    const have = new Set(n > 0 ? sheet.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);
+  return Store.locked(() => {
+    const have = Store.timer.ops();
     const rows = [];
     list.forEach(e => {
       const op = String(e.op).slice(0, 64);
@@ -51,14 +42,7 @@ function saveTimerEvents(events) {
         String(e.blk || '').slice(0, 40), String(e.item || '').slice(0, 40), String(e.name || '').slice(0, 200),
         e.value === null || e.value === undefined || e.value === '' ? '' : Number(e.value), String(e.dev || '').slice(0, 20)]);
     });
-    if (rows.length) {
-      // Text format on Date/At so Sheets never turns them into dates in another time zone.
-      const range = sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, TIMER_HEADERS.length);
-      range.setNumberFormat('@');
-      range.setValues(rows);
-    }
+    Store.timer.append(rows);
     return { saved: list.map(e => String(e.op).slice(0, 64)) };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }

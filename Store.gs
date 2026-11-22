@@ -15,13 +15,15 @@ const STORE_BACKEND = {
   ref: 'sheet',
   archive: 'sheet',
   plan: 'sheet',
-  calBacklog: 'sheet'
+  calBacklog: 'sheet',
+  timer: 'sheet',
+  props: 'properties'
   // calBacklog, timer, props, study, logs: still direct, moving in this order
 };
 
 function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
-  if (b !== 'sheet') throw new Error('Store: backend "' + b + '" for ' + area + ' is not built yet');
+  if (b !== 'sheet' && b !== 'properties') throw new Error('Store: backend "' + b + '" for ' + area + ' is not built yet');
   return b;
 }
 
@@ -53,7 +55,27 @@ function storeWriteCols_(sh, row, pairs) {
   }
 }
 
+/* Key-value settings and bookkeeping (Apps Script Properties today). Same method names as a Properties object,
+   so existing code reads the same; a 'db' backend later keeps this interface. User data keys (to move with the
+   database): refPinned, inboxItems/inboxDone (user scope), cardCats*, focusData*, funData, newData, calendar picks,
+   ceHide, calPrev:*, archiveAuto, planEv:*. Everything else is server bookkeeping (applied ids, one-time flags,
+   throttles, PWA_KEY) and stays with the server. */
+function storeProps_(scope) {
+  const svc = () => { storeBackend_('props'); return scope === 'user' ? PropertiesService.getUserProperties() : PropertiesService.getScriptProperties(); };
+  const api = {
+    getProperty: k => svc().getProperty(k),
+    getProperties: () => svc().getProperties(),
+    setProperty: (k, v) => { svc().setProperty(k, v); return api; },
+    setProperties: (o, del) => { if (del === undefined) svc().setProperties(o); else svc().setProperties(o, del); return api; },
+    deleteProperty: k => { svc().deleteProperty(k); return api; }
+  };
+  return api;
+}
+
 const Store = {
+  props: storeProps_('script'),
+  userProps: storeProps_('user'),
+
   /* Days — one row per date. Sheet: tab "Days", A date, B Today, C Notes, D Plan, E Thoughts/Scratch. */
   days: {
     sheet_(timer) {
@@ -376,6 +398,29 @@ const Store = {
       sh.getRange(sh.getLastRow() + 1, 1, tuples.length, CAL_BACKLOG_HEAD.length).setValues(tuples);
     },
     setPlaced(index, value) { this.sheet_().getRange(index + 2, 7).setValue(value); }
+  },
+
+  /* Block timer events (Timer.gs). Tuples [op, date, at, action, block, item, name, value, device];
+     append-only, one row per op id. Sheet: tab "Timer Log". */
+  timer: {
+    sheet_() { storeBackend_('timer'); return getOrCreateSheet_('Timer Log', TIMER_HEADERS); },
+    rows() {
+      const sh = this.sheet_();
+      const n = sh.getLastRow() - 1;
+      return n < 1 ? [] : sh.getRange(2, 1, n, TIMER_HEADERS.length).getValues();
+    },
+    ops() {
+      const sh = this.sheet_();
+      const n = sh.getLastRow() - 1;
+      return new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);
+    },
+    append(tuples) {
+      if (!tuples.length) return;
+      const sh = this.sheet_();
+      const range = sh.getRange(sh.getLastRow() + 1, 1, tuples.length, TIMER_HEADERS.length);
+      range.setNumberFormat('@'); // Date/At stay text, never turned into dates in another time zone
+      range.setValues(tuples);
+    }
   },
 
   /* Keep In Mind — one shared list. Sheet: tab "Keep In Mind", A2 = HTML, B2 = saved-at ms. */

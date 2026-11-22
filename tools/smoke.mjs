@@ -3112,6 +3112,120 @@ if (only('pwa-fb')) {
   if (errs.length) { fails += errs.length; console.error('✗ pwa-fb:\n  ' + errs.join('\n  ')); }
   else console.log('✓ pwa-fb: Keep In Mind loads/saves on Firestore + live sync + newest-wins backup + offline editing');
 }
+// Days on the database (2026-11-22, NOTES H4): Today saves to the day doc with the server's hashes, an edit still on
+// its way isn't undone by an older server copy, another device's save triggers a sync, an older edit is refused and
+// backed up, and offline the days near today stay editable.
+if (only('pwa-days')) {
+  const { execFileSync } = await import('child_process');
+  const http = await import('http');
+  const crypto = await import('crypto');
+  const md5 = t => crypto.createHash('md5').update(String(t || ''), 'utf8').digest('hex').slice(0, 16);
+  const dist = path.join(os.tmpdir(), 'gantt-pwa-days-smoke');
+  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['kim', 'days'], apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
+  execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
+  const dd = JSON.parse(JSON.stringify(data));
+  dd.days.forEach(d => { d.th = md5(d.tasks); d.jh = md5(d.journal); d.ph = md5(d.plan); d.hh = md5(d.tho); });
+  const td = dd.days.find(d => d.date === today);
+  const seed = { date: today, at: 100, tasks: td.tasks, tasksAt: 100, journal: td.journal || '', journalAt: 100, dev: 'x' };
+  const FAKE = `if (!window.firebase) window.firebase = (function () {
+    const S = window.__fs = { kim: { html: '<div>list</div>', at: 100, base: 0, dev: 'x' }, days: { [${JSON.stringify(today)}]: ${JSON.stringify(seed)} },
+      backups: [], qcb: null, hold: false, sets: 0 };
+    const meta = { fromCache: false, hasPendingWrites: false };
+    S.push = () => S.qcb && S.qcb({ docs: Object.keys(S.days).map(d => ({ id: d, data: () => S.days[d], metadata: meta })) });
+    const kimDoc = { get: () => Promise.resolve({ exists: true, data: () => S.kim, metadata: meta }), set: r => { S.kim = r; return Promise.resolve(); },
+      onSnapshot: () => () => {} };
+    const dayDoc = d => ({
+      get: () => Promise.resolve({ exists: !!S.days[d], data: () => S.days[d] }),
+      set: (rec, o) => {
+        S.sets++;
+        const cur = S.days[d] || {};
+        for (const f of ['tasks', 'journal', 'plan', 'tho']) if (f in rec && !(rec[f + 'At'] > (cur[f + 'At'] || 0))) return Promise.reject({ code: 'permission-denied' });
+        if (S.hold) return new Promise(() => {});
+        S.last = { keys: Object.keys(rec), prevTasks: cur.tasks };
+        S.days[d] = Object.assign(o && o.merge ? cur : {}, rec, { up: Date.now() });
+        setTimeout(S.push, 10);
+        return Promise.resolve();
+      }
+    });
+    const q = { where: () => q, onSnapshot: (o, cb) => { S.qcb = cb; setTimeout(S.push, 0); return () => {}; } };
+    const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com' }), 0), signOut: () => {} });
+    auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
+    const firestore = () => ({ enablePersistence: () => Promise.resolve(),
+      collection: n => n === 'gantt' ? { doc: () => kimDoc } : n === 'ganttDays' ? { doc: dayDoc, where: q.where } : { add: r => { S.backups.push(r); return Promise.resolve(); } } });
+    firestore.FieldValue = { serverTimestamp: () => 'SERVER_TS' };
+    return { initializeApp: () => {}, auth, firestore };
+  })();`;
+  const srv = http.createServer((qq, r) => {
+    let f = decodeURIComponent(new URL(qq.url, 'http://x').pathname); if (f.endsWith('/')) f += 'index.html';
+    if (f.startsWith('/fb/')) { r.writeHead(200, { 'Content-Type': 'text/javascript' }); return r.end(FAKE); }
+    const fp = path.join(dist, f);
+    if (!fp.startsWith(dist) || !fs.existsSync(fp)) { r.writeHead(404); return r.end(); }
+    r.writeHead(200, { 'Content-Type': f.endsWith('.html') ? 'text/html' : 'text/javascript' }); r.end(fs.readFileSync(fp));
+  });
+  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const errs = [], calls = [];
+  let syncAnswer = { build: 'smoke', ref: {}, inbox: [], days: {} };
+  const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'block' });
+  await ctx.route('https://api.test/**', route => {
+    const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
+    const r = req.fn === 'getWorkspaceData' ? dd : req.fn === 'runImports' || req.fn === 'getSyncState' ? syncAnswer : req.fn === 'getFocus' ? focus
+      : req.fn === 'getMainCalendarEvents' ? { date: req.a[0], events: [] } : null;
+    route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
+  });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => errs.push('page error: ' + e.message));
+  await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
+  const ED = `#todayScroll .day-editor[data-date="${today}"]`;
+  const type = t => pg.evaluate(([sel, t]) => { const ed = document.querySelector(sel); ed.insertAdjacentHTML('beforeend', '<div>' + t + '</div>'); ed.dispatchEvent(new Event('input', { bubbles: true })); }, [ED, t]);
+  const shown = () => pg.evaluate(sel => (document.querySelector(sel) || {}).innerText || '', ED);
+  if (!await pg.evaluate(sel => !!document.querySelector(sel), ED)) errs.push('no Today editor for ' + today);
+  // Edit → day doc (Today only, server-matching base hash), never the server.
+  await type('Typed today'); await pg.waitForTimeout(1800);
+  const d1 = await pg.evaluate(t => { const x = __fs.days[t]; return { tasks: x.tasks, at: x.tasksAt, base: x.tasksBase, last: __fs.last }; }, today);
+  if (!/Typed today/.test(d1.tasks || '') || !(d1.at > 100)) errs.push('Today not saved to the day doc: ' + JSON.stringify(d1).slice(0, 160));
+  if (d1.base !== md5(d1.last.prevTasks)) errs.push('base hash ≠ server hash of the copy it replaced: ' + d1.base);
+  if (d1.last.keys.includes('journal')) errs.push('a Today-only save also wrote Notes');
+  if (calls.includes('saveDay')) errs.push('saveDay went to the server');
+  // Second save builds on the first (hash from the doc copy = what the app holds).
+  await type('Second line'); await pg.waitForTimeout(1800);
+  if (!/Second line/.test(await pg.evaluate(t => __fs.days[t].tasks, today))) errs.push('second save did not reach the doc (hash mismatch?)');
+  // An edit still on its way: an older server copy in a sync answer must not undo it.
+  await pg.evaluate(() => { __fs.hold = true; });
+  await type('Pending line'); await pg.waitForTimeout(1500);
+  syncAnswer = { build: 'smoke', ref: {}, inbox: [], days: { [today]: { tasks: '<div>older server copy</div>', th: 'zzzz', jh: md5(td.journal) } } };
+  await pg.evaluate(() => window.fwSync(false)); await pg.waitForTimeout(1200);
+  const keep = await shown();
+  if (!/Pending line/.test(keep) || /older server copy/.test(keep)) errs.push('pending edit undone by an older server copy: ' + keep.slice(-80));
+  if (!(await pg.evaluate(() => localStorage.getItem('pwa.days.unconfirmed') || '')).includes('Pending line')) errs.push('pending edit not kept in localStorage');
+  syncAnswer = { build: 'smoke', ref: {}, inbox: [], days: {} };
+  await pg.evaluate(() => { __fs.hold = false; });
+  // Another device saves Notes → a sync runs.
+  const before = calls.filter(c => c === 'getSyncState').length;
+  await pg.evaluate(t => { const x = __fs.days[t]; x.journal = '<div>From the tablet</div>'; x.journalAt = Date.now() + 5000; x.dev = 'pc'; __fs.push(); }, today);
+  await pg.waitForTimeout(800);
+  if (calls.filter(c => c === 'getSyncState').length <= before) errs.push('live sync: other device\'s save did not start a sync');
+  // Newest wins: the doc has a newer Today than this edit → refused, copy goes to ganttBackup.
+  await pg.evaluate(t => { __fs.days[t].tasksAt = Date.now() + 9e8; }, today);
+  syncAnswer = { build: 'smoke', ref: {}, inbox: [], days: {} };
+  await pg.evaluate(t => { const x = __fs.days[t]; x.tasks = x.tasks; }, today);
+  await type('Too old'); await pg.waitForTimeout(1800);
+  const bk = await pg.evaluate(() => __fs.backups.filter(b => b.area === 'days').map(b => b.field + ':' + b.reason));
+  if (!bk.some(b => /^tasks:older edit lost/.test(b))) errs.push('refused edit not backed up: ' + JSON.stringify(bk));
+  // Offline: Today (within ± 7 days) and Keep In Mind stay editable; Reference stays read-only.
+  await ctx.setOffline(true); await pg.waitForTimeout(300);
+  const off = await pg.evaluate(sel => {
+    const ev = () => new InputEvent('beforeinput', { inputType: 'insertText', data: 'x', bubbles: true, cancelable: true });
+    const other = [...document.querySelectorAll('[contenteditable="true"]')].find(e => !e.closest('#kimScroll,#todayScroll,#journalScroll,.plan-pad,.thought-pad,#scratchPad'));
+    return { today: document.querySelector(sel).dispatchEvent(ev()), other: other ? other.dispatchEvent(ev()) : null, bar: (document.getElementById('pwaOffline') || {}).textContent };
+  }, ED);
+  if (!off.today) errs.push('offline: Today was blocked');
+  if (off.other !== false) errs.push('offline: other editors not read-only');
+  if (!/today ± 7 days save/.test(off.bar || '')) errs.push('offline banner text: ' + off.bar);
+  await ctx.close(); srv.close();
+  if (errs.length) { fails += errs.length; console.error('✗ pwa-days:\n  ' + errs.join('\n  ')); }
+  else console.log('✓ pwa-days: Today saves to the day doc (server hashes), pending edits survive a sync, live sync, newest-wins backup, offline days');
+}
 // One calm return (2026-11-21, speed item M): coming back runs ONE queue — registered jobs in order, staggered,
 // skipping ones refreshed < 60 s ago; stops if hidden again; Speed Log 'resume' row only when something ran.
 for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {

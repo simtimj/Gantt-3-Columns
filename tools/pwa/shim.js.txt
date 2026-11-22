@@ -3,7 +3,9 @@
    - Main page: the last data seen on this device opens at once (if it's for today), then fwSync(true) catches up.
    - Offline: read-only + banner. Service worker updates: "↻ Update ready" button, never an auto-reload.
    - Database step (2026-11-22, NOTES H3): with a Firebase config, Keep In Mind reads/writes Firestore directly
-     (Google sign-in, his account only), works offline (Firestore queues the edits) and syncs live. */
+     (Google sign-in, his account only), works offline (Firestore queues the edits) and syncs live.
+   - Days (2026-11-22, NOTES H4): Today / Notes / Plan / Thoughts save to a doc per day, newest wins per section,
+     editable offline for today ± 7 days. */
 (function () {
   'use strict';
   var API = '__API__', PAGE = '__PAGE__', BUILD = '__BUILD__', FB_CFG = __FIREBASE__;
@@ -44,7 +46,7 @@
     if (on && !bar) {
       bar = document.createElement('div');
       bar.id = 'pwaOffline';
-      bar.textContent = fb.canEdit() ? 'Offline · only Keep In Mind saves' : 'Offline · read-only';
+      bar.textContent = fb.offlineText();
       document.body.appendChild(bar);
     } else if (!on && bar) bar.remove();
   }
@@ -54,7 +56,7 @@
   function block(e) {
     if (!offline) return;
     if (e.target && e.target.closest && e.target.closest('#pwaKeyBox')) return;
-    if (fb.canEdit() && e.target && e.target.closest && e.target.closest(fb.EDIT_SEL)) return;
+    if (fb.editable(e.target)) return;
     e.preventDefault(); e.stopImmediatePropagation();
     flash();
   }
@@ -95,11 +97,16 @@
      whose `at` isn't newer; the refused copy goes to ganttBackup (→ Backup tab via the Sheet mirror).
      Not signed in, no doc yet, or the SDK not ready within 4 s → the old server path (getKim / saveKim). */
   var fb = (function () {
-    var off = { handles: function () { return false; }, canEdit: function () { return false; }, EDIT_SEL: '#kimScroll' };
+    var off = { handles: function () { return false; }, editable: function () { return false; },
+      offlineText: function () { return 'Offline · read-only'; }, overlay: function (n, r) { return r; } };
     if (!FB_CFG || !FB_CFG.apiKey || PAGE !== 'index') return off;
-    var NAMES = { getKim: 1, saveKim: 1 }, UNCONF = 'pwa.kim.unconfirmed', DEV_LS = 'pwa.device';
+    var AREAS = FB_CFG.areas || ['kim'], KIM = AREAS.indexOf('kim') >= 0, DAYS = AREAS.indexOf('days') >= 0;
+    var NAMES = {}, UNCONF = 'pwa.kim.unconfirmed', DEV_LS = 'pwa.device';
+    if (KIM) { NAMES.getKim = 1; NAMES.saveKim = 1; }
+    var DAY_NAMES = { saveDay: 1, savePlanPad: 1, saveThoughtPad: 1, saveScratchPad: 1, getScratchPad: 1 };
+    if (DAYS) Object.keys(DAY_NAMES).forEach(function (n) { NAMES[n] = 1; });
     var OWNER = String(FB_CFG.owner || '').toLowerCase(), cfg = Object.assign({}, FB_CFG);
-    delete cfg.owner; delete cfg._note;
+    delete cfg.owner; delete cfg._note; delete cfg.areas;
     var db = null, user = null, lastAt = null, watching = false;
     var dev = ls.get(DEV_LS);
     if (!dev) { dev = (/Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone-' : 'pc-') + Math.random().toString(36).slice(2, 8); ls.set(DEV_LS, dev); }
@@ -126,7 +133,7 @@
           if (u && String(u.email || '').toLowerCase() !== OWNER) { firebase.auth().signOut(); u = null; }
           user = u || null;
           signButton(!user);
-          if (user) watch();
+          if (user) { if (KIM) watch(); if (DAYS) days.watch(); }
           ok();
         });
       });
@@ -189,7 +196,7 @@
       var b = document.getElementById('pwaSignIn');
       if (show && !b) {
         b = document.createElement('button');
-        b.id = 'pwaSignIn'; b.type = 'button'; b.textContent = 'Sign in · Keep In Mind sync';
+        b.id = 'pwaSignIn'; b.type = 'button'; b.textContent = DAYS ? 'Sign in · sync + offline edits' : 'Sign in · Keep In Mind sync';
         b.onclick = signIn;
         document.body.appendChild(b);
       } else if (!show && b) b.remove();
@@ -202,13 +209,218 @@
         if (e && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') alert('Sign-in didn’t work: ' + (e.message || e));
       });
     }
+    // cellHash_ (Code.gs): first 8 bytes of the MD5 of the UTF-8 text, as hex. Same versions as the server's.
+    function hash(text) {
+      var b = new TextEncoder().encode(String(text || '')), n = b.length, words = new Array(((n + 8) >> 6) + 1 << 4).fill(0), i;
+      for (i = 0; i < n; i++) words[i >> 2] |= b[i] << (i % 4 * 8);
+      words[n >> 2] |= 0x80 << (n % 4 * 8);
+      words[words.length - 2] = n * 8;
+      var S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21], K = [];
+      for (i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) | 0;
+      var h = [0x67452301, 0xefcdab89 | 0, 0x98badcfe | 0, 0x10325476];
+      for (var o = 0; o < words.length; o += 16) {
+        var a = h[0], c = h[2], d = h[3], bb = h[1];
+        for (i = 0; i < 64; i++) {
+          var f, g, r = i >> 4;
+          if (r === 0) { f = (bb & c) | (~bb & d); g = i; }
+          else if (r === 1) { f = (d & bb) | (~d & c); g = (5 * i + 1) % 16; }
+          else if (r === 2) { f = bb ^ c ^ d; g = (3 * i + 5) % 16; }
+          else { f = c ^ (bb | ~d); g = (7 * i) % 16; }
+          var t = d; d = c; c = bb;
+          var x = (a + f + K[i] + words[o + g]) | 0, sh = S[r * 4 + i % 4];
+          bb = (bb + ((x << sh) | (x >>> (32 - sh)))) | 0; a = t;
+        }
+        h[0] = (h[0] + a) | 0; h[1] = (h[1] + bb) | 0; h[2] = (h[2] + c) | 0; h[3] = (h[3] + d) | 0;
+      }
+      var out = '';
+      for (i = 0; i < 8; i++) out += ((h[i >> 2] >>> (i % 4 * 8)) & 255).toString(16).padStart(2, '0');
+      return out;
+    }
+    /* ---------- Days (H4): doc per day ganttDays/{date}, newest wins per section ----------
+       Same answers as the server's saveDay / savePlanPad / saveThoughtPad / saveScratchPad / getScratchPad, with
+       the same hashes (MD5 below = cellHash_). A section not in the database yet: online → the server (it writes the
+       doc); offline → checked against this device's last copy. Unconfirmed edits stay in localStorage and are laid
+       over server answers and the opening data until the database has them. */
+    function daysArea() {
+      var FIELDS = ['tasks', 'journal', 'plan', 'tho'], HKEY = { tasks: 'th', journal: 'jh', plan: 'ph', tho: 'hh' };
+      var DU = 'pwa.days.unconfirmed', WIN = 7, seen = {}, watching = false;
+      function dayDoc(d) { return db.collection('ganttDays').doc(d); }
+      function ymd(t) { var d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+      function win() { var n = Date.now(); return [ymd(n - WIN * 864e5), ymd(n + WIN * 864e5)]; }
+      function inWin(d) { var w = win(); return !!d && d >= w[0] && d <= w[1]; }
+      function un() { try { return JSON.parse(ls.get(DU) || '{}') || {}; } catch (e) { return {}; } }
+      function unSet(m) { if (Object.keys(m).length) ls.set(DU, JSON.stringify(m)); else ls.del(DU); }
+      function unPut(d, f, v, at) { var m = un(); m[d + '|' + f] = { v: v, at: at }; unSet(m); }
+      function unDrop(d, f, at) { var m = un(), k = d + '|' + f; if (m[k] && (at == null || m[k].at === at)) { delete m[k]; unSet(m); } }
+      // This device's last copy of a section (offline check): an unconfirmed edit, else the stored opening data.
+      function localCopy(d, f) {
+        var u = un()[d + '|' + f]; if (u) return u.v;
+        try {
+          var c = JSON.parse(ls.get(DATA_LS) || 'null'), day = c && c.data && (c.data.days || []).filter(function (x) { return x.date === d; })[0];
+          return day && day[f] != null ? String(day[f]) : null;
+        } catch (e) { return null; }
+      }
+      function readDoc(d) {
+        var cache = function () { return dayDoc(d).get({ source: 'cache' }).catch(function () { return null; }); };
+        return (navigator.onLine ? dayDoc(d).get({ source: 'server' }).catch(cache) : cache()).then(function (snap) {
+          return snap && snap.exists ? snap.data() : null;
+        });
+      }
+      // Current copy of each wanted section, or null when one isn't known here (→ server path).
+      function current(d, fields) {
+        return readDoc(d).then(function (doc) {
+          var cur = { _doc: doc };
+          for (var i = 0; i < fields.length; i++) {
+            var f = fields[i];
+            if (doc && doc[f + 'At']) cur[f] = String(doc[f] == null ? '' : doc[f]);
+            else if (navigator.onLine) return null;
+            else { var lc = localCopy(d, f); if (lc == null) return null; cur[f] = lc; }
+          }
+          return cur;
+        });
+      }
+      function backup(d, f, html, reason) {
+        db.collection('ganttBackup').add({ area: 'days', date: d, field: f, html: String(html || ''), at: Date.now(), reason: reason, dev: dev })
+          .catch(function (e) { console.warn('Backup not saved: ' + (e.code || e)); });
+      }
+      function openTasks(h) { return (String(h || '').match(/class="check-line(?![^"]*\bdone\b)[^"]*"/g) || []).length; }
+      // Write the given sections (not awaited: offline it resolves only once the queued edit reaches the database).
+      function write(d, put, cur) {
+        var doc = cur._doc || {}, at = Date.now(), rec = { date: d, dev: dev, up: firebase.firestore.FieldValue.serverTimestamp() };
+        Object.keys(put).forEach(function (f) { at = Math.max(at, (Number(doc[f + 'At']) || 0) + 1); });
+        rec.at = at;
+        Object.keys(put).forEach(function (f) {
+          var old = cur[f];
+          if (old.length > 400 && put[f].length < old.length * 0.6) backup(d, f, old, 'big shrink');
+          else if (f === 'tasks' || f === 'journal') { if (openTasks(put[f]) < openTasks(old)) backup(d, f, old, 'open task removed'); }
+          rec[f] = put[f]; rec[f + 'At'] = at; rec[f + 'Base'] = hash(old);
+          unPut(d, f, put[f], at);
+        });
+        dayDoc(d).set(rec, { merge: true }).then(function () {
+          Object.keys(put).forEach(function (f) { unDrop(d, f, at); });
+        }, function (e) {
+          if (e && e.code === 'permission-denied') {
+            Object.keys(put).forEach(function (f) { backup(d, f, put[f], 'older edit lost (newest wins)'); unDrop(d, f, at); });
+            if (typeof window.fwSync === 'function') try { window.fwSync(false); } catch (x) {}
+          } else console.warn('Day not saved to the database: ' + (e.code || e));
+        });
+      }
+      // The server's rule for one section (syncCol_ / the pads): same as the copy the app started from → write.
+      function col(cur, mine, base, changed) {
+        var same = base ? hash(cur) === base : cur === '';
+        if (!changed) return { value: cur, write: false, sendBack: !same };
+        if (!same) return { value: cur, write: false, conflict: true, sendBack: true };
+        return { value: mine, write: true };
+      }
+      function saveDay(d, tasks, journal, opts) {
+        if (!opts) return Promise.resolve(null);
+        return current(d, ['tasks', 'journal']).then(function (cur) {
+          if (!cur) return null;
+          var t = col(cur.tasks, String(tasks || ''), opts.th, opts.ct), j = col(cur.journal, String(journal || ''), opts.jh, opts.cj), put = {};
+          if (t.write && t.value !== cur.tasks) put.tasks = t.value;
+          if (j.write && j.value !== cur.journal) put.journal = j.value;
+          if (Object.keys(put).length) write(d, put, cur);
+          var res = { th: hash(t.value), jh: hash(j.value), conflictT: !!t.conflict, conflictJ: !!j.conflict, build: '', release: '' };
+          if (t.sendBack) res.tasks = t.value;
+          if (j.sendBack) res.journal = j.value;
+          return res;
+        });
+      }
+      function savePad(f, d, html, base) {
+        return current(d, [f]).then(function (cur) {
+          if (!cur) return null;
+          html = String(html || '');
+          var c = col(cur[f], html, base, true), hk = HKEY[f], res = { build: '' };
+          if (c.conflict) { res[hk] = hash(cur[f]); res.conflict = true; res[f] = cur[f]; return res; }
+          if (html !== cur[f]) { var p = {}; p[f] = html; write(d, p, cur); }
+          res[hk] = hash(html);
+          return res;
+        });
+      }
+      function scratch(d, html, base) {
+        return current(d, ['tho']).then(function (cur) {
+          if (!cur) return null;
+          html = String(html || '');
+          if (base && hash(cur.tho) !== base) return { conflict: true, html: cur.tho, h: hash(cur.tho) };
+          if (html !== cur.tho) write(d, { tho: html }, cur);
+          return { h: hash(html) };
+        });
+      }
+      // Lay unconfirmed edits over a server answer, so a save still on its way isn't undone by an older copy.
+      function overlay(name, r) {
+        var m = un(), keys = Object.keys(m);
+        if (!r || !keys.length) return r;
+        if (name === 'getWorkspaceData' && Array.isArray(r.days)) {
+          r.days.forEach(function (day) {
+            FIELDS.forEach(function (f) { var u = m[day.date + '|' + f]; if (u) { day[f] = u.v; day[HKEY[f]] = hash(u.v); } });
+          });
+        } else if ((name === 'getSyncState' || name === 'runImports') && r.days && typeof r.days === 'object') {
+          Object.keys(r.days).forEach(function (d) {
+            var e = r.days[d];
+            FIELDS.forEach(function (f) { if (m[d + '|' + f]) { delete e[f]; delete e[HKEY[f]]; } });
+            if (!FIELDS.some(function (f) { return e[f] !== undefined; })) delete r.days[d];
+          });
+        }
+        return r;
+      }
+      // Live: another device's save within today ± 7 → the normal sync merges it in. Also settles edits left from an
+      // earlier session: in the database → forget them; the database kept something else → the leftover goes to Backup.
+      function watchDays() {
+        if (watching) return; watching = true;
+        var w = win(), first = true;
+        db.collection('ganttDays').where('date', '>=', w[0]).where('date', '<=', w[1]).onSnapshot({ includeMetadataChanges: true }, function (qs) {
+          var changed = false;
+          qs.docs.forEach(function (snap) {
+            if (snap.metadata.fromCache || snap.metadata.hasPendingWrites) return;
+            var x = snap.data(), d = x.date || snap.id, m = un();
+            FIELDS.forEach(function (f) {
+              var u = m[d + '|' + f], at = Number(x[f + 'At']) || 0;
+              if (u && at !== u.at) { backup(d, f, u.v, 'older edit lost (newest wins)'); unDrop(d, f, u.at); }
+              else if (u) unDrop(d, f, u.at);
+              var k = d + '|' + f;
+              if (!first && seen[k] !== at && x.dev !== dev) changed = true;
+              seen[k] = at;
+            });
+          });
+          first = false;
+          if (changed && typeof window.fwSync === 'function') try { window.fwSync(false); } catch (e) {}
+        }, function (e) { watching = false; console.warn('Days live sync stopped: ' + (e.code || e)); });
+      }
+      function editable(el) {
+        if (el.closest('#scratchPad')) return true;
+        var ed = el.closest('.day-editor[data-date],.journal-editor[data-date],.plan-pad[data-date],.thought-pad[data-date]');
+        return !!ed && inWin(ed.getAttribute('data-date'));
+      }
+      return {
+        watch: watchDays, overlay: overlay, editable: editable,
+        run: function (name, a) {
+          if (name === 'saveDay') return saveDay(a[0], a[1], a[2], a[3]);
+          if (name === 'savePlanPad') return savePad('plan', a[0], a[1], a[2]);
+          if (name === 'saveThoughtPad') return savePad('tho', a[0], a[1], a[2]);
+          if (name === 'saveScratchPad') return scratch(a[0], a[1], a[2]);
+          return current(a[0], ['tho']).then(function (cur) { return cur ? { html: cur.tho, h: hash(cur.tho) } : null; });
+        }
+      };
+    }
+    var days = DAYS ? daysArea() : null;
     return {
-      EDIT_SEL: '#kimScroll',
       handles: function (name) { return !!NAMES[name]; },
-      canEdit: function () { return !!user; },
+      // Offline: typing allowed where the edit can be queued (Keep In Mind; days within today ± 7).
+      editable: function (el) {
+        if (!user || !el || !el.closest) return false;
+        if (KIM && el.closest('#kimScroll')) return true;
+        return !!(days && days.editable(el));
+      },
+      offlineText: function () {
+        if (!user) return 'Offline · read-only';
+        return 'Offline · only ' + (KIM && DAYS ? 'Keep In Mind + today ± 7 days save' : KIM ? 'Keep In Mind saves' : 'today ± 7 days save');
+      },
+      // Server answers that carry days: edits not yet in the database stay on top.
+      overlay: function (name, r) { return days ? days.overlay(name, r) : r; },
       run: function (name, args) {
         return withTimeout(boot, 4000).then(function () {
           if (!user) return null;
+          if (DAY_NAMES[name]) return days.run(name, args);
           return name === 'getKim' ? read() : save(args[0], args[1]);
         }).catch(function (e) { console.warn('Firestore → server: ' + (e && e.message || e)); return null; })
           .then(function (r) { return r || call(name, args); });
@@ -248,6 +460,7 @@
           var args = Array.prototype.slice.call(arguments);
           (fb.handles(name) ? fb.run(name, args) : call(name, args)).then(function (r) {
             if (name === 'getWorkspaceData' && PAGE === 'index') saveData(r);
+            r = fb.overlay(name, r);
             if (ok) ok(r, user);
           }, function (err) {
             if (bad) bad(err, user); else console.error(name + ': ' + err.message);
@@ -280,7 +493,7 @@
     var cached = null;
     try { cached = JSON.parse(ls.get(DATA_LS) || 'null'); } catch (e) {}
     if (cached && cached.data && (cached.data.today === today() || offline)) {
-      window.__PWA_INITIAL__ = cached.data;
+      window.__PWA_INITIAL__ = fb.overlay('getWorkspaceData', cached.data);
       window.__PWA__.fromCache = cached.at;
       window.addEventListener('load', function () {
         // Catch up right away (days, Reference, imports); the stored copy refreshes a bit later.

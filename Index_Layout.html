@@ -517,7 +517,7 @@
 <style id="uiBatchCss">
   /* UI batch (2026-11-21 maintenance session, Julius; NOTES "UI batch"). Last style block on purpose so it wins over the
      older layers. Same file feeds the old /dev page and the PWA, so both get it. */
-  :root{--card-r:8px;--hdr-h:30px;}
+  :root{--card-r:8px;--hdr-h:var(--ws-head-h,30px);}
 
   /* 1. No column sliding: the column lines stay, the drag grips and drag areas are gone (desktop and phone split). */
   .column-resizer,#mobileSplitResizer[data-dir="col"],#mobileSplitResizerThird[data-dir="col"]{pointer-events:none!important;cursor:default!important;}
@@ -530,8 +530,7 @@
   /* 2 + 4. One height for the tabs row and the calendar header so their bottom lines meet; a slimmer top button row. */
   #toolbar{min-height:34px!important;padding:3px 6px!important;gap:4px!important;}
   #toolbar :is(.btn,.top-select){min-height:26px!important;height:26px;padding-top:0!important;padding-bottom:0!important;padding-left:7px!important;padding-right:7px!important;box-sizing:border-box;}
-  .pane-header{flex:0 0 var(--hdr-h)!important;height:var(--hdr-h)!important;min-height:0!important;box-sizing:border-box!important;padding-left:8px!important;padding-right:8px!important;}
-  #centerDownScroll .ce-head,#centerDownScroll.ce-dkon .ce-head{box-sizing:border-box!important;height:var(--hdr-h)!important;margin:0 -3px 3px!important;padding:0 6px!important;border-bottom:2px solid var(--divider)!important;flex-wrap:nowrap!important;}
+  /* (Header strips themselves: section 8, one style for every cell.) */
   #centerDownScroll .ce-head :is(button,.btn){min-height:22px!important;height:22px!important;max-height:22px!important;}
   #centerDownScroll .ce-head .ce-search{height:22px!important;}
 
@@ -562,7 +561,132 @@
   #status.status:empty{display:none;}
   #pwaOffline{top:auto!important;left:auto!important;transform:none!important;right:calc(8px + env(safe-area-inset-right))!important;
     bottom:calc(86px + env(safe-area-inset-bottom))!important;font-size:11px!important;padding:4px 9px!important;}
+  /* 8. Workspace shell (2026-11-21, Julius: "cells in one workspace"; redo of the unpushed first attempt). The frame and
+     the --ws-* tokens are in the head (Index_Css #wsFrame). Here: 1px dividers, one header strip for every cell
+     (title left, existing actions right), cell padding 16 / 12 / 8 px, drawer = right half of the frame. */
+  #workspace{--ws-cell-x:calc(var(--ws-cell-pad) * var(--pad-x,1) * var(--side,.7) / .7);}
+  #workspace .pane.pane-narrow{--ws-cell-pad:8px;}
+  #toolbar{background:transparent!important;border-bottom:0!important;padding-left:max(var(--ws-gap),env(safe-area-inset-left))!important;padding-right:max(var(--ws-gap),env(safe-area-inset-right))!important;}
+  html body #workspace > .pane{background:var(--ws-surface)!important;}
+
+  /* Dividers: one 1px line between cells, never doubled. */
+  html body #workspace > .pane{border-right:0!important;border-left:0!important;box-shadow:none!important;}
+  html body #workspace .column-resizer{background:var(--ws-line)!important;box-shadow:none!important;}
+  html body #workspace .pane.peek-pane{border-left:1px solid var(--ws-line)!important;}
+  html body #workspace .pane.peek-pane.peek-left{border-left:0!important;border-right:1px solid var(--ws-line)!important;}
+  html body.mobile-mode #workspace :is(#todayPane,#journalPane){box-shadow:inset -1px 0 0 var(--ws-line)!important;}
+  html body.mobile-split #workspace :is(#todayPane,#journalPane){box-shadow:none!important;}
+  html body #workspace :is(#mobileSplitResizer,#mobileSplitResizerThird){background:var(--ws-line)!important;}
+  html body #workspace :is(#notesSplitBar,#refSplitBar){flex-basis:1px!important;height:1px!important;min-height:1px!important;background:var(--ws-line)!important;}
+  html body #workspace #blCol{border-left:0!important;box-shadow:inset 1px 0 0 var(--ws-line)!important;}
+
+  /* One header strip for every cell. */
+  html body #workspace :is(.pane > .pane-header,#centerDownScroll > .ce-head,#blocksScroll > .blocks-head,#referenceScroll > .ref-toolbar),
+  html body.one-day #workspace #todayScroll .od-on > .od-pad-head{
+    box-sizing:border-box!important;display:flex!important;align-items:center!important;flex-wrap:nowrap!important;gap:6px!important;
+    flex:0 0 var(--ws-head-h)!important;height:var(--ws-head-h)!important;min-height:var(--ws-head-h)!important;
+    padding:0 var(--ws-cell-x)!important;background:var(--ws-head-bg)!important;color:var(--ws-head-fg);
+    border-top:0!important;border-bottom:1px solid var(--ws-line)!important;border-radius:0!important;box-shadow:none!important;
+    font-size:var(--ws-head-fs);
+  }
+  html body #workspace :is(.today-jump,.od-pad-lab,.next-steps-label){
+    font-size:var(--ws-head-fs)!important;font-weight:700!important;letter-spacing:.05em!important;
+    text-transform:uppercase!important;line-height:1!important;white-space:nowrap;color:var(--ws-head-fg);
+  }
+  html body #workspace :is(.pane > .pane-header,#referenceScroll > .ref-toolbar) :is(.btn,button:not(.hist-mode):not([data-ctab]):not([data-rtab]),input){
+    height:calc(var(--ws-head-h) - 8px)!important;min-height:0!important;padding-top:0!important;padding-bottom:0!important;
+    font-size:12px!important;line-height:1!important;box-sizing:border-box;
+  }
+  html body #workspace .pane > .pane-header .center-tabs button{width:calc(var(--ws-head-h) - 10px)!important;height:calc(var(--ws-head-h) - 10px)!important;}
+  #centerDownScroll .ce-head :is(button,.btn){min-height:22px!important;height:22px!important;max-height:22px!important;}
+  #centerDownScroll .ce-head .ce-search{height:22px!important;}
+
+  /* History / Log: title left, controls right. */
+  html body #workspace #todayPane > .pane-header :is(.hist-modes,#focusStatus){margin-left:auto;}
+  /* Middle cell: the open tab's name left, tab symbols right (narrow column: symbols only). */
+  html body #workspace #journalPane > .pane-header::before{
+    font-size:var(--ws-head-fs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;line-height:1;white-space:nowrap;
+    color:var(--ws-head-fg);flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  }
+  #journalPane[data-ctab="notes"] > .pane-header::before{content:"Dailies";}
+  #journalPane:is([data-ctab="weather"],[data-ctab="wxdaily"]) > .pane-header::before{content:"Weather";}
+  #journalPane[data-ctab="focus"] > .pane-header::before{content:"Keep In Mind";}
+  #journalPane[data-ctab="urgent"] > .pane-header::before{content:"Urgent";}
+  #journalPane[data-ctab="review"] > .pane-header::before{content:"Day Review";}
+  #journalPane[data-ctab="fun"] > .pane-header::before{content:"Fun";}
+  html body #workspace #journalPane > .pane-header .center-tabs{margin-left:auto!important;margin-right:-4px;flex:0 0 auto;}
+  html body #workspace #journalPane.pane-narrow > .pane-header::before{display:none;}
+  html body #workspace #journalPane.pane-narrow > .pane-header .center-tabs{margin-left:-4px!important;}
+  html body #workspace #referencePane > .ref-pane-header .urg-head-row{margin:0!important;}
+
+  /* Cal Events: the strip spans the cell; the calendar keeps a slim gutter (its time axis is the margin). */
+  html body #workspace #calPane{--ws-cal-x:calc(var(--ws-cell-x) / 2);}
+  html body #workspace #calPane #centerDownScroll,html body #workspace #calPane #centerDownScroll.ce-dkon{padding-inline:var(--ws-cal-x)!important;}
+  html body #workspace #calPane #centerDownScroll > .ce-head{margin:0 calc(-1 * var(--ws-cal-x)) 2px!important;}
+  html body #workspace #calPane #centerDownScroll > .ce-head .ce-tools{margin-left:auto;}
+  /* Narrow calendar column (phone): tighter strip so ⚙ BL ↻ stay inside the frame. */
+  @media (max-width:720px){
+    html body #workspace #calPane #centerDownScroll > .ce-head{padding:0 3px!important;gap:2px!important;}
+    html body #workspace #calPane #centerDownScroll > .ce-head :is(.ce-tools){gap:2px!important;}
+    html body #workspace #calPane #centerDownScroll > .ce-head .ce-search{min-width:34px!important;flex:0 1 34px!important;}
+    html body #workspace #calPane #centerDownScroll > .ce-head .ce-ttl{font-size:12px!important;min-width:0!important;flex:0 1 auto!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  }
+
+  /* Timer (bottom-left) and Focus / Thinking (bottom-middle) get real strips; the Timer strip is still the drag handle. */
+  body.one-day #workspace #todayScroll .day-row.od-on.od-on{
+    --ws-hist-pad:max(2px,calc(var(--ws-cell-x) - 7px));--rowpx:var(--ws-hist-pad);
+    padding-left:var(--ws-hist-pad)!important;padding-right:var(--ws-hist-pad)!important;
+  }
+  body.one-day #workspace #todayScroll .od-on .day-editor{margin-left:0!important;margin-right:0!important;padding-left:7px!important;padding-right:7px!important;}
+  html body.one-day #workspace #todayScroll .od-on > .od-pad-head{margin:6px calc(-1 * var(--ws-hist-pad)) 0!important;border-top:1px solid var(--ws-line)!important;}
+  html body #workspace #blocksScroll > .blocks-head{margin:0!important;}
+  html body #workspace #blocksScroll > .thought-pad{padding-left:var(--ws-cell-x)!important;padding-right:var(--ws-cell-x)!important;padding-top:6px!important;}
+
+  /* Reference: its toolbar is the cell strip (stays pinned while the cards scroll). */
+  html body #workspace #referencePane{--ws-ref-x:calc(var(--ws-cell-x) * var(--ref-pad-x,1));}
+  html body #workspace #referencePane #referenceScroll{padding-left:var(--ws-ref-x)!important;padding-right:var(--ws-ref-x)!important;padding-top:0!important;}
+  html body #workspace #referenceScroll > .ref-toolbar{margin:0 calc(-1 * var(--ws-ref-x)) 8px!important;padding-bottom:0!important;}
+  html body #workspace #referenceScroll > .ref-toolbar .ref-search{flex:1 1 60px;min-width:40px;}
+  html body #workspace #referencePane #refTopScroll{padding-left:calc(var(--ws-cell-x) - 1px)!important;padding-right:calc(var(--ws-cell-x) - 1px)!important;padding-top:6px!important;}
+
+  /* Cell padding for the other content. */
+  html body #workspace #kimScroll{padding-left:max(0px,calc(var(--ws-cell-x) - 3px))!important;padding-right:max(0px,calc(var(--ws-cell-x) - 3px))!important;padding-top:6px!important;}
+  html body #workspace #journalPane[data-ctab="urgent"] #urgTabScroll,
+  html body #workspace :is(#dayReviewScroll,#funScroll,#newScroll){padding-left:var(--ws-cell-x)!important;padding-right:var(--ws-cell-x)!important;}
+  body.one-day #workspace #journalScroll .day-row.od-on{--rowpx:var(--ws-cell-x);padding-left:var(--ws-cell-x)!important;padding-right:var(--ws-cell-x)!important;}
+
+  /* Next Steps + Reference drawer = right half of the same frame (whole frame on the phone); square inner edge, no shadow.
+     --ws-t / --ws-r / --ws-b / --ws-l / --ws-w come from the frame's own box (initWsFrame below). */
+  html body #workspace #referencePane.rd-drawer{
+    top:var(--ws-t,0px)!important;bottom:var(--ws-b,0px)!important;right:var(--ws-r,0px)!important;
+    width:calc(var(--ws-w,100vw) / 2)!important;background:var(--ws-surface)!important;
+    border:1px solid var(--ws-line)!important;border-radius:0 var(--ws-radius) var(--ws-radius) 0!important;
+    box-shadow:none!important;overflow:hidden;
+  }
+  body.rd-open #rdTab{right:calc(var(--ws-w,100vw) / 2 + var(--ws-r,0px))!important;}
+  @media (max-width:720px){
+    html body #workspace #referencePane.rd-drawer{width:var(--ws-w,100vw)!important;border-radius:var(--ws-radius)!important;}
+    body.rd-open #rdTab{right:auto!important;left:var(--ws-l,0px)!important;}
+  }
 </style>
+<script>
+/* Workspace frame box (2026-11-21): CSS vars so the fixed Next Steps / Reference drawer lines up with the frame. */
+(function initWsFrame(){
+  const ws = document.getElementById('workspace'); if(!ws) return;
+  const root = document.documentElement;
+  const set = () => {
+    const r = ws.getBoundingClientRect(), vw = root.clientWidth || innerWidth, vh = root.clientHeight || innerHeight;
+    root.style.setProperty('--ws-t', Math.round(r.top) + 'px');
+    root.style.setProperty('--ws-b', Math.max(0, Math.round(vh - r.bottom)) + 'px');
+    root.style.setProperty('--ws-l', Math.round(r.left) + 'px');
+    root.style.setProperty('--ws-r', Math.max(0, Math.round(vw - r.right)) + 'px');
+    root.style.setProperty('--ws-w', Math.round(r.width) + 'px');
+  };
+  set();
+  try{ new ResizeObserver(set).observe(ws); }catch(e){}
+  addEventListener('resize', set);
+})();
+</script>
 <script>
 /* UI batch (2026-11-21): the status pill lives on <body> so the toolbar (scrolling, hidden, slid) never clips it. */
 (function(){ const s = document.getElementById('status'); if(s && s.parentElement !== document.body) document.body.appendChild(s); })();

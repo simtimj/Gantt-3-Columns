@@ -1045,3 +1045,15 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - 6. `#status` moved to `<body>` (script after the block), fixed pill bottom-right above the zoom buttons + PWA ↻ Update; `pointer-events:none` unless `setStatus` text has "tap here" (`.st-tap`, delete undo). `#pwaOffline` sits above it.
 - 7. G fix (Index_Main): `kimColorTarget(ed,node)` = title box head if any, else the group's first line when it isn't a task; picked when the hold menu opens (`kimColorHeld`). Before, only `data-tl` titles showed 🎨. Smoke covers a plain header.
 - First attempt was cut off by usage before push (and collided with the Index split); redone on the split files the same evening.
+
+
+## Workspace shell (2026-11-21, Julius: "cells in one workspace"; redo of the unpushed first attempt on the split files)
+- **Dark mode is the main mode**: judge every look change in dark first (`localStorage fw.theme='dark'`), light second. Tokens are dark-first: `:root` = dark, `html[data-theme=light]` = light.
+- Presentation only. Two places: `<style id="wsFrame">` at the end of `Index_Css.html` (head; tokens `--ws-*` + the frame on `#workspace`: margin `--ws-gap`, 1px `--ws-line`, `--ws-radius` 14px, `width:auto`) — must stay in the head because `updateWorkspaceLayout` measures `workspace.clientWidth` at start-up; and section **8** of `#uiBatchCss` in `Index_Layout.html` (dividers, one header strip, cell padding, drawer = right half of the frame) + `initWsFrame` script right after it.
+- `--ws-line` = 20% dark / 24% light of `--divider`, so Options → Divider lines / Line strength still tint it. Header strip `--ws-head-h` 32 / 30px phone (`--hdr-h` now follows it), `--ws-head-bg`. Cell padding `--ws-cell-x` = `--ws-cell-pad` (16 / 12 / 8px; `.pane-narrow` 8) × Padding ↔ × Side space / 70%.
+- Middle header title = CSS `::before` from `#journalPane[data-ctab]` (no markup change); hidden in `.pane-narrow`.
+- History one-day row padding = `--ws-hist-pad` (cell-x − 7px, min 2px) + the editor's 7px; Timer strip bleeds with the same var.
+- Drawer: `initWsFrame` writes `--ws-t/--ws-r/--ws-b/--ws-l/--ws-w` from the frame's box (ResizeObserver + resize); drawer + `#rdTab` use them (replaces the batch's 50vw / 100vw sizes).
+- Phone (≤720px) Cal Events strip: padding 3px, gap 2px, search box 34px (smoke minimum), date title 12px and may ellipsize, so the last button stays inside the column (it overflowed ~15px before this change too).
+- Smoke: Reference half, phone drawer width and calendar right edge compare to the frame (inner edge), not the screen; phone "tap outside the card" aims beside the card.
+- Not restyled: the calendar's own internals and the backlog column's inner header.

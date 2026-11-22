@@ -9,12 +9,12 @@ Where things live, so a session can jump straight there. **Grep the quoted text;
 | File | Holds |
 |---|---|
 | `Index.html` | head, theme script, `<body>` markup, `__FW_INITIAL__` / build scriptlets, WeekdayIcons + Drafts includes |
-| `Index_Css.html` | base CSS + light / dark theme |
+| `Index_Css.html` | base CSS + light / dark theme; last block `#wsFrame` = workspace frame + `--ws-*` tokens (head on purpose) |
 | `Index_Main.html` | main app script (`STATE` banner) |
 | `Index_Cards.html` | side space slider, task cards + subject colors, theme select, card fill, saved looks |
 | `Index_Extras.html` | task mirrors, block borders, title cells, block timer, header swipe, pull tabs, long-press panes |
 | `Index_Calendar.html` | calendar module (FullCalendar) + Big Three strip |
-| `Index_Layout.html` | 4-panel layout / Reference drawer |
+| `Index_Layout.html` | 4-panel layout / Reference drawer; last block `#uiBatchCss` = UI batch (8 = workspace shell) + `initWsFrame` |
 
 
 | Area | Grep for | ~Line |

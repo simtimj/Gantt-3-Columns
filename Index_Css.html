@@ -2249,4 +2249,38 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
 .editor .daily-sort-menu{position:absolute;right:0;top:100%;z-index:20;background:var(--panel,#fff);border:1px solid var(--border,#888);border-radius:6px;padding:4px;box-shadow:0 5px 15px #0003;min-width:145px;}
 .editor .daily-sort-menu[hidden]{display:none!important;}
 .editor .daily-sort-menu button{display:block;width:100%;padding:7px;text-align:left;background:transparent;border:0;color:var(--text);font-size:12px;cursor:pointer;}
+</style><style id="wsFrame">
+  /* ===== Workspace frame (2026-11-21, Julius: "cells in one workspace"; NOTES "Workspace shell") =====
+     Tokens + the frame itself. Stays in the head: updateWorkspaceLayout measures workspace.clientWidth at start-up.
+     Dark first: :root holds the dark values, html[data-theme=light] the light ones. Divider color + Line strength
+     (Options) still tint --ws-line through --divider. The rest of the shell is in Index_Layout #uiBatchCss (8). */
+  :root{
+    --ws-radius:14px;
+    --ws-line:color-mix(in srgb,var(--divider,#e5e7eb) 20%,#121212);
+    --ws-surface:#121212;
+    --ws-head-bg:#191919;
+    --ws-head-fg:var(--dm-muted,#9a9a9a);
+    --ws-page:#080808;
+    --ws-head-h:32px;
+    --ws-head-fs:12px;
+    --ws-cell-pad:16px;
+    --ws-gap:8px;
+  }
+  html[data-theme=light]{
+    --ws-line:color-mix(in srgb,var(--divider,#1f2937) 24%,#fff);
+    --ws-surface:var(--panel,#fff);
+    --ws-head-bg:#f6f7f9;
+    --ws-head-fg:#4b5563;
+    --ws-page:#eef0f3;
+  }
+  @media (max-width:1024px){:root{--ws-cell-pad:12px;--ws-gap:6px;}}
+  @media (max-width:720px){:root{--ws-cell-pad:8px;--ws-gap:4px;--ws-head-h:30px;--ws-head-fs:11.5px;--ws-radius:12px;}}
+  html,body{background:var(--ws-page)!important;}
+  html body #workspace{
+    width:auto;box-sizing:border-box;
+    margin:0 max(var(--ws-gap),env(safe-area-inset-right)) max(var(--ws-gap),env(safe-area-inset-bottom)) max(var(--ws-gap),env(safe-area-inset-left));
+    border:1px solid var(--ws-line);border-radius:var(--ws-radius);
+    background:var(--ws-surface);box-shadow:none;
+  }
+  body.tb-hidden #workspace{margin-top:var(--ws-gap);}
 </style>

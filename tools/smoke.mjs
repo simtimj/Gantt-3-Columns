@@ -103,9 +103,9 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       // Drag the ◀ tab: opens the drawer (2026-11-21: locked size — full width on the phone, no dimming).
       const tab = document.getElementById('rdTab'), pe = (type, x) => tab.dispatchEvent(new PointerEvent(type, {bubbles:true, cancelable:true, pointerId:7, pointerType:'touch', clientX:x, clientY:y, isPrimary:true}));
       pe('pointerdown', W - 10); for (const x of [W - 40, W - 150, W - 250]) { pe('pointermove', x); await wait(16); } pe('pointerup', W - 250); tab.click(); await wait(300);
-      const dw = Math.round(document.getElementById('referencePane').getBoundingClientRect().width);
+      const dw = Math.round(document.getElementById('referencePane').getBoundingClientRect().width), fw = Math.round(document.getElementById('workspace').getBoundingClientRect().width);
       if (!fwRefDrawer.isOpen()) out.push('dragging the tab did not open the drawer');
-      if (Math.abs(dw - W) > 2) out.push('phone drawer width ' + dw + ', wanted full ' + W);
+      if (Math.abs(dw - fw) > 2) out.push('phone drawer width ' + dw + ', wanted the full frame ' + fw); // workspace shell: drawer = whole frame
       if (getComputedStyle(document.getElementById('rdBackdrop')).display !== 'none') out.push('page behind the drawer is dimmed');
       fwRefDrawer.close(); await wait(250);
       return out;
@@ -115,8 +115,8 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   // Reference = right half (2026-11-21, Julius): desktop drawer is exactly half the screen, nothing dimmed.
   if (!view.hasTouch) {
     const half = await pg.evaluate(async () => { fwRefDrawer.open(); await new Promise(r => setTimeout(r, 300));
-      const r = document.getElementById('referencePane').getBoundingClientRect(), out = [];
-      if (Math.abs(r.width - innerWidth / 2) > 2 || Math.abs(r.right - innerWidth) > 2) out.push('drawer not the right half (' + Math.round(r.left) + '–' + Math.round(r.right) + ')');
+      const r = document.getElementById('referencePane').getBoundingClientRect(), f = document.getElementById('workspace').getBoundingClientRect(), out = [];
+      if (Math.abs(r.width - f.width / 2) > 2 || Math.abs(r.right - f.right) > 2) // workspace shell: right half of the frame out.push('drawer not the right half (' + Math.round(r.left) + '–' + Math.round(r.right) + ')');
       if (getComputedStyle(document.getElementById('rdBackdrop')).display !== 'none') out.push('page behind the drawer is dimmed');
       const el = document.elementFromPoint(innerWidth / 4, innerHeight / 2); if (!el || el.id === 'rdBackdrop') out.push('left half not usable while open');
       fwRefDrawer.close(); await new Promise(r => setTimeout(r, 250)); return out; });
@@ -2523,7 +2523,10 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
               if (!r) errs.push('all-day row: not found');
               else { if (r.bw !== '3px' || /, 0\)$/.test(r.bc)) errs.push('all-day row: line under it is ' + r.bw + ' ' + r.bc);
                 if (r.ax > 1) errs.push('all-day row: empty cell left of it is still ' + r.ax + 'px wide'); } }
-            const jp = await pg.evaluate(() => { const r = document.getElementById('journalPane').getBoundingClientRect(); return { x: Math.max(r.left + 20, 20), y: r.top + r.height / 2 }; });
+            const jp = await pg.evaluate(() => { const r = document.getElementById('journalPane').getBoundingClientRect(), c = document.querySelector('#calPanel [data-cal-detail]').getBoundingClientRect();
+              const x = Math.max(r.left + 20, 20); // workspace shell: aim beside the card, not on it
+              if (x < c.left - 2 || x > c.right + 2) return { x, y: r.top + r.height / 2 };
+              return { x, y: c.bottom + 12 < r.bottom - 4 ? c.bottom + 12 : Math.max(r.top + 4, c.top - 12) }; });
             await pg.mouse.click(jp.x, jp.y); await pg.waitForTimeout(300);
             if (!(await pg.evaluate(() => document.querySelector('#calPanel [data-cal-detail]').hidden))) errs.push('card close: tapping outside (middle column) did not close the card');
           }
@@ -2874,7 +2877,8 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
             if (bc.width < 100) out.push('backlog column too narrow: ' + bc.width);
             if (ws.classList.contains('ws-halves') && Math.abs(bc.width - cp.width) > 3) out.push('half view: backlog is not a half-screen column: ' + bc.width + ' vs ' + cp.width);
             if (Math.abs(bc.right - cp.left) > 3) out.push('backlog not just left of the calendar');
-            if (Math.abs(cp.right - innerWidth) > 3) out.push('calendar column not at the right edge: ' + cp.right + ' / ' + innerWidth);
+            { const f = ws.getBoundingClientRect(), edge = f.right - (parseFloat(getComputedStyle(ws).borderRightWidth) || 0); // workspace shell: frame's inner edge
+              if (Math.abs(cp.right - edge) > 3) out.push('calendar column not at the right edge: ' + cp.right + ' / ' + edge); }
             if (ws.scrollLeft < 50) out.push('app did not slide left: ' + ws.scrollLeft);
           } else if (!bl.closest('#calBlLeft') || !document.body.classList.contains('bl-left')) out.push('phone backlog not on the left');
           // Close: everything slides back.

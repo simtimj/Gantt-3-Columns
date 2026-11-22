@@ -2280,6 +2280,7 @@
     }
     return n;
   }
+  window.kimUnpinHead = head => { const ed = head && head.parentElement; if(!ed || !head.hasAttribute('data-kpin')) return; const u = kimPinUnit(ed, head); if(u) kimTogglePin(ed, u); };
   function kimTogglePin(ed, unit){
     captureBeforeEdit(ed);
     const head = unit[0], pin = !head.hasAttribute('data-kpin');

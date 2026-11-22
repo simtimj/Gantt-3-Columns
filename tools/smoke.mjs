@@ -386,10 +386,19 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       await menu('PinA kid');
       if (top() !== 'PinB|PinB sub|PinA|PinA kid') out.push('second pin not right under the first: ' + top());
       if (!f('PinA').hasAttribute('data-kpin') || !/data-kpin/.test(cardCleanHtml(ed))) out.push('pin not saved in the cell');
-      if (getComputedStyle(f('PinA'), '::before').content.indexOf('📌') < 0) out.push('no 📌 on a pinned item');
+      // Pin (2026-11-22): a tappable 📌 beside the item; a title keeps its − / count button.
+      await wait(80); const pins = () => [...document.querySelectorAll('#kimScroll .kg-pin')];
+      if (pins().length !== 2) out.push('expected 2 📌 pins, got ' + pins().length);
+      if (/📌/.test(getComputedStyle(f('PinA'), '::before').content)) out.push('pin still replaces the title count');
+      { const pa = f('PinA').getBoundingClientRect(), p = pins().find(x => Math.abs(x.getBoundingClientRect().top + 8 - (pa.top + Math.min(pa.height, 24) / 2)) < 12);
+        if (!p) out.push('no 📌 beside the pinned title'); else if (p.getBoundingClientRect().width > 18) out.push('pin button too big'); }
       if (!/Unpin/.test(await menu('PinB'))) out.push('pinned item\'s menu does not say Unpin');
       if (top() !== 'PinA|PinA kid|PinB|PinB sub' || f('PinB').hasAttribute('data-kpin')) out.push('unpin did not move it below the pinned ones: ' + top());
       const ki = [...ed.children]; for (let i = 1; i < ki.length; i++) if (isEmptyLine(ki[i]) && isEmptyLine(ki[i - 1])) { out.push('doubled blank lines after pin moves'); break; }
+      // Tap the 📌 = unpin; it drops just below the pinned ones.
+      { await menu('PinB'); await wait(80); const pb = f('PinB').getBoundingClientRect(), p = pins().find(x => Math.abs(x.getBoundingClientRect().top - pb.top) < 14);
+        if (!p) out.push('no 📌 on PinB to tap'); else { p.click(); await wait(120);
+          if (f('PinB').hasAttribute('data-kpin') || top() !== 'PinA|PinA kid|PinB|PinB sub') out.push('tapping 📌 did not unpin below the pinned ones: ' + top()); } }
       const kim = document.querySelector('[data-ctab="focus"]');
       showContextMenu(document.querySelector('#todayScroll .day-editor'), 40, 40, false);
       const kb = document.querySelector('#contextMenu [data-ctx="kimPin"]'); if (kb && !kb.hidden) out.push('Pin shows outside Keep In Mind'); hideContextMenu();
@@ -446,8 +455,9 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
           if (f('ColT').getAttribute('data-tbc') !== '#fdd835') out.push('yellow not saved on the title');
           if (!/data-tbc="#fdd835"/.test(cardCleanHtml(ed))) out.push('color dropped from the saved cell');
           if (!/fdd835/i.test(decodeURIComponent(ed.style.backgroundImage || ''))) out.push('title box not drawn in the color');
-          const box = [...document.querySelectorAll('#kimScroll .kg-box')].find(x => /253, 216, 53/.test(getComputedStyle(x).borderTopColor));
-          if (!box) out.push('group box not in the color');
+          // One border per section (2026-11-22): the title cell's box is the section's only box, no group box on top.
+          const tr = f('ColT').getBoundingClientRect();
+          if ([...document.querySelectorAll('#kimScroll .kg-box')].some(x => { const r = x.getBoundingClientRect(); return r.top <= tr.top + 2 && r.bottom >= tr.bottom - 2; })) out.push('titled section has a second (group) border');
           b = open('ColT'); b.click(); await wait(100);
           const inp = document.querySelector('.kc-pop input[type=color]'); inp.value = '#123abc'; inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); await wait(100);
           if (f('ColT').getAttribute('data-tbc') !== '#123abc') out.push('color wheel value not applied');
@@ -2495,6 +2505,17 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           else { if (/gradient/.test(sun.col)) errs.push('docked calendar: timeline still tinted');
             if (!/gradient/.test(sun.lab)) errs.push('docked calendar: hour labels have no sky gradient');
             if (!sun.mk) errs.push('docked calendar: no sunrise / sunset line'); } }
+        // Docked divider (2026-11-22, Julius: maintenance batch): the line between the all-day list and the timeline
+        // can be grabbed (nothing on top of it) and dragged in the half-screen calendar too.
+        { const r = await pg.evaluate(async () => { const w = ms => new Promise(res => setTimeout(res, ms)); const p = document.querySelector('#calPanel.cp-docked'); if (!p) return 'no docked calendar';
+            const g = p.querySelector('.cp-adgrip.on'); if (!g) return 'grip not shown'; const b = g.getBoundingClientRect(); const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+            const hit = document.elementFromPoint(cx, cy); if (hit !== g) return 'grip covered by ' + (hit ? hit.tagName + '.' + hit.className : 'nothing') + ' at ' + Math.round(cy);
+            const sc = () => p.querySelector('.fc-daygrid-body').closest('.fc-scroller'); const line = sc().getBoundingClientRect().bottom; if (Math.abs(line - cy) > 6) return 'grip not on the line (' + Math.round(cy) + ' vs ' + Math.round(line) + ')';
+            const h0 = sc().clientHeight, pe = (t, y) => g.dispatchEvent(new PointerEvent(t, {bubbles: true, cancelable: true, clientX: cx, clientY: y, pointerId: 9, pointerType: 'touch'}));
+            pe('pointerdown', cy); pe('pointermove', cy + 40); pe('pointermove', cy + 80); pe('pointerup', cy + 80); await w(150);
+            const h1 = sc().clientHeight; window.fwCalendar && localStorage.removeItem('fw.calAllDayMax'); p.classList.remove('cp-adset');
+            return h1 >= h0 + 50 ? '' : 'drag did not grow the all-day area (' + h0 + ' → ' + h1 + ')'; });
+          if (r) errs.push(name + ' docked divider: ' + r); }
         // Full time range on a card cut off by midnight (2026-11-15 12:54, Julius): "Sat 10 PM – 7:45 AM", not "12 AM".
         { const r = await pg.evaluate(async () => { const api = window.fwCalendar.api(), d0 = api.view.currentStart.toISOString().slice(0, 10);
             const y = new Date(api.view.currentStart.getTime() - 864e5).toISOString().slice(0, 10);
@@ -2517,11 +2538,12 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
               if (r.w < Math.min(380, r.vw - 16) - 1) errs.push('half calendar card: not using the room (' + r.w + ' wide, column ' + r.col + ', screen ' + r.vw + ')');
               if (r.l < 0 || r.r > r.vw + 1 || r.t < 0 || r.bt > r.vh + 1) errs.push('half calendar card: off screen ' + JSON.stringify(r));
               if (!r.onTop) errs.push('half calendar card: covered by something'); }
-            // All-day row (2026-11-15 13:21, Julius): clear 3px line under it, no empty cell left of it.
+            // All-day row (2026-11-15 13:21, Julius): clear line under it, no empty cell left of it. 2026-11-22 (Julius,
+            // maintenance batch): in the half calendar it's one thin 1px line, still visible.
             { const r = await pg.evaluate(() => { const td = [...document.querySelectorAll('#calPanel .fc-scrollgrid-section-body > td')].find(x => x.querySelector('.fc-daygrid-body')), ax = document.querySelector('#calPanel .fc-daygrid-body .fc-timegrid-axis');
                 return td ? { bw: getComputedStyle(td).borderBottomWidth, bc: getComputedStyle(td).borderBottomColor, ax: ax ? Math.round(ax.getBoundingClientRect().width) : -1 } : null; });
               if (!r) errs.push('all-day row: not found');
-              else { if (r.bw !== '3px' || /, 0\)$/.test(r.bc)) errs.push('all-day row: line under it is ' + r.bw + ' ' + r.bc);
+              else { if (r.bw !== '1px' || /, 0\)$/.test(r.bc)) errs.push('all-day row: line under it is ' + r.bw + ' ' + r.bc);
                 if (r.ax > 1) errs.push('all-day row: empty cell left of it is still ' + r.ax + 'px wide'); } }
             const jp = await pg.evaluate(() => { const r = document.getElementById('journalPane').getBoundingClientRect(), c = document.querySelector('#calPanel [data-cal-detail]').getBoundingClientRect();
               const x = Math.max(r.left + 20, 20); // workspace shell: aim beside the card, not on it

@@ -424,6 +424,7 @@
     const ink = getComputedStyle(ed).color || '#888';
     const urg = getComputedStyle(ed).getPropertyValue('--urg').trim() || ink;
     let rects = '';
+    const kim = ed.classList.contains('kim-editor'); // Keep In Mind: thinner, like its group boxes (2026-11-22, Julius)
     bs.sort((a,b) => a.depth - b.depth).forEach(b => {
       const tr = b.t.getBoundingClientRect(), lr = b.last.getBoundingClientRect();
       const inner = bs.filter(o => o.last === b.last && o.depth > b.depth).length;
@@ -433,7 +434,7 @@
       const on = b.t.hasAttribute('data-tcfocus');
       const tbc = /^#[0-9a-f]{6}$/i.test(b.t.getAttribute('data-tbc') || '') ? b.t.getAttribute('data-tbc') : ''; // chosen color (2026-11-21)
       rects += '<rect x="' + (x + .75) + '" y="' + (top + .75) + '" width="' + (w - 1.5) + '" height="' + (h - 1.5) + '" rx="8" fill="none" stroke="' +
-        (on ? urg : tbc || ink) + '" stroke-opacity="' + (on || tbc ? '1' : '.8') + '" stroke-width="' + (on || tbc ? 2 : 1.5) + '"/>'; // brighter (2026-11-21 12:44, Julius: "barely see it")
+        (on ? urg : tbc || ink) + '" stroke-opacity="' + (on || tbc ? '1' : kim ? '.45' : '.8') + '" stroke-width="' + (kim ? (on || tbc ? 1.5 : 1) : (on || tbc ? 2 : 1.5)) + '"/>'; // brighter (2026-11-21 12:44, Julius: "barely see it")
     });
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
     Object.assign(ed.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',

@@ -47,9 +47,8 @@
   .kc-pop .kc-wheel{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;flex:1;}
   .kc-pop .kc-wheel input{width:40px;height:30px;padding:0;border:0;background:none;cursor:pointer;}
   @media (max-width:420px){ .kc-pop .kc-sw{grid-template-columns:repeat(5,34px);} .kc-pop .kc-sw button{width:34px;height:34px;} }
-  /* Keep In Mind pin (2026-11-21): a small 📌 before a pinned item. */
-  #kimScroll .kim-editor > [data-kpin].check-line > .check-text::before,
-  #kimScroll .kim-editor > [data-kpin]:not(.check-line)::before{content:'📌';font-size:.8em;margin-right:4px;}
+  /* Keep In Mind pin (2026-11-21). */
+  /* (the 📌 is painted by paintGroups in Index_Cards since 2026-11-22: tap it to unpin) */
   /* Reference → Keep In Mind drag (2026-11-21) */
   .rk-ghost{position:fixed;z-index:3300;pointer-events:none;max-width:70vw;padding:6px 10px;border-radius:8px;background:var(--panel);
     color:inherit;border:2px solid var(--urg,#3b82f6);box-shadow:0 6px 18px rgba(0,0,0,.3);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -668,6 +667,22 @@
     html body #workspace #referencePane.rd-drawer{width:var(--ws-w,100vw)!important;border-radius:var(--ws-radius)!important;}
     body.rd-open #rdTab{right:auto!important;left:var(--ws-l,0px)!important;}
   }
+
+  /* 9. Maintenance batch (2026-11-22, Julius). */
+  /* Half calendar: Today (◉) is a rounded square, not a pill. */
+  #centerDownScroll.ce-dkon .ce-head button.ce-dk.ce-today{border-radius:5px!important;}
+  /* Half calendar: the all-day / timeline line is one thin line (no 2 px bar + shadow); the grab spot stays on it. */
+  #calPanel.cp-docked .fc .fc-timegrid-divider{height:0!important;background:none!important;}
+  #calPanel.cp-docked .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:1px solid var(--cp-axis-line,var(--cp-line))!important;box-shadow:none!important;}
+  /* Keep In Mind tabs: the "on" mark is the button's own square (no spill-over ring), even spacing. */
+  #journalPane .center-tabs{gap:5px!important;}
+  #journalPane .center-tabs button.on{box-shadow:none!important;outline:0!important;background:color-mix(in srgb,var(--text,#fff) 22%,transparent)!important;}
+  /* Keep In Mind pin: a small tap-to-unpin 📌 painted beside the item (render-only, never saved); the line keeps its own
+     − / count button. */
+  #kimScroll .kim-editor > [data-kpin]{padding-left:17px!important;}
+  #kimScroll .kg-pin{position:absolute;z-index:2;width:16px;height:16px;padding:0;margin:0;border:0;background:none;font-size:11px;line-height:16px;
+    text-align:center;cursor:pointer;opacity:.85;-webkit-tap-highlight-color:transparent;}
+  #kimScroll .kg-pin:hover{opacity:1;}
 </style>
 <script>
 /* Workspace frame box (2026-11-21): CSS vars so the fixed Next Steps / Reference drawer lines up with the frame. */

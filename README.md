@@ -78,6 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-22)
+- **UI maintenance batch** (2026-11-22): half calendar ◉ Today is a rounded square (not a pill); the all-day / timeline line is one thin line and still drags · Keep In Mind: one border per section (titled sections no longer get a second box), thinner lines · pinned items show a small 📌 beside them **and** keep their − / count button; tap the 📌 to unpin (drops right below the pinned ones) · Keep In Mind tab buttons: the "on" mark stays inside its own square, even spacing.
 - **Reference no longer pops up on open**: the Next Steps + Reference drawer starts closed from the very first paint (it used to show as a column and slide away while the page loaded, most visible in the fast-opening PWA). Opens only from the Ref button, the ◀ tab or an edge swipe.
 
 ## 🧪 To be confirmed (2026-11-21)
@@ -732,8 +733,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 ## 📋 To do
 
 - **Drag to calendar from Keep In Mind / Focus-Thinking** (2026-11-22, Julius; captured, Calendar is parked): drag a line from Keep In Mind or the Focus/Thinking section onto the calendar to schedule it; the line **stays where it is** (only he moves it), and gets a small "scheduled" mark so he can see what is and isn't on the calendar.
-
-- **Maintenance batch (2026-11-22, Julius; captured for the next maintenance session)**: docked (half) calendar **Today** button squarer, not a pill · docked calendar: **draggable** divider between the events list and the timeline, and a thinner line · **Keep In Mind** borders thinner, and only one border around each category section (looks doubled now). · **Keep In Mind pin**: when a section is pinned, show the pin **and** the task count (pin currently replaces the count); pin button only as big as the pin; tapping the pin unpins it and drops the section right below the pinned ones (most recent first). · **Keep In Mind tab buttons** (★, red circle, etc.): highlight square hugs just the icon (now big and overlapping the next button), equal spacing between all of them.
+- **Move to today's calendar button on Keep In Mind lines** (2026-11-22, Julius; captured, Calendar is parked; pairs with drag to calendar): one small button on the right of each Keep In Mind item; tapping it offers the hours still ahead today (e.g. at 11 am: 12, 1, 2 … 7) and puts the item on today's calendar at that hour. Exact picker look still to work out.
 
 - **Follow the now line** (2026-11-21, idea): a setting that keeps the calendar's current-time line in view through the day when zoomed in (auto-scroll as time passes). Open questions in docs/NOTES.md → Google-style event pop-up section.
 

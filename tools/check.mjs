@@ -33,5 +33,13 @@ console.log('✓ storage layer: no new direct calls');
     console.error('✗ FIREBASE_PROJECT_ in Store.gs (' + (m && m[1]) + ') ≠ projectId in tools/pwa/firebase-config.json (' + cfg.projectId + ')');
     process.exit(1);
   }
-  console.log('✓ Firebase project: ' + (m[1] || 'off'));
+  // H4: the database areas are switched on in both places together.
+  const a = fsm.readFileSync('Store.gs', 'utf8').match(/const STORE_DB_AREAS_ = \[([^\]]*)\]/);
+  const srv = a ? a[1].split(',').map(x => x.trim().replace(/'/g, '')).filter(Boolean).sort().join(',') : '?';
+  const app = (cfg.areas || ['kim']).slice().sort().join(',');
+  if (srv !== app) {
+    console.error('✗ STORE_DB_AREAS_ in Store.gs (' + srv + ') ≠ areas in tools/pwa/firebase-config.json (' + app + ')');
+    process.exit(1);
+  }
+  console.log('✓ Firebase project: ' + (m[1] || 'off') + ' · areas ' + app);
 }

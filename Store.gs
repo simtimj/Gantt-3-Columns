@@ -14,7 +14,7 @@
    Sheet. Set = the areas in STORE_DB_AREAS_ live in Firestore, and the timed trigger storeMirror() copies them
    into the Sheet (backup mirror) and moves lost edits from Firestore into the Backup tab. */
 const FIREBASE_PROJECT_ = '';
-const STORE_DB_AREAS_ = ['kim'];
+const STORE_DB_AREAS_ = ['kim', 'days']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
 const STORE_BACKEND = {
   kim: 'sheet',
   days: 'sheet',
@@ -28,7 +28,7 @@ const STORE_BACKEND = {
 };
 
 if (FIREBASE_PROJECT_) STORE_DB_AREAS_.forEach(a => { STORE_BACKEND[a] = 'db'; });
-const STORE_DB_BUILT_ = { kim: true };
+const STORE_DB_BUILT_ = { kim: true, days: true };
 
 function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
@@ -42,9 +42,9 @@ function storeBackend_(area) {
 
 /* Firestore over REST, as Julius (his OAuth token; IAM access, so security rules don't apply here — the rules
    lock the browser side to his account). X-Goog-User-Project bills the calls to the Firebase project.
-   Plain fields only: strings and whole numbers. */
+   Plain fields only: strings, whole numbers and dates (timestamps, read back as ms). */
 const StoreFs = {
-  url_(path) { return 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ + '/databases/(default)/documents/' + path; },
+  url_(path) { return 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ + '/databases/(default)/documents' + (path.charAt(0) === ':' ? '' : '/') + path; },
   req_(method, path, body) {
     const res = UrlFetchApp.fetch(this.url_(path), {
       method: method, contentType: 'application/json', muteHttpExceptions: true,
@@ -60,7 +60,8 @@ const StoreFs = {
     const out = {};
     Object.keys((doc && doc.fields) || {}).forEach(k => {
       const v = doc.fields[k];
-      out[k] = 'integerValue' in v ? Number(v.integerValue) : 'doubleValue' in v ? Number(v.doubleValue) : 'stringValue' in v ? v.stringValue : null;
+      out[k] = 'integerValue' in v ? Number(v.integerValue) : 'doubleValue' in v ? Number(v.doubleValue) : 'stringValue' in v ? v.stringValue
+        : 'timestampValue' in v ? Date.parse(v.timestampValue) : null;
     });
     if (doc && doc.name) out.id_ = doc.name.split('/').pop();
     return out;
@@ -69,12 +70,26 @@ const StoreFs = {
     const fields = {};
     Object.keys(obj).forEach(k => {
       const v = obj[k];
-      fields[k] = typeof v === 'number' && Math.floor(v) === v ? { integerValue: String(v) } : { stringValue: String(v == null ? '' : v) };
+      fields[k] = v instanceof Date ? { timestampValue: v.toISOString() }
+        : typeof v === 'number' && Math.floor(v) === v ? { integerValue: String(v) } : { stringValue: String(v == null ? '' : v) };
     });
     return { fields: fields };
   },
   get(path) { const d = this.req_('get', path); return d ? this.dec_(d) : null; },
   set(path, obj) { this.req_('patch', path, this.enc_(obj)); return obj; },
+  // Only the given fields change; the doc's other fields stay (created when missing).
+  patch(path, obj) {
+    const mask = Object.keys(obj).map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&');
+    this.req_('patch', path + '?' + mask, this.enc_(obj)); return obj;
+  },
+  // Docs of one collection matching every [field, op, value] (op: >, >=, <, <=, ==), decoded.
+  query(coll, filters) {
+    const OPS = { '>': 'GREATER_THAN', '>=': 'GREATER_THAN_OR_EQUAL', '<': 'LESS_THAN', '<=': 'LESS_THAN_OR_EQUAL', '==': 'EQUAL' };
+    const f = filters.map(x => ({ fieldFilter: { field: { fieldPath: x[0] }, op: OPS[x[1]], value: this.enc_({ v: x[2] }).fields.v } }));
+    const where = f.length === 1 ? f[0] : { compositeFilter: { op: 'AND', filters: f } };
+    const res = this.req_('post', ':runQuery', { structuredQuery: { from: [{ collectionId: coll }], where: where } }) || [];
+    return (Array.isArray(res) ? res : [res]).filter(r => r && r.document).map(r => this.dec_(r.document));
+  },
   list(coll) { return ((this.req_('get', coll + '?pageSize=100') || {}).documents || []).map(d => this.dec_(d)); },
   del(path) { this.req_('delete', path); }
 };
@@ -152,6 +167,20 @@ const Store = {
 
   /* Days — one row per date. Sheet: tab "Days", A date, B Today, C Notes, D Plan, E Thoughts/Scratch. */
   days: {
+    /* Database (2026-11-22, NOTES "H4"): doc per day ganttDays/{date}; a section is in the database once it has
+       <f>At (saved-at ms), <f>Base = hash of the copy the edit started from. Reads = Sheet + docs on top; writes =
+       Sheet + only the given sections in the doc. Mirror copies PWA edits into the Sheet. */
+    COLL: 'ganttDays',
+    FIELDS: ['tasks', 'journal', 'plan', 'tho'],
+    LABEL: { tasks: 'Today', journal: 'Notes', plan: 'Plan', tho: 'Thoughts' },
+    db_() { return storeBackend_('days') === 'db'; },
+    doc_(date) { return StoreFs.get(this.COLL + '/' + date); },
+    // Sections the doc holds, on top of a { tasks, journal, … } record (only the given fields).
+    lay_(rec, doc, fields) {
+      if (!doc) return rec;
+      (fields || this.FIELDS).forEach(f => { if (doc[f + 'At']) rec[f] = String(doc[f] == null ? '' : doc[f]); });
+      return rec;
+    },
     sheet_(timer) {
       storeBackend_('days');
       return getOrCreateSheet_('Days', DAYS_HEADERS, timer);
@@ -174,7 +203,57 @@ const Store = {
       if (lastRow < 2) return { width: 3, rows: [], base: 2 };
       const mc = sheet.getMaxColumns();
       const width = mc >= 5 ? 5 : mc >= 4 ? 4 : 3;
-      return { width: width, rows: sheet.getRange(2, 1, lastRow - 1, width).getValues(), base: 2 };
+      const rows = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+      if (this.db_()) {
+        // Only edits the mirror hasn't copied yet can differ from the Sheet.
+        const docs = this.unmirrored_();
+        if (docs.length) {
+          const by = {};
+          docs.forEach(d => { by[d.date] = d; });
+          rows.forEach(r => {
+            const doc = by[formatDate_(r[0])];
+            if (doc) this.FIELDS.forEach((f, i) => { if (i + 1 < width && doc[f + 'At']) r[i + 1] = String(doc[f] == null ? '' : doc[f]); });
+          });
+        }
+      }
+      return { width: width, rows: rows, base: 2 };
+    },
+    MIRROR_KEY: 'daysMirrorAt',
+    unmirrored_() {
+      const wm = Number(PropertiesService.getScriptProperties().getProperty(this.MIRROR_KEY)) || 0;
+      // `up` = when the edit reached the database (server time, so a device's wrong clock can't hide an edit).
+      return StoreFs.query(this.COLL, [['up', '>', new Date(Math.max(0, wm - 10 * 60 * 1000))]]).filter(d => d.date);
+    },
+    // Timed trigger: day docs edited since the last run → Sheet. A Sheet copy that isn't the one the edit started
+    // from (another edit lost under "newest wins") goes to Backup first. Returns the number of sections copied.
+    mirror() {
+      if (!this.db_()) return 0;
+      const docs = this.unmirrored_();
+      let n = 0, top = 0;
+      docs.forEach(doc => {
+        top = Math.max(top, Number(doc.up) || 0);
+        const fields = this.FIELDS.filter(f => doc[f + 'At']);
+        if (!fields.length) return;
+        const sh = this.sheet_(), row = findDayRow_(sh, doc.date);
+        const cur = { exists: !!row, ref_: row };
+        fields.forEach(f => { cur[f] = ''; });
+        if (row) {
+          const vals = sh.getRange(row, 2, 1, Math.min(4, sh.getMaxColumns() - 1)).getValues()[0];
+          fields.forEach(f => { cur[f] = String(vals[STORE_DAY_COLS_[f] - 2] || ''); });
+        }
+        const put = {};
+        fields.forEach(f => {
+          const v = String(doc[f] == null ? '' : doc[f]);
+          if (v === cur[f]) return;
+          if (cur[f] && doc[f + 'Base'] && cellHash_(cur[f]) !== doc[f + 'Base']) {
+            backupCell_(doc.date, this.LABEL[f], 'Sheet copy replaced by a newer edit (newest wins)' + (doc.dev ? ' · ' + doc.dev : ''), cur[f]);
+          }
+          put[f] = v;
+        });
+        if (Object.keys(put).length) { this.sheetSet_(doc.date, put, cur); n += Object.keys(put).length; }
+      });
+      if (top) PropertiesService.getScriptProperties().setProperty(this.MIRROR_KEY, String(top));
+      return n;
     },
     // Days with startDate <= date <= endDate, as { date, tasks, journal, plan, tho }, sorted by date.
     // Reads the date column, then only the matching rows in contiguous runs.
@@ -199,7 +278,7 @@ const Store = {
           if (key && key >= startDate && key <= endDate) matches.push({ row: i + 2, date: key });
         }
       });
-      if (!matches.length) return [];
+      if (!matches.length) { const o = []; if (this.db_()) this.layRange_(o, startDate, endDate, timer); return o.sort((a, b) => a.date.localeCompare(b.date)); }
       // Contiguous runs, so rows appended at the bottom don't pull in the whole sheet.
       matches.sort((a, b) => a.row - b.row);
       const runs = [];
@@ -220,8 +299,19 @@ const Store = {
             plan: width > 2 ? String(row[2] || '') : '', tho: width > 3 ? String(row[3] || '') : '' });
         });
       });
+      if (this.db_()) this.layRange_(out, startDate, endDate, timer);
       out.sort((a, b) => a.date.localeCompare(b.date));
       return out;
+    },
+    layRange_(out, startDate, endDate, timer) {
+      const docs = speedPart_(timer, 'schedule.dbRead', () => StoreFs.query(this.COLL, [['date', '>=', startDate], ['date', '<=', endDate]]));
+      const by = {};
+      out.forEach(d => { by[d.date] = d; });
+      docs.forEach(doc => {
+        if (!doc.date) return;
+        if (!by[doc.date]) { by[doc.date] = { date: doc.date, tasks: '', journal: '', plan: '', tho: '' }; out.push(by[doc.date]); }
+        this.lay_(by[doc.date], doc);
+      });
     },
     // One day's fields: get(date, ['tasks', 'journal']) → { exists, tasks, journal, ref_ }.
     get(date, fields) {
@@ -230,7 +320,7 @@ const Store = {
       const row = findDayRow_(sh, date);
       const out = { exists: !!row, ref_: row };
       fields.forEach(f => { out[f] = ''; });
-      if (!row) return out;
+      if (!row) return this.db_() ? this.lay_(out, this.doc_(date), fields) : out;
       const cols = this.cols_(fields);
       const lo = Math.min.apply(null, cols);
       let hi = Math.max.apply(null, cols);
@@ -238,10 +328,28 @@ const Store = {
       if (hi < lo) return out;
       const vals = sh.getRange(row, lo, 1, hi - lo + 1).getValues()[0];
       fields.forEach((f, i) => { const c = cols[i]; if (c <= hi) out[f] = String(vals[c - lo] || ''); });
-      return out;
+      return this.db_() ? this.lay_(out, this.doc_(date), fields) : out;
     },
     // Write only the given fields; creates the day if missing. rec = what get() returned (optional).
+    // Database: the same sections also go into the day's doc (server time wins as the newest edit).
     set(date, values, rec) {
+      const fields = Object.keys(values || {});
+      if (!fields.length) return;
+      this.cols_(fields);
+      this.sheetSet_(date, values, rec);
+      if (!this.db_()) return;
+      // Only sections that actually change (rec = what get() read): an unchanged copy must not get a fresh time,
+      // or it would beat a newer edit still queued on a phone.
+      const at = Date.now(), d = { date: date, at: at, up: new Date(at), dev: 'server' };
+      let n = 0;
+      fields.forEach(f => {
+        const v = String(values[f] == null ? '' : values[f]);
+        if (rec && f in rec && rec[f] === v) return;
+        d[f] = v; d[f + 'At'] = at; d[f + 'Base'] = ''; n++;
+      });
+      if (n) StoreFs.patch(this.COLL + '/' + date, d);
+    },
+    sheetSet_(date, values, rec) {
       const fields = Object.keys(values || {});
       if (!fields.length) return;
       const sh = this.sheet_();
@@ -268,6 +376,7 @@ const Store = {
     },
     // Today cell with a cached row hint (import path, read every load).
     peekTasks(date) {
+      if (this.db_()) return this.get(date, ['tasks']);
       const r = readDoneToday_(this.sheet_(), date);
       return { exists: !!r.row, tasks: r.content, ref_: r.row };
     },
@@ -553,9 +662,11 @@ const Store = {
   mirror() {
     if (!FIREBASE_PROJECT_) return { off: true };
     return storeLocked_(() => {
-      const out = { kim: Store.kim.mirror(), backups: 0 };
+      const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), backups: 0 };
       StoreFs.list('ganttBackup').forEach(b => {
-        backupCell_(b.area === 'kim' ? Store.kim.SHEET : 'Database: ' + b.area, b.area === 'kim' ? 'A2' : '', (b.reason || 'lost edit') + (b.dev ? ' · ' + b.dev : ''), b.html || '');
+        const where = b.area === 'kim' ? Store.kim.SHEET : b.area === 'days' && b.date ? b.date : 'Database: ' + b.area;
+        const col = b.area === 'kim' ? 'A2' : b.area === 'days' ? (Store.days.LABEL[b.field] || b.field || '') : '';
+        backupCell_(where, col, (b.reason || 'lost edit') + (b.dev ? ' · ' + b.dev : ''), b.html || '');
         StoreFs.del('ganttBackup/' + b.id_);
         out.backups++;
       });

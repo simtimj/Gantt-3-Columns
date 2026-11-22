@@ -1,4 +1,4 @@
-// Firestore security rules for the Gantt app (2026-11-22, docs/NOTES.md → H3).
+// Firestore security rules for the Gantt app (2026-11-22, docs/NOTES.md → H3, H4).
 // Paste into Firebase console → Firestore → Rules → Publish.
 // Only Julius's Google account can read or write. "Newest edit wins": an update must carry a newer `at`
 // (saved-at ms) than the stored copy, so an old offline edit can't overwrite a newer one; the app then saves
@@ -15,6 +15,19 @@ service cloud.firestore {
       allow read: if me();
       allow create: if me() && request.resource.data.at is int;
       allow update: if me() && request.resource.data.at is int && request.resource.data.at > resource.data.at;
+      allow delete: if false;
+    }
+    // Days (H4): doc per day. Newest wins per section: every section an update changes (tasks, journal, plan,
+    // tho) must carry a newer <section>At than the stored one; untouched sections can't be changed.
+    function newer(f) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([f, f + 'At'])
+        || (request.resource.data[f + 'At'] is int && request.resource.data[f + 'At'] > resource.data.get(f + 'At', 0));
+    }
+    match /ganttDays/{day} {
+      allow read: if me();
+      allow create: if me() && request.resource.data.date == day && request.resource.data.at is int;
+      allow update: if me() && request.resource.data.date == day && request.resource.data.at is int
+        && newer('tasks') && newer('journal') && newer('plan') && newer('tho');
       allow delete: if false;
     }
     match /ganttBackup/{id} {

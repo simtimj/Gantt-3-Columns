@@ -68,9 +68,9 @@ g = ctx.getKim(); assert.equal(g.html, '<div>legacy</div>'); assert.equal(g.at, 
 // Database backend without a Firebase project fails loudly instead of silently using the Sheet.
 vm.runInContext("STORE_BACKEND.kim = 'db'", ctx);
 assert.throws(() => ctx.getKim(), /FIREBASE_PROJECT_ is empty/);
-vm.runInContext("STORE_BACKEND.days = 'db'", ctx);
-assert.throws(() => vm.runInContext("storeBackend_('days')", ctx), /not built yet/);
-vm.runInContext("STORE_BACKEND.days = 'sheet'", ctx);
+vm.runInContext("STORE_BACKEND.ref = 'db'", ctx);
+assert.throws(() => vm.runInContext("storeBackend_('ref')", ctx), /not built yet/);
+vm.runInContext("STORE_BACKEND.ref = 'sheet'", ctx);
 console.log('✓ store-test: Keep In Mind through Store.kim');
 
 // Database step (2026-11-22, NOTES H3): Keep In Mind on Firestore (fake REST), Sheet mirror, lost-edit backups.
@@ -79,8 +79,9 @@ console.log('✓ store-test: Keep In Mind through Store.kim');
   const fctx = vm.createContext(Object.assign({}, ctx, {
     ScriptApp: { getOAuthToken: () => 'tok' },
     UrlFetchApp: { fetch(url, o) {
-      const p = decodeURIComponent(url.split('/documents/')[1].split('?')[0]); reqs.push([o.method, p, o.headers]);
       const res = (code, body) => ({ getResponseCode: () => code, getContentText: () => body ? JSON.stringify(body) : '' });
+      if (url.includes('/documents:runQuery')) return res(200, [{ readTime: 'now' }]); // no day docs here (H4 test below)
+      const p = decodeURIComponent(url.split('/documents/')[1].split('?')[0]); reqs.push([o.method, p, o.headers]);
       if (o.method === 'get' && p === 'ganttBackup') return res(200, { documents: Object.keys(fsDocs).filter(k => k.startsWith('ganttBackup/')).map(k => ({ name: 'x/' + k, fields: fsDocs[k] })) });
       if (o.method === 'get') return fsDocs[p] ? res(200, { name: 'x/' + p, fields: fsDocs[p] }) : res(404, { error: 1 });
       if (o.method === 'patch') { fsDocs[p] = JSON.parse(o.payload).fields; return res(200, {}); }
@@ -142,7 +143,7 @@ ctx.appendTaskToDay('2026-11-23', 'Walk');
 assert.match(days()[3][1], /check-text">Walk</); assert.equal(ctx.getDayTasks('2026-11-23')[0].text, 'Walk');
 assert.equal(ctx.getDayTasks('2026-12-31').length, 0);
 vm.runInContext("STORE_BACKEND.days = 'db'", ctx);
-assert.throws(() => ctx.getDayTasks('2026-11-23'), /not built yet/);
+assert.throws(() => ctx.getDayTasks('2026-11-23'), /FIREBASE_PROJECT_ is empty/);
 console.log('✓ store-test: Days through Store.days (saves, pads, range, append)');
 
 // Reference + Archive through Store.ref / Store.archive.
@@ -214,3 +215,76 @@ assert.throws(() => vm.runInContext("Store.sheetFirst('Days')", ctx), /not a She
 assert.equal(vm.runInContext("Store.sheetFirst('New Tasks', { create: false })", ctx), null);
 assert.ok(vm.runInContext("Store.sheetFirst('Looks')", ctx));
 console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
+
+// H4 (2026-11-22): Days on Firestore (fake REST): server writes go to the Sheet and the day doc, PWA edits in the
+// doc show on top of the Sheet, the mirror copies them in (lost Sheet copy → Backup), day backups land on their day.
+{
+  const fsDocs = {};
+  const val = v => 'integerValue' in v ? Number(v.integerValue) : 'timestampValue' in v ? Date.parse(v.timestampValue) : v.stringValue;
+  const hit = (doc, f) => {
+    if (f.compositeFilter) return f.compositeFilter.filters.every(x => hit(doc, x));
+    const a = doc[f.fieldFilter.field.fieldPath]; if (!a) return false;
+    const x = val(a), y = val(f.fieldFilter.value);
+    return { GREATER_THAN: x > y, GREATER_THAN_OR_EQUAL: x >= y, LESS_THAN: x < y, LESS_THAN_OR_EQUAL: x <= y, EQUAL: x === y }[f.fieldFilter.op];
+  };
+  const dctx = vm.createContext(Object.assign({}, ctx, {
+    ScriptApp: { getOAuthToken: () => 'tok' },
+    UrlFetchApp: { fetch(url, o) {
+      const res = (code, body) => ({ getResponseCode: () => code, getContentText: () => body ? JSON.stringify(body) : '' });
+      if (url.includes('/documents:runQuery')) {
+        const q = JSON.parse(o.payload).structuredQuery, coll = q.from[0].collectionId + '/';
+        return res(200, Object.keys(fsDocs).filter(k => k.startsWith(coll) && hit(fsDocs[k], q.where)).map(k => ({ document: { name: 'x/' + k, fields: fsDocs[k] } })).concat([{ readTime: 'now' }]));
+      }
+      const [path, qs] = url.split('/documents/')[1].split('?'), p = decodeURIComponent(path);
+      if (o.method === 'get' && p === 'ganttBackup') return res(200, { documents: Object.keys(fsDocs).filter(k => k.startsWith('ganttBackup/')).map(k => ({ name: 'x/' + k, fields: fsDocs[k] })) });
+      if (o.method === 'get') return fsDocs[p] ? res(200, { name: 'x/' + p, fields: fsDocs[p] }) : res(404, { error: 1 });
+      if (o.method === 'patch') {
+        const f = JSON.parse(o.payload).fields;
+        fsDocs[p] = qs && qs.includes('updateMask') ? Object.assign(fsDocs[p] || {}, f) : f;
+        return res(200, {});
+      }
+      if (o.method === 'delete') { delete fsDocs[p]; return res(200, null); }
+    } }
+  }));
+  for (const k of Object.keys(tabs)) delete tabs[k];
+  for (const k of Object.keys(props)) delete props[k];
+  const src = fs.readFileSync('Store.gs', 'utf8').replace("const FIREBASE_PROJECT_ = '';", "const FIREBASE_PROJECT_ = 'g-test';");
+  vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + src + '\nthis.Store = Store;' +
+    "\nformatDate_ = v => v instanceof Date ? v.toISOString().slice(0, 10) : String(v || ''); parseDate_ = v => new Date(v + 'T00:00:00Z');", dctx);
+  assert.equal(vm.runInContext('STORE_BACKEND.days', dctx), 'db');
+  const H = s => dctx.cellHash_(s), day = d => vm.runInContext("new Date('" + d + "T00:00:00Z')", dctx);
+  ss.insertSheet('Days').rows.push(['Date', 'Today', 'Notes', 'Plan', 'Thoughts'], [day('2026-11-21'), '<div>t0</div>', '<div>n0</div>', '', '']);
+  const S = () => tabs.Days.rows, doc = d => fsDocs['ganttDays/' + d], str = (d, f) => doc(d)[f] && doc(d)[f].stringValue;
+  // Server save: Sheet + only the changed section in the day doc.
+  let r = dctx.saveDay('2026-11-21', '<div>t1</div>', '<div>n0</div>', { th: H('<div>t0</div>'), jh: H('<div>n0</div>'), ct: true, cj: false });
+  assert.ok(!r.conflictT); assert.equal(S()[1][1], '<div>t1</div>');
+  assert.equal(str('2026-11-21', 'tasks'), '<div>t1</div>'); assert.ok(doc('2026-11-21').tasksAt); assert.equal(doc('2026-11-21').journal, undefined);
+  assert.equal(str('2026-11-21', 'date'), '2026-11-21'); assert.ok(doc('2026-11-21').up.timestampValue);
+  // A PWA edit (Notes) in the doc shows on top of the Sheet everywhere, before the mirror runs.
+  const now = Date.now(), up = { timestampValue: new Date(now).toISOString() };
+  Object.assign(doc('2026-11-21'), { journal: { stringValue: '<div>pwa</div>' }, journalAt: { integerValue: String(now) }, journalBase: { stringValue: H('<div>n0</div>') }, up: up, dev: { stringValue: 'phone-1' } });
+  assert.equal(dctx.Store.days.get('2026-11-21', ['journal']).journal, '<div>pwa</div>');
+  assert.equal(dctx.Store.days.range('2026-11-20', '2026-11-22')[0].journal, '<div>pwa</div>');
+  assert.equal(dctx.Store.days.all().rows[0][2], '<div>pwa</div>');
+  // Stale base hash on the server conflicts against the doc copy.
+  r = dctx.saveDay('2026-11-21', '<div>t1</div>', '<div>old</div>', { th: H('<div>t1</div>'), jh: H('<div>n0</div>'), ct: false, cj: true });
+  assert.equal(r.conflictJ, true); assert.equal(r.journal, '<div>pwa</div>');
+  // A day only in the database (made on the phone) shows up in range and gets a Sheet row from the mirror.
+  fsDocs['ganttDays/2026-11-25'] = { date: { stringValue: '2026-11-25' }, at: { integerValue: String(now) }, up: up, plan: { stringValue: '<div>plan</div>' }, planAt: { integerValue: String(now) }, planBase: { stringValue: '' } };
+  assert.equal(dctx.Store.days.range('2026-11-24', '2026-11-26')[0].plan, '<div>plan</div>');
+  const backups0 = tabs.Backup ? tabs.Backup.rows.length : 1; // + header row when the tab gets made
+  fsDocs['ganttBackup/b2'] = { area: { stringValue: 'days' }, date: { stringValue: '2026-11-21' }, field: { stringValue: 'tasks' }, html: { stringValue: '<div>lost</div>' }, reason: { stringValue: 'older edit lost (newest wins)' }, dev: { stringValue: 'pc-1' } };
+  let m = dctx.Store.mirror();
+  assert.equal(m.days, 2); assert.equal(m.backups, 1);
+  assert.equal(S()[1][2], '<div>pwa</div>'); assert.equal(S()[2][3], '<div>plan</div>');
+  assert.equal(tabs.Backup.rows.length, backups0 + 1);
+  assert.equal(tabs.Backup.rows.at(-1).slice(1, 3).join(), '2026-11-21,Today'); assert.equal(tabs.Backup.rows.at(-1)[4], '<div>lost</div>');
+  assert.equal(dctx.Store.mirror().days, 0); // nothing new
+  // An edit that didn't start from the Sheet's copy: the Sheet copy goes to Backup before it's replaced.
+  S()[1][2] = '<div>sheet only</div>';
+  Object.assign(doc('2026-11-21'), { journal: { stringValue: '<div>pwa2</div>' }, journalAt: { integerValue: String(now + 5) }, journalBase: { stringValue: H('<div>pwa</div>') }, up: { timestampValue: new Date(now + 5).toISOString() } });
+  m = dctx.Store.mirror();
+  assert.equal(m.days, 1); assert.equal(S()[1][2], '<div>pwa2</div>');
+  assert.equal(tabs.Backup.rows.at(-1)[4], '<div>sheet only</div>'); assert.match(tabs.Backup.rows.at(-1)[3], /newest wins\) · phone-1/);
+  console.log('✓ store-test: Days on Firestore (overlay, per-section saves, mirror, day backups)');
+}

@@ -2283,4 +2283,8 @@ body.one-day #journalScroll .day-row.od-on .journal-editor{padding-top:0!importa
     background:var(--ws-surface);box-shadow:none;
   }
   body.tb-hidden #workspace{margin-top:var(--ws-gap);}
+  /* Reference drawer starts closed (2026-11-22, Julius: "the Reference pops up first when I open the app"). The drawer's
+     full CSS sits in Index_Layout at the end of the page, so until it parsed the pane showed as a column and then slid away.
+     The markup carries .rd-drawer from the start; this keeps it off screen from the first paint. */
+  body:not(.rd-open) #workspace #referencePane.rd-drawer{position:fixed!important;visibility:hidden;transform:translateX(105%);}
 </style>

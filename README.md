@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-21
+Last updated: 2026-11-22
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -76,6 +76,9 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-22)
+- **Reference no longer pops up on open**: the Next Steps + Reference drawer starts closed from the very first paint (it used to show as a column and slide away while the page loaded, most visible in the fast-opening PWA). Opens only from the Ref button, the ◀ tab or an edge swipe.
 
 ## 🧪 To be confirmed (2026-11-21)
 - **Workspace shell: cells in one workspace** (2026-11-21, dark first): the whole grid sits in one frame with ~14px rounded corners and a 1px border; cells meet with 1px lines (no doubled or 2px lines, square inside corners). Every cell gets the same header strip — History / Log, the middle cell (shows the open tab's name: Dailies, Keep In Mind, Day Review… with the tab symbols on the right; narrow phone columns show just the symbols), Timer, Focus / Thinking, Cal Events, Next Steps, Reference — same height, title left, existing buttons right. Cell padding 16px on a computer, 12px on a tablet, 8px on the phone (Options → Padding ↔ and Side space still scale it; Divider color / Line strength still tint the lines). The Next Steps + Reference drawer fills exactly the right half of the frame (whole frame on the phone). Urgency, day and done colors unchanged. Phone Cal Events header tightened so ⚙ BL ↻ no longer run off the edge. Check: /dev in dark on phone + PC.
@@ -727,6 +730,10 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Padding: Reference may need its own padding settings later, separate from Today/Notes.
 
 ## 📋 To do
+
+- **Drag to calendar from Keep In Mind / Focus-Thinking** (2026-11-22, Julius; captured, Calendar is parked): drag a line from Keep In Mind or the Focus/Thinking section onto the calendar to schedule it; the line **stays where it is** (only he moves it), and gets a small "scheduled" mark so he can see what is and isn't on the calendar.
+
+- **Maintenance batch (2026-11-22, Julius; captured for the next maintenance session)**: docked (half) calendar **Today** button squarer, not a pill · docked calendar: **draggable** divider between the events list and the timeline, and a thinner line · **Keep In Mind** borders thinner, and only one border around each category section (looks doubled now). · **Keep In Mind pin**: when a section is pinned, show the pin **and** the task count (pin currently replaces the count); pin button only as big as the pin; tapping the pin unpins it and drops the section right below the pinned ones (most recent first). · **Keep In Mind tab buttons** (★, red circle, etc.): highlight square hugs just the icon (now big and overlapping the next button), equal spacing between all of them.
 
 - **Follow the now line** (2026-11-21, idea): a setting that keeps the calendar's current-time line in view through the day when zoomed in (auto-scroll as time passes). Open questions in docs/NOTES.md → Google-style event pop-up section.
 

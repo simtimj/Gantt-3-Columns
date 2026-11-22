@@ -2,6 +2,10 @@
 
 Where things live, so a session can jump straight there. **Grep the quoted text; don't trust line numbers** (they drift; the ones here are only rough). Update this file when you add or move a big section.
 
+## Store.gs — storage layer (2026-11-21, NOTES "H2")
+
+Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.mjs` + `tools/store-baseline.json`, run by `check.mjs`). `STORE_BACKEND` (area → `'sheet'`, later `'db'`), `Store.<area>` objects returning `{ value, at }`, `Store.locked(fn)`. Moved: `kim`. Test: `tools/store-test.mjs`. Moving an area: add `Store.<area>`, point the feature at it, extend store-test, `node tools/store-guard.mjs --update`.
+
 ## Index.html (split 2026-11-21, speed item G)
 
 `Index.html` is now a small shell (head, theme script, page markup, start-up scriptlets) that pulls in six parts with `<?!= HtmlService.createHtmlOutputFromFile('Index_X').getContent() ?>`. Parts are raw HTML (no scriptlets: anything with `<?= ?>` must stay in the shell). Order in the page = order below. Tools read the joined page with `tools/index-html.mjs` → `readIndexHtml()`; the part list also lives in Code.gs `INDEX_PARTS_` (build hash). Line numbers below are of the **joined** page.

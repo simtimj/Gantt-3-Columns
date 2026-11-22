@@ -4,6 +4,10 @@ on:
     paths:
       - 'Code.gs'
       - 'StudyLog.gs'
+      - 'Store.gs'
+      - 'tools/store-test.mjs'
+      - 'tools/store-guard.mjs'
+      - 'tools/store-baseline.json'
       - 'Index.html'
       - 'Index_*.html'
       - 'tools/index-html.mjs'
@@ -40,6 +44,7 @@ jobs:
         with:
           node-version: 20
       - run: node tools/check.mjs
+      - run: node tools/store-test.mjs
       - run: node tools/draft-test.mjs
       - run: node tools/save-timing-test.mjs
       - run: node tools/speed-summary-test.mjs

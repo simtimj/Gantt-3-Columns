@@ -8,6 +8,8 @@ Google Apps Script web app (Today / Notes / Reference columns over a Google Shee
 - Write decisions to NOTES / README as they're made (the next session only knows what's written).
 - Non-code jobs (Sheets rows, calendar, Done Log, Reference cards, Central Data Hub, userscripts, IT study log): rules in `docs/RULES.md`, open the section you need.
 
+- **Storage rule (2026-11-21)**: new features read/write data only via `Store.*` (`Store.gs`), never the Sheet or Properties directly; `check.mjs` fails on new direct calls. Moving areas in: NOTES "H2".
+
 ## Git + checks
 - **Commit as Julius**: `git -c user.name="Julius Simtim" -c user.email="juliussimtim@gmail.com" commit ...`; Claude only in Co-Authored-By.
 - **Before every push**: `node tools/check.mjs && node tools/smoke.mjs` (`SMOKE_ONLY=calendar` etc. to run one suite while iterating). Extend `tools/smoke.mjs`, don't build a new harness.

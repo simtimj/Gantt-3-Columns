@@ -4097,27 +4097,20 @@ function calBacklogComplete(req) {
    `fresh` = never saved yet → the client builds the first copy (latest day's Keep In Mind lines + the old
    category items as plain lines) and saves it. docs/NOTES.md → "Keep In Mind shared list".
    ========================================================= */
-const KIM_SHEET = 'Keep In Mind';
-function kimSheet_() { return getOrCreateSheet_(KIM_SHEET, ['Keep In Mind (shared list, HTML) — edited in the app']); }
+// Storage goes through Store.kim (Store.gs, 2026-11-21 H2); no Sheet calls here.
 function getKim() {
-  const sh = kimSheet_();
-  const html = String(sh.getRange(2, 1).getValue() || '');
-  const fresh = !html && PropertiesService.getScriptProperties().getProperty('kimMigrated') !== '1';
-  return { html: html, h: cellHash_(html), fresh: fresh, build: appBuild_() };
+  const rec = Store.kim.read();
+  const fresh = !rec.value && !Store.kim.migrated();
+  return { html: rec.value, h: cellHash_(rec.value), at: rec.at, fresh: fresh, build: appBuild_() };
 }
 function saveKim(html, baseHash) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sh = kimSheet_();
-    const cur = String(sh.getRange(2, 1).getValue() || '');
+  return Store.locked(() => {
+    const cur = Store.kim.read().value;
     html = String(html || '');
     if (baseHash !== cellHash_(cur)) return { conflict: true, html: cur, h: cellHash_(cur), build: appBuild_() };
-    if (cur.length > 400 && html.length < cur.length * 0.6) backupCell_('Keep In Mind', 'A2', 'big shrink', cur);
-    sh.getRange(2, 1).setValue(html);
-    PropertiesService.getScriptProperties().setProperty('kimMigrated', '1');
-    return { h: cellHash_(html), build: appBuild_() };
-  } finally {
-    lock.releaseLock();
-  }
+    if (cur.length > 400 && html.length < cur.length * 0.6) Store.kim.backup('big shrink', cur);
+    const rec = Store.kim.write(html);
+    Store.kim.setMigrated();
+    return { h: cellHash_(html), at: rec.at, build: appBuild_() };
+  });
 }

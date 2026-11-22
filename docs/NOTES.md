@@ -1057,3 +1057,15 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Phone (≤720px) Cal Events strip: padding 3px, gap 2px, search box 34px (smoke minimum), date title 12px and may ellipsize, so the last button stays inside the column (it overflowed ~15px before this change too).
 - Smoke: Reference half, phone drawer width and calendar right edge compare to the frame (inner edge), not the screen; phone "tap outside the card" aims beside the card.
 - Not restyled: the calendar's own internals and the backlog column's inner header.
+
+## H2. Storage layer + database plan (2026-11-21 21:15, Julius; continues "H. App upgrade")
+- Goal: no work that has to be converted later. **Rule: new features call `Store.*` (Store.gs), never the Sheet or Properties directly.** Enforced by `tools/check.mjs` (ratchet: direct Sheet/Properties calls per file may only go down; `tools/store-baseline.json`).
+- Answers (Julius, all recommended picks):
+  1. **Database: Firestore** (Firebase). Free tier, offline persistence + multi-device sync built in, works from GitHub Pages. Sheet stays as backup mirror.
+  2. **Offline edits: queue and send later** (replaces "Offline · read-only" once an area is on Firestore).
+  3. **Conflicts: newest edit wins, the other version goes to the Backup tab.** Every Store record carries `at` (saved-at ms) for this.
+  4. **First area: Keep In Mind** (smallest; proves the layer end to end).
+- Audit (2026-11-21): ~155 direct Sheet calls, 15 tabs + ~55 Properties calls. Areas: Days (Today/Notes/pads) · Reference + Archive · Plan + Cal Backlog · Keep In Mind · Timer Log · Study Sessions/Review · AI-shared (Done Log, New Tasks, To Confirm) · logs (Speed Log, Backup, Looks) · Properties items (Focus, Fun, New Things, Inbox, card cats, calendar picks, hide list).
+- **Move order**: Keep In Mind ✅ → Days → Reference + Archive → Plan + Cal Backlog → Timer → Properties items → Study → logs + AI-shared (wrapped but stay Sheet-first: ChatGPT/Claude write those tabs directly).
+- Layout: `Store.gs` holds `STORE_BACKEND` (area → `'sheet'`, later `'db'`) and one object per area (`Store.kim.read()` / `.write(value)` returning `{ value, at }`). Flipping an area to Firestore = change its backend, write mirror to the Sheet; feature code untouched. Client side needs nothing: all calls already go through google.script.run / the PWA shim (offline queue will live in the shim).
+- Keep In Mind tab: A2 = list HTML, **B2 = saved-at (ms)** (new, for newest-wins).

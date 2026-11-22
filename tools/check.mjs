@@ -2,6 +2,7 @@
 // Parses (never runs) Code.gs, the root .js files and every inline <script> in the .html files.
 // .mjs on purpose: clasp only pushes .gs/.js/.html/.json, so this file never reaches Apps Script.
 import fs from 'fs';
+import { storeGuard } from './store-guard.mjs';
 let bad = 0;
 const parse = (code, where) => {
   try { new Function(code); }
@@ -20,3 +21,6 @@ for (const f of [...fs.readdirSync('.'), ...fs.readdirSync('tracker').map(x => '
 }
 if (bad) { console.error(bad + ' syntax error(s)'); process.exit(1); }
 console.log('✓ syntax OK');
+// Storage layer (2026-11-21 H2): no new direct Sheet/Properties calls outside Store.gs.
+if (storeGuard()) process.exit(1);
+console.log('✓ storage layer: no new direct calls');

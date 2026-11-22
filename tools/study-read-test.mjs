@@ -26,7 +26,7 @@ function fixture() {
     LockService:{getScriptLock:()=>({tryLock(){if(faults.onLock)faults.onLock();return !faults.busy;},releaseLock(){faults.released=true;}})},
     Utilities:{formatDate:()=> '2026-11-08 09:15'},Session:{getScriptTimeZone:()=> 'UTC'}
   });
-  vm.runInContext(fs.readFileSync('Code.gs','utf8'),ctx);
+  vm.runInContext((fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8')),ctx);
   vm.runInContext(fs.readFileSync('StudyLog.gs','utf8'),ctx);
   ctx.todayString_=()=> '2026-11-08';
   ctx.formatDate_=v=>v instanceof Date?v.toISOString().slice(0,10):String(v||'');

@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-const source = fs.readFileSync('Code.gs','utf8');
+const source = (fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8'));
 function fixture() {
   const reads=[], cache=new Map(), faults={}, props={claudeDoneApplied:'["s-one"]',claudeDoneGrouped:'2',claudeDoneSec:'1'};
   const rows=[['Date','Tasks'],['2026-11-07','old'],['2026-11-08','current']];

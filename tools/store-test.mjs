@@ -18,6 +18,8 @@ function fakeSheet() {
       }),
       appendRow: row => rows.push(row),
       getLastRow: () => rows.length,
+      getMaxColumns: () => Math.max(sh.cols || 0, ...rows.map(r => r.length)),
+      insertColumnsAfter: (_, n) => { sh.cols = sh.getMaxColumns() + n; },
       deleteRows: () => {}
     };
     return sh;
@@ -61,3 +63,36 @@ g = ctx.getKim(); assert.equal(g.html, '<div>legacy</div>'); assert.equal(g.at, 
 vm.runInContext("STORE_BACKEND.kim = 'db'", ctx);
 assert.throws(() => ctx.getKim(), /not built yet/);
 console.log('✓ store-test: Keep In Mind through Store.kim');
+
+// Days through Store.days (fields tasks / journal / plan / tho).
+vm.runInContext("STORE_BACKEND.kim = 'sheet'; formatDate_ = v => v instanceof Date ? v.toISOString().slice(0, 10) : String(v || ''); parseDate_ = v => new Date(v + 'T00:00:00Z');", ctx);
+const D = vm.runInContext('Store.days', ctx), days = () => tabs.Days.rows;
+assert.equal(D.get('2026-11-21', ['tasks']).exists, false);
+// saveDay on a missing day appends one row [date, Today, Notes].
+let s1 = ctx.saveDay('2026-11-21', '<div>t</div>', '<div>n</div>');
+assert.equal(s1, true); assert.equal(days().length, 2); assert.equal(JSON.stringify(days()[1].slice(1)), JSON.stringify(['<div>t</div>', '<div>n</div>']));
+// Safe save: only the changed column is written, stale hash sends the server copy back.
+const th = ctx.cellHash_('<div>t</div>'), jh = ctx.cellHash_('<div>n</div>');
+let s2 = ctx.saveDay('2026-11-21', '<div>t2</div>', 'ignored', { th: th, jh: jh, ct: true, cj: false });
+assert.equal(days()[1][1], '<div>t2</div>'); assert.equal(days()[1][2], '<div>n</div>'); assert.ok(!s2.conflictT);
+s2 = ctx.saveDay('2026-11-21', '<div>x</div>', '', { th: 'stale', jh: jh, ct: true, cj: false });
+assert.equal(s2.conflictT, true); assert.equal(s2.tasks, '<div>t2</div>'); assert.equal(days()[1][1], '<div>t2</div>');
+// Plan pad adds column D with its header; Thoughts pad column E.
+let p1 = ctx.savePlanPad('2026-11-21', '<div>plan</div>', '');
+assert.ok(!p1.conflict); assert.equal(days()[0][3], 'Plan'); assert.equal(days()[1][3], '<div>plan</div>');
+ctx.saveThoughtPad('2026-11-22', '<div>tho</div>', '');
+assert.equal(days()[0][4], 'Thoughts'); assert.equal(days()[2][4], '<div>tho</div>'); assert.equal(days()[2][1], '');
+assert.equal(ctx.getScratchPad('2026-11-22').html, '<div>tho</div>');
+// Reads: one day, a range, everything.
+assert.deepEqual(JSON.parse(JSON.stringify(D.get('2026-11-21', ['journal', 'plan']))), { exists: true, ref_: 2, journal: '<div>n</div>', plan: '<div>plan</div>' });
+const rg = ctx.getDaysRange_('2026-11-20', '2026-11-22');
+assert.equal(JSON.stringify(rg.map(d => [d.date, d.tasks, d.plan, d.tho])), JSON.stringify([['2026-11-21', '<div>t2</div>', '<div>plan</div>', ''], ['2026-11-22', '', '', '<div>tho</div>']]));
+assert.equal(rg[0].th, ctx.cellHash_('<div>t2</div>'));
+assert.equal(ctx.readAllDays_().width, 5); assert.equal(ctx.readAllDays_().rows.length, 2);
+// Append helpers and the planning read.
+ctx.appendTaskToDay('2026-11-23', 'Walk');
+assert.match(days()[3][1], /check-text">Walk</); assert.equal(ctx.getDayTasks('2026-11-23')[0].text, 'Walk');
+assert.equal(ctx.getDayTasks('2026-12-31').length, 0);
+vm.runInContext("STORE_BACKEND.days = 'db'", ctx);
+assert.throws(() => ctx.getDayTasks('2026-11-23'), /not built yet/);
+console.log('✓ store-test: Days through Store.days (saves, pads, range, append)');

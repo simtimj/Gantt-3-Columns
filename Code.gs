@@ -38,10 +38,7 @@ const VIEWPORT =
    every POST to apiCall(). Same functions google.script.run can call (no trailing _),
    gated by the PWA_KEY script property.
    ========================================================= */
-const GANTT_SS_ID = '1D9aR_pJgddDdO5PD66IBlsDIIT_VbFKYfjvwccR08AE';
 const PWA_URL = 'https://simtimj.github.io/Gantt-3-Columns/';
-// Inside the router the library has no active spreadsheet, so fall back to the ID.
-function ss_() { return SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.openById(GANTT_SS_ID); }
 
 function pwaKey_() {
   const props = PropertiesService.getScriptProperties();
@@ -140,64 +137,7 @@ function doGet(e) {
 }
 
 
-/* =========================================================
-   SETUP
-   ========================================================= */
-
-// Full setup. Safe to run by hand from the editor at any time.
-function setupWorkspace(opts) {
-  const days = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const reference = getOrCreateSheet_('Reference', REF_HEADERS);
-
-  // Keep a reasonable amount of stored date coverage.
-  speedPart_(opts && opts.timer, 'setup.dateCoverage', () => ensureDayRange_(days, 730, 365));
-
-  const props = PropertiesService.getScriptProperties();
-  // Routine date maintenance must not reformat the entire date column daily.
-  // Include tab IDs so replacing either tab invalidates this one-time hint.
-  const formatVersion = '1:' + days.getSheetId() + ':' + reference.getSheetId();
-  if (!(opts && opts.daily) || props.getProperty('workspaceFormatVersion') !== formatVersion) {
-    days.setFrozenRows(1);
-    reference.setFrozenRows(1);
-    days.getRange('A:A').setNumberFormat('yyyy-mm-dd');
-    // Publish only after all format operations succeed; failed setup retries.
-    props.setProperty('workspaceFormatVersion', formatVersion);
-  }
-  props.setProperty('lastSetupDate', todayString_());
-
-  return true;
-}
-
-
-// Cheap check used by every request: run the full setup only once per day,
-// or right away if a sheet is missing.
-function ensureSetup_(timer) {
-  const today = todayString_();
-  const props = PropertiesService.getScriptProperties();
-  // Already set up today: one property read (2026-11-05: the two sheet look-ups cost ~0.3 s every load;
-  // a missing tab is still created by getOrCreateSheet_ wherever it's used).
-  if (props.getProperty('lastSetupDate') === today) return;
-  const ss = ss_();
-
-  const lock = LockService.getScriptLock();
-  if (!speedPart_(timer, 'setup.lock', () => lock.tryLock(10000))) {
-    return; // Another request is already doing it.
-  }
-
-  try {
-    const stillNeeded =
-      !ss.getSheetByName('Days') ||
-      !ss.getSheetByName('Reference') ||
-      props.getProperty('lastSetupDate') !== today;
-
-    if (stillNeeded) {
-      setupWorkspace({ daily: true, timer: timer });
-    }
-  } finally {
-    lock.releaseLock();
-  }
-}
-
+/* SETUP (setupWorkspace, ensureSetup_, ensureDayRange_) moved to Store.gs → Sheet backend, 2026-11-21. */
 
 /* =========================================================
    WEB APP DATA
@@ -317,14 +257,7 @@ function logSpeed(kind, timing, client) {
 // section forward, even after a gap longer than the visible date window.
 // Read only: historical cells and their completion states remain untouched.
 // Every Days row as {date, values} (columns A–D when present), read once.
-function readAllDays_() {
-  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return { width: 3, rows: [] };
-  const mc = sheet.getMaxColumns();
-  const width = mc >= 5 ? 5 : mc >= 4 ? 4 : 3;
-  return { width: width, rows: sheet.getRange(2, 1, lastRow - 1, width).getValues() };
-}
+function readAllDays_() { return Store.days.all(); }
 
 function getNotesSeeds_(today, allDays) {
   const seeds = {};
@@ -402,90 +335,15 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates, timer) {
           hh:hashesFor(x.date) ? cellHash_(tho) : undefined };
       }).sort((a,b) => a.date.localeCompare(b.date));
   }
-  const sheet = speedPart_(timer, 'schedule.lookup', () => getOrCreateSheet_('Days', DAYS_HEADERS, timer));
-  const lastRow = speedPart_(timer, 'schedule.bounds', () => sheet.getLastRow());
-
-  if (lastRow < 2) {
-    return [];
-  }
-
-  // Read only the Date column to find the rows.
-  const dates = speedPart_(timer, 'schedule.datesRead', () => sheet.getRange(2, 1, lastRow - 1, 1).getValues());
-  const lo = parseDate_(startDate).getTime() - DAY_MS;
-  const hi = parseDate_(endDate).getTime() + DAY_MS;
-  const matches = [];
-
-  speedPart_(timer, 'schedule.dateScan', () => {
-    for (let i = 0; i < dates.length; i++) {
-      const value = dates[i][0];
-
-      if (!value) continue;
-
-      // Skip far-away dates without the slower formatting call.
-      if (isDate_(value)) {
-        const time = value.getTime();
-        if (time < lo || time > hi) continue;
-      }
-
-      const key = formatDate_(value);
-
-      if (key && key >= startDate && key <= endDate) {
-        matches.push({ row: i + 2, date: key });
-      }
-    }
-  });
-
-  if (!matches.length) {
-    return [];
-  }
-
-  // Read the text for the matching rows, in contiguous runs, so rows that
-  // were appended at the bottom don't pull in the whole sheet.
-  matches.sort((a, b) => a.row - b.row);
-
-  const runs = [];
-  let run = null;
-
-  matches.forEach(match => {
-    if (run && match.row - run.end <= 20) {
-      run.end = match.row;
-      run.items.push(match);
-    } else {
-      run = { start: match.row, end: match.row, items: [match] };
-      runs.push(run);
-    }
-  });
-
-  const out = [];
-  // One metadata lookup even when matching dates occupy several row runs.
-  const width = speedPart_(timer, 'schedule.width', () => { const mc = sheet.getMaxColumns(); return mc >= 5 ? 4 : mc >= 4 ? 3 : 2; });
-  runs.forEach(group => {
-    // Column D = Plan pad (one-day view, 2026-10-29); column E = Thoughts pad (2026-11-12).
-    const block = speedPart_(timer, 'schedule.textRead', () => sheet
-      .getRange(group.start, 2, group.end - group.start + 1, width)
-      .getValues());
-
-    speedPart_(timer, 'schedule.decode', () => group.items.forEach(match => {
-      const row = block[match.row - group.start];
-      const plan = width > 2 ? String(row[2] || '') : '';
-      const tho = width > 3 ? String(row[3] || '') : '';
-      out.push({
-        date: match.date,
-        tasks: String(row[0] || ''),
-        journal: String(row[1] || ''),
-        plan: plan,
-        tho: tho,
-        th: hashesFor(match.date) ? cellHash_(row[0]) : undefined,
-        jh: hashesFor(match.date) ? cellHash_(row[1]) : undefined,
-        ph: hashesFor(match.date) ? cellHash_(plan) : undefined,
-        hh: hashesFor(match.date) ? cellHash_(tho) : undefined
-      });
-    }));
-  });
-
-  out.sort((a, b) => a.date.localeCompare(b.date));
-
-  return out;
+  // Live read through the storage layer (Store.days.range: dates first, then only matching rows).
+  const days = Store.days.range(startDate, endDate, timer);
+  return speedPart_(timer, 'schedule.decode', () => days.map(d => ({
+    date: d.date, tasks: d.tasks, journal: d.journal, plan: d.plan, tho: d.tho,
+    th: hashesFor(d.date) ? cellHash_(d.tasks) : undefined,
+    jh: hashesFor(d.date) ? cellHash_(d.journal) : undefined,
+    ph: hashesFor(d.date) ? cellHash_(d.plan) : undefined,
+    hh: hashesFor(d.date) ? cellHash_(d.tho) : undefined
+  })));
 }
 
 
@@ -502,128 +360,76 @@ function getDaysRange_(startDate, endDate, snapshot, hashDates, timer) {
    Read-compare-write runs under the script lock. Old app tabs (no opts) still save, but the
    cell they overwrite is copied to the Backup tab first. */
 function saveDay(dateString, tasks, journal, opts) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-    const row = findDayRow_(sheet, dateString);
-    let curT = '', curJ = '';
-    if (row) {
-      const v = sheet.getRange(row, 2, 1, 2).getValues()[0];
-      curT = String(v[0] || ''); curJ = String(v[1] || '');
-    }
+  return Store.locked(() => {
+    const rec = Store.days.get(dateString, ['tasks', 'journal']);
+    const curT = rec.tasks, curJ = rec.journal;
     tasks = String(tasks || ''); journal = String(journal || '');
 
     if (!opts) {
       if (curT && curT !== tasks) backupCell_(dateString, 'Today', 'old app tab', curT, true);
       if (curJ && curJ !== journal) backupCell_(dateString, 'Notes', 'old app tab', curJ, true);
-      if (row) sheet.getRange(row, 2, 1, 2).setValues([[tasks, journal]]);
-      else sheet.appendRow([parseDate_(dateString), tasks, journal]);
+      Store.days.set(dateString, { tasks: tasks, journal: journal }, rec);
       return true;
     }
 
     const t = syncCol_(curT, tasks, opts.th, opts.ct, dateString, 'Today');
     const j = syncCol_(curJ, journal, opts.jh, opts.cj, dateString, 'Notes');
-    if (t.write || j.write) {
-      if (row) sheet.getRange(row, 2, 1, 2).setValues([[t.value, j.value]]);
-      else sheet.appendRow([parseDate_(dateString), t.value, j.value]);
-    }
+    if (t.write || j.write) Store.days.set(dateString, { tasks: t.value, journal: j.value }, rec);
     const res = { th: cellHash_(t.value), jh: cellHash_(j.value), conflictT: !!t.conflict, conflictJ: !!j.conflict, build: appBuild_(), release:deployedBuild_() };
     if (t.sendBack) res.tasks = t.value;
     if (j.sendBack) res.journal = j.value;
     return res;
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 /* Plan pad (Julius, 2026-10-29): free planning / thinking space under the Today cell in the
    one-day view. Stored in Days column D ("Plan"). Same safe-save rule as saveDay: write only if
    the cell still matches the version the app started from, else send the server copy back. */
 function savePlanPad(dateString, html, baseHash) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-    if (sheet.getMaxColumns() < 4) sheet.insertColumnsAfter(sheet.getMaxColumns(), 4 - sheet.getMaxColumns());
-    if (!sheet.getRange(1, 4).getValue()) sheet.getRange(1, 4).setValue('Plan');
-    let row = findDayRow_(sheet, dateString);
-    const cur = row ? String(sheet.getRange(row, 4).getValue() || '') : '';
+  return Store.locked(() => {
+    const rec = Store.days.get(dateString, ['plan']);
+    const cur = rec.plan;
     html = String(html || '');
     const same = baseHash ? cellHash_(cur) === baseHash : cur === '';
     if (!same) return { ph: cellHash_(cur), conflict: true, plan: cur, build: appBuild_() };
     if (cur.length > 400 && html.length < cur.length * 0.6) backupCell_(dateString, 'Plan', 'big shrink', cur);
-    if (!row) {
-      sheet.appendRow([parseDate_(dateString), '', '']);
-      row = sheet.getLastRow();
-    }
-    sheet.getRange(row, 4).setValue(html);
+    Store.days.set(dateString, { plan: html }, rec);
     return { ph: cellHash_(html), build: appBuild_() };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 /* Thoughts pad (Julius, 2026-11-12): free writing space with no rules, bottom of the left
    column in the one-day view (Blocks moved to the bottom of the middle column). Stored in
    Days column E ("Thoughts"). Same safe-save rule as savePlanPad. */
 function saveThoughtPad(dateString, html, baseHash) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-    if (sheet.getMaxColumns() < 5) sheet.insertColumnsAfter(sheet.getMaxColumns(), 5 - sheet.getMaxColumns());
-    if (!sheet.getRange(1, 5).getValue()) sheet.getRange(1, 5).setValue('Thoughts');
-    let row = findDayRow_(sheet, dateString);
-    const cur = row ? String(sheet.getRange(row, 5).getValue() || '') : '';
+  return Store.locked(() => {
+    const rec = Store.days.get(dateString, ['tho']);
+    const cur = rec.tho;
     html = String(html || '');
     const same = baseHash ? cellHash_(cur) === baseHash : cur === '';
     if (!same) return { hh: cellHash_(cur), conflict: true, tho: cur, build: appBuild_() };
     if (cur.length > 400 && html.length < cur.length * 0.6) backupCell_(dateString, 'Thoughts', 'big shrink', cur);
-    if (!row) {
-      sheet.appendRow([parseDate_(dateString), '', '']);
-      row = sheet.getLastRow();
-    }
-    sheet.getRange(row, 5).setValue(html);
+    Store.days.set(dateString, { tho: html }, rec);
     return { hh: cellHash_(html), build: appBuild_() };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 /* Daily Scratch Pad (2026-11-03, Julius): one free-writing pad per day, Days column E. Loaded on demand.
    Safe save like savePlanPad: the server copy comes back if it changed since the app read it. */
-function ensureScratchCol_(sheet) {
-  if (sheet.getMaxColumns() < 5) sheet.insertColumnsAfter(sheet.getMaxColumns(), 5 - sheet.getMaxColumns());
-  if (!sheet.getRange(1, 5).getValue()) sheet.getRange(1, 5).setValue('Scratch');
-}
 function getScratchPad(dateString) {
-  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  ensureScratchCol_(sheet);
-  const row = findDayRow_(sheet, dateString);
-  const html = row ? String(sheet.getRange(row, 5).getValue() || '') : '';
+  const html = Store.days.get(dateString, ['tho']).tho;
   return { html: html, h: cellHash_(html) };
 }
 function saveScratchPad(dateString, html, baseHash) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-    ensureScratchCol_(sheet);
-    let row = findDayRow_(sheet, dateString);
-    const cur = row ? String(sheet.getRange(row, 5).getValue() || '') : '';
+  return Store.locked(() => {
+    const rec = Store.days.get(dateString, ['tho']);
+    const cur = rec.tho;
     html = String(html || '');
     if (baseHash && cellHash_(cur) !== baseHash) return { conflict: true, html: cur, h: cellHash_(cur) };
     if (cur.length > 400 && html.length < cur.length * 0.6) backupCell_(dateString, 'Scratch', 'big shrink', cur);
-    if (!row) {
-      sheet.appendRow([parseDate_(dateString), '', '']);
-      row = sheet.getLastRow();
-    }
-    sheet.getRange(row, 5).setValue(html);
+    Store.days.set(dateString, { tho: html }, rec);
     return { h: cellHash_(html) };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 // One column of a safe save. baseHash = version the app started from (null = it had no row).
@@ -759,20 +565,16 @@ function moveScheduleToNotes_(snapshot) {
   const days = snapshot || getDaysRange_(today, addDaysToDateString_(today, 7), null, new Set());
   const todo = days.filter(d => d.tasks.indexOf('·') >= 0 && splitSchedule_(d.tasks).lines.length);
   if (!todo.length) return false;
-  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  Store.locked(() => {
     todo.forEach(d => {
-      const row = findDayRow_(sheet, d.date);
-      if (!row) return;
-      const v = sheet.getRange(row, 2, 1, 2).getValues()[0];
-      const split = splitSchedule_(String(v[0] || ''));
+      const rec = Store.days.get(d.date, ['tasks', 'journal']);
+      if (!rec.exists) return;
+      const split = splitSchedule_(rec.tasks);
       if (!split.lines.length) return;
-      const notes = addToScheduleCell_(String(v[1] || ''), d.date, split.lines.join(''));
-      sheet.getRange(row, 2, 1, 2).setValues([[split.rest, notes]]);
+      const notes = addToScheduleCell_(rec.journal, d.date, split.lines.join(''));
+      Store.days.set(d.date, { tasks: split.rest, journal: notes }, rec);
     });
-  } finally { lock.releaseLock(); }
+  });
   return true;
 }
 
@@ -790,19 +592,13 @@ function fixUrgentBold_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    const days = getOrCreateSheet_('Days', DAYS_HEADERS);
-    const last = days.getLastRow();
-    if (last >= 2) {
-      const range = days.getRange(2, 2, last - 1, 2);
-      const vals = range.getValues();
-      let n = 0;
-      vals.forEach((row, i) => [0, 1].forEach(c => {
-        const v = String(row[c] || '');
-        if (v.indexOf('data-urg') < 0) return;
-        const f = fix(v);
-        if (f !== v) { days.getRange(i + 2, 2 + c).setValue(f); n++; }
-      }));
-    }
+    const all = Store.days.all();
+    all.rows.forEach((row, i) => ['tasks', 'journal'].forEach((field, c) => {
+      const v = String(row[1 + c] || '');
+      if (v.indexOf('data-urg') < 0) return;
+      const f = fix(v);
+      if (f !== v) Store.days.set(formatDate_(row[0]), { [field]: f }, { exists: true, ref_: all.base + i });
+    }));
     const ref = getOrCreateSheet_('Reference', REF_HEADERS);
     const rl = ref.getLastRow();
     if (rl >= 2) {
@@ -861,32 +657,6 @@ function addToScheduleCell_(notes, date, linesHtml) {
 }
 
 
-function findDayRow_(sheet, dateString) {
-  const lastRow = sheet.getLastRow();
-
-  if (lastRow < 2) {
-    return 0;
-  }
-
-  const dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  const target = parseDate_(dateString).getTime();
-
-  for (let i = 0; i < dates.length; i++) {
-    const value = dates[i][0];
-
-    if (!value) continue;
-
-    if (isDate_(value) && Math.abs(value.getTime() - target) > DAY_MS) {
-      continue;
-    }
-
-    if (formatDate_(value) === dateString) {
-      return i + 2;
-    }
-  }
-
-  return 0;
-}
 
 
 /* =========================================================
@@ -1269,131 +1039,8 @@ function addDaysToDateString_(dateString, amount) {
 
 
 /* =========================================================
-   INITIAL DATE RANGE
+   DATE FORMAT HELPERS (getOrCreateSheet_, ensureDayRange_, findDayRow_ → Store.gs)
    ========================================================= */
-
-function ensureDayRange_(sheet, pastDays, futureDays) {
-  const timezone = Session.getScriptTimeZone();
-
-  const today = new Date();
-
-  today.setHours(
-    0,
-    0,
-    0,
-    0
-  );
-
-  const existing = new Set(), timestamps = new Set(), dateValues = [];
-  const normalized = new Map();
-  const lastRow = sheet.getLastRow();
-
-  if (lastRow >= 2) {
-    // Exact Date timestamps already prove coverage without formatting. Keep
-    // text-date normalization and a nearby-Date fallback for legacy times.
-    sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(row => {
-      const value = row[0];
-      if (isDate_(value)) {
-        timestamps.add(value.getTime()); dateValues.push(value);
-      } else {
-        const key = formatDate_(value);
-        if (key) existing.add(key);
-      }
-    });
-  }
-
-  const hasDate = (date, key) => existing.has(key) || dateValues.some(value => {
-    const time = value.getTime();
-    // Dates on the same timezone calendar day are within this conservative
-    // margin, including 25-hour DST days. Far history needs no conversion.
-    if (Math.abs(time - date.getTime()) > 2 * DAY_MS) return false;
-    if (!normalized.has(time)) normalized.set(time, formatDate_(value));
-    const found = normalized.get(time);
-    if (found) existing.add(found);
-    return found === key;
-  });
-
-  const missing = [];
-
-  for (
-    let offset = -pastDays;
-    offset <= futureDays;
-    offset++
-  ) {
-    const date = new Date(today);
-
-    date.setDate(
-      today.getDate() + offset
-    );
-
-    if (timestamps.has(date.getTime())) continue;
-    const key = Utilities.formatDate(
-      date,
-      timezone,
-      'yyyy-MM-dd'
-    );
-
-    if (!hasDate(date, key)) {
-      missing.push([
-        date,
-        '',
-        ''
-      ]);
-    }
-  }
-
-  if (missing.length) {
-    sheet
-      .getRange(
-        sheet.getLastRow() + 1,
-        1,
-        missing.length,
-        3
-      )
-      .setValues(missing);
-
-    sheet
-      .getRange(
-        2,
-        1,
-        sheet.getLastRow() - 1,
-        sheet.getMaxColumns() // Keep Plan and every other column attached to its date.
-      )
-      .sort({
-        column: 1,
-        ascending: true
-      });
-  }
-}
-
-
-/* =========================================================
-   SHEET HELPERS
-   ========================================================= */
-
-function getOrCreateSheet_(name, headers, timer) {
-  // Optional nested profiling uses the same service calls as ordinary callers.
-  // Only the schedule reader supplies a timer; names, IDs and data stay private.
-  const ss = speedPart_(timer, 'schedule.spreadsheet', () => ss_());
-
-  let sheet = speedPart_(timer, 'schedule.sheetLookup', () => ss.getSheetByName(name));
-
-  if (!sheet) {
-    sheet = ss.insertSheet(name);
-
-    sheet
-      .getRange(
-        1,
-        1,
-        1,
-        headers.length
-      )
-      .setValues([headers]);
-  }
-
-  return sheet;
-}
-
 
 function formatDate_(value) {
   if (!value) {
@@ -2116,20 +1763,15 @@ function removeDaySections_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-    const last = sheet.getLastRow();
-    if (last >= 2) {
-      const range = sheet.getRange(2, 1, last - 1, 2);
-      const vals = range.getValues();
-      vals.forEach((r, i) => {
-        const before = String(r[1] || '');
-        if (!/data-sec(end)?=/i.test(before)) return;
-        const after = stripDaySections_(before);
-        if (after === before) return;
-        backupCell_(formatDate_(r[0]), 'Today', 'day sections removed', before);
-        sheet.getRange(i + 2, 2).setValue(after);
-      });
-    }
+    const all = Store.days.all();
+    all.rows.forEach((r, i) => {
+      const before = String(r[1] || '');
+      if (!/data-sec(end)?=/i.test(before)) return;
+      const after = stripDaySections_(before);
+      if (after === before) return;
+      backupCell_(formatDate_(r[0]), 'Today', 'day sections removed', before);
+      Store.days.set(formatDate_(r[0]), { tasks: after }, { exists: true, ref_: all.base + i });
+    });
     props.setProperty('daySecsRemoved', '1');
   } finally { lock.releaseLock(); }
   return true;
@@ -2458,24 +2100,6 @@ function sheetTaskRows_(appliedIds) {
   });
 }
 
-// A row hint only: read the live date and content together on every import.
-// Moved/deleted rows and cache failures fall back to the normal date lookup.
-function readDoneToday_(sheet, date) {
-  const key = 'done-today-row:v1:' + date;
-  let cache = null, hint = 0;
-  try { cache = CacheService.getScriptCache(); hint = Number(cache.get(key)); } catch (e) {}
-  if (Number.isInteger(hint) && hint >= 2) {
-    try {
-      const values = sheet.getRange(hint,1,1,2).getValues()[0];
-      if (formatDate_(values[0]) === date) return {row:hint,content:String(values[1] || '')};
-    } catch (e) {}
-  }
-  const row = findDayRow_(sheet,date);
-  const content = row ? String(sheet.getRange(row,2).getValue() || '') : '';
-  try { if (cache) { if (row) cache.put(key,String(row),3600); else cache.remove(key); } } catch (e) {}
-  return {row:row,content:content};
-}
-
 function applyClaudeDone_(timer) {
   let list = (typeof CLAUDE_DONE !== 'undefined' && Array.isArray(CLAUDE_DONE)) ? CLAUDE_DONE : [];
   try { list = list.concat(sheetDoneRows_(timer)); } catch (e) { console.error(e); }
@@ -2491,47 +2115,39 @@ function applyClaudeDone_(timer) {
   // One-time (2026-10-29): pull today's lines out of blocks that hadn't started yet.
   const secFix = props.getProperty('claudeDoneSec') !== '1';
   // Cheap check (one cell read): does today's cell hold done lines in a window that hasn't started yet?
-  const daysSheet = getOrCreateSheet_('Days', DAYS_HEADERS);
   const needFix = speedPart_(timer, 'done.todayCheck', () => {
-    const todaySnapshot = speedPart_(timer, 'done.todayRead', () => readDoneToday_(daysSheet, todayString_()));
-    return speedPart_(timer, 'done.todayParse', () => !!todaySnapshot.row && doneFutureLines_(todaySnapshot.content).moved.length > 0);
+    const todaySnapshot = speedPart_(timer, 'done.todayRead', () => Store.days.peekTasks(todayString_()));
+    return speedPart_(timer, 'done.todayParse', () => todaySnapshot.exists && doneFutureLines_(todaySnapshot.tasks).moved.length > 0);
   });
   if (!fresh.length && !migrate && !secFix && !needFix) return;
   const lock = LockService.getScriptLock();
   speedPart_(timer, 'done.lock', () => lock.waitLock(10000));
   try { speedPart_(timer, 'done.reconcile', () => {
-    const sheet = daysSheet;
     const byDate = {};
     fresh.forEach(x => { const d = doneTargetDate_(x.date); (byDate[d] = byDate[d] || []).push(x); });
     // Move today's lines that sit in a window that hasn't started yet back to the night before (see doneFutureLines_).
     const today = todayString_(), yday = addDaysToDateString_(today, -1);
-    const todayRow = findDayRow_(sheet, today);
-    if (todayRow) {
-      const tc = sheet.getRange(todayRow, 2), tBefore = String(tc.getValue() || '');
+    const tRec = Store.days.get(today, ['tasks']);
+    if (tRec.exists) {
+      const tBefore = tRec.tasks;
       const fut = doneFutureLines_(tBefore);
       if (fut.moved.length) {
-        let yRow = findDayRow_(sheet, yday);
-        if (!yRow) { sheet.appendRow([parseDate_(yday), '', '']); yRow = sheet.getLastRow(); }
-        const yc = sheet.getRange(yRow, 2), yBefore = String(yc.getValue() || '');
+        const yRec = Store.days.get(yday, ['tasks']), yBefore = yRec.tasks;
         let yHtml = yBefore;
         fut.moved.forEach(line => { yHtml = appendDoneInSection_(yHtml, line, 'evening'); });
         yHtml = groupClaudeDone_(yHtml, valid);
         backupCell_(yday, 'Today', 'Done lines moved from tomorrow (not yet started window)', yBefore);
-        yc.setValue(yHtml);
+        Store.days.set(yday, { tasks: yHtml }, yRec);
         backupCell_(today, 'Today', 'Done lines moved to the night before', tBefore);
-        tc.setValue(groupClaudeDone_(fut.html, valid));
+        Store.days.set(today, { tasks: groupClaudeDone_(fut.html, valid) }, tRec);
       }
     }
     if (migrate) valid.forEach(x => { byDate[x.date] = byDate[x.date] || []; });
     if (secFix) byDate[todayString_()] = byDate[todayString_()] || [];
     Object.keys(byDate).forEach(date => {
-      let row = findDayRow_(sheet, date);
-      if (!row) {
-        if (!byDate[date].length) return;
-        sheet.appendRow([parseDate_(date), '', '']); row = sheet.getLastRow();
-      }
-      const cell = sheet.getRange(row, 2);
-      const before = String(cell.getValue() || '');
+      const rec = Store.days.get(date, ['tasks']);
+      if (!rec.exists && !byDate[date].length) return;
+      const before = rec.tasks;
       let html = before;
       byDate[date].forEach(x => {
         if (html.indexOf('data-cid="' + doneEsc_(x.id) + '"') < 0) html = appendDoneInSection_(html, doneLineHtml_(x), doneSecNow_(date));
@@ -2539,7 +2155,7 @@ function applyClaudeDone_(timer) {
       });
       html = groupClaudeDone_(html, valid);
       // Groups stay separate in Morning, Afternoon and Evening (2026-11-03).
-      if (html !== before) { backupCell_(date, 'Today', 'Done Log section placement', before); cell.setValue(html); }
+      if (html !== before) { backupCell_(date, 'Today', 'Done Log section placement', before); Store.days.set(date, { tasks: html }, rec); }
     });
     props.setProperty('claudeDoneApplied', JSON.stringify(applied.slice(-1000)));
     props.setProperty('claudeDoneGrouped', '2');
@@ -2633,20 +2249,17 @@ function applyClaudeTasks_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
     const refSheet = getOrCreateSheet_('Reference', REF_HEADERS);
     fresh.forEach(x => {
-      let cell;
+      let cell, rec;
       if (x.date === 'backlog') {
         const b = getReference_().find(r => /^(backlog|undated tasks)$/.test(r.title.replace(/<[^>]*>/g, '').trim().toLowerCase()));
         if (!b) return;
         cell = refSheet.getRange(b.row, 5);
       } else {
-        let row = findDayRow_(sheet, x.date);
-        if (!row) { sheet.appendRow([parseDate_(x.date), '', '']); row = sheet.getLastRow(); }
-        cell = sheet.getRange(row, 2);
+        rec = Store.days.get(x.date, ['tasks']);
       }
-      let html = String(cell.getValue() || '');
+      let html = rec ? rec.tasks : String(cell.getValue() || '');
       if (html.indexOf('data-tid="' + doneEsc_(x.id) + '"') < 0) {
         const u = [1, 2, 3].indexOf(Number(x.urg)) >= 0 ? ' data-urg="' + Number(x.urg) + '"' : '';
         const line = (text, level, tid) => '<div class="check-line" data-level="' + level + '"' + u +
@@ -2670,7 +2283,7 @@ function applyClaudeTasks_() {
         }
         html += head;
         (Array.isArray(x.subtasks) ? x.subtasks : []).forEach(t => { html += line(t, 1, ''); });
-        cell.setValue(html);
+        if (rec) Store.days.set(x.date, { tasks: html }, rec); else cell.setValue(html);
       }
       applied.push(String(x.id));
     });
@@ -2695,42 +2308,37 @@ function applyClaudeNotes_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
     fresh.forEach(x => {
-      let row = findDayRow_(sheet, x.date);
-      if (!row) { sheet.appendRow([parseDate_(x.date), '', '']); row = sheet.getLastRow(); }
-      const cell = sheet.getRange(row, 3);
-      const before = String(cell.getValue() || '');
+      const rec = Store.days.get(x.date, ['journal']);
+      const before = rec.journal;
       if (before.indexOf('data-cnote="' + doneEsc_(x.id) + '"') < 0) {
         const block = noteBlockHtml_(x);
         const gap = '<div><br></div>';
         const html = !before.trim() ? block
           : x.kind === 'wrap' ? before + gap + block
           : block + gap + before;
-        cell.setValue(html);
+        Store.days.set(x.date, { journal: html }, rec);
       }
       applied.push(String(x.id));
       if (x.rev) applied.push(revKey(x));
     });
     redo.forEach(x => {
-      const row = findDayRow_(sheet, x.date);
-      if (row) {
-        const cell = sheet.getRange(row, 3);
-        const html = String(cell.getValue() || '');
+      const rec = Store.days.get(x.date, ['journal']);
+      if (rec.exists) {
+        const html = rec.journal;
         const re = new RegExp('<table[^>]*data-cnote="' + doneEsc_(x.id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"[^>]*>[\\s\\S]*?<\\/table>');
-        if (re.test(html)) cell.setValue(html.replace(re, function () { return noteBlockHtml_(x); }));
+        if (re.test(html)) Store.days.set(x.date, { journal: html.replace(re, function () { return noteBlockHtml_(x); }) }, rec);
       }
       applied.push(revKey(x));
     });
     if (box) {
       // One-time: put blocks written before boxing into the box (2026-10-26).
       list.filter(x => x && x.id && applied.indexOf(String(x.id)) >= 0).forEach(x => {
-        const row = findDayRow_(sheet, x.date);
-        if (!row) return;
-        const cell = sheet.getRange(row, 3);
-        const html = String(cell.getValue() || '');
+        const rec = Store.days.get(x.date, ['journal']);
+        if (!rec.exists) return;
+        const html = rec.journal;
         const flat = noteBlockFlatHtml_(x);
-        if (html.indexOf(flat) >= 0) cell.setValue(html.replace(flat, noteBlockHtml_(x)));
+        if (html.indexOf(flat) >= 0) Store.days.set(x.date, { journal: html.replace(flat, noteBlockHtml_(x)) }, rec);
       });
       props.setProperty('claudeNotesBoxed', '1');
     }
@@ -3681,17 +3289,14 @@ function appendTasksToDay(dateString, items) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-    let row = findDayRow_(sheet, dateString);
-    if (!row) { sheet.appendRow([parseDate_(dateString), '', '']); row = sheet.getLastRow(); }
-    const cell = sheet.getRange(row, 2);
-    let html = String(cell.getValue() || '');
+    const rec = Store.days.get(dateString, ['tasks']);
+    let html = rec.tasks;
     items.forEach(it => {
       const level = Math.max(0, Math.min(6, Math.floor(Number(it && it.level) || 0)));
       html += '<div class="check-line" data-level="' + level + '"' + taskMetaAttrs_(it && it.meta) + (level ? ' style="margin-left: ' + (level * 24) + 'px;"' : '') + '>' +
         doneCheck_(false) + '<span class="check-text">' + String((it && it.html) || '') + '</span></div>';
     });
-    cell.setValue(html);
+    Store.days.set(dateString, { tasks: html }, rec);
     return true;
   } finally { lock.releaseLock(); }
 }
@@ -3715,9 +3320,8 @@ function taskMetaAttrs_(m) {
    Returns [{index, level, text, done, urg (0-3), due ('' or YYYY-MM-DD), dur (minutes, 0 = none)}]. */
 function getDayTasks(dateString) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateString || ''))) throw new Error('Bad date');
-  const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-  const row = findDayRow_(sheet, dateString);
-  return row ? parseTasks_(String(sheet.getRange(row, 2).getValue() || '')) : [];
+  const rec = Store.days.get(dateString, ['tasks']);
+  return rec.exists ? parseTasks_(rec.tasks) : [];
 }
 
 function parseTasks_(html) {
@@ -3770,14 +3374,11 @@ function appendTaskToDay(dateString, textHtml) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sheet = getOrCreateSheet_('Days', DAYS_HEADERS);
-    let row = findDayRow_(sheet, dateString);
-    if (!row) { sheet.appendRow([parseDate_(dateString), '', '']); row = sheet.getLastRow(); }
-    const cell = sheet.getRange(row, 2);
-    const before = String(cell.getValue() || '');
+    const rec = Store.days.get(dateString, ['tasks']);
+    const before = rec.tasks;
     const line = '<div class="check-line" data-level="0">' + doneCheck_(false) +
       '<span class="check-text">' + String(textHtml || '') + '</span></div>';
-    cell.setValue(before + line);
+    Store.days.set(dateString, { tasks: before + line }, rec);
     return true;
   } finally { lock.releaseLock(); }
 }

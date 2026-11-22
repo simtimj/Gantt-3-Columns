@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 const ctx = vm.createContext({console, Date});
-vm.runInContext(fs.readFileSync('Code.gs', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + fs.readFileSync('Store.gs', 'utf8'), ctx);
 const props = new Map();
 ctx.PropertiesService = {getScriptProperties: () => ({
   getProperty: k => props.get(k) || null,
@@ -68,7 +68,7 @@ console.log('Daily setup tests passed');
 
 // Compare actual old/new coverage functions under fixed clocks and timezones.
 // Exact-timestamp fast paths must not duplicate text dates, legacy times or DST.
-const newSource=fs.readFileSync('Code.gs','utf8');
+const newSource=(fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8'));
 // Actual pre-change coverage function frozen for compatibility, no git history required.
 const oldSource=newSource+'\n'+"function ensureDayRange_(sheet, pastDays, futureDays) {\n  const timezone = Session.getScriptTimeZone();\n\n  const today = new Date();\n\n  today.setHours(\n    0,\n    0,\n    0,\n    0\n  );\n\n  const existing = new Set();\n  const lastRow = sheet.getLastRow();\n\n  if (lastRow >= 2) {\n    // Date column only.\n    sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(row => {\n      const date = formatDate_(row[0]);\n      if (date) existing.add(date);\n    });\n  }\n\n  const missing = [];\n\n  for (\n    let offset = -pastDays;\n    offset <= futureDays;\n    offset++\n  ) {\n    const date = new Date(today);\n\n    date.setDate(\n      today.getDate() + offset\n    );\n\n    const key = Utilities.formatDate(\n      date,\n      timezone,\n      'yyyy-MM-dd'\n    );\n\n    if (!existing.has(key)) {\n      missing.push([\n        date,\n        '',\n        ''\n      ]);\n    }\n  }\n\n  if (missing.length) {\n    sheet\n      .getRange(\n        sheet.getLastRow() + 1,\n        1,\n        missing.length,\n        3\n      )\n      .setValues(missing);\n\n    sheet\n      .getRange(\n        2,\n        1,\n        sheet.getLastRow() - 1,\n        sheet.getMaxColumns() // Keep Plan and every other column attached to its date.\n      )\n      .sort({\n        column: 1,\n        ascending: true\n      });\n  }\n}";
 function coverageRun(source,input,past,future,zone='UTC',clock='2026-11-10T12:00:00Z') {

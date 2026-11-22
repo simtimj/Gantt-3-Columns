@@ -280,7 +280,6 @@ function syncStudyLog_(timer) {
     const review = studyReview_(segs, today);
     let applied = {};
     try { applied = JSON.parse(props.getProperty('studyApplied') || '{}'); } catch (e) { applied = {}; }
-    const days = getOrCreateSheet_('Days', DAYS_HEADERS);
     const where = {};
     studyGroups_(segs).forEach(g => {
       // "Next review" as of this entry, so a later session never rewrites an older day.
@@ -290,14 +289,12 @@ function syncStudyLog_(timer) {
       const h = cellHash_(block);
       g.segs.forEach(s => { where[s.id] = g.window; });
       if (applied[g.key] === h) return; // unchanged: if Julius deleted it, it stays deleted
-      let row = findDayRow_(days, g.date);
-      if (!row) { days.appendRow([parseDate_(g.date), '', '']); row = days.getLastRow(); }
-      const cell = days.getRange(row, 2);
-      const before = String(cell.getValue() || '');
+      const rec = Store.days.get(g.date, ['tasks']);
+      const before = rec.tasks;
       const after = studyPutBlock_(before, g.key, block, g.window);
       if (after !== before) {
         if (before) backupCell_(g.date, 'Today', 'IT study log', before);
-        cell.setValue(after);
+        Store.days.set(g.date, { tasks: after }, rec);
       }
       applied[g.key] = h;
     });

@@ -9,7 +9,7 @@ const fixture={v:1,cats:[{id:'c',name:'Work',items:[{id:'a',t:'First',d:0,lv:0},
 const props={};let locked=false,generation=0;
 const server=vm.createContext({console,Utilities:{getUuid:()=> 'test-'+(++generation)},PropertiesService:{getScriptProperties:()=>({getProperties:()=>({...props}),getProperty:k=>props[k]??null,setProperty:(k,v)=>props[k]=v,setProperties:p=>Object.assign(props,p),deleteProperty:k=>delete props[k]})},
   LockService:{getScriptLock:()=>({waitLock(){assert.equal(locked,false);locked=true;},releaseLock(){locked=false;}})}});
-vm.runInContext(fs.readFileSync('Code.gs','utf8'),server);
+vm.runInContext((fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8')),server);
 server.cellHash_=s=>crypto.createHash('sha256').update(s).digest('hex');
 server.writeFocus_(fixture);
 const mine=clone(fixture),theirs=clone(fixture);

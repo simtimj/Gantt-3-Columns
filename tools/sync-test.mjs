@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
-const source = fs.readFileSync('Code.gs','utf8');
+const source = (fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8'));
 const server = vm.createContext({console:{error(){}},FW_DEPLOY_BUILD:'release-under-test'});
 vm.runInContext(source,server);
 server.appBuild_ = () => 'page-under-test';

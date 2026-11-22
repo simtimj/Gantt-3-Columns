@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import { readIndexHtml } from './index-html.mjs';
-const src = fs.readFileSync('Code.gs','utf8');
+const src = (fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8'));
 const row = ['r1','new-parent','item','New title','same',true,9000];
 const sheet = { rows:[[],row], getLastRow(){return this.rows.length;},
   getRange(r,c,h=1,w=1){return {

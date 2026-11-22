@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
-const source = fs.readFileSync('Code.gs','utf8');
+const source = (fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8'));
 const HEAD = ['Date','Project','Change','How to check','Status','Checked on'];
 export function fixture(serverSource = source) {
   const reads=[],writes=[],cache=new Map(),props={},stats={lookups:0,locks:0,hashes:0},faults={};

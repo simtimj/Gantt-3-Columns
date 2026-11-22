@@ -4,7 +4,7 @@ Where things live, so a session can jump straight there. **Grep the quoted text;
 
 ## Store.gs — storage layer (2026-11-21, NOTES "H2")
 
-Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.mjs` + `tools/store-baseline.json`, run by `check.mjs`). `STORE_BACKEND` (area → `'sheet'`, later `'db'`), `Store.<area>` objects returning `{ value, at }`, `Store.locked(fn)`. Moved: `kim`. Test: `tools/store-test.mjs`. Moving an area: add `Store.<area>`, point the feature at it, extend store-test, `node tools/store-guard.mjs --update`.
+Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.mjs` + `tools/store-baseline.json`, run by `check.mjs`). `STORE_BACKEND` (area → `'sheet'`, later `'db'`), `Store.<area>` objects returning `{ value, at }`, `Store.locked(fn)`. Moved: `kim`, `days` (plus the Sheet helpers `ss_`, `getOrCreateSheet_`, `findDayRow_`, `readDoneToday_`, setup/date coverage). Test: `tools/store-test.mjs`. Moving an area: add `Store.<area>`, point the feature at it, extend store-test, `node tools/store-guard.mjs --update`.
 
 ## Index.html (split 2026-11-21, speed item G)
 

@@ -63,7 +63,7 @@ for(const initialRemote of ['sent','original']){
  c.fwBlocks=s=>[s];c.fwDraftCaptureDay(date);c.daySaveState.get(date).inFlight=false;
  const requests=[];let ok;
  c.google={script:{run:{withSuccessHandler:f=>{ok=f;return c.google.script.run;},withFailureHandler:()=>c.google.script.run,saveDay:(d,t,j,opts)=>requests.push({ok,t,opts})}}};
- const server=vm.createContext({console});vm.runInContext(fs.readFileSync('Code.gs','utf8'),server);server.cellHash_=hash;server.backupCell_=()=>{};
+ const server=vm.createContext({console});vm.runInContext((fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8')),server);server.cellHash_=hash;server.backupCell_=()=>{};
  let remote=initialRemote,firstRequest=true;
  c.saveDay(date);
  for(let guard=0;requests.length && guard<5;guard++){

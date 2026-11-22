@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 const ctx = vm.createContext({console, Date});
-vm.runInContext(fs.readFileSync('Code.gs','utf8'),ctx);
+vm.runInContext((fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8')),ctx);
 ctx.formatDate_ = v => v instanceof Date ? v.toISOString().slice(0,10) : String(v || '');
 ctx.cellHash_ = v => 'hash:' + String(v || '');
 ctx.parseDate_ = v => new Date(v+'T00:00:00Z');
@@ -105,16 +105,16 @@ let digests=0,metadata=0;
 ctx.cellHash_=v=>{digests++;return 'hash:'+String(v||'');};
 sheet.getMaxColumns=()=>{metadata++;return 4;};
 const full=plain(ctx.getDaysRange_('2026-11-08','2026-11-15'));
-assert.equal(digests,24);
+assert.equal(digests,32); // th, jh, ph, hh (Thoughts hash since 2026-11-12) × 8 days
 for(const snapshot of [null,{width:4,rows:rows.slice(1)}]) {
   digests=0;reads=0;
   const schedule=plain(ctx.getDaysRange_('2026-11-08','2026-11-15',snapshot,new Set()));
   assert.equal(digests,0,'schedule-only read computes no unused hashes');
-  assert.deepEqual(schedule,full.map(({th,jh,ph,...text})=>text));
+  assert.deepEqual(schedule,full.map(({th,jh,ph,hh,...text})=>text));
   assert.equal(reads,snapshot?0:2,'no extra service reads');
   digests=0;
   const subset=plain(ctx.getDaysRange_('2026-11-08','2026-11-15',snapshot,new Set(['2026-11-08'])));
-  assert.equal(digests,3);
+  assert.equal(digests,4);
   assert.deepEqual(subset[0],full[0]);
   assert.deepEqual(subset.slice(1),schedule.slice(1));
 }
@@ -124,7 +124,7 @@ assert.equal(ctx.getDaysRange_('2026-11-08','2026-11-15',null,new Set())[0].task
 rows.splice(2,0,...Array.from({length:30},()=>['2000-01-01','unrelated','','']));
 metadata=0;ctx.getDaysRange_('2026-11-08','2026-11-15');
 assert.equal(metadata,1,'separated runs reuse request-local column width');
-console.log('✓ schedule reads: 24→0 unused hashes; requested dates retain all 3 hashes, text stays fresh, public/snapshot parity and one width lookup');
+console.log('✓ schedule reads: 32→0 unused hashes; requested dates retain all 4 hashes, text stays fresh, public/snapshot parity and one width lookup');
 
 // Schedule profiling wraps existing operations without changing reads or output.
 const before=plain(ctx.getDaysRange_('2026-11-08','2026-11-15',null,new Set(['2026-11-08'])));

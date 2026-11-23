@@ -2453,6 +2453,24 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
             await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
             if (await pg.evaluate(() => !!document.querySelector('#calPanel .cp-adqa'))) errs.push('hold add: Esc did not close the row');
           }
+          // Tap to quick add (2026-11-23, Julius): a plain tap / click on the empty all-day cell opens the same row (no form).
+          await pg.waitForTimeout(800);
+          const c2 = await pg.evaluate(() => { const d = document.querySelector('#calPanel .fc-timegrid .fc-daygrid-day[data-date="2026-11-20"]'); const b = d.getBoundingClientRect(); return { x: b.x + b.width - 30, y: b.bottom - 4 }; });
+          if (name === 'phone') { const cdp = await pg.context().newCDPSession(pg);
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: c2.x, y: c2.y }] }); await pg.waitForTimeout(60);
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          } else { await pg.mouse.click(c2.x, c2.y); }
+          await pg.waitForTimeout(400);
+          const tp = await pg.evaluate(() => ({ row: !!document.querySelector('#calPanel .cp-adqa[data-adqa="2026-11-20"] input'), focus: !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('.cp-adqa')), form: !!document.querySelector('#calPanel [data-cal-form]') && !document.querySelector('#calPanel .cp-detail[hidden]') }));
+          if (!tp.row) errs.push('tap add: no blank row after a tap');
+          else {
+            if (tp.form) errs.push('tap add: New event form opened too');
+            if (!tp.focus) errs.push('tap add: row not focused');
+            await pg.keyboard.type('Tapped task'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(900);
+            const ok = await pg.evaluate(() => Object.values(window.__cal.ev).some(e => e.title === 'Tapped task' && e.allDay && String(e.start).slice(0, 10) === '2026-11-20'));
+            if (!ok) errs.push('tap add: Enter did not make the all-day task');
+            await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
+          }
         }
         await pg.evaluate(() => window.fwCalendar.api().today());
       }

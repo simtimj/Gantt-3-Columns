@@ -2393,8 +2393,11 @@
       selectable: finePointer(), selectMirror: true, selectLongPressDelay: 500, unselectAuto: true,
       dateClick: info => { const t0 = gridDown; gridDown = null;
         if(finePointer() || !t0 || t0.cardOpen || Date.now() - t0.at > 400 || pending || moveBusy) return; // mouse: select handles clicks
+        if(qaTap(info.allDay, info.dateStr)) return;
         openForm(formFromRange(info.allDay, info.dateStr, '')); },
-      select: info => { if(Date.now() < qaSkipSel){ cal.unselect(); return; } if(!pending){ const at = finePointer() ? mount.querySelector('.fc-event-mirror,.fc-highlight') : null; openForm(formFromRange(info.allDay, info.startStr, info.endStr)); if(at) popAt(at); } cal.unselect(); },
+      select: info => { if(Date.now() < qaSkipSel){ cal.unselect(); return; }
+        if(!pending && info.allDay && L().fromISO(info.endStr.slice(0, 10)).diff(L().fromISO(info.startStr.slice(0, 10)), 'days').days <= 1 && qaTap(true, info.startStr)){ cal.unselect(); return; }
+        if(!pending){ const at = finePointer() ? mount.querySelector('.fc-event-mirror,.fc-highlight') : null; openForm(formFromRange(info.allDay, info.startStr, info.endStr)); if(at) popAt(at); } cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       events: fetchRange,
       eventsSet: () => { setTimeout(adLayout, 0); if(typeof fadSoon === 'function') fadSoon(); },
@@ -2931,6 +2934,15 @@
     qaRow.addEventListener('pointerdown', e => e.stopPropagation()); // typing / buttons never start a hold, select or tap-to-create
     qaRow.addEventListener('click', e => { e.stopPropagation(); if(e.target.closest('[data-qa-go]')) qaSend(i, qaDay); else if(e.target.closest('[data-qa-x]')) qaClose(); });
     if(navigator.vibrate) try { navigator.vibrate(15); } catch (e) {}
+  }
+  /* 2026-11-23 (Julius: "tapping an empty spot in the all-day section opens a quick add right there"): on the docked /
+     big calendar (not full screen) a tap (touch) or single-day click (mouse) on an all-day cell opens the same row as
+     the hold, instead of the New event form. Returns true when it handled it. Timed slots still open New event. */
+  function qaTap(allDay, dateStr){
+    if(!allDay || full || pending) return false;
+    const cell = mount.querySelector('.fc-timegrid .fc-daygrid-day[data-date="' + String(dateStr).slice(0, 10) + '"]');
+    if(!cell) return false;
+    qaSkipSel = qaLift = Date.now() + 700; qaOpen(cell); return true;
   }
   mount.addEventListener('pointerdown', e => {
     clearTimeout(qaHold && qaHold.t); qaHold = null;

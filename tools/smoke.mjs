@@ -3071,7 +3071,9 @@ if (only('pwa-fb')) {
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
   const errs = [], calls = [];
   const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'block' });
+  let netOff = false; // offline: the fake API fails like a real fetch would (a route answers even when the context is offline)
   await ctx.route('https://api.test/**', route => {
+    if (netOff) return route.abort('internetdisconnected');
     const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
     const r = req.fn === 'getWorkspaceData' ? data : req.fn === 'runImports' || req.fn === 'getSyncState' ? imported : req.fn === 'getFocus' ? focus
       : req.fn === 'getKim' ? { html: '<div>from server</div>', h: 'k0' }
@@ -3104,7 +3106,7 @@ if (only('pwa-fb')) {
   const bk = await pg.evaluate(() => ({ n: __fs.backups.length, r: __fs.backups[0] && __fs.backups[0].reason, left: localStorage.getItem('pwa.kim.unconfirmed') }));
   if (bk.n !== 1 || !/newest wins/.test(bk.r || '') || bk.left) errs.push('lost edit not backed up: ' + JSON.stringify(bk));
   // Offline: Keep In Mind can still be typed in, other editors stay read-only.
-  await ctx.setOffline(true); await pg.waitForTimeout(300);
+  netOff = true; await ctx.setOffline(true); await pg.waitForTimeout(300);
   const off = await pg.evaluate(() => {
     const ev = () => new InputEvent('beforeinput', { inputType: 'insertText', data: 'x', bubbles: true, cancelable: true });
     const k = document.querySelector('#kimScroll .kim-editor');

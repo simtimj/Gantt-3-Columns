@@ -43,7 +43,7 @@ const ctx = vm.createContext({
   Utilities: { DigestAlgorithm: { MD5: 'MD5' }, Charset: { UTF_8: 'UTF_8' },
     computeDigest: (_, t) => [...crypto.createHash('md5').update(t, 'utf8').digest()].map(x => (x > 127 ? x - 256 : x)) }
 });
-vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + fs.readFileSync('Store.gs', 'utf8') + '\n' + fs.readFileSync('Timer.gs', 'utf8') + '\nthis.Store = Store;', ctx);
+vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + fs.readFileSync('Store.gs', 'utf8').replace(/const FIREBASE_PROJECT_ = '[^']*';/, "const FIREBASE_PROJECT_ = '';") + '\n' + fs.readFileSync('Timer.gs', 'utf8') + '\nthis.Store = Store;', ctx);
 
 // Fresh: empty + not migrated.
 let g = ctx.getKim();
@@ -89,7 +89,7 @@ console.log('✓ store-test: Keep In Mind through Store.kim');
     } }
   }));
   for (const k of Object.keys(tabs)) delete tabs[k];
-  const src = fs.readFileSync('Store.gs', 'utf8').replace("const FIREBASE_PROJECT_ = '';", "const FIREBASE_PROJECT_ = 'g-test';");
+  const src = fs.readFileSync('Store.gs', 'utf8').replace(/const FIREBASE_PROJECT_ = '[^']*';/, "const FIREBASE_PROJECT_ = 'g-test';");
   vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + src + '\nthis.Store = Store;', fctx);
   assert.equal(vm.runInContext('STORE_BACKEND.kim', fctx), 'db');
   // Empty database → seeded from the Sheet copy on first read.
@@ -248,7 +248,7 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
   }));
   for (const k of Object.keys(tabs)) delete tabs[k];
   for (const k of Object.keys(props)) delete props[k];
-  const src = fs.readFileSync('Store.gs', 'utf8').replace("const FIREBASE_PROJECT_ = '';", "const FIREBASE_PROJECT_ = 'g-test';");
+  const src = fs.readFileSync('Store.gs', 'utf8').replace(/const FIREBASE_PROJECT_ = '[^']*';/, "const FIREBASE_PROJECT_ = 'g-test';");
   vm.runInContext(fs.readFileSync('Code.gs', 'utf8') + '\n' + src + '\nthis.Store = Store;' +
     "\nformatDate_ = v => v instanceof Date ? v.toISOString().slice(0, 10) : String(v || ''); parseDate_ = v => new Date(v + 'T00:00:00Z');", dctx);
   assert.equal(vm.runInContext('STORE_BACKEND.days', dctx), 'db');

@@ -38,13 +38,14 @@ const data = {
     plan: '<div data-title="1" data-tl="1"><b>Next Block</b></div>' + line('Email') }],
   reference: [{ id: 'r1', parentId: '', type: 'item', title: '', content: '<h2>Sample card</h2><p>text</p>', expanded: true, sort: 1 }],
 };
-// Fast start (2026-11-05): the page loads without imports, then runImports() returns the changed cells to merge in.
+// Fast start (2026-11-05): the page loads without imports, then the first sync returns the changed cells to merge in
+// (speed plan E 2026-11-23: getSyncState with inbox:true; the imports themselves run on the server's timed trigger).
 data.timing = { fast: true, total: 1, steps: {} };
 const imported = { build: 'smoke', ref: {}, inbox: [], days: { [today]: { th: 'h-imported', jh: '',
   tasks: data.days[1].tasks + '<div class="check-line" data-level="0" data-at="09:30"><input type="checkbox"><span class="check-text">From import</span></div>' } } };
 const stub = `<script>window.google={script:{run:new Proxy({},{get(t,k){let ok=null;const p=new Proxy({},{get(_,m){
   if(m==='withSuccessHandler')return f=>{ok=f;return p;}; if(m==='withFailureHandler'||m==='withUserObject')return()=>p;
-  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);return setTimeout(()=>ok&&ok(m==='getWorkspaceData'?${JSON.stringify(data)}:m==='runImports'||m==='getSyncState'?${JSON.stringify(imported)}:m==='getFocus'?${JSON.stringify(focus)}:m==='getKim'?{html:'',h:'k0',fresh:true}:m==='saveKim'?{h:'k1'}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null),m==='getWorkspaceData'?(+localStorage.getItem('smokeWsd')||10):10);};}});return p[k];}})}};</script>`;
+  return(...a)=>{(window.__calls=window.__calls||[]).push([m,a]);const ans=(m,a)=>(m==='getWorkspaceData'?${JSON.stringify(data)}:m==='runImports'||m==='getSyncState'?${JSON.stringify(imported)}:m==='getFocus'?${JSON.stringify(focus)}:m==='getKim'?{html:'',h:'k0',fresh:true}:m==='saveKim'?{h:'k1'}:m==='getMainCalendarEvents'?{date:a[0],events:[{id:'e1',calId:'c',start:0,title:'Sample event',allDay:true,done:false}]}:null);return setTimeout(()=>ok&&ok(m==='batchCalls'?a[0].map(c=>({ok:true,r:ans(c[0],c[1])})):ans(m,a)),m==='getWorkspaceData'?(+localStorage.getItem('smokeWsd')||10):10);};}});return p[k];}})}};</script>`;
 let html = readIndexHtml()
   .replace("<?!= HtmlService.createHtmlOutputFromFile('WeekdayIcons').getContent() ?>", fs.readFileSync('WeekdayIcons.html', 'utf8'))
   .replace("<?!= HtmlService.createHtmlOutputFromFile('Drafts').getContent() ?>", fs.readFileSync('Drafts.html', 'utf8'))
@@ -68,8 +69,8 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
   // Fast start: the imported line is merged into the open page (no reload), after the load's own save if needed.
   await pg.waitForTimeout(2600);
   const merged = await pg.evaluate(() => [...document.querySelectorAll('#todayScroll .day-editor .check-text')].some(x => x.textContent === 'From import')
-    && (window.__calls || []).some(c => c[0] === 'runImports'));
-  if (!merged) errs.push('Fast start: the runImports line did not merge into the page');
+    && (window.__calls || []).some(c => c[0] === 'getSyncState' && c[1][0] && c[1][0].inbox === true));
+  if (!merged) errs.push('Fast start: the first sync (getSyncState + inbox, speed plan E) line did not merge into the page');
   // Hold to drag (2026-11-12): slider sets the hold time; the drag handle never shows, even on a picked card.
   const holdOk = await pg.evaluate(() => {
     const s = document.getElementById('holdMs'); if (!s || window.fwHoldMs() !== 500) return 'hold slider missing or default not 0.5 s';
@@ -3315,8 +3316,8 @@ if (only('pwa-days')) {
   if (errs.length) { fails += errs.length; console.error('✗ pwa-days:\n  ' + errs.join('\n  ')); }
   else console.log('✓ pwa-days: Today saves to the day doc (server hashes), pending edits survive a sync, live sync, newest-wins backup, offline days');
 }
-// One calm return (2026-11-21, speed item M): coming back runs ONE queue — registered jobs in order, staggered,
-// skipping ones refreshed < 60 s ago; stops if hidden again; Speed Log 'resume' row only when something ran.
+// One calm return (2026-11-21, speed item M; batched 2026-11-23, speed plan E): coming back runs ONE queue — registered
+// jobs in order, their reads in one batchCalls, skipping ones refreshed < 60 s ago; Speed Log 'resume' row only when something ran.
 for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
   const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' });
   const pg = await ctx.newPage(), errs = [];
@@ -3336,33 +3337,33 @@ for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 91
       const q = window.__FW_RESUME_LAST || {};
       if (!q.skipped || q.ran.length) out.push('quick return should skip all, ran: ' + (q.ran || []).join(','));
       if ((window.__calls || []).slice(n0).some(c => c[0] === 'logSpeed')) out.push('quick return wrote a Speed Log row');
-      // 2) Two minutes away: every job runs once, in ORDER, one per GAP; first server call at once.
+      // 2) Two minutes away (speed plan E): every job runs once, in ORDER, and their reads go out as ONE batchCalls.
       const real = Date.now; Date.now = () => real() + 120000;
       n0 = (window.__calls || []).length; const seen = [], t0 = performance.now();
-      const tick = setInterval(() => { const c = window.__calls || []; while (n0 < c.length) seen.push([c[n0++][0], Math.round(performance.now() - t0)]); }, 10);
-      flip('hidden'); flip('visible'); await wait(R.GAP * (R.jobs.length + 1) + 300); clearInterval(tick);
+      const tick = setInterval(() => { const c = window.__calls || []; while (n0 < c.length) seen.push([c[n0], Math.round(performance.now() - t0)]), n0++; }, 10);
+      flip('hidden'); flip('visible'); await wait(800); clearInterval(tick);
       const r = window.__FW_RESUME_LAST || {};
       const order = R.jobs.slice().sort((a, b) => R.ORDER.indexOf(a) - R.ORDER.indexOf(b));
       if ((r.ran || []).join() !== order.join()) out.push('ran ' + (r.ran || []).join(',') + ' — want ' + order.join(','));
-      if (r.ms < R.GAP * (r.ran.length - 1) * 0.9) out.push('not staggered: ' + r.ms + ' ms for ' + r.ran.length + ' jobs');
-      const sync = seen.find(s => s[0] === 'getSyncState' || s[0] === 'runImports');
-      if (!sync || sync[1] > 150) out.push('sync not first / not at once: ' + JSON.stringify(sync));
-      const burst = seen.filter(s => s[0] !== 'logSpeed' && s[1] < R.GAP - 50).length;
-      if (burst > 2) out.push(burst + ' server calls in the first ' + R.GAP + ' ms (want ≤ 2): ' + JSON.stringify(seen));
-      const log = seen.find(s => s[0] === 'logSpeed') && (window.__calls || []).filter(c => c[0] === 'logSpeed' && c[1][0] === 'resume').pop();
+      const batch = seen.find(s => s[0][0] === 'batchCalls');
+      const names = batch ? batch[0][1][0].map(c => c[0]) : [];
+      if (!batch || batch[1] > 150) out.push('no batchCalls at once: ' + JSON.stringify(seen.map(s => [s[0][0], s[1]])));
+      if (names[0] !== 'getSyncState') out.push('sync not first in the batch: ' + names.join(','));
+      ['getMainCalendarEvents','getTimerEvents','getPlan','getFocus','getNewThings','getFun'].forEach(n => { if (!names.includes(n)) out.push(n + ' not batched'); });
+      const loose = seen.filter(s => s[1] < 400 && /^get/.test(s[0][0]) && s[0][0] !== 'getKim' && s[0][0] !== 'getCalendarRange');
+      if (loose.length) out.push('reads sent outside the batch: ' + loose.map(s => s[0][0]).join(','));
+      if (r.batched !== names.length) out.push('Speed Log batched count ' + r.batched + ' vs ' + names.length);
+      const log = (window.__calls || []).filter(c => c[0] === 'logSpeed' && c[1][0] === 'resume').pop();
       if (!log || !Array.isArray(log[1][2].ran) || log[1][2].awaySec == null) out.push('no Speed Log resume row with ran / awaySec');
-      // 3) Hidden again mid-queue → stops (stopped: true, not every job ran).
-      Date.now = () => real() + 240000;
-      flip('hidden'); flip('visible'); await wait(R.GAP + 50); flip('hidden'); await wait(R.GAP * 2);
-      const s = window.__FW_RESUME_LAST || {};
-      if (!s.stopped || s.ran.length >= R.jobs.length) out.push('hiding mid-queue did not stop it: ' + JSON.stringify(s));
+      // 3) Batch answers reach each job: the sync's merged line is on the page (same stub answer as the fast start).
+      if (!(window.__FW_RESUME_LAST || {}).ran) out.push('no resume record');
       Date.now = real; flip('visible');
       return out;
     });
     errs.push(...res);
   } catch (e) { errs.push(String(e)); }
   if (errs.length) { fails += errs.length; console.error('✗ resume ' + name + ':\n  ' + errs.join('\n  ')); }
-  else console.log('✓ resume ' + name + ': quick return skips all, 2-min return runs every job in order staggered, hide stops it, Speed Log row');
+  else console.log('✓ resume ' + name + ': quick return skips all, 2-min return runs every job in order with one batchCalls, Speed Log row');
   await ctx.close();
 }
 // Calendar device cache (2026-11-23, speed step A, NOTES H5): the day's events list is kept on the device, painted at

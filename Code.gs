@@ -47,7 +47,7 @@ function pwaKey_() {
   return k;
 }
 
-const API_BLOCKED_ = { doGet: 1, doPost: 1, apiCall: 1, apiPing: 1 };
+const API_BLOCKED_ = { doGet: 1, doPost: 1, apiCall: 1, apiPing: 1, importsTick: 1, importsSetup: 1 };
 function apiOut_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 
 // Library entry (router doPost). body = '{"k":key,"fn":name,"a":[args]}'.
@@ -175,6 +175,40 @@ function runImports(req) {
   out.timing = t.done();
   out.timing.build = out.build;
   return out;
+}
+
+/* Speed plan E (2026-11-23, NOTES "H5"): the imports run on a timed trigger (importsTick, every 5 min) instead of
+   from the page, so opening and coming back only read. The trigger installs itself on the first sync
+   (importsEnsureTrigger_; or run importsSetup once from the editor). runImports stays callable by hand. */
+const IMPORTS_TRIGGER_V_ = 'e1';
+function importsTick() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return; // a run is still going
+  try { runImportSteps_(speedTimer_()); } catch (e) { console.error('importsTick: ' + e.message); }
+  finally { lock.releaseLock(); }
+}
+function importsSetup() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'importsTick').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('importsTick').timeBased().everyMinutes(5).create();
+  Store.props.setProperty('importsTrigger', IMPORTS_TRIGGER_V_);
+  return 'importsTick every 5 min ✓';
+}
+function importsEnsureTrigger_() {
+  if (Store.props.getProperty('importsTrigger') === IMPORTS_TRIGGER_V_) return;
+  try { importsSetup(); } catch (e) { console.error('importsSetup: ' + e.message); }
+}
+
+/* One call for the calm-return queue (speed plan E): the jobs' read calls go to the server together.
+   list = [[name, args], …] → [{ok, r} | {ok:false, e}], same order. Only these read-only getters. */
+const BATCH_OK_ = { getSyncState: 1, getFocus: 1, getFun: 1, getNewThings: 1, getInbox: 1, getCalendarEvents: 1,
+  getMainCalendarEvents: 1, getTimerEvents: 1, getPlan: 1 };
+function batchCalls(list) {
+  return (Array.isArray(list) ? list : []).slice(0, 20).map(c => {
+    const fn = c && c[0], f = BATCH_OK_[fn] && globalThis[fn];
+    if (typeof f !== 'function') return { ok: false, e: 'Not batchable: ' + fn };
+    try { return { ok: true, r: f.apply(null, Array.isArray(c[1]) ? c[1] : []) }; }
+    catch (e) { return { ok: false, e: (e && e.message) || String(e) }; }
+  });
 }
 
 function getWorkspaceData(opts) {
@@ -494,6 +528,8 @@ function getSyncState(req) {
   try { snapshot = readScheduleForSync_(req, t); }
   catch (e) { console.error(e); } t.mark('schedule');
   const out = syncDiff_(req, t, snapshot);
+  if (req.inbox) { try { out.inbox = getInbox(); } catch (e) { console.error(e); } t.mark('inbox'); }
+  if (req.inbox) { importsEnsureTrigger_(); t.mark('trigger'); }
   out.timing = t.done();
   out.timing.build = out.build;
   return out;

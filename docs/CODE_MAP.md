@@ -27,7 +27,7 @@ Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.m
 | Page markup (header, columns, panes) | `<body>` | 2324–2600 |
 | **Main app script** (one big block) | `STATE` banner | 2610–11720 |
 | Instant screen (snapshot paint / save, early data request) | `INSTANT SCREEN` | 2615 |
-| One calm return (`fwResume` queue on coming back) | `ONE CALM RETURN` | 3058 |
+| One calm return (`fwResume` queue on coming back; reads batched via `fwBatchStart` / `batchCalls`) | `ONE CALM RETURN`, `Batched calls (speed plan E` | 3058 |
 | · state, helpers, first load | `BASIC HELPERS`, `LOAD` | 2750 |
 | · day rows (History / Today), editors | `DAYS`, `EDITORS`, `AUTO FORMATTING` | 2920–4700 |
 | · right-click / hold menu | `RIGHT-CLICK / LONG-PRESS MENU` | 4790 |

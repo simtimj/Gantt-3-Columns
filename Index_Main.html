@@ -309,35 +309,75 @@
      skipping any refreshed < 60 s ago (last() = the module's own last-refresh time; without it, or while it is 0, when
      the queue last ran it, starting at page load). Stops when the page is hidden again. Saves on hide stay in each module (never queued).
      Speed Log kind 'resume' (only when something ran): ran, skipped, awaySec, stopped, ms. Details: docs/NOTES.md → "One calm return". */
+  /* Batched calls (speed plan E, 2026-11-23). fwBatchStart() swaps google.script.run for a recorder; calls to the
+     read-only getters in FW_BATCH_OK (same list as Code.gs BATCH_OK_) are held, anything else goes straight out.
+     fwBatchFlush() puts the real runner back and sends the held calls as one batchCalls request (one call alone
+     goes as itself); each answer goes to its own success / failure handler. */
+  const FW_BATCH_OK = {getSyncState:1,getFocus:1,getFun:1,getNewThings:1,getInbox:1,getCalendarEvents:1,getMainCalendarEvents:1,getTimerEvents:1,getPlan:1};
+  function fwBatchStart(){
+    const b = {calls: [], real: null, sent: 0};
+    if(!(window.google && google.script && google.script.run) || typeof Proxy !== 'function') return b;
+    const real = b.real = google.script.run;
+    const rec = (ok, bad, user) => new Proxy({}, {get: (_, name) => {
+      if(name === 'withSuccessHandler') return f => rec(f, bad, user);
+      if(name === 'withFailureHandler') return f => rec(ok, f, user);
+      if(name === 'withUserObject') return u => rec(ok, bad, u);
+      if(typeof name !== 'string') return undefined;
+      return (...args) => {
+        if(FW_BATCH_OK[name]) { b.calls.push({name, args, ok, bad, user}); return; }
+        let r = real; if(ok) r = r.withSuccessHandler(ok); if(bad) r = r.withFailureHandler(bad); if(user !== undefined) r = r.withUserObject(user);
+        r[name](...args);
+      };
+    }});
+    try{ google.script.run = rec(null, null, undefined); }catch(e){ b.real = null; }
+    if(google.script.run === real) b.real = null; // read-only in this host: nothing recorded
+    return b;
+  }
+  function fwBatchFlush(b){
+    if(!b.real) return;
+    google.script.run = b.real;
+    const calls = b.calls; b.sent = calls.length;
+    const hand = (c, r) => { if(c.ok) try{ c.ok(r, c.user); }catch(e){ console.error(e); } };
+    const fail = (c, e) => { if(c.bad) try{ c.bad(e, c.user); }catch(_){} else console.error(c.name + ': ' + (e && e.message || e)); };
+    const one = c => { let r = b.real; if(c.ok) r = r.withSuccessHandler(c.ok); if(c.bad) r = r.withFailureHandler(c.bad); if(c.user !== undefined) r = r.withUserObject(c.user); r[c.name](...c.args); };
+    if(calls.length === 1) return one(calls[0]);
+    if(!calls.length) return;
+    b.real.withSuccessHandler(out => {
+      calls.forEach((c, i) => { const o = Array.isArray(out) && out[i]; if(o && o.ok) hand(c, o.r); else if(o) fail(c, new Error(o.e)); else one(c); });
+    }).withFailureHandler(() => calls.forEach(one)) // batch failed (e.g. old server): send them one by one
+      .batchCalls(calls.map(c => [c.name, c.args]));
+  }
   window.fwResume = (() => {
     const ORDER = ['sync','calendar','timer','blocks','nextSteps','kim','reference','newThings','fun','weather'];
     const GAP = 350, FRESH = 60000, jobs = {};
-    let timer = 0, running = false, hiddenAt = 0, finish = null;
+    let timer = 0, running = false, hiddenAt = 0, finish = null, r_batch = 0;
     const pos = n => { const i = ORDER.indexOf(n); return i < 0 ? ORDER.length : i; };
     function add(name, run, last){ jobs[name] = {run, last, ranAt: Date.now()}; }
     function stop(){ clearTimeout(timer); if(running && finish) finish(true); running = false; }
     function start(){
       if(running) return;
-      running = true;
+      running = true; r_batch = 0;
       const list = Object.keys(jobs).sort((a,b) => pos(a) - pos(b)), ran = [], skipped = [], t0 = performance.now();
       const awaySec = hiddenAt ? Math.round((Date.now() - hiddenAt) / 1000) : null;
       const done = finish = stopped => {
         running = false; finish = null;
-        const r = {ran, skipped, awaySec, stopped, ms: Math.round(performance.now() - t0), at: Date.now()};
+        const r = {ran, skipped, awaySec, stopped, batched: r_batch, ms: Math.round(performance.now() - t0), at: Date.now()};
         window.__FW_RESUME_LAST = r;
         if(ran.length && typeof fwSendSpeed === 'function' && window.google && google.script) try{ fwSendSpeed('resume', {total: r.ms, steps: {}}, fwSpeedContext(r)); }catch(e){}
       };
-      const step = i => {
-        if(document.visibilityState !== 'visible') return done(true);
-        if(i >= list.length) return done(false);
-        const n = list[i], j = jobs[n];
+      // Speed plan E (2026-11-23): due jobs run together and their read calls leave as ONE batchCalls request.
+      if(document.visibilityState !== 'visible') return done(true);
+      const due = [];
+      list.forEach(n => {
+        const j = jobs[n];
         let at = j.ranAt; if(j.last) try{ at = Number(j.last()) || j.ranAt; }catch(e){} // 0 = never loaded → queue time
-        if(Date.now() - at < FRESH){ skipped.push(n); return step(i + 1); }
-        j.ranAt = Date.now(); ran.push(n);
-        try{ j.run(); }catch(e){ try{ console.error('fwResume ' + n, e); }catch(_){} }
-        timer = setTimeout(() => step(i + 1), GAP);
-      };
-      step(0);
+        if(Date.now() - at < FRESH) skipped.push(n); else due.push(n);
+      });
+      const batch = fwBatchStart();
+      due.forEach(n => { jobs[n].ranAt = Date.now(); ran.push(n); try{ jobs[n].run(); }catch(e){ try{ console.error('fwResume ' + n, e); }catch(_){} } });
+      fwBatchFlush(batch);
+      r_batch = batch.sent;
+      done(false);
     }
     document.addEventListener('visibilitychange', () => {
       if(document.visibilityState === 'visible') setTimeout(start, 0); else { hiddenAt = Date.now(); stop(); }
@@ -3864,14 +3904,15 @@
     state.refManifestHash = manifest.hash;
     return note || 'Synced Reference changes from elsewhere';
   }
-  // withImports (2026-11-05): runImports() first writes the Done Log / AI tasks / To Confirm / study log into the
+  // Speed plan E (2026-11-23): runImports left the page (timed trigger importsTick); withImports now only adds the Inbox.
+  // Was (2026-11-05): runImports() first writes the Done Log / AI tasks / To Confirm / study log into the
   // sheet, then returns the same diff as getSyncState. Light syncs skip the imports.
   let fwLastImport = 0;
   function fwSync(withImports){
     if(fwSyncBusy || !state.days || !state.days.length) return;
     withImports = withImports === true;
     if(withImports) fwLastImport = Date.now();
-    const req = {days:{},ref:{},refSync:2,refManifestHash:state.refManifestHash || ''};
+    const req = {days:{},ref:{},refSync:2,refManifestHash:state.refManifestHash || '',inbox:withImports};
     const refEpoch = fwRefEpoch;
     state.days.forEach(d => {
       const b = dayBase.get(d.date);
@@ -3910,7 +3951,7 @@
           fwSpeedContext({rpcMs,applyMs:Math.round(performance.now() - applyStarted)}));
       })
       .withFailureHandler(() => { fwSyncBusy = false; })
-      [withImports ? 'runImports' : 'getSyncState'](req);
+      .getSyncState(req); // speed plan E: imports run on the server's 5-min trigger; withImports = also bring the Inbox
   }
   // Live updates while the app is open (2026-11-05, Julius: "update what it needs, without a reset"): a light check
   // every minute, imports every 3 minutes and whenever the tab comes back into view.

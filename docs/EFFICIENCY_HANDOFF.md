@@ -4,7 +4,7 @@ Updated 2026-11-10. This is the current engineering handoff, not a declaration t
 
 ## Speed plan 2 — 2026-11-23 (going fully database; docs/NOTES.md → "H5")
 
-Status: **A implemented 2026-11-23 (untested live)**: main-column day list kept on the device (`fw.ceCache.v1`), painted at once, quiet re-read, dropped with the in-memory copy on any save; PWA service worker keeps pinned jsdelivr calendar libs in cache `libs-v1`. The big calendar already had its device cache (`fw.calCache.v2`). Next: E. Order A (calendar cache) → E (fewer Apps Script calls) → C (Reference + Archive on Firestore) → D (full Days history) → F (the rest) → B (calendar direct) → G (editable local-first). One per session.
+Status: **E implemented 2026-11-23 (untested live)**: imports on a 5-min server trigger (`importsTick`), not on open/return; return jobs' reads batched into one `batchCalls`. Next: C. **A implemented 2026-11-23 (untested live)**: main-column day list kept on the device (`fw.ceCache.v1`), painted at once, quiet re-read, dropped with the in-memory copy on any save; PWA service worker keeps pinned jsdelivr calendar libs in cache `libs-v1`. The big calendar already had its device cache (`fw.calCache.v2`). Order A (calendar cache) → E (fewer Apps Script calls) → C (Reference + Archive on Firestore) → D (full Days history) → F (the rest) → B (calendar direct) → G (editable local-first). One per session.
 
 ## Speed plan — 2026-11-21 (Julius: "put it away 5 min, come back, the whole thing refreshes")
 

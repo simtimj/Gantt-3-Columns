@@ -135,8 +135,14 @@
   #calPanel .cp-fadin{flex:1;min-width:0;border:0;outline:0;background:transparent;color:inherit;font:inherit;font-size:16px;padding:2px 0;}
   #calPanel .cp-fadgo,#calPanel .cp-fadx{appearance:none;border:0;background:transparent;color:inherit;font-size:15px;padding:2px 5px;cursor:pointer;}
   #calPanel .cp-fadgo{color:#1a73e8;}
-  #calPanel.cp-full .cp-fai.cp-fa-ins{box-shadow:0 -3px 0 #1a73e8;}
-  #calPanel.cp-full .cp-fai.cp-fa-ins.cp-fa-ins-b{box-shadow:0 3px 0 #1a73e8;}
+  #calPanel.cp-full .cp-fa-ins{box-shadow:0 -3px 0 #1a73e8;}
+  #calPanel.cp-full .cp-fa-ins.cp-fa-ins-b{box-shadow:0 3px 0 #1a73e8;}
+  /* Ordered group (2026-11-22): number badge on each Ordered task, hint on an empty Ordered header. */
+  #calPanel .cp-fag{cursor:default;}
+  #calPanel .cp-fagh{font-weight:400;text-transform:none;letter-spacing:0;opacity:.8;margin-left:2px;}
+  #calPanel .cp-ordn{display:inline-block;min-width:15px;padding:0 3px;margin-right:4px;border-radius:8px;background:rgba(0,0,0,.28);color:#fff;
+    font-size:10.5px;font-weight:700;line-height:15px;text-align:center;vertical-align:1px;}
+  #calPanel .cp-ordn:empty{display:none;}
   #calPanel .cp-scht{font-weight:400;opacity:.85;white-space:nowrap;}
   #calPanel .fc-event.cp-schc{opacity:.92;border-style:dashed!important;}
   #calPanel.cp-full .cp-fai.cp-fasch{border:1px dashed currentColor;}
@@ -931,7 +937,15 @@
     return { bg: '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1), fg: lum > 0.62 ? '#1f1f1f' : '#fff' };
   };
   const urgRank = x => ({1: 1, 2: 2, 3: 3})[x.urg] || 4; // checkbox order (2026-11-11): Urgent → Next → Later → not set
-  const toFc = x => { const c = softColor(x.color, x.done); x.urgRank = urgRank(x); x.cpSch = 0; x.ordKey = Number(x.ord) || 0; return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
+  /* Ordered group (2026-11-22, Julius: "split all-day into Unordered and Ordered — Ordered = ones I arrange myself and
+     run through in that order"). The sign of `ord` (private tag fwOrd) is the group: ord < 0 = Ordered (numbered 1, 2, 3…,
+     in ord order); ord ≥ 0 = Unordered (by urgency, then oldest first, so new = bottom of its urgency). `ordKey` = ord for
+     Ordered, 0 otherwise, so eventOrder / adCmp put Ordered first. Drag into / out of the Ordered group → adPlace. */
+  const ordKeyOf = o => { o = Number(o) || 0; return o < 0 ? o : 0; };
+  const isOrd = x => !!x && !x.done && !x.schCopy && Number(x.ordKey) < 0;
+  // 1-based place of an Ordered event in its (start) day's Ordered group; 0 = not found yet (cpGroups fills it in).
+  function ordNum(ev){ try { const d = (ev.startStr || '').slice(0, 10); return adDayList(d).filter(e => isOrd(e.extendedProps)).findIndex(e => e.id === ev.id) + 1; } catch (e) { return 0; } }
+  const toFc = x => { const c = softColor(x.color, x.done); x.urgRank = urgRank(x); x.cpSch = 0; x.ordKey = ordKeyOf(x.ord); return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
     backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg,
     classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x }; };
   /* Scheduled (2026-11-15, Julius: "drag an all-day task into my calendar but keep it in the all-day section… when
@@ -942,7 +956,7 @@
   /* All-day order (2026-11-15, Julius: "rearrange the all day area… keep their positioning; from the backlog or
      added = very bottom"). Each all-day event carries `ord` (private tag fwOrd, ms-time-like number): unordered (0)
      first by urgency, then by ord, so anything new (ord = now) lands last. Done stays last. Dragging a row
-     within the all-day area (full box: fadDrag; half calendar: dragStopped) → adReorder → calPanelSetOrder. */
+     within the all-day area (full box: fadDrag; half calendar: dragStopped) → adPlace → calPanelSetOrder. */
   // A stand-in goes as soon as the real event (same title, same day) has come back from the re-read (5 s at most).
   function dropWhenReal(tmp, title, day){
     if(!tmp) return; const t0 = Date.now();
@@ -951,20 +965,25 @@
     tick();
   }
   function adCmp(a, b){ const x = a.extendedProps || {}, y = b.extendedProps || {};
-    return (x.done ? 1 : 0) - (y.done ? 1 : 0) || (Number(x.ordKey) || 0) - (Number(y.ordKey) || 0) || urgRank(x) - urgRank(y) || String(a.title).localeCompare(String(b.title)); }
+    return (x.done ? 1 : 0) - (y.done ? 1 : 0) || (Number(x.ordKey) || 0) - (Number(y.ordKey) || 0) || urgRank(x) - urgRank(y) || (Number(x.ord) || 0) - (Number(y.ord) || 0) || String(a.title).localeCompare(String(b.title)); }
   function adDayList(day){ return cal ? cal.getEvents().filter(e => { const x = e.extendedProps || {}; if(!e.allDay || x.schCopy || x.done || x.blTmp || x.fqTmp) return false;
     const s0 = (e.startStr || '').slice(0, 10), e0 = (e.endStr || '').slice(0, 10) || s0; return s0 <= day && (e0 > day || (e0 === s0 && s0 === day)); }).sort(adCmp) : []; }
-  // Put `ev` before `target` (or at the bottom when target is null) in `day`'s open all-day list; drawn at once, then saved.
-  function adReorder(ev, target, after, day){
+  // toOrd: put `ev` before `target` (null = bottom) in `day`'s Ordered group; else move it back to Unordered.
+  // Drawn at once, then saved.
+  function adPlace(ev, target, after, day, toOrd){
     // EventApi objects are fresh wrappers on every getEvents(), so match by id.
-    const all = adDayList(day), me = all.find(e => e.id === ev.id) || ev, list = all.filter(e => e.id !== ev.id); if(!list.length && !target) return;
-    let i = target ? list.findIndex(e => e.id === target.id) : list.length; if(i < 0) i = list.length; if(target && after) i++;
-    list.splice(i, 0, me);
-    const changes = [], base = Date.now() - (list.length + 1) * 1000;
-    // Renumber the whole day (small lists): keeps it simple and always below "now", so later adds still go last.
-    list.forEach((e, k) => { const x = e.extendedProps || {}, v = base + k * 1000; if(x.recurring) return;
-      if(Number(x.ordKey) !== v){ try { e.setExtendedProp('ord', v); e.setExtendedProp('ordKey', v); } catch (err) {} changes.push({eventId: x.eventId, startMs: x.startMs, calId: x.calId, ord: v});
-        const raw = evById.get(e.id); if(raw) raw.ord = v; } });
+    const all = adDayList(day), me = all.find(e => e.id === ev.id) || ev, mx = me.extendedProps || {}; if(mx.recurring) return;
+    const changes = [];
+    const set = (e, v) => { const x = e.extendedProps || {}; if(x.recurring || Number(x.ord) === v) return;
+      try { e.setExtendedProp('ord', v); e.setExtendedProp('ordKey', ordKeyOf(v)); } catch (err) {} changes.push({eventId: x.eventId, startMs: x.startMs, calId: x.calId, ord: v});
+      const raw = evById.get(e.id); if(raw) raw.ord = v; };
+    if(toOrd){
+      const list = all.filter(e => e.id !== me.id && isOrd(e.extendedProps));
+      let i = target ? list.findIndex(e => e.id === target.id) : list.length; if(i < 0) i = list.length; if(target && after) i++;
+      list.splice(i, 0, me);
+      // Renumber the whole group (small lists): negative, 1 s apart, in order.
+      list.forEach((e, k) => set(e, -1e13 + k * 1000));
+    } else if(isOrd(mx)) set(me, Date.now()); // back to Unordered: bottom of its urgency
     if(!changes.length) return;
     gen++; clearTimeout(saveTimer); saveTimer = setTimeout(cacheSave, 400); // the local copy keeps the new order too
     if(typeof fadSoon === 'function') fadSoon(); cpGroupsSoon();
@@ -1676,8 +1695,12 @@
       const v = h.querySelector('.cp-ev'); return v && !(v.dataset.ceId === mine.eventId && v.dataset.ceStart === String(mine.startMs)); });
     const v = hEl && hEl.querySelector('.cp-ev'), target = v ? list.find(e => { const x = e.extendedProps || {}; return x.eventId === v.dataset.ceId && String(x.startMs) === v.dataset.ceStart; }) : null;
     if(v && !target) return; // over a done / scheduled row: leave it
-    if(target){ const r = hEl.getBoundingClientRect(); adReorder(ev, target, p.y > r.top + r.height / 2, day); }
-    else adReorder(ev, null, false, day);
+    // Ordered row = place there. The top half of the first Unordered row = the line between the groups = end of
+    // Ordered (that's how the first one goes in). Anywhere else in the cell = Unordered.
+    const r = hEl && hEl.getBoundingClientRect(), low = r && p.y > r.top + r.height / 2, firstUn = list.find(e => e.id !== ev.id && !isOrd(e.extendedProps));
+    if(target && isOrd(target.extendedProps)) adPlace(ev, target, low, day, true);
+    else if(target && target.id === (firstUn && firstUn.id) && !low) adPlace(ev, null, false, day, true);
+    else adPlace(ev, null, false, day, false);
   }
   function dragStopped(info){
     const ev = info.event, p = ptOf(info.jsEvent);
@@ -1829,7 +1852,7 @@
     blData.items = blData.items.filter(x => !ids.has(x.id)); if(blSel) reqs.forEach(r => blSel.delete(r.id)); blRender();
     const tmps = [];
     if(cal) reqs.forEach((r, k) => { try { const it = items[k], c = softColor(it.color, false);
-      tmps.push(cal.addEvent({id: 'bltmp-' + r.id, title: it.title, start: r.allDay ? r.start : r.start, end: r.allDay ? null : r.end, allDay: !!r.allDay, backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg, editable: false, extendedProps: {urg: it.urg, blTmp: true, ordKey: r.ord || 0, ord: r.ord || 0}})); } catch (e) {} });
+      tmps.push(cal.addEvent({id: 'bltmp-' + r.id, title: it.title, start: r.allDay ? r.start : r.start, end: r.allDay ? null : r.end, allDay: !!r.allDay, backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg, editable: false, extendedProps: {urg: it.urg, blTmp: true, ordKey: 0, ord: r.ord || 0}})); } catch (e) {} });
     if(typeof fadSoon === 'function') fadSoon();
     flash(msg || 'Sent ✓');
     window.__fwBlPending = (window.__fwBlPending || 0) + 1;
@@ -2020,7 +2043,7 @@
   // ── Event checkboxes (2026-11-11, Julius) ──
   const cpCat = x => { try { return typeof calRowCat === 'function' ? calRowCat({cat: x.cat || '', title: x.title || ''}) : ''; } catch (e) { return ''; } };
   const cpCatColor = k => { try { return k && CARD_CAT_BY_KEY[k] ? CARD_CAT_BY_KEY[k].color : ''; } catch (e) { return ''; } };
-  const CP_GROUPS = {1: 'Urgent', 2: 'Next', 3: 'Later', 4: 'Not set', done: 'Done', sched: 'Scheduled', todo: 'To do'};
+  const CP_GROUPS = {1: 'Urgent', 2: 'Next', 3: 'Later', 4: 'Not set', done: 'Done', sched: 'Scheduled', ord: 'Ordered', unord: 'Unordered'};
   /* Full time range on every timed card (2026-11-15 12:54, Julius: "Chill says 12 AM — show the complete range, even
      when it's cut off from yesterday / runs past tonight"): built from the event's real start / end, not the day piece.
      A side that's on another day gets its weekday ("Sat 10 PM – 7:45 AM"), and a cut-off card never hides its end. */
@@ -2037,7 +2060,7 @@
   function cpEvAttrs(ev){
     const x = ev.extendedProps || {}, k = cpCat(x), a = (n, v) => v ? ' data-' + n + '="' + esc(v) + '"' : '';
     return a('ce-id', x.eventId) + a('ce-cal', x.calId) + a('ce-start', String(x.startMs || '')) + ' data-ce-rec="' + (x.recurring ? 1 : 0) + '"' +
-      a('urg', x.urg) + a('due', x.due) + a('dur', x.dur) + a('cat', x.cat) + a('tccat', k) + ' data-cpg="' + (x.done ? 'done' : x.schCopy ? 'sched' : urgRank(x)) + '"' + (x.schCopy ? ' data-sch="1"' : '') + (x.ordKey && !x.done && !x.schCopy ? ' data-cpo="1"' : '');
+      a('urg', x.urg) + a('due', x.due) + a('dur', x.dur) + a('cat', x.cat) + a('tccat', k) + ' data-cpg="' + (x.done ? 'done' : x.schCopy ? 'sched' : urgRank(x)) + '"' + (x.schCopy ? ' data-sch="1"' : '') + (isOrd(x) ? ' data-cpo="1"' : '');
   }
   function cpChk(ev){
     const x = ev.extendedProps || {}, c = cpCatColor(cpCat(x));
@@ -2177,9 +2200,10 @@
     mount.querySelectorAll('.fc-daygrid-body .fc-daygrid-day-events').forEach(day => {
       const hs = [...day.querySelectorAll(':scope > .fc-daygrid-event-harness')].filter(h => h.querySelector('.cp-ev') && !h.classList.contains('fc-daygrid-event-harness-abs'))
         .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-      // Hand-ordered day (2026-11-15): the open tasks are one "To do" group, so urgency labels don't repeat.
-      const manual = hs.some(h => h.querySelector('.cp-ev').dataset.cpo);
-      const keys = hs.map(h => { const k = h.querySelector('.cp-ev').dataset.cpg; return manual && k !== 'done' && k !== 'sched' ? 'todo' : k; }), many = new Set(keys).size > 1;
+      // A day with an Ordered group (2026-11-22): Ordered (numbered) then Unordered, no urgency labels.
+      const manual = hs.some(h => h.querySelector('.cp-ev').dataset.cpo); let n = 0;
+      const keys = hs.map(h => { const v = h.querySelector('.cp-ev'), k = v.dataset.cpg; if(v.dataset.cpo){ const b = v.querySelector('.cp-ordn'); if(b && b.textContent !== String(++n)) b.textContent = n; else if(!b) ++n; return 'ord'; }
+        return manual && k !== 'done' && k !== 'sched' ? 'unord' : k; }), many = new Set(keys).size > 1;
       hs.forEach((h, i) => { const lab = many && (i === 0 || keys[i] !== keys[i - 1]) ? (CP_GROUPS[keys[i]] || '') : '';
         if((h.dataset.cpgl || '') !== lab){ if(lab) h.dataset.cpgl = lab; else delete h.dataset.cpgl; } });
     });
@@ -2254,7 +2278,7 @@
     cal = new FullCalendar.Calendar(mount, {
       // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
       timeZone: TZ,
-      eventOrder: 'done,cpSch,start,ordKey,urgRank,-duration,allDay,title', // completed events last (2026-11-10), then by urgency (2026-11-11, Julius)
+      eventOrder: 'done,cpSch,start,ordKey,urgRank,ord,-duration,allDay,title', // completed events last (2026-11-10), then by urgency (2026-11-11, Julius)
       // 2026-11-21 (job N): layout by real times only; the min height for text is CSS (see "Back-to-back"), so a short
       // event never makes the one after it look like an overlap. Real overlaps stay inset (slotEventOverlap default).
       eventMinHeight: 1,
@@ -2317,7 +2341,7 @@
         const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : cpRangeHtml(a);
         const short = !a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 30 * 60000;
         const sx = a.event.extendedProps || {}, st = sx.schCopy ? L().fromISO(String(sx.start || '')).setZone(TZ) : null;
-        const body = a.event.allDay ? '<span class="cp-ev-t">' + t + (st && st.isValid ? '<span class="cp-scht"> · ' + esc(st.toFormat('h:mm a').replace(':00', '')) + '</span>' : '') + '</span>'
+        const body = a.event.allDay ? (isOrd(sx) ? '<span class="cp-ordn">' + (ordNum(a.event) || '') + '</span>' : '') + '<span class="cp-ev-t">' + t + (st && st.isValid ? '<span class="cp-scht"> · ' + esc(st.toFormat('h:mm a').replace(':00', '')) + '</span>' : '') + '</span>'
           : short ? '<span class="cp-ev-t">' + t + '</span><span class="cp-ev-m">, ' + tm + '</span>'
           : '<div class="cp-ev-t">' + t + '</div><div class="cp-ev-m">' + tm + '</div>';
         return { html: '<div class="cp-ev cp-evc' + (short ? ' cp-ev-1' : '') + '"' + cpEvAttrs(a.event) + '>' + cpChk(a.event) + '<div class="cp-evb">' + body + '</div></div>' };
@@ -2802,13 +2826,21 @@
       if(days.length > 1) h += '<div class="cp-fadd' + (day === today ? ' cp-today' : '') + '">' + esc(luxon.DateTime.fromISO(day).toFormat('ccc M/d')) + (list.length ? ' · ' + list.length : '') + '</div>';
       const sl = schs.filter(e => (e.startStr || '').slice(0, 10) === day).sort((a, b) => String((a.extendedProps || {}).start).localeCompare(String((b.extendedProps || {}).start)));
       if(!list.length && !sl.length && days.length > 1) return;
-      // To do first, then a "Done" divider (2026-11-14, Julius: split incomplete / done).
-      const nDone = list.filter(e => (e.extendedProps || {}).done).length; let sep = false;
-      list.forEach(e => { const x = e.extendedProps || {}, i = fadList.push(e) - 1; total++;
-        if(x.done && !sep){ sep = true; h += '<div class="cp-fads" data-fad-done role="button" title="Hide / show finished tasks">' + (doneFold ? '▸' : '▾') + ' Done · ' + nDone + '</div>'; }
-        if(x.done && doneFold) return; // folded (2026-11-14, Julius): only the "Done · n" line stays
-        h += '<div class="cp-ev cp-fai' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '"' + (!x.done && x.editable && !x.recurring ? ' data-fa-drag' : '') + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
-          cpChk(e) + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + '</span></div>'; });
+      // Ordered (numbered, arranged by hand) → Unordered → Scheduled → Done (2026-11-22, Julius). Both group headers show
+      // whenever the day has open tasks: they are the drop targets for moving a task between the groups.
+      const row = (e, num) => { const x = e.extendedProps || {}, i = fadList.push(e) - 1; total++;
+        h += '<div class="cp-ev cp-fai' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '"' + (num ? ' data-fao' : '') + (!x.done && x.editable && !x.recurring ? ' data-fa-drag' : '') + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
+          cpChk(e) + (num ? '<span class="cp-ordn">' + num + '</span>' : '') + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + '</span></div>'; };
+      const dn = list.filter(e => (e.extendedProps || {}).done), od = list.filter(e => isOrd(e.extendedProps)), un = list.filter(e => !(e.extendedProps || {}).done && !isOrd(e.extendedProps));
+      if(od.length || un.length){
+        h += '<div class="cp-fads cp-fag" data-fa-og>Ordered' + (od.length ? ' · ' + od.length : '<span class="cp-fagh">hold &amp; drag a task here</span>') + '</div>';
+        od.forEach((e, k) => row(e, k + 1));
+        h += '<div class="cp-fads cp-fag" data-fa-ug>Unordered' + (un.length ? ' · ' + un.length : '') + '</div>';
+        un.forEach(e => row(e, 0));
+      }
+      // Then a "Done" divider (2026-11-14, Julius: split incomplete / done).
+      if(dn.length){ h += '<div class="cp-fads" data-fad-done role="button" title="Hide / show finished tasks">' + (doneFold ? '▸' : '▾') + ' Done · ' + dn.length + '</div>';
+        if(!doneFold) dn.forEach(e => row(e, 0)); else { fadList.push(...dn); total += dn.length; } } // folded (2026-11-14, Julius): only the "Done · n" line stays
       if(sl.length){ h += '<div class="cp-fads cp-fasg" data-fa-sch>Scheduled · ' + sl.length + '</div>';
         sl.forEach(e => { const x = e.extendedProps || {}, i = fadList.push(e) - 1, t = L().fromISO(String(x.start || '')).setZone(TZ); total++;
           h += '<div class="cp-ev cp-fai cp-fasch" data-fa="' + i + '" data-fa-sch' + (x.editable && !x.recurring ? ' data-fa-drag' : '') + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
@@ -2841,7 +2873,7 @@
     if(!title || !day || !canRun()) { if(i) i.focus(); return; }
     const ordNow = Date.now(), opId = 'fq' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     let tmp = null;
-    if(cal) try { tmp = cal.addEvent({id: 'fqtmp-' + opId, title: title, start: day, allDay: true, editable: false, extendedProps: {fqTmp: true, ordKey: ordNow, ord: ordNow}}); } catch (e) {}
+    if(cal) try { tmp = cal.addEvent({id: 'fqtmp-' + opId, title: title, start: day, allDay: true, editable: false, extendedProps: {fqTmp: true, ordKey: 0, ord: ordNow}}); } catch (e) {}
     i.value = ''; i.focus(); flash('Saved ✓');
     const drop = () => { if(tmp) try { tmp.remove(); } catch (e) {} };
     google.script.run.withSuccessHandler(() => { refetchFresh(); dropWhenReal(tmp, title, day); })
@@ -2872,15 +2904,20 @@
     if(d.live && d.ad >= 0){ const t = fadAdTarget(d); fadEl.querySelectorAll('.cp-fa-ins').forEach(el => el.classList.remove('cp-fa-ins', 'cp-fa-ins-b'));
       if(t && t.el){ t.el.classList.add('cp-fa-ins'); if(t.after) t.el.classList.add('cp-fa-ins-b'); } return; }
     if(d.live) fadEl.classList.toggle('cp-fad-over', fadOver(x, y)); };
-  // Where an open all-day row would land in the full-screen box: {el, ev, after} (el null = bottom), or null = not over the box.
+  // Where an open all-day row would land in the full-screen box: {el, ev, after, ord} (el = the row / header that gets
+  // the blue line, ev = the row to go before / after, null = end of the group; ord = into Ordered), or null = not over it.
+  // Ordered header or rows → Ordered; top half of the Unordered header → end of Ordered; below that → Unordered.
   function fadAdTarget(d){
     if(!fadOver(d.x, d.y)) return null;
-    const rows = [...fadEl.querySelectorAll('.cp-fai[data-fa]:not(.cp-fasch):not(.cp-done)')].filter(r => Number(r.dataset.fa) !== d.ad);
-    for(const r of rows){ const b = r.getBoundingClientRect(); if(d.y < b.bottom) return {el: r, ev: fadList[Number(r.dataset.fa)], after: d.y > b.top + b.height / 2}; }
-    return {el: rows.length ? rows[rows.length - 1] : null, ev: null, after: true};
+    const og = fadEl.querySelector('[data-fa-og]'), ug = fadEl.querySelector('[data-fa-ug]'); if(!og || !ug) return null;
+    const ords = [...fadEl.querySelectorAll('.cp-fai[data-fao]')].filter(r => Number(r.dataset.fa) !== d.ad);
+    const ordEnd = {el: ords.length ? ords[ords.length - 1] : og, ev: null, after: true, ord: true}, un = {el: ug, ev: null, after: true, ord: false};
+    const ob = og.getBoundingClientRect(); if(d.y < ob.bottom) return ords.length ? {el: ords[0], ev: fadList[Number(ords[0].dataset.fa)], after: false, ord: true} : ordEnd;
+    for(const r of ords){ const b = r.getBoundingClientRect(); if(d.y < b.bottom) return {el: r, ev: fadList[Number(r.dataset.fa)], after: d.y > b.top + b.height / 2, ord: true}; }
+    const ub = ug.getBoundingClientRect(); return d.y < ub.top + ub.height / 2 ? ordEnd : un;
   }
   const fadEnd = () => { const d = fadDrag; fadDrag = null; if(fadHeld){ fadHeld = false; setTimeout(fadRender, 0); } fadEl.classList.remove('cp-fad-over'); fadEl.querySelectorAll('.cp-fa-ins').forEach(el => el.classList.remove('cp-fa-ins', 'cp-fa-ins-b'));
-    if(d && d.live && d.ad >= 0){ const t = fadAdTarget(d), ev = fadList[d.ad]; if(t && ev) adReorder(ev, t.ev, t.after, viewStart); return; }
+    if(d && d.live && d.ad >= 0){ const t = fadAdTarget(d), ev = fadList[d.ad]; if(t && ev) adPlace(ev, t.ev, t.after, viewStart, t.ord); return; }
     if(d && d.live && d.sch >= 0){ // a Scheduled row let go over the all-day part of the box = unscheduled
       const hit = document.elementsFromPoint(d.x, d.y).some(el => { const r = el.closest && el.closest('.cp-fasch'); return r && fadEl.contains(r) && Number(r.dataset.fa) !== d.sch; }); // over another Scheduled row = stays (never the dragged row itself)
       if(fadOver(d.x, d.y) && !hit){ const ev = fadList[d.sch]; if(ev) unschedule(schOrig(ev)); }

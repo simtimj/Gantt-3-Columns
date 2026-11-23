@@ -2610,7 +2610,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
             if (!/All-day A/.test(f.textContent)) out.push('all-day task missing from the left column');
             if (br.top < fr.bottom) out.push('backlog not below the all-day list');
             { const api = window.fwCalendar.api(), d0 = api.view.currentStart, tmp = api.addEvent({ title: 'Done all-day Z', allDay: true, start: d0, extendedProps: { done: true } }); await w(400);
-              const kids = [...f.querySelectorAll('.cp-fadb > *')], si = kids.findIndex(k => k.classList.contains('cp-fads')), zi = kids.findIndex(k => /Done all-day Z/.test(k.textContent)), ai = kids.findIndex(k => /All-day A/.test(k.textContent));
+              const kids = [...f.querySelectorAll('.cp-fadb > *')], si = kids.findIndex(k => k.hasAttribute('data-fad-done')), zi = kids.findIndex(k => /Done all-day Z/.test(k.textContent)), ai = kids.findIndex(k => /All-day A/.test(k.textContent));
               if (si < 0 || !(ai < si && si < zi)) out.push('all-day list: no Done divider between to-do and done (' + [ai, si, zi] + ')');
               f.querySelector('[data-fad-done]').click(); await w(200);
               if (/Done all-day Z/.test(f.textContent) || !/Done · 1/.test(f.textContent) || !/All-day A/.test(f.textContent)) out.push('all-day list: tapping Done did not fold the finished tasks');
@@ -2789,36 +2789,42 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
               }
               await pg.evaluate(() => window.fwCalendar.api().today());
             }
-            // All-day order (2026-11-15, Julius): new = bottom; drag a row above another in the box = new order, kept after a re-read.
+            // All-day Ordered / Unordered groups (2026-11-22, Julius): new = Unordered; drag onto the Ordered header =
+            // Ordered (numbered); drag above another Ordered row = new order, kept after a re-read; drag down to Unordered = out.
             {
               const D = '2026-11-22';
-              const names = () => pg.evaluate(() => [...document.querySelectorAll('#calPanel .cp-fad .cp-fai:not(.cp-fasch):not(.cp-done)')].map(x => x.querySelector('.cp-ev-t').textContent));
+              const st = () => pg.evaluate(() => { const r = [...document.querySelectorAll('#calPanel .cp-fad .cp-fai:not(.cp-fasch):not(.cp-done)')];
+                const t = x => x.querySelector('.cp-ev-t').textContent;
+                return { ord: r.filter(x => x.hasAttribute('data-fao')).map(x => x.querySelector('.cp-ordn').textContent + ' ' + t(x)).join('|'), un: r.filter(x => !x.hasAttribute('data-fao')).map(t).join('|') }; });
               await pg.evaluate(async d => { const w = ms => new Promise(r => setTimeout(r, ms)), cal = window.fwCalendar.api(); cal.changeView('timeGridDay', d); await w(400);
                 const b = document.querySelector('#calPanel [data-fad-add]'); b.click(); await w(100);
                 const i = document.querySelector('#calPanel [data-fad-in]');
                 for (const t of ['Order one', 'Order two']) { i.value = t; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(700); }
                 document.querySelector('#calPanel [data-fad-x]').click(); await w(200); }, D);
-              let n = await names();
-              if (n.join('|') !== 'All-day A|Order one|Order two') errs.push('order: new tasks not at the bottom: ' + n.join('|'));
-              const g = await pg.evaluate(() => { const rs = [...document.querySelectorAll('#calPanel .cp-fad .cp-fai:not(.cp-fasch)')], c = r => { const b = r.getBoundingClientRect(); return { x: b.x + Math.min(40, b.width / 2), y: b.y + b.height / 2, t: b.y + 3 }; };
-                const two = rs.find(r => /Order two/.test(r.textContent)), a = rs.find(r => /All-day A/.test(r.textContent)); return two && a ? { from: c(two), to: c(a) } : null; });
-              if (!g) errs.push('order: rows not found');
-              else {
-                const to = { x: g.to.x, y: g.to.t };
+              let n = await st();
+              if (n.ord || !/Order one\|Order two$/.test(n.un)) errs.push('order: new tasks not at the bottom of Unordered: ' + JSON.stringify(n));
+              const pos = (title, top) => pg.evaluate(([tt, tp]) => { const el = tt === 'OG' ? document.querySelector('#calPanel [data-fa-og]') : tt === 'UG' ? document.querySelector('#calPanel [data-fa-ug]')
+                : [...document.querySelectorAll('#calPanel .cp-fad .cp-fai')].find(r => r.querySelector('.cp-ev-t').textContent === tt);
+                if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.x + Math.min(40, b.width / 2), y: tp === 'top' ? b.y + 3 : tp === 'low' ? b.bottom - 2 : b.y + b.height / 2 }; }, [title, top]);
+              const drag = async (from, to) => {
+                if (!from || !to) { errs.push('order: rows not found'); return; }
                 if (name === 'phone') {
                   const cdp = await pg.context().newCDPSession(pg);
                   const T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
-                  await T('touchStart', g.from.x, g.from.y); await pg.waitForTimeout(900);
-                  for (let i = 1; i <= 8; i++) { await T('touchMove', g.from.x + (to.x - g.from.x) * i / 8, g.from.y + (to.y - g.from.y) * i / 8); await pg.waitForTimeout(30); }
+                  await T('touchStart', from.x, from.y); await pg.waitForTimeout(900);
+                  for (let i = 1; i <= 8; i++) { await T('touchMove', from.x + (to.x - from.x) * i / 8, from.y + (to.y - from.y) * i / 8); await pg.waitForTimeout(30); }
                   await T('touchEnd');
-                } else { await pg.mouse.move(g.from.x, g.from.y); await pg.mouse.down(); await pg.mouse.move(to.x, to.y, { steps: 10 }); await pg.mouse.up(); }
+                } else { await pg.mouse.move(from.x, from.y); await pg.mouse.down(); await pg.mouse.move(to.x, to.y, { steps: 10 }); await pg.mouse.up(); }
                 await pg.waitForTimeout(600);
-                n = await names();
-                if (n.join('|') !== 'Order two|All-day A|Order one') errs.push('order: drag gave ' + n.join('|'));
-                await pg.evaluate(async () => { window.fwCalendar.api().refetchEvents(); await new Promise(r => setTimeout(r, 600)); });
-                n = await names();
-                if (n.join('|') !== 'Order two|All-day A|Order one') errs.push('order: not kept after a re-read: ' + n.join('|'));
-              }
+              };
+              await drag(await pos('Order two'), await pos('OG'));
+              n = await st(); if (n.ord !== '1 Order two') errs.push('order: into Ordered gave ' + JSON.stringify(n));
+              await drag(await pos('Order one'), await pos('Order two', 'top'));
+              n = await st(); if (n.ord !== '1 Order one|2 Order two') errs.push('order: above another gave ' + JSON.stringify(n));
+              await pg.evaluate(async () => { window.fwCalendar.api().refetchEvents(); await new Promise(r => setTimeout(r, 600)); });
+              n = await st(); if (n.ord !== '1 Order one|2 Order two') errs.push('order: not kept after a re-read: ' + JSON.stringify(n));
+              await drag(await pos('Order one'), await pos('UG', 'low'));
+              n = await st(); if (n.ord !== '1 Order two' || !/Order one$/.test(n.un)) errs.push('order: back to Unordered gave ' + JSON.stringify(n));
               await pg.evaluate(() => window.fwCalendar.api().today());
             }
             // Quick add in the All day box (2026-11-15, Julius): + → blank row → type → Enter = all-day task on the day shown.

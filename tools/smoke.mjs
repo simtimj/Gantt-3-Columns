@@ -2014,6 +2014,59 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           if (!det.hidden) det.querySelector('[data-cal-detail-close]').click();
           await wait(40);
         }
+        // Move to today / tomorrow (2026-11-23, Julius): same time and length, all-day stays all-day; each button only
+        // when the event isn't already on that day; none on a done event.
+        {
+          const Lx = luxon.DateTime, Z = 'America/Los_Angeles', api = window.fwCalendar.api();
+          const td = Lx.now().setZone(Z).toISODate(), tm = Lx.fromISO(td).plus({days: 1}).toISODate(), z = s => Lx.fromISO(s, {zone: Z});
+          const vd = api.view.activeStart.toISOString().slice(0, 10), vz = Lx.fromISO(vd).toISODate();
+          if (vz !== td) out.push('move: docked view is not on today (' + vd + ')');
+          else {
+            const iso = s => z(s).toISO({suppressMilliseconds: true});
+            S.ev.mv1 = {id: 'mv1|' + z(td + 'T14:00').toMillis(), eventId: 'mv1', title: 'Move me', allDay: false, start: iso(td + 'T14:00'), end: iso(td + 'T14:45'), startMs: z(td + 'T14:00').toMillis(), color: '#039be5', colorId: '', cal: 'Main', calId: 'main', editable: true};
+            S.ev.mv2 = {id: 'mv2|' + z(td).toMillis(), eventId: 'mv2', title: 'Move day', allDay: true, start: td, end: tm, startMs: z(td).toMillis(), color: '#039be5', colorId: '', cal: 'Main', calId: 'main', editable: true};
+            api.refetchEvents();
+            await until(() => evEl('Move me') && evEl('Move day'), 3000);
+            const btn = k => det.querySelector('[data-cal-act="' + k + '"]');
+            evEl('Old chore') && evEl('Old chore').click(); await wait(60);
+            if (!det.hidden && (btn('mvtoday') || btn('mvtomorrow'))) out.push('move: a done event shows move buttons');
+            if (!det.hidden) det.querySelector('[data-cal-detail-close]').click(); await wait(40);
+            evEl('Move me').click(); await wait(60);
+            if (btn('mvtoday')) out.push('move: today\'s event shows Move to today');
+            if (!btn('mvtomorrow')) out.push('move: no Move to tomorrow on a today event');
+            else {
+              btn('mvtomorrow').click();
+              await until(() => String(S.ev.mv1.start).startsWith(tm), 3000);
+              const e = S.ev.mv1;
+              if (!String(e.start).startsWith(tm + 'T14:00') || !String(e.end).startsWith(tm + 'T14:45') || e.allDay) out.push('move: tomorrow did not keep 2:00–2:45 ' + e.start + ' ' + e.end);
+            }
+            await wait(200); if (!det.hidden) det.querySelector('[data-cal-detail-close]').click(); await wait(40);
+            evEl('Move day').click(); await wait(60);
+            if (!btn('mvtomorrow')) out.push('move: no Move to tomorrow on an all-day event');
+            else {
+              btn('mvtomorrow').click();
+              await until(() => S.ev.mv2.start === tm, 3000);
+              if (S.ev.mv2.start !== tm || S.ev.mv2.end !== Lx.fromISO(tm).plus({days: 1}).toISODate() || !S.ev.mv2.allDay) out.push('move: all-day tomorrow wrong ' + JSON.stringify([S.ev.mv2.start, S.ev.mv2.end, S.ev.mv2.allDay]));
+            }
+            await wait(200); if (!det.hidden) det.querySelector('[data-cal-detail-close]').click(); await wait(40);
+            // Back: on tomorrow's view, the moved event offers Move to today (and not tomorrow).
+            api.next(); await until(() => evEl('Move me'), 3000);
+            if (!evEl('Move me')) out.push('move: moved event not on tomorrow');
+            else {
+              evEl('Move me').click(); await wait(60);
+              if (btn('mvtomorrow')) out.push('move: tomorrow\'s event shows Move to tomorrow');
+              if (!btn('mvtoday')) out.push('move: no Move to today on a tomorrow event');
+              else {
+                btn('mvtoday').click();
+                await until(() => String(S.ev.mv1.start).startsWith(td), 3000);
+                if (!String(S.ev.mv1.start).startsWith(td + 'T14:00') || !String(S.ev.mv1.end).startsWith(td + 'T14:45')) out.push('move: today did not keep 2:00–2:45 ' + S.ev.mv1.start);
+              }
+              await wait(200); if (!det.hidden) det.querySelector('[data-cal-detail-close]').click(); await wait(40);
+            }
+            delete S.ev.mv1; delete S.ev.mv2;
+            api.today(); api.refetchEvents(); await wait(300);
+          }
+        }
         // Read-only: a repeating event and an Events-calendar event have no Edit / Delete.
         for (const t of ['Standup', 'Gig']) {
           const el = evEl(t); if (!el) { out.push(t + ' not shown'); continue; }

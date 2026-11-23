@@ -78,6 +78,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-23)
+- **Move to today / tomorrow** (2026-11-23): tap an event (docked or big calendar) → **Move to today** (when it isn't today) and **Move to tomorrow** (when it isn't tomorrow). Same start time and length, all-day stays all-day, saved to Google Calendar; done events stay put; repeating = that day only.
 - **Keep In Mind spacing** (2026-11-23): dark gray a touch brighter · a title box at the very top is no longer cut off · less side margin and slightly smaller text for more room.
 
 ## 🧪 To be confirmed (2026-11-22)

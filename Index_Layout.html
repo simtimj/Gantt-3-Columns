@@ -556,6 +556,10 @@
     max-width:min(62vw,340px);margin:0!important;padding:3px 9px!important;border-radius:999px;font-size:11px!important;line-height:1.35;
     background:rgba(40,42,48,.85)!important;color:#fff!important;box-shadow:0 2px 8px rgba(0,0,0,.25)!important;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;pointer-events:none;}
+  /* Subtler (2026-11-22, Julius): smaller, see-through, no shadow; fades out (setStatus timer). */
+  #status.status{font-size:10px!important;padding:2px 7px!important;background:rgba(40,42,48,.55)!important;color:rgba(255,255,255,.78)!important;
+    box-shadow:none!important;transition:opacity .35s ease;opacity:1;}
+  #status.status.st-gone{opacity:0;}
   #status.status.st-tap{pointer-events:auto;cursor:pointer;}
   #status.status:empty{display:none;}
   #pwaOffline{top:auto!important;left:auto!important;transform:none!important;right:calc(8px + env(safe-area-inset-right))!important;
@@ -679,7 +683,10 @@
   #journalPane .center-tabs button.on{box-shadow:none!important;outline:0!important;background:color-mix(in srgb,var(--text,#fff) 22%,transparent)!important;}
   /* Keep In Mind pin: a small tap-to-unpin 📌 painted beside the item (render-only, never saved); the line keeps its own
      − / count button. */
-  #kimScroll .kim-editor > [data-kpin]{padding-left:17px!important;}
+  #kimScroll .kim-editor > [data-kpin].check-line > .check-text{text-indent:17px;}
+  #kimScroll .kim-editor > [data-kpin]:not(.check-line){padding-right:20px!important;}
+  /* Keep In Mind boxes (2026-11-22, Julius): thinner line, squarer corners to match the checkboxes. */
+  #kimScroll .kg-box{border-radius:4px!important;}
   #kimScroll .kg-pin{position:absolute;z-index:2;width:16px;height:16px;padding:0;margin:0;border:0;background:none;font-size:11px;line-height:16px;
     text-align:center;cursor:pointer;opacity:.85;-webkit-tap-highlight-color:transparent;}
   #kimScroll .kg-pin:hover{opacity:1;}

@@ -181,6 +181,17 @@
     const focusStatus=document.getElementById('focusStatus');
     if(status){ status.textContent=s; status.classList.toggle('st-tap', /tap here/i.test(s)); } // pill is click-through unless it offers a tap (UI batch 2026-11-21)
     if(focusStatus) focusStatus.textContent=s;
+    // Fades out (2026-11-22, Julius: "whatever happened last just stays there"): done messages go after 2.5 s, an undo
+    // offer after 8 s; in-progress (Saving…) and problems (not saved, retrying, conflict) stay until replaced.
+    clearTimeout(setStatus.t);
+    if(status) status.classList.remove('st-gone');
+    const msg = String(s || '');
+    const sticky = !msg || /…|\.\.\.|not saved|didn.t|couldn.t|could not|can.t|retry|conflict|error|fail|offline|keep this/i.test(msg);
+    if(!sticky) setStatus.t = setTimeout(() => {
+      if(status) status.classList.add('st-gone');
+      setTimeout(() => { if(status && status.classList.contains('st-gone') && status.textContent === msg){ status.textContent = ''; status.classList.remove('st-gone','st-tap'); } }, 400);
+      if(focusStatus && focusStatus.textContent === msg) focusStatus.textContent = '';
+    }, /tap here/i.test(msg) ? 8000 : 2500);
   }
   function storedToHtml(v){
     if(!v){

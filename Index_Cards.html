@@ -2924,14 +2924,18 @@
         if(!cur){ cur = [n,n]; groups.push(cur); } else cur[1] = n;
       });
       const sr = scroller.getBoundingClientRect(), er = ed.getBoundingClientRect();
-      // Pins (2026-11-22, Julius): a small 📌 left of each pinned item; tap = unpin (it drops just below the pinned ones).
+      // Pins (2026-11-22, Julius): a small 📌 on each pinned item; tap = unpin (it drops just below the pinned ones).
+      // A task: just right of its checkbox (the text makes room). A title (no checkbox): at the right end of its line.
       [...ed.children].forEach(n => {
         if(!n.hasAttribute('data-kpin') || getComputedStyle(n).display === 'none') return;
         const r = n.getBoundingClientRect(), lh = Math.min(r.height, parseFloat(getComputedStyle(n).lineHeight) || 20);
         const pin = document.createElement('button'); pin.type = 'button'; pin.className = 'kg-pin'; pin.textContent = '📌';
         pin.title = 'Unpin'; pin.setAttribute('aria-label', 'Unpin'); pin.tabIndex = -1;
-        pin.style.left = (r.left - sr.left + scroller.scrollLeft + 1) + 'px';
-        pin.style.top = (r.top - sr.top + scroller.scrollTop + Math.max(0, (lh - 16) / 2) + (parseFloat(getComputedStyle(n).paddingTop) || 0)) + 'px';
+        const cb = n.querySelector(':scope > input[type=checkbox]'), cr = cb && cb.getBoundingClientRect();
+        let top = r.top - sr.top + scroller.scrollTop + Math.max(0, (lh - 16) / 2) + (parseFloat(getComputedStyle(n).paddingTop) || 0);
+        if(cr && cr.width){ pin.style.left = (cr.right - sr.left + scroller.scrollLeft + 2) + 'px'; top = cr.top - sr.top + scroller.scrollTop + (cr.height - 16) / 2; }
+        else pin.style.left = (r.right - sr.left + scroller.scrollLeft - 19) + 'px';
+        pin.style.top = top + 'px';
         pin.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); });
         pin.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); if(window.kimUnpinHead) window.kimUnpinHead(n); });
         scroller.appendChild(pin);
@@ -2943,7 +2947,7 @@
         const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
         const box = document.createElement('div'); box.className = 'kg-box';
         const tbc = a.getAttribute('data-tbc'); // title border color (2026-11-21)
-        if(/^#[0-9a-f]{6}$/i.test(tbc || '')){ box.style.borderColor = tbc; box.style.borderWidth = '1.5px'; }
+        if(/^#[0-9a-f]{6}$/i.test(tbc || '')){ box.style.borderColor = tbc; box.style.borderWidth = '1px'; }
         box.style.left = (er.left - sr.left + scroller.scrollLeft) + 'px';
         box.style.width = er.width + 'px';
         box.style.top = (ra.top - sr.top + scroller.scrollTop - 2) + 'px';

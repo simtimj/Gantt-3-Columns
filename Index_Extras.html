@@ -433,8 +433,9 @@
       const w = Math.max(10,W - 2 - b.depth * 5 - x), h = Math.max(10,bottom - top);
       const on = b.t.hasAttribute('data-tcfocus');
       const tbc = /^#[0-9a-f]{6}$/i.test(b.t.getAttribute('data-tbc') || '') ? b.t.getAttribute('data-tbc') : ''; // chosen color (2026-11-21)
-      rects += '<rect x="' + (x + .75) + '" y="' + (top + .75) + '" width="' + (w - 1.5) + '" height="' + (h - 1.5) + '" rx="8" fill="none" stroke="' +
-        (on ? urg : tbc || ink) + '" stroke-opacity="' + (on || tbc ? '1' : kim ? '.45' : '.8') + '" stroke-width="' + (kim ? (on || tbc ? 1.5 : 1) : (on || tbc ? 2 : 1.5)) + '"/>'; // brighter (2026-11-21 12:44, Julius: "barely see it")
+      // Keep In Mind (2026-11-22, Julius): thinner lines and squarer corners that match the checkboxes.
+      rects += '<rect x="' + (x + .75) + '" y="' + (top + .75) + '" width="' + (w - 1.5) + '" height="' + (h - 1.5) + '" rx="' + (kim ? 4 : 8) + '" fill="none" stroke="' +
+        (on ? urg : tbc || ink) + '" stroke-opacity="' + (on || tbc ? '1' : kim ? '.45' : '.8') + '" stroke-width="' + (kim ? (on || tbc ? 1 : .75) : (on || tbc ? 2 : 1.5)) + '"/>'; // brighter (2026-11-21 12:44, Julius: "barely see it")
     });
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '">' + rects + '</svg>';
     Object.assign(ed.style,{backgroundImage:'url("data:image/svg+xml,' + encodeURIComponent(svg) + '")',backgroundRepeat:'no-repeat',

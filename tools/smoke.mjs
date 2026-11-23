@@ -55,7 +55,7 @@ const out = path.join(os.tmpdir(), 'gantt-smoke.html');
 fs.writeFileSync(out, html);
 // SMOKE_ONLY=main|snap|tracker|calendar runs just that part (2026-11-08); unset = everything.
 const only = part => !process.env.SMOKE_ONLY || process.env.SMOKE_ONLY.split(',').includes(part);
-const b = await chromium.launch();
+const b = await chromium.launch(process.env.SMOKE_CHROME ? { executablePath: process.env.SMOKE_CHROME } : {});
 let fails = 0;
 for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
   const pg = await (await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' })).newPage(); // Julius's browser clock

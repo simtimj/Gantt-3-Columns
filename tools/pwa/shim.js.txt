@@ -148,9 +148,12 @@
       var d = snap && snap.exists ? snap.data() : null;
       return d ? { html: String(d.html || ''), h: 'f' + d.at, at: Number(d.at) || 0, fresh: false, build: '' } : null;
     }
+    // Refused by the database (rules, sign-in) → throw, so run() falls back to the server (Sheet) path instead
+    // of showing an empty list or accepting an edit that can't be saved.
+    function refused(e) { return e && /permission-denied|unauthenticated|failed-precondition/.test(e.code || ''); }
     function read() {
       var cacheOnly = function () { return doc().get({ source: 'cache' }).catch(function () { return null; }); };
-      return (navigator.onLine ? doc().get({ source: 'server' }).catch(cacheOnly) : cacheOnly()).then(shape);
+      return (navigator.onLine ? doc().get({ source: 'server' }).catch(function (e) { if (refused(e)) throw e; return cacheOnly(); }) : cacheOnly()).then(shape);
     }
     function backup(html, reason) {
       db.collection('ganttBackup').add({ area: 'kim', html: String(html || ''), at: Date.now(), reason: reason, dev: dev })
@@ -262,7 +265,7 @@
       }
       function readDoc(d) {
         var cache = function () { return dayDoc(d).get({ source: 'cache' }).catch(function () { return null; }); };
-        return (navigator.onLine ? dayDoc(d).get({ source: 'server' }).catch(cache) : cache()).then(function (snap) {
+        return (navigator.onLine ? dayDoc(d).get({ source: 'server' }).catch(function (e) { if (refused(e)) throw e; return cache(); }) : cache()).then(function (snap) {
           return snap && snap.exists ? snap.data() : null;
         });
       }

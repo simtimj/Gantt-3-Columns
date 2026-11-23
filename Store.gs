@@ -34,10 +34,30 @@ function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
   if (b === 'db' && STORE_DB_BUILT_[area]) {
     if (!FIREBASE_PROJECT_) throw new Error('Store: ' + area + ' is set to the database but FIREBASE_PROJECT_ is empty');
-    return b;
+    return storeDbReady_() ? b : 'sheet';
   }
   if (b !== 'sheet' && b !== 'properties') throw new Error('Store: backend "' + b + '" for ' + area + ' is not built yet');
   return b;
+}
+
+/* Database reachable? (2026-11-22 fix: a permission error emptied Keep In Mind.) One probe per run, cached
+   2 min: any answer but "doc found" / "doc not there yet" (403, missing database, API off, no scope) → every
+   database area falls back to the Sheet, so nothing shows empty and no edit is lost. */
+let storeDbReady__ = null;
+function storeDbReady_() {
+  if (storeDbReady__ !== null) return storeDbReady__;
+  const cache = CacheService.getScriptCache(), hit = cache.get('storeDbReady');
+  if (hit) return (storeDbReady__ = hit === '1');
+  let ok = false;
+  try {
+    const res = UrlFetchApp.fetch(StoreFs.url_('gantt/kim'), { muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken(), 'X-Goog-User-Project': FIREBASE_PROJECT_ } });
+    const code = res.getResponseCode();
+    ok = code === 200 || (code === 404 && !/database/i.test(res.getContentText()));
+    if (!ok) console.warn('Database not reachable (' + code + '), using the Sheet: ' + res.getContentText().slice(0, 200));
+  } catch (e) { console.warn('Database not reachable, using the Sheet: ' + e.message); }
+  cache.put('storeDbReady', ok ? '1' : '0', 120);
+  return (storeDbReady__ = ok);
 }
 
 /* Firestore over REST, as Julius (his OAuth token; IAM access, so security rules don't apply here — the rules
@@ -661,6 +681,7 @@ const Store = {
      lost under "newest edit wins" (written to Firestore ganttBackup by the app) moved into the Backup tab. */
   mirror() {
     if (!FIREBASE_PROJECT_) return { off: true };
+    if (!storeDbReady_()) return { off: true, reason: 'database not reachable' };
     return storeLocked_(() => {
       const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), backups: 0 };
       StoreFs.list('ganttBackup').forEach(b => {

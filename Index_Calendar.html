@@ -131,6 +131,8 @@
   #calPanel .cp-fadadd{margin-left:auto;appearance:none;border:1px solid var(--cp-line);background:transparent;color:inherit;border-radius:999px;width:24px;height:22px;line-height:1;font-size:16px;padding:0;cursor:pointer;}
   #calPanel .cp-fadnew{display:flex;align-items:center;gap:4px;padding:3px 4px;margin:2px 2px 3px;border:1px solid #1a73e8;border-radius:6px;background:var(--cp-soft);}
   #calPanel .cp-fadnew[hidden]{display:none;}
+  #calPanel .cp-adqa{position:relative;z-index:5;margin:2px 1px 3px;padding:2px 3px;} /* hold-to-add row in a half-calendar all-day cell */
+  #calPanel .cp-adqa .cp-fadin{font-size:16px;}
   #calPanel .cp-fadnew .cp-chk{flex:none;}
   #calPanel .cp-fadin{flex:1;min-width:0;border:0;outline:0;background:transparent;color:inherit;font:inherit;font-size:16px;padding:2px 0;}
   #calPanel .cp-fadgo,#calPanel .cp-fadx{appearance:none;border:0;background:transparent;color:inherit;font-size:15px;padding:2px 5px;cursor:pointer;}
@@ -2366,7 +2368,7 @@
       dateClick: info => { const t0 = gridDown; gridDown = null;
         if(finePointer() || !t0 || t0.cardOpen || Date.now() - t0.at > 400 || pending || moveBusy) return; // mouse: select handles clicks
         openForm(formFromRange(info.allDay, info.dateStr, '')); },
-      select: info => { if(!pending){ const at = finePointer() ? mount.querySelector('.fc-event-mirror,.fc-highlight') : null; openForm(formFromRange(info.allDay, info.startStr, info.endStr)); if(at) popAt(at); } cal.unselect(); },
+      select: info => { if(Date.now() < qaSkipSel){ cal.unselect(); return; } if(!pending){ const at = finePointer() ? mount.querySelector('.fc-event-mirror,.fc-highlight') : null; openForm(formFromRange(info.allDay, info.startStr, info.endStr)); if(at) popAt(at); } cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       events: fetchRange,
       eventsSet: () => { setTimeout(adLayout, 0); if(typeof fadSoon === 'function') fadSoon(); },
@@ -2381,7 +2383,7 @@
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(schOrig(info.event)); return; }
         if(!pending) showDetail(schOrig(info.event), info.el); },
       eventDidMount: a => { if(a.el.classList.contains('cp-glass')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
-      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = CP_VLBL[cpvNext(info.view.type)]; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
+      datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = CP_VLBL[cpvNext(info.view.type)]; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(typeof qaClose === 'function') qaClose(); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
     });
     cal.render();
     window.addEventListener('fw-holdms', () => { try{ cal.setOption('eventLongPressDelay', window.fwHoldMs()); }catch(err){} }); // Options slider
@@ -2868,8 +2870,10 @@
     const i = fadNew.querySelector('[data-fad-in]'); i.value = ''; i.focus();
   }
   const fadAddClose = () => { fadNew.hidden = true; const i = fadNew.querySelector('[data-fad-in]'); if(i) i.blur(); };
-  function fadAddSend(){
-    const i = fadNew.querySelector('[data-fad-in]'), title = (i && i.value || '').replace(/\s+/g, ' ').trim(), day = viewStart;
+  function fadAddSend(){ qaSend(fadNew.querySelector('[data-fad-in]'), viewStart); }
+  // Quick add send (full box + and the half calendar's hold, 2026-11-22): input's text → all-day task on `day`.
+  function qaSend(i, day){
+    const title = (i && i.value || '').replace(/\s+/g, ' ').trim();
     if(!title || !day || !canRun()) { if(i) i.focus(); return; }
     const ordNow = Date.now(), opId = 'fq' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     let tmp = null;
@@ -2886,6 +2890,37 @@
     else if(e.target.closest('[data-fad-x]')){ e.stopPropagation(); fadAddClose(); }
   }, true);
   fadNew.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); fadAddSend(); } else if(e.key === 'Escape'){ e.preventDefault(); fadAddClose(); } });
+  /* Hold to quick add (2026-11-22, Julius: "hold on the empty all-day area of the half calendar → create an event"):
+     hold (fwHoldMs, finger still) on empty space in a day's all-day cell → the same blank row as the full box's +,
+     inside that cell: type, Enter / ➤ = all-day task on that day, a fresh row stays open; Esc / ✕ / another day closes.
+     All-day only (the timed grid stays tap-only so scrolling isn't affected). A quick tap still opens New event. */
+  let qaHold = null, qaRow = null, qaDay = '', qaSkipSel = 0;
+  function qaClose(){ if(qaRow){ const i = qaRow.querySelector('input'); if(i) i.blur(); qaRow.remove(); } qaRow = null; qaDay = ''; }
+  function qaOpen(cell){
+    qaClose(); const fr = cell.querySelector('.fc-daygrid-day-frame') || cell; qaDay = cell.dataset.date;
+    qaRow = document.createElement('div'); qaRow.className = 'cp-fadnew cp-adqa'; qaRow.dataset.adqa = qaDay;
+    qaRow.innerHTML = '<span class="cp-chk" aria-hidden="true"></span><input class="cp-fadin" type="text" placeholder="New task…" enterkeyhint="send" autocomplete="off"><button type="button" class="cp-fadgo" data-qa-go title="Save" aria-label="Save">➤</button><button type="button" class="cp-fadx" data-qa-x title="Close" aria-label="Close">✕</button>';
+    fr.appendChild(qaRow); const i = qaRow.querySelector('input'); i.focus();
+    qaRow.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); qaSend(i, qaDay); } else if(e.key === 'Escape'){ e.preventDefault(); qaClose(); } });
+    qaRow.addEventListener('pointerdown', e => e.stopPropagation()); // typing / buttons never start a hold, select or tap-to-create
+    qaRow.addEventListener('click', e => { e.stopPropagation(); if(e.target.closest('[data-qa-go]')) qaSend(i, qaDay); else if(e.target.closest('[data-qa-x]')) qaClose(); });
+    if(navigator.vibrate) try { navigator.vibrate(15); } catch (e) {}
+  }
+  mount.addEventListener('pointerdown', e => {
+    clearTimeout(qaHold && qaHold.t); qaHold = null;
+    if(full || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const cell = e.target.closest && e.target.closest('.fc-timegrid .fc-daygrid-day[data-date]');
+    if(!cell || e.target.closest('.fc-event,.cp-adqa,.fc-daygrid-more-link')) return;
+    const h = qaHold = {x: e.clientX, y: e.clientY, cell}; h.t = setTimeout(() => { if(qaHold !== h) return; qaHold = null; qaSkipSel = qaLift = Date.now() + 1500; try { cal.unselect(); } catch (err) {} qaOpen(cell); }, window.fwHoldMs ? window.fwHoldMs() : 500);
+  }, true);
+  const qaCancel = e => { if(qaHold && (!e || e.type !== 'pointermove' || Math.hypot(e.clientX - qaHold.x, e.clientY - qaHold.y) > 10)){ clearTimeout(qaHold.t); qaHold = null; } };
+  mount.addEventListener('pointermove', qaCancel, true); mount.addEventListener('pointerup', () => qaCancel(), true); mount.addEventListener('pointercancel', () => qaCancel(), true);
+  mount.addEventListener('scroll', () => qaCancel(), true);
+  // The finger lifting after the hold would blur the new box (the tap's compatibility mousedown / click lands on the
+  // cell): cancel those and focus the box again once it's up.
+  let qaLift = 0;
+  const qaRefocus = e => { if(Date.now() > qaLift || !qaRow || (qaRow.contains(e.target))) return; if(e.type === 'touchend'){ qaLift = 0; if(e.cancelable) e.preventDefault(); } const i = qaRow.querySelector('input'); if(i) setTimeout(() => i.focus(), 0); };
+  mount.addEventListener('touchend', qaRefocus, {capture: true, passive: false}); mount.addEventListener('pointerup', qaRefocus, true);
   /* Backlog → All day box (2026-11-15, Julius: "in the full calendar view I should be able to drag things from the
      backlog box to the all day box"). The all-day list isn't part of FullCalendar's grid, so the drop is caught here:
      a backlog drag (mouse: moved; touch: held first, then moved — same rule FullCalendar uses) let go over `.cp-fad`
@@ -2972,6 +3007,7 @@
     e.preventDefault(); e.stopPropagation();
     if(pending) return;
     if(typeof fadNew !== 'undefined' && !fadNew.hidden && fadNew.contains(e.target)){ fadAddClose(); return; } // quick-add row: Esc closes just the row
+    if(qaRow && qaRow.contains(e.target)){ qaClose(); return; } // hold-to-add row in the half calendar: same
     if(!detail.hidden){ detail.hidden = true; sheetEv = null; } else close();
   }, true);
   // Swipes / holds inside the panel never reach the workspace's own swipe and hold-to-zoom handlers.

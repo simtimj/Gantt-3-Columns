@@ -186,7 +186,7 @@
     clearTimeout(setStatus.t);
     if(status) status.classList.remove('st-gone');
     const msg = String(s || '');
-    const sticky = !msg || /…|\.\.\.|not saved|didn.t|couldn.t|could not|can.t|retry|conflict|error|fail|offline|keep this/i.test(msg);
+    const sticky = !msg || /…|\.\.\.|not saved|didn.t|couldn.t|could not|can.t|retry|conflict|error|fail|offline|database off|keep this/i.test(msg);
     if(!sticky) setStatus.t = setTimeout(() => {
       if(status) status.classList.add('st-gone');
       setTimeout(() => { if(status && status.classList.contains('st-gone') && status.textContent === msg){ status.textContent = ''; status.classList.remove('st-gone','st-tap'); } }, 400);

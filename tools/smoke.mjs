@@ -2374,6 +2374,34 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
         const w2 = await pg.evaluate(() => document.getElementById('calPanel').getBoundingClientRect().width);
         if (Math.abs(w2 - w1) > 3) errs.push('resize: width not restored after reload (' + w1 + ' → ' + w2 + ')');
       }
+      // Hold to quick add (2026-11-22, Julius): hold on empty space in a half-calendar all-day cell → blank row in that
+      // cell; type + Enter = all-day task on that day; a quick tap still opens New event (touch) / no row.
+      {
+        await pg.evaluate(async () => { const cal = window.fwCalendar.api(); cal.changeView('timeGridDay', '2026-11-20'); await new Promise(r => setTimeout(r, 400)); });
+        const c = await pg.evaluate(() => { const d = document.querySelector('#calPanel .fc-timegrid .fc-daygrid-day[data-date="2026-11-20"]'); if (!d) return null;
+          const b = d.getBoundingClientRect(); return { x: b.x + b.width - 30, y: b.bottom - 4 }; });
+        if (!c) errs.push('hold add: all-day cell not found');
+        else {
+          if (name === 'phone') {
+            const cdp = await pg.context().newCDPSession(pg);
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: c.x, y: c.y }] }); await pg.waitForTimeout(900);
+            await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+          } else { await pg.mouse.move(c.x, c.y); await pg.mouse.down(); await pg.waitForTimeout(900); await pg.mouse.up(); }
+          await pg.waitForTimeout(300);
+          const st = await pg.evaluate(() => ({ row: !!document.querySelector('#calPanel .cp-adqa[data-adqa="2026-11-20"] input'), form: !!document.querySelector('#calPanel [data-cal-form]:not([hidden])') && !document.querySelector('#calPanel .cp-detail[hidden]') }));
+          if (!st.row) errs.push('hold add: no blank row after a hold');
+          else {
+            await pg.keyboard.type('Held task'); await pg.keyboard.press('Enter'); await pg.waitForTimeout(900);
+            const ok = await pg.evaluate(() => Object.values(window.__cal.ev).some(e => e.title === 'Held task' && e.allDay && String(e.start).slice(0, 10) === '2026-11-20'));
+            if (!ok) errs.push('hold add: Enter did not make the all-day task');
+            const still = await pg.evaluate(() => { const i = document.querySelector('#calPanel .cp-adqa input'); return !!i && i.value === ''; });
+            if (!still) errs.push('hold add: blank row not ready for the next one');
+            await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
+            if (await pg.evaluate(() => !!document.querySelector('#calPanel .cp-adqa'))) errs.push('hold add: Esc did not close the row');
+          }
+        }
+        await pg.evaluate(() => window.fwCalendar.api().today());
+      }
       // Half view (2026-11-13, Julius): computer = each column half the screen; opens on History + middle,
       // scrolled right = middle + calendar.
       {

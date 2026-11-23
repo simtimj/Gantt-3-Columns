@@ -939,6 +939,13 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Full box (`fadRender`): headers `[data-fa-og]` "Ordered · n" (empty: hint) and `[data-fa-ug]` "Unordered · n" whenever the day has open tasks; Ordered rows `data-fao` + `.cp-ordn` badge. `fadAdTarget` → {el, ev, after, ord}: over Ordered header / rows → Ordered; top half of Unordered header → end of Ordered; lower → Unordered.
 - Half calendar: `eventContent` adds `.cp-ordn` (number via `ordNum`, `cpGroups` keeps it right); `cpGroups` labels Ordered / Unordered on a day with an Ordered task, else urgency labels as before. `adDropHalf`: over an Ordered row → there; top half of the first Unordered row → end of Ordered; else Unordered.
 - Smoke: new → bottom of Unordered; drag onto Ordered header; above another Ordered row (1, 2); kept after a re-read; drag to Unordered header lower half → out.
+
+## Hold to add in the half calendar's all-day area (2026-11-22 19:21, Julius)
+- Answers: opens the quick add row (like the full box's +) · all-day area only (timed grid stays tap-only) · tap keeps opening New event.
+- `mount` pointerdown (capture) on `.fc-timegrid .fc-daygrid-day[data-date]` empty space (not an event / the row), not full screen → timer `fwHoldMs`; move > 10 px / up / scroll cancels. Fire → `qaOpen(cell)`: `.cp-fadnew.cp-adqa[data-adqa=day]` appended to the cell's `.fc-daygrid-day-frame`, input focused; `qaSkipSel` stops the mouse `select` from also opening New event (touch: dateClick already skips > 400 ms).
+- `qaSend(input, day)` is the shared send (full box `fadAddSend` now calls it). Esc goes through the capture Esc handler (closes just the row, not the calendar); `datesSet` closes it.
+- Phone: the finger lifting after the hold blurred the box (compat mouse events on the cell) → `qaRefocus` on touchend (preventDefault) / pointerup within 1.5 s refocuses it.
+- Smoke: hold on 11-20's all-day cell → row; type + Enter → task on 11-20, row empty and ready; Esc closes.
 - Fix: `fadRender` waits while a row of the box is held (`fadDrag.fad`), since replacing the row mid-drag loses the touchend.
 - Smoke: "order" (two quick adds land last; drag "Order two" above "All-day A" → kept after a re-read).
 - 2026-11-21 7:45 am (Julius): sky stripe "too bright, cuts into the 4am text" → 3 px, alpha .55, label cushion padding-right 7 px. All-day divider "resize at will" → once dragged, `.cp-adset` makes `--cp-ad-max` the scroller's real height (ratio .03–.85, min 26 px); double-tap clears it. KNOWN (pre-existing, also fails on the previous commit, likely time-of-day): calendar phone smoke "scheduled: dragging back to all day gave {allDay:false,sched:true}" — batch for maintenance.

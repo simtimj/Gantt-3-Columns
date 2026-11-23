@@ -2,6 +2,10 @@
 
 Updated 2026-11-10. This is the current engineering handoff, not a declaration that the whole efficiency project or actual-device verification is finished. Read the latest `main`, deployment result and confirmation queue before changing code. Keep this guide current when resuming work.
 
+## Speed plan 2 — 2026-11-23 (going fully database; docs/NOTES.md → "H5")
+
+Status: proposed and picked by Julius, nothing implemented. Order A (calendar cache) → E (fewer Apps Script calls) → C (Reference + Archive on Firestore) → D (full Days history) → F (the rest) → B (calendar direct) → G (editable local-first). One per session.
+
 ## Speed plan — 2026-11-21 (Julius: "put it away 5 min, come back, the whole thing refreshes")
 
 Status: J, L, M, G implemented (L user-confirmed on the phone 11-21; M, G untested live); K approved by Julius ("do all of this"), not started. One per session.

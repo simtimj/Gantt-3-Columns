@@ -1111,3 +1111,16 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - **Server** (`Store.days`, backend `'db'` when `days` is in `STORE_DB_AREAS_`): reads = Sheet + the day docs on top (`get` = one doc read, `range` = date query, `all` = docs not mirrored yet); writes = Sheet **and** a masked patch of only the given sections (server time). Mirror (same 5-min trigger): docs with `up` past the watermark (`daysMirrorAt`, 10 min overlap) → Sheet; if the Sheet copy isn't the one the edit started from (`<f>Base` ≠ its hash), the Sheet copy goes to Backup first.
 - **PWA** (shim "Days" block): `saveDay` / `savePlanPad` / `saveThoughtPad` / `saveScratchPad` / `getScratchPad` go to the day doc when signed in, same answers and hashes as the server (MD5 in the shim = cellHash_). Section not in the database yet: online → server path (it writes the doc); offline → checked against this device's last copy. Unconfirmed edits kept in localStorage (`pwa.days.unconfirmed`) and laid over the opening data, so an offline edit survives a reload; refused as older → copy to `ganttBackup` + `fwSync`. Live: another device's save in today ± 7 → `fwSync(true)`.
 - **One switch**: `STORE_DB_AREAS_` (Store.gs) and `areas` in `tools/pwa/firebase-config.json` list the same areas (check.mjs). Drop `days` from both to keep Days on the Sheet.
+
+## H5. Speed plan — going fully database (2026-11-23 07:55, Julius; continues "H4", all recommended picks)
+- Today: Keep In Mind + Days **saves** are on Firestore; opening (`getWorkspaceData`, reads the whole Days sheet), Reference, past days (`getDaysRange`) and the calendar (`getCalendarRange`) still go through Apps Script (~1–5 s each). Sheet stays the 5-min backup mirror throughout.
+- Picks (Julius): calendar = **cache now, direct later** · move **Reference + Archive, full Days history and the rest** (Plan, Cal Backlog, pins, Inbox, Focus…) to Firestore · **E now, G at the end**.
+- **Order, one step per session: A → E → C → D → F → B → G.**
+  - **A. Calendar cache** (S, low risk): last calendar range kept on the device, painted at once, refreshed in the background.
+  - **E. Fewer Apps Script calls** (S–M, low): imports move to a timed trigger instead of running on opening; the return jobs batched into one call.
+  - **C. Reference + Archive on Firestore** (M, med): PWA reads/saves cards directly; same newest-wins + Backup rules as H3/H4.
+  - **D. Full Days history on Firestore** (M–L, med): seed every past day; the PWA builds opening + past days from the database and its local copy.
+  - **F. The rest on Firestore** (M, med): Plan + Cal Backlog, Properties items (pins, Inbox, Focus, Fun, New Things, card cats, calendar picks).
+  - **B. Calendar direct** (M, med): the PWA reads Google Calendar itself (Google sign-in + calendar scope), no Apps Script hop; the cache stays as the first paint.
+  - **G. Editable local-first** (L, high): the instant screen is editable at once and syncs after; only once everything is on Firestore.
+- Next session: **A**.

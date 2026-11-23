@@ -732,6 +732,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 ## 📋 To do
 
+- **All-day area: Unordered + Ordered groups** (2026-11-22, Julius; captured, Calendar is parked): in the full calendar's all-day area (top left), split the all-day events into two groups: **Unordered** (as now) and **Ordered** (ones he arranges himself and runs through in that order). Open: how an event goes into Ordered (drag between groups?), whether Ordered shows numbers, and whether the order also shows in the docked calendar.
 - **Drag to calendar from Keep In Mind / Focus-Thinking** (2026-11-22, Julius; captured, Calendar is parked): drag a line from Keep In Mind or the Focus/Thinking section onto the calendar to schedule it; the line **stays where it is** (only he moves it), and gets a small "scheduled" mark so he can see what is and isn't on the calendar.
 - **Move to today's calendar button on Keep In Mind lines** (2026-11-22, Julius; captured, Calendar is parked; pairs with drag to calendar): one small button on the right of each Keep In Mind item; tapping it offers the hours still ahead today (e.g. at 11 am: 12, 1, 2 … 7) and puts the item on today's calendar at that hour. Exact picker look still to work out.
 

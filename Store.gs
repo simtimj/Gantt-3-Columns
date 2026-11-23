@@ -48,16 +48,23 @@ function storeDbReady_() {
   if (storeDbReady__ !== null) return storeDbReady__;
   const cache = CacheService.getScriptCache(), hit = cache.get('storeDbReady');
   if (hit) return (storeDbReady__ = hit === '1');
-  let ok = false;
+  let ok = false, why = '';
   try {
     const res = UrlFetchApp.fetch(StoreFs.url_('gantt/kim'), { muteHttpExceptions: true,
       headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken(), 'X-Goog-User-Project': FIREBASE_PROJECT_ } });
     const code = res.getResponseCode();
     ok = code === 200 || (code === 404 && !/database/i.test(res.getContentText()));
-    if (!ok) console.warn('Database not reachable (' + code + '), using the Sheet: ' + res.getContentText().slice(0, 200));
-  } catch (e) { console.warn('Database not reachable, using the Sheet: ' + e.message); }
+    if (!ok) why = code + ' ' + res.getContentText().replace(/\s+/g, ' ').slice(0, 300);
+  } catch (e) { why = e.message; }
+  if (!ok) console.warn('Database not reachable, using the Sheet: ' + why);
   cache.put('storeDbReady', ok ? '1' : '0', 120);
+  cache.put('storeDbWhy', why || '', 120);
   return (storeDbReady__ = ok);
+}
+// Why the database is off right now ('' = on or not switched on), shown in the app so Julius can see the reason.
+function storeDbWhy_() {
+  if (!FIREBASE_PROJECT_ || storeDbReady_()) return '';
+  return CacheService.getScriptCache().get('storeDbWhy') || 'not reachable';
 }
 
 /* Firestore over REST, as Julius (his OAuth token; IAM access, so security rules don't apply here — the rules

@@ -3461,7 +3461,7 @@ function calBacklogComplete(req) {
 function getKim() {
   const rec = Store.kim.read();
   const fresh = !rec.value && !Store.kim.migrated();
-  return { html: rec.value, h: cellHash_(rec.value), at: rec.at, fresh: fresh, build: appBuild_() };
+  return { html: rec.value, h: cellHash_(rec.value), at: rec.at, fresh: fresh, build: appBuild_(), dbOff: storeDbWhy_() };
 }
 function saveKim(html, baseHash) {
   return Store.locked(() => {

@@ -2888,6 +2888,7 @@
       google.script.run.withSuccessHandler(r => {
         if(!r) return;
         if(first){
+          if(r.dbOff) setStatus('Database off, using the Sheet: ' + r.dbOff);
           base = {t:r.html || '', h:r.h};
           if(r.fresh){ migrate(); return; }
           ed.innerHTML = storedToHtml(r.html || ''); if(typeof normalizeEditorTasks === 'function') normalizeEditorTasks(ed); wireBoxes(); loaded = true;

@@ -803,8 +803,9 @@ function deleteReferenceItem(id) {
   // Archive first (cell + its children, one timestamp), then delete.
   const tree = Store.ref.tree(id);
   if (!tree.length) return true;
-  Store.archive.add(tree, new Date().toISOString());
-  Store.ref.remove(tree);
+  const at = new Date().toISOString();
+  Store.archive.add(tree, at);
+  Store.ref.remove(tree, at);
   return true;
 }
 

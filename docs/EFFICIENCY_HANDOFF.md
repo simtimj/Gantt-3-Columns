@@ -220,3 +220,6 @@ Do not skip live date scans based on cached row positions: direct edits, moved/b
 3. Only if one redundant service operation is demonstrated, remove/reuse it request-locally and compare total latency. Keep current full source freshness and failure fallback. If unavoidable Apps Script access/transport dominates, prepare a separately scoped architecture proposal rather than another content cache.
 
 This checkpoint ships documentation only. Rough completion remains65%; no new speed gain is claimed. No additional device run is requested immediately. Cross-device editing/live Focus restore and identity coverage remain open; recovery-prompt investigation and backlog implementation remain deferred.
+
+## Speed plan C — Reference on Firestore (2026-11-23, implemented + tested in store-test / smoke pwa-ref, not yet tested live)
+- PWA Reference saves / add / delete / restore / order / expand skip Apps Script (Firestore docs `ganttRef`). Server reads add one Firestore query per Reference read (unmirrored docs). Details: docs/NOTES.md → H5 C.

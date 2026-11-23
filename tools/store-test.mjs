@@ -68,9 +68,9 @@ g = ctx.getKim(); assert.equal(g.html, '<div>legacy</div>'); assert.equal(g.at, 
 // Database backend without a Firebase project fails loudly instead of silently using the Sheet.
 vm.runInContext("STORE_BACKEND.kim = 'db'", ctx);
 assert.throws(() => ctx.getKim(), /FIREBASE_PROJECT_ is empty/);
-vm.runInContext("STORE_BACKEND.ref = 'db'", ctx);
-assert.throws(() => vm.runInContext("storeBackend_('ref')", ctx), /not built yet/);
-vm.runInContext("STORE_BACKEND.ref = 'sheet'", ctx);
+vm.runInContext("STORE_BACKEND.plan = 'db'", ctx);
+assert.throws(() => vm.runInContext("storeBackend_('plan')", ctx), /not built yet/);
+vm.runInContext("STORE_BACKEND.plan = 'sheet'", ctx);
 console.log('✓ store-test: Keep In Mind through Store.kim');
 
 // Database step (2026-11-22, NOTES H3): Keep In Mind on Firestore (fake REST), Sheet mirror, lost-edit backups.
@@ -78,7 +78,7 @@ console.log('✓ store-test: Keep In Mind through Store.kim');
   const fsDocs = {}, reqs = [];
   const fctx = vm.createContext(Object.assign({}, ctx, {
     ScriptApp: { getOAuthToken: () => 'tok' },
-    UrlFetchApp: { fetch(url, o) {
+    UrlFetchApp: { fetchAll(list) { return list.map(x => this.fetch(x.url, x)); }, fetch(url, o) { o = Object.assign({ method: 'get' }, o);
       const res = (code, body) => ({ getResponseCode: () => code, getContentText: () => body ? JSON.stringify(body) : '' });
       if (url.includes('/documents:runQuery')) return res(200, [{ readTime: 'now' }]); // no day docs here (H4 test below)
       const p = decodeURIComponent(url.split('/documents/')[1].split('?')[0]); reqs.push([o.method, p, o.headers]);
@@ -174,7 +174,8 @@ ctx.restoreArchivedItem(parent, arch[0].deletedAt);
 assert.equal(tabs.Reference.rows.length, 4); assert.equal(tabs.Archive.rows.length, 1);
 assert.equal(ctx.getReference_().find(r => r.id === child).parentId, parent);
 vm.runInContext("STORE_BACKEND.ref = 'db'", ctx);
-assert.throws(() => ctx.getReference_(), /not built yet/);
+assert.throws(() => ctx.getReference_(), /FIREBASE_PROJECT_ is empty/);
+vm.runInContext("STORE_BACKEND.ref = 'sheet'", ctx);
 console.log('✓ store-test: Reference + Archive through Store.ref / Store.archive (add, safe save, order, delete → archive → restore)');
 
 // Daily plan + Cal Backlog through Store.plan / Store.calBacklog (Calendar not touched by these paths).
@@ -229,7 +230,7 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
   };
   const dctx = vm.createContext(Object.assign({}, ctx, {
     ScriptApp: { getOAuthToken: () => 'tok' },
-    UrlFetchApp: { fetch(url, o) {
+    UrlFetchApp: { fetchAll(list) { return list.map(x => this.fetch(x.url, x)); }, fetch(url, o) { o = Object.assign({ method: 'get' }, o);
       const res = (code, body) => ({ getResponseCode: () => code, getContentText: () => body ? JSON.stringify(body) : '' });
       if (url.includes('/documents:runQuery')) {
         const q = JSON.parse(o.payload).structuredQuery, coll = q.from[0].collectionId + '/';
@@ -287,4 +288,49 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
   assert.equal(m.days, 1); assert.equal(S()[1][2], '<div>pwa2</div>');
   assert.equal(tabs.Backup.rows.at(-1)[4], '<div>sheet only</div>'); assert.match(tabs.Backup.rows.at(-1)[3], /newest wins\) · phone-1/);
   console.log('✓ store-test: Days on Firestore (overlay, per-section saves, mirror, day backups)');
+
+  // H5 C (2026-11-23): Reference + Archive on Firestore. Seeded once from both tabs; server saves go to the Sheet and
+  // the card doc; PWA edits / new cards / deletes / restores in the docs show on top, and the mirror copies them in.
+  {
+    const same = (a, b) => assert.equal(JSON.stringify(a), JSON.stringify(b));
+    delete props.refSeeded; delete props.refMirrorAt;
+    tabs.Reference.rows.length = 1; tabs.Archive.rows.length = 1;
+    tabs.Reference.rows.push(['c1', '', 'item', 'One', '<p>one</p>', true, 1], ['c2', 'c1', 'item', 'Two', '<p>two</p>', true, 2]);
+    tabs.Archive.rows.push(['a1', '', 'item', 'Old', '<p>old</p>', true, 3, '2026-11-01T00:00:00.000Z']);
+    const R = () => tabs.Reference.rows, rd = id => fsDocs['ganttRef/' + id], rs = (id, f) => rd(id)[f] && (rd(id)[f].stringValue ?? Number(rd(id)[f].integerValue));
+    let list = dctx.getReference_();
+    same(list.map(r => r.id), ['c1', 'c2']);
+    assert.equal(rs('c1', 'content'), '<p>one</p>'); assert.equal(rs('a1', 'del'), '2026-11-01T00:00:00.000Z'); assert.equal(props.refSeeded, '1');
+    assert.ok(fsDocs['gantt/refMeta']);
+    // Server save: Sheet + doc.
+    const r1 = dctx.saveReferenceItem({ id: 'c1', fwSync: true, content: '<p>one b</p>', contentChanged: true, baseHash: H('<p>one</p>') });
+    assert.ok(!r1.conflict); assert.equal(R()[1][4], '<p>one b</p>'); assert.equal(rs('c1', 'content'), '<p>one b</p>'); assert.equal(rs('c1', 'ch'), H('<p>one b</p>'));
+    // PWA edits straight in the docs: content of c2, a new card c3, c1's subtree deleted later.
+    const t = Date.now() + 1000, up = { timestampValue: new Date(t).toISOString() }, S = v => ({ stringValue: v }), I = v => ({ integerValue: String(v) });
+    Object.assign(rd('c2'), { content: S('<p>two pwa</p>'), base: S(H('<p>two</p>')), at: I(t), up: up, dev: S('phone-1') });
+    fsDocs['ganttRef/c3'] = { id: S('c3'), parentId: S(''), type: S('item'), title: S('Three'), content: S('<p>3</p>'), expanded: I(1), sort: I(9), del: S(''), at: I(t), up: up };
+    list = dctx.getReference_();
+    assert.equal(list.find(r => r.id === 'c2').content, '<p>two pwa</p>'); assert.ok(list.some(r => r.id === 'c3'));
+    // Stale server save against the doc copy conflicts.
+    assert.equal(dctx.saveReferenceItem({ id: 'c2', fwSync: true, content: '<p>x</p>', contentChanged: true, baseHash: H('<p>two</p>') }).conflict, true);
+    let m = dctx.Store.mirror();
+    assert.equal(m.ref >= 2, true); assert.equal(R().find(r => r[0] === 'c2')[4], '<p>two pwa</p>'); assert.ok(R().some(r => r[0] === 'c3'));
+    // PWA delete (c1 + child c2) and restore of a1.
+    const t2 = t + 1000, up2 = { timestampValue: new Date(t2).toISOString() }, del = '2026-11-23T10:00:00.000Z';
+    ['c1', 'c2'].forEach(id => Object.assign(rd(id), { del: S(del), at: I(t2), up: up2 }));
+    Object.assign(rd('a1'), { del: S(''), at: I(t2), up: up2 });
+    same(dctx.getReference_().map(r => r.id).sort(), ['a1', 'c3']);
+    same(dctx.getArchive().map(x => x.id), ['c1']); assert.equal(dctx.getArchive()[0].children, 1);
+    m = dctx.Store.mirror();
+    same(R().slice(1).map(r => r[0]).sort(), ['a1', 'c3']);
+    same(tabs.Archive.rows.slice(1).map(r => r[0] + '|' + r[7]).sort(), ['c1|' + del, 'c2|' + del]);
+    assert.equal(dctx.Store.mirror().ref, 0);
+    // Server delete + restore keep Sheet and docs together.
+    dctx.deleteReferenceItem('c3');
+    assert.ok(rs('c3', 'del')); assert.ok(!R().some(r => r[0] === 'c3'));
+    const a = dctx.getArchive().find(x => x.id === 'c3');
+    dctx.restoreArchivedItem('c3', a.deletedAt);
+    assert.equal(rs('c3', 'del'), ''); assert.ok(R().some(r => r[0] === 'c3'));
+    console.log('✓ store-test: Reference + Archive on Firestore (seed, overlay, saves, PWA delete/restore, mirror)');
+  }
 }

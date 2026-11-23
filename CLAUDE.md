@@ -10,6 +10,8 @@ Google Apps Script web app (Today / Notes / Reference columns over a Google Shee
 
 - **Storage rule (2026-11-21)**: new features read/write data only via `Store.*` (`Store.gs`), never the Sheet or Properties directly; `check.mjs` fails on any direct call outside Store.gs. New data = a new `Store.<area>`; `Store.sheetFirst(tab)` only for tabs people/other AIs write directly (list in Store.gs). NOTES "H2".
 
+- **Unattended runs (Julius 2026-11-23)**: when he says "keep it rolling", don't check in or ask mid-run (he works on other things at the same time): take the best reading, ship, he corrects after. One wrap-up at the end. Tests still run (quiet, one suite while iterating, full run before each push).
+
 ## Git + checks
 - **Commit as Julius**: `git -c user.name="Julius Simtim" -c user.email="juliussimtim@gmail.com" commit ...`; Claude only in Co-Authored-By.
 - **Before every push**: `node tools/check.mjs && node tools/smoke.mjs` (`SMOKE_ONLY=calendar` etc. to run one suite while iterating). Extend `tools/smoke.mjs`, don't build a new harness.

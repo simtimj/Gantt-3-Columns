@@ -14,7 +14,7 @@
    Sheet. Set = the areas in STORE_DB_AREAS_ live in Firestore, and the timed trigger storeMirror() copies them
    into the Sheet (backup mirror) and moves lost edits from Firestore into the Backup tab. */
 const FIREBASE_PROJECT_ = 'gantt-2ee94';
-const STORE_DB_AREAS_ = ['kim', 'days']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
+const STORE_DB_AREAS_ = ['kim', 'days', 'ref']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
 const STORE_BACKEND = {
   kim: 'sheet',
   days: 'sheet',
@@ -28,7 +28,9 @@ const STORE_BACKEND = {
 };
 
 if (FIREBASE_PROJECT_) STORE_DB_AREAS_.forEach(a => { STORE_BACKEND[a] = 'db'; });
-const STORE_DB_BUILT_ = { kim: true, days: true };
+// Archive = Reference cards marked deleted in the same docs (NOTES H5 C), so it follows Reference.
+if (STORE_BACKEND.ref === 'db') STORE_BACKEND.archive = 'db';
+const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true };
 
 function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
@@ -116,6 +118,17 @@ const StoreFs = {
     const where = f.length === 1 ? f[0] : { compositeFilter: { op: 'AND', filters: f } };
     const res = this.req_('post', ':runQuery', { structuredQuery: { from: [{ collectionId: coll }], where: where } }) || [];
     return (Array.isArray(res) ? res : [res]).filter(r => r && r.document).map(r => this.dec_(r.document));
+  },
+  // Many patches at once ([[path, obj], …]; only the given fields change), 50 per round trip, run in parallel.
+  patchMany(list) {
+    for (let i = 0; i < list.length; i += 50) {
+      const reqs = list.slice(i, i + 50).map(x => ({ url: this.url_(x[0]) + '?' + Object.keys(x[1]).map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&'),
+        method: 'patch', contentType: 'application/json', muteHttpExceptions: true, payload: JSON.stringify(this.enc_(x[1])),
+        headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken(), 'X-Goog-User-Project': FIREBASE_PROJECT_ } }));
+      UrlFetchApp.fetchAll(reqs).forEach((res, j) => {
+        if (res.getResponseCode() >= 300) throw new Error('Firestore patch ' + list[i + j][0] + ': ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 300));
+      });
+    }
   },
   list(coll) { return ((this.req_('get', coll + '?pageSize=100') || {}).documents || []).map(d => this.dec_(d)); },
   del(path) { this.req_('delete', path); }
@@ -413,9 +426,19 @@ const Store = {
 
 
   /* Reference cards. Record = { id, parentId, type, title, content, expanded, sort, ref_ }.
-     Sheet: tab "Reference", columns A–G in that order; ref_ = row number (opaque). */
+     Sheet: tab "Reference", columns A–G in that order; ref_ = row number (opaque; null for a card only in the
+     database so far).
+     Database (2026-11-23, NOTES "H5 C"): doc per card ganttRef/{id} = { id, parentId, type, title, content,
+     expanded (1/0), sort, del ('' or the deleted-at ISO time = in the Archive), ch (content hash), base (hash of the
+     content the edit started from), at (saved-at ms, newest wins), up (server time it reached the database), dev }.
+     Seeded once from the Sheet (Reference + Archive). Reads = Sheet + docs the mirror hasn't copied yet on top;
+     writes = Sheet + doc. The 5-min mirror copies PWA edits / deletes / restores into the two tabs. */
   ref: {
+    COLL: 'ganttRef',
+    MIRROR_KEY: 'refMirrorAt',
+    SEED_KEY: 'refSeeded',
     sheet_() { storeBackend_('ref'); return getOrCreateSheet_('Reference', REF_HEADERS); },
+    db_() { return storeBackend_('ref') === 'db'; },
     rec_(row, index, at) {
       return { ref_: at, id: String(row[0] || ''), parentId: String(row[1] || ''), type: String(row[2] || 'item'),
         title: String(row[3] || ''), content: String(row[4] || ''), expanded: row[5] !== false, sort: Number(row[6]) || index };
@@ -423,29 +446,86 @@ const Store = {
     row_(r) {
       return [r.id, r.parentId || '', r.type || 'item', r.title || '', r.content || '', r.expanded !== false, Number(r.sort) || 0];
     },
-    // Every card in stored order (sort applied by the caller).
-    list() {
+    // ---- database helpers ----
+    okId_(id) { return !!id && String(id).indexOf('/') < 0; },
+    docFields_(r, del) {
+      const o = { id: String(r.id), parentId: String(r.parentId || ''), type: String(r.type || 'item'), title: String(r.title || ''),
+        content: String(r.content || ''), expanded: r.expanded === false || r.expanded === 'FALSE' ? 0 : 1, sort: Math.round(Number(r.sort) || 0), del: del || '' };
+      o.ch = cellHash_(o.content);
+      return o;
+    },
+    stamp_(o) { const at = Date.now(); return Object.assign(o, { at: at, up: new Date(at), dev: 'server' }); },
+    // Patch only the given fields of each card's doc ([[id, fields], …]); content changes also get ch.
+    put_(list) {
+      if (!this.db_()) return;
+      StoreFs.patchMany(list.filter(x => this.okId_(x[0])).map(x => {
+        const f = Object.assign({}, x[1]);
+        if ('content' in f) { f.content = String(f.content || ''); f.ch = cellHash_(f.content); }
+        if ('expanded' in f) f.expanded = f.expanded === false || f.expanded === 'FALSE' ? 0 : 1;
+        if ('sort' in f) f.sort = Math.round(Number(f.sort) || 0);
+        return [this.COLL + '/' + x[0], this.stamp_(f)];
+      }));
+    },
+    fromDoc_(d) {
+      return { id: String(d.id || d.id_), parentId: String(d.parentId || ''), type: String(d.type || 'item'), title: String(d.title || ''),
+        content: String(d.content || ''), expanded: Number(d.expanded) !== 0, sort: Number(d.sort) || 0 };
+    },
+    // First database read: every card and archived card from the Sheet into its doc (once).
+    seed_() {
+      if (!this.db_() || Store.props.getProperty(this.SEED_KEY) === '1') return;
+      const sh = this.sheet_(), values = sh.getDataRange().getValues().slice(1);
+      const list = values.map((row, i) => this.rec_(row, i, 0)).filter(r => r.id).map(r => [this.COLL + '/' + r.id, this.stamp_(this.docFields_(r, ''))]);
+      Store.archive.sheetList_().forEach(x => list.push([this.COLL + '/' + x.id, this.stamp_(this.docFields_(x, x.deletedAt || new Date().toISOString()))]));
+      StoreFs.patchMany(list.filter(x => this.okId_(x[0].split('/')[1])));
+      StoreFs.set('gantt/refMeta', { seeded: Date.now(), at: Date.now(), cards: list.length });
+      Store.props.setProperty(this.SEED_KEY, '1');
+    },
+    // Docs edited since the mirror last ran (10 min overlap): the only ones that can differ from the Sheet.
+    unmirrored_() {
+      if (!this.db_()) return [];
+      this.seed_();
+      const wm = Number(Store.props.getProperty(this.MIRROR_KEY)) || 0;
+      return StoreFs.query(this.COLL, [['up', '>', new Date(Math.max(0, wm - 10 * 60 * 1000))]]).filter(d => this.okId_(d.id || d.id_));
+    },
+    sheetList_() {
       const values = this.sheet_().getDataRange().getValues();
       return values.length <= 1 ? [] : values.slice(1).map((row, i) => this.rec_(row, i, i + 2));
     },
-    ids() { return new Set(referenceRowMap_(this.sheet_()).keys()); },
+    // Every card in stored order (sort applied by the caller).
+    list() {
+      const rows = this.sheetList_();
+      if (!this.db_()) return rows;
+      const by = new Map(rows.map(r => [r.id, r]));
+      this.unmirrored_().forEach(d => {
+        const id = String(d.id || d.id_), cur = by.get(id);
+        if (d.del) { by.delete(id); return; }
+        by.set(id, Object.assign(this.fromDoc_(d), { ref_: cur ? cur.ref_ : null }));
+      });
+      return [...by.values()];
+    },
+    ids() { return this.db_() ? new Set(this.list().map(r => r.id)) : new Set(referenceRowMap_(this.sheet_()).keys()); },
     get(id) {
+      id = String(id);
       const sh = this.sheet_();
-      const row = referenceRowMap_(sh).get(String(id));
-      if (!row) return { exists: false, id: String(id) };
-      return Object.assign({ exists: true }, this.rec_(sh.getRange(row, 1, 1, 7).getValues()[0], 0, row));
+      const row = referenceRowMap_(sh).get(id);
+      let out = row ? Object.assign({ exists: true }, this.rec_(sh.getRange(row, 1, 1, 7).getValues()[0], 0, row)) : { exists: false, id: id };
+      if (this.db_() && this.okId_(id)) {
+        this.seed_();
+        const d = StoreFs.get(this.COLL + '/' + id);
+        if (d && d.del) out = { exists: false, id: id };
+        else if (d) out = Object.assign({ exists: true }, this.fromDoc_(d), { ref_: row || null });
+      }
+      return out;
     },
     // Write only the given fields of an existing card (rec from get()/list()).
     update(id, values, rec) {
+      Object.keys(values).forEach(f => { if (!STORE_REF_COLS_[f]) throw new Error('Store.ref: unknown field ' + f); });
       const sh = this.sheet_();
       const row = rec && rec.ref_ ? rec.ref_ : referenceRowMap_(sh).get(String(id));
-      if (!row) return false;
-      storeWriteCols_(sh, row, Object.keys(values).map(f => {
-        const c = STORE_REF_COLS_[f];
-        if (!c) throw new Error('Store.ref: unknown field ' + f);
-        return [c, values[f]];
-      }));
-      return true;
+      if (row) storeWriteCols_(sh, row, Object.keys(values).map(f => [STORE_REF_COLS_[f], values[f]]));
+      // A card only in the database so far (ref_ null from list()/get()) still gets its doc updated.
+      if (this.db_() && (row || (rec && (rec.exists || rec.ref_ === null)))) { this.put_([[String(id), values]]); return true; }
+      return !!row;
     },
     // New card at the bottom; sort defaults to the current row count.
     add(r) {
@@ -453,68 +533,101 @@ const Store = {
       const row = this.row_(r);
       if (r.sort == null || !Number(r.sort)) row[6] = sh.getLastRow();
       sh.appendRow(row);
+      if (this.db_()) this.put_([[String(r.id), this.docFields_(Object.assign({}, r, { sort: row[6] }), '')]]);
       return r.id;
     },
     addMany(list) {
       if (!list.length) return;
       const sh = this.sheet_();
       sh.getRange(sh.getLastRow() + 1, 1, list.length, REF_HEADERS.length).setValues(list.map(r => this.row_(r)));
+      if (this.db_()) this.put_(list.map(r => [String(r.id), this.docFields_(r, '')]));
     },
     setSorts(order) {
+      if (!Array.isArray(order)) return;
       const sh = this.sheet_();
       const lastRow = sh.getLastRow();
-      if (lastRow < 2 || !Array.isArray(order)) return;
-      const rows = referenceRowMap_(sh);
-      const range = sh.getRange(2, 7, lastRow - 1, 1);
-      const sorts = range.getValues();
-      order.forEach(e => { const row = rows.get(String(e.id)); if (row) sorts[row - 2][0] = Number(e.sort) || 0; });
-      range.setValues(sorts);
+      if (lastRow >= 2) {
+        const rows = referenceRowMap_(sh);
+        const range = sh.getRange(2, 7, lastRow - 1, 1);
+        const sorts = range.getValues();
+        order.forEach(e => { const row = rows.get(String(e.id)); if (row) sorts[row - 2][0] = Number(e.sort) || 0; });
+        range.setValues(sorts);
+      }
+      if (this.db_()) this.put_(order.map(e => [String(e.id), { sort: e.sort }]));
     },
     setAllExpanded(expanded) {
       const sh = this.sheet_();
       const lastRow = sh.getLastRow();
-      if (lastRow < 2) return;
-      const values = [];
-      for (let i = 0; i < lastRow - 1; i++) values.push([expanded !== false]);
-      sh.getRange(2, 6, lastRow - 1, 1).setValues(values);
+      if (lastRow >= 2) {
+        const values = [];
+        for (let i = 0; i < lastRow - 1; i++) values.push([expanded !== false]);
+        sh.getRange(2, 6, lastRow - 1, 1).setValues(values);
+      }
+      if (this.db_()) this.put_(this.list().map(r => [r.id, { expanded: expanded !== false }]));
     },
-    // A card and everything under it, as stored (raw values, for the Archive). Nothing is removed yet.
+    // A card and everything under it, as stored (for the Archive). Nothing is removed yet.
     tree(id) {
-      const sh = this.sheet_();
-      const lastRow = sh.getLastRow();
-      if (lastRow < 2) return [];
-      const values = sh.getRange(1, 1, lastRow, REF_HEADERS.length).getValues();
+      const all = this.list();
       const ids = new Set([String(id)]);
       let changed = true;
       while (changed) {
         changed = false;
-        for (let i = 1; i < values.length; i++) {
-          const childId = String(values[i][0] || ''), parentId = String(values[i][1] || '');
-          if (ids.has(parentId) && !ids.has(childId)) { ids.add(childId); changed = true; }
-        }
+        all.forEach(r => { if (ids.has(String(r.parentId)) && !ids.has(String(r.id))) { ids.add(String(r.id)); changed = true; } });
       }
-      const out = [];
-      for (let i = 1; i < values.length; i++) {
-        const r = values[i];
-        if (ids.has(String(r[0]))) out.push({ ref_: i + 1, id: r[0], parentId: r[1], type: r[2], title: r[3], content: r[4], expanded: r[5], sort: r[6] });
-      }
-      return out;
+      return all.filter(r => ids.has(String(r.id)));
     },
-    remove(records) {
+    // Out of Reference (records from tree()); in the database they're marked deleted at deletedAt (= in the Archive).
+    remove(records, deletedAt) {
       const sh = this.sheet_();
-      records.map(x => x.ref_).sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
+      records.filter(x => x.ref_).map(x => x.ref_).sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
+      if (this.db_()) this.put_(records.map(x => [String(x.id), Object.assign(this.docFields_(x, deletedAt || new Date().toISOString()))]));
     },
     // To Confirm card content with a cached row hint (import path).
     peekConfirm() {
       const r = readConfirmCard_(this.sheet_());
-      return { exists: !!r.row, content: r.content, ref_: r.row };
+      if (!this.db_()) return { exists: !!r.row, content: r.content, ref_: r.row };
+      const g = this.get(CONFIRM_CARD_ID);
+      return { exists: g.exists, content: g.exists ? g.content : '', ref_: g.ref_ || null };
+    },
+    /* Timed trigger: database edits → the Reference / Archive tabs. A content edit that didn't start from the Sheet's
+       copy puts the Sheet copy in Backup first. Returns the number of cards copied. */
+    mirror() {
+      if (!this.db_()) return 0;
+      const docs = this.unmirrored_();
+      if (!docs.length) return 0;
+      const sh = this.sheet_(), rows = referenceRowMap_(sh), ash = Store.archive.sheet_();
+      const arch = Store.archive.sheetList_(), archKey = new Set(arch.map(x => x.id + '|' + x.deletedAt));
+      const gone = [], archGone = [], adds = [], archAdds = [];
+      let top = 0, n = 0;
+      docs.forEach(d => {
+        top = Math.max(top, Number(d.up) || 0);
+        const id = String(d.id || d.id_), r = this.fromDoc_(d), row = rows.get(id);
+        if (d.del) {
+          if (row) { gone.push(row); n++; }
+          if (!archKey.has(id + '|' + d.del)) { archAdds.push([r.id, r.parentId, r.type, r.title, r.content, r.expanded, r.sort, d.del]); archKey.add(id + '|' + d.del); }
+          return;
+        }
+        arch.filter(x => x.id === id).forEach(x => archGone.push(x.ref_));
+        if (!row) { adds.push(this.row_(r)); n++; return; }
+        const cur = this.rec_(sh.getRange(row, 1, 1, 7).getValues()[0], 0, row);
+        if (cur.content !== r.content && d.base && cellHash_(cur.content) !== d.base)
+          backupCell_('Reference ' + id, 'Content', 'Sheet copy replaced by a database edit (newest wins) · ' + (d.dev || ''), cur.content, true);
+        if (JSON.stringify(this.row_(cur)) !== JSON.stringify(this.row_(r))) { sh.getRange(row, 1, 1, 7).setValues([this.row_(r)]); n++; }
+      });
+      if (adds.length) sh.getRange(sh.getLastRow() + 1, 1, adds.length, REF_HEADERS.length).setValues(adds);
+      gone.sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
+      if (archAdds.length) ash.getRange(ash.getLastRow() + 1, 1, archAdds.length, ARCHIVE_HEADERS.length).setValues(archAdds);
+      [...new Set(archGone)].sort((a, b) => b - a).forEach(r => ash.deleteRow(r));
+      if (top) Store.props.setProperty(this.MIRROR_KEY, String(top));
+      return n;
     }
   },
 
-  /* Archive — deleted Reference cards, restorable. Record = card fields + deletedAt (ISO). */
+  /* Archive — deleted Reference cards, restorable. Record = card fields + deletedAt (ISO). Database: the same
+     ganttRef docs with del set (see Store.ref). */
   archive: {
     sheet_() { storeBackend_('archive'); return getOrCreateSheet_('Archive', ARCHIVE_HEADERS); },
-    list() {
+    sheetList_() {
       const values = this.sheet_().getDataRange().getValues();
       return values.slice(1).map((row, i) => ({
         ref_: i + 2, id: String(row[0] || ''), parentId: String(row[1] || ''), type: String(row[2] || 'item'),
@@ -522,15 +635,28 @@ const Store = {
         deletedAt: row[7] instanceof Date ? row[7].toISOString() : String(row[7] || '')
       })).filter(x => x.id);
     },
+    list() {
+      const rows = this.sheetList_();
+      if (!Store.ref.db_()) return rows;
+      const out = rows.slice(), key = x => x.id + '|' + x.deletedAt;
+      Store.ref.unmirrored_().forEach(d => {
+        const id = String(d.id || d.id_);
+        if (!d.del) { for (let i = out.length - 1; i >= 0; i--) if (out[i].id === id) out.splice(i, 1); return; } // restored
+        const x = Object.assign(Store.ref.fromDoc_(d), { ref_: null, deletedAt: String(d.del) });
+        if (!out.some(y => key(y) === key(x))) out.push(x);
+      });
+      return out;
+    },
     add(records, deletedAt) {
       if (!records.length) return;
       const sh = this.sheet_();
       sh.getRange(sh.getLastRow() + 1, 1, records.length, ARCHIVE_HEADERS.length)
         .setValues(records.map(r => [r.id, r.parentId, r.type, r.title, r.content, r.expanded, r.sort, deletedAt]));
     },
+    // Out of the Archive tab (restore). In the database, Store.ref.addMany clears del on the same docs.
     remove(records) {
       const sh = this.sheet_();
-      records.map(x => x.ref_).sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
+      records.filter(x => x.ref_).map(x => x.ref_).sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
     }
   },
 
@@ -690,10 +816,10 @@ const Store = {
     if (!FIREBASE_PROJECT_) return { off: true };
     if (!storeDbReady_()) return { off: true, reason: 'database not reachable' };
     return storeLocked_(() => {
-      const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), backups: 0 };
+      const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), ref: Store.ref.mirror(), backups: 0 };
       StoreFs.list('ganttBackup').forEach(b => {
-        const where = b.area === 'kim' ? Store.kim.SHEET : b.area === 'days' && b.date ? b.date : 'Database: ' + b.area;
-        const col = b.area === 'kim' ? 'A2' : b.area === 'days' ? (Store.days.LABEL[b.field] || b.field || '') : '';
+        const where = b.area === 'kim' ? Store.kim.SHEET : b.area === 'days' && b.date ? b.date : b.area === 'ref' && b.card ? 'Reference ' + b.card : 'Database: ' + b.area;
+        const col = b.area === 'kim' ? 'A2' : b.area === 'days' ? (Store.days.LABEL[b.field] || b.field || '') : b.area === 'ref' ? 'Content' : '';
         backupCell_(where, col, (b.reason || 'lost edit') + (b.dev ? ' · ' + b.dev : ''), b.html || '');
         StoreFs.del('ganttBackup/' + b.id_);
         out.backups++;

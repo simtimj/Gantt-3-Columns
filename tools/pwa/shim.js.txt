@@ -105,6 +105,9 @@
     if (KIM) { NAMES.getKim = 1; NAMES.saveKim = 1; }
     var DAY_NAMES = { saveDay: 1, savePlanPad: 1, saveThoughtPad: 1, saveScratchPad: 1, getScratchPad: 1 };
     if (DAYS) Object.keys(DAY_NAMES).forEach(function (n) { NAMES[n] = 1; });
+    var REF = AREAS.indexOf('ref') >= 0;
+    var REF_NAMES = { saveReferenceItem: 1, addReferenceItem: 1, saveReferenceOrder: 1, saveReferenceExpanded: 1, deleteReferenceItem: 1, getArchive: 1, restoreArchivedItem: 1 };
+    if (REF) Object.keys(REF_NAMES).forEach(function (n) { NAMES[n] = 1; });
     var OWNER = String(FB_CFG.owner || '').toLowerCase(), cfg = Object.assign({}, FB_CFG);
     delete cfg.owner; delete cfg._note; delete cfg.areas;
     var db = null, user = null, lastAt = null, watching = false;
@@ -133,7 +136,7 @@
           if (u && String(u.email || '').toLowerCase() !== OWNER) { firebase.auth().signOut(); u = null; }
           user = u || null;
           signButton(!user);
-          if (user) { if (KIM) watch(); if (DAYS) days.watch(); }
+          if (user) { if (KIM) watch(); if (DAYS) days.watch(); if (REF) refs.watch(); }
           ok();
         });
       });
@@ -406,6 +409,171 @@
       };
     }
     var days = DAYS ? daysArea() : null;
+    /* ---------- Reference + Archive (H5 C, 2026-11-23): doc per card ganttRef/{id} ----------
+       Same answers as the server's saveReferenceItem / addReferenceItem / saveReferenceOrder / saveReferenceExpanded /
+       deleteReferenceItem / getArchive / restoreArchivedItem. A deleted card keeps its doc with del = deleted-at (that's
+       the Archive). Online only (offline, Reference stays read-only); not seeded yet / card not in the database → the
+       server. Newest wins: every write carries a newer `at`; a refused write → the losing copy to ganttBackup + a sync. */
+    function refArea() {
+      var seeded = false, watching = false, syncT = 0;
+      function coll() { return db.collection('ganttRef'); }
+      function rdoc(id) { return coll().doc(String(id)); }
+      function ready() {
+        if (!navigator.onLine) return Promise.resolve(false);
+        if (seeded) return Promise.resolve(true);
+        // Seeded by the server, and the rules let this account read cards (rules not published yet → refused → server).
+        return db.collection('gantt').doc('refMeta').get({ source: 'server' }).then(function (s) {
+          if (!(s.exists && s.data().seeded)) return false;
+          return rdoc('__probe').get({ source: 'server' }).then(function () { return (seeded = true); });
+        });
+      }
+      function one(id) { return rdoc(id).get({ source: 'server' }).then(function (s) { return s.exists ? s.data() : null; }); }
+      function all() { return coll().get({ source: 'server' }).then(function (qs) { return qs.docs.map(function (s) { var d = s.data(); d.id = String(d.id || s.id); return d; }); }); }
+      function stamp(rec, prevAt) { rec.at = Math.max(Date.now(), (Number(prevAt) || 0) + 1); rec.up = firebase.firestore.FieldValue.serverTimestamp(); rec.dev = dev; return rec; }
+      function backup(id, html, reason) {
+        db.collection('ganttBackup').add({ area: 'ref', card: String(id), html: String(html || ''), at: Date.now(), reason: reason, dev: dev })
+          .catch(function (e) { console.warn('Backup not saved: ' + (e.code || e)); });
+      }
+      function lost(e) {
+        if (e && e.code === 'permission-denied') { if (typeof window.fwSync === 'function') try { window.fwSync(false); } catch (x) {} }
+        else console.warn('Reference not saved to the database: ' + (e && (e.code || e.message) || e));
+      }
+      function openTasks(h) { return (String(h || '').match(/class="check-line(?![^"]*\bdone\b)[^"]*"/g) || []).length; }
+      function card(d) {
+        var c = String(d.content || '');
+        return { id: String(d.id), parentId: String(d.parentId || ''), type: String(d.type || 'item'), title: String(d.title || ''),
+          content: c, expanded: Number(d.expanded) !== 0, sort: Number(d.sort) || 0, ref_: null, row: null, ch: hash(c) };
+      }
+      // Several docs, one batch per 400; a refusal (another device's newer copy) → write them one by one, re-read.
+      function many(list) {
+        for (var i = 0; i < list.length; i += 400) (function (part) {
+          var b = db.batch();
+          part.forEach(function (x) { b.set(rdoc(x.id), stamp(Object.assign({}, x.put), x.at), { merge: true }); });
+          b.commit().catch(function (e) {
+            if (!e || e.code !== 'permission-denied') return lost(e);
+            part.forEach(function (x) { one(x.id).then(function (d) { if (d) return rdoc(x.id).set(stamp(Object.assign({}, x.put), d.at), { merge: true }); }).catch(lost); });
+          });
+        })(list.slice(i, i + 400));
+      }
+      function tree(docs, id) {
+        var ids = {}, more = true; ids[id] = 1;
+        while (more) { more = false; docs.forEach(function (d) { if (ids[String(d.parentId || '')] && !ids[d.id]) { ids[d.id] = 1; more = true; } }); }
+        return docs.filter(function (d) { return ids[d.id]; });
+      }
+      function save(item) {
+        if (!item || !item.fwSync || !item.id) return Promise.resolve(null);
+        return one(item.id).then(function (d) {
+          if (!d) return null; // not in the database: the server decides (new card, deleted elsewhere…)
+          var res = { id: String(item.id), build: '', release: '' };
+          if (d.del) { res.deleted = true; return res; }
+          var cur = String(d.content || ''), mine = String(item.content || ''), content = cur, put = {};
+          var same = item.baseHash ? hash(cur) === item.baseHash : item.baseText != null ? cur === String(item.baseText) : cur === '';
+          if (!item.contentChanged) { if (!same) res.content = cur; }
+          else if (!same) { res.conflict = true; res.content = cur; }
+          else {
+            content = mine;
+            if (mine !== cur) {
+              if (cur.length > 400 && mine.length < cur.length * 0.6) backup(item.id, cur, 'big shrink');
+              else if (openTasks(mine) < openTasks(cur)) backup(item.id, cur, 'open task removed');
+              put.content = mine; put.ch = hash(mine); put.base = hash(cur);
+            }
+          }
+          res.meta = {}; res.metaConflicts = [];
+          ['parentId', 'expanded'].forEach(function (key) {
+            var norm = function (v) { return key === 'expanded' ? v !== false && v !== 0 : String(v || ''); };
+            var now = key === 'expanded' ? Number(d.expanded) !== 0 : String(d.parentId || '');
+            var ch = item.metaChanges && item.metaChanges[key];
+            if (ch && 'before' in ch && 'after' in ch) {
+              var b = norm(ch.before), a = norm(ch.after);
+              if (now === b || now === a) { if (now !== a) put[key] = key === 'expanded' ? (a ? 1 : 0) : a; now = a; }
+              else res.metaConflicts.push(key);
+            }
+            res.meta[key] = now;
+          });
+          if (Object.keys(put).length) rdoc(item.id).set(stamp(put, d.at), { merge: true }).catch(function (e) {
+            if (e && e.code === 'permission-denied' && put.content !== undefined) backup(item.id, put.content, 'older edit lost (newest wins)');
+            lost(e);
+          });
+          res.ch = hash(content);
+          return res;
+        });
+      }
+      function add(parentId, title, content) {
+        var id = window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+        content = String(content || '');
+        rdoc(id).set(stamp({ id: id, parentId: String(parentId || ''), type: 'item', title: String(title || ''), content: content, ch: hash(content),
+          base: '', expanded: 1, sort: Date.now(), del: '' }, 0)).catch(lost);
+        return Promise.resolve(id);
+      }
+      function archive(docs) {
+        var rows = docs.filter(function (d) { return d.del; }), groups = {};
+        rows.forEach(function (d) { (groups[d.del] = groups[d.del] || {})[d.id] = 1; });
+        return rows.filter(function (d) { return !groups[d.del][String(d.parentId || '')]; })
+          .sort(function (a, b) { return String(b.del).localeCompare(String(a.del)); })
+          .map(function (d) {
+            return { id: d.id, deletedAt: String(d.del), title: String(d.title || ''), content: String(d.content || ''),
+              children: rows.filter(function (y) { return y.del === d.del && y.id !== d.id; }).length };
+          });
+      }
+      function restore(id, deletedAt) {
+        return all().then(function (docs) {
+          var group = docs.filter(function (d) { return d.del === String(deletedAt); });
+          var root = group.filter(function (d) { return d.id === String(id); })[0];
+          if (!root) throw new Error('That cell is no longer in the archive.');
+          var live = {}; docs.forEach(function (d) { if (!d.del) live[d.id] = 1; });
+          var back = tree(group, root.id).filter(function (d) { return !live[d.id]; });
+          many(back.map(function (d) {
+            var put = { del: '' };
+            if (d.id === root.id && d.parentId && !live[d.parentId]) put.parentId = '';
+            Object.assign(d, put);
+            return { id: d.id, put: put, at: d.at };
+          }));
+          return docs.filter(function (d) { return !d.del; }).map(card).sort(function (a, b) { return a.sort - b.sort; });
+        });
+      }
+      function watchRef() {
+        if (watching) return; watching = true;
+        var first = true;
+        coll().where('up', '>', new Date(Date.now() - 60000)).onSnapshot({ includeMetadataChanges: true }, function (qs) {
+          if (first) { first = false; return; }
+          var theirs = qs.docChanges().some(function (c) { return !c.doc.metadata.hasPendingWrites && c.doc.data().dev !== dev; });
+          if (!theirs) return;
+          clearTimeout(syncT);
+          syncT = setTimeout(function () { if (typeof window.fwSync === 'function') try { window.fwSync(false); } catch (e) {} }, 400);
+        }, function (e) { watching = false; console.warn('Reference live sync stopped: ' + (e.code || e)); });
+      }
+      return {
+        watch: watchRef,
+        run: function (name, a) {
+          return ready().then(function (ok) {
+            if (!ok) return null;
+            if (name === 'saveReferenceItem') return save(a[0]);
+            if (name === 'addReferenceItem') return add(a[0], a[1], a[2]);
+            if (name === 'getArchive') return all().then(archive);
+            if (name === 'restoreArchivedItem') return restore(a[0], a[1]);
+            if (name === 'saveReferenceOrder') {
+              if (!Array.isArray(a[0])) return true;
+              return all().then(function (docs) {
+                var at = {}; docs.forEach(function (d) { at[d.id] = d.at; });
+                many(a[0].filter(function (e) { return at[String(e.id)] !== undefined; }).map(function (e) { return { id: String(e.id), put: { sort: Math.round(Number(e.sort) || 0) }, at: at[String(e.id)] }; }));
+                return true;
+              });
+            }
+            if (name === 'saveReferenceExpanded') return all().then(function (docs) {
+              many(docs.filter(function (d) { return !d.del; }).map(function (d) { return { id: d.id, put: { expanded: a[0] !== false ? 1 : 0 }, at: d.at }; }));
+              return true;
+            });
+            if (name === 'deleteReferenceItem') return all().then(function (docs) {
+              var when = new Date().toISOString();
+              many(tree(docs.filter(function (d) { return !d.del; }), String(a[0])).map(function (d) { return { id: d.id, put: { del: when }, at: d.at }; }));
+              return true;
+            });
+            return null;
+          });
+        }
+      };
+    }
+    var refs = REF ? refArea() : null;
     return {
       handles: function (name) { return !!NAMES[name]; },
       // Offline: typing allowed where the edit can be queued (Keep In Mind; days within today ± 7).
@@ -433,6 +601,7 @@
         return withTimeout(boot, 4000).then(function () {
           if (!user) return null;
           if (DAY_NAMES[name]) return days.run(name, args);
+          if (REF_NAMES[name]) return refs.run(name, args);
           return name === 'getKim' ? read() : save(args[0], args[1]);
         }).catch(function (e) { console.warn('Firestore → server: ' + (e && e.message || e)); return null; })
           .then(function (r) { return r || call(name, args); });

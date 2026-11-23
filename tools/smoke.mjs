@@ -3334,6 +3334,131 @@ if (only('pwa-days')) {
   if (errs.length) { fails += errs.length; console.error('✗ pwa-days:\n  ' + errs.join('\n  ')); }
   else console.log('✓ pwa-days: Today saves to the day doc (server hashes), pending edits survive a sync, live sync, newest-wins backup, offline days');
 }
+// Reference on Firestore in the PWA (2026-11-23, NOTES H5 C), fake Firebase SDK: card saves (server hashes), new cards,
+// delete → Archive (del on the subtree), restore, order, expand all go to ganttRef docs, never the server; another
+// device's edit starts a sync; a refused write is backed up; before the seed (no gantt/refMeta) it all goes to the server.
+if (only('pwa-ref')) {
+  const { execFileSync } = await import('child_process');
+  const http = await import('http');
+  const crypto = await import('crypto');
+  const md5 = t => crypto.createHash('md5').update(String(t || ''), 'utf8').digest('hex').slice(0, 16);
+  const dist = path.join(os.tmpdir(), 'gantt-pwa-ref-smoke');
+  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['kim', 'days', 'ref'], apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
+  execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
+  const dd = JSON.parse(JSON.stringify(data));
+  dd.reference = [{ id: 'r1', parentId: '', type: 'item', title: '', content: '<h2>Sample card</h2><p>text</p>', expanded: true, sort: 1 },
+    { id: 'r2', parentId: 'r1', type: 'item', title: '', content: '<h2>Child</h2>', expanded: true, sort: 2 }];
+  dd.reference.forEach(r => { r.ch = md5(r.content); });
+  const cards = Object.fromEntries(dd.reference.map(r => [r.id, { id: r.id, parentId: r.parentId, type: 'item', title: '', content: r.content, expanded: 1, sort: r.sort, del: '', at: 100, dev: 'x' }]));
+  const FAKE = `if (!window.firebase) window.firebase = (function () {
+    const S = window.__fs = { kim: { html: '<div>list</div>', at: 100, base: 0, dev: 'x' }, ref: ${JSON.stringify(cards)}, meta: { seeded: localStorage.getItem('fake.unseeded') ? 0 : 1 }, ups: [],
+      backups: [], qcb: null, sets: 0, refuse: false };
+    const snap = (id, d) => ({ id, exists: !!d, data: () => d, metadata: { hasPendingWrites: false } });
+    const write = (id, rec, o) => {
+      const cur = S.ref[id];
+      if (S.refuse || (cur && !(rec.at > cur.at))) return Promise.reject({ code: 'permission-denied' });
+      S.sets++; S.ups.push(rec.up); S.ref[id] = Object.assign(o && o.merge && cur ? cur : {}, rec, { up: Date.now() });
+      return Promise.resolve();
+    };
+    S.push = (id, chg) => { Object.assign(S.ref[id], chg, { up: Date.now() }); S.qcb && S.qcb({ docChanges: () => [{ doc: snap(id, S.ref[id]) }] }); };
+    const refDoc = id => ({ get: () => Promise.resolve(snap(id, S.ref[id])), set: (rec, o) => write(id, rec, o) });
+    const refColl = { doc: refDoc, get: () => Promise.resolve({ docs: Object.keys(S.ref).map(id => snap(id, S.ref[id])) }),
+      where: () => ({ onSnapshot: (o, cb) => { S.qcb = cb; setTimeout(() => cb({ docChanges: () => [] }), 0); return () => {}; } }) };
+    const gantt = { doc: n => n === 'refMeta' ? { get: () => Promise.resolve(snap(n, S.meta)) }
+      : { get: () => Promise.resolve(snap('kim', S.kim)), set: r => { S.kim = r; return Promise.resolve(); }, onSnapshot: () => () => {} } };
+    const batch = () => { const ops = []; return { set: (ref, rec, o) => ops.push([ref, rec, o]), commit: () => S.refuse ? Promise.reject({ code: 'permission-denied' }) : Promise.all(ops.map(x => x[0].set(x[1], x[2]))) }; };
+    const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com' }), 0), signOut: () => {} });
+    auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
+    const noDays = { doc: () => ({ get: () => Promise.resolve(snap('', null)), set: () => Promise.resolve() }), where: () => ({ where: () => ({ onSnapshot: () => () => {} }), onSnapshot: () => () => {} }) };
+    const firestore = () => ({ enablePersistence: () => Promise.resolve(), batch,
+      collection: n => n === 'gantt' ? gantt : n === 'ganttRef' ? refColl : n === 'ganttDays' ? noDays : { add: r => { S.backups.push(r); return Promise.resolve(); } } });
+    firestore.FieldValue = { serverTimestamp: () => 'SERVER_TS' };
+    return { initializeApp: () => {}, auth, firestore };
+  })();`;
+  const srv = http.createServer((qq, r) => {
+    let f = decodeURIComponent(new URL(qq.url, 'http://x').pathname); if (f.endsWith('/')) f += 'index.html';
+    if (f.startsWith('/fb/')) { r.writeHead(200, { 'Content-Type': 'text/javascript' }); return r.end(FAKE); }
+    const fp = path.join(dist, f);
+    if (!fp.startsWith(dist) || !fs.existsSync(fp)) { r.writeHead(404); return r.end(); }
+    r.writeHead(200, { 'Content-Type': f.endsWith('.html') ? 'text/html' : 'text/javascript' }); r.end(fs.readFileSync(fp));
+  });
+  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const errs = [], calls = [];
+  const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'block' });
+  await ctx.route('https://api.test/**', route => {
+    const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
+    const r = req.fn === 'getWorkspaceData' ? dd : req.fn === 'getSyncState' ? { build: 'smoke', ref: {}, inbox: [], days: {} } : req.fn === 'getFocus' ? focus
+      : req.fn === 'getMainCalendarEvents' ? { date: req.a[0], events: [] } : req.fn === 'getArchive' ? [{ id: 'srv', deletedAt: 'x', title: '', content: '', children: 0 }] : null;
+    route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
+  });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => errs.push('page error: ' + e.message));
+  await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
+  const run = (fn, ...a) => pg.evaluate(([fn, a]) => new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(e => bad(e.message))[fn](...a)), [fn, a]);
+  const fsr = () => pg.evaluate(() => JSON.parse(JSON.stringify(__fs.ref)));
+  // Typing in a card → its doc (content + server-matching hashes), not the server.
+  await pg.evaluate(() => { const ed = document.querySelector('#referenceTree .ref-cell-wrapper[data-id="r1"] .ref-cell'); ed.insertAdjacentHTML('beforeend', '<p>typed here</p>'); ed.dispatchEvent(new Event('input', { bubbles: true })); });
+  await pg.waitForTimeout(2500);
+  let R = await fsr();
+  if (!/typed here/.test(R.r1.content || '')) errs.push('card edit not in its doc: ' + String(R.r1.content).slice(0, 80));
+  else {
+    if (R.r1.ch !== md5(R.r1.content)) errs.push('doc ch ≠ server hash');
+    if (R.r1.base !== md5(cards.r1.content)) errs.push('doc base ≠ hash of the copy it replaced');
+    const ups = await pg.evaluate(() => __fs.ups);
+    if (!(R.r1.at > 100) || !ups.length || ups.some(u => u !== 'SERVER_TS') || !/^(phone|pc)-/.test(R.r1.dev || '')) errs.push('doc stamps: ' + JSON.stringify({ at: R.r1.at, ups, dev: R.r1.dev }));
+  }
+  if (calls.includes('saveReferenceItem')) errs.push('saveReferenceItem went to the server');
+  // Stale base → conflict with the doc copy sent back, nothing written.
+  const sets0 = await pg.evaluate(() => __fs.sets);
+  const c = await run('saveReferenceItem', { id: 'r2', fwSync: true, content: '<h2>x</h2>', contentChanged: true, baseHash: 'stale' });
+  if (!c.conflict || c.content !== cards.r2.content || c.ch !== md5(cards.r2.content)) errs.push('stale save: ' + JSON.stringify(c));
+  if (await pg.evaluate(() => __fs.sets) !== sets0) errs.push('stale save wrote the doc');
+  // Collapse via metaChanges.
+  const m = await run('saveReferenceItem', { id: 'r2', fwSync: true, content: cards.r2.content, contentChanged: false, baseHash: md5(cards.r2.content), metaChanges: { expanded: { before: true, after: false } } });
+  if (m.meta.expanded !== false || (await fsr()).r2.expanded !== 0) errs.push('collapse not saved: ' + JSON.stringify(m));
+  // New card, order, expand all.
+  const id = await run('addReferenceItem', '', '', '<h2><br></h2>');
+  R = await fsr();
+  if (!R[id] || R[id].del !== '' || R[id].expanded !== 1 || R[id].id !== id) errs.push('new card doc: ' + JSON.stringify(R[id]));
+  await run('saveReferenceOrder', [{ id: 'r2', sort: 0 }, { id: 'r1', sort: 5 }]); await pg.waitForTimeout(100);
+  R = await fsr(); if (R.r2.sort !== 0 || R.r1.sort !== 5) errs.push('order not saved');
+  await run('saveReferenceExpanded', true); await pg.waitForTimeout(100);
+  if ((await fsr()).r2.expanded !== 1) errs.push('expand all not saved');
+  // Delete r1 → r1 + child r2 marked deleted with one time; Archive lists r1 with 1 inside; restore brings both back.
+  await run('deleteReferenceItem', 'r1'); await pg.waitForTimeout(100);
+  R = await fsr();
+  if (!R.r1.del || R.r1.del !== R.r2.del || R[id].del) errs.push('delete: ' + [R.r1.del, R.r2.del, R[id].del].join('|'));
+  const arch = await run('getArchive');
+  if (arch.length !== 1 || arch[0].id !== 'r1' || arch[0].children !== 1) errs.push('archive: ' + JSON.stringify(arch));
+  else {
+    const back = await run('restoreArchivedItem', 'r1', arch[0].deletedAt); await pg.waitForTimeout(100);
+    R = await fsr();
+    if (R.r1.del || R.r2.del) errs.push('restore left del set');
+    if (!Array.isArray(back) || !back.some(x => x.id === 'r2' && x.ch === md5(x.content))) errs.push('restore answer: ' + JSON.stringify(back).slice(0, 120));
+  }
+  for (const fn of ['addReferenceItem', 'saveReferenceOrder', 'saveReferenceExpanded', 'deleteReferenceItem', 'getArchive', 'restoreArchivedItem'])
+    if (calls.includes(fn)) errs.push(fn + ' went to the server');
+  // Another device edits a card → a sync runs.
+  const before = calls.filter(x => x === 'getSyncState').length;
+  await pg.evaluate(() => __fs.push('r1', { content: '<h2>From the tablet</h2>', at: Date.now() + 5000, dev: 'pc-other' }));
+  await pg.waitForTimeout(1200);
+  if (calls.filter(x => x === 'getSyncState').length <= before) errs.push('live sync: other device\'s card edit did not start a sync');
+  // Refused (newer copy elsewhere) → the edit goes to ganttBackup.
+  await pg.evaluate(() => { __fs.refuse = true; });
+  const cur = (await fsr()).r1.content;
+  await run('saveReferenceItem', { id: 'r1', fwSync: true, content: cur + '<p>lost</p>', contentChanged: true, baseHash: md5(cur) }); await pg.waitForTimeout(300);
+  if (!(await pg.evaluate(() => __fs.backups.some(b => b.area === 'ref' && b.card === 'r1' && /newest wins/.test(b.reason))))) errs.push('refused card edit not backed up');
+  await pg.evaluate(() => { __fs.refuse = false; });
+  // Not seeded yet → the server answers.
+  await pg.evaluate(() => { localStorage.setItem('fake.unseeded', '1'); });
+  await pg.reload(); await pg.waitForTimeout(3000);
+  const a2 = await run('getArchive');
+  if (!a2.length || a2[0].id !== 'srv') errs.push('before the seed: getArchive did not go to the server');
+  await ctx.close(); srv.close();
+  if (errs.length) { fails += errs.length; console.error('✗ pwa-ref:\n  ' + errs.join('\n  ')); }
+  else console.log('✓ pwa-ref: Reference on Firestore — card saves (server hashes), add, order, expand, delete → Archive → restore, live sync, refused backup, server before the seed');
+}
 // One calm return (2026-11-21, speed item M; batched 2026-11-23, speed plan E): coming back runs ONE queue — registered
 // jobs in order, their reads in one batchCalls, skipping ones refreshed < 60 s ago; Speed Log 'resume' row only when something ran.
 for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {

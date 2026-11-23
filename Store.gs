@@ -13,7 +13,7 @@
    tools/pwa/firebase-config.json (check.mjs keeps the two equal). Empty = not switched on: every area stays on the
    Sheet. Set = the areas in STORE_DB_AREAS_ live in Firestore, and the timed trigger storeMirror() copies them
    into the Sheet (backup mirror) and moves lost edits from Firestore into the Backup tab. */
-const FIREBASE_PROJECT_ = '';
+const FIREBASE_PROJECT_ = 'gantt-2ee94';
 const STORE_DB_AREAS_ = ['kim', 'days']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
 const STORE_BACKEND = {
   kim: 'sheet',

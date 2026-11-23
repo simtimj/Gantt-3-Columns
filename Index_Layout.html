@@ -653,7 +653,9 @@
   html body #workspace #referencePane #refTopScroll{padding-left:calc(var(--ws-cell-x) - 1px)!important;padding-right:calc(var(--ws-cell-x) - 1px)!important;padding-top:6px!important;}
 
   /* Cell padding for the other content. */
-  html body #workspace #kimScroll{padding-left:max(0px,calc(var(--ws-cell-x) - 3px))!important;padding-right:max(0px,calc(var(--ws-cell-x) - 3px))!important;padding-top:6px!important;}
+  /* 2026-11-23 (Julius): less side room, slightly smaller text, and room on top so a title box at the very top isn't cut off. */
+  html body #workspace #kimScroll{padding-left:max(0px,calc(var(--ws-cell-x) - 6px))!important;padding-right:max(0px,calc(var(--ws-cell-x) - 6px))!important;padding-top:4px!important;}
+  html body #workspace #kimScroll > .kim-editor{padding:5px 2px 0!important;font-size:calc(var(--paragraph-size) * .92)!important;}
   html body #workspace #journalPane[data-ctab="urgent"] #urgTabScroll,
   html body #workspace :is(#dayReviewScroll,#funScroll,#newScroll){padding-left:var(--ws-cell-x)!important;padding-right:var(--ws-cell-x)!important;}
   body.one-day #workspace #journalScroll .day-row.od-on{--rowpx:var(--ws-cell-x);padding-left:var(--ws-cell-x)!important;padding-right:var(--ws-cell-x)!important;}
@@ -690,7 +692,7 @@
   /* Dark mode (2026-11-22, Julius: "a little too dark, brighten it up"; "Focus / Thinking should be the same gray, not
      the day color"): Keep In Mind and the Focus / Thinking box share one lighter dark gray. The inline day tint that
      blocksDock puts on #blocksScroll is overridden here (light mode keeps the day color). */
-  html[data-theme="dark"]{--kim-bg:#1e1f22;}
+  html[data-theme="dark"]{--kim-bg:#232427;} /* a touch brighter (2026-11-23, Julius) */
   html[data-theme="dark"] #journalPane[data-ctab="focus"] #kimScroll,
   html[data-theme="dark"] body.one-day #journalPane #blocksScroll{background:var(--kim-bg)!important;color:var(--text)!important;}
   #kimScroll .kg-pin{position:absolute;z-index:2;width:16px;height:16px;padding:0;margin:0;border:0;background:none;font-size:11px;line-height:16px;

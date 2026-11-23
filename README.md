@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-22
+Last updated: 2026-11-23
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -76,6 +76,9 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-23)
+- **Keep In Mind spacing** (2026-11-23): dark gray a touch brighter · a title box at the very top is no longer cut off · less side margin and slightly smaller text for more room.
 
 ## 🧪 To be confirmed (2026-11-22)
 - **Keep In Mind polish** (2026-11-22, night): box lines thinner and corners squarer to match the checkboxes · 📌 sits just right of a pinned task's checkbox (a pinned title without a checkbox: at the right end of its line) · the save message pill is smaller and see-through and fades after ~2.5 s (an undo offer after 8 s); "Saving…" and problems (not saved, retrying) stay until replaced. · dark mode: Keep In Mind and the Focus / Thinking box are one lighter dark gray (Focus no longer takes the day color).

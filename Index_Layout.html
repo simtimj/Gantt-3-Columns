@@ -687,6 +687,12 @@
   #kimScroll .kim-editor > [data-kpin]:not(.check-line){padding-right:20px!important;}
   /* Keep In Mind boxes (2026-11-22, Julius): thinner line, squarer corners to match the checkboxes. */
   #kimScroll .kg-box{border-radius:4px!important;}
+  /* Dark mode (2026-11-22, Julius: "a little too dark, brighten it up"; "Focus / Thinking should be the same gray, not
+     the day color"): Keep In Mind and the Focus / Thinking box share one lighter dark gray. The inline day tint that
+     blocksDock puts on #blocksScroll is overridden here (light mode keeps the day color). */
+  html[data-theme="dark"]{--kim-bg:#1e1f22;}
+  html[data-theme="dark"] #journalPane[data-ctab="focus"] #kimScroll,
+  html[data-theme="dark"] body.one-day #journalPane #blocksScroll{background:var(--kim-bg)!important;color:var(--text)!important;}
   #kimScroll .kg-pin{position:absolute;z-index:2;width:16px;height:16px;padding:0;margin:0;border:0;background:none;font-size:11px;line-height:16px;
     text-align:center;cursor:pointer;opacity:.85;-webkit-tap-highlight-color:transparent;}
   #kimScroll .kg-pin:hover{opacity:1;}

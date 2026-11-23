@@ -931,6 +931,14 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Full box: `fadDrag.ad` (open row) → `fadAdTarget` (blue line `.cp-fa-ins` / `-b`) → `adReorder` on release. Half calendar: `dragStopped` → `adDropHalf` when an all-day event is let go in its own day's cell (FullCalendar has no reorder).
 - `cpGroups`: a day with any hand-ordered open task (`data-cpo`) shows one "To do" group (no urgency labels).
 - Stand-ins (`bltmp-`, `fqtmp-`) now go when the real event arrives (`dropWhenReal`, ≤ 5 s) instead of a fixed 2.5 s, so no doubles.
+
+## All-day Ordered / Unordered groups (2026-11-22 16:34, Julius; overrides the Calendar park)
+- Answers: drag to move in/out and reorder · Ordered shows numbers · docked calendar gets the same split · order saved per day (built on the existing per-event `fwOrd` tag instead of localStorage: already syncs across devices, no new storage).
+- Group = sign of `ord`: < 0 = Ordered (renumbered `-1e13 + k*1000` on every change), ≥ 0 = Unordered (create / backlog = now). `ordKeyOf(ord)` = ord if < 0 else 0; `isOrd(x)` (open, not a Scheduled copy, ordKey < 0). Unordered sorts urgency, then ord (new = bottom of its urgency); `eventOrder` gained `ord`.
+- `adPlace(ev, target, after, day, toOrd)` replaces `adReorder`: toOrd → insert in the Ordered list, renumber; else → ord = now (only if it was Ordered). One `calPanelSetOrder` (no server change).
+- Full box (`fadRender`): headers `[data-fa-og]` "Ordered · n" (empty: hint) and `[data-fa-ug]` "Unordered · n" whenever the day has open tasks; Ordered rows `data-fao` + `.cp-ordn` badge. `fadAdTarget` → {el, ev, after, ord}: over Ordered header / rows → Ordered; top half of Unordered header → end of Ordered; lower → Unordered.
+- Half calendar: `eventContent` adds `.cp-ordn` (number via `ordNum`, `cpGroups` keeps it right); `cpGroups` labels Ordered / Unordered on a day with an Ordered task, else urgency labels as before. `adDropHalf`: over an Ordered row → there; top half of the first Unordered row → end of Ordered; else Unordered.
+- Smoke: new → bottom of Unordered; drag onto Ordered header; above another Ordered row (1, 2); kept after a re-read; drag to Unordered header lower half → out.
 - Fix: `fadRender` waits while a row of the box is held (`fadDrag.fad`), since replacing the row mid-drag loses the touchend.
 - Smoke: "order" (two quick adds land last; drag "Order two" above "All-day A" → kept after a re-read).
 - 2026-11-21 7:45 am (Julius): sky stripe "too bright, cuts into the 4am text" → 3 px, alpha .55, label cushion padding-right 7 px. All-day divider "resize at will" → once dragged, `.cp-adset` makes `--cp-ad-max` the scroller's real height (ratio .03–.85, min 26 px); double-tap clears it. KNOWN (pre-existing, also fails on the previous commit, likely time-of-day): calendar phone smoke "scheduled: dragging back to all day gave {allDay:false,sched:true}" — batch for maintenance.

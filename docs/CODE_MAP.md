@@ -64,4 +64,4 @@ Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.m
 
 ## Tests
 
-`tools/check.mjs` = syntax. `tools/smoke.mjs` suites: `main`, `snap`, `drafts`, `tracker`, `calendar`, `resume` (run one with `SMOKE_ONLY=calendar`). The calendar suite's fake server is `calStub` (seeded events: Dentist 9:00, Standup, Gig, All-day A…). Main suite runs in Pacific time like Julius's browser.
+`tools/check.mjs` = syntax. `tools/smoke.mjs` suites: `main`, `snap`, `drafts`, `tracker`, `calendar`, `resume`, `calcache` (run one with `SMOKE_ONLY=calendar`). The calendar suite's fake server is `calStub` (seeded events: Dentist 9:00, Standup, Gig, All-day A…). Main suite runs in Pacific time like Julius's browser.

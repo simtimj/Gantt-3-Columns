@@ -3365,5 +3365,31 @@ for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 91
   else console.log('✓ resume ' + name + ': quick return skips all, 2-min return runs every job in order staggered, hide stops it, Speed Log row');
   await ctx.close();
 }
+// Calendar device cache (2026-11-23, speed step A, NOTES H5): the day's events list is kept on the device, painted at
+// once on the next open (no "Loading…"), refreshed quietly, and dropped with the in-memory copy after a save.
+if (only('calcache')) {
+  const ctx = await b.newContext({ viewport: { width: 1300, height: 900 }, timezoneId: 'America/Los_Angeles' });
+  const pg = await ctx.newPage(), errs = [];
+  pg.on('pageerror', e => errs.push(e.message));
+  try {
+    await pg.goto('file://' + out); await pg.waitForTimeout(2500);
+    const saved = await pg.evaluate(() => { try { const c = JSON.parse(localStorage.getItem('fw.ceCache.v1')); return Object.values(c.days).some(x => x.data.events.some(e => e.title === 'Sample event')); } catch (e) { return false; } });
+    if (!saved) errs.push('day list not kept on the device after a read');
+    // Old copy on the device: painted first, then replaced by Google's answer.
+    await pg.evaluate(() => { const c = JSON.parse(localStorage.getItem('fw.ceCache.v1')); Object.values(c.days).forEach(x => { x.data.events[0].title = 'Old copy'; }); localStorage.setItem('fw.ceCache.v1', JSON.stringify(c)); });
+    await pg.reload(); await pg.waitForTimeout(2500);
+    const r = await pg.evaluate(() => ({ painted: window.__fwCeDevPaint || 0, text: (document.getElementById('centerCalendarList') || {}).textContent || '',
+      stored: JSON.parse(localStorage.getItem('fw.ceCache.v1') || '{"days":{}}') }));
+    if (!r.painted) errs.push('device copy was not painted on open');
+    if (/Old copy/.test(r.text)) errs.push('quiet re-read did not replace the old device copy');
+    if (!Object.values(r.stored.days).some(x => x.data.events.some(e => e.title === 'Sample event'))) errs.push('device copy not refreshed after the quiet re-read');
+    // A save drops the in-memory copy → the device copy goes with it.
+    const dropped = await pg.evaluate(() => { centerCalendarCache.clear(); return localStorage.getItem('fw.ceCache.v1') === null; });
+    if (!dropped) errs.push('clearing the in-memory copy left the device copy');
+  } catch (e) { errs.push(String(e)); }
+  if (errs.length) { fails += errs.length; console.error('✗ calcache:\n  ' + errs.join('\n  ')); }
+  else console.log('✓ calcache: day list kept on the device, painted at once, refreshed quietly, dropped after a save');
+  await ctx.close();
+}
 await b.close();
 process.exit(fails ? 1 : 0);

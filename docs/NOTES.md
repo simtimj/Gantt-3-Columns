@@ -1123,4 +1123,5 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
   - **F. The rest on Firestore** (M, med): Plan + Cal Backlog, Properties items (pins, Inbox, Focus, Fun, New Things, card cats, calendar picks).
   - **B. Calendar direct** (M, med): the PWA reads Google Calendar itself (Google sign-in + calendar scope), no Apps Script hop; the cache stays as the first paint.
   - **G. Editable local-first** (L, high): the instant screen is editable at once and syncs after; only once everything is on Firestore.
-- Next session: **A**.
+- **A done (2026-11-23, untested live)**: the gap was the main-column list (`loadCenterCalendar` → `getMainCalendarEvents`): only a 1-min in-memory copy, so every open showed "Loading…" and the docked day calendar waited behind it (the big calendar already had `fw.calCache.v2`). Now `CeCache` (Index_Main, grep `CE_DEV_KEY`) keeps each day's list in localStorage `fw.ceCache.v1` (today −7 → +14, ≤ 30 days): painted at once, `getMainCalendarEvents` re-read quietly, redrawn only if the JSON differs, failure keeps the copy. `centerCalendarCache.delete/clear` (every save path) also drop the device copy. PWA `sw.js.txt`: pinned `cdn.jsdelivr.net/npm/x@ver/` → cache-first in `libs-v1` (not wiped on update). Smoke: `SMOKE_ONLY=calcache`.
+- Next session: **E**.

@@ -7550,7 +7550,30 @@
   // + Task box: kept outside the list so a refresh mid-typing doesn't lose the text.
   const ceAdd = {open:false,text:'',busy:false};
   const ceAddForm = () => '<form class="ce-add"><input type="text" maxlength="300" placeholder="Task name" aria-label="New all-day task"' + (ceAdd.busy ? ' disabled' : '') + ' value="' + esc(ceAdd.text) + '"><button type="submit" class="btn"' + (ceAdd.busy ? ' disabled' : '') + '>Add</button><button type="button" class="btn" data-ce-add-cancel aria-label="Cancel">✕</button></form>';
-  const centerCalendarCache = new Map();
+  /* Calendar cache on the device (2026-11-23, speed plan step A, NOTES "H5"): each day's last list is kept in
+     localStorage, so opening the app paints the day's events (and the docked calendar) at once instead of
+     "Loading…"; Google is then re-read quietly and the day is redrawn only if something changed. Anything that
+     drops the in-memory copy (a save, a tick, a rename) drops the device copy too, so edits are never drawn stale.
+     Kept: today −7 → +14 days, at most 30 days. */
+  const CE_DEV_KEY = 'fw.ceCache.v1';
+  const ceDevRead = () => { try{ const c = JSON.parse(localStorage.getItem(CE_DEV_KEY) || 'null'); return c && c.v === 1 && c.days ? c.days : {}; }catch(e){ return {}; } };
+  const ceDevWrite = days => {
+    try{
+      const t = state.today || new Date().toISOString().slice(0, 10), sh = n => { const d = new Date(t + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+      const lo = sh(-7), hi = sh(14);
+      const keep = Object.keys(days).filter(d => d >= lo && d <= hi).sort((a, b) => days[b].at - days[a].at).slice(0, 30), out = {};
+      keep.forEach(d => { out[d] = days[d]; });
+      localStorage.setItem(CE_DEV_KEY, JSON.stringify({v: 1, days: out}));
+    }catch(e){}
+  };
+  const ceDevGet = date => { const x = ceDevRead()[date]; return x && x.data && Array.isArray(x.data.events) ? x : null; };
+  const ceDevSet = (date, data) => { const d = ceDevRead(); d[date] = {at: Date.now(), data: data}; ceDevWrite(d); };
+  const ceDevDrop = date => { if(date == null){ try{ localStorage.removeItem(CE_DEV_KEY); }catch(e){} return; } const d = ceDevRead(); if(d[date]){ delete d[date]; ceDevWrite(d); } };
+  class CeCache extends Map {
+    delete(k){ ceDevDrop(k); return super.delete(k); }
+    clear(){ ceDevDrop(null); return super.clear(); }
+  }
+  const centerCalendarCache = new CeCache();
   // Subject color for a calendar row: the saved subject, else the same auto guess cards use.
   function calRowCat(ev){
     if(ev.cat === 'none') return '';
@@ -7693,10 +7716,17 @@
     };
     const cached = centerCalendarCache.get(date);
     if(!force && cached && Date.now() - cached.at < 60000){ draw(cached.data); return; }
-    box.textContent = 'Loading…';
+    // Device copy (speed step A): paint it now, then re-read quietly; redraw only if Google's answer differs.
+    const dev = !force && !cached ? ceDevGet(date) : null;
+    const shown = dev ? JSON.stringify(dev.data) : '';
+    if(dev){ window.__fwCeDevPaint = (window.__fwCeDevPaint || 0) + 1; draw(dev.data); }
+    else box.textContent = 'Loading…';
     google.script.run.withSuccessHandler(data => {
-      centerCalendarCache.set(date,{at:Date.now(),data:data}); draw(data);
+      centerCalendarCache.set(date,{at:Date.now(),data:data});
+      if(data && Array.isArray(data.events)) ceDevSet(date, data);
+      if(!dev || JSON.stringify(data) !== shown) draw(data);
     }).withFailureHandler(() => {
+      if(dev) return; // keep the device copy on screen; the next open / ↻ tries again
       if(seq === centerCalendarSeq) box.textContent = 'Could not load calendar events. Tap refresh to retry.';
     }).getMainCalendarEvents(date);
   }

@@ -79,6 +79,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-23)
+- **📅 Calendar opens at once (speed step A)** (2026-11-23): the day's events (and the docked day calendar) now show straight away when the app opens, from the copy kept on the phone, instead of "Loading…"; Google is re-checked quietly and the list only changes if something did. After a tick, edit or add it still reads Google fresh. The PWA also keeps the calendar's code on the phone, so it draws without waiting on the network.
 - **Keep In Mind spacing** (2026-11-23): dark gray a touch brighter · a title box at the very top is no longer cut off · less side margin and slightly smaller text for more room.
 
 ## 🧪 To be confirmed (2026-11-22)

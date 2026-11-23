@@ -259,6 +259,43 @@ const Store = {
       return { width: width, rows: rows, base: 2 };
     },
     MIRROR_KEY: 'daysMirrorAt',
+    SEED_KEY: 'daysSeeded',
+    /* Full history (H5 D, 2026-11-23): every Sheet day with any text becomes a doc once, so the PWA can build the
+       opening and past days from the database. Run by the mirror trigger (not a page load). Sections a doc already
+       has are kept (they're newer); seeded sections get <f>At = 1, so any real edit beats them, and up = 1970, so the
+       mirror doesn't copy them back. A date with no doc after this = an empty day. gantt/daysMeta tells the PWA. */
+    seed_() {
+      if (!this.db_() || Store.props.getProperty(this.SEED_KEY) === '1') return 0;
+      const sh = this.sheet_(), last = sh.getLastRow(), mc = sh.getMaxColumns();
+      const width = mc >= 5 ? 5 : mc >= 4 ? 4 : 3;
+      const rows = last < 2 ? [] : sh.getRange(2, 1, last - 1, width).getValues();
+      const have = {};
+      StoreFs.query(this.COLL, [['date', '>=', '0']]).forEach(d => { if (d.date) have[d.date] = d; });
+      let first = '', lastDate = '';
+      const list = [];
+      rows.forEach(r => {
+        const date = formatDate_(r[0]);
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        if (!first || date < first) first = date;
+        if (date > lastDate) lastDate = date;
+        const doc = have[date], put = {};
+        let text = false;
+        this.FIELDS.forEach((f, i) => {
+          const v = i + 1 < width ? String(r[i + 1] == null ? '' : r[i + 1]) : '';
+          if (v) text = true;
+          if (!(doc && doc[f + 'At'])) { put[f] = v; put[f + 'At'] = 1; put[f + 'Base'] = ''; }
+        });
+        if ((!text && !doc) || !Object.keys(put).length) return;
+        put.date = date;
+        if (!doc) Object.assign(put, { at: 1, up: new Date(1000), dev: 'sheet-seed' });
+        list.push([this.COLL + '/' + date, put]);
+      });
+      StoreFs.patchMany(list);
+      const docs = Object.keys(have).length + list.filter(x => !have[x[1].date]).length;
+      StoreFs.set('gantt/daysMeta', { seeded: Date.now(), at: Date.now(), first: first, last: lastDate, days: docs });
+      Store.props.setProperty(this.SEED_KEY, '1');
+      return list.length;
+    },
     unmirrored_() {
       const wm = Number(PropertiesService.getScriptProperties().getProperty(this.MIRROR_KEY)) || 0;
       // `up` = when the edit reached the database (server time, so a device's wrong clock can't hide an edit).
@@ -268,6 +305,7 @@ const Store = {
     // from (another edit lost under "newest wins") goes to Backup first. Returns the number of sections copied.
     mirror() {
       if (!this.db_()) return 0;
+      this.seed_();
       const docs = this.unmirrored_();
       let n = 0, top = 0;
       docs.forEach(doc => {
@@ -593,6 +631,7 @@ const Store = {
        copy puts the Sheet copy in Backup first. Returns the number of cards copied. */
     mirror() {
       if (!this.db_()) return 0;
+      this.seed_();
       const docs = this.unmirrored_();
       if (!docs.length) return 0;
       const sh = this.sheet_(), rows = referenceRowMap_(sh), ash = Store.archive.sheet_();

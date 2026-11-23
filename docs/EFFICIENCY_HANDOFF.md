@@ -4,7 +4,7 @@ Updated 2026-11-10. This is the current engineering handoff, not a declaration t
 
 ## Speed plan 2 — 2026-11-23 (going fully database; docs/NOTES.md → "H5")
 
-Status: **E implemented 2026-11-23 (untested live)**: imports on a 5-min server trigger (`importsTick`), not on open/return; return jobs' reads batched into one `batchCalls`. Next: C. **A implemented 2026-11-23 (untested live)**: main-column day list kept on the device (`fw.ceCache.v1`), painted at once, quiet re-read, dropped with the in-memory copy on any save; PWA service worker keeps pinned jsdelivr calendar libs in cache `libs-v1`. The big calendar already had its device cache (`fw.calCache.v2`). Order A (calendar cache) → E (fewer Apps Script calls) → C (Reference + Archive on Firestore) → D (full Days history) → F (the rest) → B (calendar direct) → G (editable local-first). One per session.
+Status: **D implemented 2026-11-23 (untested live)**: opening + past days built from Firestore in the PWA. **C implemented 2026-11-23 (untested live).** **E implemented 2026-11-23 (untested live)**: imports on a 5-min server trigger (`importsTick`), not on open/return; return jobs' reads batched into one `batchCalls`. Next: C. **A implemented 2026-11-23 (untested live)**: main-column day list kept on the device (`fw.ceCache.v1`), painted at once, quiet re-read, dropped with the in-memory copy on any save; PWA service worker keeps pinned jsdelivr calendar libs in cache `libs-v1`. The big calendar already had its device cache (`fw.calCache.v2`). Order A (calendar cache) → E (fewer Apps Script calls) → C (Reference + Archive on Firestore) → D (full Days history) → F (the rest) → B (calendar direct) → G (editable local-first). One per session.
 
 ## Speed plan — 2026-11-21 (Julius: "put it away 5 min, come back, the whole thing refreshes")
 
@@ -223,3 +223,7 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 
 ## Speed plan C — Reference on Firestore (2026-11-23, implemented + tested in store-test / smoke pwa-ref, not yet tested live)
 - PWA Reference saves / add / delete / restore / order / expand skip Apps Script (Firestore docs `ganttRef`). Server reads add one Firestore query per Reference read (unmirrored docs). Details: docs/NOTES.md → H5 C.
+
+## Speed plan D — full Days history on Firestore (2026-11-23, implemented + tested in store-test / smoke pwa-hist, not yet tested live)
+- Server: the 5-min mirror seeds every Sheet day with text into `ganttDays` once (`daysSeeded` prop, `gantt/daysMeta`), ~one fetchAll round per 50 days; no page load pays for it.
+- PWA: `getWorkspaceData({fast})` (opening when the device copy is from an earlier day) and `getDaysRange` (past / later weeks) skip Apps Script: one Firestore query catches this device's copy up (`up` > last seen), then everything is built locally with the server's answer shape and hashes. Card categories + pins still from the last opening (step F). Expected: opening on a new day and scrolling to past weeks no longer wait ~1–5 s on Apps Script. Details: docs/NOTES.md → H5 D.

@@ -254,7 +254,8 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
     "\nformatDate_ = v => v instanceof Date ? v.toISOString().slice(0, 10) : String(v || ''); parseDate_ = v => new Date(v + 'T00:00:00Z');", dctx);
   assert.equal(vm.runInContext('STORE_BACKEND.days', dctx), 'db');
   const H = s => dctx.cellHash_(s), day = d => vm.runInContext("new Date('" + d + "T00:00:00Z')", dctx);
-  ss.insertSheet('Days').rows.push(['Date', 'Today', 'Notes', 'Plan', 'Thoughts'], [day('2026-11-21'), '<div>t0</div>', '<div>n0</div>', '', '']);
+  ss.insertSheet('Days').rows.push(['Date', 'Today', 'Notes', 'Plan', 'Thoughts'], [day('2026-11-21'), '<div>t0</div>', '<div>n0</div>', '', ''],
+    [day('2026-11-10'), '<div>old day</div>', '', '', '<div>tho</div>'], [day('2026-11-11'), '', '', '', '']);
   const S = () => tabs.Days.rows, doc = d => fsDocs['ganttDays/' + d], str = (d, f) => doc(d)[f] && doc(d)[f].stringValue;
   // Server save: Sheet + only the changed section in the day doc.
   let r = dctx.saveDay('2026-11-21', '<div>t1</div>', '<div>n0</div>', { th: H('<div>t0</div>'), jh: H('<div>n0</div>'), ct: true, cj: false });
@@ -277,7 +278,16 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
   fsDocs['ganttBackup/b2'] = { area: { stringValue: 'days' }, date: { stringValue: '2026-11-21' }, field: { stringValue: 'tasks' }, html: { stringValue: '<div>lost</div>' }, reason: { stringValue: 'older edit lost (newest wins)' }, dev: { stringValue: 'pc-1' } };
   let m = dctx.Store.mirror();
   assert.equal(m.days, 2); assert.equal(m.backups, 1);
-  assert.equal(S()[1][2], '<div>pwa</div>'); assert.equal(S()[2][3], '<div>plan</div>');
+  assert.equal(S()[1][2], '<div>pwa</div>'); assert.equal(S().at(-1)[3], '<div>plan</div>');
+  // H5 D: the first mirror seeds the full history — a day with text gets a doc (sections at 1, up 1970, so the mirror
+  // skips it), an empty day gets none, sections a doc already had are kept, and gantt/daysMeta tells the PWA.
+  assert.equal(str('2026-11-10', 'tasks'), '<div>old day</div>'); assert.equal(str('2026-11-10', 'tho'), '<div>tho</div>');
+  assert.equal(doc('2026-11-10').tasksAt.integerValue, '1'); assert.equal(Date.parse(doc('2026-11-10').up.timestampValue), 1000);
+  assert.equal(doc('2026-11-11'), undefined);
+  assert.equal(str('2026-11-21', 'journal'), '<div>pwa</div>'); assert.equal(doc('2026-11-21').planAt.integerValue, '1');
+  const meta = fsDocs['gantt/daysMeta'];
+  assert.equal(meta.first.stringValue, '2026-11-10'); assert.equal(meta.days.integerValue, '3'); assert.ok(Number(meta.seeded.integerValue) > 0);
+  assert.equal(props.daysSeeded, '1');
   assert.equal(tabs.Backup.rows.length, backups0 + 1);
   assert.equal(tabs.Backup.rows.at(-1).slice(1, 3).join(), '2026-11-21,Today'); assert.equal(tabs.Backup.rows.at(-1)[4], '<div>lost</div>');
   assert.equal(dctx.Store.mirror().days, 0); // nothing new
@@ -287,7 +297,7 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
   m = dctx.Store.mirror();
   assert.equal(m.days, 1); assert.equal(S()[1][2], '<div>pwa2</div>');
   assert.equal(tabs.Backup.rows.at(-1)[4], '<div>sheet only</div>'); assert.match(tabs.Backup.rows.at(-1)[3], /newest wins\) · phone-1/);
-  console.log('✓ store-test: Days on Firestore (overlay, per-section saves, mirror, day backups)');
+  console.log('✓ store-test: Days on Firestore (overlay, per-section saves, mirror, day backups, full-history seed)');
 
   // H5 C (2026-11-23): Reference + Archive on Firestore. Seeded once from both tabs; server saves go to the Sheet and
   // the card doc; PWA edits / new cards / deletes / restores in the docs show on top, and the mirror copies them in.

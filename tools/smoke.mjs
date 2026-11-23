@@ -3334,6 +3334,128 @@ if (only('pwa-days')) {
   if (errs.length) { fails += errs.length; console.error('✗ pwa-days:\n  ' + errs.join('\n  ')); }
   else console.log('✓ pwa-days: Today saves to the day doc (server hashes), pending edits survive a sync, live sync, newest-wins backup, offline days');
 }
+// Full Days history on Firestore in the PWA (2026-11-23, NOTES H5 D), fake Firebase SDK: once gantt/daysMeta says the
+// history is seeded, the opening (getWorkspaceData) and past days (getDaysRange) are built from the day docs + the
+// cards, never the server: every date filled, server hashes, Urgent + Notes seeds from all days, this device's copy
+// caught up with one `up` query; a day with no doc saves straight to the database; not seeded → the server.
+if (only('pwa-hist')) {
+  const { execFileSync } = await import('child_process');
+  const http = await import('http');
+  const crypto = await import('crypto');
+  const md5 = t => crypto.createHash('md5').update(String(t || ''), 'utf8').digest('hex').slice(0, 16);
+  const dist = path.join(os.tmpdir(), 'gantt-pwa-hist-smoke');
+  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['kim', 'days', 'ref'], apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
+  execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
+  const dd = JSON.parse(JSON.stringify(data));
+  dd.days.forEach(d => { d.th = md5(d.tasks); d.jh = md5(d.journal); d.ph = md5(d.plan); d.hh = md5(d.tho); });
+  const addD = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  const old = addD(today, -40), first = addD(today, -60);
+  const docs = {};
+  dd.days.forEach(d => { docs[d.date] = { date: d.date, tasks: d.tasks || '', journal: d.journal || '', plan: d.plan || '', tho: d.tho || '', tasksAt: 1, journalAt: 1, planAt: 1, thoAt: 1, at: 1, up: 1000 }; });
+  docs[today] = Object.assign(docs[today] || { journal: '', plan: '', tho: '', journalAt: 1, planAt: 1, thoAt: 1, at: 1, up: 1000, date: today },
+    { tasks: '<div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">From the database</span></div>', tasksAt: 5 });
+  docs[old] = { date: old, tasks: '<div class="check-line" data-level="0" data-urg="1"><input type="checkbox"><span class="check-text">Old urgent</span></div>', tasksAt: 1, at: 1, up: 1000 };
+  const cards = { r1: { id: 'r1', parentId: '', type: 'item', title: '', content: '<h2>Db card</h2>', expanded: 1, sort: 1, del: '', at: 100 },
+    r9: { id: 'r9', parentId: '', type: 'item', title: '', content: '<h2>Gone</h2>', expanded: 1, sort: 2, del: '2026-01-01T00:00:00Z', at: 100 } };
+  const FAKE = `if (!window.firebase) window.firebase = (function () {
+    const S = window.__fs = { kim: { html: '<div>list</div>', at: 100, base: 0, dev: 'x' }, days: ${JSON.stringify(docs)}, ref: ${JSON.stringify(cards)},
+      meta: { seeded: localStorage.getItem('fake.unseeded') ? 0 : 1, first: ${JSON.stringify(first)}, days: ${Object.keys(docs).length} }, gets: [], backups: [] };
+    const meta = { fromCache: false, hasPendingWrites: false };
+    const snap = (id, d) => ({ id, exists: !!d, data: () => d, metadata: meta });
+    const qset = list => ({ docs: list, size: list.length });
+    const query = (coll, fl) => ({
+      where: (f, op, v) => query(coll, fl.concat([[f, op, v instanceof Date ? v.getTime() : v]])),
+      get: o => { S.gets.push(coll + ':' + (o && o.source) + ':' + fl.map(x => x[0]).join(',')); const all = S[coll];
+        return Promise.resolve(qset(Object.keys(all).filter(id => fl.every(([f, op, v]) => { const a = all[id][f]; return op === '>' ? a > v : op === '>=' ? a >= v : op === '<=' ? a <= v : a === v; })).map(id => snap(id, all[id])))); },
+      onSnapshot: (o, cb) => { setTimeout(() => cb(coll === 'days' ? qset([]) : { docChanges: () => [] }), 0); return () => {}; } });
+    const dayDoc = d => ({ get: () => Promise.resolve(snap(d, S.days[d])), set: (rec, o) => { S.days[d] = Object.assign(o && o.merge && S.days[d] || {}, rec, { up: Date.now() }); return Promise.resolve(); } });
+    const gantt = { doc: n => n === 'daysMeta' ? { get: () => Promise.resolve(snap(n, S.meta)) } : n === 'refMeta' ? { get: () => Promise.resolve(snap(n, { seeded: 1 })) }
+      : { get: () => Promise.resolve(snap('kim', S.kim)), set: r => { S.kim = r; return Promise.resolve(); }, onSnapshot: () => () => {} } };
+    const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com' }), 0), signOut: () => {} });
+    auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
+    const firestore = () => ({ enablePersistence: () => Promise.resolve(),
+      collection: n => n === 'gantt' ? gantt : n === 'ganttDays' ? Object.assign(query('days', []), { doc: dayDoc })
+        : n === 'ganttRef' ? Object.assign(query('ref', []), { doc: id => ({ get: () => Promise.resolve(snap(id, S.ref[id])) }) }) : { add: r => { S.backups.push(r); return Promise.resolve(); } } });
+    firestore.FieldValue = { serverTimestamp: () => Date.now() };
+    return { initializeApp: () => {}, auth, firestore };
+  })();`;
+  const srv = http.createServer((qq, r) => {
+    let f = decodeURIComponent(new URL(qq.url, 'http://x').pathname); if (f.endsWith('/')) f += 'index.html';
+    if (f.startsWith('/fb/')) { r.writeHead(200, { 'Content-Type': 'text/javascript' }); return r.end(FAKE); }
+    const fp = path.join(dist, f);
+    if (!fp.startsWith(dist) || !fs.existsSync(fp)) { r.writeHead(404); return r.end(); }
+    r.writeHead(200, { 'Content-Type': f.endsWith('.html') ? 'text/html' : 'text/javascript' }); r.end(fs.readFileSync(fp));
+  });
+  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const errs = [], calls = [];
+  const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'block' });
+  await ctx.route('https://api.test/**', route => {
+    const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
+    const r = req.fn === 'getWorkspaceData' ? Object.assign({}, dd, { cardCats: [{ id: 'cc1', name: 'Cat' }] }) : req.fn === 'getSyncState' ? { build: 'smoke', ref: {}, inbox: [], days: {} } : req.fn === 'getFocus' ? focus
+      : req.fn === 'getMainCalendarEvents' ? { date: req.a[0], events: [] } : req.fn === 'getDaysRange' ? [{ date: req.a[0], tasks: 'srv', journal: '', plan: '', tho: '' }] : null;
+    route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
+  });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => errs.push('page error: ' + e.message));
+  const logs = []; pg.on('console', m => logs.push(m.text().slice(0, 200)));
+  // First open on this device (no last opening here): the server answers, its copy is kept.
+  await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
+  if (!calls.includes('getWorkspaceData')) errs.push('first open (no device copy) did not ask the server');
+  // Next day's open (device copy from yesterday): built from the database.
+  await pg.evaluate(() => { const c = JSON.parse(localStorage.getItem('pwa.initial.v1')); c.data.today = '2000-01-01'; localStorage.setItem('pwa.initial.v1', JSON.stringify(c)); });
+  calls.length = 0;
+  await pg.reload(); await pg.waitForTimeout(3500);
+  if (calls.includes('getWorkspaceData')) errs.push('opening went to the server');
+  const st = await pg.evaluate(() => JSON.parse(localStorage.getItem('pwa.initial.v1')).data);
+  if (!st.days.some(d => /From the database/.test(d.tasks))) errs.push('opening not built from the database (calls ' + calls.join(',') + ')');
+  else {
+    const want = []; for (let d = addD(today, -7); d <= addD(today, 3); d = addD(d, 1)) want.push(d);
+    if (st.days.map(d => d.date).join() !== want.join()) errs.push('opening dates: ' + st.days.map(d => d.date).join());
+    const t = st.days.find(d => d.date === today);
+    if (!t || !/From the database/.test(t.tasks) || t.th !== md5(t.tasks) || t.jh !== md5(t.journal)) errs.push('today from the db / hashes: ' + JSON.stringify(t).slice(0, 160));
+    if (st.today !== today) errs.push('today: ' + st.today);
+    if (!st.urgent.some(u => u.date === old && /Old urgent/.test(u.tasks))) errs.push('Urgent misses an old day');
+    if (!st.notesSeeds.focus) errs.push('Notes seed (focus) missing');
+    if (st.reference.length !== 1 || st.reference[0].id !== 'r1' || st.reference[0].ch !== md5('<h2>Db card</h2>')) errs.push('reference: ' + JSON.stringify(st.reference).slice(0, 160));
+    const man = JSON.stringify(st.reference.map(r => ({ id: r.id, parentId: r.parentId, type: r.type, title: r.title, expanded: r.expanded, sort: r.sort })));
+    if (st.refManifestHash !== md5(man)) errs.push('manifest hash ≠ server hash');
+    if (!Array.isArray(st.cardCats) || st.cardCats[0].id !== 'cc1') errs.push('card categories not carried over');
+  }
+  if (!/From the database/.test(await pg.evaluate(t => (document.querySelector('#todayScroll .day-editor[data-date="' + t + '"]') || {}).innerText || '', today))) errs.push('database Today not on screen');
+  // This device's copy is caught up with one `up` query (full read only the first time).
+  const gets = await pg.evaluate(() => __fs.gets.slice());
+  if (!gets.includes('days:server:')) errs.push('first history read was not a full read: ' + gets.join(' '));
+  const run = (fn, ...a) => pg.evaluate(([fn, a]) => new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(e => bad(e.message))[fn](...a)), [fn, a]);
+  await pg.evaluate(() => { __fs.gets.length = 0; });
+  await pg.evaluate(() => { const c = JSON.parse(localStorage.getItem('pwa.initial.v1')); c.data.today = '2000-01-01'; localStorage.setItem('pwa.initial.v1', JSON.stringify(c)); });
+  await pg.reload(); await pg.waitForTimeout(3000);
+  const g2 = await pg.evaluate(() => __fs.gets.slice());
+  if (!g2.includes('days:server:up') || g2.includes('days:server:')) errs.push('second opening did not catch up with an `up` query: ' + g2.join(' '));
+  // Past days from the database: every date filled (from the first Sheet day), server hashes.
+  calls.length = 0;
+  const rg = await run('getDaysRange', addD(old, -2), addD(old, 2));
+  if (calls.includes('getDaysRange')) errs.push('getDaysRange went to the server');
+  if (!Array.isArray(rg) || rg.length !== 5 || rg[2].date !== old || !/Old urgent/.test(rg[2].tasks) || rg[2].th !== md5(rg[2].tasks) || rg[0].tasks !== '' || rg[0].th !== md5('')) errs.push('range: ' + JSON.stringify(rg).slice(0, 200));
+  const before = await run('getDaysRange', addD(first, -3), addD(first, 1));
+  if (before.length !== 2 || before[0].date !== first) errs.push('range before the first day: ' + JSON.stringify(before.map(d => d.date)));
+  // A day with no doc (empty) saves straight into the database.
+  const empty = addD(today, 20);
+  const sv = await run('saveDay', empty, '<div>new</div>', '', { th: md5(''), jh: md5(''), ct: true, cj: false });
+  await pg.waitForTimeout(200);
+  if (calls.includes('saveDay') || !sv || sv.th !== md5('<div>new</div>')) errs.push('empty day save: ' + JSON.stringify(sv));
+  if (!(await pg.evaluate(d => __fs.days[d] && __fs.days[d].tasks, empty) || '').includes('new')) errs.push('empty day not written to its doc');
+  // Not seeded → the server answers both.
+  await pg.evaluate(() => { localStorage.setItem('fake.unseeded', '1'); const c = JSON.parse(localStorage.getItem('pwa.initial.v1')); c.data.today = '2000-01-01'; localStorage.setItem('pwa.initial.v1', JSON.stringify(c)); });
+  calls.length = 0;
+  await pg.reload(); await pg.waitForTimeout(3500);
+  if (!calls.includes('getWorkspaceData')) errs.push('not seeded: opening did not go to the server');
+  const r2 = await run('getDaysRange', old, old);
+  if (!r2.length || r2[0].tasks !== 'srv') errs.push('not seeded: getDaysRange did not go to the server');
+  await ctx.close(); srv.close();
+  if (errs.length) { fails += errs.length; console.error('✗ pwa-hist:\n  ' + errs.join('\n  ')); }
+  else console.log('✓ pwa-hist: opening + past days from the database (dates, hashes, Urgent, seeds, cards), `up` catch-up, empty day saves, server before the seed');
+}
 // Reference on Firestore in the PWA (2026-11-23, NOTES H5 C), fake Firebase SDK: card saves (server hashes), new cards,
 // delete → Archive (del on the subtree), restore, order, expand all go to ganttRef docs, never the server; another
 // device's edit starts a sync; a refused write is backed up; before the seed (no gantt/refMeta) it all goes to the server.

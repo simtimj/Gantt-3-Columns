@@ -39,5 +39,9 @@ jobs:
         run: |
           printf '%s' "$SA_KEY" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          # The Firebase CLI checks the billing plan through the Cloud Billing API, which it doesn't switch on itself.
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" --quiet
+          gcloud services enable cloudbilling.googleapis.com --project gantt-2ee94 --quiet
+          sleep 30
           npx -y firebase-tools@13 deploy --only functions --project gantt-2ee94 --non-interactive --force
           rm -f "$RUNNER_TEMP/sa.json"

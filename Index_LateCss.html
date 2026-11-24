@@ -1,0 +1,1467 @@
+<!-- Late CSS (2026-11-24, Julius: "it initializes with a different style, then changes into the usable one").
+     These style blocks used to sit inside Index_Cards / Extras / Calendar / Layout, i.e. AFTER the page markup and
+     the big main script, so the browser painted #app with only Index_Css first and restyled when they arrived.
+     They now load at the very top of <body>, in their old order: still after every <head> style (and after styles
+     scripts add to <head>), so the cascade is unchanged, but before any markup is painted.
+     Add new feature CSS HERE (or Index_Css), never inside the script parts. Order = old page order. -->
+<!-- from Index_Cards -->
+<style>
+  /* ===== Task cards (Julius, 2026-10-27) =====
+     A card = one task (checkbox + text) with its subtasks underneath. Drawn with
+     render-only data-tc* attributes (stripped on save by cardCleanHtml). */
+  :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fl,0) * 1%),transparent);--tc-bd:rgba(0,0,0,.14);--tc-mix:24%;}
+  .check-line[data-tc]{
+    position:relative;box-sizing:border-box;
+    /* Card outline stays one rounded box (2026-11-15 11:43, Julius); subtasks indent inside it with padding. */
+    margin-left:calc(var(--tch,0) * 24px)!important;
+    padding:2px calc(8px * var(--side-k,1)) 2px calc(8px * var(--side-k,1) + var(--tcr,0) * 22px);
+    background:linear-gradient(var(--tc-tint,transparent),var(--tc-tint,transparent)),var(--tc-base);
+    border-left:1px solid var(--tc-bd);border-right:1px solid var(--tc-bd);
+  }
+  /* A tapped / typed-in subtask gets its own indented cell ring (starts at its checkbox), not the full card width. */
+  .check-line[data-tc][data-tcrel][data-tcfocus]:not([data-tlon]){box-shadow:none;}
+  .check-line[data-tc][data-tcrel][data-tcfocus]:not([data-tlon])::before{content:"";position:absolute;top:0;bottom:0;right:0;
+    left:calc(8px * var(--side-k,1) + var(--tcr,0) * 22px - 5px);border:1px solid var(--urg,#8a8f98);border-radius:5px;pointer-events:none;}
+  .check-line[data-tc^="f"]{border-top:1px solid var(--tc-bd);border-top-left-radius:8px;border-top-right-radius:8px;margin-top:5px;padding-top:4px;}
+  .check-line[data-tc$="l"]{border-bottom:1px solid var(--tc-bd);border-bottom-left-radius:8px;border-bottom-right-radius:8px;margin-bottom:5px;padding-bottom:4px;}
+  .check-line[data-tccat]{--tc-tint:color-mix(in srgb,var(--tc-cat) var(--tc-mix),transparent);}
+  .check-line[data-tcdrag]{opacity:.3;}
+  /* Side space (Julius, 2026-10-28): one multiplier for the left/right room in cells, section boxes and
+     cards — Options → Side space (fw.sideSpace, default 70%); narrow panes (<420px) take 60% of that. */
+  :root{--side-k:var(--side,.7);}
+  #workspace > .pane.pane-narrow{--side-k:calc(var(--side,.7) * .6);}
+  /* Quiet cards (Julius, 2026-10-28): no card outline at rest — the borders stay transparent so
+     nothing shifts. The line you're typing in gets a thin ring in its urgency color (gray if none),
+     like editing a task in Urgent. data-tcfocus is render-only (stripped on save). */
+  .check-line[data-tc]{border-color:transparent!important;}
+  .check-line[data-tcfocus]{box-shadow:0 0 0 1px var(--urg,#8a8f98);border-radius:5px;}
+  /* Drag grip on the focused card line (Julius, 2026-10-28) — overlay, never part of the cell. */
+  #tcGrip{position:fixed;z-index:2900;width:26px;height:14px;display:grid;place-items:center;border-radius:7px;
+    font-size:11px;line-height:1;letter-spacing:-1px;color:#555;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.18);
+    box-shadow:0 1px 3px rgba(0,0,0,.15);cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;}
+  #tcGrip[hidden]{display:none;}
+  @media (prefers-color-scheme: dark){#tcGrip{color:#ccc;background:rgba(30,30,30,.92);border-color:rgba(255,255,255,.2);}}
+  .check-line[data-tc][data-tcfocus]:not([data-tcrel]){border-radius:5px!important;}
+  /* Day sections (Julius, 2026-10-27): Morning / Afternoon / Evening separators in the Today cell. */
+  .editor > [data-sec]{margin:10px 0 4px;padding:0 0 2px;border-bottom:2px solid var(--note-line-adj,var(--border));font-size:.82em;letter-spacing:.06em;text-transform:uppercase;color:var(--note-line-adj,var(--muted));}
+  .editor > [data-sec]:first-child{margin-top:0;}
+  /* Day section boxes (Julius, 2026-10-27): each section is its own rounded box like the Suggested Day —
+     bright outline + soft fill along the sun (morning midday-sun yellow, afternoon bright orange — 2026-10-27 retune; afternoon orange, evening sunset purple).
+     Drawn render-only behind the editor by paintDaySecs (.sec-boxes is never saved). */
+  :root{--sec-m-bd:#e3bd43;--sec-m:transparent;--sec-a-bd:#df8b3a;--sec-a:transparent;--sec-e-bd:#9c74c9;--sec-e:transparent;}
+  @media (prefers-color-scheme: dark){:root{--sec-m-bd:#e3bd43;--sec-m:transparent;--sec-a-bd:#df8b3a;--sec-a:transparent;--sec-e-bd:#9c74c9;--sec-e:transparent;}}
+  .sec-host,.day-row:has(> .sec-host){position:relative;}
+  .sec-host > .editor.sec-painted{position:relative;z-index:1;padding-left:calc(15px * var(--side-k,1))!important;padding-right:calc(15px * var(--side-k,1))!important;padding-bottom:8px!important;}
+  .sec-boxes{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+  .editor > [data-sec]{margin-top:16px;}
+  .editor > [data-sec="morning"]{border-bottom-color:var(--sec-m-bd);color:var(--sec-m-bd);}
+  .editor > [data-sec="afternoon"]{border-bottom-color:var(--sec-a-bd);color:var(--sec-a-bd);}
+  .editor > [data-sec="evening"]{border-bottom-color:var(--sec-e-bd);color:var(--sec-e-bd);}
+  /* Time frames on the section lines (Julius, 2026-10-27; display only, not saved): his day runs ~8:30 am – 9:30 pm with a nap after 2. */
+  .editor > [data-sec] > b:first-child::after{font-weight:500;opacity:.8;letter-spacing:.02em;}
+  .editor > [data-sec="morning"] > b:first-child::after{content:" · 8 am – 2 pm";}
+  .editor > [data-sec="afternoon"] > b:first-child::after{content:" · 2 – 7 pm";}
+  .editor > [data-sec="evening"] > b:first-child::after{content:" · 7 – 10 pm";}
+  .editor > [data-sec]:first-child{margin-top:6px;}
+  /* Same short look for the older Morning / Afternoon / Evening title lines (Julius, 2026-11-01). Display only — the saved word stays. */
+  .editor > [data-sec="morning"] > b:first-child,.editor > [data-sec="afternoon"] > b:first-child,.editor > [data-sec="evening"] > b:first-child{white-space:nowrap;font-size:0!important;letter-spacing:0;}
+  .editor > [data-sec="morning"] > b:first-child::before,.editor > [data-sec="afternoon"] > b:first-child::before,.editor > [data-sec="evening"] > b:first-child::before{content:"";display:inline-block;width:calc(var(--paragraph-size,14px) * 1.05);height:calc(var(--paragraph-size,14px) * 1.05);vertical-align:-.2em;margin-right:.35em;-webkit-mask:var(--ts-ic) center/contain no-repeat;mask:var(--ts-ic) center/contain no-repeat;background:var(--ts-c);font-size:calc(var(--paragraph-size,14px) * .75);}
+  .editor > [data-sec="morning"] > b:first-child::after,.editor > [data-sec="afternoon"] > b:first-child::after,.editor > [data-sec="evening"] > b:first-child::after{font-size:calc(var(--paragraph-size,14px) * .75);font-weight:600;letter-spacing:.02em;opacity:1;text-transform:none;}
+  .editor > [data-sec="morning"] > b:first-child{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill-rule="evenodd" d="M17.60 11.86L17.46 10.77L17.12 9.73L16.58 8.78L15.86 7.94L15.00 7.27L14.02 6.78L12.96 6.48L11.86 6.40L10.77 6.54L9.73 6.88L8.78 7.42L7.94 8.14L7.27 9.00L6.78 9.98L6.48 11.04L6.40 12.14L6.54 13.23L6.88 14.27L7.42 15.22L8.14 16.06L9.00 16.73L9.98 17.22L11.04 17.52L12.14 17.60L13.23 17.46L14.27 17.12L15.22 16.58L16.06 15.86L16.73 15.00L17.22 14.02L17.52 12.96L17.60 11.86ZM1.62 11.24L1.37 11.47L1.23 11.78L1.21 12.13L1.37 12.53L1.62 12.76L3.88 14.17L2.57 16.69L2.53 16.94L2.56 17.20L2.78 17.57L3.06 17.77L3.31 17.84L6.06 17.94L6.16 20.69L6.31 21.09L6.64 21.37L6.97 21.47L7.40 21.40L9.83 20.12L11.29 22.45L11.62 22.72L11.96 22.80L12.38 22.72L12.71 22.45L14.17 20.12L16.69 21.43L17.12 21.46L17.36 21.37L17.57 21.22L17.73 21.02L17.84 20.69L17.94 17.94L20.69 17.84L21.09 17.69L21.37 17.36L21.47 17.03L21.40 16.60L20.12 14.17L22.45 12.71L22.72 12.38L22.80 12.04L22.72 11.62L22.45 11.29L20.12 9.83L21.43 7.31L21.46 6.88L21.37 6.64L21.22 6.43L21.02 6.27L20.69 6.16L17.94 6.06L17.84 3.31L17.69 2.91L17.36 2.63L16.94 2.53L16.60 2.60L14.17 3.88L12.71 1.55L12.46 1.32L12.04 1.20L11.62 1.28L11.29 1.55L9.83 3.88L7.31 2.57L6.88 2.54L6.64 2.63L6.43 2.78L6.23 3.06L6.16 3.31L6.06 6.06L3.31 6.16L2.91 6.31L2.63 6.64L2.53 7.06L2.60 7.40L3.88 9.83L1.62 11.24ZM18.89 12.34L18.83 13.01L18.69 13.68L18.50 14.32L18.24 14.95L17.92 15.55L17.54 16.11L17.11 16.63L16.63 17.11L16.11 17.54L15.55 17.92L14.95 18.24L14.32 18.50L13.68 18.69L13.01 18.83L12.34 18.89L11.66 18.89L10.99 18.83L10.32 18.69L9.68 18.50L9.05 18.24L8.45 17.92L7.89 17.54L7.37 17.11L6.89 16.63L6.46 16.11L6.08 15.55L5.76 14.95L5.50 14.32L5.31 13.68L5.17 13.01L5.11 12.34L5.11 11.66L5.17 10.99L5.31 10.32L5.50 9.68L5.76 9.05L6.08 8.45L6.46 7.89L6.89 7.37L7.37 6.89L7.89 6.46L8.45 6.08L9.05 5.76L9.68 5.50L10.32 5.31L10.99 5.17L11.66 5.11L12.34 5.11L13.01 5.17L13.68 5.31L14.32 5.50L14.95 5.76L15.55 6.08L16.11 6.46L16.63 6.89L17.11 7.37L17.54 7.89L17.92 8.45L18.24 9.05L18.50 9.68L18.69 10.32L18.83 10.99L18.89 11.66L18.89 12.34Z" fill="%23000"/%3E%3C/svg%3E');--ts-c:#f4b400;}
+  .editor > [data-sec="morning"] > b:first-child::after{content:"Morn 6–2";}
+  .editor > [data-sec="afternoon"] > b:first-child{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill-rule="evenodd" d="M1.49 16.54L1.32 16.74L1.22 17.00L5.10 17.00L5.15 16.36L5.27 15.69L5.45 15.04L5.69 14.40L6.00 13.80L6.36 13.23L6.78 12.69L7.24 12.20L7.75 11.76L8.31 11.37L8.90 11.04L9.52 10.76L10.16 10.55L10.82 10.40L11.49 10.32L12.17 10.30L12.84 10.35L13.51 10.47L14.64 10.83L15.25 11.11L15.83 11.46L16.38 11.87L16.88 12.32L17.64 13.23L18.00 13.80L18.31 14.40L18.55 15.04L18.73 15.69L18.85 16.36L18.90 17.00L22.78 17.00L22.68 16.74L22.45 16.49L20.12 15.03L21.40 12.60L21.47 12.17L21.37 11.84L21.09 11.51L20.69 11.36L17.94 11.26L17.84 8.51L17.73 8.18L17.57 7.98L17.20 7.76L16.94 7.73L16.69 7.77L14.17 9.08L12.71 6.75L12.38 6.48L12.04 6.40L11.62 6.48L11.29 6.75L9.83 9.08L7.31 7.77L7.06 7.73L6.80 7.76L6.43 7.98L6.23 8.26L6.16 8.51L6.06 11.26L3.31 11.36L2.91 11.51L2.63 11.84L2.53 12.17L2.60 12.60L3.88 15.03L1.49 16.54ZM17.57 16.65L17.36 15.57L16.94 14.56L16.41 13.75L15.66 12.96L14.76 12.33L13.89 11.93L12.96 11.68L11.86 11.60L10.77 11.74L9.73 12.08L8.89 12.54L8.04 13.24L7.42 13.98L6.88 14.93L6.54 15.97L6.40 17.00L17.60 17.00L17.57 16.65ZM1.90 19.61L1.68 19.71L1.52 19.95L1.50 21.10L1.54 21.29L1.65 21.45L1.95 21.60L22.00 21.60L22.32 21.49L22.44 21.34L22.50 21.15L22.48 19.95L22.32 19.71L22.05 19.60L1.90 19.61Z" fill="%23000"/%3E%3C/svg%3E');--ts-c:#fb8c00;}
+  .editor > [data-sec="afternoon"] > b:first-child::after{content:"Aft 2–8";}
+  .editor > [data-sec="evening"] > b:first-child{--ts-ic:url('data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath d="M15.5 2.5A9.5 9.5 0 1 0 21.5 17.5A8 8 0 0 1 15.5 2.5z" fill="%23000"/%3E%3C/svg%3E');--ts-c:#bf97e8;}
+  .editor > [data-sec="evening"] > b:first-child::after{content:"Eve 8–6";}
+  .sec-boxes > i{position:absolute;box-sizing:border-box;border:1px solid var(--bd);border-radius:7px;background:var(--fill);}
+  /* Subject color in the checkbox (Julius, 2026-10-27; default): card stays neutral, the subject
+     fills the checkbox, urgency is its border (gray when none), done = the check mark.
+     The mark is white with a dark outline so it reads on any fill. Option "Subject color: whole card" brings back the tinted cards. */
+  body.tc-boxfill .check-line[data-tccat]{--tc-tint:transparent;}
+  /* Whole card, subtle (2026-11-03, Julius): same tint at a third of the strength. */
+  body.tc-subtle{--tc-mix:8%;}
+  /* Subtle + border (2026-11-04, Julius): one tint everywhere, a hint of the subject color over the black cell. Dailies match. */
+  body.tc-subtle.tc-subtleline{--tc-mix:13%;}
+  body.tc-subtleline #journalScroll .day-row{background:transparent!important;}
+  body.tc-subtleline #journalPane .journal-editor .check-line[data-tc]{--tc-base:var(--panel);}
+  /* Subtle + border line (2026-11-03, Julius): same tint, card outline in a brighter subject color. */
+  body.tc-subtleline .check-line[data-tccat]{--tc-bd:color-mix(in srgb,var(--tc-cat) 65%,#fff);border-left-width:var(--sl-w,1.5px);border-right-width:var(--sl-w,1.5px);}
+  body.tc-subtleline .check-line[data-tccat][data-tc^="f"]{border-top-width:var(--sl-w,1.5px);}
+  body.tc-subtleline .check-line[data-tccat][data-tc],body.tc-subtleline .plan-pad .check-line[data-tccat][data-tc]{border-color:var(--tc-bd)!important;} /* beats Quiet cards */
+  /* Urgent rows become cells in this mode (2026-11-04, Julius). */
+  body.tc-subtleline #urgentPanel .urg-row[data-tccat]{box-sizing:border-box;margin:3px 0;padding:3px 5px;background:color-mix(in srgb,var(--tc-cat) var(--tc-mix),var(--panel));border:var(--sl-w,1.5px) solid color-mix(in srgb,var(--tc-cat) 65%,#fff);border-radius:7px;}
+  body.tc-subtleline .check-line[data-tccat][data-tc$="l"]{border-bottom-width:var(--sl-w,1.5px);}
+  /* Thinner outline in Cal Events, Urgent and History / Log (2026-11-05, Julius: "a little"; was 1.5px — to go back, set --sl-w to 1.5px). */
+  body.tc-subtleline #centerCalendarList,body.tc-subtleline #urgentPanel,body.tc-subtleline #todayScroll .day-editor{--sl-w:1.2px;}
+  /* Urgent + History / Log styled exactly like Cal Events (2026-11-04, Julius): same section background,
+     card fill over --panel, 1.5px subject border, radius 7; a card with no subject gets the plain Cal Events look. */
+  body.tc-subtleline #urgentPanel,body.tc-subtleline #todayScroll .day-row{background:transparent!important;}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc]{--tc-base:var(--panel);}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc][data-tc^="f"]{border-top-left-radius:7px;border-top-right-radius:7px;}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc][data-tc$="l"]{border-bottom-left-radius:7px;border-bottom-right-radius:7px;}
+  body.tc-subtleline #todayScroll .day-editor .check-line[data-tc]:not([data-tccat]){--tc-bd:#fff;border-color:#fff!important;}
+  body.tc-subtleline #urgentPanel .urg-row:not([data-tccat]){box-sizing:border-box;margin:3px 0;padding:3px 5px;background:var(--panel);border:1px solid #fff;border-radius:7px;}
+  body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat]{border-left-width:1px;border-right-width:1px;}
+  body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat][data-tc^="f"]{border-top-width:1px;}
+  body.tc-subtleline #journalPane[data-ctab="notes"] .journal-editor .check-line[data-tccat][data-tc$="l"]{border-bottom-width:1px;}
+  /* Subject-only border mode: no subject fill; urgency remains independently marked. */
+  body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}
+  /* Keep subject colors readable without the bright outlines/fold controls. */
+  [data-tlon]::before{border-color:color-mix(in srgb,var(--tc-cat,var(--border)) 38%,transparent);color:color-mix(in srgb,var(--tc-cat,var(--muted)) 60%,var(--muted));}
+  [data-tlon="c"][data-tlsum]:not([data-due-label])::after{border-left-color:color-mix(in srgb,var(--tc-cat,var(--border)) 38%,transparent);}
+  .editor > [data-cgrp]{margin-top:12px!important;}
+  .urg-batch{margin-top:12px;}
+  body.tc-borderonly .check-line[data-tccat] > input[type=checkbox]{background:transparent;}
+
+  body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]{
+    -webkit-appearance:none!important;appearance:none!important;box-sizing:border-box;
+    width:1.05em;height:1.05em;border:2px solid var(--urg,#8a8f98)!important;border-radius:3px;
+    background:var(--tc-cat)!important;display:inline-grid;place-content:center;cursor:pointer;
+  }
+  /* Urgency stands out (Julius, 2026-10-27): thicker colored border + a dark gap before the subject fill, plus a soft glow. */
+  /* Slimmer (Julius, 2026-10-28): same size as any box, 2px urgency border drawn over the subject fill
+     (no gap, no extra outer ring), just a faint glow. */
+  body.tc-boxfill .check-line[data-tccat]:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{
+    border-width:2px!important;padding:0;background-clip:border-box!important;
+    box-shadow:0 0 3px color-mix(in srgb,var(--urg) 45%,transparent);
+  }
+  .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{border-width:2px;box-shadow:0 0 3px color-mix(in srgb,var(--urg) 45%,transparent);}
+  body.tc-boxfill .check-line[data-tccat]:not([data-urg]) > input[type=checkbox]{border-color:color-mix(in srgb,var(--tc-cat) 55%,#555)!important;}
+  /* Urgency mark (Julius, 2026-10-28: the urgency border around the subject fill looked gaudy).
+     body.urg-mark-bar (default) = thin bar left of the box, box height; urg-mark-under = line under the box;
+     urg-mark-text = colored underline under the task text; urg-mark-box = the old colored border.
+     The box itself keeps a plain border (subject-tinted gray, or gray). Option "Urgency mark", localStorage fw.urgMark. */
+  body:not(.urg-mark-box) .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{position:relative;overflow:visible;box-shadow:none!important;border-color:#8a8f98!important;}
+  body.tc-boxfill:not(.urg-mark-box) .check-line[data-tccat]:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{border-color:color-mix(in srgb,var(--tc-cat) 55%,#555)!important;}
+  body:is(.urg-mark-bar,.urg-mark-under) .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]::before{content:"";position:absolute;background:var(--urg);border-radius:2px;pointer-events:none;}
+  body.urg-mark-bar .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]::before{left:-7px;top:-2px;bottom:-2px;width:3px;}
+  body.urg-mark-under .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]::before{left:-2px;right:-2px;bottom:-6px;height:2.5px;}
+  body.urg-mark-text .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]):not(.task-struck) > .check-text{text-decoration:underline;text-decoration-color:var(--urg);text-decoration-thickness:2px;text-underline-offset:3px;}
+  body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]:checked::after{
+    content:"";width:.28em;height:.55em;border:solid #fff;border-width:0 2.5px 2.5px 0;
+    transform:rotate(45deg) translate(-8%,-12%);filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);
+  }
+  /* Drag the checkbox to move the card; the page doesn't scroll from a checkbox. */
+  .editor .check-line > input[type=checkbox],.ref-cell .check-line > input[type=checkbox]{touch-action:none;}
+  /* Hold-to-drag ready (2026-10-28): the held card gets a ring; move to drag. */
+  .check-line.tc-holdready,.urg-row.tc-holdready,.di-line.tc-holdready{box-shadow:0 0 0 2px var(--urg,#8a8f98)!important;border-radius:6px;}
+  body.tc-dragging,body.tc-dragging *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important;}
+  .tc-ghost{position:fixed;z-index:4000;pointer-events:none;opacity:.92;box-shadow:0 10px 28px rgba(0,0,0,.28);border-radius:8px;transform:rotate(1deg);}
+  .tc-ghost .check-line{margin-top:0!important;margin-bottom:0!important;}
+  .tc-drop{position:fixed;z-index:3999;height:3px;border-radius:2px;background:#3b82f6;pointer-events:none;box-shadow:0 0 0 2px rgba(59,130,246,.25);}
+  .tc-drop::before{content:"";position:absolute;left:-4px;top:-3px;width:9px;height:9px;border-radius:50%;background:#3b82f6;}
+  /* Task → calendar drop spot (2026-11-23): time line + label, or the all-day cell outlined. */
+  .tc-drop.tc-drop-calad{background:rgba(59,130,246,.16);border:2px dashed #3b82f6;box-shadow:none;border-radius:6px;box-sizing:border-box;}
+  .tc-drop.tc-drop-calad::before{content:none;}
+  .tc-drop.tc-drop-cal[data-lbl]::after{content:attr(data-lbl);position:absolute;left:6px;bottom:calc(100% + 3px);padding:1px 7px;border-radius:7px;background:#3b82f6;color:#fff;font:600 11px/1.5 system-ui,sans-serif;white-space:nowrap;}
+  .tc-drop.tc-drop-calad[data-lbl]::after{bottom:auto;top:2px;}
+  /* Subject row in the hold menu */
+  .urg-picker{max-width:252px;}
+  /* Never cut off on a phone: scrolls inside instead (2026-10-31, Julius). */
+  .urg-picker{max-height:calc(100vh - 12px);max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain;}
+  .urg-cat-row{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;padding-top:6px;border-top:1px solid var(--border);}
+  .urg-cat-row .uc-head{flex:1 0 100%;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+  .urg-cat{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border:1px solid var(--border);border-radius:999px;background:transparent;color:inherit;font-size:11px;line-height:1.3;cursor:pointer;}
+  .urg-cat i{width:9px;height:9px;border-radius:50%;background:var(--c,#bbb);display:inline-block;}
+  .urg-cat.on{border-color:var(--c,#888);background:color-mix(in srgb,var(--c,#888) 22%,transparent);font-weight:700;}
+  @media (prefers-color-scheme: dark){
+    :root{--tc-base:color-mix(in srgb,#fff calc(var(--tc-fd,0) * 1%),transparent);--tc-bd:rgba(255,255,255,.14);--tc-mix:22%;}
+    .urg-cat-row{border-top-color:#333;}
+  }
+  /* Uniform section lines (2026-11-04, Julius): every section and header line is 2px in --divider. */
+  #toolbar,.pane-header,body.day-lines .pane-header,.editor > [data-nsec="must"],body.day-lines .editor > [data-nsec="must"]{border-bottom:2px solid var(--divider)!important;}
+  /* Uniform lines, round 2 (2026-11-05, Julius: "match the thickest, all look the same"): the lines the first pass
+     missed. Every divider is 2px solid --divider (day color only under Options → Lines in the day color). */
+  .pane{border-right:0!important;} /* the 1px light pane edge; column lines come from .column-resizer (2px) */
+  #workspace .pane.peek-pane{border-left:2px solid var(--divider)!important;}
+  #workspace .pane.peek-pane.peek-left{border-left:0!important;border-right:2px solid var(--divider)!important;}
+  .editor > [data-tsec]:not([data-tsec="gap"]){border-bottom-width:2px!important;border-bottom-color:var(--divider)!important;}
+  .editor > [data-nsec]{border-bottom:2px solid var(--divider)!important;}
+  .editor > [data-nsec="focus"]{border-top-width:2px!important;border-top-color:var(--divider)!important;}
+  body.day-lines .editor > [data-nsec]{border-bottom:2px solid var(--note-line-adj,var(--divider))!important;}
+  body.day-lines .editor > [data-nsec="must"]{border-bottom-color:var(--divider)!important;}
+  #centerCalendarList .ce-group{border-top:2px solid var(--divider)!important;}
+  #centerDownScroll > .ce-head{margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px;width:auto!important;box-sizing:border-box;} /* line runs wall to wall like the other headers */
+  #centerCalendarList > .ce-group:first-child{border-top:0!important;margin-top:4px;padding-top:0;} /* right under the Cal Events line: no double line */
+  /* Hold-to-expand labels never select text (2026-11-04, Julius). */
+  .ce-head strong,.urg-head,.today-jump,.od-pad-head,.editor > [data-nsec="must"]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+</style>
+<!-- from Index_Extras -->
+<style>
+  /* Block borders (2026-11-04, Julius): see the script below. */
+  .plan-pad{position:relative;}
+  .plan-pad > [data-blk]{position:relative;left:7px;margin-right:14px;}
+  .plan-pad > [data-blk^="f"]{margin-top:9px;}
+  .plan-pad > [data-blk$="l"],.plan-pad > .check-line[data-blk$="l"]{margin-bottom:10px;}
+  .plan-pad > [data-blkn]{margin-top:21px;}
+  .plan-pad > [data-blkph] > .check-text:empty::before{content:'Tasks for your next block · ▶ starts it';color:var(--muted,#999);font-style:italic;opacity:.8;pointer-events:none;} /* room for the line above Next Block */
+</style>
+<!-- from Index_Extras -->
+<style>
+  /* Title cells (2026-11-21, Julius): a little room above a title box and below its last line. Render-only attrs. */
+  .editor > [data-tbf]{margin-top:7px;}
+  .editor > [data-tbl]{margin-bottom:calc(6px + var(--tbs,0) * 4px);}
+</style>
+<!-- from Index_Extras -->
+<style>
+  /* Block timer MVP (2026-11-05, Julius). Bar + chips are render-only: they live next to the Blocks pad, never in it. */
+  .tmr-bar,.tmr-layer{display:none;}
+  /* 2026-11-12: Blocks pad hidden while the Timer slot is empty, so its bar + chips stay hidden too. */
+  .tmr-bar{flex:0 0 auto;align-items:center;gap:2px 4px;flex-wrap:wrap;font-size:12px;line-height:1.25;padding:2px 2px 3px;color:var(--muted);}
+  .tmr-bar .tmr-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  .tmr-bar .tmr-name{color:var(--text,inherit);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-bar .tmr-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-bar .tmr-clock{font-variant-numeric:tabular-nums;font-weight:600;color:var(--text,inherit);cursor:pointer;}
+  .tmr-bar.run .tmr-clock{color:#1e9e4a;}
+  .tmr-bar button{font:inherit;font-size:11px;line-height:1;min-width:24px;height:22px;padding:0 5px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .tmr-bar i{font-style:normal;}
+  .tmr-bar .tmr-btns{display:flex;gap:4px;flex:0 0 auto;}
+  .tmr-bar i{display:none;} /* icons only (2026-11-05, Julius: compact); labels are in the tooltips */
+  .tmr-bar.narrow .tmr-main{flex-basis:100%;}
+  .tmr-bar.narrow .tmr-btns{margin-left:auto;}
+  .tmr-bar .tmr-sub{font-size:11px;}
+  .tmr-bar .tmr-sync{font-size:10px;opacity:.75;}
+  .tmr-layer{position:absolute;overflow:hidden;pointer-events:none;z-index:2;}
+  .tmr-chip{position:absolute;right:4px;display:flex;align-items:center;gap:2px;pointer-events:auto;font-size:11px;line-height:1;
+    font-variant-numeric:tabular-nums;color:var(--muted);}
+  .tmr-chip .tmr-t{cursor:pointer;padding:2px 1px;}
+  .tmr-chip button{font:inherit;font-size:10px;width:20px;height:18px;padding:0;border-radius:5px;border:1px solid currentColor;
+    background:transparent;color:inherit;cursor:pointer;opacity:.55;}
+  .tmr-chip.blk button{opacity:.8;}
+  .tmr-chip.on{color:#1e9e4a;font-weight:600;}
+  .tmr-chip.on button{opacity:1;}
+  .tmr-chip.pz{color:#d08a00;}
+  .plan-pad > [data-blk]{padding-right:58px;}
+  .tmr-menu{position:fixed;z-index:9500;min-width:170px;max-width:260px;display:flex;flex-direction:column;padding:4px;border-radius:9px;
+    background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc);box-shadow:0 8px 28px rgba(0,0,0,.28);}
+  .tmr-menu-t{font-size:11px;font-weight:700;opacity:.65;padding:4px 8px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tmr-menu button{font:inherit;font-size:14px;text-align:left;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;}
+  .tmr-menu button:hover{background:color-mix(in srgb,currentColor 10%,transparent);}
+</style>
+<!-- from Index_Extras -->
+<style>
+  .ref-toolbar.hs-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);}
+  .ref-toolbar.hs-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);}
+  .ref-toolbar.hs-l.hs-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
+/* Minimal time sections (2026-11-07, Julius: lines bled past the box's left edge, too much space). Applies to every
+   time section (Morn / After / Night) in History: content sits inside the box, lines and group headers packed tight. */
+#todayScroll .day-editor.sec-painted.sec-painted.sec-painted{padding-left:7px!important;padding-right:7px!important;margin-left:0!important;margin-right:0!important;}
+/* Less room outside the boxes (2026-11-07): the day row's side padding drops to 2px (boxes sit 1px inside the editor, see paintDaySecs). */
+#todayScroll .day-row.od-on.od-on,#todayScroll .day-row.today.today:has(> .sec-host){padding-left:2px!important;padding-right:2px!important;}
+#todayScroll .day-editor > [data-tsec]{margin-top:4px!important;margin-bottom:2px!important;}
+/* A little space between Morn / After / Night (2026-11-07): gap + the thin line above After and Night. */
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){margin-top:12px!important;padding-top:4px!important;}
+/* One line: icon, label, then the count as a small green cell like the group buttons (51/53 ✓ −). */
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){flex-wrap:nowrap!important;align-items:center;gap:2px;padding-left:2px!important;}
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab):has(> .ts-sum){flex-wrap:wrap!important;} /* the folded list still goes under the line */
+#todayScroll .day-editor > [data-tsec] > .ts-lab{flex:0 1 auto!important;}
+#todayScroll .day-editor > [data-tsec]::before{margin-right:1px!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{content:attr(data-tsinfo)!important;flex:0 0 auto!important;margin-left:2px;padding:0 4px;font-size:10px;font-weight:700;line-height:1.35;letter-spacing:0;text-transform:none;white-space:nowrap!important;color:#1e9e50;border:1px solid #22a55a;border-radius:5px;}
+#todayScroll .day-editor > [data-tsec][data-tsf="c"]:has(> .ts-lab)::after{content:"+\00A0" attr(data-tsinfo)!important;} /* folded: + in front; open: just the count (tap the header to fold) */
+/* Header lines (2026-11-07, Julius): the line under each time section's title is 1px in the section's own color
+   (Morn yellow, Aft orange, Eve purple), the same for all three; no extra line above Aft / Eve inside their box. */
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){border-top:0!important;padding-top:1px!important;}
+#todayScroll .day-editor > [data-tsec="morning"][data-tsf="o"]{border-bottom:1px solid var(--sec-m-bd)!important;}
+#todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="o"]{border-bottom:1px solid var(--sec-a-bd)!important;}
+#todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]{border-bottom:1px solid var(--sec-e-bd)!important;}
+/* Tighter titles (2026-11-07, Julius): less empty space in the Morn / Aft / Eve title rows. */
+#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){padding-top:0!important;padding-bottom:1px!important;align-items:center!important;}
+#todayScroll .day-editor > [data-tsec] > .ts-lab{line-height:1.1!important;}
+#todayScroll .day-editor > [data-tsec]::before{margin-top:0!important;}
+#todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{line-height:1.2!important;}
+#todayScroll .day-editor > [data-tsec][data-tsec] + :is([data-cgrp],.check-line,[data-tl]){margin-top:2px!important;}
+#todayScroll .day-editor > [data-tsec][data-tsec]{margin-bottom:0!important;}
+/* Space between Morn / Aft / Eve boxes (2026-11-07, Julius: ~50px → a small, comfortable gap). The blank line(s) right
+   before a section title are squeezed to 3px (still in the cell, never removed), and the title's top margin is 8px. */
+#todayScroll .day-editor > div:not([data-tsec]):not(.check-line):not([data-cgrp]):not([data-tl]):is(:empty,:has(> br:only-child)):is(:has(+ [data-tsec]),:has(+ div:is(:empty,:has(> br:only-child)) + [data-tsec])){height:3px!important;min-height:0!important;margin:0!important;padding:0!important;font-size:0!important;line-height:0!important;overflow:hidden!important;}
+#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"])[data-tsec]{margin-top:8px!important;}
+/* Group names (Gantt, Userscripts…): underlined, not bold. */
+#todayScroll .day-editor > [data-cgrp] :is(b,strong){font-weight:400!important;}
+#todayScroll .day-editor > [data-tsec] ~ .check-line{margin-top:1px!important;margin-bottom:1px!important;padding-top:1px!important;padding-bottom:1px!important;}
+#todayScroll .day-editor > [data-tsec] ~ [data-cgrp]{margin-top:4px!important;margin-bottom:0!important;}
+</style>
+<!-- from Index_Calendar -->
+<style>
+  #calPanelBackdrop{position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .2s;}
+  #calPanel{--cp-bg:#fff;--cp-text:#202124;--cp-muted:#5f6368;--cp-line:#dadce0;--cp-soft:#f1f3f4;
+    position:fixed;top:0;right:0;bottom:0;z-index:4001;width:min(880px,72vw);max-width:100vw;display:flex;flex-direction:column;
+    background:var(--cp-bg);color:var(--cp-text);border-left:1px solid var(--cp-line);box-shadow:-8px 0 28px rgba(0,0,0,.18);
+    transform:translateX(105%);visibility:hidden;transition:transform .24s ease,visibility 0s linear .24s;
+    padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);font-size:14px;}
+  html[data-theme=dark] #calPanel{--cp-bg:#161616;--cp-text:#e8eaed;--cp-muted:#9aa0a6;--cp-line:#3c4043;--cp-soft:#232323;}
+  body.cal-open #calPanel{transform:none;visibility:visible;transition:transform .24s ease,visibility 0s;}
+  body.cal-open #calPanelBackdrop{opacity:1;pointer-events:auto;}
+  /* Phone peek (2026-11-10, Julius): leave a ~28px strip of the page showing on the left (tap it to close). */
+  @media (max-width:720px){ #calPanel{width:calc(100vw - 28px);max-width:calc(100vw - 28px);border-left:0;box-shadow:-4px 0 16px rgba(0,0,0,.22);} }
+  /* Resizable width (2026-11-08, Julius): drag the left edge; saved per device (fw.calWidth), phone too (default full width minus a 28px left peek). */
+  #calPanel .cp-resize{position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:ew-resize;z-index:20;touch-action:none;}
+  #calPanel .cp-resize::after{content:"";position:absolute;left:3px;top:50%;width:4px;height:18px;margin-top:-9px;background:radial-gradient(circle,var(--cp-muted,#888) 1.5px,transparent 1.9px) center/4px 6px repeat-y;}
+  #calPanel .cp-resize:hover::after,#calPanel.cp-resizing .cp-resize::after{background:radial-gradient(circle,var(--cp-blue,#1a73e8) 1.6px,transparent 2px) center/4px 6px repeat-y;}
+  #calPanel.cp-resizing{transition:none;user-select:none;}
+  @media (max-width:720px){ #calPanel .cp-resize{left:0;width:16px;} #calPanel .cp-resize::after{left:4px;} }
+  #calPanel .cp-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--cp-line);flex:0 0 auto;}
+  #calPanel .cp-head strong{font-size:16px;flex:1;}
+  #calPanel .cp-head button{font:inherit;color:inherit;background:var(--cp-soft);border:1px solid var(--cp-line);border-radius:8px;min-height:36px;min-width:40px;padding:0 10px;cursor:pointer;}
+  #calPanel .cp-close{font-size:15px;font-weight:600;}
+  #calPanel .cp-state{flex:0 0 auto;padding:6px 12px;font-size:13px;color:var(--cp-muted);border-bottom:1px solid var(--cp-line);display:flex;align-items:center;gap:8px;}
+  #calPanel .cp-state[hidden]{display:none;}
+  #calPanel .cp-state.err{color:#c5221f;background:rgba(217,48,37,.08);}
+  #calPanel .cp-state button{font:inherit;padding:4px 12px;border-radius:8px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;}
+  #calPanel .cp-body{flex:1 1 auto;min-height:0;position:relative;padding:6px 8px 8px;display:flex;flex-direction:column;}
+  #calPanel #calMount{flex:1 1 auto;min-height:0;}
+  /* Calendar backlog (2026-11-11, Julius): phone = bottom half under the calendar; wider = list on the left. */
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bl{flex:0 0 45%;min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--cp-line);margin-top:6px;background:var(--cp-bg);}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bl[hidden]{display:none;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blh{display:flex;align-items:baseline;gap:6px;padding:6px 8px 4px;font-size:13px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blc{color:var(--cp-muted);}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blhint{margin-left:auto;font-size:11px;color:var(--cp-muted);}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blb{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 8px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blg{font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--cp-muted);margin:8px 2px 3px;text-transform:uppercase;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli{display:flex;align-items:center;gap:6px;padding:6px 8px;margin:2px 0;border-radius:6px;font-size:13px;line-height:1.25;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:grab;touch-action:pan-y;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blt{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-bld{flex:0 0 auto;font-size:11px;opacity:.8;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{flex:0 0 auto;border:0;background:transparent;color:inherit;opacity:.7;font-size:14px;padding:0 2px;cursor:pointer;}
+  /* No wasted columns (2026-11-14, Julius): the full name wraps across the whole row; the date and ✕ sit small in the
+     top-right corner and the text flows under them, instead of each keeping its own column down the row. */
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli{display:block;padding:5px 6px 5px 8px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli::after{content:"";display:block;clear:both;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{float:right;line-height:1.1;margin:0 -2px 0 2px;padding:0 2px;font-size:12px;}
+  /* 2026-11-21 (Julius: "pressing X in the backlog doesn't get rid of them"): the ✕ was ~10 px wide, so finger taps
+     landed on the row. Invisible bigger touch area (about 32 × 32) around it; looks the same. */
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx{position:relative;font-size:14px;opacity:.85;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blx::after{content:'';position:absolute;inset:-9px -10px -9px -8px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-bld{float:right;font-size:10px;line-height:1.6;margin-left:4px;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-bli .cp-blt{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blh{flex-wrap:wrap;row-gap:0;} /* the drag hint drops under the title when narrow */
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blhint{white-space:nowrap;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blmsg{padding:10px 4px;font-size:13px;color:var(--cp-muted);}
+  /* Full-screen calendar (2026-11-14, Julius): one more slide left from the half-screen calendar. Same panel as the
+     📅 pop-out, stretched to the whole screen, with the backlog beside it and its task names shown in full. */
+  #calPanel.cp-full{width:100vw!important;max-width:100vw!important;left:0;border-left:0;box-shadow:none;}
+  body.cal-full #calPanelBackdrop{display:none;}
+  #calPanel.cp-full .cp-resize{display:none;}
+  #calPanel.cp-full{--blw:var(--fl-w,50%);} /* half / half by default, drag the line between (2026-11-14, Julius) */
+  #calPanel.cp-full .cp-body.bl-open{padding-left:var(--blw)!important;}
+  #calPanel.cp-full .cp-body.bl-open .cp-bl{position:absolute;left:6px;top:6px;bottom:8px;width:calc(var(--blw) - 12px);margin:0;border:1px solid var(--cp-line);border-radius:10px;display:flex;flex-direction:column;}
+  #calPanel.cp-full .cp-blside,#calPanel.cp-full .cp-blclose{display:none;}
+  /* Full screen left column (2026-11-14, Julius): all-day tasks on top (Week = grouped by day), backlog below, with a
+     draggable line between them; the calendar grid keeps no all-day strip. --fad-r = the all-day share (fw.calFullAdR). */
+  #calPanel .cp-fad,#calPanel .cp-fadgrip,#calPanel .cp-flgrip{display:none;}
+  #calPanel.cp-full.cp-fullwk .cp-body,#calPanel.cp-full.cp-fullwk .cp-body.bl-open{padding-left:0!important;}
+  #calPanel.cp-full.cp-fullwk :is(.cp-fad,.cp-fadgrip,.cp-flgrip,.cp-bl){display:none!important;}
+  #calPanel.cp-full .cp-flgrip{display:block;position:absolute;top:6px;bottom:8px;left:calc(var(--blw) - 8px);width:14px;cursor:ew-resize;touch-action:none;z-index:4;}
+  #calPanel.cp-full .cp-flgrip::after{content:"";position:absolute;top:0;bottom:0;left:6px;width:2px;background:var(--cp-axis-line);border-radius:1px;}
+  #calPanel.cp-full .cp-flgrip::before{content:"";position:absolute;top:50%;margin-top:-18px;height:36px;left:4px;width:6px;border-radius:3px;background:var(--cp-axis-line);}
+  #calPanel.cp-flresizing .cp-flgrip::after,#calPanel.cp-flresizing .cp-flgrip::before{background:var(--cp-blue,#1a73e8);}
+  #calPanel.cp-full .cp-body{padding-left:var(--blw)!important;}
+  /* Full screen ↻ ✕ top right (2026-11-14, Julius): pinned to the corner instead of wrapping onto a 3rd toolbar row. */
+  #calPanel .cp-fbtns{display:none;}
+  #calPanel.cp-full .cp-fbtns{display:flex;gap:2px;position:absolute;top:3px;right:4px;z-index:6;}
+  /* Full screen, one toolbar line (2026-11-15, Julius): no ‹ › (swipe changes days), ◉ − + float subtly at the bottom
+     right of the timeline, Day|Week pill → one Wk / Day toggle, clear line between the toolbar and the timeline. */
+  #calPanel .cp-fnav{display:none;}
+  #calPanel.cp-full .cp-fnav{display:flex;gap:4px;position:absolute;right:16px;bottom:16px;z-index:5;opacity:.55;transition:opacity .15s;}
+  #calPanel.cp-full .cp-fnav:hover,#calPanel.cp-full .cp-fnav:active{opacity:.9;}
+  #calPanel .cp-fnav button{font:inherit;width:32px;height:32px;padding:0;border:1px solid var(--cp-line);border-radius:50%;background:color-mix(in srgb,var(--cp-bg) 55%,transparent);color:var(--cp-muted);font-size:16px;line-height:1;cursor:pointer;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);touch-action:manipulation;}
+  #calPanel .cp-fnav button:focus{outline:0;}
+  #calPanel.cp-full .fc .fc-prev-button,#calPanel.cp-full .fc .fc-next-button,#calPanel.cp-full .fc .fc-today-button,
+  #calPanel.cp-full .fc .fc-cpZoomOut-button,#calPanel.cp-full .fc .fc-cpZoomIn-button,
+  #calPanel.cp-full .fc .fc-button-group:has(.fc-timeGridDay-button){display:none!important;}
+  #calPanel.cp-full .fc .fc-cpView-button{display:inline-flex!important;align-items:center;border:1px solid var(--cp-line);border-radius:999px!important;padding:0 8px!important;}
+  #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar,#calPanel.cp-full .fc .fc-toolbar-chunk{flex-wrap:nowrap!important;}
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:0!important;}
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:64px!important;}
+  @media (max-width:699px){ #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:56px!important;} }
+  #calPanel.cp-full .fc .fc-toolbar-chunk:first-child{min-width:0;flex:1 1 auto;}
+  #calPanel.cp-full .fc .fc-toolbar-title{overflow:hidden;text-overflow:ellipsis;}
+  #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar{margin-bottom:0!important;padding-bottom:4px;border-bottom:2px solid var(--cp-sep);}
+  @media (max-width:699px){ #calPanel.cp-full .cp-fbtns{right:2px;gap:0;} #calPanel.cp-full .cp-fbtns button{width:27px;height:26px;border-radius:13px;font-size:15px;} #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:56px;} #calPanel.cp-full .cp-plan .cp-ph{padding-right:6px;flex-wrap:wrap;row-gap:0;}
+    /* Plan header in the narrow column (2026-11-14, Julius: option A): title on its own line beside ↻ ✕, count + Add under it. */
+    #calPanel.cp-full .cp-plan .cp-pfold{flex:1 1 100%;margin-right:56px;min-width:0;padding:0 2px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #calPanel.cp-full .cp-plan .cp-pword{display:none;} #calPanel.cp-full .cp-plan .cp-pcnt{flex:0 0 auto;margin:0;padding-left:2px;} #calPanel.cp-full .cp-plan .cp-padd{flex:0 0 auto;margin-left:auto;min-height:26px;padding:0 8px;} } /* stays inside toolbar row 1 */
+  #calPanel.cp-full .cp-plan .cp-pfold,#calPanel.cp-full .cp-plan .cp-pcnt,#calPanel.cp-full .cp-plan .cp-padd{white-space:nowrap;}
+  #calPanel.cp-full.cp-blmin .cp-blh{cursor:pointer;}
+  #calPanel .cp-fbtns button{font:inherit;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:var(--cp-bg);color:var(--cp-muted);font-size:17px;cursor:pointer;}
+  #calPanel .cp-fbtns button:hover,#calPanel .cp-fbtns button:active{background:var(--cp-hover);}
+  #calPanel.cp-full .fc-cpRefresh-button,#calPanel.cp-full .fc-cpClose-button{display:none!important;}
+  @media (min-width:700px){ #calPanel.cp-full .cp-plan .cp-ph{padding-right:70px;} }
+  /* Plan folded: the toolbar's first row makes room for ↻ ✕ (phone: only the first chunk, so row 2 keeps its width). */
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:70px;}
+  @media (min-width:700px){ #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:70px;}
+    #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:0;} }
+  /* Full screen (2026-11-14 evening, Julius): no BL button — the backlog always sits in the left column (▾ minimizes it);
+     Week fits on the second row, so only two rows of buttons above the calendar. */
+  #calPanel.cp-full .fc-cpBacklog-button,#calPanel.cp-full .cp-blbtn{display:none!important;}
+  /* Minimize the backlog (2026-11-14, Julius): ▾ on its header folds it to a bar at the bottom, all-day gets the room. */
+  #calPanel .cp-blmin-btn{display:none;}
+  #calPanel.cp-full .cp-blmin-btn{display:inline-block;font:inherit;background:transparent;border:0;color:var(--cp-muted);padding:0 4px;cursor:pointer;font-size:12px;}
+  #calPanel.cp-full.cp-blmin .cp-blmin-btn{transform:rotate(-90deg);}
+  #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{top:auto!important;bottom:8px;}
+  #calPanel.cp-full.cp-blmin .cp-blb,#calPanel.cp-full.cp-blmin .cp-blbar,#calPanel.cp-full.cp-blmin .cp-blhint,#calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-fadgrip{display:none;}
+  #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-fad{height:calc(100% - 54px);}
+  #calPanel.cp-full{--fad-r:.45;--fad-h:calc((100% - 26px) * var(--fad-r));}
+  #calPanel.cp-full .cp-fad{display:flex;flex-direction:column;position:absolute;left:6px;top:6px;width:calc(var(--blw) - 12px);height:var(--fad-h);
+    border:1px solid var(--cp-line);border-radius:10px;background:var(--cp-bg);overflow:hidden;z-index:2;}
+  #calPanel.cp-full .cp-body:not(.bl-open) .cp-fad{height:auto;bottom:8px;}
+  #calPanel .cp-fadh{display:flex;align-items:center;gap:4px;}
+  #calPanel .cp-fadadd{margin-left:auto;appearance:none;border:1px solid var(--cp-line);background:transparent;color:inherit;border-radius:999px;width:24px;height:22px;line-height:1;font-size:16px;padding:0;cursor:pointer;}
+  #calPanel .cp-fadnew{display:flex;align-items:center;gap:4px;padding:3px 4px;margin:2px 2px 3px;border:1px solid #1a73e8;border-radius:6px;background:var(--cp-soft);}
+  #calPanel .cp-fadnew[hidden]{display:none;}
+  #calPanel .cp-adqa{position:relative;z-index:5;margin:2px 1px 3px;padding:2px 3px;} /* hold-to-add row in a half-calendar all-day cell */
+  #calPanel .cp-adqa .cp-fadin{font-size:16px;}
+  #calPanel .cp-fadnew .cp-chk{flex:none;}
+  #calPanel .cp-fadin{flex:1;min-width:0;border:0;outline:0;background:transparent;color:inherit;font:inherit;font-size:16px;padding:2px 0;}
+  #calPanel .cp-fadgo,#calPanel .cp-fadx{appearance:none;border:0;background:transparent;color:inherit;font-size:15px;padding:2px 5px;cursor:pointer;}
+  #calPanel .cp-fadgo{color:#1a73e8;}
+  #calPanel.cp-full .cp-fa-ins{box-shadow:0 -3px 0 #1a73e8;}
+  #calPanel.cp-full .cp-fa-ins.cp-fa-ins-b{box-shadow:0 3px 0 #1a73e8;}
+  /* Ordered group (2026-11-22): number badge on each Ordered task, hint on an empty Ordered header. */
+  #calPanel .cp-fag{cursor:default;}
+  #calPanel .cp-fagh{font-weight:400;text-transform:none;letter-spacing:0;opacity:.8;margin-left:2px;}
+  #calPanel .cp-ordn{display:inline-block;min-width:15px;padding:0 3px;margin-right:4px;border-radius:8px;background:rgba(0,0,0,.28);color:#fff;
+    font-size:10.5px;font-weight:700;line-height:15px;text-align:center;vertical-align:1px;}
+  #calPanel .cp-ordn:empty{display:none;}
+  #calPanel .cp-scht{font-weight:400;opacity:.85;white-space:nowrap;}
+  #calPanel .fc-event.cp-schc{opacity:.92;border-style:dashed!important;}
+  #calPanel.cp-full .cp-fai.cp-fasch{border:1px dashed currentColor;}
+  #calPanel.cp-full .cp-fasg{cursor:default;}
+  #calPanel .cp-falg{cursor:default;} #calPanel .cp-falife{cursor:default;padding-left:8px;}
+  #calPanel.cp-full .cp-fad.cp-fad-over{outline:3px dashed #1a73e8;outline-offset:-3px;background:rgba(26,115,232,.12);}
+  #calPanel.cp-full .cp-body.bl-open .cp-bl{top:calc(var(--fad-h) + 20px)!important;}
+  #calPanel.cp-full .cp-body.bl-open .cp-fadgrip{display:block;position:absolute;left:6px;width:calc(var(--blw) - 12px);top:calc(var(--fad-h) + 6px);height:14px;cursor:ns-resize;touch-action:none;z-index:3;}
+  #calPanel.cp-full .cp-fadgrip::after{content:"";position:absolute;left:0;right:0;top:6px;height:2px;background:var(--cp-axis-line);border-radius:1px;}
+  #calPanel.cp-full .cp-fadgrip::before{content:"";position:absolute;left:50%;width:36px;margin-left:-18px;top:4px;height:6px;border-radius:3px;background:var(--cp-axis-line);}
+  /* Quadrant separators (2026-11-14 night, Julius: "make them white so it's very visible"): solid white 3px lines
+     between the four parts — all-day | backlog (left), Plan | grid (right), and the column split. Light theme = near-black. */
+  #calPanel.cp-full{--cp-sep:rgba(32,33,36,.9);}
+  html[data-theme=dark] #calPanel.cp-full{--cp-sep:#fff;--cp-bg:#1c1c1c;--cp-soft:#282828;} /* bg a touch brighter in full screen (was #161616 / #232323) */
+  #calPanel.cp-full .cp-flgrip::after{left:5.5px;width:3px;background:var(--cp-sep);}
+  #calPanel.cp-full .cp-flgrip::before,#calPanel.cp-full .cp-fadgrip::before{background:var(--cp-sep);}
+  #calPanel.cp-full .cp-fadgrip::after{top:5.5px;height:3px;background:var(--cp-sep);}
+  /* Full screen columns always half / half (2026-11-15, Julius): the left | right line can't be dragged, no handle pill;
+     the line stays, and the box borders are brighter in dark mode so the split reads clearly. */
+  #calPanel.cp-full{--blw:50%!important;}
+  #calPanel.cp-full .cp-flgrip{pointer-events:none;cursor:default;}
+  #calPanel.cp-full .cp-flgrip::before{display:none;}
+  html[data-theme=dark] #calPanel.cp-full{--cp-line:#80868b;}
+  /* 2026-11-21 11:42 (Julius): no line between the all-day box and the backlog, just the two boxes; the grip still drags
+     (invisible, shows blue only while dragging). Was a 3 px top border on the minimized backlog + a visible grip bar. */
+  #calPanel.cp-full .cp-fadgrip:not(:active)::after,#calPanel.cp-full .cp-fadgrip:not(:active)::before{display:none;}
+  #calPanel.cp-fadresizing .cp-fadgrip::after{display:block!important;}
+  #calPanel.cp-full .cp-plan:not(.folded){border-bottom:3px solid var(--cp-sep);border-bottom-left-radius:0;border-bottom-right-radius:0;}
+  /* Sun colors (2026-11-14 night, Julius): full screen + half-screen docked calendar (asked again 2026-11-15 12:21, Julius). --sun-a = tint strength ("barely there" first; .22 = clearly visible). */
+  #calPanel{--sun-a:.13;}
+  /* 2026-11-21 (Julius: "too much going on"): the timeline itself has no tint any more; the day's sky (night navy →
+     dawn pink → sunrise orange → yellow → midday blue → sunset orange / red → dusk purple) runs down the hour-label
+     strip instead, one smooth gradient (each label cell paints its own slice). Sunrise / sunset = a faint dotted line. */
+  /* 2026-11-21 later (Julius: "a bit much, more subtle"): the sky is a thin 3 px stripe on the strip's right edge, not a fill. */
+  /* 2026-11-21 7:43 am (Julius: "too bright, more subtle, cuts into the 4am text"): 3 px stripe at 55% strength, and
+     the hour text gets 4 px more room on the right so it never touches the stripe. */
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-image:var(--sky,none);background-size:5px 100%;background-position:right top;background-repeat:no-repeat;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:9px!important;padding-left:0!important;} /* 5 px sky bar + 4 px room (2026-11-21 12:55, Julius: tighter, more timeline) */
+  /* Gap labels (2026-11-21, Julius; docs/NOTES.md → Gap labels): muted duration centered in the empty space between two timed events. */
+  #calPanel .cp-gap{position:absolute;left:0;right:0;display:flex;align-items:flex-start;justify-content:flex-end;padding:3px 5px 0 0;box-sizing:border-box;pointer-events:none;z-index:0;overflow:hidden;} /* top-right of the gap (2026-11-21 12:37, Julius) */
+  #calPanel .cp-gap span{font-size:10px;line-height:1;color:var(--cp-muted);opacity:.7;white-space:nowrap;}
+  #calPanel .cp-gap.cp-gap-x span{visibility:hidden;}
+  #calPanel .cp-sunmk{display:none;}
+  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk{display:block;position:absolute;left:0;right:0;height:0;border-top:1px dotted rgb(242 113 28 / .35);pointer-events:none;z-index:0;}
+  #calPanel:is(.cp-full,.cp-docked) .cp-sunmk span{position:absolute;right:3px;top:1px;font-size:8.5px;line-height:1;color:var(--cp-muted);opacity:.6;}
+  /* Tight cells (2026-11-14 night, Julius: "squeeze more room out, get rid of empty space and margin, text can go
+     under the checkbox"): full screen only; font size unchanged for now (he wants to see this first). */
+  #calPanel.cp-full .cp-fadh,#calPanel.cp-full .cp-blh{padding:2px 4px 1px;}
+  #calPanel.cp-full .cp-fadh{padding:1px 3px 0;}
+  #calPanel.cp-full .cp-fadb,#calPanel.cp-full .cp-blb{padding:0 2px 2px;}
+  #calPanel.cp-full .cp-fadb{padding:0 1px 1px;}
+  #calPanel.cp-full .cp-fadd,#calPanel.cp-full .cp-fads{margin:3px 2px 1px;}
+  #calPanel.cp-full .cp-fadd{margin:2px 1px 1px;}
+  #calPanel.cp-full .cp-fads{padding:1px 0;}
+  #calPanel.cp-full .cp-fai{display:block;padding:1px 2px;margin:0 0 2.5px;} /* 2.5px gap between cards (2026-11-15, Julius: a bit more space) */
+  #calPanel.cp-full .cp-fai::after,#calPanel.cp-full .cp-pi::after{content:"";display:block;clear:both;}
+  #calPanel.cp-full .cp-fai .cp-chk{float:left;margin:1px 4px -8px 0;}
+  #calPanel.cp-full .cp-fai .cp-ev-t{display:inline;}
+  #calPanel.cp-full .cp-bli{padding:2px 3px;margin:0 0 2.5px;}
+  #calPanel.cp-full .cp-plan{margin:0 2px 4px 2px;}
+  #calPanel.cp-full .cp-pbody{padding:0 3px 2px;}
+  #calPanel.cp-full .cp-pg{margin-top:1px;}
+  #calPanel.cp-full .cp-pgh{padding:1px 0;}
+  #calPanel.cp-full .cp-pi{display:block;padding:2px 0;}
+  #calPanel.cp-full .cp-pi input[type=checkbox]{float:left;margin:1px 4px -10px 0;}
+  #calPanel.cp-full .cp-pi .cp-pbtn{float:right;margin-left:4px;}
+  #calPanel.cp-full .cp-pi .cp-pbtn button{min-width:24px;min-height:24px;}
+  #calPanel.cp-full .cp-pt2{display:block;}
+  #calPanel.cp-full .cp-pt2 > .cp-pm,#calPanel.cp-full .cp-pt2 > .cp-tg{display:block;}
+  #calPanel.cp-full .fc .fc-timegrid-event .fc-event-main{padding:1px 3px;}
+  #calPanel.cp-full .cp-evc{gap:3px;}
+  #calPanel.cp-flresizing .cp-flgrip::after,#calPanel.cp-flresizing .cp-flgrip::before,
+  #calPanel.cp-fadresizing .cp-fadgrip::after,#calPanel.cp-fadresizing .cp-fadgrip::before{background:var(--cp-blue,#1a73e8);}
+  #calPanel .cp-fadh{display:flex;align-items:baseline;gap:6px;padding:6px 8px 4px;font-size:13px;font-weight:600;}
+  #calPanel .cp-fadh .cp-fadn{font-weight:400;color:var(--cp-muted);}
+  #calPanel .cp-fadb{flex:1 1 auto;min-height:0;overflow:auto;padding:0 6px 8px;}
+  #calPanel .cp-fadd{font-size:11px;font-weight:600;letter-spacing:.4px;color:var(--cp-muted);margin:8px 2px 3px;text-transform:uppercase;}
+  #calPanel .cp-fads{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--cp-muted);margin:8px 2px 3px;}
+  #calPanel .cp-fads{cursor:pointer;padding:3px 0;user-select:none;}
+  #calPanel .cp-fads::after{content:"";flex:1;height:1px;background:var(--cp-line);}
+  /* Half-screen all-day strip: the Done group starts with a line across, so to-do and done read as two lists. */
+  #calPanel .fc-daygrid-event-harness[data-cpgl="Done"]::before{border-top:1px solid var(--cp-axis-line,var(--cp-line));margin-top:5px;}
+  #calPanel .cp-fadd.cp-today{color:var(--cp-blue,#1a73e8);}
+  #calPanel .cp-fai{display:flex;align-items:flex-start;gap:6px;padding:5px 6px 5px 6px;margin:2px 0;border-radius:6px;font-size:13px;line-height:1.25;cursor:pointer;}
+  #calPanel .cp-fai .cp-chk{flex:0 0 auto;margin-top:1px;}
+  #calPanel .cp-fai .cp-ev-t{flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;font-weight:500;}
+  #calPanel .cp-fai.cp-done .cp-ev-t{text-decoration:line-through;opacity:.8;}
+  #calPanel .cp-fadmsg{padding:6px 4px;font-size:12px;color:var(--cp-muted);}
+  /* Phone: narrower backlog and a compact toolbar (wrapping onto 2 rows) so the calendar keeps its room. */
+  @media (max-width:720px){
+    #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;flex-wrap:wrap;}
+    #calPanel.cp-full .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:wrap;}
+    #calPanel.cp-full .fc .fc-toolbar-title{font-size:13px;margin:0 2px;white-space:nowrap;}
+    #calPanel.cp-full .fc .fc-button{padding:0 6px!important;min-height:24px;height:24px;font-size:12px;margin:0!important;}
+    #calPanel.cp-full .fc .fc-button-group{gap:2px;}
+  }
+  @media (min-width:721px){
+    #calPanel .cp-body.bl-open{padding-left:248px;}
+    #calPanel .cp-body.bl-open .cp-bl{position:absolute;left:8px;top:6px;bottom:8px;width:232px;margin:0;border:1px solid var(--cp-line);border-radius:10px;}
+  }
+  #calPanel .cp-detail{position:absolute;left:10px;right:10px;bottom:10px;z-index:10;background:var(--cp-bg);color:var(--cp-text);border:1px solid var(--cp-line);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:12px 14px;}
+  #calPanel .cp-detail[hidden]{display:none;}
+  #calPanel .cp-detail .cp-dt{font-weight:600;font-size:15px;display:flex;gap:8px;align-items:flex-start;}
+  #calPanel .cp-detail .cp-dot{flex:0 0 12px;height:12px;border-radius:50%;margin-top:4px;}
+  #calPanel .cp-detail .cp-dm{color:var(--cp-muted);font-size:13px;margin-top:4px;}
+  #calPanel .cp-detail .cp-da{display:flex;gap:8px;margin-top:10px;}
+  #calPanel .cp-detail .cp-da a,#calPanel .cp-detail .cp-da button{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--cp-line);background:var(--cp-soft);color:inherit;text-decoration:none;cursor:pointer;}
+  /* FullCalendar look: follows the app's light / dark theme. */
+  #calPanel .fc{--fc-page-bg-color:var(--cp-bg);--fc-neutral-bg-color:var(--cp-soft);--fc-border-color:var(--cp-line);
+    --fc-today-bg-color:rgba(26,115,232,.07);--fc-now-indicator-color:#ea4335;--fc-button-bg-color:var(--cp-soft);--fc-button-border-color:var(--cp-line);
+    --fc-button-text-color:var(--cp-text);--fc-button-hover-bg-color:var(--cp-line);--fc-button-hover-border-color:var(--cp-line);
+    --fc-button-active-bg-color:#1a73e8;--fc-button-active-border-color:#1a73e8;font-size:13px;height:100%;}
+  #calPanel .fc .fc-button-primary:not(:disabled).fc-button-active{color:#fff;}
+  #calPanel .fc .fc-toolbar{gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+  #calPanel .fc .fc-toolbar-title{font-size:18px;font-weight:400;}
+  #calPanel .fc .fc-button{padding:.35em .7em;font-size:13px;min-height:34px;}
+  #calPanel .fc .fc-event{cursor:pointer;}
+  #calPanel .fc .cp-done .fc-event-title{text-decoration:line-through;opacity:.8;}
+  #calPanel .fc .fc-timegrid-axis-cushion,#calPanel .fc .fc-timegrid-slot-label-cushion{color:var(--cp-muted);}
+  #calPanel .fc .fc-col-header-cell-cushion{color:var(--cp-text);}
+  .btn.cal-open-btn{white-space:nowrap;}
+  /* Phase 2: event form + delete confirm (same bottom sheet as the detail card). */
+  #calPanel .cp-state.ok{color:#188038;background:rgba(24,128,56,.08);}
+  #calPanel .cp-detail{max-height:calc(100% - 20px);overflow:auto;}
+  #calPanel .cp-form{display:flex;flex-direction:column;gap:8px;}
+  #calPanel .cp-form .cp-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  #calPanel .cp-form .cp-row > span{min-width:42px;color:var(--cp-muted);font-size:13px;}
+  #calPanel .cp-form input[type=text],#calPanel .cp-form input[type=date],#calPanel .cp-form input[type=time]{font:inherit;font-size:16px;color:var(--cp-text);background:var(--cp-bg);border:1px solid var(--cp-line);border-radius:8px;padding:6px 8px;min-height:38px;box-sizing:border-box;}
+  #calPanel .cp-form input[type=text]{width:100%;}
+  #calPanel .cp-form input[type=date]{flex:1 1 140px;min-width:0;}
+  #calPanel .cp-form input[type=time]{flex:0 1 120px;min-width:0;}
+  #calPanel .cp-form.allday input[type=time]{display:none;}
+  #calPanel .cp-form label.cp-chk{display:flex;align-items:center;gap:6px;font-size:14px;}
+  #calPanel .cp-ferr{color:#c5221f;font-size:13px;}
+  #calPanel .cp-ferr:empty{display:none;}
+  #calPanel .cp-detail .cp-da .cp-primary{background:#1a73e8;border-color:#1a73e8;color:#fff;}
+  #calPanel .cp-detail .cp-da .cp-danger{color:#c5221f;border-color:rgba(197,34,31,.5);}
+  #calPanel .cp-detail .cp-da .cp-danger.cp-primary{background:#c5221f;border-color:#c5221f;color:#fff;}
+  #calPanel .cp-detail .cp-da button:disabled{opacity:.6;cursor:default;}
+  #calPanel .cp-da .cp-sp{flex:1;}
+  #calPanel .cp-note{font-size:12px;color:var(--cp-muted);margin-top:6px;}
+  /* Phase 3a: daily plan above the timeline. */
+  #calPanel .cp-plan{flex:0 0 auto;max-height:42%;overflow:auto;border:1px solid var(--cp-line);border-radius:10px;margin-bottom:6px;background:var(--cp-bg);}
+  #calPanel .cp-plan.busy{opacity:.75;}
+  #calPanel .cp-ph{display:flex;align-items:center;gap:6px;padding:4px 6px;position:sticky;top:0;background:var(--cp-bg);z-index:1;border-bottom:1px solid var(--cp-line);}
+  #calPanel .cp-plan.folded .cp-ph{border-bottom:0;}
+  #calPanel .cp-plan.folded .cp-parr{display:inline-block;transform:rotate(-90deg);}
+  #calPanel .cp-ph button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer;min-height:32px;padding:0 6px;}
+  #calPanel .cp-pfold{font-weight:600;flex:1;text-align:left;}
+  #calPanel .cp-pcnt{font-size:12px;color:var(--cp-muted);}
+  #calPanel .cp-ph .cp-padd{border:1px solid var(--cp-line);border-radius:8px;background:var(--cp-soft);}
+  #calPanel .cp-pbody{padding:2px 6px 6px;}
+  #calPanel .cp-pg{margin-top:4px;}
+  #calPanel .cp-pgh{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--cp-muted);text-transform:uppercase;letter-spacing:.03em;padding:2px 0;}
+  #calPanel .cp-pgh button{font:inherit;color:inherit;background:transparent;border:0;padding:0;cursor:pointer;text-transform:uppercase;letter-spacing:.03em;}
+  #calPanel .cp-pg[data-plan-group=big] .cp-pgt{color:var(--cp-text);font-weight:700;}
+  #calPanel .cp-pe{font-size:12px;color:var(--cp-muted);padding:2px 0 4px;font-style:italic;}
+  #calPanel .cp-pi{display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-top:1px solid var(--cp-soft);}
+  #calPanel .cp-pi input[type=checkbox]{width:18px;height:18px;margin:2px 0 0;flex:0 0 auto;}
+  #calPanel .cp-pi.done .cp-ptt{text-decoration:line-through;opacity:.6;}
+  #calPanel .cp-pt2{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  #calPanel .cp-ptt{overflow-wrap:anywhere;}
+  /* Phase 3b: a plan row you can hold and drag onto the timeline (the whole row, since phones snap a touch to the
+     nearest button; taps on its buttons still work). No text selection / callout on the long press. */
+  #calPanel .cp-pi[data-plan-drag]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+  #calPanel .cp-pi[data-plan-drag] .cp-ptt{cursor:grab;}
+  .cp-pi.fc-event-dragging{background:var(--cp-bg,#fff);border:1px solid #888;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:.92;padding:4px 8px;max-width:260px;}
+  #calPanel .cp-pm{font-size:11px;color:var(--cp-muted);}
+  #calPanel .cp-tg{align-self:flex-start;font:inherit;font-size:12px;color:var(--cp-muted);background:transparent;border:0;padding:0;cursor:pointer;text-align:left;}
+  #calPanel .cp-pbtn{display:flex;gap:2px;flex:0 0 auto;}
+  #calPanel .cp-pbtn button{font:inherit;font-size:12px;color:inherit;background:var(--cp-soft);border:1px solid var(--cp-line);border-radius:6px;min-width:28px;min-height:28px;padding:0;cursor:pointer;}
+  #calPanel .cp-pbtn button:disabled{opacity:.35;cursor:default;}
+  #calPanel .cp-pmsg{font-size:12px;color:var(--cp-muted);padding:4px 0;}
+  #calPanel .cp-pmsg.err{color:#c5221f;}
+  #calPanel .cp-pmsg button{font:inherit;font-size:12px;border:1px solid currentColor;border-radius:6px;background:transparent;color:inherit;padding:2px 8px;cursor:pointer;}
+  #calPanel .cp-seg{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0;}
+  #calPanel .cp-detail .cp-seg button{font:inherit;font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--cp-line);background:var(--cp-soft);color:inherit;cursor:pointer;}
+  #calPanel .cp-detail .cp-seg button.on{background:#1a73e8;border-color:#1a73e8;color:#fff;}
+  #calPanel .cp-psearch{font:inherit;font-size:16px;width:100%;box-sizing:border-box;color:var(--cp-text);background:var(--cp-bg);border:1px solid var(--cp-line);border-radius:8px;padding:6px 8px;min-height:38px;margin:4px 0;}
+  #calPanel .cp-plist{max-height:min(46vh,360px);overflow:auto;display:flex;flex-direction:column;}
+  #calPanel .cp-pls{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--cp-muted);margin:8px 0 2px;}
+  #calPanel .cp-detail .cp-pc{display:flex;flex-direction:column;align-items:flex-start;text-align:left;font:inherit;font-size:14px;color:inherit;background:transparent;border:0;border-top:1px solid var(--cp-soft);padding:7px 2px;cursor:pointer;}
+  #calPanel .cp-detail .cp-pc small{color:var(--cp-muted);font-size:11px;}
+  #calPanel .cp-row2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  #calPanel .cp-row2 > span{font-size:13px;color:var(--cp-muted);}
+  #calPanel .cp-row2 input[type=date]{font:inherit;font-size:16px;color:var(--cp-text);background:var(--cp-bg);border:1px solid var(--cp-line);border-radius:8px;padding:5px 8px;min-height:36px;}
+  #calPanel .cp-detail .cp-row2 button{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid #1a73e8;background:#1a73e8;color:#fff;cursor:pointer;}
+  #calPanel .cp-detail .cp-plan-ev{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:8px;font-size:12px;color:var(--cp-muted);}
+  #calPanel .cp-detail .cp-plan-ev button{font:inherit;font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--cp-line);background:var(--cp-soft);color:var(--cp-text);cursor:pointer;}
+  /* ===== Google Calendar look (2026-11-08, Julius: "as close as Google Calendar, style and feel"). Overrides only;
+     behaviour unchanged. Light + dark tokens follow Google's current palette. ===== */
+  /* Font (2026-11-10, Julius): Google Sans like Google Calendar; Roboto / system font until it loads or if blocked. */
+  #calPanel,#calPanel button,#calPanel input,#calPanel select,#calPanel .fc{font-family:'Google Sans Flex','Google Sans',Roboto,system-ui,Arial,sans-serif;}
+  #calPanel{--cp-bg:#fff;--cp-text:#1f1f1f;--cp-muted:#70757a;--cp-line:#dde3ea;--cp-soft:#f0f4f9;--cp-hover:rgba(68,71,70,.08);
+    --cp-blue:#0b57d0;--cp-blue-soft:#d3e3fd;--cp-blue-text:#041e49;--cp-shadow:0 1px 3px rgba(60,64,67,.3),0 4px 8px 3px rgba(60,64,67,.15);
+    font-family:'Google Sans',Roboto,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;}
+  html[data-theme=dark] #calPanel{--cp-bg:#1f1f1f;--cp-text:#e3e3e3;--cp-muted:#9aa0a6;--cp-line:#444746;--cp-soft:#282a2c;--cp-hover:rgba(227,227,227,.08);
+    --cp-blue:#a8c7fa;--cp-blue-soft:#004a77;--cp-blue-text:#062e6f;--cp-shadow:0 1px 3px rgba(0,0,0,.5),0 4px 8px 3px rgba(0,0,0,.3);}
+  #calPanel button{-webkit-tap-highlight-color:transparent;}
+  #calPanel .cp-head button:focus{outline:0;}
+  #calPanel .cp-head button:focus-visible{outline:0;background:var(--cp-hover);}
+  /* Header: title + flat round icon buttons; "+ New" is a Create-style pill. */
+  #calPanel .cp-head{border-bottom:0;padding:8px 8px 4px 16px;gap:6px;}
+  #calPanel .cp-head strong{font-size:20px;font-weight:400;letter-spacing:0;}
+  #calPanel .cp-head button{background:transparent;border:0;border-radius:999px;min-width:40px;min-height:40px;font-size:15px;color:var(--cp-muted);transition:background .15s;}
+  #calPanel .cp-head button:hover,#calPanel .cp-head button:active{background:var(--cp-hover);}
+  #calPanel .cp-head .cp-close{font-size:20px;font-weight:400;width:40px;padding:0;}
+  #calPanel .cp-head .cp-refresh{font-size:18px;width:40px;padding:0;}
+  #calPanel .cp-head .cp-new{background:var(--cp-bg);color:var(--cp-text);box-shadow:var(--cp-shadow);padding:0 18px 0 12px;font-weight:500;margin-right:4px;}
+  #calPanel .cp-head .cp-new:hover{background:var(--cp-soft);}
+  #calPanel .cp-plus{font-size:22px;font-weight:300;line-height:0;vertical-align:-2px;margin-right:4px;color:var(--cp-blue);}
+  /* Status: a soft rounded strip instead of a full-width banner. */
+  #calPanel .cp-state{border:0;margin:0 12px 4px;border-radius:8px;padding:6px 12px;background:var(--cp-soft);}
+  #calPanel .cp-state.err{background:rgba(217,48,37,.1);}
+  #calPanel .cp-state button{border-radius:999px;}
+  #calPanel .cp-body{padding:0 8px 8px 4px;}
+  /* Toolbar: [Today] ‹ › Month … [Day|Week]. */
+  #calPanel .fc{font-size:12px;--fc-border-color:var(--cp-line);--fc-today-bg-color:transparent;--fc-now-indicator-color:#ea4335;--fc-page-bg-color:var(--cp-bg);--fc-neutral-bg-color:var(--cp-bg);}
+  #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:2px 4px 8px 8px;gap:4px;flex-wrap:nowrap;}
+  #calPanel .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;min-width:0;}
+  #calPanel .fc .fc-toolbar-chunk:first-child{flex:1 1 auto;}
+  #calPanel .fc .fc-toolbar-title{font-size:20px;font-weight:400;margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #calPanel .fc .fc-button{background:transparent;border:0;color:var(--cp-text);box-shadow:none!important;font-size:14px;font-weight:500;text-transform:none;min-height:36px;transition:background .15s;}
+  #calPanel .fc .fc-button:hover{background:var(--cp-hover);color:var(--cp-text);}
+  #calPanel .fc .fc-button:focus-visible{outline:2px solid var(--cp-blue);outline-offset:1px;}
+  #calPanel .fc .fc-today-button{border:1px solid var(--cp-line);border-radius:999px;padding:0 16px;margin-right:6px;opacity:1;}
+  #calPanel .fc .fc-today-button:disabled{opacity:1;color:var(--cp-text);}
+  #calPanel .fc .fc-prev-button,#calPanel .fc .fc-next-button{width:36px;height:36px;padding:0;border-radius:50%!important;color:var(--cp-muted);}
+  #calPanel .fc .fc-button-group{gap:0;}
+  #calPanel .fc .fc-toolbar-chunk:last-child .fc-button-group{border:1px solid var(--cp-line);border-radius:999px;overflow:hidden;}
+  #calPanel .fc .fc-timeGridDay-button,#calPanel .fc .fc-timeGridWeek-button{border-radius:0!important;padding:0 14px;font-size:13px;}
+  #calPanel .fc .fc-button-primary:not(:disabled).fc-button-active{background:var(--cp-blue-soft);color:var(--cp-blue-text);}
+  html[data-theme=dark] #calPanel .fc .fc-button-primary:not(:disabled).fc-button-active{color:#d3e3fd;}
+  /* Grid: no box, faint hour lines only, small grey "1 PM" labels sitting on the line. */
+  #calPanel .fc .fc-scrollgrid{border:0;}
+  #calPanel .fc .fc-scrollgrid td:last-of-type,#calPanel .fc .fc-scrollgrid th:last-of-type{border-right:0;}
+  #calPanel .fc-theme-standard td,#calPanel .fc-theme-standard th{border-color:var(--cp-line);}
+  #calPanel .fc .fc-col-header-cell{border-left:0;border-right:0;border-top:0;}
+  #calPanel .fc .fc-timegrid-slot{height:24px;border-bottom:0;}
+  #calPanel .fc .fc-timegrid-slot-minor{border-top:0;}
+  /* Zoom guides: half / quarter-hour lines lighter and dashed, their labels smaller. */
+  #calPanel.cp-zfine .fc .fc-timegrid-slot-lane.cp-half{border-top:1px dashed var(--cp-line);}
+  #calPanel.cp-zfine .fc .fc-timegrid-slot-minor.cp-half{border-top:1px dashed var(--cp-line);}
+  #calPanel .fc .fc-timegrid-slot-label.cp-half .fc-timegrid-slot-label-cushion{font-size:9px;opacity:.75;}
+  #calPanel .fc .fc-timegrid-slot-label{border:0;vertical-align:top;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion{font-size:10px;color:var(--cp-muted);position:relative;top:-7px;padding:0 8px 0 4px;background:var(--cp-bg);}
+  #calPanel .fc .fc-timegrid-axis{border:0;}
+  #calPanel .fc .fc-timegrid-axis-cushion{font-size:10px;color:var(--cp-muted);}
+  #calPanel .fc .fc-timegrid-col{border-left:1px solid var(--cp-line);}
+  /* Clearer line between the hour numbers and the day (2026-11-14, Julius: "they look way too close"): a 2px line
+     a bit darker than the grid, with a few px of air after the numbers. */
+  /* Dividing lines stand out (2026-11-14, Julius: "make all those lines white"): white in dark mode, near-black in
+     light mode — the hour-numbers line and the all-day / timeline line. */
+  #calPanel{--cp-axis-line:rgba(32,33,36,.7);}
+  html[data-theme=dark] #calPanel{--cp-axis-line:#fff;}
+  #calPanel .fc .fc-timegrid-slot-label,#calPanel .fc .fc-timegrid-axis{border-right:2px solid var(--cp-axis-line)!important;}
+  #calPanel .fc .fc-timegrid-divider{display:table-cell;padding:0!important;height:2px;line-height:0;font-size:0;border:0!important;background:var(--cp-axis-line)!important;}
+  /* All-day cap (2026-11-10, Julius): a long all-day list stops at half the calendar height (saved ratio, fw.calAllDayMax)
+     and scrolls; drag the small bar under it to change the cap, double-click / double-tap it = back to half. */
+  #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-scroller{max-height:var(--cp-ad-max,none);overflow-x:hidden !important;overflow-y:auto !important;}
+  /* 2026-11-21 7:45 am (Julius: "make the dividing line draggable so I can resize at will"): once dragged, the line sets
+     the all-day area's real height (bigger or smaller, even with only one task); double-tap goes back to auto. */
+  #calPanel.cp-adset .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-scroller{height:var(--cp-ad-max)!important;}
+  #calPanel.cp-adset .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-daygrid-body,
+  #calPanel.cp-adset .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) .fc-scrollgrid-sync-table{min-height:100%;}
+  #calPanel .cp-adgrip{position:absolute;left:50%;width:64px;margin-left:-32px;height:18px;z-index:6;cursor:ns-resize;touch-action:none;display:none;}
+  #calPanel .cp-adgrip.on{display:block;}
+  #calPanel .cp-adgrip::after{content:"";position:absolute;left:14px;right:14px;top:6px;height:6px;border-radius:3px;background:var(--cp-axis-line);opacity:1;box-shadow:0 0 0 1px var(--cp-bg);}
+  #calPanel .cp-adgrip:hover::after,#calPanel.cp-adresizing .cp-adgrip::after{background:var(--cp-blue,#1a73e8);opacity:1;}
+  /* 2026-11-21 11:09 (Julius: "don't show the drag handle, just keep the functionality"): the pill is hidden; the line itself is the grab spot. */
+  #calPanel .cp-adgrip::after{display:none;}
+  #calPanel.cp-adresizing{user-select:none;}
+  #calPanel .fc .fc-daygrid-body,#calPanel .fc .fc-timegrid-body{border-top:0;}
+  #calPanel .fc .fc-scrollgrid-section-header > th,#calPanel .fc .fc-scrollgrid-section-header td{border-bottom:0;}
+  #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:1px solid var(--cp-line);box-shadow:0 2px 3px -2px rgba(60,64,67,.25);}
+  /* Day header: small weekday over a big number; today's number in a blue circle. */
+  #calPanel .fc .fc-col-header-cell-cushion{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0 6px;text-decoration:none;color:var(--cp-muted);}
+  #calPanel .cp-dh-w{font-size:11px;font-weight:500;letter-spacing:.8px;}
+  #calPanel .cp-dh-n{font-size:22px;font-weight:400;color:var(--cp-text);width:40px;height:40px;line-height:40px;text-align:center;border-radius:50%;transition:background .15s;}
+  #calPanel .fc .fc-col-header-cell-cushion:hover .cp-dh-n{background:var(--cp-hover);}
+  #calPanel .fc .fc-day-today .cp-dh-w{color:var(--cp-blue);}
+  #calPanel .fc .fc-day-today .cp-dh-n{background:var(--cp-blue);color:#fff;}
+  html[data-theme=dark] #calPanel .fc .fc-day-today .cp-dh-n{color:var(--cp-blue-text);}
+  #calPanel .fc .fc-day-past .cp-dh-n{color:var(--cp-muted);}
+  /* Events: rounded, title first (500), time under it, thin page-colored gap between overlaps. */
+  #calPanel .fc .fc-event{border:0;border-radius:4px;box-shadow:none;}
+  #calPanel .fc .fc-timegrid-col-events{margin:0 10px 0 1px;}
+  /* 3-day view tight (2026-11-24, Julius: "make full use of the space"): one-line "Mon 23" header, slim time column,
+     events nearly to the column edges. */
+  #calPanel .fc-timeGrid3-view .fc-col-header-cell-cushion{flex-direction:row;align-items:baseline;justify-content:center;gap:4px;padding:1px 0 2px!important;}
+  #calPanel .fc-timeGrid3-view .cp-dh-w{font-size:12px;letter-spacing:0;}
+  #calPanel .fc-timeGrid3-view .cp-dh-n{font-size:13px!important;font-weight:600;width:auto!important;min-width:20px;height:20px!important;line-height:20px!important;padding:0 5px;border-radius:10px;box-sizing:border-box;}
+  #calPanel .fc .fc-timeGrid3-view .fc-timegrid-slot-label-cushion{padding:0 2px 0 0!important;}
+  #calPanel.cp-full .fc .fc-timeGrid3-view .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding:0 6px 0 0!important;} /* 5 px sky stripe */
+  #calPanel .fc .fc-timeGrid3-view .fc-timegrid-col-events{margin:0 1px 0 0!important;}
+  /* Week view (2026-11-21 11:40, Julius: "less margins on the side of the events"). */
+  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-col-events,#calPanel .fc .fc-timeGrid3-view .fc-timegrid-col-events{margin:0 3px 0 1px;}
+  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-timeGrid3-view .fc-timegrid-event .fc-event-main{padding-left:3px;padding-right:2px;}
+  #calPanel .fc .fc-timegrid-event-harness-inset .fc-timegrid-event{box-shadow:0 0 0 1px var(--cp-bg);}
+  /* Back-to-back (2026-11-21, Julius, job N): touching events (Meditate → 1 am → Sleep) stack with a small 2 px gap so
+     two same-colored events never read as one; a real overlap stays Google-style (FullCalendar's inset) but the offset one is
+     drawn solid with a page-colored outline (cp-ovl, set in cpGroups; FullCalendar's -inset class only means "has events stacked over it"); a short event is at least one text line tall (eventMinHeight is 1 so it
+     doesn't push the next event sideways) and sits on top, covering a sliver of the next one. */
+  #calPanel .fc .fc-timegrid-event-harness>.fc-timegrid-event{bottom:2px;margin-bottom:0;}
+  #calPanel .fc .fc-timegrid-event-harness.cp-ovl>.fc-timegrid-event.cp-glass{background:var(--cp-evbg,#1a73e8)!important;box-shadow:0 0 0 1.5px var(--cp-bg)!important;}
+  #calPanel .fc .fc-timegrid-event.fc-timegrid-event-short{min-height:22px;}
+  #calPanel .fc .fc-timegrid-event.cp-tiny{min-height:17px;}
+  #calPanel .fc .fc-timegrid-event-harness:has(>.fc-timegrid-event-short){z-index:4!important;}
+  #calPanel .fc .fc-timegrid-event-harness:has(>.cp-tiny){z-index:5!important;}
+  /* Zoomed out (2026-11-21 12:48, Julius: "small events too close merge into one"): a short event drawn taller than its
+     time covers the top of the next one — a page-colored ring keeps the edge between them visible at any zoom. */
+  #calPanel .fc .fc-timegrid-event:is(.fc-timegrid-event-short,.cp-tiny):not(.fc-event-mirror){box-shadow:0 0 0 1.5px var(--cp-bg)!important;}
+  #calPanel .fc .fc-timegrid-event .fc-event-main{padding:2px 6px;}
+  #calPanel .fc .fc-daygrid-event{margin:1px 10px 1px 2px!important;padding:1px 0;}
+  #calPanel .fc .fc-daygrid-event .fc-event-main{padding:1px 6px;}
+  /* Event text like the Google Calendar app (2026-11-10, Julius, from his screenshot): regular weight, bigger on the phone. */
+  #calPanel .cp-ev{line-height:1.25;overflow:hidden;font-size:13px;letter-spacing:.1px;}
+  #calPanel .cp-ev-t{font-weight:500;overflow:hidden;text-overflow:ellipsis;}
+  @media (max-width:720px){ #calPanel .cp-ev{font-size:14px;} #calPanel .cp-ev-m{font-size:12px;} #calPanel .fc .fc-daygrid-event .fc-event-main{padding:3px 8px;} }
+  #calPanel .cp-ev-m{opacity:.9;font-size:11.5px;}
+  #calPanel .cp-ev-1{white-space:nowrap;text-overflow:ellipsis;}
+  #calPanel .fc .cp-tiny .fc-event-main{padding:0 6px;}
+  #calPanel .fc .cp-tiny .cp-ev{font-size:10.5px;line-height:1.05;}
+  #calPanel .fc .cp-tiny .cp-ev-m{font-size:10px;}
+  #calPanel .fc .fc-toolbar-chunk:last-child{flex:0 0 auto;}
+  #calPanel .fc .cp-done .cp-ev-t{text-decoration:line-through;}
+  /* Text fit (2026-11-11, Julius): timed cards shrink text with their width (never below 10px), the title gives up
+     lines to the time as the card gets shorter, and the time never spills out (narrow cards show the start time only). */
+  #calPanel .fc .fc-timegrid-event{container:cpev / size;}
+  #calPanel .fc .fc-timegrid-event .cp-ev{font-size:clamp(10px, 7.5px + 7cqi, 14px);}
+  #calPanel .fc .fc-timegrid-event .cp-ev-m{font-size:max(10px, .88em);}
+  #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;}
+  #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  @container cpev (max-height:62px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:2;} }
+  @container cpev (max-height:46px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:1;} }
+  /* Nothing spills out of a card (2026-11-14, Julius: "some text is spilling out"): the card clips its own content, and
+     as it gets shorter (zoomed out / 15-min events) the time line goes first, then text + box shrink to one tight line;
+     very narrow cards (phone Week) drop the time and the box and wrap the title small. */
+  #calPanel .fc .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-daygrid-event .fc-event-main{overflow:hidden;} /* not the card itself: its resize handle sits on the edge */
+  #calPanel .fc .fc-timegrid-event .fc-event-main{height:100%;box-sizing:border-box;}
+  /* See-through long events (2026-11-15, Julius): faint tint + colored outline, grid lines visible; the title sits on a
+     solid chip in the event color. */
+  /* 2026-11-21 (Julius): every timed event is see-through in its own color (cp-glass), not only the long ones. */
+  /* 2026-11-21 11:30 (Julius: "transparent isn't doing it for me"): solid block color like Google Calendar — full event color,
+     no outline, white text; overlapping ones keep a page-colored outline (cp-ovl). */
+  #calPanel .fc .fc-timegrid-event.cp-glass{background:var(--cp-evbg,#1a73e8)!important;border:0!important;box-shadow:none!important;border-radius:4px;}
+  #calPanel .fc .fc-timegrid-event.cp-see .fc-event-main{height:auto;position:sticky;top:0;} /* title stays in view while the event runs past the top */
+  /* 2026-11-15 08:21 (Julius): no chip behind the title, a stronger tint instead (12 % → 32 %); the text is solid white
+     with a soft shadow so it reads over the grid. */
+  #calPanel .fc .fc-timegrid-event.cp-glass .cp-evc,#calPanel .fc .fc-timegrid-event.cp-glass .cp-ev-t,#calPanel .fc .fc-timegrid-event.cp-glass .cp-ev-m{color:#fff!important;opacity:1!important;text-shadow:none;}
+  /* Time always shows (2026-11-14 night, Julius: "even if the font is small, include the time with the title; no room
+     below → put it to the right"): short cards and 30-min events = one line, title truncates, start time kept on the right. */
+  #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-evb{display:flex;align-items:baseline;}
+  #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-ev-t{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #calPanel .fc .fc-timegrid-event .cp-ev-1 .cp-ev-m{flex:0 0 auto;white-space:nowrap;}
+  @container cpev (max-height:34px){
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1){align-items:safe center;}
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-evb{display:flex;align-items:baseline;gap:4px;white-space:nowrap;}
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{display:block;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{flex:0 0 auto;overflow:visible;}
+    /* 2026-11-21 (Julius): end time always shows (title truncates first); short cards sit centered, nothing cut at the top. */
+    #calPanel .fc .fc-timegrid-event .fc-event-main{display:flex;align-items:safe center;padding-top:0!important;padding-bottom:0!important;} /* safe: text that doesn't fit starts at the top (2026-11-21 11:40, Julius) */
+    #calPanel .fc .fc-timegrid-event .fc-event-main > .cp-ev{flex:1 1 auto;min-width:0;}
+  }
+  @container cpev (max-height:21px){
+    #calPanel .fc .fc-timegrid-event .fc-event-main{padding-top:0!important;padding-bottom:0!important;}
+    #calPanel .fc .fc-timegrid-event .cp-ev{font-size:10px!important;line-height:1.05;}
+    #calPanel .fc .fc-timegrid-event .cp-ev-m{font-size:9.5px!important;}
+    #calPanel .fc .fc-timegrid-event .cp-chk{width:10px!important;height:10px!important;border-width:1px;margin-top:0;}
+  }
+  @container cpev (max-height:13px){ #calPanel .fc .fc-timegrid-event .cp-ev{font-size:9px!important;line-height:1;} #calPanel .fc .fc-timegrid-event .cp-chk{width:8px!important;height:8px!important;} }
+  @container cpev (max-width:44px){
+    #calPanel .fc .fc-timegrid-event .cp-chk{display:none!important;}
+    #calPanel .fc .fc-timegrid-event .cp-evb{display:block!important;white-space:normal!important;}
+    #calPanel .fc .fc-timegrid-event .cp-ev-m{display:block!important;font-size:8.5px!important;white-space:nowrap!important;overflow:hidden;} /* time under the title, tiny */
+    #calPanel .fc .fc-timegrid-event .fc-event-main{padding:1px 2px!important;}
+    #calPanel .fc .fc-timegrid-event .cp-ev{font-size:9px!important;line-height:1.1;}
+    #calPanel .fc .fc-timegrid-event .cp-ev-1,#calPanel .fc .fc-timegrid-event .cp-ev-t{white-space:normal!important;overflow-wrap:anywhere;word-break:break-word;}
+  }
+  /* Day headers stay inside their column on narrow screens. */
+  #calPanel .fc .fc-col-header-cell-cushion{width:100%;box-sizing:border-box;overflow:hidden;}
+  #calPanel .fc-timeGridWeek-view .cp-dh-n,#calPanel .fc-timeGrid3-view .cp-dh-n{max-width:100%;}
+  /* Event checkboxes (2026-11-11, Julius): subject-colored box at the card's left; ✓ when done; smaller on short events. */
+  #calPanel .cp-evc{display:flex;align-items:flex-start;gap:5px;}
+  #calPanel .cp-evc.cp-ev-1{align-items:center;}
+  #calPanel .cp-evb{flex:1 1 auto;min-width:0;overflow:hidden;}
+  #calPanel .cp-ev-1 .cp-evb{white-space:nowrap;text-overflow:ellipsis;}
+  #calPanel .cp-chk{flex:0 0 auto;box-sizing:border-box;width:14px;height:14px;margin-top:1px;border:1.5px solid currentColor;border-radius:3px;
+    background:transparent;position:relative;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+  #calPanel .cp-chk::before{content:"";position:absolute;inset:-7px;} /* bigger touch target */
+  #calPanel .cp-chk-cat{background:var(--chk);border-color:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.35);}
+  #calPanel .cp-done .cp-chk::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;line-height:1;color:#fff;}
+  #calPanel .cp-done .cp-chk:not(.cp-chk-cat)::after{color:inherit;}
+  #calPanel .fc .cp-tiny .cp-chk{width:10px;height:10px;border-width:1px;margin-top:0;}
+  #calPanel .fc .cp-tiny .cp-done .cp-chk::after,#calPanel .fc .cp-tiny.cp-done .cp-chk::after{font-size:8px;}
+  @media (max-width:720px){ #calPanel .cp-chk{width:16px;height:16px;} #calPanel .fc .cp-tiny .cp-chk{width:11px;height:11px;} }
+  /* Urgency groups in the all-day row (2026-11-11, Julius). */
+  #calPanel .fc-daygrid-event-harness[data-cpgl]::before{content:attr(data-cpgl);display:block;font-size:10.5px;font-weight:600;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--cp-muted);padding:5px 4px 1px;}
+  #calPanel .fc .cp-done{opacity:1;} /* done is already pale via softColor (2026-11-10) */
+  #calPanel .fc .fc-event:hover{filter:brightness(.96);}
+  #calPanel .fc .fc-event.fc-event-dragging,#calPanel .fc .fc-event-mirror{box-shadow:var(--cp-shadow)!important;}
+  /* Now: red line with a dot on the left. */
+  #calPanel .fc .fc-timegrid-now-indicator-line{border-width:2px 0 0;border-color:#ea4335;}
+  #calPanel .fc .fc-timegrid-now-indicator-line::before{content:"";position:absolute;left:-6px;top:-7px;width:12px;height:12px;border-radius:50%;background:#ea4335;}
+  #calPanel .fc .fc-timegrid-now-indicator-arrow{display:none;}
+  /* Selection while dragging out a new event. */
+  #calPanel .fc .fc-highlight{background:var(--cp-blue-soft);opacity:.6;border-radius:4px;}
+  /* Event card / form: a Google-style floating sheet (no border, soft shadow, pill buttons). */
+  #calPanel .cp-detail{border:0;border-radius:16px;box-shadow:var(--cp-shadow);padding:16px 18px;}
+  #calPanel .cp-detail .cp-dt{font-size:20px;font-weight:400;gap:14px;line-height:1.3;}
+  #calPanel .cp-detail .cp-dot{flex:0 0 14px;height:14px;border-radius:4px;margin-top:6px;}
+  #calPanel .cp-detail .cp-dm{font-size:14px;margin-top:4px;padding-left:28px;}
+  #calPanel .cp-detail .cp-note{padding-left:28px;}
+  #calPanel .cp-detail .cp-da{gap:2px;margin-top:8px;flex-wrap:wrap;}
+  #calPanel .cp-detail .cp-da a,#calPanel .cp-detail .cp-da button{border:0;background:transparent;border-radius:999px;padding:6px 10px;font-size:14px;font-weight:500;color:var(--cp-blue);white-space:nowrap;}
+  /* Event card (2026-11-11, Julius): smaller, Edit · Delete · GCal · Close on one line. */
+  #calPanel .cp-detail.cp-evcard{padding:10px 12px 8px;}
+  /* Popup card (2026-11-11): beside the event, with a clear border so it stands out from the grid. */
+  #calPanel .cp-detail{border:1.5px solid #9aa0a6!important;}
+  html[data-theme=dark] #calPanel .cp-detail{border-color:#c4c7c5!important;}
+  /* Event card border = the event's color (2026-11-21, Julius: "meditate is light blue → blue border"). */
+  #calPanel .cp-detail.cp-evcard,html[data-theme=dark] #calPanel .cp-detail.cp-evcard{border:2px solid var(--evc,#9aa0a6)!important;}
+  #calPanel .cp-detail.cp-pop.cp-popfix{position:fixed;z-index:3000;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);}
+  #calPanel .cp-detail.cp-pop{left:var(--pop-x);top:var(--pop-y);right:auto;bottom:auto;width:var(--pop-w);box-sizing:border-box;max-height:calc(100% - 16px);z-index:30;
+    box-shadow:0 8px 28px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.18);}
+  #calPanel .cp-detail.cp-evcard .cp-dt{font-size:17px;gap:10px;}
+  #calPanel .cp-detail.cp-evcard .cp-dm,#calPanel .cp-detail.cp-evcard .cp-note{font-size:13px;padding-left:24px;margin-top:2px;}
+  #calPanel .cp-detail.cp-evcard .cp-da{flex-wrap:nowrap;margin-top:6px;}
+  /* Google Calendar-style event pop-up (2026-11-14, Julius). */
+  #calPanel .cp-detail.cp-evcard{padding:6px 8px 12px 14px;}
+  #calPanel .cp-etop{display:flex;justify-content:flex-end;gap:2px;margin:0 -2px 2px 0;}
+  #calPanel .cp-ib{width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--cp-muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+  #calPanel .cp-ib:hover,#calPanel .cp-ib[aria-expanded=true]{background:var(--cp-hover);color:var(--cp-text);}
+  #calPanel .cp-emenu{display:flex;flex-direction:column;margin:0 0 6px auto;max-width:260px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);background:var(--cp-bg);padding:4px 0;}
+  #calPanel .cp-emenu button,#calPanel .cp-emenu a{display:flex;align-items:center;gap:12px;border:0;background:transparent;color:var(--cp-text);font-size:14px;padding:8px 14px;text-align:left;text-decoration:none;cursor:pointer;}
+  #calPanel .cp-emenu svg{color:var(--cp-muted);flex:0 0 auto;}
+  #calPanel .cp-emenu button:hover,#calPanel .cp-emenu a:hover{background:var(--cp-hover);}
+  #calPanel .cp-etitle{display:flex;align-items:flex-start;gap:14px;font-size:20px;line-height:1.3;padding-right:6px;}
+  #calPanel .cp-etitle .cp-dot{flex:0 0 14px;width:14px;height:14px;border-radius:4px;margin:6px 0 0 3px;}
+  #calPanel .cp-etitle [data-cal-edit]{cursor:pointer;overflow-wrap:anywhere;}
+  #calPanel .cp-etitle .cp-edone{text-decoration:line-through;color:var(--cp-muted);}
+  #calPanel .cp-ewhen{font-size:14px;color:var(--cp-text);padding-left:34px;margin:2px 0 8px;}
+  /* Edit in the card (2026-11-15 13:08): fields look like the card's text until tapped. */
+  #calPanel .cp-qform{margin:0;}
+  #calPanel .cp-etin{flex:1 1 auto;min-width:0;font:inherit;color:inherit;background:transparent;border:0;border-bottom:1px solid transparent;border-radius:0;padding:0 0 1px;margin:0;outline:none;}
+  #calPanel .cp-etin:hover{border-bottom-color:var(--cp-line,var(--border));}
+  #calPanel .cp-etin:focus{border-bottom-color:var(--cp-accent,#1a73e8);}
+  #calPanel .cp-ewin{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;}
+  #calPanel .cp-ewin .cp-wpart{display:inline-flex;gap:2px;}
+  #calPanel .cp-ewin input{font:inherit;font-size:13px;color:inherit;background:transparent;border:1px solid transparent;border-radius:6px;padding:2px 3px;min-width:0;}
+  #calPanel .cp-ewin input:hover,#calPanel .cp-ewin input:focus{border-color:var(--cp-line,var(--border));background:var(--cp-soft,transparent);outline:none;}
+  #calPanel .cp-ewin .cp-emuted{flex-basis:100%;}
+  #calPanel .cp-qform.allday .cp-ewin input[type=time]{display:none;}
+  #calPanel .cp-qsave{display:none;padding-left:34px;margin:-2px 0 8px;}
+  #calPanel .cp-qform.dirty .cp-qsave{display:block;}
+  #calPanel .cp-qsave .cp-da{display:flex;gap:8px;margin-top:4px;}
+  #calPanel .cp-emuted{color:var(--cp-muted);font-size:13px;}
+  #calPanel .cp-er{display:flex;gap:14px;align-items:flex-start;font-size:14px;margin:6px 6px 0 0;}
+  #calPanel .cp-ei{flex:0 0 20px;color:var(--cp-muted);line-height:0;}
+  #calPanel .cp-ev2{min-width:0;overflow-wrap:anywhere;padding-top:1px;}
+  #calPanel .cp-ev2 a{color:var(--cp-blue);}
+  #calPanel .cp-desc{white-space:pre-line;max-height:6.2em;overflow:hidden;cursor:pointer;position:relative;}
+  #calPanel .cp-desc:not(.open)::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.4em;background:linear-gradient(transparent,var(--cp-bg));}
+  #calPanel .cp-desc.open{max-height:none;}
+  #calPanel .cp-desc.fits{cursor:auto;}
+  #calPanel .cp-desc.fits::after{display:none;}
+  #calPanel .cp-equick{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0 34px;}
+  #calPanel .cp-equick button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--cp-line);background:transparent;color:var(--cp-text);border-radius:999px;padding:5px 12px 5px 9px;font-size:13px;font-weight:500;cursor:pointer;}
+  #calPanel .cp-equick button svg{width:17px;height:17px;color:var(--cp-muted);}
+  #calPanel .cp-equick button:hover{background:var(--cp-hover);}
+  #calPanel .cp-equick button.on{background:var(--cp-blue-soft);border-color:transparent;color:var(--cp-blue-text);}
+  #calPanel .cp-equick button.on svg{color:inherit;}
+  #calPanel .cp-ecolors{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 0 34px;}
+  #calPanel .cp-ecolors button{width:20px;height:20px;border-radius:50%;border:0;padding:0;background:var(--sw);cursor:pointer;position:relative;}
+  #calPanel .cp-ecolors button.cp-sw0{background:var(--cp-bg);border:2px dashed var(--cp-muted);}
+  #calPanel .cp-ecolors button.on::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--cp-text);}
+  #calPanel .cp-detail.cp-evcard .cp-plan-ev{margin-left:34px;}
+  #calPanel .cp-detail.cp-evcard .cp-note{padding-left:34px;}
+  #calPanel .cp-detail.cp-evcard .cp-ferr{padding-left:34px;}
+  #calPanel .cp-detail.cp-busy .cp-equick,#calPanel .cp-detail.cp-busy .cp-ecolors{opacity:.55;pointer-events:none;}
+  #calPanel .cp-detail .cp-da a:hover,#calPanel .cp-detail .cp-da button:hover{background:var(--cp-hover);}
+  #calPanel .cp-detail .cp-da .cp-primary{background:var(--cp-blue);color:#fff;}
+  html[data-theme=dark] #calPanel .cp-detail .cp-da .cp-primary{color:var(--cp-blue-text);}
+  #calPanel .cp-detail .cp-da .cp-danger{color:#c5221f;}
+  #calPanel .cp-detail .cp-da .cp-danger.cp-primary{background:#c5221f;color:#fff;}
+  #calPanel .cp-form input[type=text]{border:0;border-bottom:1px solid var(--cp-line);border-radius:0;font-size:20px;padding:6px 2px;}
+  #calPanel .cp-form input[type=text]:focus{outline:0;border-bottom:2px solid var(--cp-blue);}
+  #calPanel .cp-form input[type=date],#calPanel .cp-form input[type=time]{border:0;background:var(--cp-soft);border-radius:6px;}
+  #calPanel .cp-detail .cp-seg button,#calPanel .cp-detail .cp-plan-ev button{border:1px solid var(--cp-line);background:transparent;}
+  #calPanel .cp-detail .cp-seg button.on{background:var(--cp-blue-soft);border-color:var(--cp-blue-soft);color:var(--cp-blue-text);}
+  html[data-theme=dark] #calPanel .cp-detail .cp-seg button.on{color:#d3e3fd;}
+  /* Plan box: flatter, quieter, same features. */
+  #calPanel .cp-plan{border:0;border-radius:12px;background:var(--cp-soft);margin:0 4px 8px 8px;}
+  #calPanel .cp-ph{background:var(--cp-soft);border-bottom:0;padding:4px 6px 2px;}
+  #calPanel .cp-pfold{font-weight:500;}
+  #calPanel .cp-ph .cp-padd{border:0;background:transparent;color:var(--cp-blue);font-weight:500;border-radius:999px;padding:0 12px;}
+  #calPanel .cp-ph .cp-padd:hover{background:var(--cp-hover);}
+  #calPanel .cp-pgh{font-size:11px;font-weight:500;letter-spacing:.6px;}
+  #calPanel .cp-pi{border-top:0;padding:3px 0;}
+  #calPanel .cp-pi input[type=checkbox]{accent-color:var(--cp-blue);}
+  #calPanel .cp-pbtn button{background:transparent;border:0;border-radius:50%;color:var(--cp-muted);}
+  #calPanel .cp-pbtn button:hover:not(:disabled){background:var(--cp-hover);}
+  /* Plan hidden until the toolbar's Plan button opens it; Day view puts the date in the top-left corner. */
+  #calPanel .cp-plan.folded{display:none;}
+  /* Calendars fold (2026-11-11, Julius): pick which Google calendars show; 🔒 = view-only. */
+  #calPanel .cp-cals{flex:0 0 auto;margin:0 4px 4px 8px;max-height:40%;overflow:auto;}
+  #calPanel .cp-cfold{font:inherit;font-size:13px;font-weight:500;color:var(--cp-muted);background:transparent;border:0;padding:3px 4px;cursor:pointer;}
+  #calPanel .cp-ccnt{font-weight:400;}
+  #calPanel .cp-cals.folded .cp-cbody{display:none;}
+  #calPanel .cp-zrow{float:right;display:inline-flex;gap:4px;align-items:center;}
+  /* 2026-11-13: the old "▸ Calendars" row + − + / BL are in the toolbar now (⚙ opens the list); the list rows start at the left. */
+  #calPanel .cp-cfold,#calPanel .cp-zrow{display:none!important;}
+  #calPanel .cp-cals.folded{display:none;}
+  #calPanel .cp-cals .cp-crow{justify-content:flex-start;padding-left:2px;}
+  #calPanel .fc .fc-cpCals-button{font-size:14px;}
+  #calPanel.cp-docked .fc .fc-cpCals-button{display:none;} /* one ⚙: it's in the search line's ⚙ (2026-11-13) */
+  #calPanel.cp-docked .fc .fc-header-toolbar,#calPanel.cp-docked .cp-cals{display:none!important;} /* one header row: the search line carries ◉ · date · BL · ↻ */
+  #centerDownScroll .ce-head .ce-dk{display:none;}
+  #centerDownScroll.ce-dkon{padding-inline:2px!important;}
+  #centerDownScroll.ce-dkon .ce-head{gap:3px!important;margin:2px 0 2px!important;flex-wrap:nowrap!important;}
+  #centerDownScroll.ce-dkon .ce-head .ce-dk{display:inline-flex;align-items:center;justify-content:center;}
+  #centerDownScroll.ce-dkon .ce-head button.ce-dk{appearance:none;box-sizing:border-box;height:22px!important;min-height:22px!important;min-width:20px!important;padding:0 5px!important;margin:0;font:inherit;font-size:12px!important;line-height:1;border:1px solid var(--border);border-radius:11px;background:var(--panel);color:inherit;cursor:pointer;flex:0 0 auto;}
+  #centerDownScroll.ce-dkon .ce-head .ce-today{width:20px!important;padding:0!important;font-size:11px!important;}
+  #centerDownScroll.ce-dkon .ce-head .ce-rf{width:22px!important;padding:0!important;font-size:13px!important;border:0!important;background:none!important;}
+  #centerDownScroll.ce-dkon .ce-head .ce-bl.on{background:var(--accent-soft,rgba(66,133,244,.22));}
+  #centerDownScroll.ce-dkon .ce-head .ce-ttl{font-size:13px;font-weight:600;white-space:nowrap;flex:0 0 auto;margin:0 1px;}
+  #centerDownScroll.ce-dkon .ce-head .ce-search{flex:1 1 40px!important;min-width:34px!important;max-width:none!important;height:22px!important;}
+  #centerDownScroll.ce-dkon .ce-head .ce-tools{gap:3px!important;}
+  #centerCalendarList .ce-opt-cals .cp-crow{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13px;cursor:pointer;}
+  #centerCalendarList .ce-opt-cals .cp-crow input{width:16px;height:16px;margin:0;accent-color:var(--cc,#1a73e8);}
+  #centerCalendarList .ce-opt-cals .cp-cn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #centerCalendarList .ce-opt-cals .cp-lk{font-size:11px;opacity:.7;}
+  #centerCalendarList .ce-opt-cals .cp-cmsg{font-size:12px;color:var(--muted);}
+  #centerCalendarList .ce-bar :is(.ce-showcal,.ce-relist){font:inherit;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:inherit;padding:1px 7px;cursor:pointer;}
+  #centerCalendarList .ce-bar .ce-showcal{margin-left:auto;}
+  #centerCalendarList .ce-opt .ce-opt-b{display:block;margin:4px 0;font-size:12px;}
+  #calPanel .fc .fc-cpZoomOut-button,#calPanel .fc .fc-cpZoomIn-button{min-width:24px;padding:0 4px!important;}
+  #calPanel .fc .fc-header-toolbar{flex-wrap:wrap;row-gap:3px;}
+  #calPanel .fc .fc-header-toolbar .fc-toolbar-chunk:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:2px;min-width:0;}
+  #calPanel .fc .fc-cpPlan-button{display:none!important;}
+  #calPanel.cp-docked .fc .fc-button-group:has(.fc-timeGridDay-button){display:none!important;}
+  #calPanel.cp-docked .fc .fc-header-toolbar .fc-toolbar-chunk:last-child{flex:1 0 auto;flex-wrap:nowrap;min-width:auto;}
+  #calPanel .cp-zb,:is(#calPanel,#blCol,#calBlLeft) .cp-blbtn{font:inherit;font-size:13px;color:var(--cp-text);background:transparent;border:1px solid var(--cp-line);border-radius:999px;min-width:30px;height:26px;padding:0 8px;cursor:pointer;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blbtn.on{background:var(--cp-soft);font-weight:600;}
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blbtn{display:none;}
+  /* phone: the toolbar BL is used everywhere now (2026-11-13). */
+  /* Calendar zoom (2026-11-11, Julius): slot height 14–120px, pinch / ctrl+wheel / − +, saved per device. */
+  #calPanel .fc .fc-timegrid-slot{height:var(--cp-slot,24px)!important;}
+  /* Zoomed-out fix (2026-11-14, Julius): the time labels take no row height, so every slot is exactly --cp-slot and
+     the hours stay evenly spaced on the grid lines at any zoom (labels used to push their rows taller). */
+  #calPanel .fc .fc-timegrid-slot{line-height:0;padding:0;}
+  /* inline-block (not block) so the label's own width sets the hour column, no wider (2026-11-14, Julius: less left margin) */
+  #calPanel .fc .fc-timegrid-slot-label-cushion{display:inline-block;vertical-align:top;height:0;overflow:visible;line-height:0;}
+  #calPanel .cp-cals:not(.folded) .cp-parr{display:inline-block;transform:rotate(90deg);}
+  #calPanel .cp-crow{display:flex;align-items:center;gap:8px;padding:4px 6px;font-size:14px;cursor:pointer;}
+  #calPanel .cp-crow input{width:18px;height:18px;margin:0;accent-color:var(--cc,#1a73e8);}
+  #calPanel .cp-crow .cp-cn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #calPanel .cp-crow .cp-lk{font-size:11px;opacity:.7;}
+  #calPanel .cp-cmsg{font-size:12px;color:var(--cp-muted);padding:2px 6px;}
+  #calPanel .cp-scope{display:flex;gap:12px;align-items:center;font-size:13px;margin-top:6px;}
+  #calPanel .cp-scope label{display:flex;gap:4px;align-items:center;}
+  #calPanel select[name=cal]{font:inherit;font-size:12px;margin-left:auto;max-width:55%;}
+  #calPanel .fc-timeGridDay-view .fc-scrollgrid-section-header{display:none;}
+  #calPanel .fc .fc-timegrid-axis-cushion:has(.cp-corner){padding:2px 0;max-width:none;}
+  #calPanel .cp-corner{display:flex;flex-direction:column;align-items:center;line-height:1.1;}
+  #calPanel .cp-corner .cp-dh-w{font-size:8px;font-weight:500;letter-spacing:0;color:var(--cp-muted);}
+  #calPanel .cp-corner .cp-dh-n{font-size:12px;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;color:var(--cp-text);}
+  #calPanel .cp-corner.cp-today .cp-dh-w{color:var(--cp-blue);}
+  #calPanel .cp-corner.cp-today .cp-dh-n{background:var(--cp-blue);color:#fff;}
+  html[data-theme=dark] #calPanel .cp-corner.cp-today .cp-dh-n{color:var(--cp-blue-text);}
+  #calPanel .fc .fc-cpRefresh-button,#calPanel .fc .fc-cpClose-button{width:36px;padding:0;border-radius:50%!important;color:var(--cp-muted);font-size:17px;}
+  #calPanel .fc .fc-cpPlan-button,#calPanel .fc .fc-cpBacklog-button{border:1px solid var(--cp-line);border-radius:999px!important;padding:0 12px;margin-right:4px;}
+  #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:8px 4px 6px 8px;}
+  #calPanel .fc .fc-cpClose-button:focus,#calPanel .fc .fc-cpRefresh-button:focus{outline:0;box-shadow:none;}
+  #calPanel .fc .fc-cpView-button{display:inline-flex;align-items:center;border:1px solid var(--cp-line);border-radius:999px!important;padding:0 9px;}
+  #calPanel .fc .fc-toolbar-chunk .fc-button-group:has(.fc-timeGridDay-button){display:none!important;} /* one cycle button instead (3/4-day views) */
+  #calPanel .fc .fc-cpView-button[data-label]{font-size:0!important;}
+  /* Weekday colors (2026-11-15, Julius: "match my per-day color convention"): the same title colors the day rows use
+     (--note-line per weekday, light / dark). [data-dow] = 0 Sun … 6 Sat. Used by the calendar day title and the
+     backlog's date headers. */
+  :root{--dowc-0:#a3870a;--dowc-1:#4d4d4d;--dowc-2:#b06a2c;--dowc-3:#3f74a6;--dowc-4:#7d5630;--dowc-5:#9a7a12;--dowc-6:#6e4a24;}
+  html[data-theme=dark]{--dowc-0:#c2b562;--dowc-1:#ababab;--dowc-2:#c29f7b;--dowc-3:#87a4c0;--dowc-4:#b09b82;--dowc-5:#c0ae62;--dowc-6:#b59d79;}
+  [data-dow="0"]{--dowc:var(--dowc-0);} [data-dow="1"]{--dowc:var(--dowc-1);} [data-dow="2"]{--dowc:var(--dowc-2);} [data-dow="3"]{--dowc:var(--dowc-3);}
+  [data-dow="4"]{--dowc:var(--dowc-4);} [data-dow="5"]{--dowc:var(--dowc-5);} [data-dow="6"]{--dowc:var(--dowc-6);}
+  #calPanel .fc .fc-toolbar-title[data-dow],[data-ce-title][data-dow],#calPanel .cp-blgd[data-dow]{color:var(--dowc)!important;font-weight:600;}
+  #calPanel .fc .fc-cpView-button[data-label]::after{content:attr(data-label);font-size:12px;}
+  #calPanel .cp-vpick{position:fixed;z-index:100000;display:flex;flex-direction:column;min-width:96px;padding:4px;border-radius:10px;background:var(--cp-bg);border:1px solid var(--cp-line);box-shadow:0 6px 20px rgba(0,0,0,.25);}
+  #calPanel .cp-vpick button{all:unset;cursor:pointer;padding:8px 12px;border-radius:7px;font-size:14px;color:var(--cp-text);}
+  #calPanel .cp-vpick button.on{font-weight:700;background:var(--cp-soft);}
+  #calPanel .cp-vpick button:hover{background:var(--cp-soft);}
+  /* Week header: smaller date circles to save height. */
+  #calPanel .fc .fc-col-header-cell-cushion{padding:2px 0 4px;}
+  #calPanel .fc-timeGridWeek-view .cp-dh-n,#calPanel .fc-timeGrid3-view .cp-dh-n{font-size:18px;width:32px;height:32px;line-height:32px;}
+  @media (max-width:720px){
+    #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:6px 2px 4px 6px;gap:2px;}
+    #calPanel .fc .fc-toolbar-title{font-size:15px;margin-left:2px;flex:0 0 auto;overflow:visible;}
+    #calPanel .fc .fc-toolbar-chunk:first-child{flex:0 0 auto;}
+    #calPanel .fc .fc-toolbar-chunk:last-child{flex:0 1 auto;min-width:0;}
+    #calPanel .fc .fc-toolbar-chunk:last-child .fc-button-group{display:none;}
+    #calPanel .fc .fc-cpView-button{display:inline-flex;border:1px solid var(--cp-line);border-radius:999px!important;padding:0 7px;margin-right:0;}
+    #calPanel .fc .fc-today-button{padding:0 9px;margin-right:0;}
+    #calPanel .fc .fc-prev-button,#calPanel .fc .fc-next-button{width:26px;}
+    #calPanel .fc .fc-cpPlan-button,#calPanel .fc .fc-cpBacklog-button{padding:0 7px;margin-right:0;}
+    #calPanel .fc .fc-timeGridDay-button,#calPanel .fc .fc-timeGridWeek-button{padding:0 8px;}
+    #calPanel .fc .fc-cpRefresh-button,#calPanel .fc .fc-cpClose-button{width:28px;}
+  }
+  @media (max-width:720px){
+    #calPanel .cp-head{padding-left:12px;}
+    #calPanel .fc .fc-toolbar-title{font-size:17px;margin-left:4px;}
+    #calPanel .fc .fc-today-button{padding:0 12px;margin-right:2px;}
+    #calPanel .fc .fc-timeGridDay-button,#calPanel .fc .fc-timeGridWeek-button{padding:0 10px;}
+  }
+</style>
+<!-- from Index_Calendar -->
+<style>
+  #b3Strip{flex:0 0 auto;padding:2px 6px 3px;border-bottom:1px solid var(--divider,#ccc);font-size:.86em;line-height:1.3;}
+  #b3Strip[hidden]{display:none;}
+  #todayPane #b3Strip{display:none!important;} /* 2026-11-11 (Julius): not needed at the top of History; ★ hold-menu / Plan tab unchanged */
+  #b3Strip .b3-r{display:flex;align-items:center;gap:6px;min-height:22px;cursor:pointer;border-radius:5px;padding:0 2px;}
+  #b3Strip .b3-r:hover{background:color-mix(in srgb,var(--accent,#1a73e8) 8%,transparent);}
+  #b3Strip .b3-n{flex:0 0 auto;font-weight:700;color:#d99a00;min-width:1.6em;}
+  #b3Strip .b3-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #b3Strip .b3-r.done .b3-t{text-decoration:line-through;opacity:.6;}
+  #b3Strip .b3-k{flex:0 0 auto;font-size:.8em;color:var(--muted,#888);}
+  #b3Strip .b3-dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:transparent;}
+  #b3Strip .b3-dot.u1{background:#e5484d;} #b3Strip .b3-dot.u2{background:#d99a00;} #b3Strip .b3-dot.u3{background:#3b82f6;}
+  #b3Strip input[type=checkbox]{flex:0 0 auto;margin:0;width:14px;height:14px;}
+  #b3Strip .b3-e{color:var(--muted,#888);font-style:italic;}
+  #b3Strip .b3-up{display:flex;align-items:center;gap:6px;margin:2px 0 1px;padding:2px 6px;border-radius:6px;background:color-mix(in srgb,#d99a00 12%,transparent);}
+  #b3Strip .b3-up span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #b3Strip .b3-up button{font:inherit;border:1px solid var(--divider,#ccc);background:transparent;color:inherit;border-radius:999px;min-width:30px;min-height:24px;cursor:pointer;}
+  #b3Strip .b3-wait{font-size:.8em;color:var(--muted,#888);padding-left:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #todayPane.pane-narrow #b3Strip{padding:2px 3px;}
+  #todayPane.pane-narrow #b3Strip .b3-r{gap:3px;}
+  .b3-flash{outline:2px solid #d99a00!important;outline-offset:2px;transition:outline-color .6s;}
+  .urg-b3row{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;}
+  .urg-b3row .urg-goto.on{font-weight:700;}
+</style>
+<!-- from Index_Layout -->
+<style>
+  /* 2026-11-12: Blocks moved to the bottom of the middle column (#blocksScroll); the split bar
+     is back in one-day view to resize Dailies vs Blocks. Outside one-day the middle stays one piece. */
+  body:not(.one-day) #notesSplitBar{display:none!important;}
+  body:not(.one-day) #journalPane #journalScroll{flex:1 1 0!important;}
+  #blocksScroll{display:none;}
+  body.one-day #journalPane #blocksScroll{display:flex;flex:var(--ns-b,1) 1 0;min-height:34px;}
+  body.one-day #journalPane #journalScroll{flex:var(--ns-a,1) 1 0;}
+  #calPane{position:relative;}
+  #calPane #centerDownScroll{flex:1 1 0!important;min-height:0;padding-inline:3px!important;} /* tighter side margins around the list + timeline (2026-11-11) */
+  html body #workspace #referencePane.rd-drawer{
+    position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:auto!important;
+    width:min(var(--rd-w,340px),calc(100vw - 32px))!important;max-width:none!important;height:auto!important;min-height:0!important;
+    grid-column:auto!important;grid-row:auto!important;display:flex!important;z-index:2400;
+    border-left:1px solid var(--border);box-shadow:-6px 0 24px rgba(0,0,0,.25);
+    overscroll-behavior:contain;touch-action:pan-y;
+    transform:translateX(105%);visibility:hidden;transition:transform .2s ease,visibility 0s linear .2s;
+  }
+  html body.rd-open #workspace #referencePane.rd-drawer{transform:none;visibility:visible;transition:transform .2s ease;}
+  #rdBackdrop{position:fixed;inset:0;z-index:2390;background:rgba(0,0,0,.28);display:none;touch-action:none;}
+  body.rd-open #rdBackdrop{display:block;}
+  #rdTab{position:fixed;right:0;top:50%;z-index:2410;width:20px;height:64px;margin-top:-32px;padding:0;
+    display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:var(--muted);
+    background:var(--panel);border:1px solid var(--border);border-right:0;border-radius:8px 0 0 8px;
+    box-shadow:-2px 0 6px rgba(0,0,0,.12);opacity:.9;cursor:pointer;transition:right .2s ease;}
+  body.rd-open #rdTab{right:min(var(--rd-w,340px),calc(100vw - 32px));opacity:1;}
+  #rdTab{touch-action:none;}
+  body.rd-sizing #rdTab,body.rd-sizing #workspace #referencePane.rd-drawer{transition:none!important;}
+  body.cal-open #rdTab{display:none;}
+  /* 2026-11-11 (Julius): the blue "Ref" tag was too much — back to the quiet edge tab, just a little wider; the
+     toolbar Ref button (next to Cols) is the visible way in. */
+  #rdTab{width:24px;}
+  /* Hidden top row (2026-11-21): the toolbar is gone; a thin strip at the top brings it back. */
+  body.tb-hidden #toolbar{display:none!important;}
+  #tbStrip{display:none;}
+  body.tb-hidden #tbStrip{display:block;position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:2420;width:64px;height:10px;padding:0;
+    border:1px solid var(--border);border-top:0;border-radius:0 0 8px 8px;background:var(--panel);opacity:.85;cursor:pointer;touch-action:manipulation;}
+  body.tb-hidden #tbStrip::after{content:'';position:absolute;inset:-8px -10px -10px;} /* bigger tap area */
+  /* Keep In Mind border color picker (2026-11-21) */
+  .kc-pop{position:fixed;z-index:3250;padding:8px;border-radius:10px;background:var(--panel);color:inherit;border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:calc(100vw - 16px);}
+  .kc-pop .kc-sw{display:grid;grid-template-columns:repeat(9,28px);gap:6px;}
+  .kc-pop .kc-sw button{width:28px;height:28px;border-radius:50%;border:2px solid rgba(0,0,0,.15);padding:0;cursor:pointer;}
+  .kc-pop .kc-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .kc-pop .kc-wheel{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;flex:1;}
+  .kc-pop .kc-wheel input{width:40px;height:30px;padding:0;border:0;background:none;cursor:pointer;}
+  @media (max-width:420px){ .kc-pop .kc-sw{grid-template-columns:repeat(5,34px);} .kc-pop .kc-sw button{width:34px;height:34px;} }
+  /* Keep In Mind pin (2026-11-21). */
+  /* (the 📌 is painted by paintGroups in Index_Cards since 2026-11-22: tap it to unpin) */
+  /* Reference → Keep In Mind drag (2026-11-21) */
+  .rk-ghost{position:fixed;z-index:3300;pointer-events:none;max-width:70vw;padding:6px 10px;border-radius:8px;background:var(--panel);
+    color:inherit;border:2px solid var(--urg,#3b82f6);box-shadow:0 6px 18px rgba(0,0,0,.3);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ref-cell-wrapper.rk-armed{outline:2px solid var(--urg,#3b82f6);outline-offset:1px;}
+  body.rk-dragging,body.rk-dragging *{user-select:none!important;-webkit-user-select:none!important;}
+  #kimScroll .kim-editor > .rk-drop-before{box-shadow:0 -3px 0 0 var(--urg,#3b82f6);}
+  #kimScroll .kim-editor > .rk-drop-after{box-shadow:0 3px 0 0 var(--urg,#3b82f6);}
+  #journalPane button[data-ctab="focus"].rk-drop-tab{outline:2px solid var(--urg,#3b82f6);}
+  /* Reference = right half (2026-11-21, Julius; NOTES "C. Reference = right half"): exactly half the screen like every
+     other column (phone: full width), no drag-to-size, and no dimming, so the left half stays visible + usable and
+     the drawer doesn't look lighter than the columns. */
+  html body #workspace #referencePane.rd-drawer{width:50vw!important;box-shadow:none;}
+  body.rd-open #rdTab{right:50vw;}
+  #rdBackdrop,body.rd-open #rdBackdrop{display:none!important;}
+  @media (max-width:720px){
+    html body #workspace #referencePane.rd-drawer{width:100vw!important;border-left:0;}
+    body.rd-open #rdTab{right:auto;left:0;border-radius:0 8px 8px 0;border-left:0;border-right:1px solid var(--border);}
+  }
+  /* 2026-11-11 (Julius): no pull tab on the edge — the Ref button (next to Cols) and the edge swipe open the drawer.
+     The tab still shows while the drawer is open (close / drag-to-size handle). */
+  body:not(.rd-open) #rdTab{display:none;}
+  /* Cal Events, Google Calendar layout (2026-11-11, Julius): bar (▾ Events · hidden · ⚙ − +), the list (foldable, at
+     most half the column), then the day timeline filling the rest. */
+  #calPane #centerDownScroll:has(#centerCalendarList.ce-has-day){display:flex;flex-direction:column;overflow:hidden;}
+  #centerCalendarList.ce-has-day{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+  #centerCalendarList.ce-has-day > .ce-list{flex:0 1 auto;max-height:50%;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
+  /* Separator = drag bar (2026-11-11, Julius): the 2px line between the list and the timeline can be dragged to give
+     the top or bottom more room (saved per device); double-tap it to go back to automatic. Grip like the other bars. */
+  #centerCalendarList.ce-has-day > .ce-day{flex:1 1 0;height:auto;min-height:60px;margin-top:0;border:0;border-radius:0;}
+  /* Docked big calendar (2026-11-13, Julius): the 📅 panel itself fills the timeline spot, Day view, same look. */
+  #centerCalendarList.ce-has-day > .ce-dock{flex:1 1 0;min-height:120px;display:flex;flex-direction:column;position:relative;}
+  #centerCalendarList .ce-dock-away{align-items:center;justify-content:center;color:var(--muted);font-size:13px;}
+  #calPanel.cp-docked{position:relative;inset:auto;z-index:auto;flex:1 1 0;min-height:0;width:auto!important;max-width:none;margin:0;padding:0;
+    transform:none;visibility:visible;transition:none;box-shadow:none;border:0;border-radius:0;font-size:13px;}
+  #calPanel.cp-docked .cp-resize,#calPanel.cp-docked .cp-head,
+  #calPanel.cp-docked .fc-cpClose-button,#calPanel.cp-docked .fc-timeGridDay-button,#calPanel.cp-docked .fc-timeGridWeek-button,#calPanel.cp-docked .fc-cpView-button{display:none!important;}
+  #calPanel.cp-docked .cp-body{padding:0 2px 2px 0;}
+  #calPanel.cp-docked .fc .fc-toolbar{gap:4px;margin-bottom:4px;}
+  #calPanel.cp-docked .fc .fc-toolbar-title{font-size:15px;}
+  #calPanel.cp-docked .fc .fc-button{padding:.25em .5em;min-height:28px;font-size:12px;}
+  #calPanel.cp-blout .cp-body.bl-open{padding-left:0;}
+  /* Compact calendar (2026-11-13, Julius: buttons cut off): tighter toolbar, ◉ Today, BL n, close − +, stacked times. */
+  #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-weight:500;font-size:11px;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-style:normal;font-size:8px;opacity:.85;}
+  #calPanel .fc .fc-timegrid-slot-label-cushion{padding:0 5px 0 0;} /* room before the axis line, no extra margin (2026-11-21 12:37 / 12:55, Julius) */
+  /* 12 AM sits at the very top edge, so its label (centered on the line) was cut off (2026-11-15, Julius): drop it below the line. */
+  #calPanel .fc .fc-timegrid-slot-label[data-time="00:00:00"] .fc-timegrid-slot-label-cushion{top:4px;}
+  /* Docked: narrower time column, no FRI 13 badge (the date is on the header line) (2026-11-13 evening, Julius). */
+  #calPanel.cp-docked .cp-corner{display:none!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-axis-cushion{padding:0!important;min-width:0!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion{padding:0 9px 0 0!important;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:10px;}
+  #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl i{font-size:7px;}
+  #calPanel.cp-docked .fc .fc-daygrid-body-natural .fc-daygrid-day-events{margin-bottom:0;}
+  /* All-day row (2026-11-15 13:21, Julius: "the line under the all-day tasks is basically invisible, make it white;
+     shrink the margins; get rid of the empty quadrant left of it"). The line is now a 3px border on the all-day
+     section itself (axis-line color: white in dark), not the thin divider row. Docked: the empty time-axis cell left
+     of the all-day tasks is gone (they start at the panel's left edge) and the cards sit tight. */
+  /* 2026-11-21 10:57 (Julius: "brighter, wider, more obvious, it's hard to see"): full-strength color + soft glow; 11:09 "too thick" → back to 3 px. */
+  #calPanel{--cp-ad-line:#202124;--cp-ad-glow:rgba(32,33,36,.25);}
+  html[data-theme=dark] #calPanel{--cp-ad-line:#fff;--cp-ad-glow:rgba(255,255,255,.35);}
+  #calPanel .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:3px solid var(--cp-ad-line)!important;box-shadow:0 2px 6px var(--cp-ad-glow)!important;}
+  #calPanel .fc .fc-timegrid-divider{display:none!important;}
+  #calPanel.cp-docked .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) col:first-child{width:0!important;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-timegrid-axis{width:0!important;min-width:0!important;max-width:0!important;padding:0!important;border:0!important;overflow:hidden;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-timegrid-axis > *{display:none!important;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-daygrid-day{border-left:0!important;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-daygrid-day-frame{min-height:0!important;padding:0!important;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-daygrid-day-events{min-height:0!important;margin:0!important;padding:1px 0 3px;}
+  #calPanel.cp-docked .fc .fc-daygrid-body .fc-daygrid-day-bottom{display:none;}
+  #calPanel.cp-docked .fc .fc-daygrid-event{margin:0 1px 1px 1px!important;padding:0;}
+  #calPanel.cp-docked .fc .fc-daygrid-event .fc-event-main{padding:1px 4px!important;}
+  #calPanel.cp-docked .cp-body{padding:0 1px 1px 0!important;}
+  #calPanel.cp-docked .fc .fc-toolbar.fc-header-toolbar{margin:4px 2px 4px 4px;gap:2px;flex-wrap:wrap;} /* one row when it fits, else two (2026-11-13) */
+  #calPanel.cp-docked .fc .fc-toolbar-chunk{display:flex;align-items:center;gap:2px;flex-wrap:nowrap;}
+  #calPanel.cp-docked .fc .fc-toolbar-title{font-size:13px;margin:0 2px;white-space:nowrap;}
+  #calPanel.cp-docked .fc .fc-button{padding:0 6px!important;min-height:24px;height:24px;font-size:12px;margin:0!important;}
+  #calPanel.cp-docked .fc .fc-today-button{padding:0 5px!important;font-size:13px;}
+  #calPanel.cp-docked .fc .fc-prev-button,#calPanel.cp-docked .fc .fc-next-button{width:20px;padding:0!important;}
+  #calPanel.cp-docked .fc .fc-cpRefresh-button{width:24px;font-size:14px;}
+  #calPanel.cp-docked span.cp-zrow{gap:2px;}
+  #calPanel.cp-docked .cp-zb,#calPanel.cp-docked .cp-blbtn{min-width:22px;height:22px;padding:0 5px;font-size:12px;margin:0;}
+  #calPanel .fc .fc-cpBacklog-button[data-n]::after{content:" " attr(data-n);white-space:pre;}
+  #calPanel .cp-zfloat{display:none;}
+  #calPanel.cp-docked .cp-zfloat{display:flex;gap:4px;position:absolute;right:8px;bottom:8px;z-index:6;}
+  #calPanel.cp-docked .cp-zfloat button{font:inherit;font-size:15px;line-height:1;width:28px;height:28px;border-radius:50%;border:1px solid var(--cp-line);background:var(--cp-bg);color:var(--cp-text);opacity:.85;box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;padding:0;}
+  #calPanel.cp-docked .fc .fc-prev-button,#calPanel.cp-docked .fc .fc-next-button,#calPanel.cp-docked .fc .fc-cpZoomOut-button,#calPanel.cp-docked .fc .fc-cpZoomIn-button{display:none!important;}
+  /* the calendar keeps sideways finger swipes for itself (day change), so the app doesn't slide from there */
+  #calPanel.cp-docked #calMount{touch-action:pan-y pinch-zoom;}
+  #calPark{display:none;}
+  /* Backlog column left of Cal Events: the app slides left by its width (2026-11-13, Julius). */
+  #blCol,#calBlLeft{display:none;--cp-bg:var(--panel,#fff);--cp-text:var(--text,#202124);--cp-muted:var(--muted,#5f6368);--cp-line:var(--divider,#dadce0);--cp-soft:color-mix(in srgb,var(--divider,#ccc) 40%,transparent);}
+  body.bl-push #blCol{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--divider);overflow:hidden;}
+  body.bl-push #workspace:not(.view-single){grid-template-columns:var(--col-today) 1px var(--col-journal) 1px var(--bl-w,260px) var(--col-reference)!important;}
+  body.bl-push #workspace #blCol{grid-column:5;grid-row:1;}
+  body.bl-push #workspace.ws-halves:not(.view-single){grid-template-columns:var(--half-w) 1px var(--half-w) 1px var(--half-w) var(--half-w)!important;}
+  /* Half view snap points (2026-11-13): History + middle at the left, middle + calendar at the right. */
+  #workspace.ws-halves > .pane{scroll-snap-align:start;}
+  #workspace.ws-halves > #calPane{scroll-snap-align:end;}
+  #workspace.ws-halves > #blCol{scroll-snap-align:none;}
+  /* Phone swipe (2026-11-13, Julius: "sliding right doesn't work"): inner scrollers had overscroll-behavior:contain on
+     both axes, which kept a sideways swipe from ever reaching #workspace. Half view lets the sideways part through. */
+  #workspace.ws-halves .pane,#workspace.ws-halves .pane *{overscroll-behavior-x:auto!important;}
+  /* History's day editor was pan-y only (vertical), so a sideways swipe there did nothing. */
+  #workspace.ws-halves .pane .day-editor{touch-action:pan-x pan-y!important;}
+  body.ws-halves-on #referenceEdgeResize{display:none;}
+  body.bl-push #workspace #calPane{grid-column:6!important;}
+  body.bl-left #calPane:not(.view-hidden){display:flex!important;flex-direction:row;}
+  body.bl-left #calBlLeft{display:flex;flex-direction:column;flex:0 0 44%;min-width:0;border-right:1px solid var(--divider);overflow:hidden;}
+  body.bl-left #calPane > #centerDownScroll{flex:1 1 0;min-width:0;}
+  :is(#blCol,#calBlLeft) > .cp-bl{flex:1 1 auto;margin:0;border-top:0;font-size:13px;}
+  .cp-blside,.cp-blclose{appearance:none;border:1px solid var(--cp-line);background:transparent;color:inherit;font:inherit;font-size:11px;border-radius:6px;padding:1px 6px;cursor:pointer;}
+  .cp-blside{margin-left:4px;}
+  .cp-blsort{appearance:none;margin-left:6px;border:1px solid var(--cp-line);background:transparent;color:inherit;font:inherit;font-size:11px;border-radius:999px;padding:0 8px;cursor:pointer;opacity:.75;}
+  .cp-blsort.on{opacity:1;background:var(--cp-soft);font-weight:600;}
+  .cp-blck{margin-right:4px;font-size:14px;line-height:1;}
+  .cp-bli.cp-blon{outline:2px solid #1a73e8;outline-offset:-2px;}
+  .cp-blselon .cp-blx{display:none;}
+  .cp-bldday{flex:1 0 100%;display:flex;align-items:center;gap:6px;margin-top:2px;font-size:12px;}
+  .cp-bldday input{flex:1;min-width:0;font:inherit;padding:2px 4px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;}
+  .cp-bltoast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9500;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:8px 10px 8px 14px;border-radius:10px;background:#323232;color:#fff;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.3);}
+  .cp-bltoast[hidden]{display:none;}
+  .cp-bltoast button{border:0;background:transparent;color:#8ab4f8;font:inherit;font-weight:700;padding:4px 6px;cursor:pointer;}
+  .cp-blbar{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;gap:6px;padding:5px 6px;background:var(--cp-bg,#fff);border-top:2px solid #1a73e8;font-size:12px;}
+  .cp-blbar[hidden]{display:none;}
+  .cp-blbar .cp-blbn{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .cp-blbar button{appearance:none;border:0;border-radius:999px;padding:4px 10px;background:#1a73e8;color:#fff;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .cp-blbar button:disabled{opacity:.45;cursor:default;}
+  body:not(.bl-phone) .cp-blside{display:none;}
+  #calPanel:not(.cp-blout) .cp-blclose{display:none;}
+  /* Only the center handle drags (2026-11-11, Julius): the line itself ignores touches so scrolling past it is safe. */
+  #centerCalendarList .ce-split{flex:0 0 2px;position:relative;background:var(--divider);touch-action:none;z-index:5;margin:4px 0 3px;pointer-events:none;}
+  #centerCalendarList .ce-split::before{content:"";position:absolute;left:50%;width:64px;margin-left:-32px;top:-12px;bottom:-12px;pointer-events:auto;cursor:row-resize;}
+  #centerCalendarList .ce-split::after{content:"";position:absolute;left:50%;top:-1px;width:22px;height:3px;margin-left:-11px;border-radius:2px;background:color-mix(in srgb,var(--grip,var(--divider)) 70%,transparent);}
+  #centerCalendarList .ce-list[hidden] + .ce-split{display:none;}
+  #centerCalendarList.ce-man > .ce-list:not([hidden]){flex:0 0 var(--ce-ls,40%);max-height:88%;min-height:28px;}
+  #centerCalendarList .ce-list[hidden]{display:none!important;}
+  #centerDownScroll .ce-head > strong{display:none!important;} /* 2026-11-13: no "Cal Events" / 📅 label */
+  #centerCalendarList.ce-has-day > .ce-opt{flex:0 1 auto;max-height:55%;overflow-y:auto;}
+  #centerCalendarList .ce-bar{display:flex;align-items:center;gap:3px;margin:0 0 2px;min-height:22px;}
+  #centerCalendarList .ce-fold{appearance:none;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:2px 4px 2px 0;cursor:pointer;white-space:nowrap;}
+  #centerCalendarList .ce-fold small{font-weight:500;color:var(--muted);margin-left:2px;}
+  #centerCalendarList .ce-farr{display:inline-block;width:1em;color:var(--muted);}
+  #centerCalendarList .ce-hidn{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted);font:inherit;font-size:11px;border-radius:999px;padding:1px 7px;cursor:pointer;white-space:nowrap;}
+  #centerCalendarList .ce-hidn.on{background:var(--accent-soft,rgba(66,133,244,.18));color:inherit;}
+  #centerCalendarList .ce-bsp{flex:1 1 auto;}
+  #centerCalendarList .ce-bb{appearance:none;flex:0 0 22px;width:22px;height:22px;min-width:22px;min-height:22px;padding:0!important;margin:0;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;} /* 2026-11-11 (Julius): ⚙ event-font-sized — big enough to read, no bigger */
+  /* − / + live on the timeline itself (2026-11-11, Julius): stuck to its top-right corner, always next to the calendar. */
+  #centerCalendarList{position:relative;}
+  #centerCalendarList .ce-zoom{position:absolute;right:6px;bottom:8px;z-index:4;display:flex;gap:4px;pointer-events:none;}
+  #centerCalendarList .ce-zoom button{pointer-events:auto;appearance:none;width:24px;height:24px;border:1px solid color-mix(in srgb,var(--border) 45%,transparent);border-radius:7px;background:color-mix(in srgb,var(--panel) 40%,transparent);color:inherit;font-size:15px;line-height:1;cursor:pointer;opacity:.55;display:inline-flex;align-items:center;justify-content:center;padding:0;}
+  #centerCalendarList .ce-zoom [data-ce-now] i{width:9px;height:9px;border-radius:50%;border:2px solid currentColor;display:block;box-sizing:border-box;} /* plain ring, same color as − / + (2026-11-11) */
+  #centerCalendarList .ce-zoom button:active,#centerCalendarList .ce-zoom button:hover{opacity:1;background:var(--panel);}
+  #centerCalendarList .ce-opt{border:1.5px solid var(--divider);border-radius:10px;padding:8px 9px;margin:2px 0 6px;font-size:13px;background:var(--panel);}
+  #centerCalendarList .ce-opt-h{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  #centerCalendarList .ce-opt-note{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  #centerCalendarList .ce-opt-s{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:8px 0 3px;}
+  #centerCalendarList .ce-opt-c{display:flex;align-items:center;gap:6px;padding:3px 0;}
+  #centerCalendarList .ce-opt-w{display:flex;flex-wrap:wrap;gap:4px;}
+  #centerCalendarList .ce-chip{display:inline-flex;align-items:center;gap:3px;font:inherit;font-size:12px;padding:2px 8px;border-radius:999px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;}
+  #centerCalendarList .ce-chip.on{border-style:solid;color:inherit;background:var(--accent-soft,rgba(66,133,244,.18));cursor:default;}
+  #centerCalendarList .ce-chip button{appearance:none;border:0;background:transparent;color:inherit;font-size:11px;padding:0 0 0 2px;cursor:pointer;}
+  #centerCalendarList .ce-opt-f{display:flex;gap:4px;margin-top:6px;}
+  #centerCalendarList .ce-opt-f input{flex:1 1 auto;min-width:0;font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:inherit;}
+  /* Narrow Cal Events column (phone, 3 columns): tighter header so 🔍 still fits. */
+  @container (max-width:150px){#centerDownScroll .ce-head{gap:2px!important;}#centerDownScroll .ce-tools{gap:2px!important;}}
+</style>
+<!-- from Index_Layout -->
+<style id="uiBatchCss">
+  /* UI batch (2026-11-21 maintenance session, Julius; NOTES "UI batch"). Last style block on purpose so it wins over the
+     older layers. Same file feeds the old /dev page and the PWA, so both get it. */
+  :root{--card-r:8px;--hdr-h:var(--ws-head-h,30px);}
+
+  /* 1. No column sliding: the column lines stay, the drag grips and drag areas are gone (desktop and phone split). */
+  .column-resizer,#mobileSplitResizer[data-dir="col"],#mobileSplitResizerThird[data-dir="col"]{pointer-events:none!important;cursor:default!important;}
+  .column-resizer::before,.column-resizer::after,
+  #mobileSplitResizer[data-dir="col"]::before,#mobileSplitResizer[data-dir="col"]::after,
+  #mobileSplitResizerThird[data-dir="col"]::before,#mobileSplitResizerThird[data-dir="col"]::after{display:none!important;}
+  .column-resizer:hover{background:var(--divider-on,var(--divider))!important;}
+  #referenceEdgeResize{display:none!important;}
+
+  /* 2 + 4. One height for the tabs row and the calendar header so their bottom lines meet; a slimmer top button row. */
+  #toolbar{min-height:34px!important;padding:3px 6px!important;gap:4px!important;}
+  #toolbar :is(.btn,.top-select){min-height:26px!important;height:26px;padding-top:0!important;padding-bottom:0!important;padding-left:7px!important;padding-right:7px!important;box-sizing:border-box;}
+  /* (Header strips themselves: section 8, one style for every cell.) */
+  #centerDownScroll .ce-head :is(button,.btn){min-height:22px!important;height:22px!important;max-height:22px!important;}
+  #centerDownScroll .ce-head .ce-search{height:22px!important;}
+
+  /* 3. Calendar: no white line between the hour labels and the events; the colored sky bar is the timeline line, with a
+     little room before it (labels) and after it (events). The all-day line stays (asked for 2026-11-21 10:57). */
+  #calPanel .fc .fc-timegrid-slot-label,#calPanel .fc .fc-timegrid-axis{border-right:0!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-position:calc(100% - 3px) top!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:14px!important;}
+
+  /* 4 + 5. Cards: one corner rounding and one set of card margins everywhere (Today, Notes, Keep In Mind, Next Steps,
+     Cal Events, calendar events, title boxes). */
+  .check-line[data-tc^="f"]{border-top-left-radius:var(--card-r)!important;border-top-right-radius:var(--card-r)!important;margin-top:3px!important;padding-top:3px!important;}
+  .check-line[data-tc$="l"]{border-bottom-left-radius:var(--card-r)!important;border-bottom-right-radius:var(--card-r)!important;margin-bottom:3px!important;padding-bottom:3px!important;}
+  .check-line[data-tc][data-tcfocus]:not([data-tcrel]),body.tc-borderonly .check-line[data-tccat],
+  .check-line.tc-holdready,.urg-row.tc-holdready,.di-line.tc-holdready{border-radius:var(--card-r)!important;}
+  #urgentPanel > .urg-group,.urg-group,#kimScroll .kg-box,#calPanel .fc .fc-event,
+  #centerCalendarList .ce-urg,#centerCalendarList .ce-day,.dr-cat,.fx-cat{border-radius:var(--card-r)!important;}
+  .urg-group{margin-top:5px!important;}
+
+  /* 6. Sync / save message: a small floating pill bottom-right, above the calendar zoom buttons and the PWA update
+     button. Click-through unless it offers a tap (undo after a delete). The PWA "Offline" tag sits just above it. */
+  #status.status{position:fixed!important;top:auto!important;left:auto!important;right:calc(8px + env(safe-area-inset-right))!important;
+    bottom:calc(58px + env(safe-area-inset-bottom))!important;z-index:2147482000;flex:none!important;min-width:0!important;
+    max-width:min(62vw,340px);margin:0!important;padding:3px 9px!important;border-radius:999px;font-size:11px!important;line-height:1.35;
+    background:rgba(40,42,48,.85)!important;color:#fff!important;box-shadow:0 2px 8px rgba(0,0,0,.25)!important;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;pointer-events:none;}
+  /* Subtler (2026-11-22, Julius): smaller, see-through, no shadow; fades out (setStatus timer). */
+  #status.status{font-size:10px!important;padding:2px 7px!important;background:rgba(40,42,48,.55)!important;color:rgba(255,255,255,.78)!important;
+    box-shadow:none!important;transition:opacity .35s ease;opacity:1;}
+  #status.status.st-gone{opacity:0;}
+  #status.status.st-tap{pointer-events:auto;cursor:pointer;}
+  #status.status:empty{display:none;}
+  #pwaOffline{top:auto!important;left:auto!important;transform:none!important;right:calc(8px + env(safe-area-inset-right))!important;
+    bottom:calc(86px + env(safe-area-inset-bottom))!important;font-size:11px!important;padding:4px 9px!important;}
+  /* 8. Workspace shell (2026-11-21, Julius: "cells in one workspace"; redo of the unpushed first attempt). The frame and
+     the --ws-* tokens are in the head (Index_Css #wsFrame). Here: 1px dividers, one header strip for every cell
+     (title left, existing actions right), cell padding 16 / 12 / 8 px, drawer = right half of the frame. */
+  #workspace{--ws-cell-x:calc(var(--ws-cell-pad) * var(--pad-x,1) * var(--side,.7) / .7);}
+  #workspace .pane.pane-narrow{--ws-cell-pad:8px;}
+  #toolbar{background:transparent!important;border-bottom:0!important;padding-left:max(var(--ws-gap),env(safe-area-inset-left))!important;padding-right:max(var(--ws-gap),env(safe-area-inset-right))!important;}
+  html body #workspace > .pane{background:var(--ws-surface)!important;}
+
+  /* Dividers: one 1px line between cells, never doubled. */
+  html body #workspace > .pane{border-right:0!important;border-left:0!important;box-shadow:none!important;}
+  html body #workspace .column-resizer{background:var(--ws-line)!important;box-shadow:none!important;}
+  html body #workspace .pane.peek-pane{border-left:1px solid var(--ws-line)!important;}
+  html body #workspace .pane.peek-pane.peek-left{border-left:0!important;border-right:1px solid var(--ws-line)!important;}
+  html body.mobile-mode #workspace :is(#todayPane,#journalPane){box-shadow:inset -1px 0 0 var(--ws-line)!important;}
+  html body.mobile-split #workspace :is(#todayPane,#journalPane){box-shadow:none!important;}
+  html body #workspace :is(#mobileSplitResizer,#mobileSplitResizerThird){background:var(--ws-line)!important;}
+  html body #workspace :is(#notesSplitBar,#refSplitBar){flex-basis:1px!important;height:1px!important;min-height:1px!important;background:var(--ws-line)!important;}
+  html body #workspace #blCol{border-left:0!important;box-shadow:inset 1px 0 0 var(--ws-line)!important;}
+
+  /* One header strip for every cell. */
+  html body #workspace :is(.pane > .pane-header,#centerDownScroll > .ce-head,#blocksScroll > .blocks-head,#referenceScroll > .ref-toolbar),
+  html body.one-day #workspace #todayScroll .od-on > .od-pad-head{
+    box-sizing:border-box!important;display:flex!important;align-items:center!important;flex-wrap:nowrap!important;gap:6px!important;
+    flex:0 0 var(--ws-head-h)!important;height:var(--ws-head-h)!important;min-height:var(--ws-head-h)!important;
+    padding:0 var(--ws-cell-x)!important;background:var(--ws-head-bg)!important;color:var(--ws-head-fg);
+    border-top:0!important;border-bottom:1px solid var(--ws-line)!important;border-radius:0!important;box-shadow:none!important;
+    font-size:var(--ws-head-fs);
+  }
+  html body #workspace :is(.today-jump,.od-pad-lab,.next-steps-label){
+    font-size:var(--ws-head-fs)!important;font-weight:700!important;letter-spacing:.05em!important;
+    text-transform:uppercase!important;line-height:1!important;white-space:nowrap;color:var(--ws-head-fg);
+  }
+  html body #workspace :is(.pane > .pane-header,#referenceScroll > .ref-toolbar) :is(.btn,button:not(.hist-mode):not([data-ctab]):not([data-rtab]),input){
+    height:calc(var(--ws-head-h) - 8px)!important;min-height:0!important;padding-top:0!important;padding-bottom:0!important;
+    font-size:12px!important;line-height:1!important;box-sizing:border-box;
+  }
+  html body #workspace .pane > .pane-header .center-tabs button{width:calc(var(--ws-head-h) - 10px)!important;height:calc(var(--ws-head-h) - 10px)!important;}
+  #centerDownScroll .ce-head :is(button,.btn){min-height:22px!important;height:22px!important;max-height:22px!important;}
+  #centerDownScroll .ce-head .ce-search{height:22px!important;}
+
+  /* History / Log: title left, controls right. */
+  html body #workspace #todayPane > .pane-header :is(.hist-modes,#focusStatus){margin-left:auto;}
+  /* Middle cell: the open tab's name left, tab symbols right (narrow column: symbols only). */
+  html body #workspace #journalPane > .pane-header::before{
+    font-size:var(--ws-head-fs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;line-height:1;white-space:nowrap;
+    color:var(--ws-head-fg);flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  }
+  #journalPane[data-ctab="notes"] > .pane-header::before{content:"Dailies";}
+  #journalPane:is([data-ctab="weather"],[data-ctab="wxdaily"]) > .pane-header::before{content:"Weather";}
+  #journalPane[data-ctab="focus"] > .pane-header::before{content:"Keep In Mind";}
+  #journalPane[data-ctab="urgent"] > .pane-header::before{content:"Urgent";}
+  #journalPane[data-ctab="review"] > .pane-header::before{content:"Day Review";}
+  #journalPane[data-ctab="fun"] > .pane-header::before{content:"Fun";}
+  html body #workspace #journalPane > .pane-header .center-tabs{margin-left:auto!important;margin-right:-4px;flex:0 0 auto;}
+  html body #workspace #journalPane.pane-narrow > .pane-header::before{display:none;}
+  html body #workspace #journalPane.pane-narrow > .pane-header .center-tabs{margin-left:-4px!important;}
+  html body #workspace #referencePane > .ref-pane-header .urg-head-row{margin:0!important;}
+
+  /* Cal Events: the strip spans the cell; the calendar keeps a slim gutter (its time axis is the margin). */
+  html body #workspace #calPane{--ws-cal-x:calc(var(--ws-cell-x) / 2);}
+  html body #workspace #calPane #centerDownScroll,html body #workspace #calPane #centerDownScroll.ce-dkon{padding-inline:var(--ws-cal-x)!important;}
+  html body #workspace #calPane #centerDownScroll > .ce-head{margin:0 calc(-1 * var(--ws-cal-x)) 2px!important;}
+  html body #workspace #calPane #centerDownScroll > .ce-head .ce-tools{margin-left:auto;}
+  /* Narrow calendar column (phone): tighter strip so ⚙ BL ↻ stay inside the frame. */
+  @media (max-width:720px){
+    html body #workspace #calPane #centerDownScroll > .ce-head{padding:0 3px!important;gap:2px!important;}
+    html body #workspace #calPane #centerDownScroll > .ce-head :is(.ce-tools){gap:2px!important;}
+    html body #workspace #calPane #centerDownScroll > .ce-head .ce-search{min-width:34px!important;flex:0 1 34px!important;}
+    html body #workspace #calPane #centerDownScroll > .ce-head .ce-ttl{font-size:12px!important;min-width:0!important;flex:0 1 auto!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  }
+
+  /* Timer (bottom-left) and Focus / Thinking (bottom-middle) get real strips; the Timer strip is still the drag handle. */
+  body.one-day #workspace #todayScroll .day-row.od-on.od-on{
+    --ws-hist-pad:max(2px,calc(var(--ws-cell-x) - 7px));--rowpx:var(--ws-hist-pad);
+    padding-left:var(--ws-hist-pad)!important;padding-right:var(--ws-hist-pad)!important;
+  }
+  body.one-day #workspace #todayScroll .od-on .day-editor{margin-left:0!important;margin-right:0!important;padding-left:7px!important;padding-right:7px!important;}
+  html body.one-day #workspace #todayScroll .od-on > .od-pad-head{margin:6px calc(-1 * var(--ws-hist-pad)) 0!important;border-top:1px solid var(--ws-line)!important;}
+  html body #workspace #blocksScroll > .blocks-head{margin:0!important;}
+  html body #workspace #blocksScroll > .thought-pad{padding-left:var(--ws-cell-x)!important;padding-right:var(--ws-cell-x)!important;padding-top:6px!important;}
+
+  /* Reference: its toolbar is the cell strip (stays pinned while the cards scroll). */
+  html body #workspace #referencePane{--ws-ref-x:calc(var(--ws-cell-x) * var(--ref-pad-x,1));}
+  html body #workspace #referencePane #referenceScroll{padding-left:var(--ws-ref-x)!important;padding-right:var(--ws-ref-x)!important;padding-top:0!important;}
+  html body #workspace #referenceScroll > .ref-toolbar{margin:0 calc(-1 * var(--ws-ref-x)) 8px!important;padding-bottom:0!important;}
+  html body #workspace #referenceScroll > .ref-toolbar .ref-search{flex:1 1 60px;min-width:40px;}
+  html body #workspace #referencePane #refTopScroll{padding-left:calc(var(--ws-cell-x) - 1px)!important;padding-right:calc(var(--ws-cell-x) - 1px)!important;padding-top:6px!important;}
+
+  /* Cell padding for the other content. */
+  /* 2026-11-23 (Julius): less side room, slightly smaller text, and room on top so a title box at the very top isn't cut off. */
+  html body #workspace #kimScroll{padding-left:max(0px,calc(var(--ws-cell-x) - 6px))!important;padding-right:max(0px,calc(var(--ws-cell-x) - 6px))!important;padding-top:4px!important;}
+  html body #workspace #kimScroll > .kim-editor{padding:5px 2px 0!important;font-size:calc(var(--paragraph-size) * .92)!important;}
+  html body #workspace #journalPane[data-ctab="urgent"] #urgTabScroll,
+  html body #workspace :is(#dayReviewScroll,#funScroll,#newScroll){padding-left:var(--ws-cell-x)!important;padding-right:var(--ws-cell-x)!important;}
+  body.one-day #workspace #journalScroll .day-row.od-on{--rowpx:var(--ws-cell-x);padding-left:var(--ws-cell-x)!important;padding-right:var(--ws-cell-x)!important;}
+
+  /* Next Steps + Reference drawer = right half of the same frame (whole frame on the phone); square inner edge, no shadow.
+     --ws-t / --ws-r / --ws-b / --ws-l / --ws-w come from the frame's own box (initWsFrame below). */
+  html body #workspace #referencePane.rd-drawer{
+    top:var(--ws-t,0px)!important;bottom:var(--ws-b,0px)!important;right:var(--ws-r,0px)!important;
+    width:calc(var(--ws-w,100vw) / 2)!important;background:var(--ws-surface)!important;
+    border:1px solid var(--ws-line)!important;border-radius:0 var(--ws-radius) var(--ws-radius) 0!important;
+    box-shadow:none!important;overflow:hidden;
+  }
+  body.rd-open #rdTab{right:calc(var(--ws-w,100vw) / 2 + var(--ws-r,0px))!important;}
+  @media (max-width:720px){
+    html body #workspace #referencePane.rd-drawer{width:var(--ws-w,100vw)!important;border-radius:var(--ws-radius)!important;}
+    body.rd-open #rdTab{right:auto!important;left:var(--ws-l,0px)!important;}
+  }
+
+  /* 9. Maintenance batch (2026-11-22, Julius). */
+  /* Half calendar: Today (◉) is a rounded square, not a pill. */
+  #centerDownScroll.ce-dkon .ce-head button.ce-dk.ce-today{border-radius:5px!important;}
+  /* Half calendar: the all-day / timeline line is one thin line (no 2 px bar + shadow); the grab spot stays on it. */
+  #calPanel.cp-docked .fc .fc-timegrid-divider{height:0!important;background:none!important;}
+  #calPanel.cp-docked .fc .fc-scrollgrid-section-body:has(.fc-daygrid-body) > td{border-bottom:1px solid var(--cp-axis-line,var(--cp-line))!important;box-shadow:none!important;}
+  /* Keep In Mind tabs: the "on" mark is the button's own square (no spill-over ring), even spacing. */
+  #journalPane .center-tabs{gap:5px!important;}
+  #journalPane .center-tabs button.on{box-shadow:none!important;outline:0!important;background:color-mix(in srgb,var(--text,#fff) 22%,transparent)!important;}
+  /* Keep In Mind pin: a small tap-to-unpin 📌 painted beside the item (render-only, never saved); the line keeps its own
+     − / count button. */
+  #kimScroll .kim-editor > [data-kpin].check-line > .check-text{text-indent:17px;}
+  #kimScroll .kim-editor > [data-kpin]:not(.check-line){padding-right:20px!important;}
+  /* Keep In Mind boxes (2026-11-22, Julius): thinner line, squarer corners to match the checkboxes. */
+  #kimScroll .kg-box{border-radius:4px!important;}
+  /* Dark mode (2026-11-22, Julius: "a little too dark, brighten it up"; "Focus / Thinking should be the same gray, not
+     the day color"): Keep In Mind and the Focus / Thinking box share one lighter dark gray. The inline day tint that
+     blocksDock puts on #blocksScroll is overridden here (light mode keeps the day color). */
+  html[data-theme="dark"]{--kim-bg:#232427;} /* a touch brighter (2026-11-23, Julius) */
+  html[data-theme="dark"] #journalPane[data-ctab="focus"] #kimScroll,
+  html[data-theme="dark"] body.one-day #journalPane #blocksScroll{background:var(--kim-bg)!important;color:var(--text)!important;}
+  #kimScroll .kg-pin{position:absolute;z-index:2;width:16px;height:16px;padding:0;margin:0;border:0;background:none;font-size:11px;line-height:16px;
+    text-align:center;cursor:pointer;opacity:.85;-webkit-tap-highlight-color:transparent;}
+  #kimScroll .kg-pin:hover{opacity:1;}
+</style>

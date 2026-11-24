@@ -491,7 +491,7 @@ function cellHash_(s) {
 }
 
 // The page's parts, pulled into Index.html with createHtmlOutputFromFile (keep in step with tools/index-html.mjs).
-const INDEX_PARTS_ = ['Index_Css', 'Index_Main', 'Index_Cards', 'Index_Extras', 'Index_Calendar', 'Index_Layout'];
+const INDEX_PARTS_ = ['Index_Css', 'Index_LateCss', 'Index_Main', 'Index_Cards', 'Index_Extras', 'Index_Calendar', 'Index_Layout'];
 
 // Version of the app's page code, so an open tab can tell a newer version was pushed.
 function appBuild_(fresh) {
@@ -3387,18 +3387,18 @@ function saveLookSnapshot(slot, json, ua) {
 
 
 /* =========================================================
-   CALENDAR BACKLOG (2026-11-11, Julius; reworked 2026-11-12; docs/NOTES.md → "Calendar backlog")
-   Unfinished all-day task events on the MAIN calendar from past days are indexed in the `Cal Backlog` tab AND the
-   event itself moves to YESTERDAY: title gets "↪ "; its color is KEPT (2026-11-13, Julius: the color = urgency, so
-   it must survive the move; the 11/12 Grape recolor is undone by calBacklogRestoreColor_). The ↪ pile keeps rolling forward (always sits on yesterday) until dealt with,
-   so it stays in Julius's attention next to today.
+   CALENDAR BACKLOG (2026-11-11, Julius; reworked 2026-11-12; NO MOVING since 2026-11-24 — docs/NOTES.md → "Backlog stays put")
+   Unfinished all-day task events on the MAIN calendar from past days are INDEXED in the `Cal Backlog` tab and shown
+   in the app's Backlog list. 2026-11-24 (Julius: "it's destroying the previous day that I need for reference"):
+   the automation NEVER touches the calendar any more — no move to yesterday, no "↪ " prefix, no supersede delete.
+   Events stay on the day they were planned.
    - Swept: all-day, main calendar, not repeating, not Graphite, not "[x] " / "↪ " / archive titles, ended before today.
-   - Deal with one by dragging it onto today/future — in Google Calendar or from the app's Backlog panel: the roll
-     (calBacklogRoll_, every app load, throttled 3 min) strips "↪ " and marks the row Placed (color untouched). The app's Backlog drop (calBacklogPlace) moves the same real event, no duplicates.
-   - Supersede: a fresh sweep of the same title closes older open rows ('superseded') and deletes their stale ↪ event.
-   - Cheap: row-adding runs at most once a day (script property calBacklogSwept); the roll is one Calendar list over
-     a ±1-month window, throttled by calBacklogRollAt. Script lock against double runs.
-   - "↪ " events are moved tasks, not done work: transfers to the Done Log must skip them (by the prefix).
+   - Reconcile (calBacklogRoll_, throttled 3 min, read-only except stripping a leftover "↪ " from the old system):
+     the event turned Graphite / "[x] " → row 'done'; moved onto today or later (in Google Calendar or the app) →
+     row Placed = that date; deleted → row 'dropped'.
+   - Julius's own actions still change events: Backlog drop onto a day (calBacklogPlace) moves it there; ✓ Done
+     (calBacklogComplete) marks it done IN PLACE; ✓ Done · Delete removes it. ✕ only takes it off the list.
+   - Supersede: a fresh sweep of the same title closes older open rows ('superseded'); their events are left alone.
    ========================================================= */
 const CAL_BACKLOG_SHEET = 'Cal Backlog';
 const CAL_BACKLOG_HEAD = ['Id', 'Date', 'Title', 'ColorId', 'Urgency', 'Swept', 'Placed'];
@@ -3446,8 +3446,9 @@ function calBacklogSweep_() {
       (r.items || []).forEach(it => {
         if (it.status === 'cancelled' || !it.start || !it.start.date || it.recurringEventId) return;
         if (it.start.date < from || (it.end && it.end.date > today)) return; // still running today → not past yet
+        if (calBacklogIsDone_(it)) return;
         const t = String(it.summary || '');
-        if (String(it.colorId || '') === '8' || /^\[x\]\s/i.test(t) || t.indexOf(CAL_BACKLOG_PREFIX) === 0 || t.indexOf(ARCHIVE_PREFIX) === 0 || / X$/.test(t)) return;
+        if (t.indexOf(CAL_BACKLOG_PREFIX) === 0 || t.indexOf(ARCHIVE_PREFIX) === 0) return;
         items.push(it);
       });
       token = r.nextPageToken;
@@ -3457,80 +3458,86 @@ function calBacklogSweep_() {
     const stamp = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm'), add = [];
     items.forEach(it => {
       const id = (it.iCalUID || it.id) + '|' + it.start.date, colorId = String(it.colorId || ''), title = String(it.summary || '(no title)');
-      if (!have[id]) {
-        // Supersede: an older open row with the same title is stale (the task was re-created on a newer day).
-        rows.forEach((r, i) => {
-          if (r[0] !== id && !r[6] && r[2] === title) {
-            Store.calBacklog.setPlaced(i, 'superseded');
-            r[6] = 'superseded';
-            try { Calendar.Events.remove(calId, calBacklogEventId_(r[0])); } catch (e) { console.error('calBacklogSweep_ supersede: ' + e); }
-          }
-        });
-        const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === colorId) || '';
-        add.push([id, it.start.date, title, colorId, u, stamp, '']);
-        have[id] = 1;
-      }
-      // Move to yesterday with "↪ ", keeping its urgency color, so it sits next to today until dealt with.
-      try { Calendar.Events.patch({ summary: CAL_BACKLOG_PREFIX + String(it.summary || ''),
-        start: { date: yest }, end: { date: today } }, calId, it.id); }
-      catch (e) { console.error('calBacklogSweep_ patch: ' + e); }
+      if (have[id]) return;
+      // Supersede: an older open row with the same title is stale (the task was re-planned on a newer day).
+      // Only the row closes; the old event stays on its day as reference (2026-11-24).
+      rows.forEach((r, i) => {
+        if (r[0] !== id && !r[6] && r[2] === title) { Store.calBacklog.setPlaced(i, 'superseded'); r[6] = 'superseded'; }
+      });
+      const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === colorId) || '';
+      add.push([id, it.start.date, title, colorId, u, stamp, '']);
+      have[id] = 1;
     });
     Store.calBacklog.add(add);
     props.setProperty('calBacklogSwept', yest);
     return { swept: add.length };
   } finally { lock.releaseLock(); }
 }
-/* Roll + reconcile (2026-11-12, Julius): keeps the ↪ pile on yesterday, and restores events he dragged onto
-   today or a future day (strip "↪ ", row marked Placed). Colors are never changed (2026-11-13); a ↪ event still
-   in the old Grape / Graphite gets its original color back. One Calendar list over [-35, +4) days, throttled. */
+// Done on the calendar = Graphite, "[x] " title, or the old trailing " X".
+function calBacklogIsDone_(it) {
+  const t = String(it.summary || '').replace(/^↪\s*/, '');
+  return String(it.colorId || '') === '8' || /^\[x\]\s/i.test(t) || / X$/.test(t);
+}
+// LA date of an event's start (all-day or timed).
+function calBacklogStartDay_(it, tz) {
+  if (it.start.date) return it.start.date;
+  return Utilities.formatDate(new Date(it.start.dateTime), tz, 'yyyy-MM-dd');
+}
+/* Reconcile (2026-11-24 rewrite, Julius: "don't auto move them around"): READ the calendar and close open rows
+   whose event was done, moved onto today/later, or deleted. Never moves, recolors or renames an event — the only
+   write is stripping a leftover "↪ " (old system) from an event that is done or placed. One list, throttled. */
 function calBacklogRoll_() {
   if (typeof Calendar === 'undefined' || !Calendar.Events) return;
   const props = Store.props, now = Date.now();
   if (now - Number(props.getProperty('calBacklogRollAt') || 0) < CAL_BACKLOG_ROLL_MS) return;
+  if (!Store.calBacklog.exists()) return;
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(2000)) return;
   try {
     if (now - Number(props.getProperty('calBacklogRollAt') || 0) < CAL_BACKLOG_ROLL_MS) return;
     props.setProperty('calBacklogRollAt', String(now));
+    const rows = Store.calBacklog.rows(), open = {};
+    let minDay = '';
+    rows.forEach((r, i) => {
+      if (!r[0] || r[6]) return;
+      open[r[0].split('|')[0]] = (open[r[0].split('|')[0]] || []).concat(i);
+      if (!minDay || r[1] < minDay) minDay = r[1];
+    });
+    if (!minDay) return;
     const tz = Session.getScriptTimeZone();
-    const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'), yest = addDaysToDateString_(today, -1);
-    const calId = EVENT_CALENDARS[0], moved = [];
+    const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    const floor = addDaysToDateString_(today, -(CAL_BACKLOG_FIRST_DAYS + 5));
+    const from = addDaysToDateString_(minDay < floor ? minDay : floor, -1);
+    const calId = EVENT_CALENDARS[0], seen = {};
     let token = null;
     do {
-      const q = { timeMin: parseDate_(addDaysToDateString_(today, -(CAL_BACKLOG_FIRST_DAYS + 5))).toISOString(),
-        timeMax: parseDate_(addDaysToDateString_(today, 4)).toISOString(), singleEvents: true, maxResults: 2500,
+      const q = { timeMin: parseDate_(from).toISOString(), timeMax: parseDate_(addDaysToDateString_(today, 120)).toISOString(),
+        singleEvents: true, showDeleted: true, maxResults: 2500,
         fields: 'nextPageToken,items(id,iCalUID,status,summary,start,colorId,recurringEventId)' };
       if (token) q.pageToken = token;
       const r = Calendar.Events.list(calId, q);
       (r.items || []).forEach(it => {
-        if (it.status === 'cancelled' || !it.start || !it.start.date || it.recurringEventId) return;
-        if (String(it.summary || '').indexOf(CAL_BACKLOG_PREFIX) === 0) moved.push(it);
+        const uid = String(it.iCalUID || it.id);
+        if (it.recurringEventId || !open[uid]) return;
+        if (it.status === 'cancelled') { if (!seen[uid]) seen[uid] = { gone: true }; return; }
+        if (!it.start) return;
+        seen[uid] = { it: it };
       });
       token = r.nextPageToken;
     } while (token);
-    if (!moved.length) return;
-    const rows = Store.calBacklog.rows();
-    moved.forEach(it => {
-      const uid = String(it.iCalUID || it.id);
-      try {
-        // Done (Graphite) → it leaves the backlog: drop "↪ ", row marked done, left on its day (Graphite stays).
-        if (String(it.colorId || '') === '8') {
-          const j = rows.findIndex(r => !r[6] && r[0].split('|')[0] === uid);
-          Calendar.Events.patch({ summary: String(it.summary || '').slice(CAL_BACKLOG_PREFIX.length) }, calId, it.id);
-          if (j >= 0) { Store.calBacklog.setPlaced(j, 'done'); rows[j][6] = 'done'; }
-          return;
-        }
-        calBacklogRestoreColor_(calId, it, rows); // undo the old Grape recolor first (no-op otherwise)
-        if (it.start.date < yest) {
-          // Still undealt-with on an older day → roll it to yesterday (color untouched).
-          Calendar.Events.patch({ start: { date: yest }, end: { date: today } }, calId, it.id);
-        } else if (it.start.date >= today) {
-          // Julius dragged it onto today/future → restore it as a live task.
-          const i = rows.findIndex(r => !r[6] && r[0].split('|')[0] === uid);
-          Calendar.Events.patch({ summary: String(it.summary || '').slice(CAL_BACKLOG_PREFIX.length) }, calId, it.id);
-          if (i >= 0) { Store.calBacklog.setPlaced(i, it.start.date); rows[i][6] = it.start.date; }
-        }
-      } catch (e) { console.error('calBacklogRoll_: ' + e); }
+    Object.keys(seen).forEach(uid => {
+      const s = seen[uid];
+      let mark = '';
+      if (s.gone) mark = 'dropped';
+      else if (calBacklogIsDone_(s.it)) mark = 'done';
+      else { const d = calBacklogStartDay_(s.it, tz); if (d >= today) mark = d; }
+      if (!mark) return;
+      open[uid].forEach(i => { Store.calBacklog.setPlaced(i, mark); rows[i][6] = mark; });
+      const t = s.it && String(s.it.summary || '');
+      if (t && t.indexOf(CAL_BACKLOG_PREFIX) === 0) {
+        try { Calendar.Events.patch({ summary: t.slice(CAL_BACKLOG_PREFIX.length) }, calId, s.it.id); }
+        catch (e) { console.error('calBacklogRoll_ strip: ' + e); }
+      }
     });
   } finally { lock.releaseLock(); }
 }
@@ -3616,8 +3623,8 @@ function calBacklogPlaceIn_(r, rows) {
     if (rows[i][6]) return { ok: true, already: rows[i][6] };
     const calId = EVENT_CALENDARS[0], evId = calBacklogEventId_(id);
     if (r.drop) {
+      // 2026-11-24 (Julius): ✕ only takes it off the list; the event stays on its day as reference.
       Store.calBacklog.setPlaced(i, 'dropped'); rows[i][6] = 'dropped';
-      try { Calendar.Events.remove(calId, evId); } catch (e) { console.error('calBacklogPlace drop: ' + e); }
       return { ok: true };
     }
     const w = calPanelWhen_(Object.assign({}, r, { title: rows[i][2] }));
@@ -3656,8 +3663,8 @@ function calBacklogPlaceIn_(r, rows) {
 }
 /* Mark complete (2026-11-16, Julius): hold a backlog row → ✓ Done · Archive (default) or ✓ Done · Delete, on a
    chosen day (default today; a date picker for tasks he finished earlier but never ticked).
-   - archive: the ↪ event moves to that day as an all-day "[x] Title" in Graphite (= done, already accounted for,
-     so Graphite transfers skip it), row marked 'done', and a Done Log row on that day (Project Backlog, by Julius).
+   - archive: the event is marked done where it sits (2026-11-24: no move) as "[x] Title" in Graphite (= done,
+     already accounted for, so Graphite transfers skip it), row marked 'done', and a Done Log row on that day (Project Backlog, by Julius).
    - delete: the event is removed, row marked 'deleted', nothing logged.
    The client holds the call ~6 s for Undo, so the server never needs to reverse it. */
 function calBacklogComplete(req) {
@@ -3682,8 +3689,9 @@ function calBacklogComplete__(req) {
       return { ok: true, mode: mode };
     }
     try {
-      Calendar.Events.patch({ summary: '[x] ' + title, colorId: '8',
-        start: { date: day, dateTime: null }, end: { date: addDaysToDateString_(day, 1), dateTime: null } }, calId, evId);
+      // 2026-11-24 (Julius: "don't auto move them"): marked done IN PLACE — Graphite + "[x] ", same day as planned.
+      // The chosen day only goes to the Done Log row.
+      Calendar.Events.patch({ summary: '[x] ' + title, colorId: '8' }, calId, evId);
     } catch (e) { console.error('calBacklogComplete patch: ' + e); } // event gone → still logged
     Store.calBacklog.setPlaced(i, 'done');
     const log = Store.sheetFirst('Done Log');

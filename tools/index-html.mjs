@@ -3,7 +3,7 @@
 // so they see exactly what Apps Script serves. WeekdayIcons / Drafts are left for each tool to swap in.
 import fs from 'fs';
 
-export const INDEX_PARTS = ['Index_Css', 'Index_Main', 'Index_Cards', 'Index_Extras', 'Index_Calendar', 'Index_Layout'];
+export const INDEX_PARTS = ['Index_Css', 'Index_LateCss', 'Index_Main', 'Index_Cards', 'Index_Extras', 'Index_Calendar', 'Index_Layout'];
 
 export function readIndexHtml() {
   return fs.readFileSync('Index.html', 'utf8').replace(

@@ -72,6 +72,8 @@
 <script>fwTheme.collect();</script>
 </head>
 <body>
+<?!= HtmlService.createHtmlOutputFromFile('Index_LateCss').getContent() ?>
+<script>fwTheme.collect();</script>
 <div id="app">
   <div id="focusControls">
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>

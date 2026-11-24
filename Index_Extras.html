@@ -254,15 +254,7 @@
     };
   })();
 </script>
-<style>
-  /* Block borders (2026-11-04, Julius): see the script below. */
-  .plan-pad{position:relative;}
-  .plan-pad > [data-blk]{position:relative;left:7px;margin-right:14px;}
-  .plan-pad > [data-blk^="f"]{margin-top:9px;}
-  .plan-pad > [data-blk$="l"],.plan-pad > .check-line[data-blk$="l"]{margin-bottom:10px;}
-  .plan-pad > [data-blkn]{margin-top:21px;}
-  .plan-pad > [data-blkph] > .check-text:empty::before{content:'Tasks for your next block · ▶ starts it';color:var(--muted,#999);font-style:italic;opacity:.8;pointer-events:none;} /* room for the line above Next Block */
-</style>
+<!-- style moved to Index_LateCss.html (2026-11-24: first paint = final look) -->
 <script>
 /* Block borders (2026-11-04, Julius): each block in Blocks (its title line plus the task cells under it, down
    to the next title or an empty line) sits inside one rounded border, so it's clear what a block contains.
@@ -378,11 +370,7 @@
   },true);
 })();
 </script>
-<style>
-  /* Title cells (2026-11-21, Julius): a little room above a title box and below its last line. Render-only attrs. */
-  .editor > [data-tbf]{margin-top:7px;}
-  .editor > [data-tbl]{margin-bottom:calc(6px + var(--tbs,0) * 4px);}
-</style>
+<!-- style moved to Index_LateCss.html (2026-11-24: first paint = final look) -->
 <script>
 /* Title cells (2026-11-21, Julius: "when I titleize something, I want it to be in a cell for itself"): every marked
    title (data-tl="1") and the lines it covers (titleCovered) sit inside one rounded box; a nested title's box sits
@@ -460,41 +448,7 @@
   window.tboxTitle = boxTitle;
 })();
 </script>
-<style>
-  /* Block timer MVP (2026-11-05, Julius). Bar + chips are render-only: they live next to the Blocks pad, never in it. */
-  .tmr-bar,.tmr-layer{display:none;}
-  /* 2026-11-12: Blocks pad hidden while the Timer slot is empty, so its bar + chips stay hidden too. */
-  .tmr-bar{flex:0 0 auto;align-items:center;gap:2px 4px;flex-wrap:wrap;font-size:12px;line-height:1.25;padding:2px 2px 3px;color:var(--muted);}
-  .tmr-bar .tmr-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
-  .tmr-bar .tmr-name{color:var(--text,inherit);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .tmr-bar .tmr-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .tmr-bar .tmr-clock{font-variant-numeric:tabular-nums;font-weight:600;color:var(--text,inherit);cursor:pointer;}
-  .tmr-bar.run .tmr-clock{color:#1e9e4a;}
-  .tmr-bar button{font:inherit;font-size:11px;line-height:1;min-width:24px;height:22px;padding:0 5px;border-radius:6px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
-  .tmr-bar i{font-style:normal;}
-  .tmr-bar .tmr-btns{display:flex;gap:4px;flex:0 0 auto;}
-  .tmr-bar i{display:none;} /* icons only (2026-11-05, Julius: compact); labels are in the tooltips */
-  .tmr-bar.narrow .tmr-main{flex-basis:100%;}
-  .tmr-bar.narrow .tmr-btns{margin-left:auto;}
-  .tmr-bar .tmr-sub{font-size:11px;}
-  .tmr-bar .tmr-sync{font-size:10px;opacity:.75;}
-  .tmr-layer{position:absolute;overflow:hidden;pointer-events:none;z-index:2;}
-  .tmr-chip{position:absolute;right:4px;display:flex;align-items:center;gap:2px;pointer-events:auto;font-size:11px;line-height:1;
-    font-variant-numeric:tabular-nums;color:var(--muted);}
-  .tmr-chip .tmr-t{cursor:pointer;padding:2px 1px;}
-  .tmr-chip button{font:inherit;font-size:10px;width:20px;height:18px;padding:0;border-radius:5px;border:1px solid currentColor;
-    background:transparent;color:inherit;cursor:pointer;opacity:.55;}
-  .tmr-chip.blk button{opacity:.8;}
-  .tmr-chip.on{color:#1e9e4a;font-weight:600;}
-  .tmr-chip.on button{opacity:1;}
-  .tmr-chip.pz{color:#d08a00;}
-  .plan-pad > [data-blk]{padding-right:58px;}
-  .tmr-menu{position:fixed;z-index:9500;min-width:170px;max-width:260px;display:flex;flex-direction:column;padding:4px;border-radius:9px;
-    background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc);box-shadow:0 8px 28px rgba(0,0,0,.28);}
-  .tmr-menu-t{font-size:11px;font-weight:700;opacity:.65;padding:4px 8px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .tmr-menu button{font:inherit;font-size:14px;text-align:left;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;}
-  .tmr-menu button:hover{background:color-mix(in srgb,currentColor 10%,transparent);}
-</style>
+<!-- style moved to Index_LateCss.html (2026-11-24: first paint = final look) -->
 <script>
 /* Block timer MVP (2026-11-05, Julius; design = Reference card "📜 Timer App", Nov 3 decisions).
    - ▶ on a block title starts that block's timer; ▶ on a task in it starts that task's timer (and the block's).
@@ -901,47 +855,7 @@
   setTimeout(pull, 1500);
 })();
 </script>
-<style>
-  .ref-toolbar.hs-r{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 22px),transparent);}
-  .ref-toolbar.hs-l{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 22px),transparent);}
-  .ref-toolbar.hs-l.hs-r{-webkit-mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,transparent,#000 22px,#000 calc(100% - 22px),transparent);}
-/* Minimal time sections (2026-11-07, Julius: lines bled past the box's left edge, too much space). Applies to every
-   time section (Morn / After / Night) in History: content sits inside the box, lines and group headers packed tight. */
-#todayScroll .day-editor.sec-painted.sec-painted.sec-painted{padding-left:7px!important;padding-right:7px!important;margin-left:0!important;margin-right:0!important;}
-/* Less room outside the boxes (2026-11-07): the day row's side padding drops to 2px (boxes sit 1px inside the editor, see paintDaySecs). */
-#todayScroll .day-row.od-on.od-on,#todayScroll .day-row.today.today:has(> .sec-host){padding-left:2px!important;padding-right:2px!important;}
-#todayScroll .day-editor > [data-tsec]{margin-top:4px!important;margin-bottom:2px!important;}
-/* A little space between Morn / After / Night (2026-11-07): gap + the thin line above After and Night. */
-#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){margin-top:12px!important;padding-top:4px!important;}
-/* One line: icon, label, then the count as a small green cell like the group buttons (51/53 ✓ −). */
-#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){flex-wrap:nowrap!important;align-items:center;gap:2px;padding-left:2px!important;}
-#todayScroll .day-editor > [data-tsec]:has(> .ts-lab):has(> .ts-sum){flex-wrap:wrap!important;} /* the folded list still goes under the line */
-#todayScroll .day-editor > [data-tsec] > .ts-lab{flex:0 1 auto!important;}
-#todayScroll .day-editor > [data-tsec]::before{margin-right:1px!important;}
-#todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{content:attr(data-tsinfo)!important;flex:0 0 auto!important;margin-left:2px;padding:0 4px;font-size:10px;font-weight:700;line-height:1.35;letter-spacing:0;text-transform:none;white-space:nowrap!important;color:#1e9e50;border:1px solid #22a55a;border-radius:5px;}
-#todayScroll .day-editor > [data-tsec][data-tsf="c"]:has(> .ts-lab)::after{content:"+\00A0" attr(data-tsinfo)!important;} /* folded: + in front; open: just the count (tap the header to fold) */
-/* Header lines (2026-11-07, Julius): the line under each time section's title is 1px in the section's own color
-   (Morn yellow, Aft orange, Eve purple), the same for all three; no extra line above Aft / Eve inside their box. */
-#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"]){border-top:0!important;padding-top:1px!important;}
-#todayScroll .day-editor > [data-tsec="morning"][data-tsf="o"]{border-bottom:1px solid var(--sec-m-bd)!important;}
-#todayScroll .day-editor > [data-tsec="afternoon"][data-tsf="o"]{border-bottom:1px solid var(--sec-a-bd)!important;}
-#todayScroll .day-editor > [data-tsec="evening"][data-tsf="o"]{border-bottom:1px solid var(--sec-e-bd)!important;}
-/* Tighter titles (2026-11-07, Julius): less empty space in the Morn / Aft / Eve title rows. */
-#todayScroll .day-editor > [data-tsec]:has(> .ts-lab){padding-top:0!important;padding-bottom:1px!important;align-items:center!important;}
-#todayScroll .day-editor > [data-tsec] > .ts-lab{line-height:1.1!important;}
-#todayScroll .day-editor > [data-tsec]::before{margin-top:0!important;}
-#todayScroll .day-editor > [data-tsec][data-tsf]:has(> .ts-lab)::after{line-height:1.2!important;}
-#todayScroll .day-editor > [data-tsec][data-tsec] + :is([data-cgrp],.check-line,[data-tl]){margin-top:2px!important;}
-#todayScroll .day-editor > [data-tsec][data-tsec]{margin-bottom:0!important;}
-/* Space between Morn / Aft / Eve boxes (2026-11-07, Julius: ~50px → a small, comfortable gap). The blank line(s) right
-   before a section title are squeezed to 3px (still in the cell, never removed), and the title's top margin is 8px. */
-#todayScroll .day-editor > div:not([data-tsec]):not(.check-line):not([data-cgrp]):not([data-tl]):is(:empty,:has(> br:only-child)):is(:has(+ [data-tsec]),:has(+ div:is(:empty,:has(> br:only-child)) + [data-tsec])){height:3px!important;min-height:0!important;margin:0!important;padding:0!important;font-size:0!important;line-height:0!important;overflow:hidden!important;}
-#todayScroll .day-editor > :is([data-tsec="afternoon"],[data-tsec="evening"])[data-tsec]{margin-top:8px!important;}
-/* Group names (Gantt, Userscripts…): underlined, not bold. */
-#todayScroll .day-editor > [data-cgrp] :is(b,strong){font-weight:400!important;}
-#todayScroll .day-editor > [data-tsec] ~ .check-line{margin-top:1px!important;margin-bottom:1px!important;padding-top:1px!important;padding-bottom:1px!important;}
-#todayScroll .day-editor > [data-tsec] ~ [data-cgrp]{margin-top:4px!important;margin-bottom:0!important;}
-</style>
+<!-- style moved to Index_LateCss.html (2026-11-24: first paint = final look) -->
 <script>
 /* Header rows slide left / right on the phone (2026-11-04, Julius): the rows already scroll sideways, but a swipe
    that starts on the search box was taken by the box itself (it's the widest thing there), so the row never moved.

@@ -13,6 +13,7 @@ Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.m
 | File | Holds |
 |---|---|
 | `Index.html` | head, theme script, `<body>` markup, `__FW_INITIAL__` / build scriptlets, WeekdayIcons + Drafts includes |
+| `Index_LateCss.html` | (2026-11-24) the CSS of Cards / Extras / Calendar / Layout (incl. `#uiBatchCss`), at the top of `<body>` so the first paint has it; add feature CSS here, not in script parts |
 | `Index_Css.html` | base CSS + light / dark theme; last block `#wsFrame` = workspace frame + `--ws-*` tokens (head on purpose) |
 | `Index_Main.html` | main app script (`STATE` banner) |
 | `Index_Cards.html` | side space slider, task cards + subject colors, theme select, card fill, saved looks |

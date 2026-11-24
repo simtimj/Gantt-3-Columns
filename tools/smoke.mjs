@@ -3827,7 +3827,7 @@ if (only('pwa-d2')) {
   const { execFileSync } = await import('child_process');
   const http = await import('http');
   const dist = path.join(os.tmpdir(), 'gantt-pwa-d2-smoke');
-  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['focus', 'inbox', 'plan', 'timer', 'cal'], apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
+  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['focus', 'inbox', 'plan', 'timer', 'cal'], calFn: 'https://fn.test/cal', apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
   execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
   const FAKE = `if (!window.firebase) window.firebase = (function () {
     const now = Date.now();
@@ -3878,7 +3878,7 @@ if (only('pwa-d2')) {
       where: (f, op, v) => ({ get: () => Promise.resolve({ docs: all(n).filter(x => x.data()[f] >= v) }), onSnapshot: () => () => {} }),
       onSnapshot: (cb) => { if (n === 'ganttCal') setTimeout(() => cb({ docChanges: () => [] }), 0);
         else { (S.subs[n] = S.subs[n] || []).push(cb); setTimeout(() => cb({ docs: all(n) }), 0); } return () => {}; } });
-    const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com' }), 0), signOut: () => {} });
+    const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com', getIdToken: () => Promise.resolve('idtok') }), 0), signOut: () => {} });
     auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
     const firestore = () => ({ enablePersistence: () => Promise.resolve(), collection: collRef });
     firestore.FieldValue = { serverTimestamp: () => Date.now(), increment: n => ({ __inc: n }) };
@@ -3903,6 +3903,17 @@ if (only('pwa-d2')) {
       : fn === 'getCalendarRange' ? { events: [], calendars: [], failed: [], via: 'api' } : fn === 'getTimerEvents' ? [] : null;
     const r = req.fn === 'batchCalls' ? req.a[0].map(c => ({ ok: true, r: one(c[0]) })) : one(req.fn);
     route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
+  });
+  // Cloud Function (I): fnMode = ok | fallback | error | down
+  const fnCalls = []; let fnMode = 'ok';
+  await ctx.route('https://fn.test/**', route => {
+    const q = route.request();
+    if (q.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type' } });
+    const req = JSON.parse(q.postData() || '{}'); fnCalls.push(req.fn + ':' + (q.headers().authorization || ''));
+    if (fnMode === 'down') return route.abort();
+    const body = fnMode === 'fallback' ? { fallback: 'not shared' } : fnMode === 'error' ? { ok: false, e: 'Done events stay where they are' }
+      : { ok: true, r: Object.assign({ eventId: 'e1@google.com', startMs: 5, calId: 'main', title: 'Fn' }, req.fn === 'calPanelMoveEvent' ? { relink: true, copyAt: Date.now() } : { copyAt: Date.now() }) };
+    route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(body) });
   });
   const pg = await ctx.newPage();
   pg.on('pageerror', e => errs.push('page error: ' + e.message + (process.env.SMOKE_STACK ? ' ' + e.stack : '')));
@@ -3992,6 +4003,25 @@ if (only('pwa-d2')) {
   if (!nd || nd.at !== 0 || !nd.tmr.o3) errs.push('timer save on a day with no doc: ' + JSON.stringify(nd));
   te = await run('getTimerEvents', today);
   if (te.map(e => e.op).join() !== 'o1,o2,o3') errs.push('timer read after save: ' + te.map(e => e.op).join());
+  // ---- Calendar edits on the Cloud Function (I)
+  calls.length = 0; fnCalls.length = 0;
+  let fr = await run('calPanelCreateEvent', { title: 'x', allDay: true, start: today, end: today, opId: 'o1' });
+  if (fr.title !== 'Fn' || 'copyAt' in fr || fnCalls.join() !== 'calPanelCreateEvent:Bearer idtok' || calls.includes('calPanelCreateEvent') || calls.includes('calSyncNow')) errs.push('fn create: ' + JSON.stringify(fr) + ' fn ' + fnCalls.join() + ' srv ' + calls.join());
+  fr = await run('calPanelMoveEvent', { eventId: 'e1@google.com', startMs: 5 }); await pg.waitForTimeout(300);
+  if ('relink' in fr || !calls.includes('planRelinkEvent') || calls.includes('calPanelMoveEvent')) errs.push('fn move: relink in the background: ' + calls.join());
+  fnMode = 'fallback'; calls.length = 0;
+  await run('setCalendarEventDone', 'main', 'e1@google.com', 5, true);
+  if (!calls.includes('setCalendarEventDone')) errs.push('fn fallback did not go to Apps Script');
+  fnMode = 'error'; calls.length = 0;
+  const fe = await run('calPanelMoveEvent', { eventId: 'e1@google.com', startMs: 5 }).catch(e => 'ERR ' + e);
+  if (!/Done events stay/.test(String(fe)) || calls.includes('calPanelMoveEvent')) errs.push('fn error not shown as is: ' + fe + ' ' + calls.join());
+  fnMode = 'down'; calls.length = 0; fnCalls.length = 0;
+  const fd = await run('calPanelCreateEvent', { title: 'y', allDay: true, start: today, end: today, opId: 'o2' }).catch(e => 'ERR ' + e);
+  if (!/Not sure the event was created/.test(String(fd)) || calls.includes('calPanelCreateEvent') || fnCalls.length !== 2) errs.push('fn create while down: ' + fd + ' fn ' + fnCalls.length + ' srv ' + calls.join());
+  calls.length = 0;
+  await run('calPanelDeleteEvent', { eventId: 'e1@google.com', startMs: 5 });
+  if (!calls.includes('calPanelDeleteEvent')) errs.push('fn down: delete did not go to Apps Script');
+  fnMode = 'ok';
   // ---- Batched reads: the database answers what it can; only the rest goes to the server.
   batches.length = 0; calls.length = 0;
   const bo = await run('batchCalls', [['getFocus', []], ['getInbox', []], ['getSyncState', [{}]], ['getPlan', [today]]]);
@@ -4023,7 +4053,7 @@ if (only('pwa-d2')) {
   if (!calls.includes('getCalendarEvents')) errs.push("yesterday's Cal Events list was used");
   await ctx.close(); srv.close();
   if (errs.length) { fails += errs.length; console.error('✗ pwa-d2:\n  ' + errs.join('\n  ')); }
-  else console.log('✓ pwa-d2: Focus (device merge, base refusal re-merge, loser backup), Inbox, Plan + Cal Backlog, timer events, Cal Events list from the database; batch split; offline Focus + Inbox saves, Plan read-only');
+  else console.log('✓ pwa-d2: Focus (device merge, base refusal re-merge, loser backup), Inbox, Plan + Cal Backlog, timer events, Cal Events list from the database; calendar edits on the Cloud Function (fallback, errors, create retry); batch split; offline Focus + Inbox saves, Plan read-only');
 }
 for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
   const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' });

@@ -1,0 +1,43 @@
+name: Deploy Cloud Functions
+
+# NOTES I (2026-11-24): calendar edits on Firebase Cloud Functions (functions/). Deploys when functions/ changes, or by
+# hand (Run workflow). Does nothing until the FIREBASE_SA_KEY secret (service account JSON key) is added.
+on:
+  push:
+    branches: [main]
+    paths: ['functions/**', 'firebase.json', '.firebaserc', '.github/workflows/functions.yaml', 'tools/functions-test.mjs']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SA_KEY: ${{ secrets.FIREBASE_SA_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Waiting for setup
+        if: env.SA_KEY == ''
+        run: echo "FIREBASE_SA_KEY secret not set yet (docs/NOTES.md → I) — nothing to deploy"
+
+      - uses: actions/setup-node@v4
+        if: env.SA_KEY != ''
+        with:
+          node-version: 22
+
+      - name: Tests
+        if: env.SA_KEY != ''
+        run: node tools/functions-test.mjs
+
+      - name: Install
+        if: env.SA_KEY != ''
+        working-directory: functions
+        run: npm install --omit=dev --no-audit --no-fund
+
+      - name: Deploy
+        if: env.SA_KEY != ''
+        run: |
+          printf '%s' "$SA_KEY" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx -y firebase-tools@13 deploy --only functions --project gantt-2ee94 --non-interactive --force
+          rm -f "$RUNNER_TEMP/sa.json"

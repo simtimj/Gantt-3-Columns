@@ -1177,6 +1177,13 @@ const Store = {
         hs[m] = h;
         if (prev[m] !== h) list.push([this.COLL + '/' + m, { month: m, ev: txt, h: h, n: byMonth[m].length, at: now, up: new Date(now) }]);
       });
+      // I: a month the Cloud Function changed after this copy's calendar read began keeps the function's version
+      // (this copy may be older); its hash isn't recorded, so the next run rewrites it from a fresh read.
+      if (info.readAt && list.length) {
+        const keep = list.filter(x => { const d = StoreFs.get(x[0]); return !(d && Number(d.fnAt) > info.readAt); });
+        list.filter(x => keep.indexOf(x) < 0).forEach(x => { delete hs[x[1].month]; });
+        list.length = 0; keep.forEach(x => list.push(x));
+      }
       if (list.length) StoreFs.patchMany(list);
       StoreFs.set(this.COLL + '/meta', { v: 1, from: info.from, to: info.to, months: JSON.stringify(Object.keys(hs)), cals: JSON.stringify(info.cals || []),
         failed: JSON.stringify(info.failed || []), main: String(info.main || ''), tz: String(info.tz || ''), via: String(info.via || ''), at: now, up: new Date(now) });

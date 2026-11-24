@@ -134,7 +134,11 @@
       setCalendarEventDone: 1, archiveCompletedTasks: 1, calBacklogComplete: 1, planSave: 1, planMoveEvent: 1, calBacklogSync: 1,
       calBacklogPlace: 1, calBacklogPlaceMany: 1, calRetitleLinked: 1 };
     var OWNER = String(FB_CFG.owner || '').toLowerCase(), cfg = Object.assign({}, FB_CFG);
-    delete cfg.owner; delete cfg._note; delete cfg.areas;
+    delete cfg.owner; delete cfg._note; delete cfg.areas; delete cfg.calFn;
+    // I (2026-11-24): calendar edits on the Cloud Function (config calFn = its URL; empty = off, Apps Script as before).
+    var FN_URL = String(FB_CFG.calFn || ''), FN_NAMES = { calPanelCreateEvent: 1, calPanelUpdateEvent: 1, calPanelMoveEvent: 1,
+      calPanelDeleteEvent: 1, calPanelDuplicateEvent: 1, setCalendarEventTitle: 1, setCalendarEventDone: 1 };
+    if (FN_URL && CAL) Object.keys(FN_NAMES).forEach(function (n) { NAMES[n] = 1; });
     var db = null, user = null, lastAt = null, watching = false;
     var dev = ls.get(DEV_LS);
     if (!dev) { dev = (/Android|iPhone|iPad/i.test(navigator.userAgent) ? 'phone-' : 'pc-') + Math.random().toString(36).slice(2, 8); ls.set(DEV_LS, dev); }
@@ -689,6 +693,8 @@
         },
         run: function (name, a) { return withTimeout(first, 3000).catch(function () {}).then(function () { return RUN[name].apply(null, a || []); }); },
         okAt: okAt,
+        // The function already put its edit into the copy (meta.at = at): use the copy again once that arrives.
+        settle: function (at) { ++touchN; dirtyAt = Date.now(); wantAt = Number(at) || 0; caught(); },
         // An edit just went through: use the server until the copy catches up, and ask it to catch up now.
         touch: function () {
           var n = ++touchN;
@@ -1336,6 +1342,32 @@
             dayRows: Object.keys(by).length, refRows: reference.length } };
       });
     }
+    // Calendar edit on the Cloud Function: its answer, or null (→ Apps Script). A create whose request may have gone
+    // through is retried here (same opId = no second event) instead of handed to Apps Script.
+    function fnRun(name, args, again) {
+      if (!user || !navigator.onLine) return Promise.resolve(null);
+      var sent = false;
+      return user.getIdToken().then(function (tok) {
+        sent = true;
+        return withTimeout(fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+          body: JSON.stringify({ fn: name, a: args }) }), 15000);
+      }).then(function (res) { return res.json(); }).then(function (j) {
+        if (j && j.fallback) { console.warn('Calendar → Apps Script: ' + j.fallback); return null; }
+        if (!j || !j.ok) throw Object.assign(new Error((j && j.e) || 'Calendar error'), { shown: true });
+        var r = j.r;
+        if (r && typeof r === 'object') {
+          if (r.copyAt) cal.settle(r.copyAt); else cal.touch(); // repeating events: the server re-copies, as before
+          if (r.relink) call('planRelinkEvent', [r.calId, r.eventId, r.startMs]).catch(function () {});
+          delete r.copyAt; delete r.relink;
+        }
+        return r;
+      }, function (e) {
+        if (e && e.shown) throw e;
+        if (name === 'calPanelCreateEvent' && sent && !again) return fnRun(name, args, true);
+        if (name === 'calPanelCreateEvent' && sent) throw new Error('Not sure the event was created — tap ↻ on the Calendar before trying again');
+        return null;
+      });
+    }
     // The database answer, or null (→ the server).
     function dbRun(name, args) {
       return withTimeout(boot, 4000).then(function () {
@@ -1399,6 +1431,10 @@
       },
       run: function (name, args) {
         if (name === 'batchCalls') return batch(args[0]);
+        if (FN_URL && FN_NAMES[name]) return withTimeout(boot, 4000).catch(function () {}).then(function () { return fnRun(name, args); }).then(function (r) {
+          if (r) { fromDb[name] = 1; return r; }
+          return call(name, args);
+        });
         return dbRun(name, args).then(function (r) {
           if (r) { fromDb[name] = 1; return r; }
           return call(name, args).then(function (x) { if (name === 'getSyncState') lastSrvSync = Date.now(); return x; });

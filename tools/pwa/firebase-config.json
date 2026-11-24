@@ -1,5 +1,5 @@
 {
-  "_note": "Firebase web config (public by design; the Firestore rules lock the data to owner). Empty apiKey = database step off. projectId must equal FIREBASE_PROJECT_ in Store.gs (check.mjs). areas = what lives in the database, same list as STORE_DB_AREAS_ (check.mjs). docs/NOTES.md → H3, H4, H5 C, F, D2.",
+  "_note": "Firebase web config (public by design; the Firestore rules lock the data to owner). Empty apiKey = database step off. projectId must equal FIREBASE_PROJECT_ in Store.gs (check.mjs). areas = what lives in the database, same list as STORE_DB_AREAS_ (check.mjs). docs/NOTES.md → H3, H4, H5 C, F, D2. calFn = URL of the Cloud Function `cal` (calendar edits, NOTES I); empty = off.",
   "owner": "juliussimtim@gmail.com",
   "areas": [
     "kim",
@@ -17,5 +17,6 @@
   "projectId": "gantt-2ee94",
   "storageBucket": "gantt-2ee94.firebasestorage.app",
   "messagingSenderId": "269617310727",
-  "appId": "1:269617310727:web:c78078b8c26e5b915d0ea2"
+  "appId": "1:269617310727:web:c78078b8c26e5b915d0ea2",
+  "calFn": ""
 }

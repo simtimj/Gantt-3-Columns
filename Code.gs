@@ -2699,7 +2699,7 @@ function calCopySync_() {
     const by = {};
     w.months.forEach(m => { by[m] = []; });
     r.events.forEach(ev => calCopyMonths_(ev, w.months).forEach(m => by[m].push(ev)));
-    const out = Store.cal.sync(by, { from: w.from, to: w.to, tz: tz, cals: r.calendars, failed: r.failed, main: EVENT_CALENDARS[0], via: r.via });
+    const out = Store.cal.sync(by, { from: w.from, to: w.to, tz: tz, cals: r.calendars, failed: r.failed, main: EVENT_CALENDARS[0], via: r.via, readAt: t0 });
     if (ce) try { Store.cal.events(ce); } catch (e) { console.error('Cal Events copy: ' + e.message); }
     out.ms = Date.now() - t0;
     return out;
@@ -2851,7 +2851,7 @@ function calPanelSetColor(req) {
   if (c && !/^([1-9]|1[01])$/.test(c)) throw new Error('Unknown color');
   if (c === '8') throw new Error('Graphite = done — use Mark done');
   const ev = calPanelEditable_(r.eventId, r.startMs, calId), props = Store.props;
-  if (String(ev.getColor() || '') === '8') props.setProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs), c || 'default');
+  if (String(ev.getColor() || '') === '8') { props.setProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs), c || 'default'); try { ev.setTag('fwPrev', c || 'default'); } catch (e) { console.error(e); } }
   else ev.setColor(c || '0');
   if (calId === EVENT_CALENDARS[0]) {
     const key = calMetaKey_(String(r.eventId), Number(r.startMs), !!r.recurring);
@@ -2877,7 +2877,7 @@ function calPanelDuplicateEvent(req) {
   } else ev = cal.createEvent(src.getTitle(), src.getStartTime(), src.getEndTime(), opts);
   try { ev.removeAllReminders(); } catch (e) { console.error(e); }
   let c = String(src.getColor() || '');
-  if (c === '8') { const p = Store.props.getProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs)); c = p && p !== 'default' && p !== '8' ? p : ''; }
+  if (c === '8') { let t = ''; try { t = src.getTag('fwPrev') || ''; } catch (e) {} const p = t || Store.props.getProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs)); c = p && p !== 'default' && p !== '8' ? p : ''; }
   if (c) try { ev.setColor(c); } catch (e) { console.error(e); }
   return calPanelOut_(ev, calId);
 }
@@ -3029,6 +3029,12 @@ function planRelink_(ev) {
   if (tid) Store.plan.setLink(tid.slice(0, 66), link);
   return link;
 }
+// I (2026-11-24): after the Cloud Function moved / edited an event, the app calls this in the background so Plan rows and
+// Schedule links follow it (same as the Apps Script edits do inline).
+function planRelinkEvent(calId, eventId, startMs) {
+  try { planRelinkLocked_(calEventAt_(String(calId || EVENT_CALENDARS[0]), String(eventId), Number(startMs))); return { ok: true }; }
+  catch (e) { return { ok: false, e: e.message }; }
+}
 function planRelinkLocked_(ev) {
   if (!Store.plan.exists()) return;
   try { Store.locked(() => planRelink_(ev)); } catch (e) { console.error(e); }
@@ -3105,12 +3111,15 @@ function setCalendarEventDone(calId, eventId, start, done) {
   const ev = calEventAt_(calId, eventId, start);
   const props = Store.props;
   const key = 'calPrev:' + eventId.slice(0, 60) + ':' + Number(start);
+  // The color it had is also kept on the event itself (private tag fwPrev, I: the Cloud Function reads the same tag).
+  let tagPrev = ''; try { tagPrev = ev.getTag('fwPrev') || ''; } catch (e) { tagPrev = ''; }
   if (done) {
     const cur = String(ev.getColor() || '');
-    if (cur !== '8') props.setProperty(key, cur || 'default');
+    if (cur !== '8') { props.setProperty(key, cur || 'default'); try { ev.setTag('fwPrev', cur || 'default'); } catch (e) { console.error(e); } }
     ev.setColor('8');
   } else {
-    const prev = props.getProperty(key);
+    const prev = tagPrev || props.getProperty(key);
+    if (tagPrev) try { ev.deleteTag('fwPrev'); } catch (e) { console.error(e); }
     // '0' clears the event color so a default-colored event goes back to the calendar's own color.
     ev.setColor(prev && prev !== '8' && prev !== 'default' ? prev : prev === 'default' ? '0' : '5');
     props.deleteProperty(key);

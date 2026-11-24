@@ -16,7 +16,7 @@ export const COLORS = { '1': '#7986cb', '2': '#59af80', '3': '#8e24aa', '4': '#e
   '7': '#5398cf', '8': '#808080', '9': '#7577c4', '10': '#0b8043', '11': '#de583d' }; // = CAL_PANEL_COLORS_
 export const UNASSIGNED = '#8a8f98';
 export const URG_COLOR = { '1': '11', '2': '5', '3': '9' }; // = URG_EVENT_COLOR_
-export const ORD_TAG = 'fwOrd', SCHED_TAG = 'fwSched', PREV_TAG = 'fwPrev', TID_TAG = 'ganttTid';
+export const ORD_TAG = 'fwOrd', SCHED_TAG = 'fwSched', PREV_TAG = 'fwPrev', TID_TAG = 'ganttTid', LINK_TID = 'fwTid', LINK_TT = 'fwTt';
 const DAY = 864e5;
 
 export class Fallback extends Error { constructor(m) { super(m); this.fallback = true; } }
@@ -129,7 +129,8 @@ export function makeCal(api, db) {
       start: allDay ? ymd(st) : isoLocal(st), end: allDay ? ymd(en) : isoLocal(en),
       color: COLORS[colorId] || (calId === MAIN ? UNASSIGNED : c.color || '#039be5'), colorId, done: colorId === '8',
       location: it.location || '', desc: plainDesc(it.description), recurring: !!it.recurringEventId, link: it.htmlLink || '', editable: true,
-      sched: !allDay && p[SCHED_TAG] === '1', ord: allDay ? Number(p[ORD_TAG]) || 0 : 0, life: allDay && calId === EVENTS_CAL
+      sched: !allDay && p[SCHED_TAG] === '1', ord: allDay ? Number(p[ORD_TAG]) || 0 : 0, life: allDay && calId === EVENTS_CAL,
+      tid: p[LINK_TID] || '', tt: p[LINK_TT] || '' // linked task (Code.gs CAL_TID_TAG / CAL_TT_TAG)
     };
     if (old) ['due', 'dur', 'cat'].forEach(k => { if (old[k]) out[k] = old[k]; });
     if (old && old.urg && !old.uc) out.urg = old.urg;
@@ -180,7 +181,7 @@ export function makeCal(api, db) {
   const OPS = {
     async calPanelCreateEvent(req) {
       const w = when(req), opId = String((req && req.opId) || '').replace(/[^\w-]/g, '').slice(0, 60);
-      const calId = String((req && req.calId) || MAIN);
+      const calId = String((req && req.life) ? EVENTS_CAL : (req && req.calId) || MAIN);
       await writable(calId);
       const opRef = opId ? db.doc('ganttCalOps/' + opId) : null;
       if (opRef) {
@@ -192,7 +193,11 @@ export function makeCal(api, db) {
         }
       }
       const body = Object.assign({ summary: w.title, reminders: { useDefault: false, overrides: [] } }, apiTimes(w));
-      if (w.allDay) body.extendedProperties = { private: { [ORD_TAG]: String(Number(req.ord) || Date.now()) } }; // new all-day = bottom
+      const tags = {};
+      if (w.allDay) tags[ORD_TAG] = String(Number(req.ord) || Date.now()); // new all-day = bottom
+      const tid = String((req && req.tid) || '').replace(/[^\w-]/g, '').slice(0, 60); // linked task (2026-11-23)
+      if (tid) { tags[LINK_TID] = tid; tags[LINK_TT] = w.title; }
+      if (Object.keys(tags).length) body.extendedProperties = { private: tags };
       const it = (await ev.insert({ calendarId: calId, requestBody: body })).data;
       const out = await panel(it, calId, null);
       if (opRef) await opRef.set({ eventId: out.eventId, startMs: out.startMs, calId, at: Date.now() });

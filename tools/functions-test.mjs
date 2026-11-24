@@ -8,7 +8,7 @@ const code = fs.readFileSync('Code.gs', 'utf8');
 assert.ok(code.includes("'" + core.MAIN + "'") && code.includes("'" + core.EVENTS_CAL + "'"), 'calendar ids = Code.gs EVENT_CALENDARS');
 assert.ok(code.includes("const URG_EVENT_COLOR_ = { '1': '11', '2': '5', '3': '9' };"), 'urgency colors = Code.gs');
 Object.entries(core.COLORS).forEach(([k, v]) => assert.ok(new RegExp("'" + k + "': '" + v + "'").test(code), 'color ' + k));
-assert.ok(code.includes("const CAL_ORD_TAG = 'fwOrd'") && code.includes("const CAL_SCHED_TAG = 'fwSched'"), 'tag names');
+assert.ok(code.includes("const CAL_ORD_TAG = 'fwOrd'") && code.includes("const CAL_SCHED_TAG = 'fwSched'") && code.includes("const CAL_TID_TAG = 'fwTid', CAL_TT_TAG = 'fwTt';"), 'tag names');
 
 // Time zone: wall time ↔ ms, across DST.
 assert.equal(core.isoLocal(core.wallMs(2026, 11, 24, 9, 30)), '2026-11-24T09:30:00-08:00');
@@ -76,7 +76,9 @@ const copyEv = (db, m) => JSON.parse(db.D['ganttCal/' + (m || month)].ev);
   assert.equal(again.repeat, true); assert.equal(again.eventId, r.eventId); assert.equal(S.calls.filter(c => c === 'insert').length, 1);
   const ad = await cal.OPS.calPanelCreateEvent({ title: 'Trip', allDay: true, start: '2026-11-29', end: '2026-12-02', ord: 7 });
   assert.equal(ad.ord, 7); assert.equal(ad.allDay, true); assert.equal(ad.end, '2026-12-02');
-  assert.equal(copyEv(db).filter(e => e.title === 'Trip').length, 1); assert.equal(copyEv(db, '2026-12').filter(e => e.title === 'Trip').length, 1, 'spans both months');
+  assert.equal(copyEv(db).filter(e => e.title === 'Trip').length, 1);
+  const lk = await cal.OPS.calPanelCreateEvent({ title: 'Linked', allDay: false, start: '2026-11-25T09:00', end: '2026-11-25T10:00', tid: 't-12$3' });
+  assert.equal(lk.tid, 't-123'); assert.equal(lk.tt, 'Linked'); assert.equal(Object.values(S.items).at(-1).extendedProperties.private.fwTid, 't-123'); assert.equal(copyEv(db, '2026-12').filter(e => e.title === 'Trip').length, 1, 'spans both months');
   await assert.rejects(cal.OPS.calPanelCreateEvent({ title: '', allDay: true, start: '2026-11-29', end: '2026-11-30' }), /Title is empty/);
   await assert.rejects(cal.OPS.calPanelCreateEvent({ title: 'x', calId: 'other@cal' , allDay: true, start: '2026-11-29', end: '2026-11-30' }), e => e.fallback === true);
 }

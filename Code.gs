@@ -3387,11 +3387,12 @@ function saveLookSnapshot(slot, json, ua) {
    the automation NEVER touches the calendar any more — no move to yesterday, no "↪ " prefix, no supersede delete.
    Events stay on the day they were planned.
    - Swept: all-day, main calendar, not repeating, not Graphite, not "[x] " / "↪ " / archive titles, ended before today.
-   - Reconcile (calBacklogRoll_, throttled 3 min, read-only except stripping a leftover "↪ " from the old system):
+   - Reconcile (calBacklogRoll_, throttled 3 min, read-only except cleaning up the old system's "↪ " events: an open
+     one goes back to its planned day once, a done / placed one just loses the prefix):
      the event turned Graphite / "[x] " → row 'done'; moved onto today or later (in Google Calendar or the app) →
      row Placed = that date; deleted → row 'dropped'.
    - Julius's own actions still change events: Backlog drop onto a day (calBacklogPlace) moves it there; ✓ Done
-     (calBacklogComplete) marks it done IN PLACE; ✓ Done · Delete removes it. ✕ only takes it off the list.
+     (calBacklogComplete) marks it done IN PLACE; ✓ Done · Delete and ✕ remove it (list + event).
    - Supersede: a fresh sweep of the same title closes older open rows ('superseded'); their events are left alone.
    ========================================================= */
 const CAL_BACKLOG_SHEET = 'Cal Backlog';
@@ -3525,7 +3526,20 @@ function calBacklogRoll_() {
       if (s.gone) mark = 'dropped';
       else if (calBacklogIsDone_(s.it)) mark = 'done';
       else { const d = calBacklogStartDay_(s.it, tz); if (d >= today) mark = d; }
-      if (!mark) return;
+      if (!mark) {
+        // One-time unpile (2026-11-24 08:33, Julius OK'd "option A"): a task the OLD system moved onto yesterday with
+        // "↪ " goes back to the day it was planned (row Date) and loses the prefix. After that it no longer starts
+        // with "↪ ", so this never runs twice for an event.
+        const it = s.it, t0 = String(it.summary || '');
+        if (t0.indexOf(CAL_BACKLOG_PREFIX) !== 0 || !it.start.date) return;
+        const i0 = open[uid][open[uid].length - 1], day = rows[i0][1];
+        const body = { summary: t0.slice(CAL_BACKLOG_PREFIX.length) };
+        if (/^\d{4}-\d{2}-\d{2}$/.test(day) && day < today && day !== it.start.date) {
+          body.start = { date: day }; body.end = { date: addDaysToDateString_(day, 1) };
+        }
+        try { Calendar.Events.patch(body, calId, it.id); } catch (e) { console.error('calBacklogRoll_ unpile: ' + e); }
+        return;
+      }
       open[uid].forEach(i => { Store.calBacklog.setPlaced(i, mark); rows[i][6] = mark; });
       const t = s.it && String(s.it.summary || '');
       if (t && t.indexOf(CAL_BACKLOG_PREFIX) === 0) {
@@ -3617,8 +3631,10 @@ function calBacklogPlaceIn_(r, rows) {
     if (rows[i][6]) return { ok: true, already: rows[i][6] };
     const calId = EVENT_CALENDARS[0], evId = calBacklogEventId_(id);
     if (r.drop) {
-      // 2026-11-24 (Julius): ✕ only takes it off the list; the event stays on its day as reference.
+      // ✕ = remove the task: off the list AND its calendar event deleted (2026-11-24 08:33, Julius: "it should remove
+      // the calendar event as well"). His own tap, so not "automation".
       Store.calBacklog.setPlaced(i, 'dropped'); rows[i][6] = 'dropped';
+      try { Calendar.Events.remove(calId, evId); } catch (e) { console.error('calBacklogPlace drop: ' + e); }
       return { ok: true };
     }
     const w = calPanelWhen_(Object.assign({}, r, { title: rows[i][2] }));

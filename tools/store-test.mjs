@@ -484,6 +484,47 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
     dctx.calBacklogPublishIfDirty_();
     eq(JSON.parse(fsDocs['gantt/calBacklog'].items.stringValue).map(x => x.title), ['Old task']);
     assert.equal(vm.runInContext('Store.calBacklog.dirty', dctx), false);
+    // ---- Backlog stays put (2026-11-24): sweep + reconcile never move / rename / delete events (only the old "↪ "
+    // cleanup and Julius's own ✕ write to the calendar).
+    {
+      vm.runInContext("Utilities.formatDate = (d, tz, f) => f === 'yyyy-MM-dd' ? new Date(d).toISOString().slice(0, 10) : new Date(d).toISOString().slice(0, 16).replace('T', ' ');", dctx);
+      const T = dctx.Utilities.formatDate(new Date(), 'x', 'yyyy-MM-dd'), D = n => dctx.addDaysToDateString_(T, n);
+      const calls = [], evs = [
+        { id: 'a', iCalUID: 'a@google.com', summary: 'Plain open', start: { date: D(-3) }, end: { date: D(-2) }, colorId: '11' },
+        { id: 'b', iCalUID: 'b@google.com', summary: 'Done one', start: { date: D(-2) }, end: { date: D(-1) }, colorId: '8' },
+        { id: 'c', iCalUID: 'c@google.com', summary: 'Will move', start: { date: D(-2) }, end: { date: D(-1) } },
+        { id: 'd', iCalUID: 'd@google.com', summary: '↪ Old pile', start: { date: D(-1) }, end: { date: D(0) } },
+        { id: 'e', iCalUID: 'e@google.com', summary: '↪ Old done', start: { date: D(-1) }, end: { date: D(0) }, colorId: '8' }];
+      const calWas = dctx.Calendar;
+      dctx.Calendar = { Events: {
+        list: () => ({ items: JSON.parse(JSON.stringify(evs)) }),
+        patch: (b, cal, id) => { calls.push(['patch', id, b]); return {}; },
+        remove: (cal, id) => { calls.push(['remove', id]); },
+        get: () => ({}), update: () => ({}) } };
+      const bl = vm.runInContext('Store.calBacklog', dctx);
+      const before = bl.rows().length;
+      bl.add([['d@google.com|' + D(-6), D(-6), '↪ Old pile', '', '', 's', ''], ['e@google.com|' + D(-5), D(-5), '↪ Old done', '', '', 's', '']]);
+      delete P.calBacklogSwept; delete P.calBacklogRollAt;
+      const sw = dctx.calBacklogSweep_();
+      assert.equal(sw.swept, 2, 'open past all-day tasks indexed (done + ↪ skipped)');
+      assert.deepEqual(calls, [], 'sweep writes nothing to the calendar');
+      const rows = () => bl.rows().slice(before), placed = t => (rows().find(r => r[2].replace('↪ ', '') === t) || [])[6];
+      evs[2].start = { date: D(1) }; evs[2].end = { date: D(2) }; // Julius drags "Will move" onto tomorrow
+      dctx.calBacklogRoll_();
+      assert.equal(placed('Will move'), D(1)); assert.equal(placed('Plain open'), ''); assert.equal(placed('Old done'), 'done');
+      assert.equal(placed('Old pile'), '', 'unpiled task stays in the backlog');
+      const pile = calls.find(c => c[1] === 'd'), done = calls.find(c => c[1] === 'e');
+      assert.deepEqual(JSON.parse(JSON.stringify(pile[2])), { summary: 'Old pile', start: { date: D(-6) }, end: { date: D(-5) } }, 'old ↪ task back on its planned day');
+      assert.deepEqual(JSON.parse(JSON.stringify(done[2])), { summary: 'Old done' }, 'done ↪ task: prefix only');
+      assert.equal(calls.filter(c => c[1] === 'a' || c[1] === 'c').length, 0, 'normal events never touched');
+      assert.equal(calls.filter(c => c[0] === 'remove').length, 0);
+      const pid = rows().find(r => r[2] === 'Plain open')[0];
+      dctx.calBacklogPlace({ id: pid, drop: true });
+      assert.deepEqual(JSON.parse(JSON.stringify(calls[calls.length - 1])), ['remove', 'a'], '✕ deletes the event');
+      assert.equal(placed('Plain open'), 'dropped');
+      dctx.Calendar = calWas; delete P.calBacklogSwept; delete P.calBacklogRollAt;
+      console.log('✓ store-test: backlog sweep / reconcile leave the calendar alone; old ↪ pile unpiled; ✕ deletes');
+    }
     vm.runInContext("calBacklogSweep_ = () => ({ swept: 2 }); calBacklogRoll_ = () => {};", dctx);
     const tick = dctx.calBacklogTick_();
     assert.equal(tick.swept, 2); assert.equal(JSON.parse(fsDocs['gantt/calBacklog'].sweep.stringValue).swept, 2);

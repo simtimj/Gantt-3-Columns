@@ -155,6 +155,32 @@ export function makeCal(api, db) {
     await db.doc('ganttCal/meta').set({ at: now, fnAt: now }, { merge: true });
     return now;
   }
+  // Change fields of entries already in the copy (by panel id); fn(entry) returns the changed entry or null.
+  async function patchCopy(ids, fn) {
+    const m = await copyMeta();
+    if (!m || !ids.length) return 0;
+    const now = Date.now();
+    let hit = false;
+    for (const mo of list(m.months)) {
+      const ref = db.doc('ganttCal/' + mo), snap = await ref.get();
+      if (!snap.exists) continue;
+      let changed = false;
+      const evs = list(snap.data().ev).map(e => { if (ids.indexOf(e.id) < 0) return e; const n = fn(Object.assign({}, e)); if (n) { changed = true; return n; } return e; });
+      if (!changed) continue;
+      hit = true;
+      await ref.set({ ev: JSON.stringify(evs), n: evs.length, fnAt: now, at: now }, { merge: true });
+    }
+    if (!hit) return 0;
+    await db.doc('ganttCal/meta').set({ at: now, fnAt: now }, { merge: true });
+    return now;
+  }
+  // Up to 5 at a time.
+  async function pool(items, f) {
+    const out = new Array(items.length);
+    let i = 0;
+    await Promise.all(Array.from({ length: Math.min(5, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await f(items[k]).then(v => ({ ok: true, v }), e => ({ ok: false, e })); } }));
+    return out;
+  }
   function withCopy(r, at) { return Object.assign({}, r, { copyAt: at || undefined }); }
 
   // calRecurringEdit_: 'one' = this day's instance, 'all' = the series (same shift of start, same length).
@@ -267,6 +293,71 @@ export function makeCal(api, db) {
       if (it.recurringEventId) return { title: name };
       const id = String(eventId) + '|' + startOf(it);
       return withCopy({ title: name }, await intoCopy([id], await panel(res, calId, await oldEntry(id))));
+    },
+    // Quick add from Cal Events (Code.gs addAllDayTask): one-day all-day event on the main calendar, no reminders.
+    async addAllDayTask(dateString, title) {
+      const date = String(dateString || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid calendar date');
+      const name = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+      if (!name) throw new Error('Task name is empty');
+      const it = (await ev.insert({ calendarId: MAIN, requestBody: { summary: name, start: { date }, end: { date: addDays(date, 1) }, reminders: { useDefault: false, overrides: [] } } })).data;
+      const out = await panel(it, MAIN, null);
+      return withCopy({ id: out.eventId, date }, await intoCopy([], out));
+    },
+    // All-day order (Code.gs calPanelSetOrder): [{eventId, startMs, calId, ord}] → private tag fwOrd on each.
+    async calPanelSetOrder(items) {
+      items = (Array.isArray(items) ? items : []).filter(x => x && x.eventId).slice(0, 200);
+      for (const c of new Set(items.map(x => String(x.calId || MAIN)))) await writable(c);
+      const res = await pool(items, async x => {
+        const calId = String(x.calId || MAIN), it = await find(calId, x.eventId, x.startMs), ord = String(Number(x.ord) || 0);
+        await ev.patch({ calendarId: calId, eventId: it.id, requestBody: { extendedProperties: { private: { [ORD_TAG]: ord } } } });
+        return { id: String(x.eventId) + '|' + startOf(it), ord: Number(ord) };
+      });
+      const failed = items.filter((x, i) => !res[i].ok).map(x => String(x.eventId)), ords = {};
+      res.forEach(r => { if (r.ok) ords[r.v.id] = r.v.ord; });
+      const at = await patchCopy(Object.keys(ords), e => Object.assign(e, { ord: ords[e.id] }));
+      return withCopy({ ok: !failed.length, failed }, at);
+    },
+    // Linked tasks (Code.gs calRetitleLinked): [{calId, eventId, startMs, title}] → title + fwTt = title.
+    async calRetitleLinked(items) {
+      items = (Array.isArray(items) ? items : []).filter(x => x && x.eventId).slice(0, 100);
+      for (const c of new Set(items.map(x => String(x.calId || MAIN)))) await writable(c);
+      const res = await pool(items, async x => {
+        const calId = String(x.calId || MAIN), name = String(x.title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+        if (!name) throw new Error('Title is empty');
+        const it = await find(calId, x.eventId, x.startMs);
+        await ev.patch({ calendarId: calId, eventId: it.id, requestBody: { summary: name, extendedProperties: { private: { [LINK_TT]: name } } } });
+        return { id: String(x.eventId) + '|' + startOf(it), name };
+      });
+      const failed = items.filter((x, i) => !res[i].ok).map(x => String(x.eventId)), names = {};
+      res.forEach(r => { if (r.ok) names[r.v.id] = r.v.name; });
+      const at = await patchCopy(Object.keys(names), e => Object.assign(e, { title: names[e.id], tt: names[e.id] }));
+      return withCopy({ ok: !failed.length, failed }, at);
+    },
+    // Color (Code.gs calPanelSetColor). A done event keeps Graphite and the color is saved for "not done" (fwPrev).
+    // Main calendar: the app then has Apps Script update the saved urgency (calMetaUrgFromColor, its properties).
+    async calPanelSetColor(req) {
+      const r = req || {}, calId = String(r.calId || MAIN), c = String(r.colorId || '');
+      if (c && !/^([1-9]|1[01])$/.test(c)) throw new Error('Unknown color');
+      if (c === '8') throw new Error('Graphite = done — use Mark done');
+      await writable(calId);
+      const it = await find(calId, r.eventId, r.startMs), wasDone = String(it.colorId || '') === '8';
+      if (wasDone) await ev.patch({ calendarId: calId, eventId: it.id, requestBody: { extendedProperties: { private: { [PREV_TAG]: c || 'default' } } } });
+      else {
+        const body = Object.assign({}, it);
+        if (c) body.colorId = c; else delete body.colorId;
+        await ev.update({ calendarId: calId, eventId: it.id, requestBody: body });
+      }
+      const out = { colorId: c };
+      if (calId === MAIN) out.metaSync = { eventId: String(r.eventId), startMs: Number(r.startMs), recurring: !!it.recurringEventId, colorId: c };
+      if (it.recurringEventId || wasDone) return out; // repeating: the server re-copies; done: nothing visible changed
+      const id = String(r.eventId) + '|' + startOf(it), u = Object.keys(URG_COLOR).find(k => URG_COLOR[k] === c) || '';
+      const at = await patchCopy([id], e => {
+        e.colorId = c; e.color = COLORS[c] || (calId === MAIN ? UNASSIGNED : e.color); e.done = false;
+        if (calId === MAIN) { delete e.uc; if (u) e.urg = u; else delete e.urg; }
+        return e;
+      });
+      return withCopy(out, at);
     },
     // Graphite = done; the color it had is kept in private tag fwPrev (Apps Script writes the same tag), "not done" puts it back.
     async setCalendarEventDone(calId, eventId, start, done) {

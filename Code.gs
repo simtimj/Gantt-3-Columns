@@ -2853,16 +2853,19 @@ function calPanelSetColor(req) {
   const ev = calPanelEditable_(r.eventId, r.startMs, calId), props = Store.props;
   if (String(ev.getColor() || '') === '8') { props.setProperty('calPrev:' + String(r.eventId).slice(0, 60) + ':' + Number(r.startMs), c || 'default'); try { ev.setTag('fwPrev', c || 'default'); } catch (e) { console.error(e); } }
   else ev.setColor(c || '0');
-  if (calId === EVENT_CALENDARS[0]) {
-    const key = calMetaKey_(String(r.eventId), Number(r.startMs), !!r.recurring);
-    let m = {};
-    try { m = JSON.parse(props.getProperty(key) || '{}'); } catch (e) { m = {}; }
-    const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === c) || '';
-    if (u) m.urg = u; else delete m.urg;
-    if (Object.keys(m).some(k => k !== 's')) props.setProperty(key, JSON.stringify(Object.assign(m, { s: Number(r.startMs) })));
-    else props.deleteProperty(key);
-  }
+  if (calId === EVENT_CALENDARS[0]) calMetaUrgFromColor({ eventId: r.eventId, startMs: r.startMs, recurring: r.recurring, colorId: c });
   return { colorId: c };
+}
+// Saved urgency follows a new color (main calendar). Also called by the app after the Cloud Function set the color (I).
+function calMetaUrgFromColor(x) {
+  const r = x || {}, c = String(r.colorId || ''), props = Store.props, key = calMetaKey_(String(r.eventId), Number(r.startMs), !!r.recurring);
+  let m = {};
+  try { m = JSON.parse(props.getProperty(key) || '{}'); } catch (e) { m = {}; }
+  const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === c) || '';
+  if (u) m.urg = u; else delete m.urg;
+  if (Object.keys(m).some(k => k !== 's')) props.setProperty(key, JSON.stringify(Object.assign(m, { s: Number(r.startMs) })));
+  else props.deleteProperty(key);
+  return { ok: true };
 }
 // Duplicate (Google's ⋮ → Duplicate): same calendar, title, times, location, notes and color; a done copy starts open.
 function calPanelDuplicateEvent(req) {

@@ -37,7 +37,10 @@ function fakeCal() {
     async patch(q) {
       S.calls.push('patch');
       const it = S.items[key(q.calendarId, q.eventId)], b = q.requestBody;
-      Object.keys(b).forEach(k => { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) { it[k] = Object.assign({}, it[k], b[k]); Object.keys(it[k]).forEach(x => { if (it[k][x] === null) delete it[k][x]; }); } else if (b[k] === null) delete it[k]; else it[k] = b[k]; });
+      // Google patch semantics: objects merge recursively (other tags kept), null removes, arrays / values replace.
+      const merge = (dst, src) => { Object.keys(src).forEach(k => { const v = src[k];
+        if (v === null) delete dst[k]; else if (typeof v === 'object' && !Array.isArray(v)) dst[k] = merge(Object.assign({}, dst[k]), v); else dst[k] = v; }); return dst; };
+      merge(it, b);
       return { data: JSON.parse(JSON.stringify(it)) };
     },
     async update(q) {
@@ -146,3 +149,35 @@ const copyEv = (db, m) => JSON.parse(db.D['ganttCal/' + (m || month)].ev);
   assert.equal(db.D['ganttCal/meta'].at, 1, 'repeating edits leave the copy to the server');
 }
 console.log('✓ functions: calendar edits on Cloud Functions (constants = Apps Script, LA time + DST, create + opId, move tags + meta, done / not done via fwPrev, update / title / duplicate / delete, repeating one / all, copy kept in step, fallbacks)');
+
+// ---- J: add all-day task, all-day order, linked rename, color (copy patched; urgency follows on main)
+{
+  const { S, db, cal } = setup();
+  const t = await cal.OPS.addAllDayTask('2026-11-24', '  Buy  milk ');
+  assert.equal(t.date, '2026-11-24'); assert.ok(t.id.endsWith('@google.com')); assert.ok(t.copyAt);
+  const it0 = Object.values(S.items)[0]; assert.equal(it0.summary, 'Buy milk'); assert.equal(it0.end.date, '2026-11-25'); assert.deepEqual(it0.reminders.overrides, []);
+  await assert.rejects(cal.OPS.addAllDayTask('nope', 'x'), /Invalid calendar date/);
+  const a = await cal.OPS.calPanelCreateEvent({ title: 'A', allDay: true, start: '2026-11-25', end: '2026-11-26' });
+  const b = await cal.OPS.calPanelCreateEvent({ title: 'B', allDay: true, start: '2026-11-25', end: '2026-11-26', tid: 'tk1' });
+  const o = await cal.OPS.calPanelSetOrder([{ eventId: a.eventId, startMs: a.startMs, ord: 2 }, { eventId: b.eventId, startMs: b.startMs, ord: 1 }, { eventId: 'gone@google.com', startMs: a.startMs, ord: 3 }]);
+  assert.deepEqual([o.ok, o.failed], [false, ['gone@google.com']]); assert.ok(o.copyAt);
+  assert.deepEqual(copyEv(db).filter(e => e.title === 'A' || e.title === 'B').map(e => e.title + e.ord), ['A2', 'B1']);
+  const rl = await cal.OPS.calRetitleLinked([{ eventId: b.eventId, startMs: b.startMs, title: 'B renamed' }]);
+  assert.equal(rl.ok, true); const bi = Object.values(S.items).find(i => i.summary === 'B renamed');
+  assert.equal(bi.extendedProperties.private.fwTt, 'B renamed'); assert.equal(bi.extendedProperties.private.fwTid, 'tk1', 'other tags kept');
+  assert.equal(copyEv(db).find(e => e.id === b.id).tt, 'B renamed');
+  // color on main: urgency follows (explicit, not uc); clearing the color clears it; metaSync for Apps Script
+  let c = await cal.OPS.calPanelSetColor({ eventId: a.eventId, startMs: a.startMs, colorId: '11' });
+  assert.equal(c.colorId, '11'); assert.deepEqual(c.metaSync, { eventId: a.eventId, startMs: a.startMs, recurring: false, colorId: '11' });
+  let ce = copyEv(db).find(e => e.id === a.id); assert.deepEqual([ce.colorId, ce.urg, ce.uc], ['11', '1', undefined]);
+  c = await cal.OPS.calPanelSetColor({ eventId: a.eventId, startMs: a.startMs, colorId: '' });
+  ce = copyEv(db).find(e => e.id === a.id); assert.deepEqual([ce.colorId, ce.urg, ce.color], ['', undefined, core.UNASSIGNED]);
+  assert.equal(Object.values(S.items).find(i => i.summary === 'A').colorId, undefined);
+  await assert.rejects(cal.OPS.calPanelSetColor({ eventId: a.eventId, startMs: a.startMs, colorId: '8' }), /Mark done/);
+  // done event: stays Graphite, the new color is saved for "not done"
+  await cal.OPS.setCalendarEventDone(core.MAIN, a.eventId, a.startMs, true);
+  await cal.OPS.calPanelSetColor({ eventId: a.eventId, startMs: a.startMs, colorId: '9' });
+  const ai = Object.values(S.items).find(i => i.summary === 'A'); assert.equal(ai.colorId, '8'); assert.equal(ai.extendedProperties.private.fwPrev, '9');
+  assert.equal((await cal.OPS.setCalendarEventDone(core.MAIN, a.eventId, a.startMs, false)).color, '9');
+}
+console.log('✓ functions J: add all-day task, all-day order, linked rename, color (urgency follows, done keeps Graphite)');

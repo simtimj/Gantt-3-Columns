@@ -137,7 +137,8 @@
     delete cfg.owner; delete cfg._note; delete cfg.areas; delete cfg.calFn;
     // I (2026-11-24): calendar edits on the Cloud Function (config calFn = its URL; empty = off, Apps Script as before).
     var FN_URL = String(FB_CFG.calFn || ''), FN_NAMES = { calPanelCreateEvent: 1, calPanelUpdateEvent: 1, calPanelMoveEvent: 1,
-      calPanelDeleteEvent: 1, calPanelDuplicateEvent: 1, setCalendarEventTitle: 1, setCalendarEventDone: 1 };
+      calPanelDeleteEvent: 1, calPanelDuplicateEvent: 1, setCalendarEventTitle: 1, setCalendarEventDone: 1,
+      addAllDayTask: 1, calPanelSetOrder: 1, calRetitleLinked: 1, calPanelSetColor: 1 };
     if (FN_URL && CAL) Object.keys(FN_NAMES).forEach(function (n) { NAMES[n] = 1; });
     var db = null, user = null, lastAt = null, watching = false;
     var dev = ls.get(DEV_LS);
@@ -1367,7 +1368,8 @@
         if (r && typeof r === 'object') {
           if (r.copyAt) cal.settle(r.copyAt); else cal.touch(); // repeating events: the server re-copies, as before
           if (r.relink) call('planRelinkEvent', [r.calId, r.eventId, r.startMs]).catch(function () {});
-          delete r.copyAt; delete r.relink;
+          if (r.metaSync) call('calMetaUrgFromColor', [r.metaSync]).catch(function () {}); // saved urgency (Apps Script properties)
+          delete r.copyAt; delete r.relink; delete r.metaSync;
         }
         return r;
       }, function (e) {

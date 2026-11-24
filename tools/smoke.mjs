@@ -3965,7 +3965,8 @@ if (only('pwa-d2')) {
     const req = JSON.parse(q.postData() || '{}'); fnCalls.push(req.fn + ':' + (q.headers().authorization || ''));
     if (fnMode === 'down') return route.abort();
     const body = fnMode === 'fallback' ? { fallback: 'not shared' } : fnMode === 'error' ? { ok: false, e: 'Done events stay where they are' }
-      : { ok: true, r: Object.assign({ eventId: 'e1@google.com', startMs: 5, calId: 'main', title: 'Fn' }, req.fn === 'calPanelMoveEvent' ? { relink: true, copyAt: Date.now() } : { copyAt: Date.now() }) };
+      : { ok: true, r: Object.assign({ eventId: 'e1@google.com', startMs: 5, calId: 'main', title: 'Fn' }, req.fn === 'calPanelMoveEvent' ? { relink: true, copyAt: Date.now() }
+        : req.fn === 'calPanelSetColor' ? { colorId: '11', metaSync: { eventId: 'e1@google.com', startMs: 5, recurring: false, colorId: '11' }, copyAt: Date.now() } : { copyAt: Date.now() }) };
     route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(body) });
   });
   const pg = await ctx.newPage();
@@ -4062,6 +4063,9 @@ if (only('pwa-d2')) {
   if (fr.title !== 'Fn' || 'copyAt' in fr || fnCalls.join() !== 'calPanelCreateEvent:Bearer idtok' || calls.includes('calPanelCreateEvent') || calls.includes('calSyncNow')) errs.push('fn create: ' + JSON.stringify(fr) + ' fn ' + fnCalls.join() + ' srv ' + calls.join());
   fr = await run('calPanelMoveEvent', { eventId: 'e1@google.com', startMs: 5 }); await pg.waitForTimeout(300);
   if ('relink' in fr || !calls.includes('planRelinkEvent') || calls.includes('calPanelMoveEvent')) errs.push('fn move: relink in the background: ' + calls.join());
+  calls.length = 0;
+  fr = await run('calPanelSetColor', { eventId: 'e1@google.com', startMs: 5, colorId: '11' }); await pg.waitForTimeout(300);
+  if ('metaSync' in fr || fr.colorId !== '11' || !calls.includes('calMetaUrgFromColor') || calls.includes('calPanelSetColor')) errs.push('fn color: urgency sync in the background: ' + JSON.stringify(fr) + ' ' + calls.join());
   fnMode = 'fallback'; calls.length = 0;
   await run('setCalendarEventDone', 'main', 'e1@google.com', 5, true);
   if (!calls.includes('setCalendarEventDone')) errs.push('fn fallback did not go to Apps Script');

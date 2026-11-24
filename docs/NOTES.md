@@ -1251,3 +1251,11 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - **Not moved: archive** (`archiveCompletedTasks`): background job Julius never waits on (calendar panel load / after done), verify-then-delete logic over many events — risk without felt speed.
 - Tests: functions-test "P" (schedule create / again / slot / lost link, DST, relink, backlog place / bulk / fresh / archive / drop / delete), store-test (links seed + ops apply + Done Log once), smoke pwa-d2 (the 5 names go to the function; fallback → Apps Script). Health check lists `gantt/planLinks` and the `ganttBacklogOps` count (should be 0 most of the time).
 
+## Timeline left margin (2026-11-24 09:56, Julius: "reduce empty margin in left side of timeline")
+- Docked + full screen: hour-label cell padding 0, label cushion left 0 / right 8 px (was 14), stacked label left-aligned (Index_LateCss "section 3"). ~6 px more for events.
+
+## Keep In Mind Completed section (2026-11-24 09:57, Julius: "under its category, make a completed section that can also be minimized")
+- Built unattended with defaults: a category = a group (run of non-empty lines) whose first line is a title (plain line or data-tl title cell); bare task runs are left alone. Ticked tasks at the group's task level (lowest data-level under the title) move with their deeper subtasks to the bottom of the group (saved order change; newest tick at the top of Completed); a ticked subtask under an open task stays put.
+- Header `<div data-render-kd contenteditable=false class="kim-done-head">▾ Completed · n</div>` (n = tasks, not lines) is render-only: `cardCleanHtml` drops it and `data-kdhid` (folded lines). Tap = fold; state in `fw.kimDoneFold` (per category title text, per device).
+- Code: Index_Cards `initKim` → `kdLayout` (MutationObserver incl. class changes, 250 ms), `window.fwKimDoneLayout`. Smoke main "KIM Completed".
+

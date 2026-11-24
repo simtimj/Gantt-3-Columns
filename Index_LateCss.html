@@ -1115,6 +1115,9 @@
     color:inherit;border:2px solid var(--urg,#3b82f6);box-shadow:0 6px 18px rgba(0,0,0,.3);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ref-cell-wrapper.rk-armed{outline:2px solid var(--urg,#3b82f6);outline-offset:1px;}
   body.rk-dragging,body.rk-dragging *{user-select:none!important;-webkit-user-select:none!important;}
+  /* Keep In Mind "Completed · n" (2026-11-24, Julius): render-only header under each category, tap = fold. */
+  #kimScroll .kim-editor > .kim-done-head{font-size:.78em;color:var(--muted,#888);padding:3px 2px 1px 6px;margin-top:2px;border-top:1px dashed var(--line,rgba(128,128,128,.35));cursor:pointer;user-select:none;-webkit-user-select:none;}
+  #kimScroll .kim-editor > [data-kdhid]{display:none!important;}
   #kimScroll .kim-editor > .rk-drop-before{box-shadow:0 -3px 0 0 var(--urg,#3b82f6);}
   #kimScroll .kim-editor > .rk-drop-after{box-shadow:0 3px 0 0 var(--urg,#3b82f6);}
   #journalPane button[data-ctab="focus"].rk-drop-tab{outline:2px solid var(--urg,#3b82f6);}
@@ -1303,7 +1306,10 @@
      little room before it (labels) and after it (events). The all-day line stays (asked for 2026-11-21 10:57). */
   #calPanel .fc .fc-timegrid-slot-label,#calPanel .fc .fc-timegrid-axis{border-right:0!important;}
   #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{background-position:calc(100% - 3px) top!important;}
-  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:14px!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-right:8px!important;padding-left:0!important;}
+  /* 2026-11-24 09:56 (Julius: "reduce empty margin in left side of timeline"): hour labels hug the left edge, less room before the sky bar. */
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{padding:0!important;}
+  #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .cp-sl{align-items:flex-start;}
 
   /* 4 + 5. Cards: one corner rounding and one set of card margins everywhere (Today, Notes, Keep In Mind, Next Steps,
      Cal Events, calendar events, title boxes). */

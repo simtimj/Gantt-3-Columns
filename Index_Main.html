@@ -3444,13 +3444,15 @@
   /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
   const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tcstep','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn','data-blkph','data-tbf','data-tbl'];
   function cardCleanHtml(el){
-    if(!el.querySelector('input[data-wired],[data-tbf],[data-tbl],[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph],[data-render-due],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
+    if(!el.querySelector('input[data-wired],[data-tbf],[data-tbl],[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph],[data-render-due],[data-render-kd],[data-kdhid],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
     const c = el.cloneNode(true);
     c.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
     c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => { ['data-tlon','data-tlinfo','data-tlhid','data-tlsum','data-tlbox','data-tlcnt'].forEach(a => n.removeAttribute(a)); n.querySelectorAll(':scope > .tl-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
+    c.querySelectorAll('[data-render-kd]').forEach(n => n.remove()); // Keep In Mind "Completed" header is render-only
+    c.querySelectorAll('[data-kdhid]').forEach(n => n.removeAttribute('data-kdhid')); // folded = this device only
     c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
     c.querySelectorAll('[data-tbl]').forEach(n => { n.style.removeProperty('--tbs'); if(!n.getAttribute('style')) n.removeAttribute('style'); });
     c.querySelectorAll('[data-tbf],[data-tbl]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));

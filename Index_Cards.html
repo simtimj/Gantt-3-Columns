@@ -2793,6 +2793,75 @@
         scroller.appendChild(box);
       });
     }
+    /* Completed section (2026-11-24 09:57, Julius: "under its category, make a completed section that can also be
+       minimized"). Per group (a title + its lines, down to the empty line): ticked tasks at the group's task level move
+       (with their subtasks) to the bottom of the group (newest tick at the top of Completed), under a render-only "Completed · n" header (data-render-kd,
+       never saved). Tap the header = fold / unfold; folded lines get data-kdhid (stripped on save); fold state per
+       category title, this device only (fw.kimDoneFold). Unticking one puts it back above the header. */
+    const KD_LS = 'fw.kimDoneFold';
+    const kdFold = () => { try { return JSON.parse(localStorage.getItem(KD_LS) || '{}') || {}; } catch (e) { return {}; } };
+    const kdKey = (g, i) => { const t = (g[0].matches('.check-line') ? '' : g[0].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60); return t || 'g' + i; };
+    function kdLayout(){
+      if(!loaded || dictating) return false;
+      const isHead = n => n.hasAttribute('data-render-kd');
+      const blank = n => !isHead(n) && !n.classList.contains('check-line') && !n.textContent.trim() && !n.querySelector('input,img');
+      const groups = []; let cur = null;
+      [...ed.children].forEach(n => { if(blank(n)){ cur = null; return; } if(!cur){ cur = []; groups.push(cur); } cur.push(n); });
+      const fold = kdFold(), lv = n => Number(n.getAttribute('data-level')) || 0;
+      let moved = false, changed = false;
+      groups.forEach((g0, gi) => {
+        const head = g0.find(isHead), g = g0.filter(n => !isHead(n));
+        if(!g.length){ if(head){ head.remove(); changed = true; } return; }
+        // Only categories (a title line on top); a run of bare tasks has no category to sit under.
+        if(g[0].classList.contains('check-line') && !g[0].hasAttribute('data-tl')){ if(head){ head.remove(); changed = true; } g.forEach(n => { if(n.hasAttribute('data-kdhid')){ n.removeAttribute('data-kdhid'); changed = true; } }); return; }
+        const tasks = g.slice(1).filter(n => n.classList.contains('check-line'));
+        const base = tasks.length ? Math.min(...tasks.map(lv)) : 0;
+        // Units: a ticked task at the base level + the deeper lines right under it.
+        const units = [], open = [];
+        for(let i = 0; i < g.length; i++){
+          const n = g[i];
+          if(i > 0 && n.classList.contains('check-line') && n.classList.contains('done') && lv(n) === base){
+            const u = [n]; while(i + 1 < g.length && lv(g[i + 1]) > base && g[i + 1].classList.contains('check-line')) u.push(g[++i]);
+            units.push(u);
+          } else open.push(n);
+        }
+        const done = units.flat(), key = kdKey(g, gi), folded = !!fold[key];
+        if(!done.length){ if(head){ head.remove(); changed = true; } return; }
+        // Order wanted: open lines, header, done units. Move only what's out of place.
+        const want = open.concat([null], done), last = open[open.length - 1];
+        let h = head;
+        if(!h){ h = document.createElement('div'); h.setAttribute('data-render-kd', ''); h.contentEditable = 'false'; h.className = 'kim-done-head'; changed = true; }
+        const label = (folded ? '▸ ' : '▾ ') + 'Completed · ' + units.length;
+        if(h.textContent !== label){ h.textContent = label; changed = true; }
+        h.dataset.kdKey = key;
+        let at = last; // open[0] is the group's head line, never moved
+        want.slice(1).forEach(n => {
+          const node = n || h;
+          if(at.nextSibling !== node){ at.after(node); if(n) moved = true; else changed = true; }
+          at = node;
+        });
+        done.forEach(n => { if(folded){ if(!n.hasAttribute('data-kdhid')){ n.setAttribute('data-kdhid', ''); changed = true; } } else if(n.hasAttribute('data-kdhid')){ n.removeAttribute('data-kdhid'); changed = true; } });
+        open.forEach(n => { if(n.hasAttribute('data-kdhid')) n.removeAttribute('data-kdhid'); });
+      });
+      // Headers left outside any group (lines deleted around them).
+      ed.querySelectorAll(':scope > [data-render-kd]').forEach(h => { const p = h.previousElementSibling, nx = h.nextElementSibling;
+        if(!nx || !nx.classList.contains('done') || !p || blank(p)){ h.remove(); changed = true; } });
+      if(moved) schedule();
+      return moved || changed;
+    }
+    ed.addEventListener('click', e => {
+      const h = e.target.closest && e.target.closest('[data-render-kd]'); if(!h || !ed.contains(h)) return;
+      e.preventDefault(); e.stopPropagation();
+      const f = kdFold(), k = h.dataset.kdKey || ''; if(f[k]) delete f[k]; else f[k] = 1;
+      try { localStorage.setItem(KD_LS, JSON.stringify(f)); } catch (err) {}
+      kdLayout(); repaint();
+    });
+    let kdBusy = false;
+    const kdRun = () => { if(kdBusy) return; kdBusy = true; try { kdLayout(); } finally { setTimeout(() => { kdBusy = false; }, 0); } };
+    let kdT = 0;
+    const kdSoon = () => { clearTimeout(kdT); kdT = setTimeout(kdRun, 250); };
+    new MutationObserver(kdSoon).observe(ed, {childList: true, subtree: true, attributes: true, attributeFilter: ['class']});
+    window.fwKimDoneLayout = kdRun;
     const repaint = () => { if(!kgRaf) kgRaf = requestAnimationFrame(paintGroups); };
     window.kimRepaintGroups = repaint;
     new MutationObserver(repaint).observe(ed,{childList:true,subtree:true,characterData:true});

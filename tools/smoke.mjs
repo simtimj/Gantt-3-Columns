@@ -230,6 +230,36 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Insert line: ' + x));
   }
+  // Keep In Mind Completed section (2026-11-24): ticked tasks drop under "Completed · n" at the bottom of their category,
+  // the header folds / unfolds, and neither the header nor the fold is saved.
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      document.querySelector('[data-ctab="focus"]').click(); await wait(400);
+      const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
+      const L = (t, lv, tl, done) => '<div class="check-line' + (done ? ' done' : '') + '" data-level="' + lv + '"' + (tl ? ' data-tl="1"' : '') + '><input type="checkbox"' + (done ? ' checked' : '') + '><span class="check-text">' + t + '</span></div>';
+      ed.insertAdjacentHTML('beforeend', '<div><br></div>' + L('KD cat', 0, true) + L('KD a', 1, false, true) + L('KD a sub', 2) + L('KD b', 1) + L('KD c', 1));
+      refreshCards(ed); window.fwKimDoneLayout(); await wait(100);
+      const f = t => [...ed.querySelectorAll('.check-line')].find(l => l.querySelector('.check-text').textContent.trim() === t);
+      const order = () => { const out2 = []; for (let n = f('KD cat'); n && (n.textContent.trim() || n.matches('.check-line')); n = n.nextElementSibling) out2.push(n.matches('[data-render-kd]') ? 'H' : n.textContent.trim().replace('KD ', '')); return out2.join(','); };
+      if (order() !== 'cat,b,c,H,a,a sub') out.push('order after layout: ' + order());
+      const h = () => ed.querySelector('[data-render-kd]');
+      if (!h() || !/Completed · 1/.test(h().textContent)) out.push('header: ' + (h() && h().textContent));
+      const c = f('KD c'); c.classList.add('done'); c.querySelector('input').checked = true; window.fwKimDoneLayout(); await wait(50);
+      if (order() !== 'cat,b,H,c,a,a sub' || !/· 2/.test(h().textContent)) out.push('tick: ' + order() + ' ' + h().textContent);
+      h().click(); await wait(50);
+      if (f('KD a').getBoundingClientRect().height || f('KD c').getBoundingClientRect().height) out.push('fold did not hide the completed ones');
+      const saved = cardCleanHtml(ed);
+      if (/data-render-kd|data-kdhid|Completed ·/.test(saved)) out.push('render-only bits saved');
+      h().click(); await wait(50);
+      if (!f('KD a').getBoundingClientRect().height) out.push('unfold did not show them');
+      f('KD a').classList.remove('done'); window.fwKimDoneLayout(); await wait(50);
+      if (order() !== 'cat,b,a,a sub,H,c') out.push('untick: ' + order());
+      captureBeforeEdit(ed); const cat = f('KD cat'); const kill = [cat.previousElementSibling]; for (let n = cat; n && (n.textContent.trim() || n.matches('.check-line')); n = n.nextElementSibling) kill.push(n); kill.forEach(x => x && x.remove()); finishEditorEdit(ed);
+      try { localStorage.removeItem('fw.kimDoneFold'); } catch (e) {}
+      document.querySelector('[data-ctab="notes"]').click(); await wait(200);
+      return out; });
+    k.forEach(x => errs.push('KIM Completed: ' + x));
+  }
   // Checkbox cursor (2026-11-21, Julius; NOTES "F. Checkbox cursor"): every way of making a checkbox leaves the caret in
   // its text (right of the box), so the next letters land inside the task. Real key presses, one case per path.
   {

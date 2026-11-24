@@ -3591,8 +3591,9 @@ function calBacklogPublishIfDirty_() {
 function calBacklogTick_() {
   if (!Store.plan.db_()) return { off: true };
   const r = calBacklogSync(), last = Number(Store.props.getProperty('calBacklogPub')) || 0;
-  if (Date.now() - last > 15 * 60000) { Store.calBacklog.publish(r.items); }
-  Store.props.setProperty('calBacklogPub', String(Date.now()));
+  // 2026-11-24 fix: the stamp used to be written every run, so the 15-min republish never happened and the list doc
+  // went stale (> 20 min → the app and the Cloud Function fell back to Apps Script). Now stamped only on a publish.
+  if (Date.now() - last > 15 * 60000) { Store.calBacklog.publish(r.items); Store.props.setProperty('calBacklogPub', String(Date.now())); }
   return { items: r.items.length, swept: r.sweep && r.sweep.swept || 0 };
 }
 /* D2: each Plan row's linked event info (getPlan's `ev`) cached on its doc, so the app has it without a calendar

@@ -6147,7 +6147,7 @@
     const merge = srv => { data = {v:1, items:mergeL(data.items, srv && srv.items), cats:mergeL(data.cats, srv && srv.cats)}; };
     const catSel = document.getElementById('funCat');
     // Date added as "NOV 5" (2026-11-06, Julius: month name, not 11/5).
-    const funDate = ms => { const d = new Date(ms); return d.toLocaleDateString('en-US',{month:'short'}).toUpperCase() + ' ' + d.getDate(); };
+    const funDate = ms => { const d = new Date(ms); return (d.getMonth() + 1) + '/' + d.getDate(); }; // short M/D (2026-11-24, Julius: date column too wide)
     // Order: dragged items get o (lower = higher up); the rest keep newest first.
     const okey = i => i.o != null ? i.o : -(i.c || 0);
     const fid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);

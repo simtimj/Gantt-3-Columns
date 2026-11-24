@@ -1481,4 +1481,12 @@
   #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:10px;}
   #calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:9px;}
   #calPanel .fc-daygrid-event-harness[data-cpgl]::before{font-size:9.5px;}
+  /* Fill gaps (2026-11-24): header ⇕ on while picking; the picked range on the timeline */
+  #calPanel .fc .fc-cpFill-button.cp-on{background:var(--cp-blue,#1a73e8)!important;border-color:var(--cp-blue,#1a73e8)!important;color:#fff!important;}
+  #calPanel .cp-fillband{position:absolute;left:0;right:0;z-index:6;pointer-events:none;background:rgba(138,180,248,.18);border-top:2px solid #8ab4f8;border-bottom:2px solid #8ab4f8;box-sizing:border-box;}
+  #calPanel .cp-fillband.cp-fillmark{background:none;border-bottom:0;}
+  .cp-fillbar{z-index:9600;}
+  /* Fun rows (2026-11-24, Julius: "date column and the x take up too much space"): both hug their content */
+  html body .fun-item .fun-date{margin-left:2px;font-size:.72em;letter-spacing:-.01em;}
+  html body .fun-item .fun-x{flex:0 0 auto;width:auto!important;min-width:0!important;min-height:0!important;height:auto!important;padding:0 1px!important;margin:0 -2px 0 -3px;line-height:1.2;font-size:.8em;}
 </style>

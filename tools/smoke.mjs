@@ -781,7 +781,7 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     if(!sv || !(sv[1][0].cats || []).some(c => c.name === 'Shows')) return ['category not saved'];
     // 2026-11-06: date reads "NOV 5"; hold the checkbox → Move to menu; hold + drag the text onto a category header.
     const dt = sec.querySelector('.fun-date');
-    if(!dt || !/^[A-Z]{3} \d{1,2}$/.test(dt.textContent)) return ['date not like NOV 5: ' + (dt && dt.textContent)];
+    if(!dt || !/^\d{1,2}\/\d{1,2}$/.test(dt.textContent)) return ['date not like 11/5: ' + (dt && dt.textContent)];
     const sel = document.getElementById('funCat'); sel.value = ''; sel.dispatchEvent(new Event('change'));
     inp.value = 'Play Hades'; inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); await wait(800); // let the save's re-render land first
     const hades = () => [...document.querySelectorAll('#funList .fun-item')].find(x => /Play Hades/.test(x.textContent));
@@ -2327,6 +2327,30 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           await gesture(rz, { x: rz.x, y: rz.y + 2 * (s2.y - s1.y) }, phone ? 60 : 0); await waitIdle(); await pg.waitForTimeout(200);
           const e = await ev('b-' + day);
           if (!e || !/T10:30/.test(e.start) || !/T12:30/.test(e.end)) out.push('resize did not end Dentist at 12:30: ' + JSON.stringify(e && [e.start, e.end]));
+        }
+        // Fill gaps (2026-11-24): next day (fresh seed). ⇕ → tap 8:30, tap 14:00 → Dentist (9–10) stretches to the done
+        // Old chore's 1:00 start; done / repeating / Events calendar untouched; no new-event form; Undo puts 10:00 back.
+        {
+          const day2 = await pg.evaluate(async () => { const api = window.fwCalendar.api(); api.incrementDate({ days: 1 }); await new Promise(r => setTimeout(r, 400)); window.__fwFillMain = 'main'; return api.formatIso(api.getDate()).slice(0, 10); });
+          await waitIdle(); await pg.waitForTimeout(200);
+          const nCreate = await calls('calPanelCreateEvent'), f0 = await pg.evaluate(() => window.__fwFill || 0);
+          const btnOk = await pg.evaluate(() => { const b = document.querySelector('#calPanel .fc-cpFill-button'); if (!b) return false; b.click(); return b.classList.contains('cp-on'); });
+          if (!btnOk) out.push('fill gaps: no ⇕ button in the header, or it did not turn on');
+          await center('09:00'); let p1 = await slotPt(day2, '08:30'); if (p1) await pg.mouse.click(p1.x, p1.y + 2); await pg.waitForTimeout(150);
+          await center('13:30'); let p2 = await slotPt(day2, '14:00'); if (p2) await pg.mouse.click(p2.x, p2.y + 2);
+          await pg.waitForFunction(f0 => (window.__fwFill || 0) > f0, f0, { timeout: 4000 }).catch(() => out.push('fill gaps: taps did not run a fill'));
+          await waitIdle(); await pg.waitForTimeout(200);
+          const d = await ev('b-' + day2), c = await ev('c-' + day2), r2 = await ev('r-' + day2), g = await ev('g-' + day2);
+          if (!d || !/T09:00/.test(d.start) || !/T13:00/.test(d.end)) out.push('fill gaps: Dentist not 9:00–1:00 ' + JSON.stringify(d && [d.start, d.end]));
+          if (!c || !/T13:30/.test(c.end) || !r2 || !/T15:15/.test(r2.end) || !g || !/T21:00/.test(g.end)) out.push('fill gaps: touched a done / repeating / other-calendar event');
+          if (await calls('calPanelCreateEvent') !== nCreate) out.push('fill gaps: a tap opened / made a new event');
+          const f1 = await pg.evaluate(() => { document.querySelector('[data-fill-bar] [data-fill-b]').click(); return window.__fwFill || 0; });
+          await pg.waitForFunction(f1 => (window.__fwFill || 0) > f1, f1, { timeout: 4000 }).catch(() => out.push('fill gaps: Undo did not run'));
+          await waitIdle(); const d2 = await ev('b-' + day2);
+          if (!d2 || !/T10:00/.test(d2.end)) out.push('fill gaps: Undo did not put Dentist back to 10:00 ' + JSON.stringify(d2 && d2.end));
+          if (await pg.evaluate(() => window.fwCalendar.fill.active())) out.push('fill gaps: still picking after the fill');
+          await pg.evaluate(async () => { delete window.__fwFillMain; const b = document.querySelector('[data-fill-bar]'); if (b) b.hidden = true; window.fwCalendar.api().incrementDate({ days: -1 }); await new Promise(r => setTimeout(r, 400)); });
+          await waitIdle(); await pg.waitForTimeout(200);
         }
         // Timed → all-day row.
         await center('11:00');

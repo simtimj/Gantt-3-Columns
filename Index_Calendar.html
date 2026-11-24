@@ -1628,9 +1628,10 @@
       // + New are gone (hold / drag on the grid or the all-day row makes a new event).
       // 2026-11-13 (Julius): Plan button gone; ⚙ (calendars list), − +, BL moved up here so the controls sit in one row
       // (wraps to a second row only when the column is too narrow).
-      headerToolbar: { left: 'today title prev,next', center: '', right: 'cpCals cpZoomOut cpZoomIn cpBacklog cpPlan timeGridDay,timeGridWeek cpView cpRefresh cpClose' },
+      headerToolbar: { left: 'today title prev,next', center: '', right: 'cpCals cpFill cpZoomOut cpZoomIn cpBacklog cpPlan timeGridDay,timeGridWeek cpView cpRefresh cpClose' },
       customButtons: {
         cpCals: { text: '⚙', hint: 'Calendars: pick which ones show', click: () => { const f = panel.querySelector('[data-cals-fold]'); if(f) f.click(); } },
+        cpFill: { text: '⇕', hint: 'Fill gaps: tap a start and an end on the timeline; main-calendar events stretch to the next one', click: () => fillToggle() },
         cpZoomOut: { text: '−', hint: 'Zoom out (or pinch)', click: () => setZoom(zoomPx / 1.35) },
         cpZoomIn: { text: '+', hint: 'Zoom in (or pinch)', click: () => setZoom(zoomPx * 1.35) },
         cpBacklog: { text: 'BL', hint: 'Show / hide past unfinished tasks', click: () => blToggle() },
@@ -1713,7 +1714,7 @@
         if(!pending){ const at = finePointer() ? mount.querySelector('.fc-event-mirror,.fc-highlight') : null; openForm(formFromRange(info.allDay, info.startStr, info.endStr)); if(at) popAt(at); } cal.unselect(); },
       firstDay: 0, expandRows: false, stickyHeaderDates: true, navLinks: true,
       events: fetchRange,
-      eventsSet: () => { setTimeout(adLayout, 0); if(typeof fadSoon === 'function') fadSoon(); },
+      eventsSet: () => { if(fill) setTimeout(fillPaint, 0); setTimeout(adLayout, 0); if(typeof fadSoon === 'function') fadSoon(); },
       // Cached days answer at once, so "Loading events…" only shows when Google is really being asked (after 150 ms).
       loading: b => { busy = b; if(!b && keepOpen) setTimeout(reopenKept, 60); if(b){ if(!keepOpen && !detail.querySelector('[data-cal-form],[data-cal-del-yes],[data-cal-scope],[data-cal-qform].dirty,[data-cal-qform]:focus-within')) detail.hidden = true; setTimeout(() => { if(busy && Date.now() >= flashUntil) setState('loading', 'Loading events…'); }, 150); } else setTimeout(refreshState, 0); },
       eventSourceFailure: err => setState('error', 'Couldn’t load events: ' + ((err && err.message) || 'unknown error')),
@@ -2552,7 +2553,133 @@
     return true;
   };
   setTimeout(() => lkSoon(50), 2500); // badges from the device's cached copy, once the cells are drawn
-  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), blReload: () => blLoad(true), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : openNewest(); }, openNewest, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  /* Fill gaps (2026-11-24, Julius): ⇕ in the calendar header → tap a start and an end on the timeline. Inside that range,
+     main-calendar timed events keep their starts and each one's end stretches to the next main event's start (never
+     shrinks). Left alone: other calendars, all-day, done (Graphite), repeating events, and the last event in the range;
+     done / repeating ones still count as the "next" event. Saved one by one through calPanelMoveEvent; a toast offers
+     Undo (puts the old ends back). NOTES "Fill gaps". */
+  let fill = null, fillJob = null; // fill = {a: DateTime|null}; fillJob = last applied change list (for Undo)
+  const fillMain = hint => calsMainId() || String((cals && cals.main) || '') || String(hint || window.__fwFillMain || ''); // __fwFillMain: smoke stub (no calendar list)
+  function fillBar(msg, btn, fn){
+    let t = document.querySelector('[data-fill-bar]');
+    if(!t){ t = document.createElement('div'); t.className = 'cp-bltoast cp-fillbar'; t.setAttribute('data-fill-bar', '');
+      t.innerHTML = '<span data-fill-t></span><button type="button" data-fill-b></button>'; document.body.appendChild(t);
+      t.querySelector('[data-fill-b]').addEventListener('click', e => { e.stopPropagation(); const f = t._fn; if(f) f(); }); }
+    clearTimeout(t._hide);
+    if(!msg){ t.hidden = true; t._fn = null; return t; }
+    t.querySelector('[data-fill-t]').textContent = msg;
+    const b = t.querySelector('[data-fill-b]'); b.textContent = btn || ''; b.hidden = !btn; t._fn = fn || null; t.hidden = false;
+    return t;
+  }
+  function fillBtn(on){ const b = panel.querySelector('.fc-cpFill-button'); if(b){ b.classList.toggle('cp-on', !!on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); } }
+  function fillToggle(){ if(fill) fillCancel(); else fillStart(); }
+  function fillStart(){
+    if(!cal) return;
+    if(moveBusy){ flash('Wait for the last save to finish.'); return; }
+    detail.hidden = true; sheetEv = null; if(typeof qaClose === 'function') qaClose();
+    fill = {a: null}; fillBtn(true); fillPaint();
+    fillBar('Fill gaps: tap where it starts', 'Cancel', fillCancel);
+  }
+  function fillCancel(){ fill = null; fillBtn(false); fillPaint(); fillBar(''); }
+  // Timeline geometry: the slot rows (minutes from midnight) and the day columns, read from what's drawn.
+  function fillLanes(){
+    return [...mount.querySelectorAll('td.fc-timegrid-slot-lane[data-time]')].map(el => { const m = String(el.dataset.time).match(/^(\d+):(\d+)/); return m ? {el, m: +m[1] * 60 + +m[2]} : null; }).filter(Boolean);
+  }
+  const fillCols = () => [...mount.querySelectorAll('td.fc-timegrid-col[data-date]')];
+  function fillAt(x, y){
+    const col = fillCols().find(c => { const r = c.getBoundingClientRect(); return x >= r.left && x < r.right; });
+    const lanes = fillLanes(); if(!col || lanes.length < 2) return null;
+    const step = lanes[1].m - lanes[0].m || 15;
+    let mins = null;
+    for(const ln of lanes){ const r = ln.el.getBoundingClientRect(); if(y >= r.top && y < r.bottom){ mins = ln.m + (y - r.top) / (r.height || 1) * step; break; } }
+    if(mins == null) return null;
+    mins = Math.max(0, Math.min(24 * 60, Math.round(mins / 15) * 15));
+    return L().fromISO(col.dataset.date, {zone: TZ}).startOf('day').plus({minutes: mins});
+  }
+  function fillY(lanes, mins){ // page y of a time (minutes from midnight) on the drawn timeline
+    const step = lanes.length > 1 ? lanes[1].m - lanes[0].m || 15 : 15;
+    let ln = lanes[0]; for(const x of lanes) if(x.m <= mins) ln = x;
+    const r = ln.el.getBoundingClientRect(); return r.top + (mins - ln.m) / step * r.height;
+  }
+  function fillPaint(){
+    mount.querySelectorAll('.cp-fillband').forEach(b => b.remove());
+    if(!fill || !fill.a || !cal) return;
+    const lanes = fillLanes(); if(!lanes.length) return;
+    const a = fill.a, b = fill.b || a;
+    fillCols().forEach(col => {
+      const d0 = L().fromISO(col.dataset.date, {zone: TZ}).startOf('day'), d1 = d0.plus({days: 1});
+      const s = a > d0 ? a : d0, e = b < d1 ? b : d1; if(s > e || (s.equals(e) && !a.equals(b))) return;
+      const fr = col.querySelector('.fc-timegrid-col-frame') || col; const fy = fr.getBoundingClientRect().top;
+      const y1 = fillY(lanes, s.diff(d0, 'minutes').minutes), y2 = fillY(lanes, e.diff(d0, 'minutes').minutes);
+      const band = document.createElement('div'); band.className = 'cp-fillband' + (a.equals(b) ? ' cp-fillmark' : '');
+      band.style.top = (y1 - fy) + 'px'; band.style.height = Math.max(2, y2 - y1) + 'px';
+      if(getComputedStyle(fr).position === 'static') fr.style.position = 'relative';
+      fr.appendChild(band);
+    });
+  }
+  function fillTap(x, y){
+    const t = fillAt(x, y); if(!t || !fill) return;
+    if(!fill.a){ fill.a = t; fillPaint(); fillBar('Fill gaps from ' + t.toFormat('h:mm a').replace(':00', '') + ' — now tap where it ends', 'Cancel', fillCancel); return; }
+    let a = fill.a, b = t; if(b < a){ const c = a; a = b; b = c; }
+    if(a.equals(b)){ fillBar('Tap a different time for the end', 'Cancel', fillCancel); return; }
+    fill.a = a; fill.b = b; fillPaint();
+    const plan = fillPlan(a, b);
+    fill = null; fillBtn(false); fillPaint();
+    if(plan.err){ const t2 = fillBar(plan.err); t2._hide = setTimeout(() => { t2.hidden = true; }, 3500); return; }
+    if(!plan.list.length){ const t3 = fillBar('No gaps to fill there'); t3._hide = setTimeout(() => { t3.hidden = true; }, 3000); return; }
+    fillApply(plan.list, false);
+  }
+  // Pure part (also used by the smoke test): which main events in [a, b) get which new end.
+  function fillPlan(a, b, mainHint){
+    const main = fillMain(mainHint);
+    if(!main) return {err: 'Calendars not loaded yet — open ⚙ once, then try again', list: []};
+    const A = a.toMillis(), B = b.toMillis();
+    const evs = cal.getEvents().filter(e => { const x = e.extendedProps || {};
+      return !e.allDay && e.start && e.end && !x.schCopy && !x.blTmp && !x.fqTmp && x.calId === main && e.start.valueOf() >= A && e.start.valueOf() < B; })
+      .sort((p, q) => p.start - q.start || p.end - q.end);
+    const list = [];
+    evs.forEach((e, i) => { const x = e.extendedProps || {};
+      if(x.done || x.recurring || x.editable === false) return;
+      const nx = evs.slice(i + 1).find(n => n.start.valueOf() > e.start.valueOf()); if(!nx) return; // the last one stays
+      if(nx.start.valueOf() <= e.end.valueOf()) return; // touching or overlapping: nothing to fill
+      list.push({id: e.id, eventId: x.eventId, startMs: x.startMs, calId: x.calId, start: L().fromJSDate(e.start).setZone(TZ), oldEnd: L().fromJSDate(e.end).setZone(TZ), newEnd: L().fromJSDate(nx.start).setZone(TZ)});
+    });
+    return {list};
+  }
+  function fillApply(list, undo){
+    moveBusy = true; gen++;
+    list.forEach(c => { const e = cal.getEventById(c.id); if(e) try { e.setEnd((undo ? c.oldEnd : c.newEnd).toJSDate()); } catch (err) {} });
+    fillBar((undo ? 'Undoing…' : 'Filling ' + list.length + ' gap' + (list.length === 1 ? '' : 's') + '…'));
+    let i = 0, failed = 0;
+    const next = () => {
+      if(i >= list.length){ moveBusy = false; refetchFresh(); loadPlan(true); window.__fwFill = (window.__fwFill || 0) + 1;
+        if(failed) moveFail('Couldn’t save ' + failed + ' of ' + list.length + ' — reloaded from Google.');
+        if(undo){ fillJob = null; const t = fillBar('Gaps put back'); t._hide = setTimeout(() => { t.hidden = true; }, 2500); return; }
+        fillJob = list;
+        const t = fillBar('Filled ' + (list.length - failed) + ' gap' + (list.length - failed === 1 ? '' : 's'), 'Undo', () => { const j = fillJob; if(j && !moveBusy) fillApply(j, true); });
+        t._hide = setTimeout(() => { t.hidden = true; fillJob = null; }, 8000);
+        return; }
+      const c = list[i++];
+      google.script.run.withSuccessHandler(() => next()).withFailureHandler(() => { failed++; next(); })
+        .calPanelMoveEvent({eventId: c.eventId, startMs: c.startMs, calId: c.calId, scope: 'one', allDay: false, start: wall(c.start), end: wall(undo ? c.oldEnd : c.newEnd)});
+    };
+    next();
+  }
+  // While picking, taps on the timeline set the range and nothing else (no new-event form, no card, no drag);
+  // scrolling still works (nothing is prevented until a tap is certain).
+  (() => {
+    let down = null;
+    const inGrid = e => fill && e.target && e.target.closest && e.target.closest('.fc-timegrid-body') && mount.contains(e.target);
+    const block = e => { if(inGrid(e)) e.stopPropagation(); };
+    ['mousedown', 'touchstart', 'mouseup', 'touchend'].forEach(n => mount.addEventListener(n, block, {capture: true, passive: true}));
+    mount.addEventListener('pointerdown', e => { if(!inGrid(e)) return; e.stopPropagation(); down = {x: e.clientX, y: e.clientY, t: Date.now()}; }, true);
+    mount.addEventListener('pointerup', e => { if(!inGrid(e)) return; e.stopPropagation(); const d = down; down = null;
+      if(!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10 || Date.now() - d.t > 800) return;
+      fillTap(e.clientX, e.clientY); }, true);
+    mount.addEventListener('click', e => { if(fill && mount.contains(e.target) && e.target.closest && e.target.closest('.fc-timegrid-body')){ e.stopPropagation(); e.preventDefault(); } }, true);
+    document.addEventListener('keydown', e => { if(fill && e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); fillCancel(); } }, true);
+  })();
+  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), blReload: () => blLoad(true), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : openNewest(); }, openNewest, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag, fill: {start: () => fillStart(), cancel: () => fillCancel(), active: () => !!fill, plan: (a, b, m) => fillPlan(L().fromISO(a, {zone: TZ}), L().fromISO(b, {zone: TZ}), m), run: (a, b, m) => { const p = fillPlan(L().fromISO(a, {zone: TZ}), L().fromISO(b, {zone: TZ}), m); if(p.list.length) fillApply(p.list, false); return p.list.length; }, undo: () => { if(fillJob && !moveBusy) fillApply(fillJob, true); }} };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

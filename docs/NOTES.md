@@ -1237,7 +1237,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - "Do the most recent one": `openNewest()` = `openFull(true)` (force: any layout, phone too; builds the calendar first if needed). 📅 button (`toggle`) and badge tap (`lkJump`) use it. The old pop-out stays reachable via `fwCalendar.open()` (tests, Cal Events pull-down).
 - ⚙ Options: "▸ Calendars" folded every time ⚙ opens (`ceOpt.cals`, `data-ce-calsfold`); the panel's own Calendars section no longer restores `fw.calCalsOpen`.
 - Docked line: search box hidden (a leftover search is cleared on dock), BL count hidden (also the pop-out's). Calendar text ~1 px smaller (Index_LateCss end block).
-- Not done yet (new feature, next session): select an area → main-calendar events only → keep starts, stretch ends to fill gaps; a quick button.
+- Fill gaps: done in its own session (see "Fill gaps" below).
 
 - Still on Apps Script: planSchedule / planMoveEvent, Cal Backlog place / complete, archive (Sheet + Plan links). → moved in "P" (except archive).
 
@@ -1259,3 +1259,9 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Header `<div data-render-kd contenteditable=false class="kim-done-head">▾ Completed · n</div>` (n = tasks, not lines) is render-only: `cardCleanHtml` drops it and `data-kdhid` (folded lines). Tap = fold; state in `fw.kimDoneFold` (per category title text, per device).
 - Code: Index_Cards `initKim` → `kdLayout` (MutationObserver incl. class changes, 250 ms), `window.fwKimDoneLayout`. Smoke main "KIM Completed".
 
+## Fill gaps (2026-11-24 09:57, Julius; all recommended picks + skip done)
+- Pick: ⇕ header button (`cpFill`, after ⚙) → tap start, tap end (`fillTap`; taps on the timeline only set the range while `fill` is on, scrolling still works). Range shown as `.cp-fillband` in each day column; Esc / ⇕ again = cancel.
+- Rule (`fillPlan`): main-calendar timed events starting in [start, end); each one's end → the next main event's start (only when there's a gap; never shrinks). Skipped but still a boundary: done (Graphite), repeating, not editable. Other calendars, all-day and the last event: untouched.
+- Saves one by one with `calPanelMoveEvent` (same id, scope one); toast "Filled N gaps · Undo" 8 s (`fillJob`, Undo = old ends). Hooks: `fwCalendar.fill.{start,cancel,active,plan,run,undo}`; smoke (calendar suite) uses `window.__fwFillMain` because the stub has no calendar list.
+## Fun rows slimmer (2026-11-24 10:05, Julius: "the date column is taking up too much space… and the x")
+- `funDate` → M/D; LateCss end block: smaller date, ✕ with no min size / padding.

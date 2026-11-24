@@ -905,9 +905,22 @@
         if (!metaP) metaP = db.collection('gantt').doc('planMeta').get({ source: 'server' }).then(function (sn) { var d = sn.exists ? sn.data() : null; if (!(d && d.seeded)) metaP = null; return d && d.seeded ? d : null; }, function (e) { metaP = null; throw e; });
         return metaP;
       }
+      // One live listener (D, 2026-11-24): all rows once per app start, then only changes (was a full read per getPlan).
+      var mem = null, live = null;
+      function listen() {
+        if (live) return live;
+        live = new Promise(function (ok) {
+          try {
+            coll().onSnapshot(function (qs) { mem = qs.docs.map(function (sn) { var d = sn.data(); d.id = String(d.id || sn.id); return d; }); ok(true); },
+              function (e) { mem = null; live = null; console.warn('Plan → server: ' + (e && e.code || e)); ok(false); });
+          } catch (e) { live = null; ok(false); }
+        });
+        return live;
+      }
       function rows() {
-        return coll().get({ source: 'server' }).then(function (q) {
-          return q.docs.map(function (sn) { var d = sn.data(); return Object.assign({}, d, { id: String(d.id || sn.id), group: String(d.group || '').toLowerCase(), rank: Number(d.rank) || 0, ref: String(d.ref || '') }); })
+        return withTimeout(listen(), 5000).then(function (on) {
+          if (!on || !mem) throw new Error('Plan listener off');
+          return mem.map(function (d) { return Object.assign({}, d, { group: String(d.group || '').toLowerCase(), rank: Number(d.rank) || 0, ref: String(d.ref || '') }); })
             .filter(function (x) { return !Number(x.del) && x.ref && GROUPS[x.group] !== undefined; });
         });
       }

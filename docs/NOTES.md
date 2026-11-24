@@ -1170,3 +1170,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Inbox (D2 change): one `onSnapshot` on `ganttInbox` keeps the items in memory; reads / writes answer from it (no full read every 3 min).
 - Read budget note: Firestore free tier = 50k reads/day; keep periodic paths incremental or listener-based.
 - Tests: smoke `pwa-hist` (sync part: unchanged → empty, other device's day + card edit → exactly those, no full card re-read).
+
+## D. Plan rows on a listener (2026-11-24 00:05, Julius: "do all of that")
+- Shim `planArea.rows()` now reads from one `onSnapshot` on `ganttPlan` (all rows once per app start, then only changes) instead of a full server read per getPlan / planSave. Same answers; still online-only for edits. Smoke `pwa-d2` (fake notifies listeners on writes; `__fs.touch`).
+- L (speeds after a day) + E (Firebase usage): one-time scheduled task 2026-11-24 evening reads the Speed Log and reports; Firebase reads/day is checked by Julius in the console (Firestore → Usage).

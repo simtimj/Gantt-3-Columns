@@ -3755,7 +3755,7 @@ if (only('pwa-d2')) {
   execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
   const FAKE = `if (!window.firebase) window.firebase = (function () {
     const now = Date.now();
-    const S = window.__fs = { refuseOnce: 0, writes: [], backups: [], subs: {},
+    const S = window.__fs = { refuseOnce: 0, writes: [], backups: [], subs: {}, touch: n => (S.subs[n] || []).forEach(cb => cb({ docs: all(n) })),
       docs: {
         'ganttFocus/main': { v: JSON.stringify({ v: 1, cats: [{ id: 'c1', name: 'Work', items: [{ id: 'i1', t: 'One' }] }] }), at: 10, base: 0 },
         'gantt/inboxMeta': { seeded: 1 }, 'gantt/planMeta': { seeded: 1, cal: 'main' },
@@ -3903,7 +3903,7 @@ if (only('pwa-d2')) {
   if (bl.sweep.swept) errs.push('sweep count shown twice');
   if (calls.includes('calSyncNow')) errs.push('database backlog read asked for a calendar re-copy');
   // The trigger caches the linked event's info on the row.
-  await pg.evaluate(() => { const d = Object.values(__fs.docs).find(x => x.ref === 'tid:ee'); d.ev = JSON.stringify({ eventId: 'new', startMs: 5, title: 'L', done: false, date: '2026-11-23', allDay: true, recurring: false, time: '' }); });
+  await pg.evaluate(() => { const d = Object.values(__fs.docs).find(x => x.ref === 'tid:ee'); d.ev = JSON.stringify({ eventId: 'new', startMs: 5, title: 'L', done: false, date: '2026-11-23', allDay: true, recurring: false, time: '' }); __fs.touch('ganttPlan'); });
   // ---- Block timer (H5 B): read from the day docs, save as one map key per event (merge keeps the others).
   calls.length = 0;
   let te = await run('getTimerEvents', today);

@@ -5,7 +5,7 @@ const html=readIndexHtml();
 const source=html.slice(html.indexOf('  let fwSaveSamples='),html.indexOf('  function fwSpeedLog('));
 let now=0;const logs=[];
 const run={withSuccessHandler(fn){this.ok=fn;return this;},withFailureHandler(fn){this.bad=fn;return this;},logSpeed(kind,timing,client){logs.push({kind,timing,client,ok:this.ok,bad:this.bad});}};
-const c=vm.createContext({console,performance:{now:()=>now},document:{visibilityState:'visible'},google:{script:{run}}});c.window=c;c.innerWidth=412;c.__FW_BUILD__='page';c.__FW_RELEASE__='open-page';c.crypto={randomUUID:()=> 'timing-session'};
+const c=vm.createContext({console,performance:{now:()=>now},document:{visibilityState:'visible',addEventListener(){}},google:{script:{run}}});c.window=c;c.addEventListener=()=>{};c.removeEventListener=()=>{};c.localStorage={getItem:()=>null,setItem(){},removeItem(){}};c.setTimeout=setTimeout;c.clearTimeout=clearTimeout;c.innerWidth=412;c.__FW_BUILD__='page';c.__FW_RELEASE__='open-page';c.crypto={randomUUID:()=> 'timing-session'};
 vm.runInContext(source,c);
 now=125;c.fwObserveSave('day',100,{release:'server-A',build:'build-A'});
 now=160;c.fwObserveSave('reference',140,{release:'server-B',conflict:true});

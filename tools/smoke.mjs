@@ -3653,17 +3653,18 @@ if (only('pwa-cal')) {
   });
   await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
   const base = 'http://127.0.0.1:' + srv.address().port + '/';
-  const errs = [], calls = [];
+  const errs = [], calls = []; let syncAt = 0;
   const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'block' });
   await ctx.route('https://api.test/**', route => {
     const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
+    if (req.fn === 'calSyncNow') syncAt = Date.now() + 60000;
     const r = req.fn === 'getWorkspaceData' ? data : req.fn === 'getSyncState' ? { build: 'smoke', ref: {}, inbox: [], days: {} } : req.fn === 'getFocus' ? focus
       : req.fn === 'getMainCalendarEvents' ? { date: req.a[0], events: [], srv: 1 } : req.fn === 'getCalendarRange' ? { events: [], calendars: [], failed: [], via: 'api' }
-      : req.fn === 'calSyncNow' ? { months: 2, written: 1 } : req.fn === 'calPanelCreateEvent' ? { id: 'n' } : null;
+      : req.fn === 'calSyncNow' ? { months: 2, written: 1, at: syncAt } : req.fn === 'calPanelCreateEvent' ? { id: 'n' } : null;
     route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
   });
   const pg = await ctx.newPage();
-  pg.on('pageerror', e => errs.push('page error: ' + e.message));
+  pg.on('pageerror', e => errs.push('page error: ' + e.message + (process.env.SMOKE_STACK ? ' ' + e.stack : '')));
   await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
   const run = (fn, ...a) => pg.evaluate(([fn, a]) => new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(e => bad(e.message))[fn](...a)), [fn, a]);
   calls.length = 0;
@@ -3695,7 +3696,12 @@ if (only('pwa-cal')) {
   calls.length = 0;
   await run('getMainCalendarEvents', today);
   if (!calls.includes('getMainCalendarEvents')) errs.push('right after an edit the copy was used');
-  await pg.evaluate(() => __fs.push('meta', { at: Date.now() + 5 }));
+  // A copy that finished after the edit but isn't the re-copy it asked for (read before it) must not count.
+  await pg.evaluate(at => __fs.push('meta', { at: at - 1000 }), syncAt);
+  calls.length = 0;
+  await run('getMainCalendarEvents', today);
+  if (!calls.includes('getMainCalendarEvents')) errs.push('an older copy (read before the edit) was taken as caught up');
+  await pg.evaluate(at => __fs.push('meta', { at: at }), syncAt);
   calls.length = 0;
   await run('getMainCalendarEvents', today);
   if (calls.includes('getMainCalendarEvents')) errs.push('copy not used again after it caught up');

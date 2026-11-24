@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 const ctx = vm.createContext({console, Date});
-vm.runInContext((fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8')),ctx);
+vm.runInContext((fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8').replace(/const FIREBASE_PROJECT_ = '[^']*';/, "const FIREBASE_PROJECT_ = '';")),ctx);
 ctx.formatDate_ = v => v instanceof Date ? v.toISOString().slice(0,10) : String(v || '');
 ctx.cellHash_ = v => 'hash:' + String(v || '');
 ctx.parseDate_ = v => new Date(v+'T00:00:00Z');

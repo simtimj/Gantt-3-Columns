@@ -571,7 +571,7 @@
        Server path instead when: no copy / refused (rules not published) / outside the window / copy > 20 min old
        (online) / an edit in the last 90 s that the copy hasn't caught up with. */
     function calArea() {
-      var meta = null, months = {}, off = false, dirtyAt = 0, watching = false, gotFirst, first = new Promise(function (ok) { gotFirst = ok; });
+      var meta = null, months = {}, off = false, dirtyAt = 0, wantAt = 0, touchN = 0, watching = false, gotFirst, first = new Promise(function (ok) { gotFirst = ok; });
       var DAYMS = 864e5;
       function list(x) { try { var v = JSON.parse(x || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
       function watch() {
@@ -584,16 +584,26 @@
               if (id === 'meta') meta = d;
               else if (/^\d{4}-\d{2}$/.test(id)) months[id] = list(d.ev);
             });
-            if (meta && dirtyAt && Number(meta.at) > dirtyAt) dirtyAt = 0;
+            caught();
             gotFirst();
           }, function (e) { off = true; gotFirst(); console.warn('Calendar copy → server: ' + (e && e.code || e)); });
         } catch (e) { off = true; gotFirst(); }
       }
+      /* After an edit the copy counts only once it holds the re-copy that edit asked for (calSyncNow answers with its
+         meta `at`, server clock): a 5-min copy that read the calendar before the edit can finish after it and must
+         not count (it would put a just-dragged event back). Re-copy failed → server path for 6 min (the trigger catches up). */
+      function dirty() {
+        if (!dirtyAt) return false;
+        if (wantAt && meta && Number(meta.at) >= wantAt) { dirtyAt = 0; wantAt = 0; return false; }
+        if (!wantAt && Date.now() - dirtyAt > 6 * 60000) { dirtyAt = 0; return false; }
+        return true;
+      }
+      function caught() { if (dirtyAt) dirty(); }
       function addDay(d, n) { return new Date(Date.parse(d + 'T00:00:00Z') + n * DAYMS).toISOString().slice(0, 10); }
       // Events overlapping [s, e) (yyyy-MM-dd, e exclusive) from the copy, or null → server.
       function pick(s, e) {
         if (off || !meta || Number(meta.v) !== 1) return null;
-        if (dirtyAt && Date.now() - dirtyAt < 90000) return null;
+        if (dirty()) return null;
         if (navigator.onLine && Date.now() - Number(meta.at) > 20 * 60000) return null;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !/^\d{4}-\d{2}-\d{2}$/.test(e) || e <= s || s < meta.from || e > meta.to) return null;
         var have = list(meta.months), seen = {}, out = [];
@@ -647,8 +657,13 @@
         run: function (name, a) { return withTimeout(first, 3000).catch(function () {}).then(function () { return RUN[name].apply(null, a || []); }); },
         // An edit just went through: use the server until the copy catches up, and ask it to catch up now.
         touch: function () {
-          dirtyAt = Date.now();
-          call('calSyncNow', []).then(function (r) { if (r && r.off) dirtyAt = 0; }, function () {});
+          var n = ++touchN;
+          dirtyAt = Date.now(); wantAt = 0;
+          call('calSyncNow', []).then(function (r) {
+            if (n !== touchN) return; // a newer edit asked for its own re-copy
+            if (r && r.off) { dirtyAt = 0; return; }
+            if (r && Number(r.at)) { wantAt = Number(r.at); caught(); }
+          }, function () {});
         }
       };
     }

@@ -942,7 +942,7 @@ const Store = {
       StoreFs.set(this.COLL + '/meta', { v: 1, from: info.from, to: info.to, months: JSON.stringify(Object.keys(hs)), cals: JSON.stringify(info.cals || []),
         failed: JSON.stringify(info.failed || []), main: String(info.main || ''), tz: String(info.tz || ''), via: String(info.via || ''), at: now, up: new Date(now) });
       props.setProperty('calSyncH', JSON.stringify(hs));
-      return { months: Object.keys(hs).length, written: list.length, big: big };
+      return { months: Object.keys(hs).length, written: list.length, big: big, at: now };
     }
   },
 

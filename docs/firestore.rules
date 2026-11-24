@@ -39,6 +39,11 @@ service cloud.firestore {
         && request.resource.data.at > resource.data.at;
       allow delete: if false;
     }
+    // Calendar copy (H5 B2, 2026-11-23): written only by the server (it reads Google Calendar); the app just reads.
+    match /ganttCal/{doc} {
+      allow read: if me();
+      allow write: if false;
+    }
     match /ganttBackup/{id} {
       allow create: if me();
       allow read, update, delete: if false;

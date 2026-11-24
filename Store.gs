@@ -14,7 +14,7 @@
    Sheet. Set = the areas in STORE_DB_AREAS_ live in Firestore, and the timed trigger storeMirror() copies them
    into the Sheet (backup mirror) and moves lost edits from Firestore into the Backup tab. */
 const FIREBASE_PROJECT_ = 'gantt-2ee94';
-const STORE_DB_AREAS_ = ['kim', 'days', 'ref', 'kv']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
+const STORE_DB_AREAS_ = ['kim', 'days', 'ref', 'kv', 'cal']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
 const STORE_BACKEND = {
   kim: 'sheet',
   days: 'sheet',
@@ -24,6 +24,7 @@ const STORE_BACKEND = {
   calBacklog: 'sheet',
   timer: 'sheet',
   kv: 'properties',
+  cal: 'sheet', // calendar copy (H5 B2): off = the app reads Google Calendar through the server, as before
   props: 'properties'
   // calBacklog, timer, props, study, logs: still direct, moving in this order
 };
@@ -31,7 +32,7 @@ const STORE_BACKEND = {
 if (FIREBASE_PROJECT_) STORE_DB_AREAS_.forEach(a => { STORE_BACKEND[a] = 'db'; });
 // Archive = Reference cards marked deleted in the same docs (NOTES H5 C), so it follows Reference.
 if (STORE_BACKEND.ref === 'db') STORE_BACKEND.archive = 'db';
-const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true, kv: true };
+const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true, kv: true, cal: true };
 
 function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
@@ -915,6 +916,36 @@ const Store = {
     }
   },
 
+  /* Calendar copy (H5 B2, 2026-11-23): Code.gs calCopySync_ reads the calendar window and hands the events here,
+     bucketed by month. Doc ganttCal/<yyyy-MM> = { month, ev (JSON list, getCalendarRange's event shape + uc = urgency
+     came from the color), h, n, at, up }; only months whose hash changed are written (hashes in prop calSyncH; a full
+     rewrite every 6 h in case a doc went missing). ganttCal/meta = { v, from, to (exclusive), months, cals, failed,
+     main, tz, at, up } is written every run, so its `at` = last good copy (the app ignores a copy > 20 min old).
+     Read-only for the app (rules); Google Calendar stays the source of truth. */
+  cal: {
+    COLL: 'ganttCal',
+    db_() { return storeBackend_('cal') === 'db'; },
+    sync(byMonth, info) {
+      if (!this.db_()) return { off: true };
+      const props = Store.props, now = Date.now();
+      let prev = {};
+      try { prev = JSON.parse(props.getProperty('calSyncH') || '{}'); } catch (e) { prev = {}; }
+      if (now - (Number(props.getProperty('calSyncFull')) || 0) > 6 * 3600000) { prev = {}; props.setProperty('calSyncFull', String(now)); }
+      const list = [], hs = {}, big = [];
+      Object.keys(byMonth).sort().forEach(m => {
+        const txt = JSON.stringify(byMonth[m]), h = cellHash_(txt);
+        if (txt.length > 900000) { big.push(m); return; } // over the doc limit: that month stays on the server path
+        hs[m] = h;
+        if (prev[m] !== h) list.push([this.COLL + '/' + m, { month: m, ev: txt, h: h, n: byMonth[m].length, at: now, up: new Date(now) }]);
+      });
+      if (list.length) StoreFs.patchMany(list);
+      StoreFs.set(this.COLL + '/meta', { v: 1, from: info.from, to: info.to, months: JSON.stringify(Object.keys(hs)), cals: JSON.stringify(info.cals || []),
+        failed: JSON.stringify(info.failed || []), main: String(info.main || ''), tz: String(info.tz || ''), via: String(info.via || ''), at: now, up: new Date(now) });
+      props.setProperty('calSyncH', JSON.stringify(hs));
+      return { months: Object.keys(hs).length, written: list.length, big: big };
+    }
+  },
+
   /* Database mirror (timed trigger, every 5 min): each database area copied into its Sheet tab, then edits that
      lost under "newest edit wins" (written to Firestore ganttBackup by the app) moved into the Backup tab. */
   mirror() {
@@ -937,6 +968,8 @@ const Store = {
 // Trigger target (installed by firebaseSetup). Never throws, so the trigger keeps running.
 function storeMirror() {
   try { console.log(JSON.stringify(Store.mirror())); } catch (e) { console.error('storeMirror: ' + e.message); }
+  // Calendar copy (H5 B2): outside the script lock (a calendar read takes a few seconds; saves shouldn't wait).
+  try { if (typeof calCopySync_ === 'function') console.log(JSON.stringify({ cal: calCopySync_() })); } catch (e) { console.error('calendar copy: ' + e.message); }
 }
 
 /* Run once from the editor after FIREBASE_PROJECT_ is set (docs/NOTES.md → "H3"): asks for the new permissions

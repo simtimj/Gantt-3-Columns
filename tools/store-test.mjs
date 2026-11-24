@@ -371,4 +371,27 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
     fresh(); dctx.setArchiveAuto(true); assert.equal(fsDocs['gantt/kv_archiveAuto'].v.stringValue, '1');
     console.log('✓ store-test: app settings on Firestore (seed, server writes, newer PWA doc wins, Fun merge)');
   }
+  // Calendar copy (H5 B2): month docs + meta, only changed months rewritten, color urgency flagged (uc).
+  {
+    dctx.LockService = { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }), getUserLock: () => ({ tryLock: () => true, releaseLock: () => {} }) };
+    let evs = [
+      { id: 'a|1', eventId: 'a', startMs: 1, calId: 'main', cal: 'Main', title: 'Dentist', allDay: false, start: '2026-11-23T09:00:00-08:00', end: '2026-11-23T10:00:00-08:00', colorId: '11', editable: true, recurring: false },
+      { id: 'b|2', eventId: 'b', startMs: 2, calId: 'main', cal: 'Main', title: 'Trip', allDay: true, start: '2026-11-29', end: '2026-12-03', colorId: '', editable: true, recurring: false }];
+    vm.runInContext("todayString_ = () => '2026-11-23'; calPanelRead_ = () => ({ events: JSON.parse(globalThis.__evs), calendars: [{ id: 'main', name: 'Main', color: '#fff' }], failed: [], via: 'api' });", dctx);
+    dctx.__evs = JSON.stringify(evs);
+    const w = vm.runInContext('calCopyWindow_()', dctx);
+    assert.equal(w.from, '2026-11-01'); assert.equal(w.to, '2027-03-01'); assert.deepEqual(Array.from(w.months), ['2026-11', '2026-12', '2027-01', '2027-02']);
+    let r = dctx.calSyncNow();
+    assert.equal(r.months, 4); assert.equal(r.written, 4, JSON.stringify(r));
+    const ev = m => JSON.parse(fsDocs['ganttCal/' + m].ev.stringValue);
+    assert.deepEqual(ev('2026-11').map(e => e.title), ['Dentist', 'Trip']); assert.deepEqual(ev('2026-12').map(e => e.title), ['Trip']);
+    assert.equal(ev('2026-11')[0].urg, '1'); assert.equal(ev('2026-11')[0].uc, 1);
+    const meta = fsDocs['ganttCal/meta'];
+    assert.equal(meta.from.stringValue, '2026-11-01'); assert.equal(JSON.parse(meta.months.stringValue).length, 4); assert.equal(meta.v.integerValue, '1');
+    // Nothing changed → only meta written; one event moved → only its month.
+    r = dctx.calSyncNow(); assert.equal(r.written, 0);
+    evs[0].title = 'Dentist 2'; dctx.__evs = JSON.stringify(evs);
+    r = dctx.calSyncNow(); assert.equal(r.written, 1); assert.equal(ev('2026-11')[0].title, 'Dentist 2');
+    console.log('✓ store-test: calendar copy on Firestore (window, month docs, only changed months, color urgency flag)');
+  }
 }

@@ -3606,6 +3606,103 @@ if (only('pwa-ref')) {
   if (errs.length) { fails += errs.length; console.error('✗ pwa-ref:\n  ' + errs.join('\n  ')); }
   else console.log('✓ pwa-ref: Reference on Firestore — card saves (server hashes), add, order, expand, delete → Archive → restore, live sync, refused backup, server before the seed');
 }
+// Calendar copy (H5 B2, 2026-11-23): calendar reads from the server's month docs in the database (server shapes),
+// server path when outside the window / copy stale / refused / right after an edit (which asks the server to re-copy).
+if (only('pwa-cal')) {
+  const { execFileSync } = await import('child_process');
+  const http = await import('http');
+  const dist = path.join(os.tmpdir(), 'gantt-pwa-cal-smoke');
+  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['cal'], apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
+  execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
+  const m0 = today.slice(0, 7), addD = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  const nextM = m => addD(m + '-28', 7).slice(0, 7), m1 = nextM(m0);
+  const evs = [
+    { id: 'a@g|1', eventId: 'a@g', startMs: 1, calId: 'main', cal: 'Main', title: 'Dentist', allDay: false, start: today + 'T09:00:00-08:00', end: today + 'T10:30:00-08:00', color: '#de583d', colorId: '11', done: false, editable: true, recurring: false, urg: '1', uc: 1 },
+    { id: 'b@g|2', eventId: 'b@g', startMs: Date.parse(today + 'T08:00:00Z'), calId: 'other', cal: 'Other', title: 'Trip', allDay: true, start: today, end: addD(today, 2), color: '#7577c4', colorId: '9', done: false, editable: false, recurring: false, urg: '3', uc: 1 },
+    { id: 'c@g|3', eventId: 'c@g', startMs: 3, calId: 'main', cal: 'Main', title: 'Later', allDay: false, start: addD(today, 3) + 'T13:00:00-08:00', end: addD(today, 3) + 'T14:00:00-08:00', color: '#8a8f98', colorId: '', done: false, editable: true, recurring: true, due: '2026-12-01' }];
+  const FAKE = `if (!window.firebase) window.firebase = (function () {
+    const S = window.__fs = { cb: null, err: null, refuse: !!localStorage.getItem('fake.refuse'),
+      docs: { meta: { v: 1, from: ${JSON.stringify(m0 + '-01')}, to: ${JSON.stringify(nextM(m1) + '-01')}, months: ${JSON.stringify(JSON.stringify([m0, m1]))},
+        cals: '[{"id":"main","name":"Main","color":"#fff"}]', failed: '[]', main: 'main', tz: 'America/Los_Angeles', at: Date.now() - Number(localStorage.getItem('fake.age') || 0) },
+        ${JSON.stringify(m0)}: { ev: ${JSON.stringify(JSON.stringify(evs))} }, ${JSON.stringify(m1)}: { ev: ${JSON.stringify(JSON.stringify(evs))} } } };
+    const snap = (id, d) => ({ id, exists: !!d, data: () => d });
+    S.push = (id, d) => { S.docs[id] = Object.assign(S.docs[id] || {}, d); S.cb && S.cb({ docChanges: () => [{ type: 'modified', doc: snap(id, S.docs[id]) }] }); };
+    const calColl = { onSnapshot: (cb, bad) => { S.cb = cb; setTimeout(() => S.refuse ? bad({ code: 'permission-denied' }) : cb({ docChanges: () => Object.keys(S.docs).map(id => ({ type: 'added', doc: snap(id, S.docs[id]) })) }), 0); return () => {}; } };
+    const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com' }), 0), signOut: () => {} });
+    auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
+    const none = { doc: () => ({ get: () => Promise.resolve(snap('', null)), onSnapshot: () => () => {} }), where: () => ({ onSnapshot: () => () => {} }), add: () => Promise.resolve() };
+    const firestore = () => ({ enablePersistence: () => Promise.resolve(), collection: n => n === 'ganttCal' ? calColl : none });
+    firestore.FieldValue = { serverTimestamp: () => Date.now() };
+    return { initializeApp: () => {}, auth, firestore };
+  })();`;
+  const srv = http.createServer((qq, r) => {
+    let f = decodeURIComponent(new URL(qq.url, 'http://x').pathname); if (f.endsWith('/')) f += 'index.html';
+    if (f.startsWith('/fb/')) { r.writeHead(200, { 'Content-Type': 'text/javascript' }); return r.end(FAKE); }
+    const fp = path.join(dist, f);
+    if (!fp.startsWith(dist) || !fs.existsSync(fp)) { r.writeHead(404); return r.end(); }
+    r.writeHead(200, { 'Content-Type': f.endsWith('.html') ? 'text/html' : 'text/javascript' }); r.end(fs.readFileSync(fp));
+  });
+  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const errs = [], calls = [];
+  const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'block' });
+  await ctx.route('https://api.test/**', route => {
+    const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
+    const r = req.fn === 'getWorkspaceData' ? data : req.fn === 'getSyncState' ? { build: 'smoke', ref: {}, inbox: [], days: {} } : req.fn === 'getFocus' ? focus
+      : req.fn === 'getMainCalendarEvents' ? { date: req.a[0], events: [], srv: 1 } : req.fn === 'getCalendarRange' ? { events: [], calendars: [], failed: [], via: 'api' }
+      : req.fn === 'calSyncNow' ? { months: 2, written: 1 } : req.fn === 'calPanelCreateEvent' ? { id: 'n' } : null;
+    route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
+  });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => errs.push('page error: ' + e.message));
+  await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
+  const run = (fn, ...a) => pg.evaluate(([fn, a]) => new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(e => bad(e.message))[fn](...a)), [fn, a]);
+  calls.length = 0;
+  const rg = await run('getCalendarRange', today, addD(today, 7));
+  if (calls.includes('getCalendarRange') || !rg || rg.via !== 'db') errs.push('range not from the copy: ' + JSON.stringify(rg).slice(0, 160) + ' calls ' + calls.join());
+  else {
+    if (rg.events.map(e => e.title).join() !== 'Dentist,Trip,Later') errs.push('range events: ' + rg.events.map(e => e.title).join());
+    if (rg.events.some(e => 'uc' in e)) errs.push('uc flag leaked into the answer');
+    if (rg.calendars[0].name !== 'Main') errs.push('calendars: ' + JSON.stringify(rg.calendars));
+  }
+  const one = await run('getCalendarRange', addD(today, 3), addD(today, 4));
+  if (!one || one.events.map(e => e.title).join() !== 'Later') errs.push('one-day range overlap: ' + JSON.stringify(one && one.events.map(e => e.title)));
+  const main = await run('getMainCalendarEvents', today);
+  if (calls.includes('getMainCalendarEvents') || !main || main.srv) errs.push('main list not from the copy: ' + JSON.stringify(main).slice(0, 160));
+  else {
+    const [a, d] = main.events;
+    if (!a || a.title !== 'Trip' || !a.allDay || a.ro !== true || a.urg || a.time !== 'All day') errs.push('main all-day row: ' + JSON.stringify(a));
+    if (!d || d.title !== 'Dentist' || d.time !== '9:00 AM–10:30 AM' || d.urg !== '1' || d.id !== 'a@g' || d.hex !== '#de583d' || d.ro !== false || d.start !== Date.parse(today + 'T09:00:00-08:00')) errs.push('main timed row: ' + JSON.stringify(d));
+    if (a && a.end - a.start < 47 * 3600000) errs.push('all-day end: ' + (a.end - a.start));
+  }
+  // Outside the window → server.
+  calls.length = 0;
+  await run('getCalendarRange', addD(m0 + '-01', -10), addD(m0 + '-01', -3));
+  if (!calls.includes('getCalendarRange')) errs.push('outside the window did not go to the server');
+  // An edit → re-copy asked for, server answers until the copy catches up.
+  calls.length = 0;
+  await run('calPanelCreateEvent', { title: 'x' }); await pg.waitForTimeout(300);
+  if (!calls.includes('calSyncNow')) errs.push('edit did not ask for a re-copy: ' + calls.join());
+  calls.length = 0;
+  await run('getMainCalendarEvents', today);
+  if (!calls.includes('getMainCalendarEvents')) errs.push('right after an edit the copy was used');
+  await pg.evaluate(() => __fs.push('meta', { at: Date.now() + 5 }));
+  calls.length = 0;
+  await run('getMainCalendarEvents', today);
+  if (calls.includes('getMainCalendarEvents')) errs.push('copy not used again after it caught up');
+  // Old copy (trigger stopped) → server; refused (rules not published) → server.
+  for (const [k, v, why] of [['fake.age', String(30 * 60000), 'stale copy'], ['fake.refuse', '1', 'refused']]) {
+    await pg.evaluate(([k, v]) => { localStorage.setItem(k, v); }, [k, v]);
+    await pg.reload(); await pg.waitForTimeout(2500);
+    calls.length = 0;
+    await run('getCalendarRange', today, addD(today, 7));
+    if (!calls.includes('getCalendarRange')) errs.push(why + ': did not go to the server');
+    await pg.evaluate(k => localStorage.removeItem(k), k);
+  }
+  await ctx.close(); srv.close();
+  if (errs.length) { fails += errs.length; console.error('✗ pwa-cal:\n  ' + errs.join('\n  ')); }
+  else console.log('✓ pwa-cal: calendar from the database copy (range + main list in server shapes), server outside the window / after an edit until re-copied / stale / refused');
+}
 // One calm return (2026-11-21, speed item M; batched 2026-11-23, speed plan E): coming back runs ONE queue — registered
 // jobs in order, their reads in one batchCalls, skipping ones refreshed < 60 s ago; Speed Log 'resume' row only when something ran.
 for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {

@@ -230,3 +230,6 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 
 ## Speed plan F — app settings on Firestore (2026-11-23, implemented + tested in store-test / smoke pwa-hist, not yet tested live)
 - PWA: Fun, New things, Cal Events hide list, Reference pins, auto-archive read/save on Firestore docs `gantt/kv_*`; opening takes pins + card subjects from them. Expected: those calls (3 on every open: getFun, getNewThings, getCalEventsHide) no longer wait on Apps Script. Server reads add one Firestore list per run that touches a setting. Focus, Inbox, calendar picks, Plan + Cal Backlog stay on the server. Details: docs/NOTES.md → H5 F.
+
+## Speed plan B2 — calendar copy on Firestore (2026-11-23, implemented + tested in store-test / smoke pwa-cal, not yet tested live)
+- Server copies the calendar window into `ganttCal` month docs every 5 min (mirror trigger) and after each app edit (`calSyncNow`, fired in the background by the PWA). PWA `getCalendarRange` / `getMainCalendarEvents` answer from memory (one live listener) instead of ~1–3 s Apps Script + Calendar API calls. Cost: one calendar read per 5 min on the server, writes only for changed months. Details: docs/NOTES.md → H5 B.

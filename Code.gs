@@ -2497,10 +2497,16 @@ function getCalendarRange(startDate, endDate) {
   const from = parseDate_(s), to = parseDate_(e);
   if (to - from > 62 * DAY_MS) throw new Error('Calendar range too long');
   const t0 = Date.now(), tz = Session.getScriptTimeZone();
+  const r = calPanelRead_(from, to, tz);
+  calPanelAttachMeta_(r.events);
+  return Object.assign(r, { start: s, end: e, tz: tz, ms: Date.now() - t0 });
+}
+// Raw range read (no meta), shared by getCalendarRange and the database copy (B2). { events, calendars, failed, via }.
+function calPanelRead_(from, to, tz) {
   // Fast path (2026-11-08, Julius: "make the days load faster"): one Calendar API call per calendar returns every
   // field at once, instead of CalendarApp's per-event getters. Same output shape; any failure → CalendarApp below.
   const fast = calPanelRangeApi_(from, to, tz);
-  if (fast) { calPanelAttachMeta_(fast.events); return Object.assign(fast, { start: s, end: e, tz: tz, via: 'api', ms: Date.now() - t0 }); }
+  if (fast) return Object.assign(fast, { via: 'api' });
   const out = [], calendars = [], failed = [];
   pickedCalendars_().forEach(id => {
     let cal = null;
@@ -2510,20 +2516,19 @@ function getCalendarRange(startDate, endDate) {
     calendars.push({ id: id, name: calName, color: calColor });
     cal.getEvents(from, to).forEach(ev => out.push(calPanelEventOut_(ev, id, calName, calColor, tz)));
   });
-  calPanelAttachMeta_(out);
-  return { start: s, end: e, tz: tz, events: out, calendars: calendars, failed: failed, via: 'app', ms: Date.now() - t0 };
+  return { events: out, calendars: calendars, failed: failed, via: 'app' };
 }
 // Calendar panel checkboxes (2026-11-11, Julius): each event carries the urgency / subject / due / minutes saved from
 // the hold menu (same calMeta keys as Cal Events); no saved urgency → read it from the event color (Tomato / Banana /
 // Blueberry), like getMainCalendarEvents.
-function calPanelAttachMeta_(events) {
+function calPanelAttachMeta_(events, markColor) {
   let saved = {};
   try { saved = Store.props.getProperties(); } catch (err) { console.error(err); }
   (events || []).forEach(ev => {
     let m = {};
     try { m = JSON.parse(saved[calMetaKey_(ev.eventId, ev.startMs, ev.recurring)] || '{}'); } catch (err) { m = {}; }
     ['urg', 'due', 'dur', 'cat'].forEach(k => { if (m[k]) ev[k] = String(m[k]); });
-    if (!ev.urg) { const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === ev.colorId); if (u) ev.urg = u; }
+    if (!ev.urg) { const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === ev.colorId); if (u) { ev.urg = u; if (markColor) ev.uc = 1; } }
   });
 }
 // Calendar advanced service (appsscript.json → enabledAdvancedServices). Returns null when it's missing or fails, so
@@ -2575,6 +2580,47 @@ function calPanelRangeApi_(from, to, tz) {
     cache.put('calApiOff', '1', 1800);
     return null;
   }
+}
+
+/* CALENDAR COPY IN THE DATABASE (speed plan B2, 2026-11-23, Julius; docs/NOTES.md → H5 B)
+   The server copies the picked calendars (same events + urgency / due / duration / subject as getCalendarRange) into
+   Firestore, one doc per month (ganttCal/<yyyy-MM>), so the PWA reads the calendar without an Apps Script hop.
+   Runs from the 5-min mirror trigger and right after every calendar edit in the app (the PWA calls calSyncNow in the
+   background). Changes made in Google Calendar itself show up within 5 min. Window: the month of today − 14 days
+   through the month of today + 75 days; anything outside → the server path as before. Store.cal writes the docs. */
+const CAL_COPY_BACK_ = 14, CAL_COPY_AHEAD_ = 75;
+function calCopyWindow_() {
+  const t = todayString_(), a = addDaysToDateString_(t, -CAL_COPY_BACK_).slice(0, 7), b = addDaysToDateString_(t, CAL_COPY_AHEAD_).slice(0, 7);
+  const next = m => { const y = +m.slice(0, 4), mo = +m.slice(5, 7); return mo === 12 ? (y + 1) + '-01' : y + '-' + String(mo + 1).padStart(2, '0'); };
+  const months = [];
+  for (let m = a; m <= b; m = next(m)) months.push(m);
+  return { from: a + '-01', to: next(b) + '-01', months: months };
+}
+// Months an event touches (inside the window). Extra months are harmless: the app filters by overlap.
+function calCopyMonths_(ev, months) {
+  const a = String(ev.start).slice(0, 7), b = String(ev.end).slice(0, 7);
+  return months.filter(m => m >= a && m <= b);
+}
+function calCopySync_() {
+  if (!FIREBASE_PROJECT_ || STORE_DB_AREAS_.indexOf('cal') < 0) return { off: true };
+  if (storeBackend_('cal') !== 'db') return { off: true, reason: 'database not reachable' };
+  const lock = LockService.getUserLock();
+  if (!lock.tryLock(25000)) return { busy: true };
+  try {
+    const t0 = Date.now(), w = calCopyWindow_(), tz = Session.getScriptTimeZone();
+    const r = calPanelRead_(parseDate_(w.from), parseDate_(w.to), tz);
+    calPanelAttachMeta_(r.events, true);
+    const by = {};
+    w.months.forEach(m => { by[m] = []; });
+    r.events.forEach(ev => calCopyMonths_(ev, w.months).forEach(m => by[m].push(ev)));
+    const out = Store.cal.sync(by, { from: w.from, to: w.to, tz: tz, cals: r.calendars, failed: r.failed, main: EVENT_CALENDARS[0], via: r.via });
+    out.ms = Date.now() - t0;
+    return out;
+  } finally { lock.releaseLock(); }
+}
+// The PWA calls this (in the background) after a calendar edit, so the database copy catches up right away.
+function calSyncNow() {
+  try { return calCopySync_(); } catch (e) { console.error('calSyncNow: ' + e.message); return { ok: false, e: e.message }; }
 }
 
 /* Calendar panel, phase 2 (2026-11-08, Julius): create / edit / delete on the MAIN calendar only; repeating events

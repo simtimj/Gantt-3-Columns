@@ -114,6 +114,14 @@
     var KV = AREAS.indexOf('kv') >= 0;
     var KV_NAMES = { getFun: 1, saveFun: 1, getNewThings: 1, saveNewThings: 1, getCalEventsHide: 1, setCalEventsHide: 1, setReferencePin: 1, setArchiveAuto: 1 };
     if (KV) Object.keys(KV_NAMES).forEach(function (n) { NAMES[n] = 1; });
+    // Calendar copy (H5 B2): calendar reads from the server's copy in the database.
+    var CAL = AREAS.indexOf('cal') >= 0, CAL_NAMES = { getCalendarRange: 1, getMainCalendarEvents: 1 };
+    if (CAL) Object.keys(CAL_NAMES).forEach(function (n) { NAMES[n] = 1; });
+    // Calendar edits: the copy is out of date until the server re-copies (asked for right away, see cal.touch).
+    var CAL_WRITES = { addAllDayTask: 1, setCalendarEventMeta: 1, calPanelSetOrder: 1, calPanelCreateEvent: 1, calPanelUpdateEvent: 1,
+      calPanelMoveEvent: 1, calPanelSetColor: 1, calPanelDuplicateEvent: 1, calPanelDeleteEvent: 1, planSchedule: 1, setCalendarEventTitle: 1,
+      setCalendarEventDone: 1, archiveCompletedTasks: 1, calBacklogComplete: 1, planSave: 1, planMoveEvent: 1, calBacklogSync: 1,
+      calBacklogPlace: 1, calBacklogPlaceMany: 1 };
     var OWNER = String(FB_CFG.owner || '').toLowerCase(), cfg = Object.assign({}, FB_CFG);
     delete cfg.owner; delete cfg._note; delete cfg.areas;
     var db = null, user = null, lastAt = null, watching = false;
@@ -142,7 +150,7 @@
           if (u && String(u.email || '').toLowerCase() !== OWNER) { firebase.auth().signOut(); u = null; }
           user = u || null;
           signButton(!user);
-          if (user) { if (KIM) watch(); if (DAYS) days.watch(); if (REF) refs.watch(); }
+          if (user) { if (KIM) watch(); if (DAYS) days.watch(); if (REF) refs.watch(); if (CAL) cal.watch(); }
           ok();
         });
       });
@@ -556,6 +564,96 @@
     }
     var kv = KV ? kvArea() : null;
 
+    /* ---------- Calendar copy (H5 B2, 2026-11-23) ----------
+       The server copies the calendar window (month of today − 14 d … month of today + 75 d) into ganttCal/<yyyy-MM>
+       docs every 5 min and right after each app edit; ganttCal/meta says which months and when. One live listener
+       keeps them in memory, so getCalendarRange / getMainCalendarEvents answer at once, in the server's shapes.
+       Server path instead when: no copy / refused (rules not published) / outside the window / copy > 20 min old
+       (online) / an edit in the last 90 s that the copy hasn't caught up with. */
+    function calArea() {
+      var meta = null, months = {}, off = false, dirtyAt = 0, watching = false, gotFirst, first = new Promise(function (ok) { gotFirst = ok; });
+      var DAYMS = 864e5;
+      function list(x) { try { var v = JSON.parse(x || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+      function watch() {
+        if (watching) return; watching = true;
+        try {
+          db.collection('ganttCal').onSnapshot(function (qs) {
+            qs.docChanges().forEach(function (c) {
+              var id = c.doc.id, d = c.doc.data() || {};
+              if (c.type === 'removed') { if (id === 'meta') meta = null; else delete months[id]; return; }
+              if (id === 'meta') meta = d;
+              else if (/^\d{4}-\d{2}$/.test(id)) months[id] = list(d.ev);
+            });
+            if (meta && dirtyAt && Number(meta.at) > dirtyAt) dirtyAt = 0;
+            gotFirst();
+          }, function (e) { off = true; gotFirst(); console.warn('Calendar copy → server: ' + (e && e.code || e)); });
+        } catch (e) { off = true; gotFirst(); }
+      }
+      function addDay(d, n) { return new Date(Date.parse(d + 'T00:00:00Z') + n * DAYMS).toISOString().slice(0, 10); }
+      // Events overlapping [s, e) (yyyy-MM-dd, e exclusive) from the copy, or null → server.
+      function pick(s, e) {
+        if (off || !meta || Number(meta.v) !== 1) return null;
+        if (dirtyAt && Date.now() - dirtyAt < 90000) return null;
+        if (navigator.onLine && Date.now() - Number(meta.at) > 20 * 60000) return null;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !/^\d{4}-\d{2}-\d{2}$/.test(e) || e <= s || s < meta.from || e > meta.to) return null;
+        var have = list(meta.months), seen = {}, out = [];
+        for (var m = s.slice(0, 7), last = addDay(e, -1).slice(0, 7); m <= last; m = addDay(m + '-28', 7).slice(0, 7)) {
+          if (have.indexOf(m) < 0 || !months[m]) return null;
+          months[m].forEach(function (ev) {
+            if (seen[ev.id]) return;
+            var hit = ev.allDay ? ev.start < e && ev.end > s : String(ev.start).slice(0, 16) < e + 'T00:00' && String(ev.end).slice(0, 16) > s + 'T00:00';
+            if (hit) { seen[ev.id] = 1; out.push(ev); }
+          });
+        }
+        return out;
+      }
+      function clean(ev) { var o = Object.assign({}, ev); delete o.uc; return o; }
+      // Local midnight (America/Los_Angeles) of a date, in ms, like the server's parseDate_.
+      function midnight(d) {
+        var probe = new Date(Date.parse(d + 'T12:00:00Z')), mins = 0;
+        try {
+          var t = new Intl.DateTimeFormat('en-US', { timeZone: meta.tz || 'America/Los_Angeles', timeZoneName: 'shortOffset' }).formatToParts(probe)
+            .filter(function (p) { return p.type === 'timeZoneName'; })[0].value, mm = t.match(/GMT([+-])(\d+)(?::(\d+))?/);
+          if (mm) mins = (mm[1] === '-' ? -1 : 1) * (Number(mm[2]) * 60 + Number(mm[3] || 0));
+        } catch (e) {}
+        return Date.parse(d + 'T00:00:00Z') - mins * 60000;
+      }
+      function hm(iso) { var h = Number(String(iso).slice(11, 13)), m = String(iso).slice(14, 16); return (h % 12 || 12) + ':' + m + ' ' + (h < 12 ? 'AM' : 'PM'); }
+      var RUN = {
+        getCalendarRange: function (s, e) {
+          var evs = pick(String(s || ''), String(e || ''));
+          if (!evs) return null;
+          return { events: evs.map(clean), calendars: list(meta.cals), failed: list(meta.failed), via: 'db', start: s, end: e, tz: meta.tz || 'America/Los_Angeles', ms: 0, at: Number(meta.at) };
+        },
+        // Same shape as the server's main-column list (Code.gs getMainCalendarEvents).
+        getMainCalendarEvents: function (date) {
+          date = String(date || '');
+          var evs = pick(date, /^\d{4}-\d{2}-\d{2}$/.test(date) ? addDay(date, 1) : '');
+          if (!evs) return null;
+          var out = evs.map(function (ev) {
+            var o = { title: ev.title, allDay: ev.allDay, ro: !ev.editable, id: ev.eventId, calId: ev.calId, done: !!ev.done, hex: ev.color, cal: ev.cal,
+              start: ev.allDay ? ev.startMs : Date.parse(ev.start), end: ev.allDay ? midnight(ev.end) : Date.parse(ev.end), recurring: !!ev.recurring,
+              time: ev.allDay ? 'All day' : hm(ev.start) + '–' + hm(ev.end) };
+            ['urg', 'due', 'dur', 'cat'].forEach(function (k) { if (ev[k]) o[k] = ev[k]; });
+            if (ev.uc && ev.calId !== meta.main) delete o.urg; // color → urgency: main calendar only in this list
+            return o;
+          });
+          out.sort(function (a, b) { return Number(b.allDay) - Number(a.allDay) || a.start - b.start; });
+          return { date: date, events: out };
+        }
+      };
+      return {
+        watch: watch,
+        run: function (name, a) { return withTimeout(first, 3000).catch(function () {}).then(function () { return RUN[name].apply(null, a || []); }); },
+        // An edit just went through: use the server until the copy catches up, and ask it to catch up now.
+        touch: function () {
+          dirtyAt = Date.now();
+          call('calSyncNow', []).then(function (r) { if (r && r.off) dirtyAt = 0; }, function () {});
+        }
+      };
+    }
+    var cal = CAL ? calArea() : null;
+
     function refArea() {
       var seeded = false, watching = false, syncT = 0;
       function coll() { return db.collection('ganttRef'); }
@@ -761,6 +859,8 @@
     }
     return {
       handles: function (name) { return !!NAMES[name]; },
+      // After a successful call: calendar edits mark the copy out of date (B2).
+      after: function (name) { if (cal && CAL_WRITES[name]) cal.touch(); },
       // Offline: typing allowed where the edit can be queued (Keep In Mind; days within today ± 7).
       editable: function (el) {
         if (!user || !el || !el.closest) return false;
@@ -790,6 +890,7 @@
           if (DAY_NAMES[name]) return days.run(name, args);
           if (REF_NAMES[name]) return refs.run(name, args);
           if (KV_NAMES[name]) return kv.run(name, args);
+          if (CAL_NAMES[name]) return cal.run(name, args);
           return name === 'getKim' ? read() : save(args[0], args[1]);
         }).catch(function (e) { console.warn('Firestore → server: ' + (e && e.message || e)); return null; })
           .then(function (r) { return r || call(name, args); });
@@ -829,6 +930,7 @@
           var args = Array.prototype.slice.call(arguments);
           (fb.handles(name) ? fb.run(name, args) : call(name, args)).then(function (r) {
             if (name === 'getWorkspaceData' && PAGE === 'index') saveData(r);
+            if (fb.after) fb.after(name);
             r = fb.overlay(name, r, args[0]);
             if (ok) ok(r, user);
           }, function (err) {

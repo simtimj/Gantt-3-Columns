@@ -3525,6 +3525,10 @@ function calBacklogTick_() {
    read; the app prefers the calendar copy when the event is in it. Only changed ones are written. */
 function planEvRefresh_() {
   if (!Store.plan.db_()) return { off: true };
+  // Read budget: every 30 min (the app prefers the live calendar copy anyway; this is the fallback cache).
+  const last = Number(Store.props.getProperty('planEvAt')) || 0;
+  if (Date.now() - last < 30 * 60000) return { skipped: true };
+  Store.props.setProperty('planEvAt', String(Date.now()));
   const docs = Store.plan.docs_().filter(d => !Number(d.del) && d.event).slice(0, 60), list = [];
   docs.forEach(d => {
     const ev = planEventInfo_(d.event), txt = JSON.stringify(ev);

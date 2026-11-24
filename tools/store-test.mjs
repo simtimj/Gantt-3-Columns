@@ -468,9 +468,16 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
     assert.throws(() => dctx.planSave({ type: 'target', date: '2026-11-23', id: 'nope', target: 'x' }), /not found/);
     vm.runInContext('Store.plan.mirror()', dctx);
     eq(ptab.rows.slice(1).filter(r => r[0]).map(r => r[2] + ':' + r[5]), ['big:Two']);
-    assert.equal(dctx.planEvRefresh_().written, 0); // Two has no event
+    const evNow = () => { delete P.planEvAt; return dctx.planEvRefresh_(); };
+    assert.equal(evNow().written, 0); // Two has no event
     dctx.planSave({ type: 'upsert', date: '2026-11-23', item: { group: 'next', ref: 'tid:cc', title: 'Three', event: 'ev9@5' } });
-    assert.equal(dctx.planEvRefresh_().written, 1); assert.equal(dctx.planEvRefresh_().written, 0);
+    assert.equal(evNow().written, 1); assert.equal(evNow().written, 0);
+    assert.equal(dctx.planEvRefresh_().skipped, true, 'event cache refreshed at most every 30 min');
+    // Read budget: a mirror run with nothing changed asks one "changed since?" query and stops.
+    vm.runInContext('Store.plan.mirror()', dctx);
+    const rowsBefore = JSON.stringify(ptab.rows);
+    Object.values(fsDocs).forEach(d => { if (d.up && d.ref) d.up = { timestampValue: '2001-01-01T00:00:00Z' }; });
+    assert.equal(vm.runInContext('Store.plan.mirror()', dctx), 0); assert.equal(JSON.stringify(ptab.rows), rowsBefore);
     assert.equal(JSON.parse(Object.values(fsDocs).find(d => d.ref && d.ref.stringValue === 'tid:cc').ev.stringValue).eventId, 'ev9');
     // ---- Cal Backlog: a change publishes gantt/calBacklog; the trigger republishes after 15 min.
     dctx.Store.calBacklog.add([['u1|2026-11-01', '2026-11-01', 'Old task', '11', '0', 's', '']]);

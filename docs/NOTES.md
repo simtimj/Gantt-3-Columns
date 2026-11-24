@@ -1174,3 +1174,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## D. Plan rows on a listener (2026-11-24 00:05, Julius: "do all of that")
 - Shim `planArea.rows()` now reads from one `onSnapshot` on `ganttPlan` (all rows once per app start, then only changes) instead of a full server read per getPlan / planSave. Same answers; still online-only for edits. Smoke `pwa-d2` (fake notifies listeners on writes; `__fs.touch`).
 - L (speeds after a day) + E (Firebase usage): one-time scheduled task 2026-11-24 evening reads the Speed Log and reports; Firebase reads/day is checked by Julius in the console (Firestore → Usage).
+
+## Read budget for the 5-min trigger (2026-11-24 00:20, after Julius read the Firestore usage tab)
+- The trigger runs 288×/day; free tier = 50k reads/day. Mirrors now start with `storeChangedSince_(coll, prop)` = one query `up > last run − 10 min` (1 read when nothing changed); full read only on a change, the first run, or every 6 h. Applied to: kv (`gantt`), Inbox (+ re-list when inbox.js ids change, prop `inboxClaudeIds`), Plan. Timer mirror: last 2 days each run, 14 days once an hour. `planEvRefresh_`: at most every 30 min. Days / Reference mirrors were already watermark-based.
+- Rough budget now: ~10–30 reads per trigger run ≈ 3k–9k/day + the app's listeners. Check Firestore → Usage after a full day (count resets at midnight Pacific).

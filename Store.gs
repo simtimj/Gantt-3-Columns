@@ -154,6 +154,19 @@ const StoreFs = {
   del(path) { this.req_('delete', path); }
 };
 
+/* Read budget (2026-11-24): the 5-min trigger runs 288 times a day and Firestore's free tier is 50k reads/day, so
+   each mirror first asks "changed since my last run?" (1 read when nothing changed) and only then reads everything.
+   Returns true when something changed (or on the first run / every 6 h as a safety net). */
+function storeChangedSince_(coll, prop, docsField) {
+  const props = PropertiesService.getScriptProperties(), now = Date.now(), last = Number(props.getProperty(prop)) || 0;
+  const full = !last || now - (Number(props.getProperty(prop + 'Full')) || 0) > 6 * 3600000;
+  let changed = full;
+  if (!full) changed = StoreFs.query(coll, [[docsField || 'up', '>', new Date(last - 600000)]]).length > 0;
+  if (full) props.setProperty(prop + 'Full', String(now));
+  props.setProperty(prop, String(now));
+  return changed;
+}
+
 // One script lock around a read-check-write, same as the old per-feature locks.
 function storeLocked_(fn, ms) {
   const lock = LockService.getScriptLock();
@@ -808,7 +821,9 @@ const Store = {
     // Trigger: Plan tab = the live rows (rewritten only when different).
     mirror() {
       if (!this.db_()) return 0;
+      const fresh = Store.props.getProperty('planSeeded') !== '1';
       this.seed_();
+      if (!fresh && !storeChangedSince_(this.COLL, 'planMirrorAt')) return 0;
       const rows = this.list().sort((a, b) => (a.group < b.group ? -1 : a.group > b.group ? 1 : 0) || a.rank - b.rank)
         .map(x => [x.id, x.date, x.group, String(x.rank || 0), x.ref, x.title, x.target, x.event, x.updated]);
       const sh = this.sheet_(rows.length > 0);
@@ -883,6 +898,10 @@ const Store = {
     mirror() {
       if (!this.on_()) return 0;
       const seeded = this.seed_();
+      const claudeH = JSON.stringify(this.claude_().map(x => String(x.id)));
+      const claudeNew = Store.props.getProperty('inboxClaudeIds') !== claudeH;
+      if (!seeded && !claudeNew && !storeChangedSince_(this.COLL, 'inboxMirrorAt')) return 0;
+      Store.props.setProperty('inboxClaudeIds', claudeH);
       const docs = this.list(), have = {};
       docs.forEach(d => { have[d.id] = d; });
       const add = [];
@@ -1008,7 +1027,9 @@ const Store = {
     mirror() {
       if (!this.db_()) return 0;
       const n = this.seed_();
-      const since = Utilities.formatDate(new Date(Date.now() - 14 * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      const props = Store.props, wide = Date.now() - (Number(props.getProperty('timerMirrorWide')) || 0) > 3600000;
+      if (wide) props.setProperty('timerMirrorWide', String(Date.now()));
+      const since = Utilities.formatDate(new Date(Date.now() - (wide ? 14 : 1) * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
       const have = this.ops(), add = this.dbEvents(since).filter(e => !have.has(String(e.op)) && e.at > 0).sort((a, b) => a.at - b.at)
         .map(e => [String(e.op), String(e.date), new Date(Number(e.at)).toISOString(), String(e.act), e.blk || '', e.item || '', e.name || '',
           e.value === null || e.value === undefined ? '' : Number(e.value), e.dev || '']);
@@ -1128,6 +1149,7 @@ const Store = {
       if (!this.db_()) return 0;
       this.docs__ = null;
       const n = this.seed_();
+      if (!n && !storeChangedSince_('gantt', 'kvMirrorAt')) return 0;
       Object.keys(this.KEYS).forEach(key => this.get(key));
       return n;
     }

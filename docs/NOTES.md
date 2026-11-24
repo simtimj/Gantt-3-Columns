@@ -1232,3 +1232,9 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Writers race? Apps Script does read-modify-write over REST (no transaction) — one user, rare; worst case one hold-menu change is lost and shows on the next read.
 - Tests: functions-test "M", store-test (calMeta block), smoke pwa-d2 (hold menu routed to the function). Health check lists `gantt/calMeta`.
 - Still on Apps Script: planSchedule / planMoveEvent, Cal Backlog place / complete, archive (Sheet + Plan links).
+
+## 📅 button → full screen; roomier header (2026-11-24 08:52–09:01, Julius)
+- "Do the most recent one": `openNewest()` = `openFull(true)` (force: any layout, phone too; builds the calendar first if needed). 📅 button (`toggle`) and badge tap (`lkJump`) use it. The old pop-out stays reachable via `fwCalendar.open()` (tests, Cal Events pull-down).
+- ⚙ Options: "▸ Calendars" folded every time ⚙ opens (`ceOpt.cals`, `data-ce-calsfold`); the panel's own Calendars section no longer restores `fw.calCalsOpen`.
+- Docked line: search box hidden (a leftover search is cleared on dock), BL count hidden (also the pop-out's). Calendar text ~1 px smaller (Index_LateCss end block).
+- Not done yet (new feature, next session): select an area → main-calendar events only → keep starts, stretch ends to fill gaps; a quick button.

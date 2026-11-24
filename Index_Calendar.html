@@ -1839,7 +1839,7 @@
   let cals = null, calsMsg = '';
   try { cals = JSON.parse(lsGet('fw.calPicker') || 'null'); } catch (e) { cals = null; }
   const calsWritable = () => (cals && cals.calendars ? cals.calendars.filter(c => c.writable && (c.picked || c.main)) : []).concat(cals ? [] : [{id: '', name: 'Main calendar', main: true}]);
-  if(lsGet('fw.calCalsOpen') === '1' && calsEl) calsEl.classList.remove('folded');
+  // Calendars list starts folded every time (2026-11-24, Julius: "I don't want to see them every time"); ⚙ opens it.
   function renderCals(){
     if(!calsEl) return;
     const list = (cals && cals.calendars) || [];
@@ -1921,6 +1921,8 @@
      search line carries ◉ · date · 🔍 · ⚙ · BL n · ↻. */
   function dkHead(on){
     const cd = document.getElementById('centerDownScroll'); if(cd) cd.classList.toggle('ce-dkon', !!on);
+    // Docked: the search box is hidden (2026-11-24), so a leftover search must not keep filtering the list.
+    const sb = on && document.querySelector('[data-ce-search]'); if(sb && sb.value){ sb.value = ''; sb.dispatchEvent(new Event('input', {bubbles: true})); }
     const t = document.querySelector('[data-ce-title]'); if(t && on && cal) t.textContent = cal.view.title;
     if(on) blRender();
   }
@@ -2013,8 +2015,9 @@
     const want = !full || wk;
     try { if(cal.getOption('allDaySlot') !== want) setTimeout(() => { try { cal.setOption('allDaySlot', want); cal.updateSize(); } catch (e) {} }, 0); else cal.updateSize(); } catch (e) {}
   }
-  function openFull(){
-    if(!canFull()) return false;
+  // force (📅 button / badge tap, 2026-11-24 Julius: "do the most recent one"): from anywhere, phone too, not only the slide.
+  function openFull(force){
+    if(force ? (!cal || full) : !canFull()) return false;
     let d = null; try { d = cal.getDate(); } catch (e) {}
     fullBlWas = blEl.hidden;
     panel.classList.add('cp-full'); document.body.classList.add('cal-full');
@@ -2027,6 +2030,15 @@
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     blPlace(); blRender(); if(!blEl.hidden) blLoad(false);
     setTimeout(() => { try { cal.updateSize(); } catch (e) {} }, 0);
+    return true;
+  }
+  // 📅 button + linked-badge tap → this full screen (not the old pop-out). First open builds the calendar, then goes full.
+  function openNewest(){
+    if(full) return true;
+    if(cal) return openFull(true);
+    open();
+    let n = 0;
+    (function t(){ if(cal && isOpen()){ if(!full) openFull(true); return; } if(++n < 40) setTimeout(t, 100); })();
     return true;
   }
   // Leave full screen: a swipe that starts at the left edge and goes right, or a sideways wheel (not over the grid).
@@ -2437,15 +2449,14 @@
     if(!x) return;
     let d = null; try { d = L().fromISO(String(x.start), {zone: TZ}); } catch (e) {}
     const day = d && d.isValid ? d.toISODate() : String(x.start).slice(0, 10);
-    if(!docked && !isOpen()) open();
+    openNewest();
     let n = 0;
     (function go(){
-      if(!cal){ if(++n < 25) setTimeout(go, 200); return; }
+      if(!cal || !full){ if(++n < 25) setTimeout(go, 200); return; }
       try {
         cal.gotoDate(day);
         if(!x.allDay && d && d.isValid && cal.scrollToTime) cal.scrollToTime({hours: Math.max(0, d.hour - 1)});
       } catch (e) {}
-      if(docked) try { panel.scrollIntoView({block: 'nearest', behavior: 'smooth'}); } catch (e) {}
       let k = 0;
       (function hi(){
         let el = null; try { el = panel.querySelector('[data-lk-ev="' + CSS.escape(String(x.id)) + '"]'); } catch (e) {}
@@ -2541,7 +2552,7 @@
     return true;
   };
   setTimeout(() => lkSoon(50), 2500); // badges from the device's cached copy, once the cells are drawn
-  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), blReload: () => blLoad(true), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
+  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), blReload: () => blLoad(true), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : openNewest(); }, openNewest, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

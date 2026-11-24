@@ -7482,7 +7482,7 @@
      cooldown…) stay off the Cal Events list but still show on the timeline. Saved in the Sheet's script properties
      (getCalEventsHide / setCalEventsHide), cached on the device so the first draw is right. */
   let ceHide = {cals: [], words: []}, ceHideLoaded = false, ceShowHidden = false;
-  const ceOpt = {open: false};
+  const ceOpt = {open: false, cals: false};
   try{ const h = JSON.parse(localStorage.getItem('fw.ceHide') || 'null'); if(h && Array.isArray(h.cals) && Array.isArray(h.words)) ceHide = h; }catch(e){}
   function ceIsHidden(ev){
     const t = String(ev.title || '').toLowerCase();
@@ -7513,7 +7513,7 @@
       '<label class="ce-opt-c"><input type="checkbox" data-ce-day' + (ceDayOn() ? ' checked' : '') + '> 🕒 Day calendar (off = events list)</label>' +
       // 2026-11-13 (Julius): one ⚙ — the calendar's own ⚙ (which calendars show) and the Cats / Time order live here too.
       // 2026-11-13 evening (Julius): the colored calendar checkboxes live only here (moved out of the calendar).
-      (window.fwCalendar && window.fwCalendar.mountCals ? '<div class="ce-opt-s">Calendars</div><div class="ce-opt-cals" data-ce-calslot></div>' : '') +
+      (window.fwCalendar && window.fwCalendar.mountCals ? '<button type="button" class="ce-opt-s ce-opt-sf" data-ce-calsfold aria-expanded="' + (ceOpt.cals ? 'true' : 'false') + '">' + (ceOpt.cals ? '▾' : '▸') + ' Calendars</button><div class="ce-opt-cals" data-ce-calslot' + (ceOpt.cals ? '' : ' hidden') + '></div>' : '') +
       (!ceDayOn() ? '<div class="ce-opt-s">List order</div><label class="ce-opt-c"><input type="radio" name="ceSort" data-ce-sortpick="cat"' + (ceSortMode() === 'cat' ? ' checked' : '') + '> By category</label><label class="ce-opt-c"><input type="radio" name="ceSort" data-ce-sortpick="time"' + (ceSortMode() !== 'cat' ? ' checked' : '') + '> By time</label>' : '') +
       // The old "Hide from the list → Calendars" checkboxes are gone (duplicate of the list above, 2026-11-13).
       // Title words only matter for the events list, so they show only when the day calendar is off.
@@ -7798,7 +7798,9 @@
       if(ceDraw) ceDraw();
     }
     if(e.target.closest('[data-ce-showhid]')){ ceShowHidden = !ceShowHidden; if(ceDraw) ceDraw(); }
-    if(e.target.closest('[data-ce-opt]')){ ceOpt.open = !ceOpt.open; if(ceDraw) ceDraw(); }
+    // Calendars list in ⚙ starts folded every time (2026-11-24, Julius: "I don't want to have to see them every time").
+    if(e.target.closest('[data-ce-opt]')){ ceOpt.open = !ceOpt.open; ceOpt.cals = false; if(ceDraw) ceDraw(); }
+    if(e.target.closest('[data-ce-calsfold]')){ ceOpt.cals = !ceOpt.cals; if(ceDraw) ceDraw(); }
     // 📅 Show calendar (list mode): never get stuck without the day calendar (2026-11-13, Julius).
     if(e.target.closest('[data-ce-showcal]')){ try{ localStorage.setItem('fw.ceDay', '1'); }catch(err){} ceOpt.open = false; if(ceDraw) ceDraw(); }
     if(e.target.closest('[data-ce-today]')){ const a = window.fwCalendar && window.fwCalendar.api && window.fwCalendar.api(); if(a) a.today(); }

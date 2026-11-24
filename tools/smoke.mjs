@@ -1674,7 +1674,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
         const visible = () => { const r = panel.getBoundingClientRect(); return getComputedStyle(panel).visibility === 'visible' && r.left >= -1 && r.right <= innerWidth + 1; };
         const evText = () => [...panel.querySelectorAll('.fc-event')].map(x => x.textContent).join(' / ');
         for (let i = 0; i < 3; i++) {
-          btn.click();
+          window.fwCalendar.open(); // the old pop-out (📅 now opens full screen, tested below)
           if (!await until(() => visible() && panel.querySelector('.fc-timegrid-event'))) { out.push('open #' + (i + 1) + ': panel or events not shown (' + (panel.querySelector('[data-cal-state]').textContent || 'no state') + ')'); break; }
           if (i === 0) {
             const timed = [...panel.querySelectorAll('.fc-timegrid-event')].find(x => /Dentist/.test(x.textContent));
@@ -1770,7 +1770,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
         // Error → Retry
         // Cache (2026-11-08): reopening while Google fails still shows the cached days (no error, no blank); a fresh
         // read (↻) that fails shows the error + Retry.
-        window.__calFail = 1; btn.click();
+        window.__calFail = 1; window.fwCalendar.open();
         if (!await until(() => visible() && panel.querySelector('.fc-timegrid-event'), 1500)) out.push('reopen with Google failing: cached events not shown');
         panel.querySelector('[data-cal-refresh]').click();
         if (!await until(() => /Couldn.t load events/.test(panel.querySelector('[data-cal-state]').textContent))) out.push('no error state when loading fails');
@@ -1850,7 +1850,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
       // Event card border = event color; a real tap outside the open card only closes it on touch (no focus →
       // no phone keyboard), while a mouse click still lands (2026-11-21, Julius).
       {
-        const r0 = await pg.evaluate(async () => { const p = document.getElementById('calPanel'); if (!document.body.classList.contains('cal-open')) document.querySelector('#toolbar [data-cal-open]').click();
+        const r0 = await pg.evaluate(async () => { const p = document.getElementById('calPanel'); if (!document.body.classList.contains('cal-open')) window.fwCalendar.open();
           for (let i = 0; i < 80 && !p.querySelector('.fc-timegrid-event .cp-ev'); i++) await new Promise(r => setTimeout(r, 50));
           await new Promise(r => setTimeout(r, 400));
           const ev = p.querySelector('.fc-timegrid-event:not(.fc-event-mirror)'); if (!ev) return { err: 'no event' };
@@ -1873,7 +1873,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
       }
       // Real input on an event checkbox (2026-11-11 bug: element.click() passed, a real tap didn't toggle).
       {
-        await pg.evaluate(async () => { const p = document.getElementById('calPanel'); if (!document.body.classList.contains('cal-open')) document.querySelector('#toolbar [data-cal-open]').click();
+        await pg.evaluate(async () => { const p = document.getElementById('calPanel'); if (!document.body.classList.contains('cal-open')) window.fwCalendar.open();
           for (let i = 0; i < 80 && !(p.querySelector('.fc-timegrid-event .cp-chk') && p.getBoundingClientRect().right <= innerWidth + 1); i++) await new Promise(r => setTimeout(r, 50));
           await new Promise(r => setTimeout(r, 400)); });
         const box = await pg.evaluate(() => { const ev = document.querySelector('#calPanel .fc-timegrid-event:not(.cp-done):not(.fc-event-mirror)'); if (!ev) return null;
@@ -1905,7 +1905,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
         const byTitle = t => Object.values(S.ev).filter(e => e.title === t);
         const form = () => det.querySelector('[data-cal-form]');
         const set = (n, v) => { const el = form().elements[n]; if (el.type === 'checkbox') el.checked = v; else el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); };
-        document.querySelector('#toolbar [data-cal-open]').click();
+        window.fwCalendar.open();
         await until(() => panel.querySelector('.fc-timegrid-event'));
         const api = window.fwCalendar.api();
         api.changeView('timeGridDay'); await wait(200);
@@ -2114,7 +2114,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           if (!b) { out.push('+ Add list has no "' + text + '"'); return; }
           b.click(); await until(() => planRow(text)); await wait(60);
         };
-        document.querySelector('#toolbar [data-cal-open]').click();
+        window.fwCalendar.open();
         // Plan is hidden until the toolbar's Plan button opens it (2026-11-08).
         await until(() => panel.querySelector('.fc-cpPlan-button'));
         if (!panel.querySelector('.cp-plan.folded')) out.push('plan not hidden by default');
@@ -2258,7 +2258,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
         const center = t => pg.evaluate(t => { const lane = document.querySelector('#calPanel .fc-timegrid-slot-lane[data-time="' + t + ':00"]'); if (!lane) return; const sc = lane.closest('.fc-scroller'), r = sc.getBoundingClientRect(); sc.scrollTop += lane.getBoundingClientRect().top - r.top - r.height / 2; }, t).then(() => pg.waitForTimeout(120));
         const setup = await pg.evaluate(async () => {
           const wait = ms => new Promise(r => setTimeout(r, ms));
-          document.querySelector('#toolbar [data-cal-open]').click(); await wait(400);
+          window.fwCalendar.open(); await wait(400);
           const api = window.fwCalendar.api(); api.changeView('timeGridDay'); api.today(); api.incrementDate({ days: 5 });
           for (let i = 0; i < 60 && !document.querySelector('#calPanel .fc-timegrid-event'); i++) await wait(50);
           await wait(300);
@@ -2534,7 +2534,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           tx.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, clientX: bx, clientY: by}));
           await wait(700);
           const at = cal.view.currentStart, atDay = at.getFullYear() + '-' + String(at.getMonth() + 1).padStart(2, '0') + '-' + String(at.getDate()).padStart(2, '0');
-          if (!window.__fwLinkJumped || window.__fwLinkJumped.tid !== tid || atDay !== '2026-11-20') out.push('badge tap: ' + JSON.stringify(window.__fwLinkJumped) + ' view ' + atDay);
+          if (!window.__fwLinkJumped || window.__fwLinkJumped.tid !== tid || atDay !== '2026-11-20' || !window.fwCalendar.isFull()) out.push('badge tap (full ' + window.fwCalendar.isFull() + '): ' + JSON.stringify(window.__fwLinkJumped) + ' view ' + atDay);
           // A tap in the middle of the text is a normal tap (no jump).
           window.__fwLinkJumped = null;
           tx.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, clientX: lr2.left + 4, clientY: by}));
@@ -2573,6 +2573,16 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           if (!r.kept) errs.push('linked drag: the line left its cell');
         }
         await pg.evaluate(() => window.fwCalendar.api().today());
+      }
+      // 📅 button = the newer full-screen calendar, phone too (2026-11-24, Julius: "do the most recent one").
+      {
+        const b = await pg.evaluate(async (name) => { const wait = ms => new Promise(r => setTimeout(r, ms)); window.fwCalendar.close(); await wait(700);
+          const btn = [...document.querySelectorAll('[data-cal-open]')].find(x => x.offsetParent); if (!btn) return 'no visible 📅 button';
+          btn.click(); await wait(900); const ok = window.fwCalendar.isFull() && document.body.classList.contains('cal-full');
+          if (name === 'phone') return ok ? 'shot' : 'not full';
+          window.fwCalendar.close(); await wait(700); return ok ? '' : 'not full'; }, name);
+        if (b === 'shot') { await pg.screenshot({ path: (process.env.SHOT_DIR || '/tmp') + '/cal-full-phone.png' }); await pg.evaluate(async () => { window.fwCalendar.close(); await new Promise(r => setTimeout(r, 700)); }); }
+        else if (b) errs.push('📅 button: ' + b);
       }
       // 3-day swipe like Google (2026-11-24, Julius): the days follow the finger; release = as many days as dragged,
       // a short quick flick = one day; a vertical scroll never pans.
@@ -3168,17 +3178,22 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           const ownGear = panel.querySelector('.fc-cpCals-button'); if (ownGear && ownGear.offsetWidth) out.push("calendar's own ⚙ still shows");
           document.querySelector('[data-ce-opt]').click(); await wait(150);
           // Calendar list (colored checkboxes) only inside the ⚙ box; no "hide calendars" duplicate (2026-11-13 evening).
+          // Folded until "▸ Calendars" is tapped (2026-11-24, Julius).
+          const slot0 = document.querySelector('[data-ce-calslot]');
+          if (!slot0 || !slot0.hidden) out.push('⚙ calendars list not folded at first');
+          document.querySelector('[data-ce-calsfold]')?.click(); await wait(150);
           const slot = document.querySelector('[data-ce-calslot]');
-          if (!slot || !slot.querySelector('.cp-cbody')) out.push('⚙ box has no calendar list');
+          if (!slot || slot.hidden || !slot.querySelector('.cp-cbody')) out.push('⚙ box has no calendar list');
           if (document.querySelector('[data-ce-hcal]')) out.push('old hide-calendars list still in ⚙');
           document.querySelector('[data-ce-opt-done]')?.click(); await wait(300);
           if (!panel.querySelector('[data-cal-cals] .cp-cbody')) out.push('calendar list did not go back to the calendar when ⚙ closed');
           // One header row while docked: ◉ · date · 🔍 · ⚙ · BL · ↻ on the search line, calendar toolbar hidden.
           const hd = document.querySelector('#centerDownScroll .ce-head');
           const vis = sel => { const el = hd.querySelector(sel); return el && el.offsetWidth > 0 && el; };
-          if (!vis('[data-ce-today]') || !vis('[data-ce-bl]') || !vis('[data-cal-refresh]') || !vis('[data-ce-search]') || !vis('[data-ce-opt]')) out.push('search line is missing ◉ / BL / ↻ / search / ⚙');
+          if (!vis('[data-ce-today]') || !vis('[data-ce-bl]') || !vis('[data-cal-refresh]') || vis('[data-ce-search]') || !vis('[data-ce-opt]')) out.push('search line: needs ◉ / BL / ↻ / ⚙, no search box (2026-11-24)');
+          if (hd.querySelector('[data-ce-bln]').offsetWidth) out.push('BL shows a count');
           if (!/\d/.test(hd.querySelector('[data-ce-title]').textContent)) out.push('no date on the search line');
-          const tops = ['[data-ce-today]', '[data-ce-search]', '[data-ce-bl]'].map(x => Math.round(hd.querySelector(x).getBoundingClientRect().top));
+          const tops = ['[data-ce-today]', '[data-ce-opt]', '[data-ce-bl]'].map(x => Math.round(hd.querySelector(x).getBoundingClientRect().top));
           if (Math.max(...tops) - Math.min(...tops) > 4) out.push('header not on one row: ' + tops);
           const ftb = panel.querySelector('.fc-header-toolbar'); if (ftb && ftb.offsetHeight) out.push('calendar toolbar row still shows');
           vis('[data-ce-bl]').click(); await wait(300);

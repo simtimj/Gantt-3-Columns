@@ -2520,6 +2520,26 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           src.querySelector('.check-text').textContent = name0 + ' (pair)';
           window.fwLinkRefresh(); await wait(600);
           if (!mine().every(e => e.title === name0 + ' (pair)' && e.tt === name0 + ' (pair)')) out.push('line rename did not reach events: ' + mine().map(e => e.title).join(' | '));
+          // Badge also counts the database copy (days not loaded here); never the same event twice.
+          window.fwCalCopyLinked = () => [{id: 'lk-copy-1', tid, title: 'x', allDay: true, start: '2027-01-05', end: '2027-01-06', startMs: Date.parse('2027-01-05T08:00:00Z'), done: true},
+            Object.assign({}, mine()[0])];
+          window.fwLinkRefresh(); await wait(300);
+          let css2 = (document.getElementById('fwLinkCss') || {}).textContent || '';
+          if (!/1\/3 ✓/.test(css2)) out.push('copy badge: ' + css2.slice(0, 200));
+          delete window.fwCalCopyLinked; window.fwLinkRefresh(); await wait(300);
+          // Tap the badge (just after the text) → the calendar goes to the occurrence's day.
+          cal.gotoDate('2026-11-05'); await wait(400); window.__fwLinkJumped = null;
+          const tx = src.querySelector('.check-text'), rg = document.createRange(); rg.selectNodeContents(tx);
+          const lr2 = [...rg.getClientRects()].pop(), bx = lr2.right + 12, by = lr2.top + lr2.height / 2;
+          tx.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, clientX: bx, clientY: by}));
+          await wait(700);
+          const at = cal.view.currentStart, atDay = at.getFullYear() + '-' + String(at.getMonth() + 1).padStart(2, '0') + '-' + String(at.getDate()).padStart(2, '0');
+          if (!window.__fwLinkJumped || window.__fwLinkJumped.tid !== tid || atDay !== '2026-11-20') out.push('badge tap: ' + JSON.stringify(window.__fwLinkJumped) + ' view ' + atDay);
+          // A tap in the middle of the text is a normal tap (no jump).
+          window.__fwLinkJumped = null;
+          tx.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, clientX: lr2.left + 4, clientY: by}));
+          await wait(200);
+          if (window.__fwLinkJumped) out.push('text tap jumped');
           window.__lkSrc = {tid, name: name0 + ' (pair)'};
           return out;
         });

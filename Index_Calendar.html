@@ -1724,7 +1724,7 @@
         const onBox = (info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')) || (dn && dn.id === x.eventId && dn.ms === String(x.startMs) && Date.now() - dn.t < 1200);
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(schOrig(info.event)); return; }
         if(!pending) showDetail(schOrig(info.event), info.el); },
-      eventDidMount: a => { if(a.el.classList.contains('cp-glass')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
+      eventDidMount: a => { a.el.dataset.lkEv = a.event.id; if(a.el.classList.contains('cp-glass')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
       datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = CP_VLBL[cpvNext(info.view.type)]; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(typeof qaClose === 'function') qaClose(); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
     });
     cal.render();
@@ -2353,23 +2353,35 @@
       return x.allDay ? lab : lab + ' ' + d.toFormat(d.minute ? 'h:mma' : 'ha').toLowerCase();
     } catch (e) { return ''; }
   };
-  function lkIndex(){
-    const m = new Map();
-    for(const x of evById.values()){ if(!x || !x.tid || !/^[\w-]+$/.test(x.tid)) continue; if(!m.has(x.tid)) m.set(x.tid, []); m.get(x.tid).push(x); }
+  // withCopy: also the database copy of the calendar (PWA, ~2 weeks back … ~2.5 months ahead), for days not loaded here.
+  // Badges / jump only; title sync stays on the loaded (fresh) events.
+  function lkIndex(withCopy){
+    const m = new Map(), add = x => { if(!x || !x.tid || !/^[\w-]+$/.test(x.tid)) return; if(!m.has(x.tid)) m.set(x.tid, []); m.get(x.tid).push(x); };
+    for(const x of evById.values()) add(x);
+    if(withCopy && typeof window.fwCalCopyLinked === 'function'){
+      let cp = null; try { cp = window.fwCalCopyLinked(); } catch (e) {}
+      (cp || []).forEach(x => { if(x && x.id && !evById.has(x.id) && !dayAt.has(String(x.start || '').slice(0, 10))) add(x); });
+    }
     return m;
   }
+  const lkEnd = x => { const t = Date.parse(x.allDay ? x.end + 'T00:00:00' : x.end); return isNaN(t) ? x.startMs : t; };
+  // The occurrence a badge points at: next open one not over yet, else the last open, else the last one.
+  function lkNext(list){
+    const now = Date.now(), by = (a, b) => a.startMs - b.startMs, open = list.filter(x => !x.done).sort(by);
+    return open.find(x => lkEnd(x) >= now) || open[open.length - 1] || list.slice().sort(by).pop() || null;
+  }
+  let lkMap = null;
   function lkPaint(m){
-    m = m || lkIndex();
-    const now = Date.now(), rules = [];
+    m = m || lkIndex(true);
+    lkMap = m;
+    const rules = [];
     m.forEach((list, tid) => {
-      const done = list.filter(x => x.done).length, open = list.filter(x => !x.done).sort((a, b) => a.startMs - b.startMs);
-      const endMs = x => { const t = Date.parse(x.allDay ? x.end + 'T00:00:00' : x.end); return isNaN(t) ? x.startMs : t; };
-      const next = open.find(x => endMs(x) >= now) || open[open.length - 1];
+      const done = list.filter(x => x.done).length, open = list.filter(x => !x.done), next = open.length ? lkNext(list) : null;
       let t = '📅' + (next ? ' ' + lkWhen(next) : '');
       if(list.length > 1) t += ' · ' + done + '/' + list.length + ' ✓'; else if(done) t += ' ✓';
       rules.push('.check-line[data-tid="' + tid + '"]:not([data-rep]) > .check-text::after{content:' + JSON.stringify(t) + ';}');
     });
-    const css = rules.length ? '.check-line[data-tid]:not([data-rep]) > .check-text::after{margin-left:6px;font-size:.74em;font-weight:600;color:var(--muted,#8a8f98);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}\n' + rules.join('\n') : '';
+    const css = rules.length ? '.check-line[data-tid]:not([data-rep]) > .check-text::after{margin-left:6px;font-size:.74em;font-weight:600;color:var(--muted,#8a8f98);white-space:nowrap;cursor:pointer;-webkit-user-select:none;user-select:none;}\n.lk-hit{outline:2px solid #d99a00!important;outline-offset:1px;}\n' + rules.join('\n') : '';
     if(css === lkSig) return;
     lkSig = css;
     let st = document.getElementById('fwLinkCss');
@@ -2396,9 +2408,62 @@
       .withFailureHandler(err => { lkBusy = false; console.error('calRetitleLinked', err); refetchFresh(); })
       .calRetitleLinked(fix.map(f => ({calId: f.x.calId, eventId: f.x.eventId, startMs: f.x.startMs, title: f.want})));
   }
-  function lkRun(){ try { const m = lkIndex(); lkPaint(m); lkSync(m); } catch (e) { console.error('fwLink', e); } }
+  function lkRun(){ try { lkPaint(lkIndex(true)); lkSync(lkIndex()); } catch (e) { console.error('fwLink', e); } }
   function lkSoon(ms){ clearTimeout(lkT); lkT = setTimeout(lkRun, ms || 600); }
   window.fwLinkRefresh = () => lkSoon(50);
+  // Tap the badge → the calendar at that occurrence (docked: go to its day; else the big calendar opens), event outlined.
+  let lkCv = null;
+  function lkBadgeAt(e){
+    const tx = e.target && e.target.closest && e.target.closest('.check-line[data-tid]:not([data-rep]) > .check-text');
+    if(!tx || !lkMap || !lkMap.has(tx.parentElement.dataset.tid)) return null;
+    try {
+      const cs = getComputedStyle(tx, '::after'), txt = String(cs.content || '').replace(/^"|"$/g, '');
+      if(!txt || txt === 'none') return null;
+      lkCv = lkCv || document.createElement('canvas');
+      const g = lkCv.getContext('2d'); g.font = cs.font || (cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily);
+      const w = g.measureText(txt).width + (parseFloat(cs.marginLeft) || 0) + 6;
+      const r = document.createRange(); r.selectNodeContents(tx);
+      const rs = [...r.getClientRects()].filter(q => q.width > 0 || q.height > 0), last = rs[rs.length - 1];
+      const box = tx.getBoundingClientRect(), x = e.clientX, y = e.clientY;
+      if(y < box.top - 2 || y > box.bottom + 2) return null;
+      if(!last) return x <= box.left + w ? tx : null;
+      if(y >= last.top - 2 && y <= last.bottom + 2 && x > last.right - 1 && x <= last.right + w) return tx; // same line, after the text
+      if(y > last.bottom - 1 && x <= box.left + w) return tx; // badge wrapped onto its own line
+    } catch (err) {}
+    return null;
+  }
+  function lkJump(tid){
+    const x = lkNext((lkMap && lkMap.get(tid)) || []);
+    if(!x) return;
+    let d = null; try { d = L().fromISO(String(x.start), {zone: TZ}); } catch (e) {}
+    const day = d && d.isValid ? d.toISODate() : String(x.start).slice(0, 10);
+    if(!docked && !isOpen()) open();
+    let n = 0;
+    (function go(){
+      if(!cal){ if(++n < 25) setTimeout(go, 200); return; }
+      try {
+        cal.gotoDate(day);
+        if(!x.allDay && d && d.isValid && cal.scrollToTime) cal.scrollToTime({hours: Math.max(0, d.hour - 1)});
+      } catch (e) {}
+      if(docked) try { panel.scrollIntoView({block: 'nearest', behavior: 'smooth'}); } catch (e) {}
+      let k = 0;
+      (function hi(){
+        let el = null; try { el = panel.querySelector('[data-lk-ev="' + CSS.escape(String(x.id)) + '"]'); } catch (e) {}
+        if(el){ el.classList.add('lk-hit'); try { el.scrollIntoView({block: 'nearest'}); } catch (e) {} setTimeout(() => el.classList.remove('lk-hit'), 1600); return; }
+        if(++k < 15) setTimeout(hi, 200);
+      })();
+    })();
+    window.__fwLinkJumped = {tid, id: x.id, day};
+  }
+  window.fwLinkJump = lkJump;
+  // mousedown: no caret / keyboard for a badge tap; click: jump. Capture, so the cell's own handlers never see it.
+  document.addEventListener('mousedown', e => { if(lkBadgeAt(e)) e.preventDefault(); }, true);
+  document.addEventListener('click', e => {
+    const tx = lkBadgeAt(e);
+    if(!tx) return;
+    e.preventDefault(); e.stopPropagation();
+    lkJump(tx.parentElement.dataset.tid);
+  }, true);
   // Typing in a linked line → rename its events once the typing stops.
   document.addEventListener('input', () => {
     if(!lkSig) return;

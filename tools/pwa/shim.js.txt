@@ -601,6 +601,7 @@
             });
             caught();
             gotFirst();
+            if (typeof window.fwLinkRefresh === 'function') try { window.fwLinkRefresh(); } catch (e) {} // linked-task badges
           }, function (e) { off = true; gotFirst(); console.warn('Calendar copy → server: ' + (e && e.code || e)); });
         } catch (e) { off = true; gotFirst(); }
       }
@@ -693,6 +694,13 @@
         },
         run: function (name, a) { return withTimeout(first, 3000).catch(function () {}).then(function () { return RUN[name].apply(null, a || []); }); },
         okAt: okAt,
+        // Linked-task badges: every event in the copy that carries a task id (tid), or null (no usable copy).
+        linked: function () {
+          if (off || !meta || Number(meta.v) !== 1) return null;
+          var out = [];
+          Object.keys(months).forEach(function (m) { (months[m] || []).forEach(function (ev) { if (ev && ev.tid) out.push(clean(ev)); }); });
+          return out;
+        },
         // The function already put its edit into the copy (meta.at = at): use the copy again once that arrives.
         settle: function (at) { ++touchN; dirtyAt = Date.now(); wantAt = Number(at) || 0; caught(); },
         // An edit just went through: use the server until the copy catches up, and ask it to catch up now.
@@ -708,6 +716,7 @@
       };
     }
     var cal = CAL ? calArea() : null;
+    window.fwCalCopyLinked = function () { return cal ? cal.linked() : null; };
 
     /* ---------- Focus, Inbox, Plan + Cal Backlog (D2, 2026-11-23, docs/NOTES.md → D2) ----------
        Focus: doc ganttFocus/main = { v (list JSON), at, base, up, dev }. saveFocus merges on the device with the same

@@ -9,7 +9,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
-import { makeCal, Fallback } from './cal-core.mjs';
+import { makeCal, Fallback, MAIN, EVENTS_CAL } from './cal-core.mjs';
 
 initializeApp();
 const OWNER = 'juliussimtim@gmail.com';
@@ -30,6 +30,15 @@ export const cal = onRequest({ region: REGION, serviceAccount: SA, memory: '256M
   res.set('Access-Control-Allow-Methods', 'POST');
   if (req.method === 'OPTIONS') return res.status(204).send('');
   if (req.method === 'GET' && req.query.warm) return res.json({ ok: true, warm: true });
+  // Health check (deploy workflow): can it reach each calendar and the copy? Yes / no only, never event details.
+  if (req.method === 'GET' && req.query.check) {
+    const out = {}, api = calendar();
+    for (const [k, id] of [['main', MAIN], ['events', EVENTS_CAL]]) {
+      try { await api.events.list({ calendarId: id, maxResults: 1, timeMin: new Date().toISOString() }); out[k] = true; } catch (e) { out[k] = 'no (' + (e.code || e.message) + ')'; }
+    }
+    try { out.copy = (await getFirestore().doc('ganttCal/meta').get()).exists; } catch (e) { out.copy = 'no (' + e.message + ')'; }
+    return res.json(out);
+  }
   if (req.method !== 'POST') return res.status(405).json({ ok: false, e: 'POST only' });
   try {
     const tok = String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');

@@ -44,4 +44,15 @@ jobs:
           gcloud services enable cloudbilling.googleapis.com --project gantt-2ee94 --quiet
           sleep 30
           npx -y firebase-tools@13 deploy --only functions --project gantt-2ee94 --non-interactive --force
+          # Old build images deleted after a day (otherwise they slowly cost storage).
+          npx -y firebase-tools@13 functions:artifacts:setpolicy --location us-west1 --days 1 --project gantt-2ee94 --force --non-interactive || echo "cleanup policy not set"
           rm -f "$RUNNER_TEMP/sa.json"
+
+      - name: Health check
+        if: env.SA_KEY != ''
+        run: |
+          U=https://us-west1-gantt-2ee94.cloudfunctions.net/cal
+          echo "warm: $(curl -s -m 60 "$U?warm=1")"
+          echo "no sign-in: $(curl -s -m 30 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"fn":"x"}' "$U") (expect 401)"
+          C=$(curl -s -m 60 "$U?check=1"); echo "access: $C"
+          echo "$C" | grep -q '"main":true' || echo "::warning::Main calendar not reachable: is it shared with the gantt-functions service account?"

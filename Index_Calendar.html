@@ -432,9 +432,17 @@
   /* Events: rounded, title first (500), time under it, thin page-colored gap between overlaps. */
   #calPanel .fc .fc-event{border:0;border-radius:4px;box-shadow:none;}
   #calPanel .fc .fc-timegrid-col-events{margin:0 10px 0 1px;}
+  /* 3-day view tight (2026-11-24, Julius: "make full use of the space"): one-line "Mon 23" header, slim time column,
+     events nearly to the column edges. */
+  #calPanel .fc-timeGrid3-view .fc-col-header-cell-cushion{flex-direction:row;align-items:baseline;justify-content:center;gap:4px;padding:1px 0 2px!important;}
+  #calPanel .fc-timeGrid3-view .cp-dh-w{font-size:12px;letter-spacing:0;}
+  #calPanel .fc-timeGrid3-view .cp-dh-n{font-size:13px!important;font-weight:600;width:auto!important;min-width:20px;height:20px!important;line-height:20px!important;padding:0 5px;border-radius:10px;box-sizing:border-box;}
+  #calPanel .fc .fc-timeGrid3-view .fc-timegrid-slot-label-cushion{padding:0 2px 0 0!important;}
+  #calPanel.cp-full .fc .fc-timeGrid3-view .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding:0 6px 0 0!important;} /* 5 px sky stripe */
+  #calPanel .fc .fc-timeGrid3-view .fc-timegrid-col-events{margin:0 1px 0 0!important;}
   /* Week view (2026-11-21 11:40, Julius: "less margins on the side of the events"). */
-  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-col-events,#calPanel .fc .fc-timeGrid3-view .fc-timegrid-col-events,#calPanel .fc .fc-timeGrid4-view .fc-timegrid-col-events{margin:0 3px 0 1px;}
-  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-timeGrid3-view .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-timeGrid4-view .fc-timegrid-event .fc-event-main{padding-left:3px;padding-right:2px;}
+  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-col-events,#calPanel .fc .fc-timeGrid3-view .fc-timegrid-col-events{margin:0 3px 0 1px;}
+  #calPanel .fc .fc-timeGridWeek-view .fc-timegrid-event .fc-event-main,#calPanel .fc .fc-timeGrid3-view .fc-timegrid-event .fc-event-main{padding-left:3px;padding-right:2px;}
   #calPanel .fc .fc-timegrid-event-harness-inset .fc-timegrid-event{box-shadow:0 0 0 1px var(--cp-bg);}
   /* Back-to-back (2026-11-21, Julius, job N): touching events (Meditate → 1 am → Sleep) stack with a small 2 px gap so
      two same-colored events never read as one; a real overlap stays Google-style (FullCalendar's inset) but the offset one is
@@ -518,7 +526,7 @@
   }
   /* Day headers stay inside their column on narrow screens. */
   #calPanel .fc .fc-col-header-cell-cushion{width:100%;box-sizing:border-box;overflow:hidden;}
-  #calPanel .fc-timeGridWeek-view .cp-dh-n,#calPanel .fc-timeGrid3-view .cp-dh-n,#calPanel .fc-timeGrid4-view .cp-dh-n{max-width:100%;}
+  #calPanel .fc-timeGridWeek-view .cp-dh-n,#calPanel .fc-timeGrid3-view .cp-dh-n{max-width:100%;}
   /* Event checkboxes (2026-11-11, Julius): subject-colored box at the card's left; ✓ when done; smaller on short events. */
   #calPanel .cp-evc{display:flex;align-items:flex-start;gap:5px;}
   #calPanel .cp-evc.cp-ev-1{align-items:center;}
@@ -730,7 +738,7 @@
   #calPanel .cp-vpick button:hover{background:var(--cp-soft);}
   /* Week header: smaller date circles to save height. */
   #calPanel .fc .fc-col-header-cell-cushion{padding:2px 0 4px;}
-  #calPanel .fc-timeGridWeek-view .cp-dh-n,#calPanel .fc-timeGrid3-view .cp-dh-n,#calPanel .fc-timeGrid4-view .cp-dh-n{font-size:18px;width:32px;height:32px;line-height:32px;}
+  #calPanel .fc-timeGridWeek-view .cp-dh-n,#calPanel .fc-timeGrid3-view .cp-dh-n{font-size:18px;width:32px;height:32px;line-height:32px;}
   @media (max-width:720px){
     #calPanel .fc .fc-toolbar.fc-header-toolbar{margin:6px 2px 4px 6px;gap:2px;}
     #calPanel .fc .fc-toolbar-title{font-size:15px;margin-left:2px;flex:0 0 auto;overflow:visible;}
@@ -792,15 +800,16 @@
   /* 3 / 4-day views (2026-11-21, Julius; NOTES "3/4-day views"): big calendar only (pop-out + full screen; docked stays Day).
      One button cycles Day → 3D → 4D → Wk (its label = where a tap goes); hold it / right-click = a picker. 3D / 4D start on
      the day being looked at, and ‹ › / a sideways swipe move one day. Remembered per screen like Day / Week. */
-  const CP_VIEWS = ['timeGridDay', 'timeGrid3', 'timeGrid4', 'timeGridWeek'];
-  const CP_VLBL = {timeGridDay: 'Day', timeGrid3: '3D', timeGrid4: '4D', timeGridWeek: 'Wk'};
+  const CP_VIEWS = ['timeGridDay', 'timeGrid3', 'timeGridWeek']; // 4D removed 2026-11-24 (Julius: Day, 3D, Week is enough)
+  const CP_VLBL = {timeGridDay: 'Day', timeGrid3: '3D', timeGridWeek: 'Wk'};
+  const cpvFix = v => v === 'timeGrid4' ? 'timeGrid3' : v; // a remembered 4D opens as 3D
   const cpvNext = v => CP_VIEWS[(Math.max(0, CP_VIEWS.indexOf(v)) + 1) % CP_VIEWS.length];
   let cpvSkip = 0; // a hold just opened the picker: the click that follows is not a tap
   function cpvPick(btn){
     document.querySelectorAll('.cp-vpick').forEach(m => m.remove());
     if(!cal) return;
     const m = document.createElement('div'); m.className = 'cp-vpick'; m.setAttribute('role', 'menu');
-    m.innerHTML = CP_VIEWS.map(v => '<button type="button" role="menuitem" data-cpv="' + v + '"' + (cal.view.type === v ? ' class="on"' : '') + '>' + ({timeGridDay: 'Day', timeGrid3: '3 days', timeGrid4: '4 days', timeGridWeek: 'Week'})[v] + '</button>').join('');
+    m.innerHTML = CP_VIEWS.map(v => '<button type="button" role="menuitem" data-cpv="' + v + '"' + (cal.view.type === v ? ' class="on"' : '') + '>' + ({timeGridDay: 'Day', timeGrid3: '3 days', timeGridWeek: 'Week'})[v] + '</button>').join('');
     panel.appendChild(m); // inside the panel so it gets the calendar's light / dark colors
     const r = btn.getBoundingClientRect(), w = m.offsetWidth;
     m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px'; m.style.top = (r.bottom + 4) + 'px';
@@ -2151,15 +2160,61 @@
   ['pointerdown', 'touchstart', 'mousedown'].forEach(t => zf.addEventListener(t, e => e.stopPropagation(), {passive: true}));
   mount.parentElement.style.position = 'relative'; mount.parentElement.appendChild(zf);
   let swp = null, swpLock = 0;
-  const swOk = () => docked || full || !!(cal && /^timeGrid[34]$/.test(cal.view.type)); // pop-out: 3D / 4D swipe one day (2026-11-21)
+  const swOk = () => docked || full || !!(cal && cal.view.type === 'timeGrid3'); // pop-out: 3D swipes by day (2026-11-21)
   const swDay = dir => { if(!cal || !swOk() || Date.now() < swpLock) return; swpLock = Date.now() + 450; dir > 0 ? cal.next() : cal.prev(); };
   window.fwCalSwipeDay = swDay;
-  mount.addEventListener('touchstart', e => { if(!swOk() || e.touches.length !== 1) { swp = null; return; } const t = e.touches[0]; swp = {x: t.clientX, y: t.clientY, at: Date.now()}; }, {passive: true});
-  mount.addEventListener('touchend', e => {
-    const p = swp; swp = null; if(!p || !swOk() || document.querySelector('.fc-event-dragging,.fc-event-resizing')) return;
-    const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y;
-    if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.6 && Date.now() - p.at < 700) swDay(dx < 0 ? 1 : -1);
+  /* Google-style swipe (2026-11-24, Julius: "match Google Calendar when you scroll one day left / right in 3-day"):
+     the days follow the finger (header, all-day row and timeline together; the hour column stays put), and on release
+     the calendar moves by as many days as were dragged (a quick flick = at least one day). Vertical scrolling and
+     hold-to-drag are untouched: the pan only starts when the finger goes sideways first. */
+  const swDays = () => [...mount.querySelectorAll('th.fc-col-header-cell[data-date], .fc-daygrid-day[data-date], td.fc-timegrid-col[data-date]')];
+  function swPaint(dx, anim){
+    const cols = mount.querySelectorAll('td.fc-timegrid-col[data-date]'); if(!cols.length) return;
+    const a = cols[0].getBoundingClientRect().left, b = cols[cols.length - 1].getBoundingClientRect().right;
+    swDays().forEach(el => {
+      const r = el.getBoundingClientRect(), l = r.left - (swp && swp.dx0 || 0), L0 = l + dx;
+      el.style.transition = anim ? 'transform .16s ease-out, clip-path .16s ease-out' : '';
+      el.style.transform = dx ? 'translateX(' + dx + 'px)' : '';
+      el.style.clipPath = dx ? 'inset(0 ' + Math.max(0, L0 + r.width - b) + 'px 0 ' + Math.max(0, a - L0) + 'px)' : '';
+    });
+    if(swp) swp.dx0 = dx;
+  }
+  function swReset(){ swDays().forEach(el => { el.style.transition = el.style.transform = el.style.clipPath = ''; }); }
+  mount.addEventListener('touchstart', e => {
+    if(!swOk() || e.touches.length !== 1) { swp = null; return; }
+    const t = e.touches[0];
+    if(cal && cal.view.type === 'timeGridWeek'){ swp = {week: true, x: t.clientX, y: t.clientY, at: Date.now()}; return; } // Week: a quick swipe = next / previous week, as before
+    swp = {x: t.clientX, y: t.clientY, at: Date.now(), on: false, dx0: 0, last: [t.clientX, Date.now()], prev: [t.clientX, Date.now()]};
   }, {passive: true});
+  mount.addEventListener('touchmove', e => {
+    const p = swp; if(!p || p.week || e.touches.length !== 1) return;
+    const t = e.touches[0], dx = t.clientX - p.x, dy = t.clientY - p.y;
+    if(!p.on){
+      if(Math.hypot(dx, dy) < 10) return;
+      if(Math.abs(dx) < Math.abs(dy) * 1.3 || document.body.classList.contains('tc-dragging') || document.querySelector('.fc-event-dragging,.fc-event-mirror,.fc-event-resizing')){ swp = null; return; }
+      p.on = true;
+    }
+    if(e.cancelable) e.preventDefault();
+    p.prev = p.last; p.last = [t.clientX, Date.now()];
+    swPaint(t.clientX - p.x, false);
+  }, {passive: false});
+  const swEnd = e => {
+    const p = swp; swp = null; if(!p) return;
+    if(p.week){ const t = e.changedTouches[0], dx = t.clientX - p.x, dy = t.clientY - p.y;
+      if(!document.querySelector('.fc-event-dragging,.fc-event-resizing') && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.6 && Date.now() - p.at < 700) swDay(dx < 0 ? 1 : -1); return; }
+    if(!p.on) return;
+    const col = mount.querySelector('td.fc-timegrid-col[data-date]'), w = col ? col.getBoundingClientRect().width : 0;
+    const dx = p.last[0] - p.x; // last move (a lifted finger's own position can lag)
+    const v = (p.last[0] - p.prev[0]) / Math.max(1, p.last[1] - p.prev[1]); // px / ms at release
+    let n = w ? Math.round(-dx / w) : 0;
+    if(!n && (Math.abs(v) > .35 || Math.abs(dx) > 50)) n = dx < 0 ? 1 : -1;
+    if(!n || !cal || Date.now() < swpLock){ swp = {dx0: dx}; swPaint(0, true); swp = null; setTimeout(swReset, 180); return; }
+    swpLock = Date.now() + 300;
+    swp = {dx0: dx}; swPaint(-n * w, true); swp = null;
+    setTimeout(() => { swReset(); try { cal.incrementDate({days: n}); } catch (err) { n > 0 ? cal.next() : cal.prev(); } window.__fwSwipeDays = (window.__fwSwipeDays || 0) + n; }, 170);
+  };
+  mount.addEventListener('touchend', swEnd, {passive: true});
+  mount.addEventListener('touchcancel', e => { if(swp && swp.on){ swp = null; swReset(); } else swp = null; }, {passive: true});
   /* Scroll ≠ pick up (2026-11-14, Julius: "I'm just trying to scroll and it ends up picking up a task"). FullCalendar
      lets a finger wander during the hold delay and still starts the drag when the delay ends (unless it noticed a scroll
      event). Here: if the finger moves more than 10 px before the hold time is up, that touch is a scroll — FullCalendar
@@ -2313,7 +2368,7 @@
   function adReset(){ adRatio = AD_DEF; panel.classList.remove('cp-adset'); try { localStorage.removeItem(AD_KEY); } catch (e) {} adLayout(); if(cal) cal.updateSize(); }
   function build(){
     const phone = window.matchMedia('(max-width:720px)').matches;
-    const saved = lsGet('fw.calView');
+    const saved = cpvFix(lsGet('fw.calView'));
     cal = new FullCalendar.Calendar(mount, {
       // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
       timeZone: TZ,
@@ -2336,7 +2391,7 @@
         cpPlan: { text: 'Plan', hint: 'Show / hide the plan (Big Three, Waiting list)', click: () => { lsSet('fw.calPlanFold', planFolded() ? '0' : '1'); renderPlan(); setTimeout(() => cal && cal.updateSize(), 0); } },
         // Phones: one Day ⇄ Week toggle instead of the two-button pill (saves a button's width on the single line).
         // 3 / 4-day views (2026-11-21, Julius): tap cycles Day → 3D → 4D → Wk; hold (or right-click) = quick picker.
-        cpView: { text: 'Wk', hint: 'Switch view: Day → 3 days → 4 days → Week (hold to pick)', click: () => { if(Date.now() < cpvSkip) return; cal.changeView(cpvNext(cal.view.type)); } },
+        cpView: { text: 'Wk', hint: 'Switch view: Day → 3 days → Week (hold to pick)', click: () => { if(Date.now() < cpvSkip) return; cal.changeView(cpvNext(cal.view.type)); } },
         cpRefresh: { text: '↻', hint: 'Reload events from Google Calendar', click: () => {} }, // handled by the [data-cal-refresh] listener
         cpClose: { text: '✕', hint: 'Close (Esc) and go back to the Gantt', click: () => {} } // handled by [data-cal-close]
       },
@@ -2344,7 +2399,7 @@
       buttonHints: { today: 'Today' },
       buttonIcons: { prev: 'chevron-left', next: 'chevron-right' },
       // Day title with the weekday after it (2026-11-15, Julius): "Nov 15, Sun" (wide: "Nov 15, 2026, Sun").
-      views: { timeGrid3: { type: 'timeGrid', duration: {days: 3}, dateIncrement: {days: 1}, buttonText: '3D' }, timeGrid4: { type: 'timeGrid', duration: {days: 4}, dateIncrement: {days: 1}, buttonText: '4D' }, timeGridDay: { titleFormat: a => { const d = a.date, D = luxon.DateTime.fromObject({year: d.year, month: d.month + 1, day: d.day}); return D.toFormat(phone ? 'MMM d, ccc' : 'MMM d, yyyy, ccc'); } } },
+      views: { timeGrid3: { type: 'timeGrid', duration: {days: 3}, dateIncrement: {days: 1}, buttonText: '3D' }, timeGridDay: { titleFormat: a => { const d = a.date, D = luxon.DateTime.fromObject({year: d.year, month: d.month + 1, day: d.day}); return D.toFormat(phone ? 'MMM d, ccc' : 'MMM d, yyyy, ccc'); } } },
       titleFormat: { month: 'short', year: 'numeric' },
       titleRangeSeparator: ' – ',
       allDayText: '',
@@ -2368,7 +2423,8 @@
       defaultRangeSeparator: ' – ',
       // Header: small weekday over a big date number; today's number in a blue circle.
       dayHeaderContent: a => { const L = luxon.DateTime.fromJSDate(a.date, {zone: 'UTC'});
-        return { html: '<span class="cp-dh-w">' + L.toFormat('ccc').toUpperCase() + '</span><span class="cp-dh-n">' + L.day + '</span>' }; },
+        const w = a.view && a.view.type === 'timeGrid3' ? L.toFormat('ccc') : L.toFormat('ccc').toUpperCase(); // 3D: one line "Mon 23" (2026-11-24)
+        return { html: '<span class="cp-dh-w">' + w + '</span><span class="cp-dh-n">' + L.day + '</span>' }; },
       // Event: title first (bold), time under it, like Google.
       // 2026-11-15 (Julius): long timed events (2 h+, e.g. Sleep 1 – 7:45) are see-through, so the grid shows behind
       // them; only the title chip keeps the event color.
@@ -2629,7 +2685,7 @@
     panel.classList.remove('cp-docked'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('role', 'dialog');
     if(panelNext && panelNext.parentNode === panelHome) panelHome.insertBefore(panel, panelNext); else panelHome.appendChild(panel);
     blPlace();
-    const v = lsGet('fw.calView');
+    const v = cpvFix(lsGet('fw.calView'));
     try { if(cal && v && v !== cal.view.type) cal.changeView(v); } catch (e) {}
   }
   /* ── Backlog beside the docked calendar (2026-11-13, Julius) ──
@@ -2717,7 +2773,7 @@
     fullBlWas = blEl.hidden;
     panel.classList.add('cp-full'); document.body.classList.add('cal-full');
     open(); full = true; fullAt = Date.now();
-    try { const s = lsGet('fw.calFullView'), v = CP_VIEWS.includes(s) ? s : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
+    try { const s = cpvFix(lsGet('fw.calFullView')), v = CP_VIEWS.includes(s) ? s : 'timeGridDay'; cal.changeView(v, d || undefined); } catch (e) {}
     fullWkSync(); // Day: all-day tasks in the left column; Week: full width with the all-day strip on top
     fadRender();
     blEl.hidden = false; // always in the left column in full screen (no BL button there); ▾ minimizes it

@@ -962,7 +962,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Between events only (nothing before the first / after the last). No minimum duration: hidden only when the text doesn't fit (height or width).
 - Format `3 h 45 m` · `2 h` · `45 m`. Past gaps shown the same. Always on, no toggle. Display-only (clicks pass through). Same rules in half and full.
 
-## 3/4-day views (2026-11-21 12:11, Julius)
+## 3/4-day views (2026-11-21 12:11, Julius) — 4D removed 2026-11-24, see "3-day tight"
 - Big calendar only (half + full screen); the docked side calendar stays Day-only.
 - (1) No new buttons: the Day/Wk button cycles Day → 3D → 4D → Wk; hold it for a quick picker.
 - (2) Starts on the day you're looking at (◉ = today).
@@ -1199,3 +1199,8 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
   - Deploy: `.github/workflows/functions.yaml` (on functions/ changes or Run workflow) with secret `FIREBASE_SA_KEY`; skips until it exists.
   - Tests: `tools/functions-test.mjs` (fake Calendar + Firestore), smoke `pwa-d2` (routing, fallback, errors, create retry).
 - **Julius's one-time setup (computer, ~10 min)**: 1) Firebase → Blaze plan + Cloud Billing budget $1 alert 2) enable Google Calendar API in gantt-2ee94 3) service account `gantt-functions` with roles Editor, Cloud Functions Admin, Cloud Run Admin, Service Account User → JSON key 4) GitHub secret `FIREBASE_SA_KEY` = the key file's contents, then delete the file 5) share each calendar shown in the app with `gantt-functions@gantt-2ee94.iam.gserviceaccount.com` ("Make changes to events") 6) tell Claude → run the workflow, set `calFn`.
+## 3-day tight + Google swipe, 4D removed (2026-11-24 00:32, Julius: "make full use of the space… match Google's scroll one day left/right… take out the 4-day view")
+- 4D gone: `CP_VIEWS` = Day / 3D / Week; `cpvFix` maps a saved `timeGrid4` (fw.calView / fw.calFullView) to 3D.
+- 3D layout (CSS after the `.fc-timegrid-col-events` rule): header row "Mon 23" (`dayHeaderContent` skips upper-case in 3D; `.cp-dh-n` 13 px pill), slot label padding 0 2px (full screen 6px for the sky stripe), events margin 0 1px.
+- Swipe (replaces the touchend-only swipe): `swPaint(dx)` translates + clip-paths every day cell (header `th`, all-day `.fc-daygrid-day`, timeline `td.fc-timegrid-col`) so the hour column stays; starts only when the first 10 px go sideways (×1.3) and no card / event drag is on; release → n = round(−dx / column width), a flick (> .35 px/ms or > 50 px) = 1; animates there, then `incrementDate({days: n})`. Week keeps the old quick swipe (next / previous week). Counter `window.__fwSwipeDays`.
+- Smoke (calendar phone): ~0.9 column → 1 day, 1.7 columns right → −2, quick flick → 1, vertical scroll → 0, no transforms left; 3D header one line; no 4D in the picker.

@@ -1723,17 +1723,21 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
               if (!vb || !vb.getClientRects().length) out.push('3/4-day: no view button shown');
               else {
                 api.next(); await wait(150); const shown = st();
-                const seq = []; for (let i = 0; i < 4; i++) { vb.click(); await wait(200); seq.push(api.view.type + ':' + cols()); }
-                if (seq.join(',') !== 'timeGrid3:3,timeGrid4:4,timeGridWeek:7,timeGridDay:1') out.push('3/4-day: cycle went ' + seq.join(','));
+                const seq = []; for (let i = 0; i < 3; i++) { vb.click(); await wait(200); seq.push(api.view.type + ':' + cols()); }
+                if (seq.join(',') !== 'timeGrid3:3,timeGridWeek:7,timeGridDay:1') out.push('3/4-day: cycle went ' + seq.join(',')); // 4D removed 2026-11-24
                 vb.click(); await wait(200);
                 if (st() !== shown) out.push('3/4-day: 3D did not start on the day shown (' + st() + ' vs ' + shown + ')');
                 const s0 = st(); panel.querySelector('.fc-next-button').click(); await wait(150);
                 const dd = (Date.parse(st()) - Date.parse(s0)) / 864e5; if (dd !== 1) out.push('3/4-day: › moved ' + dd + ' days');
                 if (localStorage.getItem('fw.calView') !== 'timeGrid3') out.push('3/4-day: view not remembered');
                 vb.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); await wait(50);
-                const pk = panel.querySelector('.cp-vpick [data-cpv="timeGrid4"]');
+                // 3D header is one line "Mon 23" (2026-11-24)
+                const hc = panel.querySelector('.fc-timeGrid3-view .fc-col-header-cell-cushion');
+                if (!hc || getComputedStyle(hc).flexDirection !== 'row' || !/^[A-Z][a-z]{2}\s*\d{1,2}$/.test(hc.textContent.trim())) out.push('3D header not one line: ' + (hc && hc.textContent));
+                if (panel.querySelector('.cp-vpick [data-cpv="timeGrid4"]')) out.push('4D still in the picker');
+                const pk = panel.querySelector('.cp-vpick [data-cpv="timeGridWeek"]');
                 if (!pk) out.push('3/4-day: no picker on hold');
-                else { pk.click(); await wait(200); if (api.view.type !== 'timeGrid4') out.push('3/4-day: picker did not switch'); }
+                else { pk.click(); await wait(200); if (api.view.type !== 'timeGridWeek') out.push('3/4-day: picker did not switch'); }
                 api.changeView('timeGridDay'); panel.querySelector('.fc-today-button').click(); await wait(200);
               }
             }
@@ -2549,6 +2553,35 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           if (!r.kept) errs.push('linked drag: the line left its cell');
         }
         await pg.evaluate(() => window.fwCalendar.api().today());
+      }
+      // 3-day swipe like Google (2026-11-24, Julius): the days follow the finger; release = as many days as dragged,
+      // a short quick flick = one day; a vertical scroll never pans.
+      if (name === 'phone') {
+        const w = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)); window.fwCalendar.close(); await wait(700); document.getElementById('workspace').scrollLeft = 0; await wait(300);
+          window.fwCalendar.open(); await wait(700); const api = window.fwCalendar.api(); api.changeView('timeGrid3', '2026-11-20'); await wait(500);
+          const c = document.querySelector('#calPanel td.fc-timegrid-col[data-date]'), r = c && c.getBoundingClientRect(), b = document.querySelector('#calPanel .fc-timegrid-body').getBoundingClientRect();
+          return r ? { w: r.width, x: r.left + r.width * 2.5, y: b.top + 120 } : null; });
+        if (!w) errs.push('3D swipe: no column');
+        else {
+          const cdp = await pg.context().newCDPSession(pg), T = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+          const st = () => pg.evaluate(() => window.fwCalendar.api().view.currentStart.toISOString().slice(0, 10));
+          const drag = async (dx, dy, steps, gap) => { await T('touchStart', w.x, w.y); for (let i = 1; i <= steps; i++) { await T('touchMove', w.x + dx * i / steps, w.y + dy * i / steps); await pg.waitForTimeout(gap); } await T('touchEnd'); await pg.waitForTimeout(500); };
+          let s0 = await st();
+          await T('touchStart', w.x, w.y); for (let i = 1; i <= 8; i++) { await T('touchMove', w.x - w.w * 0.9 * i / 8, w.y); await pg.waitForTimeout(30); }
+          const mid = await pg.evaluate(() => (document.querySelector('#calPanel td.fc-timegrid-col[data-date]').style.transform || ''));
+          await T('touchEnd'); await pg.waitForTimeout(500);
+          if (!/translateX\(-/.test(mid)) errs.push('3D swipe: days did not follow the finger (' + mid + ')');
+          let d = (Date.parse(await st()) - Date.parse(s0)) / 864e5; if (d !== 1) errs.push('3D swipe: ~1 column moved ' + d + ' days');
+          s0 = await st(); await drag(w.w * 1.7, 0, 10, 30);
+          d = (Date.parse(await st()) - Date.parse(s0)) / 864e5; if (d !== -2) errs.push('3D swipe: ~2 columns right moved ' + d + ' days');
+          s0 = await st(); await drag(-55, 0, 3, 16);
+          d = (Date.parse(await st()) - Date.parse(s0)) / 864e5; if (d !== 1) errs.push('3D swipe: quick flick moved ' + d + ' days');
+          s0 = await st(); await drag(25, -200, 10, 20);
+          d = (Date.parse(await st()) - Date.parse(s0)) / 864e5; if (d !== 0) errs.push('3D swipe: vertical scroll moved ' + d + ' days');
+          const left = await pg.evaluate(() => [...document.querySelectorAll('#calPanel td.fc-timegrid-col[data-date], #calPanel th.fc-col-header-cell')].some(el => el.style.transform || el.style.clipPath));
+          if (left) errs.push('3D swipe: transforms left behind');
+        }
+        await pg.evaluate(async () => { const api = window.fwCalendar.api(); api.changeView('timeGridDay'); api.today(); window.fwCalendar.close(); await new Promise(r => setTimeout(r, 600)); try { localStorage.removeItem('fw.calView'); } catch (e) {} });
       }
       // Half view (2026-11-13, Julius): computer = each column half the screen; opens on History + middle,
       // scrolled right = middle + calendar.

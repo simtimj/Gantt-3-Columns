@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-23
+Last updated: 2026-11-24
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -77,6 +77,10 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-24)
+- **Drag tasks onto the calendar, linked** (2026-11-24): hold any task line (Keep In Mind, Today, Notes, Reference, pads — a whole task or any single sub-item) and drag it onto the calendar. An all-day cell = all-day on that day (the **Events** group = your Events calendar); a timeline slot = timed at that spot (15-min snap, the task's length if set, else 30 min). A blue label shows where it lands. The line **stays where it is** and is linked: drag it again for another occurrence; it shows a small badge with the next time and progress (📅 Tue 2pm · 1/3 ✓). Ticking an event = done for that one occurrence (the task stays open). Renaming either side renames the other (and the task's other open events). Removing the event just unschedules it.
+- Limits: the badge counts events the calendar has loaded on this device (about this week ± 1); repeating events aren't renamed.
 
 ## 🧪 To be confirmed (2026-11-23)
 - **Catch-up from the database (speed plan H)** (2026-11-23): the every-minute check for changes from your other devices (days, Reference cards, Inbox) now reads only what changed from the database instead of asking the server. The server still answers the first check after opening and one every 10 min (that's how the "New version" bar is found). The Inbox uses one live connection instead of re-reading every item.

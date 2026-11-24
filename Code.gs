@@ -2533,6 +2533,12 @@ function calPanelSetOrder(list) {
   return { ok: !failed.length, failed: failed };
 }
 const CAL_SCHED_TAG = 'fwSched'; // private extended property: timed event that came from an all-day task
+/* Linked tasks (2026-11-23, Julius: "drag from Keep In Mind onto the calendar, mirrored"): an event made by dragging a
+   task line carries the line's data-tid (fwTid) and the title it was last synced with (fwTt). Title ≠ fwTt = renamed on
+   the calendar → the app renames the task; task renamed → calRetitleLinked renames its open events and resets fwTt.
+   Done stays per event (each occurrence ticks on its own; the task stays open). */
+const CAL_TID_TAG = 'fwTid', CAL_TT_TAG = 'fwTt';
+const calTidClean_ = t => String(t || '').replace(/[^\w-]/g, '').slice(0, 60);
 function calPanelEventOut_(ev, calId, calName, calColor, tz) {
   const allDay = ev.isAllDayEvent();
   let colorId = '';
@@ -2551,7 +2557,9 @@ function calPanelEventOut_(ev, calId, calName, calColor, tz) {
     editable: calWritable_(calId), // any calendar he can edit; repeating too, with a This day / All days choice (2026-11-11)
     sched: !allDay && (function () { try { return ev.getTag(CAL_SCHED_TAG) === '1'; } catch (e) { return false; } })(),
     ord: allDay ? (function () { try { return Number(ev.getTag(CAL_ORD_TAG)) || 0; } catch (e) { return 0; } })() : 0,
-    life: allDay && calId === EVENT_CALENDARS[1] // red "Events" calendar = birthdays etc.: own all-day group (2026-11-23)
+    life: allDay && calId === EVENT_CALENDARS[1], // red "Events" calendar = birthdays etc.: own all-day group (2026-11-23)
+    tid: (function () { try { return ev.getTag(CAL_TID_TAG) || ''; } catch (e) { return ''; } })(),
+    tt: (function () { try { return ev.getTag(CAL_TT_TAG) || ''; } catch (e) { return ''; } })()
   };
 }
 // Event popup notes (2026-11-14, Julius: "like Google Calendar's pop-up"): the description as plain text, short
@@ -2641,7 +2649,9 @@ function calPanelRangeApi_(from, to, tz) {
             editable: canEdit,
             sched: !allDay && !!(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_SCHED_TAG] === '1'),
             ord: allDay ? Number(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_ORD_TAG]) || 0 : 0,
-            life: allDay && id === EVENT_CALENDARS[1] // Events calendar = birthdays etc. (2026-11-23)
+            life: allDay && id === EVENT_CALENDARS[1], // Events calendar = birthdays etc. (2026-11-23)
+            tid: (it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_TID_TAG]) || '',
+            tt: (it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_TT_TAG]) || ''
           });
         });
         token = r.nextPageToken;
@@ -2791,11 +2801,13 @@ function calPanelCreateEvent(req) {
       try { return Object.assign(calPanelOut_(calEventAt_(d.calId || EVENT_CALENDARS[0], d.eventId, d.startMs), d.calId), { repeat: true }); }
       catch (e) { return { eventId: d.eventId, startMs: d.startMs, repeat: true }; }
     }
-    const calId = String((req && req.calId) || EVENT_CALENDARS[0]), cal = calPanelMain_(calId);
+    const calId = String((req && req.life) ? EVENT_CALENDARS[1] : (req && req.calId) || EVENT_CALENDARS[0]), cal = calPanelMain_(calId);
     const ev = w.allDay ? (w.oneDay ? cal.createAllDayEvent(w.title, w.start) : cal.createAllDayEvent(w.title, w.start, w.end))
       : cal.createEvent(w.title, w.start, w.end);
     try { ev.removeAllReminders(); } catch (e) { console.error(e); }
     if (w.allDay) try { ev.setTag(CAL_ORD_TAG, String(Number(req.ord) || Date.now())); } catch (e) { console.error('create ord: ' + e); } // new all-day = bottom
+    const tid = calTidClean_(req && req.tid);
+    if (tid) try { ev.setTag(CAL_TID_TAG, tid); ev.setTag(CAL_TT_TAG, w.title); } catch (e) { console.error('create tid: ' + e); } // linked task (2026-11-23)
     const out = calPanelOut_(ev, calId);
     if (key) cache.put(key, JSON.stringify({ eventId: out.eventId, startMs: out.startMs, calId: calId }), 21600);
     return out;
@@ -3055,6 +3067,26 @@ function calEventAt_(calId, eventId, start) {
     || cal.getEvents(new Date(t.getTime() - DAY_MS), new Date(t.getTime() + DAY_MS)).filter(e => e.getId() === eventId)[0];
   if (!ev) throw new Error('Event not found (moved or deleted?) — tap ↻ on the Calendar');
   return ev;
+}
+// Linked tasks (2026-11-23): [{calId, eventId, startMs, title}] → each event gets the title and fwTt = title (one lock).
+function calRetitleLinked(list) {
+  const items = (Array.isArray(list) ? list : []).filter(x => x && x.eventId).slice(0, 100), failed = [];
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    items.forEach(x => {
+      try {
+        const calId = String(x.calId || EVENT_CALENDARS[0]);
+        calRequireWritable_(calId);
+        const name = String(x.title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+        if (!name) throw new Error('Title is empty');
+        const ev = calEventAt_(calId, String(x.eventId), Number(x.startMs));
+        if (ev.getTitle() !== name) ev.setTitle(name);
+        ev.setTag(CAL_TT_TAG, name);
+      } catch (e) { failed.push(String(x.eventId)); }
+    });
+  } finally { lock.releaseLock(); }
+  return { ok: !failed.length, failed: failed };
 }
 // Editing a title in Cal Events changes the Google Calendar event (2026-11-04, Julius).
 function setCalendarEventTitle(calId, eventId, start, title) {

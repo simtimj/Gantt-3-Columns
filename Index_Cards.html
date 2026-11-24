@@ -315,6 +315,11 @@
   .tc-ghost .check-line{margin-top:0!important;margin-bottom:0!important;}
   .tc-drop{position:fixed;z-index:3999;height:3px;border-radius:2px;background:#3b82f6;pointer-events:none;box-shadow:0 0 0 2px rgba(59,130,246,.25);}
   .tc-drop::before{content:"";position:absolute;left:-4px;top:-3px;width:9px;height:9px;border-radius:50%;background:#3b82f6;}
+  /* Task → calendar drop spot (2026-11-23): time line + label, or the all-day cell outlined. */
+  .tc-drop.tc-drop-calad{background:rgba(59,130,246,.16);border:2px dashed #3b82f6;box-shadow:none;border-radius:6px;box-sizing:border-box;}
+  .tc-drop.tc-drop-calad::before{content:none;}
+  .tc-drop.tc-drop-cal[data-lbl]::after{content:attr(data-lbl);position:absolute;left:6px;bottom:calc(100% + 3px);padding:1px 7px;border-radius:7px;background:#3b82f6;color:#fff;font:600 11px/1.5 system-ui,sans-serif;white-space:nowrap;}
+  .tc-drop.tc-drop-calad[data-lbl]::after{bottom:auto;top:2px;}
   /* Subject row in the hold menu */
   .urg-picker{max-width:252px;}
   /* Never cut off on a phone: scrolls inside instead (2026-10-31, Julius). */
@@ -2009,6 +2014,8 @@
       return {ed,before,prev,level,urg:u === '0' ? '' : u,row,above};
     }
     function targetAt(x,y){
+      // Onto the calendar (2026-11-23, Julius): a linked event, the line stays (Index_Calendar fwCalTaskTarget).
+      if(!drag.inbox && !drag.cal && window.fwCalTaskTarget){ const ct = fwCalTaskTarget(x,y); if(ct) return ct; }
       const el = document.elementFromPoint(x,y);
       const ut = urgTargetAt(el,x,y);
       if(ut !== undefined) return ut;
@@ -2046,6 +2053,16 @@
     function placeIndicator(){
       const t = drag.target = targetAt(drag.x,drag.y);
       const ind = drag.ind;
+      ind.classList.toggle('tc-drop-cal',!!(t && t.calDrop));
+      ind.classList.toggle('tc-drop-calad',!!(t && t.calDrop && t.allDay));
+      if(t && t.calDrop){
+        ind.hidden = false; ind.dataset.lbl = t.lbl || '';
+        ind.style.left = t.box.left + 'px'; ind.style.width = Math.max(30,t.box.width) + 'px';
+        ind.style.top = (t.allDay ? t.box.top : t.box.top - 1) + 'px';
+        ind.style.height = t.allDay ? Math.max(18,t.box.height) + 'px' : '';
+        return;
+      }
+      ind.style.height = ''; delete ind.dataset.lbl;
       if(!t){ ind.hidden = true; return; }
       if(t.retag){
         const hd = t.group.querySelector('.urg-sub') || t.group, gr = hd.getBoundingClientRect();
@@ -2108,6 +2125,7 @@
       if(d.inbox) return finishInbox(d,t);
       if(d.cal) return finishCal(d,t);
       if(!t) return;
+      if(t.calDrop){ if(window.fwCalTaskDrop) fwCalTaskDrop(d.line,d.src,t); return; }
       if(t.retag){
         if(d.nodes.every(n => n.dataset.urg === t.urg)) return;
         captureBeforeEdit(d.src);

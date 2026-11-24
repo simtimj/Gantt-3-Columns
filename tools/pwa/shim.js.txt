@@ -132,7 +132,7 @@
     var CAL_WRITES = { addAllDayTask: 1, setCalendarEventMeta: 1, calPanelSetOrder: 1, calPanelCreateEvent: 1, calPanelUpdateEvent: 1,
       calPanelMoveEvent: 1, calPanelSetColor: 1, calPanelDuplicateEvent: 1, calPanelDeleteEvent: 1, planSchedule: 1, setCalendarEventTitle: 1,
       setCalendarEventDone: 1, archiveCompletedTasks: 1, calBacklogComplete: 1, planSave: 1, planMoveEvent: 1, calBacklogSync: 1,
-      calBacklogPlace: 1, calBacklogPlaceMany: 1 };
+      calBacklogPlace: 1, calBacklogPlaceMany: 1, calRetitleLinked: 1 };
     var OWNER = String(FB_CFG.owner || '').toLowerCase(), cfg = Object.assign({}, FB_CFG);
     delete cfg.owner; delete cfg._note; delete cfg.areas;
     var db = null, user = null, lastAt = null, watching = false;

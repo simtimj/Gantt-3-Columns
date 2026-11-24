@@ -1537,7 +1537,8 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
         return {start:a[0],end:a[1],events:window.__calEmpty?[]:Object.values(S.ev).concat(window.__calManyAllDay&&(window.__mDay=window.fwCalendar.api().view.activeStart.toISOString().slice(0,10))?Array.from({length:30},(_,i)=>({id:'m'+i+'|x',eventId:'m'+i,title:'Many '+i,allDay:true,start:window.__mDay,end:L.fromISO(window.__mDay).plus({days:1}).toISODate(),startMs:ms(window.__mDay),color:'#3f51b5',colorId:(window.__mDone||{})['m'+i]??i%5===4?'8':'9',done:(window.__mDone||{})['m'+i]??i%5===4,urg:['1','2','3',''][i%4]||undefined,cat:i%2?'code':'',cal:'Main',calId:'main',editable:true})):[]).filter(e=>e.start.slice(0,10)<a[1]&&(e.allDay?e.end:e.end.slice(0,10))>=a[0]).map(e=>Object.assign({},e)),failed:[]};}
       const r=a[0]||{},shape=e=>{e.title=r.title;e.allDay=!!r.allDay;e.start=r.allDay?r.start:iso(r.start);e.end=r.allDay?r.end:iso(r.end);e.startMs=ms(e.start);return e;};
       if(m==='calPanelCreateEvent'){ if(S.ops[r.opId])return Object.assign({repeat:true},S.ev[S.ops[r.opId]]);
-        const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));if(r.allDay)e.ord=r.ord||Date.now();S.ops[r.opId]=e.eventId;return e;}
+        const e=put(shape({eventId:'n'+(++S.n),color:'#039be5',colorId:'',cal:'Main',calId:'main',editable:true,reminders:0}));if(r.allDay)e.ord=r.ord||Date.now();if(r.tid){e.tid=r.tid;e.tt=e.title;}S.ops[r.opId]=e.eventId;return e;}
+      if(m==='calRetitleLinked'){(a[0]||[]).forEach(x=>{const e=S.ev[x.eventId];if(e){e.title=x.title;e.tt=x.title;}});return {ok:true,failed:[]};}
       if(m==='calPanelSetOrder'){(a[0]||[]).forEach(x=>{if(S.ev[x.eventId])S.ev[x.eventId].ord=x.ord;});return {ok:true,failed:[]};}
       if(m==='calPanelUpdateEvent'){const e=S.ev[r.eventId];if(!e)throw new Error('Event not found');if(e.recurring||!e.editable)throw new Error('Repeating events are read-only here');delete S.ev[r.eventId];return put(shape(e));}
       // Phase 3b: move / resize in place (same id); Graphite (done) is locked; plan links follow the new start.
@@ -2471,6 +2472,81 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
             if (!ok) errs.push('tap add: Enter did not make the all-day task');
             await pg.keyboard.press('Escape'); await pg.waitForTimeout(150);
           }
+        }
+        await pg.evaluate(() => window.fwCalendar.api().today());
+      }
+      // Linked tasks (2026-11-23, Julius): a task line dropped on the calendar = an event linked by data-tid; the line
+      // stays; drop again = another occurrence; badge counts done; renaming either side renames the other.
+      if (name === 'desktop') {
+        const lk = await pg.evaluate(async () => { window.__lkSrc = null;
+          const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+          const cal = window.fwCalendar.api(); cal.changeView('timeGridDay', '2026-11-20'); await wait(600);
+          document.querySelector('[data-ctab="focus"]')?.click(); await wait(600);
+          const kimEd = document.querySelector('#kimScroll .kim-editor');
+          if (!kimEd) return ['no Keep In Mind editor'];
+          kimEd.insertAdjacentHTML('beforeend', '<div class="check-line" data-level="0"><input type="checkbox"><span class="check-text">Wax board</span></div>');
+          const src = [...kimEd.querySelectorAll('.check-line')].find(l => l.textContent.trim() === 'Wax board');
+          if (!src) return ['no source line'];
+          const ed = src.closest('.kim-editor'), name0 = src.textContent.trim();
+          const lane = document.querySelector('#calPanel .fc-timegrid-slot-lane[data-time="11:00:00"]'), col = document.querySelector('#calPanel .fc-timegrid-col[data-date="2026-11-20"]');
+          if (!lane || !col) return ['no lane / column'];
+          const sc = lane.closest('.fc-scroller'); sc.scrollTop += lane.getBoundingClientRect().top - sc.getBoundingClientRect().top - 60; await wait(150);
+          const lr = lane.getBoundingClientRect(), cr = col.getBoundingClientRect();
+          const t = window.fwCalTaskTarget(cr.left + cr.width / 2, lr.top + 2);
+          if (!t || t.allDay || t.time !== '11:00' || t.date !== '2026-11-20') out.push('timed target ' + JSON.stringify(t));
+          window.fwCalTaskDrop(src, ed, t); await wait(900);
+          const tid = src.dataset.tid, mine = () => Object.values(window.__cal.ev).filter(e => e.tid && e.tid === tid);
+          if (!tid || mine().length !== 1 || mine()[0].allDay || mine()[0].title !== name0) out.push('timed drop made ' + JSON.stringify(mine()));
+          else { const e = mine()[0], mins = (Date.parse(e.end) - Date.parse(e.start)) / 60000; if (mins !== 30) out.push('timed length ' + mins); }
+          const ad = document.querySelector('#calPanel .fc-timegrid .fc-daygrid-day[data-date="2026-11-20"]'), ar = ad.getBoundingClientRect();
+          const t2 = window.fwCalTaskTarget(ar.right - 20, ar.bottom - 4);
+          if (!t2 || !t2.allDay || t2.date !== '2026-11-20') out.push('all-day target ' + JSON.stringify(t2));
+          window.fwCalTaskDrop(src, ed, t2); await wait(900);
+          if (mine().length !== 2 || !mine().some(e => e.allDay)) out.push('second drop: ' + mine().length);
+          if (src.dataset.tid !== tid || !src.isConnected || src.textContent.trim() !== name0) out.push('source line changed by the drop');
+          window.fwLinkRefresh(); await wait(300);
+          const css = (document.getElementById('fwLinkCss') || {}).textContent || '';
+          if (!css.includes('"' + tid + '"') || !/0\/2/.test(css)) out.push('badge: ' + css.slice(0, 160));
+          // Renamed on the calendar → the line follows, and the other occurrence too.
+          const e0 = mine().find(e => !e.allDay); e0.title = name0 + ' warm';
+          window.fwCalendar.refresh(); await wait(1500);
+          if (src.textContent.trim() !== name0 + ' warm') out.push('calendar rename did not reach the line: ' + src.textContent.trim());
+          if (!mine().every(e => e.title === name0 + ' warm')) out.push('other occurrence not renamed: ' + mine().map(e => e.title).join(' | '));
+          // Renamed on the line → open events follow.
+          src.querySelector('.check-text').textContent = name0 + ' (pair)';
+          window.fwLinkRefresh(); await wait(600);
+          if (!mine().every(e => e.title === name0 + ' (pair)' && e.tt === name0 + ' (pair)')) out.push('line rename did not reach events: ' + mine().map(e => e.title).join(' | '));
+          window.__lkSrc = {tid, name: name0 + ' (pair)'};
+          return out;
+        });
+        lk.forEach(x => errs.push('linked: ' + x));
+        // Real gesture: hold the line, drag it onto 2 pm.
+        const pts = await pg.evaluate(async () => {
+          const w = ms => new Promise(r => setTimeout(r, ms)), ws = document.getElementById('workspace');
+          window.fwCalendar.close(); await w(900); if (window.fwCeRedraw) window.fwCeRedraw(); await w(500); ws.scrollLeft = ws.scrollWidth; await w(500); // docked: middle + calendar
+          window.fwCalendar.api().changeView('timeGridDay', '2026-11-20'); await w(500);
+          window.__probe = {docked: window.fwCalendar.isDocked()};
+          const src = [...document.querySelectorAll('#kimScroll .check-line')].find(l => l.dataset.tid === (window.__lkSrc || {}).tid);
+          const lane = document.querySelector('#calPanel .fc-timegrid-slot-lane[data-time="14:00:00"]'), col = document.querySelector('#calPanel .fc-timegrid-col[data-date="2026-11-20"]');
+          if (!src || !lane || !col) return null;
+          const sc = lane.closest('.fc-scroller'); sc.scrollTop += lane.getBoundingClientRect().top - sc.getBoundingClientRect().top - sc.clientHeight / 2;
+          const s = src.querySelector('.check-text').getBoundingClientRect(), l = lane.getBoundingClientRect(), c = col.getBoundingClientRect();
+          return { sx: s.left + Math.min(40, s.width / 2), sy: s.top + s.height / 2, tx: c.left + c.width / 2, ty: l.top + 3, vis: s.width > 0 && s.top >= 0 && s.bottom <= innerHeight && s.left >= 0 && s.right <= innerWidth && !!document.elementFromPoint(s.left + Math.min(40, s.width / 2), s.top + s.height / 2) };
+        });
+        if (!pts || !pts.vis) errs.push('linked drag: source line not on screen (' + JSON.stringify(pts) + ') ' + JSON.stringify(await pg.evaluate(() => window.__probe)));
+        else {
+          const before = await pg.evaluate(() => Object.values(window.__cal.ev).filter(e => e.tid === (window.__lkSrc || {}).tid).length);
+          await pg.mouse.move(pts.sx, pts.sy); await pg.mouse.down(); await pg.waitForTimeout(800);
+          const hd = await pg.evaluate(({sx, sy}) => { const el = document.elementFromPoint(sx, sy); return 'ready ' + !!document.querySelector('.tc-holdready') + ' at ' + (el && [el, el.parentElement, el.parentElement && el.parentElement.parentElement].map(x => x && (x.tagName + '#' + x.id + '.' + x.className)).join(' < ')) + ' txt ' + (el && el.textContent.slice(0, 40)) + ' holdMs ' + window.fwHoldMs(); }, pts);
+          for (let i = 1; i <= 12; i++) { await pg.mouse.move(pts.sx + (pts.tx - pts.sx) * i / 12, pts.sy + (pts.ty - pts.sy) * i / 12); await pg.waitForTimeout(30); }
+          const lbl = await pg.evaluate(({tx, ty}) => { const d = document.querySelector('.tc-drop.tc-drop-cal'); const el = document.elementFromPoint(tx, ty);
+            return d ? d.dataset.lbl : 'none · dragging ' + document.body.classList.contains('tc-dragging') + ' · ghost ' + !!document.querySelector('.tc-ghost') + ' · at ' + (el && (el.className || el.tagName)); }, pts);
+          await pg.mouse.up(); await pg.waitForTimeout(1000);
+          const r = await pg.evaluate(() => { const l = Object.values(window.__cal.ev).filter(e => e.tid === (window.__lkSrc || {}).tid);
+            return { n: l.length, two: l.some(e => !e.allDay && /T14:00/.test(e.start)), kept: [...document.querySelectorAll('.check-line')].some(x => x.dataset.tid === (window.__lkSrc || {}).tid && x.closest('.kim-editor,.ref-cell')) }; });
+          if (!/2:00/.test(lbl)) errs.push('linked drag: label while over 2 pm was ' + JSON.stringify(lbl) + ' · ' + hd);
+          if (r.n !== before + 1 || !r.two) errs.push('linked drag: ' + JSON.stringify(r) + ' (before ' + before + ')');
+          if (!r.kept) errs.push('linked drag: the line left its cell');
         }
         await pg.evaluate(() => window.fwCalendar.api().today());
       }

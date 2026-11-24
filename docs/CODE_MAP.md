@@ -52,6 +52,7 @@ Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.m
 | ·· backlog column | `function blRender` | 17400 |
 | ·· mark done | `function toggleDone` | 17693 |
 | ·· build / open / close / dock / full screen / all-day box | `function build(`, `function dockTo`, `function openFull`, `function fadRender` | 17860–18450 |
+| ·· linked tasks (drag a line onto the calendar, badge, title sync) | `fwCalTaskTarget`, `fwCalTaskDrop`, `lkPaint`, `lkSync` | ~3030 |
 | Big Three strip | `getElementById('b3Strip')` | 18576 |
 | Reference drawer | `initRefDrawer` | 18876 |
 

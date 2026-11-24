@@ -914,6 +914,7 @@
     daysIn(s, e).forEach(d => dayAt.set(d, at || Date.now()));
     cacheFailed = (r.failed || []).length;
     clearTimeout(saveTimer); saveTimer = setTimeout(cacheSave, 400);
+    lkSoon();
     return true;
   }
   const cacheGet = (s, e) => [...evById.values()].filter(x => overlaps(x, s, e));
@@ -1046,6 +1047,7 @@
     evById.delete(oldId);
     if(x && x.id) evById.set(x.id, x);
     clearTimeout(saveTimer); saveTimer = setTimeout(cacheSave, 400);
+    lkSoon();
   }
   function fetchRange(info, ok, fail){
     const s = info.startStr.slice(0, 10), e = info.endStr.slice(0, 10);
@@ -3031,6 +3033,147 @@
     };
     fadGrip.addEventListener('pointermove', move); fadGrip.addEventListener('pointerup', up); fadGrip.addEventListener('pointercancel', up);
   });
+  /* Task → calendar, linked (2026-11-23, Julius: "drag things from Keep In Mind onto the all-day area and the timeline,
+     same for everything else — mirrored"). Any task line (Keep In Mind, Today, Notes, Reference, pads) held and dragged
+     onto the calendar becomes an event linked to the line by its data-tid (server tags fwTid / fwTt). Answers: one task,
+     many placements (drag again = another occurrence) · the line stays where it is · ticking an event = done for that
+     occurrence only (badge shows 2/5) · any sub-item can be dragged on its own · renaming either side renames the other
+     (fwTt = last synced title tells which side changed) · removing the event only unschedules it.
+     Drop spots: an all-day cell (or the full-screen All day box) = all-day on that day; the "Events" group = the Events
+     calendar; a timeline slot = timed at that spot (15-min snap), length = the line's data-dur, else 30 min.
+     Badge = generated CSS (`#fwLinkCss`, ::after on the line's text), so nothing is ever written into the saved cells. */
+  var lkT = 0, lkBusy = false, lkSig = '';
+  const lkWhen = x => {
+    if(!window.luxon) return x.allDay ? String(x.start).slice(5, 10) : String(x.start).slice(5, 16).replace('T', ' ');
+    try {
+      const d = L().fromISO(x.start, {zone: TZ}), today = todayLA(), day = d.toISODate();
+      const lab = day === today ? 'Today' : day === addDays(today, 1) ? 'Tmrw' : d.toFormat(day < addDays(today, 6) && day > today ? 'ccc' : 'ccc M/d');
+      return x.allDay ? lab : lab + ' ' + d.toFormat(d.minute ? 'h:mma' : 'ha').toLowerCase();
+    } catch (e) { return ''; }
+  };
+  function lkIndex(){
+    const m = new Map();
+    for(const x of evById.values()){ if(!x || !x.tid || !/^[\w-]+$/.test(x.tid)) continue; if(!m.has(x.tid)) m.set(x.tid, []); m.get(x.tid).push(x); }
+    return m;
+  }
+  function lkPaint(m){
+    m = m || lkIndex();
+    const now = Date.now(), rules = [];
+    m.forEach((list, tid) => {
+      const done = list.filter(x => x.done).length, open = list.filter(x => !x.done).sort((a, b) => a.startMs - b.startMs);
+      const endMs = x => { const t = Date.parse(x.allDay ? x.end + 'T00:00:00' : x.end); return isNaN(t) ? x.startMs : t; };
+      const next = open.find(x => endMs(x) >= now) || open[open.length - 1];
+      let t = '📅' + (next ? ' ' + lkWhen(next) : '');
+      if(list.length > 1) t += ' · ' + done + '/' + list.length + ' ✓'; else if(done) t += ' ✓';
+      rules.push('.check-line[data-tid="' + tid + '"]:not([data-rep]) > .check-text::after{content:' + JSON.stringify(t) + ';}');
+    });
+    const css = rules.length ? '.check-line[data-tid]:not([data-rep]) > .check-text::after{margin-left:6px;font-size:.74em;font-weight:600;color:var(--muted,#8a8f98);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}\n' + rules.join('\n') : '';
+    if(css === lkSig) return;
+    lkSig = css;
+    let st = document.getElementById('fwLinkCss');
+    if(!st){ st = document.createElement('style'); st.id = 'fwLinkCss'; document.head.appendChild(st); }
+    st.textContent = css;
+  }
+  // Titles: whichever side changed since the last sync (fwTt) wins; open, one-off events only.
+  function lkSync(m){
+    if(lkBusy || !canRun() || !window.fwTasks || typeof fwTasks.info !== 'function') return;
+    const fix = [];
+    m.forEach((list, tid) => {
+      const info = fwTasks.info(tid), src = info && info.text;
+      if(!src) return; // the line isn't loaded here: leave it alone
+      const open = list.filter(x => !x.done && x.editable && !x.recurring);
+      const ren = open.find(x => x.tt && x.title !== x.tt && x.title !== src);
+      const want = ren ? ren.title : src;
+      if(ren && want !== src && window.tidRetitle) try { tidRetitle(tid, esc(want)); } catch (e) { console.error(e); }
+      open.forEach(x => { if(x.title !== want || x.tt !== want) fix.push({x, want}); });
+    });
+    if(!fix.length) return;
+    lkBusy = true;
+    fix.forEach(f => { f.x.title = f.want; f.x.tt = f.want; const fe = cal && cal.getEventById(f.x.id); if(fe) try { fe.setProp('title', f.want); } catch (e) {} });
+    google.script.run.withSuccessHandler(() => { lkBusy = false; window.__fwLinkRetitled = (window.__fwLinkRetitled || 0) + fix.length; })
+      .withFailureHandler(err => { lkBusy = false; console.error('calRetitleLinked', err); refetchFresh(); })
+      .calRetitleLinked(fix.map(f => ({calId: f.x.calId, eventId: f.x.eventId, startMs: f.x.startMs, title: f.want})));
+  }
+  function lkRun(){ try { const m = lkIndex(); lkPaint(m); lkSync(m); } catch (e) { console.error('fwLink', e); } }
+  function lkSoon(ms){ clearTimeout(lkT); lkT = setTimeout(lkRun, ms || 600); }
+  window.fwLinkRefresh = () => lkSoon(50);
+  // Typing in a linked line → rename its events once the typing stops.
+  document.addEventListener('input', () => {
+    if(!lkSig) return;
+    let l = null;
+    try { const n = getSelection().focusNode, el = n && (n.nodeType === 1 ? n : n.parentElement); l = el && el.closest && el.closest('.check-line[data-tid]'); } catch (e) {}
+    if(l && lkSig.indexOf('"' + l.dataset.tid + '"') >= 0) lkSoon(3000);
+  }, true);
+  // Where on the calendar a dragged task would land: {calDrop, allDay, date, time, life, box, lbl} or null.
+  window.fwCalTaskTarget = function(x, y){
+    if(!cal) return null;
+    const el = document.elementFromPoint(x, y);
+    if(!el || !el.closest || !panel.contains(el) || el.closest('[data-cal-detail]')) return null;
+    const rect = r => ({left: r.left, top: r.top, width: r.width, height: r.height});
+    const dayLab = d => { try { return L().fromISO(d, {zone: TZ}).toFormat('ccc M/d'); } catch (e) { return d; } };
+    if(full && fadEl.contains(el) && viewStart){
+      const life = !!el.closest('[data-fa-life],.cp-falife');
+      return {calDrop: true, allDay: true, date: viewStart, life, box: rect(fadEl.getBoundingClientRect()), lbl: (life ? 'Events · ' : 'All day · ') + dayLab(viewStart)};
+    }
+    const ad = el.closest('.fc-daygrid-day[data-date]');
+    if(ad && mount.contains(ad)){
+      const life = !!el.closest('[data-cpg="life"]');
+      return {calDrop: true, allDay: true, date: ad.dataset.date, life, box: rect(ad.getBoundingClientRect()), lbl: (life ? 'Events · ' : 'All day · ') + dayLab(ad.dataset.date)};
+    }
+    if(!el.closest('.fc-timegrid-body') || !mount.contains(el)) return null;
+    const col = [...mount.querySelectorAll('.fc-timegrid-col[data-date]')].find(c => { const r = c.getBoundingClientRect(); return r.width && x >= r.left && x < r.right; });
+    const lanes = [...mount.querySelectorAll('.fc-timegrid-slot-lane[data-time]')];
+    if(!col || !lanes.length) return null;
+    const mins = t => { const p = String(t).split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); };
+    let i = lanes.findIndex(n => { const r = n.getBoundingClientRect(); return y >= r.top && y < r.bottom; });
+    if(i < 0) i = y < lanes[0].getBoundingClientRect().top ? 0 : lanes.length - 1;
+    const lane = lanes[i], lr = lane.getBoundingClientRect(), m0 = mins(lane.dataset.time);
+    const slot = lanes[i + 1] ? Math.max(5, mins(lanes[i + 1].dataset.time) - m0) : 30;
+    const frac = Math.max(0, Math.min(.999, (y - lr.top) / Math.max(1, lr.height)));
+    const m = Math.min(24 * 60 - 15, m0 + Math.floor(frac * slot / 15) * 15);
+    const time = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const cr = col.getBoundingClientRect(), top = lr.top + ((m - m0) / slot) * lr.height;
+    let lbl = '';
+    try { lbl = L().fromISO(col.dataset.date + 'T' + time, {zone: TZ}).toFormat('ccc h:mm a'); } catch (e) { lbl = time; }
+    return {calDrop: true, allDay: false, date: col.dataset.date, time, life: false, box: {left: cr.left, top, width: cr.width, height: 0}, lbl};
+  };
+  window.fwCalTaskDrop = function(line, src, t){
+    if(!line || !t || !t.calDrop) return false;
+    const tx = line.querySelector(':scope > .check-text') || line.querySelector('.check-text');
+    const title = ((tx ? tx.textContent : line.textContent) || '').replace(/\s+/g, ' ').trim();
+    if(!title){ moveFail('That line is empty — type something first.'); return false; }
+    if(!canRun()){ moveFail('Not connected — try again in a moment.'); return false; }
+    let tid = line.dataset.tid || '';
+    const dup = tid && src && src.querySelectorAll('.check-line[data-tid="' + CSS.escape(tid) + '"]').length > 1;
+    if(!tid || dup || !/^[\w-]+$/.test(tid)){
+      if(dup) delete line.dataset.tid;
+      tid = window.fwTasks && fwTasks.ensureTid ? fwTasks.ensureTid({line, tid: ''}) : '';
+    }
+    if(!tid){ moveFail('Couldn’t link that line — nothing changed.'); return false; }
+    const opId = 'lk' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), ordNow = Date.now();
+    const dur = Math.max(15, Math.min(12 * 60, Math.round(Number(line.dataset.dur)) || 30));
+    let req, tmpStart, tmpEnd;
+    if(t.allDay){
+      const end = addDays(t.date, 1);
+      req = {allDay: true, start: t.date, end, ord: ordNow}; tmpStart = t.date; tmpEnd = end;
+    } else {
+      const a = L().fromISO(t.date + 'T' + t.time, {zone: TZ}), b = a.plus({minutes: dur});
+      req = {allDay: false, start: wall(a), end: wall(b)}; tmpStart = a.toISO(); tmpEnd = b.toISO();
+    }
+    Object.assign(req, {opId, title, tid, life: !!t.life});
+    let tmp = null;
+    try { tmp = cal.addEvent({id: 'fqtmp-' + opId, title, start: tmpStart, end: tmpEnd, allDay: !!t.allDay, editable: false, extendedProps: {fqTmp: true, ordKey: 0, ord: ordNow, tid}}); } catch (e) {}
+    flash('Scheduled · linked ✓');
+    line.classList.add('urg-flash'); setTimeout(() => line.classList.remove('urg-flash'), 1400);
+    window.__fwLinkDrops = (window.__fwLinkDrops || 0) + 1;
+    google.script.run.withSuccessHandler(out => {
+      if(out && out.id && !out.repeat){ evById.set(out.id, out); lkSoon(50); }
+      refetchFresh(); dropWhenReal(tmp, title, t.date);
+    }).withFailureHandler(err => { if(tmp) try { tmp.remove(); } catch (e) {} moveFail('Couldn’t schedule — nothing changed. ' + errText(err)); })
+      .calPanelCreateEvent(req);
+    return true;
+  };
+  setTimeout(() => lkSoon(50), 2500); // badges from the device's cached copy, once the cells are drawn
   window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), blReload: () => blLoad(true), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : open(); }, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {

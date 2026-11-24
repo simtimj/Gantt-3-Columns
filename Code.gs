@@ -3549,6 +3549,23 @@ function calBacklogRoll_() {
     });
   } finally { lock.releaseLock(); }
 }
+/* P (2026-11-24): the Cloud Function does place / drop / complete on the calendar and leaves one ganttBacklogOps doc per
+   row (Store.calBacklog.ops). Copied into the tab here, before any read of the rows: Placed value, and for ✓ Done ·
+   Archive the Done Log row. Each doc is deleted once applied. Caller holds the script lock (or is the trigger). */
+function calBacklogApplyOps_() {
+  let ops = [];
+  try { ops = Store.calBacklog.ops(); } catch (e) { console.error('backlog ops: ' + e.message); return 0; }
+  if (!ops.length || !Store.calBacklog.exists()) return 0;
+  const rows = Store.calBacklog.rows(), logs = [];
+  ops.forEach(o => {
+    const i = rows.findIndex(r => r[0] === String(o.id));
+    if (i >= 0 && !rows[i][6] && o.v) { Store.calBacklog.setPlaced(i, String(o.v)); rows[i][6] = String(o.v); }
+    if (o.logDay && o.logTitle) logs.push([String(o.logDay), 'Backlog', String(o.logTitle), 'Marked done from the calendar backlog', 'Julius', '']);
+  });
+  if (logs.length) { const log = Store.sheetFirst('Done Log'); log.getRange(log.getLastRow() + 1, 1, logs.length, DONE_LOG_HEADERS.length).setValues(logs); }
+  ops.forEach(o => { try { Store.calBacklog.opDone(o); } catch (e) { console.error('backlog op delete: ' + e.message); } });
+  return ops.length;
+}
 function calBacklogList_() {
   if (!Store.calBacklog.exists()) return [];
   return Store.calBacklog.rows().filter(r => r[0] && !r[6]).map(r => ({
@@ -3559,6 +3576,7 @@ function calBacklogList_() {
 // Client entry: sweep if due (cheap check), roll the ↪ pile, then return the open backlog.
 function calBacklogSync() {
   let sweep = {};
+  { const lock = LockService.getScriptLock(); if (lock.tryLock(5000)) { try { calBacklogApplyOps_(); } finally { lock.releaseLock(); } } }
   try { sweep = calBacklogSweep_(); } catch (e) { console.error('calBacklogSweep_: ' + e); sweep = { error: String(e.message || e) }; }
   try { calBacklogRoll_(); } catch (e) { console.error('calBacklogRoll_: ' + e); }
   const items = calBacklogList_();
@@ -3605,6 +3623,7 @@ function calBacklogPlace__(req) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    calBacklogApplyOps_();
     return calBacklogPlaceIn_(r, Store.calBacklog.rows());
   } finally { lock.releaseLock(); }
 }
@@ -3618,6 +3637,7 @@ function calBacklogPlaceMany__(reqs) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    calBacklogApplyOps_();
     const rows = Store.calBacklog.rows(), done = [], failed = [];
     list.forEach(r => { try { calBacklogPlaceIn_(r, rows); done.push(String(r.id)); } catch (e) { failed.push({ id: String(r.id), error: String(e && e.message || e) }); } });
     return { ok: !failed.length, done: done, failed: failed };
@@ -3688,6 +3708,7 @@ function calBacklogComplete__(req) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    calBacklogApplyOps_();
     const rows = Store.calBacklog.rows(), i = rows.findIndex(x => x[0] === id);
     if (i < 0) throw new Error('Not in the backlog any more — tap ↻');
     if (rows[i][6]) return { ok: true, already: rows[i][6] };

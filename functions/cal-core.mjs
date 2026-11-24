@@ -139,17 +139,21 @@ export function makeCal(api, db) {
   }
   // Put the edited event into the copy now (and drop its old spot), stamp meta.at; Apps Script's 5-min copy won't
   // overwrite a month doc with fnAt newer than when its own read started (Store.cal.sync).
-  async function intoCopy(dropIds, entry) {
+  // dropIds: panel ids, or a function (entry → true = drop), e.g. every spot of one non-repeating event.
+  async function intoCopy(dropIds, entry) { return intoCopyMany([{ drop: dropIds, entry }]); }
+  // Several changes in one pass over the month docs (bulk backlog send): [{ drop, entry }].
+  async function intoCopyMany(changes) {
     const m = await copyMeta();
-    if (!m) return 0;
+    if (!m || !changes.length) return 0;
     const now = Date.now(), months = list(m.months);
-    const touch = months.filter(mo => entry && String(entry.start).slice(0, 7) <= mo && String(entry.end).slice(0, 7) >= mo);
+    const ch = changes.map(c => ({ drop: typeof c.drop === 'function' ? c.drop : e => c.drop.indexOf(e.id) >= 0, entry: c.entry }));
+    const hits = (c, mo) => c.entry && String(c.entry.start).slice(0, 7) <= mo && String(c.entry.end).slice(0, 7) >= mo;
     for (const mo of months) {
       const ref = db.doc('ganttCal/' + mo), s = await ref.get();
       if (!s.exists) continue;
-      const evs = list(s.data().ev), kept = evs.filter(e => dropIds.indexOf(e.id) < 0);
-      if (touch.indexOf(mo) >= 0) kept.push(entry);
-      if (kept.length === evs.length && touch.indexOf(mo) < 0) continue;
+      const evs = list(s.data().ev), kept = evs.filter(e => !ch.some(c => c.drop(e))), add = ch.filter(c => hits(c, mo)).map(c => c.entry);
+      kept.push(...add);
+      if (kept.length === evs.length && !add.length) continue;
       await ref.set({ ev: JSON.stringify(kept), n: kept.length, fnAt: now, at: now }, { merge: true });
     }
     await db.doc('ganttCal/meta').set({ at: now, fnAt: now }, { merge: true });
@@ -227,6 +231,127 @@ export function makeCal(api, db) {
     return { eventId: inst.iCalUID, refetch: true };
   }
 
+  /* ---- Plan rows + Schedule links (P, 2026-11-24; Code.gs planSchedule / planMoveEvent / planRelink_) ----
+     Rows: ganttPlan/<id> (NOTES D2). Links (task tid → 'eventId@startMs'): ONE doc gantt/planLinks = { v: JSON map }
+     (Store.plan.links_ seeds it from the planEv:* properties). Either missing → Apps Script does the job (Fallback). */
+  const LINKS = 'gantt/planLinks';
+  async function planOn() { const s = await db.doc('gantt/planMeta').get(); return s.exists && Number(s.data().seeded) > 0; }
+  const linkOf = it => (it.iCalUID || it.id + '@google.com') + '@' + startOf(it);
+  function linkParts(x) { const m = String(x || '').match(/^(.+)@(\d+)$/); return m ? { eventId: m[1], startMs: Number(m[2]) } : null; }
+  async function rowsWhere(field, lo, hi) {
+    let q = db.collection('ganttPlan');
+    q = hi === undefined ? q.where(field, '==', lo) : q.where(field, '>=', lo).where(field, '<', hi);
+    return (await q.get()).docs.map(d => Object.assign({}, d.data(), { id: d.id })).filter(x => !Number(x.del));
+  }
+  function stamp() { const p = parts(Date.now()); return p.year + '-' + p.month + '-' + p.day + ' ' + p.hour + ':' + p.minute; }
+  async function writeRow(x, fields) {
+    const at = Math.max(Date.now(), (Number(x.at) || 0) + 1);
+    await db.doc('ganttPlan/' + x.id).set(Object.assign({}, fields, { updated: stamp(), at, up: new Date(at), dev: 'fn' }), { merge: true });
+  }
+  // Read-modify-write of one JSON-map doc (transaction when the SDK has one). fn(map) → changed? Missing doc → null.
+  async function editMap(path, fn) {
+    const ref = db.doc(path), apply = snap => {
+      if (!snap.exists || !snap.data().v) return null;
+      let m; try { m = JSON.parse(snap.data().v) || {}; } catch (e) { return null; }
+      const ch = fn(m), now = Date.now();
+      return { m, rec: ch ? { v: JSON.stringify(m), at: now, up: new Date(now), dev: 'fn' } : null };
+    };
+    if (db.runTransaction) return db.runTransaction(async t => { const x = apply(await t.get(ref)); if (x && x.rec) t.set(ref, x.rec, { merge: true }); return x && x.m; });
+    const x = apply(await ref.get()); if (x && x.rec) await ref.set(x.rec, { merge: true }); return x && x.m;
+  }
+  // planRelink_: every row pointing at this event gets its new link; its task's Schedule link too. ok = links doc there.
+  async function relink(it) {
+    const link = linkOf(it), uid = link.replace(/@\d+$/, '');
+    for (const x of await rowsWhere('event', uid + '@', uid + '@\uf8ff')) {
+      const p = linkParts(x.event);
+      if (p && p.eventId === uid && x.event !== link) await writeRow(x, { event: link });
+    }
+    const tid = String(priv(it)[TID_TAG] || '').slice(0, 66);
+    if (!tid) return { link, ok: true };
+    const m = await editMap(LINKS, map => { if (map[tid] === link) return false; map[tid] = link; return true; });
+    return { link, ok: !!m };
+  }
+  // After a main-calendar move / edit: relink here when Plan is on the database; else the app asks Apps Script (relink).
+  async function relinkOut(out, res, calId) {
+    if (calId !== MAIN || res.recurringEventId) return Object.assign(out, { relink: true });
+    try { if (await planOn() && (await relink(res)).ok) return out; } catch (e) { console.warn('relink: ' + e.message); }
+    return Object.assign(out, { relink: true });
+  }
+  // planMoveEv_: to another day, keeping the length (all-day) or the clock times (timed, LA wall time across DST).
+  function shiftTo(it, date) {
+    if (it.start.date) {
+      const days = Math.max(1, Math.round((dayMs(it.end.date) - dayMs(it.start.date)) / DAY));
+      return { start: { date, dateTime: null }, end: { date: addDays(date, days), dateTime: null } };
+    }
+    const s = Date.parse(it.start.dateTime), e = Date.parse(it.end.dateTime), shift = Math.round((dayMs(date) - dayMs(ymd(s))) / DAY);
+    const mv = ms => { const p = parts(ms), d = addDays(p.year + '-' + p.month + '-' + p.day, shift); return wallMs(+d.slice(0, 4), +d.slice(5, 7), +d.slice(8, 10), +p.hour, +p.minute) + Number(p.second) * 1000; };
+    return { start: { dateTime: new Date(mv(s)).toISOString(), timeZone: TZ, date: null }, end: { dateTime: new Date(mv(e)).toISOString(), timeZone: TZ, date: null } };
+  }
+  const notFound = e => Number(e && e.code) === 404 || Number(e && e.code) === 410;
+
+  /* ---- Cal Backlog (P; Code.gs calBacklogPlace / PlaceMany / Complete) ----
+     The open list = doc gantt/calBacklog (Apps Script publishes it from the Cal Backlog tab). The function does the
+     calendar part, takes the row off that list, and leaves one ganttBacklogOps doc per row; Apps Script copies it into
+     the tab (calBacklogApplyOps_) before its next read of the rows. List missing / older than 20 min → Apps Script. */
+  const BL = 'gantt/calBacklog', BL_OPS = 'ganttBacklogOps';
+  const opKey = id => Buffer.from(String(id)).toString('base64url').slice(0, 600);
+  async function blItems() {
+    const s = await db.doc(BL).get();
+    if (!s.exists) throw new Fallback('backlog not on the database');
+    const d = s.data();
+    if (Date.now() - Number(d.at) > 20 * 60000) throw new Fallback('backlog copy is old');
+    try { const v = JSON.parse(d.items || '[]'); if (Array.isArray(v)) return v; } catch (e) { /* below */ }
+    throw new Fallback('backlog list unreadable');
+  }
+  async function blPending(id) { const s = await db.doc(BL_OPS + '/' + opKey(id)).get(); return s.exists ? String(s.data().v || 'done') : ''; }
+  async function blMark(id, v, log) {
+    const now = Date.now(), rec = { key: opKey(id), id: String(id), v, at: now };
+    if (log) { rec.logDay = log.day; rec.logTitle = log.title; }
+    await db.doc(BL_OPS + '/' + rec.key).set(rec);
+  }
+  // Take rows off the published open list (the app's Backlog reads it); `at` untouched so a stale list still falls back.
+  async function blTakeOut(ids) {
+    if (!ids.length) return;
+    const ref = db.doc(BL), apply = snap => {
+      if (!snap.exists) return null;
+      let items; try { items = JSON.parse(snap.data().items || '[]'); } catch (e) { return null; }
+      const kept = items.filter(x => ids.indexOf(x.id) < 0);
+      return kept.length === items.length ? null : { items: JSON.stringify(kept), fnAt: Date.now() };
+    };
+    if (db.runTransaction) return db.runTransaction(async t => { const rec = apply(await t.get(ref)); if (rec) t.set(ref, rec, { merge: true }); });
+    const rec = apply(await ref.get()); if (rec) await ref.set(rec, { merge: true });
+  }
+  const blUid = id => String(id || '').split('|')[0];
+  const blEvId = id => blUid(id).replace(/@google\.com$/, ''); // Code.gs calBacklogEventId_
+  const sameEvent = uid => e => e.eventId === uid && !e.recurring;
+  // calBacklogPlaceIn_ for one row (item from the open list).
+  async function blPlace(r, it) {
+    const id = String(r.id), evId = blEvId(id), uid = blUid(id);
+    if (r.drop) {
+      try { await ev.delete({ calendarId: MAIN, eventId: evId }); } catch (e) { if (!notFound(e)) throw e; }
+      await blMark(id, 'dropped');
+      return { res: { ok: true }, copy: { drop: sameEvent(uid), entry: null } };
+    }
+    const w = when(Object.assign({}, r, { title: it.title }));
+    const color = it.colorId && it.colorId !== '8' && it.colorId !== '3' ? String(it.colorId) : '';
+    const body = Object.assign({ summary: w.title }, apiTimes(w));
+    if (color) body.colorId = color;
+    if (w.allDay) body.extendedProperties = { private: { [ORD_TAG]: String(Number(r.ord) || Date.now()) } }; // bottom of the day
+    let res, made = false;
+    try {
+      res = (await ev.patch({ calendarId: MAIN, eventId: evId, requestBody: body })).data;
+      if (String(res.colorId || '') === '3') { const full = Object.assign({}, res); delete full.colorId; res = (await ev.update({ calendarId: MAIN, eventId: res.id, requestBody: full })).data; } // old Grape
+    } catch (e) {
+      if (!notFound(e)) throw e;
+      const nb = Object.assign({ summary: w.title, reminders: { useDefault: false, overrides: [] } }, apiTimes(w)); // original gone → a fresh one
+      if (color) nb.colorId = color;
+      res = (await ev.insert({ calendarId: MAIN, requestBody: nb })).data; made = true;
+    }
+    const out = await panel(res, MAIN, null);
+    await blMark(id, w.allDay ? w.s : ymd(w.start));
+    return { res: { ok: true, event: made ? out : { id: res.id } }, copy: { drop: made ? [] : sameEvent(uid), entry: out } };
+  }
+
   const OPS = {
     async calPanelCreateEvent(req) {
       const w = when(req), opId = String((req && req.opId) || '').replace(/[^\w-]/g, '').slice(0, 60);
@@ -260,7 +385,8 @@ export function makeCal(api, db) {
       const old = await oldEntry(String(req.eventId) + '|' + startOf(it));
       const r = (await ev.patch({ calendarId: calId, eventId: it.id, requestBody: Object.assign({ summary: w.title }, apiTimes(w)) })).data;
       const out = await panel(r, calId, old);
-      return withCopy(Object.assign(out, { relink: true }), await intoCopy([String(req.eventId) + '|' + startOf(it)], out));
+      const at = await intoCopy([String(req.eventId) + '|' + startOf(it)], out);
+      return withCopy(await relinkOut(out, r, calId), at);
     },
     async calPanelMoveEvent(req) {
       const r = req || {}, calId = String(r.calId || MAIN);
@@ -278,7 +404,8 @@ export function makeCal(api, db) {
       const old = await oldEntry(String(r.eventId) + '|' + startOf(it));
       const res = (await ev.update({ calendarId: calId, eventId: it.id, requestBody: body })).data;
       const out = await panel(res, calId, old);
-      return withCopy(Object.assign(out, { relink: true }), await intoCopy([String(r.eventId) + '|' + startOf(it)], out));
+      const at = await intoCopy([String(r.eventId) + '|' + startOf(it)], out);
+      return withCopy(await relinkOut(out, res, calId), at);
     },
     async calPanelDeleteEvent(req) {
       const r = req || {}, calId = String(r.calId || MAIN);
@@ -443,6 +570,118 @@ export function makeCal(api, db) {
       if (it.recurringEventId) return out;
       const id = String(eventId) + '|' + startOf(it);
       return withCopy(out, await intoCopy([id], await panel(res, calId, await oldEntry(id))));
+    },
+    /* Schedule… (Code.gs planSchedule): one event per Gantt task on the main calendar (reminders off, tag ganttTid);
+       again = move that event (to r.date, or to the r.start / r.end slot). Its rows + Schedule link follow. */
+    async planSchedule(req) {
+      const r = req || {}, ref = String(r.ref || ''), slot = !!(r.start && r.end);
+      const date = slot ? String(r.start).slice(0, 10) : String(r.date || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Pick a date');
+      if (!/^tid:[\w-]{2,64}$/.test(ref)) throw new Error('Only Gantt tasks can be scheduled this way');
+      const title = String(r.title || '').replace(/\s+/g, ' ').trim().slice(0, 300) || 'Task';
+      const w = slot ? when({ title, allDay: !!r.allDay, start: r.start, end: r.end }) : null;
+      if (!(await planOn())) throw new Fallback('plan not on the database');
+      const lk = await db.doc(LINKS).get();
+      if (!lk.exists) throw new Fallback('schedule links not on the database yet');
+      let links = {}; try { links = JSON.parse(lk.data().v || '{}') || {}; } catch (e) { throw new Fallback('schedule links unreadable'); }
+      const tid = ref.slice(4, 70), mine = await rowsWhere('ref', ref);
+      const known = (mine.find(x => x.event) || {}).event || links[tid] || '';
+      let it = null, p = linkParts(known);
+      if (p) { try { it = await find(MAIN, p.eventId, p.startMs); } catch (e) { if (!/not found/i.test(e.message)) throw e; } }
+      if (!it) {
+        // Link lost (or a retry after a create that did go through): the task's own tagged event, newest first.
+        const q = await ev.list({ calendarId: MAIN, privateExtendedProperty: TID_TAG + '=' + ref.slice(4), showDeleted: false, maxResults: 10 });
+        it = (q.data.items || []).filter(i => i.status !== 'cancelled' && i.start && !i.recurrence).sort((a, b) => startOf(b) - startOf(a))[0] || null;
+      }
+      let res, moved = false, oldId = '';
+      if (it && !it.recurringEventId && !it.recurrence) {
+        oldId = (it.iCalUID || it.id + '@google.com') + '|' + startOf(it);
+        res = (await ev.patch({ calendarId: MAIN, eventId: it.id, requestBody: w ? apiTimes(w) : shiftTo(it, date) })).data;
+        moved = true;
+      } else {
+        const ww = w || { allDay: true, start: dayMs(date), end: dayMs(addDays(date, 1)) };
+        res = (await ev.insert({ calendarId: MAIN, requestBody: Object.assign({ summary: title, reminders: { useDefault: false, overrides: [] },
+          extendedProperties: { private: { [TID_TAG]: ref.slice(4) } } }, apiTimes(ww)) })).data;
+      }
+      const link = (await relink(res)).link;
+      for (const x of mine) if (x.event !== link) await writeRow(x, { event: link });
+      const out = await panel(res, MAIN, oldId ? await oldEntry(oldId) : null);
+      return withCopy({ event: link, moved, date }, await intoCopy(oldId ? [oldId] : [], out));
+    },
+    // Move to date… for an event in the plan (Code.gs planMoveEvent): keeps the event id; rows + link follow.
+    async planMoveEvent(req) {
+      const r = req || {}, date = String(r.date || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Pick a date');
+      if (!r.eventId) throw new Error('Missing event id');
+      if (!(await planOn())) throw new Fallback('plan not on the database');
+      const it = await find(MAIN, r.eventId, r.startMs), oldId = String(r.eventId) + '|' + startOf(it);
+      const old = it.recurringEventId ? null : await oldEntry(oldId);
+      const res = (await ev.patch({ calendarId: MAIN, eventId: it.id, requestBody: shiftTo(it, date) })).data;
+      const rl = await relink(res), out = { event: rl.link, date };
+      if (!rl.ok) Object.assign(out, { relink: true, calId: MAIN, eventId: res.iCalUID, startMs: startOf(res) });
+      if (it.recurringEventId) return out; // repeating: the server re-copies
+      return withCopy(out, await intoCopy([oldId], await panel(res, MAIN, old)));
+    },
+    // Backlog row dropped on a day / time, or ✕ (drop: event deleted) — Code.gs calBacklogPlace.
+    async calBacklogPlace(req) {
+      const r = req || {}, id = String(r.id || '');
+      if (!id) throw new Error('Missing backlog id');
+      const it = (await blItems()).find(x => x.id === id);
+      if (!it) throw new Fallback('not on the open list');
+      const pend = await blPending(id);
+      if (pend) return { ok: true, already: pend };
+      const x = await blPlace(r, it);
+      await blTakeOut([id]);
+      return withCopy(x.res, await intoCopyMany([x.copy]));
+    },
+    // Bulk send: {ok, done: [ids], failed: [{id, error}]} — one bad row doesn't stop the rest.
+    async calBacklogPlaceMany(reqs) {
+      const list = (Array.isArray(reqs) ? reqs : []).filter(r => r && r.id).slice(0, 100), items = await blItems();
+      if (list.some(r => !items.find(x => x.id === String(r.id)))) throw new Fallback('not all on the open list');
+      const done = [], failed = [], copy = [];
+      let first = true;
+      const one = async r => {
+        const id = String(r.id);
+        if (await blPending(id)) { done.push(id); return; }
+        const x = await blPlace(r, items.find(y => y.id === id));
+        done.push(id); copy.push(x.copy);
+      };
+      for (const r of list) {
+        try { await one(r); } catch (e) {
+          // Calendar not reachable at all on the first row → nothing changed yet: Apps Script does the batch.
+          if (first && (Number(e.code) === 403 || Number(e.code) === 401)) throw e;
+          failed.push({ id: String(r.id), error: String(e && e.message || e) });
+        }
+        first = false;
+      }
+      await blTakeOut(done);
+      return withCopy({ ok: !failed.length, done, failed }, await intoCopyMany(copy));
+    },
+    /* ✓ Done · Archive ("[x] " + Graphite where it sits, Done Log row on the chosen day) or ✓ Done · Delete (event
+       removed, nothing logged) — Code.gs calBacklogComplete. */
+    async calBacklogComplete(req) {
+      const r = req || {}, id = String(r.id || ''), mode = r.mode === 'delete' ? 'delete' : 'archive';
+      if (!id) throw new Error('Missing backlog id');
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(String(r.day || '')) ? String(r.day) : ymd(Date.now());
+      const it = (await blItems()).find(x => x.id === id);
+      if (!it) throw new Fallback('not on the open list');
+      const pend = await blPending(id);
+      if (pend) return { ok: true, already: pend };
+      const evId = blEvId(id), uid = blUid(id), title = String(it.title || '').replace(/^↪\s*/, '').trim() || '(no title)';
+      let at = 0;
+      if (mode === 'delete') {
+        try { await ev.delete({ calendarId: MAIN, eventId: evId }); } catch (e) { if (!notFound(e)) throw e; }
+        await blMark(id, 'deleted');
+        at = await intoCopy(sameEvent(uid), null);
+      } else {
+        let res = null;
+        try { res = (await ev.patch({ calendarId: MAIN, eventId: evId, requestBody: { summary: '[x] ' + title, colorId: '8' } })).data; }
+        catch (e) { if (!notFound(e)) throw e; } // event gone → still logged
+        await blMark(id, 'done', { day, title });
+        if (res) at = await intoCopy(sameEvent(uid), await panel(res, MAIN, null));
+      }
+      await blTakeOut([id]);
+      return withCopy(mode === 'delete' ? { ok: true, mode } : { ok: true, mode, day }, at);
     }
   };
   return { OPS, find, panel, when };

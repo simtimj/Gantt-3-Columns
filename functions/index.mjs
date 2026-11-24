@@ -40,10 +40,10 @@ export const cal = onRequest({ region: REGION, serviceAccount: SA, memory: '256M
     // Which database parts the Apps Script side has written (exists + how old, minutes).
     if (req.query.check === '2') {
       const fdb = getFirestore(), age = d => d.exists ? Math.round((Date.now() - (Number(d.data().at) || 0)) / 60000) : null;
-      for (const p of ['gantt/kim', 'ganttCal/meta', 'gantt/calEvents', 'gantt/planMeta', 'gantt/inboxMeta', 'gantt/timerMeta', 'gantt/calBacklog', 'ganttFocus/main', 'gantt/calMeta']) {
+      for (const p of ['gantt/kim', 'ganttCal/meta', 'gantt/calEvents', 'gantt/planMeta', 'gantt/inboxMeta', 'gantt/timerMeta', 'gantt/calBacklog', 'ganttFocus/main', 'gantt/calMeta', 'gantt/planLinks']) {
         try { const d = await fdb.doc(p).get(); out[p] = d.exists ? 'yes, ' + age(d) + ' min' : 'no'; } catch (e) { out[p] = 'err'; }
       }
-      for (const c of ['ganttDays', 'ganttRef', 'ganttInbox', 'ganttPlan', 'ganttCal']) {
+      for (const c of ['ganttDays', 'ganttRef', 'ganttInbox', 'ganttPlan', 'ganttCal', 'ganttBacklogOps']) {
         try { out[c] = (await fdb.collection(c).count().get()).data().count; } catch (e) { out[c] = 'err'; }
       }
     }
@@ -67,7 +67,8 @@ export const cal = onRequest({ region: REGION, serviceAccount: SA, memory: '256M
     // Calendar API refused (calendar not shared with the service account yet, API off…) → Apps Script does it.
     if (e.code === 403 || e.code === 401 || /insufficient|forbidden|not been used|disabled/i.test(e.message || '')) return res.json({ fallback: 'calendar access: ' + e.message });
     // Google hiccup: Apps Script retries it — except a create, which may already exist (the app retries this one instead).
-    if (Number(e.code) >= 500 && body.fn !== 'calPanelCreateEvent') return res.json({ fallback: 'calendar error ' + e.code });
+    // planSchedule too: a retry on the function finds the task's tagged event; Apps Script could make a second one.
+    if (Number(e.code) >= 500 && body.fn !== 'calPanelCreateEvent' && body.fn !== 'planSchedule') return res.json({ fallback: 'calendar error ' + e.code });
     return res.json({ ok: false, e: e.message || String(e) });
   }
 });

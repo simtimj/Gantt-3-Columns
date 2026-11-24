@@ -249,3 +249,4 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 
 ## I — calendar edits on Cloud Functions (2026-11-24, implemented + tested in functions-test / smoke pwa-d2, off until setup)
 - Expected: calendar edits ~1–3 s (Apps Script + CalendarApp) → ~0.2–0.5 s warm (Calendar API from a Cloud Function), shown at once via the copy write; cold starts avoided by a free scheduled ping 6 am–11 pm. Cost: Blaze plan, expected $0 (free tiers), $1 budget alert. Details: docs/NOTES.md → I.
+- P (2026-11-24, implemented + tested in functions-test / store-test / smoke pwa-d2, not yet tested live): Schedule… / Move to date… and Backlog place / bulk send / ✕ / ✓ Done now on the function too (same ~1–3 s → ~0.3 s); Plan rows, Schedule links and calendar-panel relinks updated there (no background Apps Script call). Details: docs/NOTES.md → P.

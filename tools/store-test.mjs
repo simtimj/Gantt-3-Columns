@@ -525,6 +525,29 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
       dctx.Calendar = calWas; delete P.calBacklogSwept; delete P.calBacklogRollAt;
       console.log('✓ store-test: backlog sweep / reconcile leave the calendar alone; old ↪ pile unpiled; ✕ deletes');
     }
+    // ---- P (2026-11-24): Schedule links in gantt/planLinks (seeded from planEv:*), backlog ops from the Cloud Function.
+    {
+      P['planEv:t-old'] = 'x@google.com@100'; delete fsDocs['gantt/planLinks'];
+      assert.equal(vm.runInContext("Store.plan.link('t-old')", dctx), 'x@google.com@100');
+      assert.equal(JSON.parse(fsDocs['gantt/planLinks'].v.stringValue)['t-old'], 'x@google.com@100', 'seeded from the properties');
+      vm.runInContext("Store.plan.setLink('t-new', 'y@google.com@200')", dctx);
+      assert.equal(JSON.parse(fsDocs['gantt/planLinks'].v.stringValue)['t-new'], 'y@google.com@200'); assert.equal(P['planEv:t-new'], 'y@google.com@200');
+      // the function changed a link → Apps Script reads it from the doc
+      fsDocs['gantt/planLinks'].v = S(JSON.stringify({ 't-old': 'z@google.com@300' }));
+      assert.equal(vm.runInContext("Store.plan.link('t-old')", dctx), 'z@google.com@300');
+      const bl = vm.runInContext('Store.calBacklog', dctx);
+      bl.add([['op1|2026-11-02', '2026-11-02', 'By function', '', '', 's', ''], ['op2|2026-11-03', '2026-11-03', 'Done by function', '', '', 's', '']]);
+      const n0 = bl.rows().length, dl = ss.getSheetByName('Done Log') || dctx.Store.sheetFirst('Done Log'), logN = dl.rows.length;
+      fsDocs['ganttBacklogOps/k1'] = { key: S('k1'), id: S('op1|2026-11-02'), v: S('2026-11-25'), at: I(1) };
+      fsDocs['ganttBacklogOps/k2'] = { key: S('k2'), id: S('op2|2026-11-03'), v: S('done'), logDay: S('2026-11-23'), logTitle: S('Done by function'), at: I(1) };
+      const out = dctx.calBacklogSync();
+      assert.equal(bl.rows()[n0 - 2][6], '2026-11-25'); assert.equal(bl.rows()[n0 - 1][6], 'done');
+      assert.ok(!out.items.some(x => /^op[12]\|/.test(x.id)), 'applied rows leave the open list');
+      eq(dl.rows.slice(logN).map(r => r.slice(0, 3)), [['2026-11-23', 'Backlog', 'Done by function']]);
+      assert.equal(Object.keys(fsDocs).filter(k => k.startsWith('ganttBacklogOps/')).length, 0, 'ops deleted once applied');
+      dctx.calBacklogSync(); assert.equal(dl.rows.length, logN + 1, 'never logged twice');
+      console.log('✓ store-test: P — Schedule links on gantt/planLinks, function backlog ops copied into the tab (+ Done Log)');
+    }
     vm.runInContext("calBacklogSweep_ = () => ({ swept: 2 }); calBacklogRoll_ = () => {};", dctx);
     const tick = dctx.calBacklogTick_();
     assert.equal(tick.swept, 2); assert.equal(JSON.parse(fsDocs['gantt/calBacklog'].sweep.stringValue).swept, 2);

@@ -25,6 +25,7 @@ function fakeCal() {
   const events = {
     async list(q) {
       S.calls.push('list');
+      if (q.privateExtendedProperty) { const [k, v] = q.privateExtendedProperty.split('='); return { data: { items: Object.values(S.items).filter(i => i.cal === q.calendarId && ((i.extendedProperties || {}).private || {})[k] === v).map(i => JSON.parse(JSON.stringify(i))) } }; }
       const lo = Date.parse(q.timeMin), hi = Date.parse(q.timeMax);
       return { data: { items: Object.values(S.items).filter(i => i.cal === q.calendarId && i.iCalUID === q.iCalUID && st(i) >= lo && st(i) < hi).map(i => JSON.parse(JSON.stringify(i))) } };
     },
@@ -37,6 +38,7 @@ function fakeCal() {
     async patch(q) {
       S.calls.push('patch');
       const it = S.items[key(q.calendarId, q.eventId)], b = q.requestBody;
+      if (!it) throw Object.assign(new Error('Not Found'), { code: 404 });
       // Google patch semantics: objects merge recursively (other tags kept), null removes, arrays / values replace.
       const merge = (dst, src) => { Object.keys(src).forEach(k => { const v = src[k];
         if (v === null) delete dst[k]; else if (typeof v === 'object' && !Array.isArray(v)) dst[k] = merge(Object.assign({}, dst[k]), v); else dst[k] = v; }); return dst; };
@@ -54,7 +56,11 @@ function fakeCal() {
 }
 function fakeDb(docs) {
   const D = docs || {};
-  return { D, doc: p => ({ get: async () => ({ exists: !!D[p], data: () => JSON.parse(JSON.stringify(D[p])) }),
+  const cmp = { '==': (a, b) => a === b, '>=': (a, b) => a >= b, '<': (a, b) => a < b };
+  const coll = (c, fs) => ({ where: (f, op, v) => coll(c, fs.concat([[f, op, v]])),
+    get: async () => ({ docs: Object.keys(D).filter(k => k.startsWith(c + '/') && k.split('/').length === 2 && fs.every(([f, op, v]) => D[k][f] !== undefined && cmp[op](D[k][f], v)))
+      .map(k => ({ id: k.split('/')[1], data: () => JSON.parse(JSON.stringify(D[k])) })) }) });
+  return { D, collection: c => coll(c, []), doc: p => ({ get: async () => ({ exists: !!D[p], data: () => JSON.parse(JSON.stringify(D[p])) }),
     set: async (v, o) => { D[p] = o && o.merge ? Object.assign({}, D[p], v) : v; } }) };
 }
 const month = '2026-11';
@@ -219,3 +225,102 @@ console.log('✓ functions J: add all-day task, all-day order, linked rename, co
   assert.equal(c.metaSync, undefined); assert.equal(JSON.parse(db.D['gantt/calMeta'].v)['calMeta:' + a.eventId].urg, '2');
 }
 console.log('✓ functions M: hold-menu fields on the database (save, prune, urgency recolor, done keeps Graphite, clear, repeating key, color updates it, not seeded → Apps Script)');
+
+// ---- P: Schedule / Move to date (Plan rows + links follow), Backlog place / drop / bulk / complete
+{
+  const { S, db, cal } = setup();
+  // not on the database yet → Apps Script
+  await assert.rejects(cal.OPS.planSchedule({ ref: 'tid:t1', title: 'Essay', date: '2026-11-25' }), e => e.fallback === true);
+  db.D['gantt/planMeta'] = { seeded: 1 };
+  await assert.rejects(cal.OPS.planSchedule({ ref: 'tid:t1', title: 'Essay', date: '2026-11-25' }), e => e.fallback === true, 'links doc missing');
+  db.D['gantt/planLinks'] = { v: '{}', at: 1 };
+  db.D['ganttPlan/p1'] = { id: 'p1', group: 'big', ref: 'tid:t1', title: 'Essay', event: '', rank: 1, del: 0, at: 5 };
+  db.D['ganttPlan/p2'] = { id: 'p2', group: 'next', ref: 'tid:t1', title: 'Essay', event: '', rank: 1, del: 1, at: 5 };
+  await assert.rejects(cal.OPS.planSchedule({ ref: 'card:x', date: '2026-11-25' }), /Only Gantt tasks/);
+  await assert.rejects(cal.OPS.planSchedule({ ref: 'tid:t1' }), /Pick a date/);
+  let r = await cal.OPS.planSchedule({ ref: 'tid:t1', title: ' Essay ', date: '2026-11-25' });
+  const e1 = Object.values(S.items)[0];
+  assert.deepEqual([e1.summary, e1.start.date, e1.end.date, e1.extendedProperties.private.ganttTid], ['Essay', '2026-11-25', '2026-11-26', 't1']);
+  assert.deepEqual(e1.reminders, { useDefault: false, overrides: [] });
+  assert.equal(r.event, e1.iCalUID + '@' + core.dayMs('2026-11-25')); assert.equal(r.moved, false); assert.ok(r.copyAt);
+  assert.equal(db.D['ganttPlan/p1'].event, r.event); assert.equal(db.D['ganttPlan/p1'].dev, 'fn'); assert.ok(db.D['ganttPlan/p1'].at > 5);
+  assert.equal(db.D['ganttPlan/p2'].event, '', 'removed row left alone');
+  assert.equal(JSON.parse(db.D['gantt/planLinks'].v).t1, r.event);
+  assert.equal(copyEv(db).filter(e => e.title === 'Essay').length, 1);
+  // again → the same event moves (no second one); a slot makes it timed
+  r = await cal.OPS.planSchedule({ ref: 'tid:t1', title: 'Essay', start: '2026-11-27T14:00', end: '2026-11-27T15:00', allDay: false });
+  assert.equal(r.moved, true); assert.equal(Object.keys(S.items).length, 1); assert.equal(Object.values(S.items)[0].start.date, undefined);
+  assert.equal(db.D['ganttPlan/p1'].event, e1.iCalUID + '@' + core.wallMs(2026, 11, 27, 14, 0));
+  assert.deepEqual(copyEv(db).filter(e => e.title === 'Essay').map(e => e.start), ['2026-11-27T14:00:00-08:00'], 'old spot gone');
+  // link lost (no row, empty links doc) → its tagged event is found, not a second one
+  db.D['ganttPlan/p1'].event = ''; db.D['gantt/planLinks'].v = '{}';
+  r = await cal.OPS.planSchedule({ ref: 'tid:t1', title: 'Essay', date: '2026-11-28' });
+  assert.equal(r.moved, true); assert.equal(Object.keys(S.items).length, 1);
+  assert.equal(Object.values(S.items)[0].start.dateTime, new Date(core.wallMs(2026, 11, 28, 14, 0)).toISOString(), 'timed keeps its clock time');
+  // Move to date: all-day keeps its length; rows pointing at it follow; across DST the clock time stays
+  const t = await cal.OPS.calPanelCreateEvent({ title: 'Trip', allDay: true, start: '2026-11-24', end: '2026-11-26' });
+  db.D['ganttPlan/p3'] = { id: 'p3', group: 'next', ref: 'cal:x', title: 'Trip', event: t.eventId + '@' + t.startMs, rank: 2, del: 0, at: 1 };
+  r = await cal.OPS.planMoveEvent({ eventId: t.eventId, startMs: t.startMs, date: '2026-12-03' });
+  const ti = Object.values(S.items).find(i => i.summary === 'Trip');
+  assert.deepEqual([ti.start.date, ti.end.date], ['2026-12-03', '2026-12-05']);
+  assert.equal(db.D['ganttPlan/p3'].event, r.event); assert.equal(r.event, t.eventId + '@' + core.dayMs('2026-12-03')); assert.equal(r.relink, undefined);
+  assert.deepEqual(copyEv(db, '2026-12').filter(e => e.title === 'Trip').length, 1); assert.equal(copyEv(db).filter(e => e.title === 'Trip').length, 0);
+  const d = await cal.OPS.calPanelCreateEvent({ title: 'Call', allDay: false, start: '2026-10-30T09:00', end: '2026-10-30T09:30' });
+  await cal.OPS.planMoveEvent({ eventId: d.eventId, startMs: d.startMs, date: '2026-11-02' });
+  assert.equal(Object.values(S.items).find(i => i.summary === 'Call').start.dateTime, new Date(core.wallMs(2026, 11, 2, 9, 0)).toISOString());
+  // a calendar-panel move of a main event relinks here now (no background Apps Script call)
+  const mv = await cal.OPS.calPanelMoveEvent({ eventId: t.eventId, startMs: core.dayMs('2026-12-03'), allDay: true, start: '2026-12-07', end: '2026-12-08' });
+  assert.equal(mv.relink, undefined); assert.equal(db.D['ganttPlan/p3'].event, t.eventId + '@' + core.dayMs('2026-12-07'));
+}
+{
+  const { S, db, cal } = setup();
+  const mk = async (title, day, color) => { const x = await cal.OPS.calPanelCreateEvent({ title, allDay: true, start: day, end: core.addDays(day, 1) }); if (color) Object.values(S.items).find(i => i.summary === title).colorId = color; return x; };
+  const a = await mk('Old A', '2026-11-20', '11'), b = await mk('Old B', '2026-11-21', '3'), c = await mk('Old C', '2026-11-21'), z = await mk('Old Z', '2026-11-19');
+  const row = (x, day, colorId) => ({ id: x.eventId + '|' + day, date: day, title: x.title, colorId: colorId || '', urg: '' });
+  const items = [row(a, '2026-11-20', '11'), row(b, '2026-11-21', '3'), row(c, '2026-11-21'), row(z, '2026-11-19')];
+  // no published list → Apps Script; stale list → Apps Script
+  await assert.rejects(cal.OPS.calBacklogPlace({ id: items[0].id, allDay: true, start: '2026-11-25', end: '2026-11-26' }), e => e.fallback === true);
+  db.D['gantt/calBacklog'] = { items: JSON.stringify(items), at: Date.now() - 30 * 60000 };
+  await assert.rejects(cal.OPS.calBacklogPlace({ id: items[0].id, allDay: true, start: '2026-11-25', end: '2026-11-26' }), e => e.fallback === true);
+  db.D['gantt/calBacklog'].at = Date.now();
+  await assert.rejects(cal.OPS.calBacklogPlace({ id: 'nope|2026-11-01', allDay: true, start: '2026-11-25', end: '2026-11-26' }), e => e.fallback === true, 'not listed → Apps Script answers');
+  // place on a day: moved, color kept, bottom order, op left for Apps Script, row off the list, copy moved
+  let r = await cal.OPS.calBacklogPlace({ id: items[0].id, allDay: true, start: '2026-11-25', end: '2026-11-26', ord: 42 });
+  const ea = Object.values(S.items).find(i => i.summary === 'Old A');
+  assert.deepEqual([ea.start.date, ea.colorId, ea.extendedProperties.private.fwOrd], ['2026-11-25', '11', '42']); assert.ok(r.copyAt);
+  const ops = () => Object.keys(db.D).filter(k => k.startsWith('ganttBacklogOps/')).map(k => db.D[k]);
+  assert.deepEqual(ops().map(o => [o.id, o.v]), [[items[0].id, '2026-11-25']]);
+  assert.equal(JSON.parse(db.D['gantt/calBacklog'].items).length, 3); assert.ok(db.D['gantt/calBacklog'].fnAt);
+  assert.deepEqual(copyEv(db).filter(e => e.title === 'Old A').map(e => e.start), ['2026-11-25']);
+  // double tap after the list was republished stale-free → already
+  db.D['gantt/calBacklog'].items = JSON.stringify(items);
+  assert.equal((await cal.OPS.calBacklogPlace({ id: items[0].id, allDay: true, start: '2026-11-26', end: '2026-11-27' })).already, '2026-11-25');
+  // bulk: B (old Grape) to a time, C to a day; Grape not kept
+  r = await cal.OPS.calBacklogPlaceMany([{ id: items[1].id, allDay: false, start: '2026-11-25T10:00', end: '2026-11-25T10:30' }, { id: items[2].id, allDay: true, start: '2026-11-25', end: '2026-11-26' }]);
+  assert.deepEqual([r.ok, r.done.length, r.failed.length], [true, 2, 0]);
+  const eb = Object.values(S.items).find(i => i.summary === 'Old B');
+  assert.equal(eb.colorId, undefined); assert.equal(eb.start.dateTime, new Date(core.wallMs(2026, 11, 25, 10, 0)).toISOString());
+  assert.equal(ops().find(o => o.id === items[1].id).v, '2026-11-25');
+  // event deleted meanwhile → a fresh one
+  delete S.items[core.MAIN + '/' + c.eventId.replace('@google.com', '')];
+  for (const k of Object.keys(db.D)) if (k.startsWith('ganttBacklogOps/')) delete db.D[k];
+  db.D['gantt/calBacklog'].items = JSON.stringify(items);
+  r = await cal.OPS.calBacklogPlace({ id: items[2].id, allDay: true, start: '2026-11-29', end: '2026-11-30' });
+  assert.ok(r.event && r.event.title === 'Old C'); assert.equal(Object.values(S.items).filter(i => i.summary === 'Old C').length, 1);
+  // complete · archive: marked done in place, Done Log row waits in the op; ✕ drop deletes the event
+  for (const k of Object.keys(db.D)) if (k.startsWith('ganttBacklogOps/')) delete db.D[k];
+  r = await cal.OPS.calBacklogComplete({ id: items[3].id, mode: 'archive', day: '2026-11-23' });
+  const ez = Object.values(S.items).find(i => i.summary === '[x] Old Z');
+  assert.deepEqual([ez.colorId, ez.start.date], ['8', '2026-11-19']); assert.deepEqual([r.mode, r.day], ['archive', '2026-11-23']);
+  assert.deepEqual(ops().map(o => [o.v, o.logDay, o.logTitle]), [['done', '2026-11-23', 'Old Z']]);
+  assert.equal(copyEv(db).find(e => e.eventId === z.eventId).done, true);
+  for (const k of Object.keys(db.D)) if (k.startsWith('ganttBacklogOps/')) delete db.D[k];
+  db.D['gantt/calBacklog'].items = JSON.stringify(items); // republished by Apps Script
+  await cal.OPS.calBacklogPlace({ id: items[3].id, drop: true });
+  assert.equal(Object.values(S.items).filter(i => /Old Z/.test(i.summary)).length, 0); assert.equal(ops()[0].v, 'dropped');
+  assert.equal(copyEv(db).filter(e => e.eventId === z.eventId).length, 0);
+  for (const k of Object.keys(db.D)) if (k.startsWith('ganttBacklogOps/')) delete db.D[k];
+  r = await cal.OPS.calBacklogComplete({ id: items[0].id, mode: 'delete' });
+  assert.deepEqual([r.mode, ops()[0].v, ops()[0].logDay], ['delete', 'deleted', undefined]);
+}
+console.log('✓ functions P: Schedule (create, again = move, slot, lost link finds the tagged event), Move to date (length / clock time kept), rows + links follow, Backlog place / bulk / fresh / done / drop / delete');

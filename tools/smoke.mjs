@@ -4084,7 +4084,19 @@ if (only('pwa-d2')) {
   calls.length = 0; fnCalls.length = 0;
   await run('setCalendarEventMeta', 'e1@google.com', 5, false, { urg: '1' }, 'main');
   if (!fnCalls.some(x => /^setCalendarEventMeta:/.test(x)) || calls.includes('setCalendarEventMeta')) errs.push('hold menu not on the function: ' + fnCalls.join() + ' ' + calls.join());
+  // P: Schedule / Move to date / Backlog place, bulk, complete go to the function too
+  calls.length = 0; fnCalls.length = 0;
+  await run('planSchedule', { ref: 'tid:t1', title: 'x', date: today });
+  await run('planMoveEvent', { eventId: 'e1@google.com', startMs: 5, date: today });
+  await run('calBacklogPlace', { id: 'u1|' + today, drop: true });
+  await run('calBacklogPlaceMany', [{ id: 'u1|' + today, allDay: true, start: today, end: today }]);
+  await run('calBacklogComplete', { id: 'u1|' + today, mode: 'archive', day: today });
+  if (fnCalls.map(x => x.split(':')[0]).join() !== 'planSchedule,planMoveEvent,calBacklogPlace,calBacklogPlaceMany,calBacklogComplete'
+    || ['planSchedule', 'planMoveEvent', 'calBacklogPlace', 'calBacklogPlaceMany', 'calBacklogComplete'].some(n => calls.includes(n))) errs.push('P not on the function: ' + fnCalls.join() + ' srv ' + calls.join());
   fnMode = 'fallback'; calls.length = 0;
+  await run('calBacklogComplete', { id: 'u1|' + today, mode: 'archive', day: today }).catch(() => {});
+  if (!calls.includes('calBacklogComplete')) errs.push('P fallback did not go to Apps Script');
+  calls.length = 0;
   await run('setCalendarEventDone', 'main', 'e1@google.com', 5, true);
   if (!calls.includes('setCalendarEventDone')) errs.push('fn fallback did not go to Apps Script');
   fnMode = 'error'; calls.length = 0;

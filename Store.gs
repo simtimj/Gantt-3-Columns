@@ -835,8 +835,30 @@ const Store = {
       if (out.length) sh.getRange(2, 1, out.length, PLAN_HEAD.length).setValues(out);
       return rows.length;
     },
-    link(tid) { return PropertiesService.getScriptProperties().getProperty('planEv:' + tid); },
-    setLink(tid, link) { PropertiesService.getScriptProperties().setProperty('planEv:' + tid, link); }
+    /* Schedule links (task tid → its event 'eventId@startMs'). P (2026-11-24): on the database (area 'plan') they live in
+       ONE doc gantt/planLinks = { v (JSON map tid → link), at, up, dev }, seeded once from the planEv:* properties, so
+       the Cloud Function (planSchedule / planMoveEvent) reads and writes the same links. The properties stay a backup. */
+    LINKS: 'gantt/planLinks',
+    links_() {
+      const d = StoreFs.get(this.LINKS);
+      if (d && d.v) { try { return JSON.parse(d.v) || {}; } catch (e) { console.error('planLinks: ' + e.message); } }
+      const all = Store.props.getProperties() || {}, map = {};
+      Object.keys(all).forEach(k => { if (k.indexOf('planEv:') === 0) map[k.slice(7)] = all[k]; });
+      const now = Date.now();
+      StoreFs.set(this.LINKS, { v: JSON.stringify(map), at: now, up: new Date(now), dev: 'server', seeded: now });
+      return map;
+    },
+    link(tid) {
+      if (this.db_()) { const v = this.links_()[tid]; if (v) return v; }
+      return Store.props.getProperty('planEv:' + tid);
+    },
+    setLink(tid, link) {
+      if (this.db_()) {
+        const map = this.links_();
+        if (map[tid] !== link) { map[tid] = link; const now = Date.now(); StoreFs.patch(this.LINKS, { v: JSON.stringify(map), at: now, up: new Date(now), dev: 'server' }); }
+      }
+      Store.props.setProperty('planEv:' + tid, link);
+    }
   },
 
   /* Hold-menu fields for calendar events (M, 2026-11-24): urgency / due / length / subject, keyed like Code.gs
@@ -1013,6 +1035,12 @@ const Store = {
     setPlaced(index, value) { this.sheet_().getRange(index + 2, 7).setValue(value); this.dirty = true; },
     // D2: the open list as doc gantt/calBacklog = { items (JSON, calBacklogSync's shape), sweep (JSON, last sweep that
     // moved something: { swept, at }), at, up }, written by Code.gs calBacklogPublish_ after a change and by the trigger.
+    /* P (2026-11-24): place / drop / complete done by the Cloud Function leave one doc per row in ganttBacklogOps
+       = { key, id (row id), v (Placed value), logDay, logTitle (✓ Done · Archive → a Done Log row), at }. Code.gs
+       calBacklogApplyOps_ copies them into the tab (before any read of the rows) and deletes them. */
+    OPS: 'ganttBacklogOps',
+    ops() { return storeBackend_('plan') === 'db' ? StoreFs.listAll(this.OPS).filter(o => o.key && o.id) : []; },
+    opDone(o) { StoreFs.del(this.OPS + '/' + o.key); },
     dirty: false,
     publish(items, sweep) {
       if (storeBackend_('plan') !== 'db') return false;

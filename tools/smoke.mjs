@@ -2717,6 +2717,13 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
               f.querySelector('[data-fad-done]').click(); await w(200);
               if (!/Done all-day Z/.test(f.textContent)) out.push('all-day list: tapping Done again did not show them');
               tmp.remove(); await w(300); }
+            // Events group (2026-11-23): a birthday on the Events calendar sits on top, alone, with no checkbox.
+            { const api = window.fwCalendar.api(), d0 = api.view.currentStart, bd = api.addEvent({ title: 'Bday Q', allDay: true, start: d0, extendedProps: { allDay: true, life: true, cal: 'Events' } }); await w(400);
+              const kids = [...f.querySelectorAll('.cp-fadb > *')], li = kids.findIndex(k => k.hasAttribute('data-fa-life')), bi = kids.findIndex(k => /Bday Q/.test(k.textContent)), oi = kids.findIndex(k => k.hasAttribute('data-fa-og'));
+              if (!(li >= 0 && li < bi && (oi < 0 || bi < oi))) out.push('Events group not on top (' + [li, bi, oi] + ')');
+              if (bi >= 0 && kids[bi].querySelector('.cp-chk')) out.push('Events row has a checkbox');
+              if (/Bday Q/.test((f.querySelector('[data-fa-og]') || {}).textContent || '') ) out.push('birthday counted in Ordered');
+              bd.remove(); await w(300); }
             window.fwCalendar.api().changeView('timeGridWeek'); await w(400);
             // Week (2026-11-15, Julius: "too narrow"): full width, left column hidden, all-day strip back on top.
             { const g = p.querySelector('#calMount').getBoundingClientRect(), b = p.querySelector('.cp-body').getBoundingClientRect();

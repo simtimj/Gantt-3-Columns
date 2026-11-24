@@ -2476,7 +2476,8 @@ function calPanelEventOut_(ev, calId, calName, calColor, tz) {
     location: ev.getLocation() || '', desc: calPanelDesc_(ev.getDescription()), recurring: recurring, link: link,
     editable: calWritable_(calId), // any calendar he can edit; repeating too, with a This day / All days choice (2026-11-11)
     sched: !allDay && (function () { try { return ev.getTag(CAL_SCHED_TAG) === '1'; } catch (e) { return false; } })(),
-    ord: allDay ? (function () { try { return Number(ev.getTag(CAL_ORD_TAG)) || 0; } catch (e) { return 0; } })() : 0
+    ord: allDay ? (function () { try { return Number(ev.getTag(CAL_ORD_TAG)) || 0; } catch (e) { return 0; } })() : 0,
+    life: allDay && calId === EVENT_CALENDARS[1] // red "Events" calendar = birthdays etc.: own all-day group (2026-11-23)
   };
 }
 // Event popup notes (2026-11-14, Julius: "like Google Calendar's pop-up"): the description as plain text, short

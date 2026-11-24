@@ -149,6 +149,7 @@
   #calPanel .fc-event.cp-schc{opacity:.92;border-style:dashed!important;}
   #calPanel.cp-full .cp-fai.cp-fasch{border:1px dashed currentColor;}
   #calPanel.cp-full .cp-fasg{cursor:default;}
+  #calPanel .cp-falg{cursor:default;} #calPanel .cp-falife{cursor:default;padding-left:8px;}
   #calPanel.cp-full .cp-fad.cp-fad-over{outline:3px dashed #1a73e8;outline-offset:-3px;background:rgba(26,115,232,.12);}
   #calPanel.cp-full .cp-body.bl-open .cp-bl{top:calc(var(--fad-h) + 20px)!important;}
   #calPanel.cp-full .cp-body.bl-open .cp-fadgrip{display:block;position:absolute;left:6px;width:calc(var(--blw) - 12px);top:calc(var(--fad-h) + 6px);height:14px;cursor:ns-resize;touch-action:none;z-index:3;}
@@ -944,10 +945,14 @@
      in ord order); ord ≥ 0 = Unordered (by urgency, then oldest first, so new = bottom of its urgency). `ordKey` = ord for
      Ordered, 0 otherwise, so eventOrder / adCmp put Ordered first. Drag into / out of the Ordered group → adPlace. */
   const ordKeyOf = o => { o = Number(o) || 0; return o < 0 ? o : 0; };
-  const isOrd = x => !!x && !x.done && !x.schCopy && Number(x.ordKey) < 0;
+  /* Events group (2026-11-23, Julius: "red on my calendar = birthdays, separate from the rest"): all-day events on
+     his red "Events" calendar (server flag `life`) sit in their own "Events" group on top of the all-day area, with no
+     checkbox / urgency, never in Ordered / Unordered and never reordered. Timed ones on the grid are unchanged. */
+  const isLife = x => !!x && !!x.allDay && !x.schCopy && (!!x.life || x.cal === 'Events');
+  const isOrd = x => !!x && !x.done && !x.schCopy && !isLife(x) && Number(x.ordKey) < 0;
   // 1-based place of an Ordered event in its (start) day's Ordered group; 0 = not found yet (cpGroups fills it in).
   function ordNum(ev){ try { const d = (ev.startStr || '').slice(0, 10); return adDayList(d).filter(e => isOrd(e.extendedProps)).findIndex(e => e.id === ev.id) + 1; } catch (e) { return 0; } }
-  const toFc = x => { const c = softColor(x.color, x.done); x.urgRank = urgRank(x); x.cpSch = 0; x.ordKey = ordKeyOf(x.ord); return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
+  const toFc = x => { const c = softColor(x.color, x.done); x.urgRank = urgRank(x); x.cpSch = 0; x.ordKey = ordKeyOf(x.ord); x.lifeK = isLife(x) ? 0 : 1; return { id: x.id, title: x.title, start: x.start, end: x.end, allDay: !!x.allDay,
     backgroundColor: c.bg, borderColor: c.bg, textColor: c.fg,
     classNames: x.done ? ['cp-done'] : [], editable: !!x.editable && !x.done, extendedProps: x }; };
   /* Scheduled (2026-11-15, Julius: "drag an all-day task into my calendar but keep it in the all-day section… when
@@ -967,8 +972,8 @@
     tick();
   }
   function adCmp(a, b){ const x = a.extendedProps || {}, y = b.extendedProps || {};
-    return (x.done ? 1 : 0) - (y.done ? 1 : 0) || (Number(x.ordKey) || 0) - (Number(y.ordKey) || 0) || urgRank(x) - urgRank(y) || (Number(x.ord) || 0) - (Number(y.ord) || 0) || String(a.title).localeCompare(String(b.title)); }
-  function adDayList(day){ return cal ? cal.getEvents().filter(e => { const x = e.extendedProps || {}; if(!e.allDay || x.schCopy || x.done || x.blTmp || x.fqTmp) return false;
+    return (isLife(x) ? 0 : 1) - (isLife(y) ? 0 : 1) || (x.done ? 1 : 0) - (y.done ? 1 : 0) || (Number(x.ordKey) || 0) - (Number(y.ordKey) || 0) || urgRank(x) - urgRank(y) || (Number(x.ord) || 0) - (Number(y.ord) || 0) || String(a.title).localeCompare(String(b.title)); }
+  function adDayList(day){ return cal ? cal.getEvents().filter(e => { const x = e.extendedProps || {}; if(!e.allDay || x.schCopy || x.done || x.blTmp || x.fqTmp || isLife(x)) return false;
     const s0 = (e.startStr || '').slice(0, 10), e0 = (e.endStr || '').slice(0, 10) || s0; return s0 <= day && (e0 > day || (e0 === s0 && s0 === day)); }).sort(adCmp) : []; }
   // toOrd: put `ev` before `target` (null = bottom) in `day`'s Ordered group; else move it back to Unordered.
   // Drawn at once, then saved.
@@ -2071,7 +2076,7 @@
   // ── Event checkboxes (2026-11-11, Julius) ──
   const cpCat = x => { try { return typeof calRowCat === 'function' ? calRowCat({cat: x.cat || '', title: x.title || ''}) : ''; } catch (e) { return ''; } };
   const cpCatColor = k => { try { return k && CARD_CAT_BY_KEY[k] ? CARD_CAT_BY_KEY[k].color : ''; } catch (e) { return ''; } };
-  const CP_GROUPS = {1: 'Urgent', 2: 'Next', 3: 'Later', 4: 'Not set', done: 'Done', sched: 'Scheduled', ord: 'Ordered', unord: 'Unordered'};
+  const CP_GROUPS = {life: 'Events', 1: 'Urgent', 2: 'Next', 3: 'Later', 4: 'Not set', done: 'Done', sched: 'Scheduled', ord: 'Ordered', unord: 'Unordered'};
   /* Full time range on every timed card (2026-11-15 12:54, Julius: "Chill says 12 AM — show the complete range, even
      when it's cut off from yesterday / runs past tonight"): built from the event's real start / end, not the day piece.
      A side that's on another day gets its weekday ("Sat 10 PM – 7:45 AM"), and a cut-off card never hides its end. */
@@ -2088,10 +2093,11 @@
   function cpEvAttrs(ev){
     const x = ev.extendedProps || {}, k = cpCat(x), a = (n, v) => v ? ' data-' + n + '="' + esc(v) + '"' : '';
     return a('ce-id', x.eventId) + a('ce-cal', x.calId) + a('ce-start', String(x.startMs || '')) + ' data-ce-rec="' + (x.recurring ? 1 : 0) + '"' +
-      a('urg', x.urg) + a('due', x.due) + a('dur', x.dur) + a('cat', x.cat) + a('tccat', k) + ' data-cpg="' + (x.done ? 'done' : x.schCopy ? 'sched' : urgRank(x)) + '"' + (x.schCopy ? ' data-sch="1"' : '') + (isOrd(x) ? ' data-cpo="1"' : '');
+      a('urg', x.urg) + a('due', x.due) + a('dur', x.dur) + a('cat', x.cat) + a('tccat', k) + ' data-cpg="' + (isLife(x) ? 'life' : x.done ? 'done' : x.schCopy ? 'sched' : urgRank(x)) + '"' + (x.schCopy ? ' data-sch="1"' : '') + (isOrd(x) ? ' data-cpo="1"' : '');
   }
   function cpChk(ev){
     const x = ev.extendedProps || {}, c = cpCatColor(cpCat(x));
+    if(isLife(x)) return '';
     return '<span class="cp-chk' + (c ? ' cp-chk-cat' : '') + '" role="checkbox" aria-checked="' + (x.done ? 'true' : 'false') + '"' + (c ? ' style="--chk:' + esc(c) + '"' : '') +
       ' title="Tap = done · hold = urgency, subject, due date"></span>';
   }
@@ -2231,7 +2237,7 @@
       // A day with an Ordered group (2026-11-22): Ordered (numbered) then Unordered, no urgency labels.
       const manual = hs.some(h => h.querySelector('.cp-ev').dataset.cpo); let n = 0;
       const keys = hs.map(h => { const v = h.querySelector('.cp-ev'), k = v.dataset.cpg; if(v.dataset.cpo){ const b = v.querySelector('.cp-ordn'); if(b && b.textContent !== String(++n)) b.textContent = n; else if(!b) ++n; return 'ord'; }
-        return manual && k !== 'done' && k !== 'sched' ? 'unord' : k; }), many = new Set(keys).size > 1;
+        return manual && k !== 'done' && k !== 'sched' && k !== 'life' ? 'unord' : k; }), many = new Set(keys).size > 1;
       hs.forEach((h, i) => { const lab = many && (i === 0 || keys[i] !== keys[i - 1]) ? (CP_GROUPS[keys[i]] || '') : '';
         if((h.dataset.cpgl || '') !== lab){ if(lab) h.dataset.cpgl = lab; else delete h.dataset.cpgl; } });
     });
@@ -2306,7 +2312,7 @@
     cal = new FullCalendar.Calendar(mount, {
       // The luxon3 plugin registers itself globally on load (gives the real America/Los_Angeles zone).
       timeZone: TZ,
-      eventOrder: 'done,cpSch,start,ordKey,urgRank,ord,-duration,allDay,title', // completed events last (2026-11-10), then by urgency (2026-11-11, Julius)
+      eventOrder: 'lifeK,done,cpSch,start,ordKey,urgRank,ord,-duration,allDay,title', // completed events last (2026-11-10), then by urgency (2026-11-11, Julius)
       // 2026-11-21 (job N): layout by real times only; the min height for text is CSS (see "Back-to-back"), so a short
       // event never makes the one after it look like an overlap. Real overlaps stay inset (slotEventOverlap default).
       eventMinHeight: 1,
@@ -2862,7 +2868,12 @@
       const row = (e, num) => { const x = e.extendedProps || {}, i = fadList.push(e) - 1; total++;
         h += '<div class="cp-ev cp-fai' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '"' + (num ? ' data-fao' : '') + (!x.done && x.editable && !x.recurring ? ' data-fa-drag' : '') + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
           cpChk(e) + (num ? '<span class="cp-ordn">' + num + '</span>' : '') + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + '</span></div>'; };
-      const dn = list.filter(e => (e.extendedProps || {}).done), od = list.filter(e => isOrd(e.extendedProps)), un = list.filter(e => !(e.extendedProps || {}).done && !isOrd(e.extendedProps));
+      const lf = list.filter(e => isLife(e.extendedProps)), tk = list.filter(e => !isLife(e.extendedProps));
+      const dn = tk.filter(e => (e.extendedProps || {}).done), od = tk.filter(e => isOrd(e.extendedProps)), un = tk.filter(e => !(e.extendedProps || {}).done && !isOrd(e.extendedProps));
+      // Events (birthdays etc., 2026-11-23) first, on their own: no checkbox, no drag.
+      if(lf.length){ h += '<div class="cp-fads cp-falg" data-fa-life>Events · ' + lf.length + '</div>';
+        lf.forEach(e => { const i = fadList.push(e) - 1; total++;
+          h += '<div class="cp-ev cp-fai cp-falife" data-fa="' + i + '"' + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '"><span class="cp-ev-t">' + esc(e.title || '(no title)') + '</span></div>'; }); }
       if(od.length || un.length){
         h += '<div class="cp-fads cp-fag" data-fa-og>Ordered' + (od.length ? ' · ' + od.length : '<span class="cp-fagh">hold &amp; drag a task here</span>') + '</div>';
         od.forEach((e, k) => row(e, k + 1));

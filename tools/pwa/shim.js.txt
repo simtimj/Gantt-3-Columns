@@ -117,6 +117,15 @@
     // Calendar copy (H5 B2): calendar reads from the server's copy in the database.
     var CAL = AREAS.indexOf('cal') >= 0, CAL_NAMES = { getCalendarRange: 1, getMainCalendarEvents: 1 };
     if (CAL) Object.keys(CAL_NAMES).forEach(function (n) { NAMES[n] = 1; });
+    // D2: Focus, Inbox, Plan + Cal Backlog.
+    var D2_NAMES = {};
+    if (AREAS.indexOf('focus') >= 0) { D2_NAMES.getFocus = 'focus'; D2_NAMES.saveFocus = 'focus'; }
+    if (AREAS.indexOf('inbox') >= 0) ['getInbox', 'addInboxItem', 'updateInboxItem', 'dismissInboxItem'].forEach(function (n) { D2_NAMES[n] = 'inbox'; });
+    if (AREAS.indexOf('plan') >= 0) ['getPlan', 'planSave', 'calBacklogSync'].forEach(function (n) { D2_NAMES[n] = 'plan'; });
+    Object.keys(D2_NAMES).forEach(function (n) { NAMES[n] = 1; });
+    // Batched reads (speed plan E): the ones the database can answer leave the batch.
+    NAMES.batchCalls = 1;
+    var fromDb = {};
     // Calendar edits: the copy is out of date until the server re-copies (asked for right away, see cal.touch).
     var CAL_WRITES = { addAllDayTask: 1, setCalendarEventMeta: 1, calPanelSetOrder: 1, calPanelCreateEvent: 1, calPanelUpdateEvent: 1,
       calPanelMoveEvent: 1, calPanelSetColor: 1, calPanelDuplicateEvent: 1, calPanelDeleteEvent: 1, planSchedule: 1, setCalendarEventTitle: 1,
@@ -654,6 +663,17 @@
       };
       return {
         watch: watch,
+        // D2 (Plan): one event of the main calendar by id near startMs, or null (no usable copy / not in it).
+        find: function (id, ms) {
+          if (off || !meta || Number(meta.v) !== 1 || dirty()) return null;
+          var hit = null;
+          Object.keys(months).forEach(function (m) {
+            (months[m] || []).forEach(function (ev) {
+              if (!hit && ev.eventId === id && ev.calId === meta.main && Math.abs(Number(ev.startMs) - ms) < DAYMS) hit = ev;
+            });
+          });
+          return hit;
+        },
         run: function (name, a) { return withTimeout(first, 3000).catch(function () {}).then(function () { return RUN[name].apply(null, a || []); }); },
         // An edit just went through: use the server until the copy catches up, and ask it to catch up now.
         touch: function () {
@@ -668,6 +688,305 @@
       };
     }
     var cal = CAL ? calArea() : null;
+
+    /* ---------- Focus, Inbox, Plan + Cal Backlog (D2, 2026-11-23, docs/NOTES.md → D2) ----------
+       Focus: doc ganttFocus/main = { v (list JSON), at, base, up, dev }. saveFocus merges on the device with the same
+       3-way merge as the server (mergeFocus below = Code.gs mergeFocus_, store-test checks they agree); the rules refuse a
+       write whose base isn't the stored `at` → read again, merge again. Editable offline (the write is queued; refused
+       later → merged again in the background, then the page reloads Focus). Losing values → ganttBackup.
+       Inbox: doc per item ganttInbox/<id>; same answers as the server's getInbox; editable offline.
+       Plan: doc per row ganttPlan/<id> (del = removed); getPlan / planSave like the server (Schedule / move stay on
+       the server). Linked event info from the calendar copy, else the row's cached `ev`, else the server answers.
+       Cal Backlog: doc gantt/calBacklog (written by the server). Plan + Backlog read-only offline. */
+    /* mergeFocus:start */
+    function mergeFocus(base, mine, theirs) {
+      const overwritten = [];
+      const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+      const object = v => v && typeof v === 'object' && !Array.isArray(v);
+      const stamp = v => object(v) && typeof v.u === 'number' ? v.u : 0;
+      function merge(b,m,t,path,mineNewer) {
+        if(same(m,b)) return t;
+        if(same(t,b) || same(m,t)) return m;
+        if(m === undefined && object(t)) return t;
+        if(t === undefined && object(m)) return m;
+        if(object(b) && object(m) && object(t)) {
+          const newer = stamp(m) || stamp(t) ? stamp(m) >= stamp(t) : mineNewer;
+          const out = {};
+          [...new Set(Object.keys(b).concat(Object.keys(m),Object.keys(t)))].forEach(k => {
+            const v = merge(b[k],m[k],t[k],path + '.' + k,newer);
+            if(v !== undefined) out[k] = v;
+          });
+          return out;
+        }
+        const records = a => Array.isArray(a) && a.every(x => object(x) && typeof x.id === 'string');
+        const uniq = a => { const seen = {}; return a.filter(x => seen[x.id] ? false : (seen[x.id] = true)); };
+        if(Array.isArray(b) && records(m) && records(t) && (records(b) || !b.length)) {
+          b = uniq(b); m = uniq(m); t = uniq(t);
+          const maps = [b,m,t].map(a => new Map(a.map(x => [x.id,x]))), out = new Map();
+          [...new Set(b.concat(m,t).map(x => x.id))].forEach(id => {
+            const v = merge(maps[0].get(id),maps[1].get(id),maps[2].get(id),path + '[' + id + ']',mineNewer);
+            if(v !== undefined) out.set(id,v);
+          });
+          const common = b.map(x => x.id).filter(id => maps[1].has(id) && maps[2].has(id) && out.has(id));
+          const order = a => a.map(x => x.id).filter(id => common.indexOf(id) >= 0);
+          const tc = !same(order(t),common) && same(order(m),common);
+          const primary = tc ? t : m, secondary = tc ? m : t;
+          const ids = primary.map(x => x.id).filter(id => out.has(id));
+          secondary.forEach((x,i) => {
+            if(!out.has(x.id) || ids.indexOf(x.id) >= 0) return;
+            const next = secondary.slice(i+1).find(n => ids.indexOf(n.id) >= 0);
+            ids.splice(next ? ids.indexOf(next.id) : ids.length,0,x.id);
+          });
+          out.forEach((v,id) => { if(ids.indexOf(id) < 0) ids.push(id); });
+          return ids.map(id => out.get(id));
+        }
+        const win = mineNewer === false ? t : m, lose = win === m ? t : m;
+        overwritten.push({path:path,lost:lose});
+        return win;
+      }
+      return {data:merge(base,mine,theirs,'focus',true),conflicts:[],overwritten:overwritten};
+    }
+    /* mergeFocus:end */
+    // One read: the server copy when online (refused → throw, so the server answers), else this device's cache.
+    function getDoc(ref) {
+      var cache = function () { return ref.get({ source: 'cache' }).catch(function () { return null; }); };
+      return (navigator.onLine ? ref.get({ source: 'server' }).catch(function (e) { if (refused(e)) throw e; return cache(); }) : cache())
+        .then(function (sn) { return sn && sn.exists ? sn.data() : null; });
+    }
+    function getColl(ref) {
+      var cache = function () { return ref.get({ source: 'cache' }).then(function (q) { return { docs: q.docs, cache: true }; }); };
+      return (navigator.onLine ? ref.get({ source: 'server' }).then(function (q) { return { docs: q.docs, cache: false }; })
+        .catch(function (e) { if (refused(e)) throw e; return cache(); }) : cache())
+        .then(function (r) { return { cache: r.cache, list: r.docs.map(function (sn) { var d = sn.data(); d.id = String(d.id || sn.id); return d; }) }; });
+    }
+    function localDay(t) { var d = new Date(t || Date.now()); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function addBackup(area, html, reason) {
+      db.collection('ganttBackup').add({ area: area, html: String(html || ''), at: Date.now(), reason: reason, dev: dev })
+        .catch(function (e) { console.warn('Backup not saved: ' + (e.code || e)); });
+    }
+
+    function focusArea() {
+      function fdoc() { return db.collection('ganttFocus').doc('main'); }
+      function parse(d) { try { var v = d && JSON.parse(d.v); return v && Array.isArray(v.cats) ? v : null; } catch (e) { return null; } }
+      function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+      function reload() { if (typeof window.fwFocusReload === 'function') try { window.fwFocusReload(); } catch (e) {} }
+      // d = the stored doc; data = this device's list; base = the list it was edited from.
+      function write(d, data, base, tries) {
+        var cur = parse(d);
+        if (!cur) throw new Error('Focus doc unreadable');
+        if (same(data, cur)) return Promise.resolve({ data: cur });
+        var res = mergeFocus(base, data, cur), txt = JSON.stringify(res.data);
+        if (txt.length > 200000) throw new Error('Focus data too big (' + txt.length + ' chars)');
+        var prev = Number(d.at) || 0;
+        var rec = { v: txt, at: Math.max(Date.now(), prev + 1), base: prev, up: firebase.firestore.FieldValue.serverTimestamp(), dev: dev };
+        var out = { data: res.data, merged: res.overwritten.length };
+        var lost = function () { res.overwritten.forEach(function (o) { addBackup('focus', o.path + ': ' + JSON.stringify(o.lost === undefined ? null : o.lost).slice(0, 2000), 'Focus merge: older value'); }); };
+        var p = fdoc().set(rec);
+        if (navigator.onLine) {
+          return withTimeout(p, 8000).then(function () { lost(); return out; }, function (e) {
+            // Someone saved in between (base no longer matches) → merge against the newer copy.
+            if (e && e.code === 'permission-denied' && tries < 3) return getDoc(fdoc()).then(function (d2) { if (!d2) throw e; return write(d2, data, base, tries + 1); });
+            throw e;
+          });
+        }
+        // Offline: queued. Refused later → merge against the newer copy in the background, then show the result.
+        p.then(lost, function (e) {
+          if (!(e && e.code === 'permission-denied') || tries >= 3) return console.warn('Focus not saved to the database: ' + (e && (e.code || e.message) || e));
+          getDoc(fdoc()).then(function (d2) { return d2 && write(d2, data, base, tries + 1); }).then(reload, function (x) { console.warn('Focus re-merge: ' + (x && x.message || x)); });
+        });
+        return Promise.resolve(out);
+      }
+      var RUN = {
+        getFocus: function () { return getDoc(fdoc()).then(function (d) { return d ? parse(d) : null; }); },
+        saveFocus: function (data, opts) {
+          if (!data || !Array.isArray(data.cats) || !opts || !opts.base || !Array.isArray(opts.base.cats)) return null; // the server explains
+          return getDoc(fdoc()).then(function (d) { return d ? write(d, data, opts.base, 0) : null; });
+        }
+      };
+      return { run: function (n, a) { return RUN[n].apply(null, a || []); } };
+    }
+    var focus = AREAS.indexOf('focus') >= 0 ? focusArea() : null;
+
+    function inboxArea() {
+      var SEEN = 'pwa.inbox.ok';
+      function coll() { return db.collection('ganttInbox'); }
+      // Seeded by the server, and read from the database at least once on this device (so an empty cache means empty).
+      function ready() {
+        if (ls.get(SEEN) === '1') return Promise.resolve(true);
+        if (!navigator.onLine) return Promise.resolve(false);
+        return db.collection('gantt').doc('inboxMeta').get({ source: 'server' }).then(function (sn) {
+          if (!(sn.exists && sn.data().seeded)) return false;
+          return coll().get({ source: 'server' }).then(function () { ls.set(SEEN, '1'); return true; });
+        });
+      }
+      function build(list) {
+        return list.filter(function (d) { return !Number(d.gone); }).sort(function (a, b) {
+          return (a.from === 'claude' ? 0 : 1) - (b.from === 'claude' ? 0 : 1) || (Number(a.ord) || 0) - (Number(b.ord) || 0);
+        }).map(function (x) {
+          return { id: String(x.id), title: String(x.title || ''), details: String(x.details || ''), added: String(x.added || ''),
+            from: x.from, arch: String(x.arch || ''), done: !!Number(x.done) };
+        });
+      }
+      function items() { return getColl(coll()).then(function (r) { return build(r.list); }); }
+      function put(id, fields, prevAt) {
+        var rec = Object.assign({ id: String(id) }, fields, { at: Math.max(Date.now(), (Number(prevAt) || 0) + 1), up: firebase.firestore.FieldValue.serverTimestamp(), dev: dev });
+        var p = coll().doc(String(id)).set(rec, { merge: true });
+        p.catch(function (e) {
+          if (e && e.code === 'permission-denied') { if (typeof window.fwSync === 'function') try { window.fwSync(true); } catch (x) {} }
+          else console.warn('Inbox not saved to the database: ' + (e && (e.code || e.message) || e));
+        });
+        // Online: wait for it (the list read next comes from the server); offline: queued, the cache already has it.
+        return navigator.onLine ? withTimeout(p, 8000) : Promise.resolve();
+      }
+      function one(id) { return getColl(coll()).then(function (r) { return r.list.filter(function (d) { return d.id === id; })[0] || null; }); }
+      var RUN = {
+        getInbox: items,
+        addInboxItem: function (title, details) {
+          title = String(title || '').trim(); details = String(details || '').trim();
+          if (!title && !details) return items();
+          var now = Date.now();
+          return put('a' + now, { from: 'app', title: title, details: details, added: localDay(now), arch: '', done: 0, gone: 0, ord: now }, 0).then(items);
+        },
+        updateInboxItem: function (id, fields) {
+          id = String(id || ''); fields = fields || {};
+          var pick = {};
+          ['title', 'details', 'arch'].forEach(function (k) { if (k in fields) pick[k] = String(fields[k] || '').slice(0, 4000); });
+          if ('done' in fields) pick.done = fields.done ? 1 : 0;
+          return one(id).then(function (d) { return d ? put(id, pick, d.at).then(items) : null; }); // not copied in yet → server
+        },
+        dismissInboxItem: function (id) {
+          id = String(id || '');
+          return one(id).then(function (d) { return d ? put(id, { gone: 1 }, d.at).then(items) : null; });
+        }
+      };
+      return {
+        run: function (n, a) { return ready().then(function (ok) { return ok ? RUN[n].apply(null, a || []) : null; }); },
+        opening: function () { return ready().then(function (ok) { return ok ? items() : null; }).catch(function () { return null; }); }
+      };
+    }
+    var inbox = AREAS.indexOf('inbox') >= 0 ? inboxArea() : null;
+
+    function planArea() {
+      var GROUPS = { big: 3, stretch: 3, next: 500, backlog: 500 }, DATED = { stretch: true }, metaP = null, SWEEP = 'pwa.blSweep';
+      var REF_RE = /^(tid:m-[\w-]{2,60}|tid:[\w-]{2,60}|cal:[^\s]{3,200}|card:[\w-]{1,80})$/;
+      function coll() { return db.collection('ganttPlan'); }
+      // planMeta (seeded + the main calendar id); online only (Plan is read-only offline, reads included).
+      function meta() {
+        if (!navigator.onLine) return Promise.resolve(null);
+        if (!metaP) metaP = db.collection('gantt').doc('planMeta').get({ source: 'server' }).then(function (sn) { var d = sn.exists ? sn.data() : null; if (!(d && d.seeded)) metaP = null; return d && d.seeded ? d : null; }, function (e) { metaP = null; throw e; });
+        return metaP;
+      }
+      function rows() {
+        return coll().get({ source: 'server' }).then(function (q) {
+          return q.docs.map(function (sn) { var d = sn.data(); return Object.assign({}, d, { id: String(d.id || sn.id), group: String(d.group || '').toLowerCase(), rank: Number(d.rank) || 0, ref: String(d.ref || '') }); })
+            .filter(function (x) { return !Number(x.del) && x.ref && GROUPS[x.group] !== undefined; });
+        });
+      }
+      function parts(s) { var m = String(s || '').match(/^(.+)@(\d+)$/); return m ? { eventId: m[1], startMs: Number(m[2]) } : null; }
+      function hm(iso) { var h = Number(String(iso).slice(11, 13)), m = String(iso).slice(14, 16); return (h % 12 || 12) + ':' + m + ' ' + (h < 12 ? 'AM' : 'PM'); }
+      // The event's live info: calendar copy first, then the row's cached copy (if it's about the same event), else undefined (→ server).
+      function evInfo(x) {
+        var p = parts(x.event);
+        if (!p) return null;
+        var e = cal && cal.find ? cal.find(p.eventId, p.startMs) : null;
+        if (e) return { eventId: p.eventId, startMs: e.startMs, title: e.title === '(no title)' ? '' : String(e.title || ''), done: String(e.colorId || '') === '8',
+          date: String(e.start).slice(0, 10), allDay: !!e.allDay, recurring: !!e.recurring, time: e.allDay ? '' : hm(e.start) };
+        var c = null; try { c = x.ev ? JSON.parse(x.ev) : null; } catch (er) { c = null; }
+        return c && c.eventId === p.eventId ? c : undefined;
+      }
+      function out(d, list, m) {
+        var items = list.filter(function (x) { return !DATED[x.group] || x.date === d; }).map(function (x) {
+          return { id: x.id, date: String(x.date || ''), group: x.group, rank: x.rank, ref: x.ref, title: String(x.title || ''), target: String(x.target || ''),
+            event: String(x.event || ''), updated: String(x.updated || ''), ev: x.event ? evInfo(x) : null };
+        });
+        if (items.some(function (x) { return x.ev === undefined; })) return null;
+        items.sort(function (a, b) { return a.rank - b.rank; });
+        return { date: d, cal: String(m.cal || ''), items: items };
+      }
+      function stamp() { var t = new Date(); return localDay(t) + ' ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'); }
+      function save(x) {
+        x.updated = stamp();
+        var rec = { id: x.id, date: x.date || '', group: x.group, rank: Number(x.rank) || 0, ref: x.ref, title: x.title || '', target: x.target || '',
+          event: x.event || '', updated: x.updated, del: 0, at: Math.max(Date.now(), (Number(x.at) || 0) + 1), up: firebase.firestore.FieldValue.serverTimestamp(), dev: dev };
+        x.at = rec.at;
+        return coll().doc(x.id).set(rec, { merge: true });
+      }
+      function drop(x) { var at = Math.max(Date.now(), (Number(x.at) || 0) + 1); x.at = at; return coll().doc(x.id).set({ id: x.id, del: 1, at: at, up: firebase.firestore.FieldValue.serverTimestamp(), dev: dev }, { merge: true }); }
+      var RUN = {
+        getPlan: function (d) {
+          d = String(d || '');
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+          return meta().then(function (m) { return m ? rows().then(function (list) { return out(d, list, m); }) : null; });
+        },
+        planSave: function (op) {
+          var o = op || {}, d = String(o.date || '');
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+          return meta().then(function (m) {
+            if (!m) return null;
+            return rows().then(function (list) {
+              var writes = [];
+              var inGroup = function (g, except) { return list.filter(function (x) { return x.group === g && (!DATED[g] || x.date === d) && x !== except; }); };
+              var maxRank = function (g, except) { return inGroup(g, except).reduce(function (mx, r) { return Math.max(mx, r.rank); }, 0); };
+              var full = function (g) { return new Error((g === 'big' ? 'Big Three' : 'Stretch') + ' is full (3) — remove one first'); };
+              var find = function (id) { return list.filter(function (r) { return r.id === String(id || ''); })[0]; };
+              if (o.type === 'upsert') {
+                var it = o.item || {}, g = String(it.group || '');
+                if (GROUPS[g] === undefined) throw new Error('Unknown plan group');
+                var ref = String(it.ref || '');
+                if (!REF_RE.test(ref)) throw new Error('Unknown task link');
+                var x = list.filter(function (r) { return r.ref === ref && (!DATED[r.group] || r.date === d); })[0];
+                if (inGroup(g, x).length >= GROUPS[g]) throw full(g);
+                if (!x) { x = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ref: ref, at: 0 }; list.push(x); }
+                var moved = x.group !== g;
+                x.group = g; x.date = DATED[g] ? d : '';
+                x.title = String(it.title || x.title || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+                if (it.target !== undefined) x.target = String(it.target || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+                if (it.event && parts(it.event)) x.event = String(it.event);
+                if (moved || !x.rank) x.rank = maxRank(g, x) + 1;
+                writes.push(save(x));
+              } else if (o.type === 'moveup') {
+                var done = list.filter(function (r) { return r.id === String(o.doneId || '') && r.group === 'big'; })[0];
+                var up = list.filter(function (r) { return r.id === String(o.upId || '') && r.group === 'next'; })[0];
+                if (!up) throw new Error('That waiting item is gone — tap ↻');
+                if (done) { writes.push(drop(done)); list.splice(list.indexOf(done), 1); }
+                if (inGroup('big', up).length >= 3) throw full('big');
+                up.group = 'big'; up.date = ''; up.rank = maxRank('big', up) + 1;
+                writes.push(save(up));
+              } else if (o.type === 'remove') {
+                var rx = find(o.id);
+                if (rx) { writes.push(drop(rx)); list.splice(list.indexOf(rx), 1); }
+              } else if (o.type === 'order') {
+                (o.ids || []).map(String).forEach(function (id, i) { var r = list.filter(function (y) { return y.id === id && y.group === o.group; })[0]; if (r && r.rank !== i + 1) { r.rank = i + 1; writes.push(save(r)); } });
+              } else if (o.type === 'target') {
+                var tx = find(o.id);
+                if (!tx) throw new Error('Plan item not found — tap ↻');
+                tx.target = String(o.target || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+                writes.push(save(tx));
+              } else throw new Error('Unknown plan change');
+              return withTimeout(Promise.all(writes), 8000).then(function () {
+                // Saved. The answer needs event info the device doesn't have → ask the server for the list only (never planSave again).
+                return out(d, list, m) || call('getPlan', [d]);
+              });
+            });
+          });
+        },
+        calBacklogSync: function () {
+          return getDoc(db.collection('gantt').doc('calBacklog')).then(function (d) {
+            if (!d || (navigator.onLine && Date.now() - Number(d.at) > 20 * 60000)) return null; // trigger not running → server
+            var items = []; try { items = JSON.parse(d.items || '[]'); } catch (e) { return null; }
+            var sweep = {}; try { var sw = d.sweep ? JSON.parse(d.sweep) : null; if (sw && sw.at > (Number(ls.get(SWEEP)) || 0)) { ls.set(SWEEP, String(sw.at)); sweep = { swept: sw.swept }; } } catch (e) {}
+            return { items: items, sweep: sweep, fromDb: true };
+          });
+        }
+      };
+      return {
+        run: function (n, a) {
+          if (n !== 'calBacklogSync' && !navigator.onLine) return Promise.resolve(null); // read-only offline: server path (fails offline, as before)
+          return Promise.resolve(RUN[n].apply(null, a || []));
+        }
+      };
+    }
+    var plan = AREAS.indexOf('plan') >= 0 ? planArea() : null;
 
     function refArea() {
       var seeded = false, watching = false, syncT = 0;
@@ -845,8 +1164,8 @@
       last = last && last.data;
       if (!kv && !(last && last.cardCats)) return Promise.resolve(null);
       var t0 = Date.now();
-      return Promise.all([days.history(), refs.cards(), kv ? kv.opening() : null]).then(function (x) {
-        var by = x[0], cards = x[1], set = x[2] && x[2].has ? x[2] : null;
+      return Promise.all([days.history(), refs.cards(), kv ? kv.opening() : null, inbox ? inbox.opening() : null]).then(function (x) {
+        var by = x[0], cards = x[1], set = x[2] && x[2].has ? x[2] : null, inboxList = Array.isArray(x[3]) ? x[3] : [];
         // Pins + card categories: from the database (H5 F), else this device's last opening, else the server.
         if (!set) { if (!last || !last.cardCats) return null; set = { cardCats: last.cardCats, refPins: last.refPins || [] }; }
         if (!by || !cards) return null;
@@ -866,25 +1185,59 @@
             if (new RegExp('data-nsec=["\']' + k + '["\']').test(journal)) seeds[k] = { date: date, journal: journal };
           });
         });
-        return { days: out, reference: reference, refManifestHash: hash(JSON.stringify(manifest)), urgent: urgent, inbox: [],
+        return { days: out, reference: reference, refManifestHash: hash(JSON.stringify(manifest)), urgent: urgent, inbox: inboxList,
           cardCats: set.cardCats, refPins: set.refPins, notesSeeds: seeds, today: today,
           timing: { total: Date.now() - t0, steps: { dbRead: t1 - t0, build: Date.now() - t1 }, release: '', fast: true, fromDb: true,
             dayRows: Object.keys(by).length, refRows: reference.length } };
       });
     }
+    // The database answer, or null (→ the server).
+    function dbRun(name, args) {
+      return withTimeout(boot, 4000).then(function () {
+        if (!user) return null;
+        if (name === 'getWorkspaceData') return withTimeout(opening(args[0]), 6000);
+        if (name === 'getDaysRange') return withTimeout(days.range(String(args[0]), String(args[1])), 5000);
+        if (DAY_NAMES[name]) return days.run(name, args);
+        if (REF_NAMES[name]) return refs.run(name, args);
+        if (KV_NAMES[name]) return kv.run(name, args);
+        if (CAL_NAMES[name]) return cal.run(name, args);
+        if (D2_NAMES[name]) { var a = D2_NAMES[name] === 'focus' ? focus : D2_NAMES[name] === 'inbox' ? inbox : plan; return withTimeout(Promise.resolve(a.run(name, args)), 9000); }
+        if (name === 'getKim' || name === 'saveKim') return name === 'getKim' ? read() : save(args[0], args[1]);
+        return null;
+      }).then(function (r) { if (r && r.fromDb) delete r.fromDb; return r; })
+        .catch(function (e) { console.warn('Firestore → server: ' + (e && e.message || e)); return null; });
+    }
+    // batchCalls: answer what the database can, send the rest to the server as one batch (same answer shape).
+    function batch(list) {
+      list = Array.isArray(list) ? list : [];
+      return Promise.all(list.map(function (c) { return c && NAMES[c[0]] && c[0] !== 'batchCalls' ? dbRun(c[0], c[1] || []) : Promise.resolve(null); })).then(function (got) {
+        var rest = [], at = [];
+        got.forEach(function (r, i) { if (r == null) { rest.push(list[i]); at.push(i); } });
+        var out = got.map(function (r) { return r == null ? null : { ok: true, r: r }; });
+        if (!rest.length) return out;
+        return call('batchCalls', [rest]).then(function (srv) {
+          at.forEach(function (i, j) { out[i] = Array.isArray(srv) && srv[j] ? srv[j] : { ok: false, e: 'No answer' }; });
+          return out;
+        });
+      });
+    }
     return {
       handles: function (name) { return !!NAMES[name]; },
       // After a successful call: calendar edits mark the copy out of date (B2).
-      after: function (name) { if (cal && CAL_WRITES[name]) cal.touch(); },
+      after: function (name) { if (fromDb[name]) { delete fromDb[name]; return; } if (cal && CAL_WRITES[name]) cal.touch(); },
       // Offline: typing allowed where the edit can be queued (Keep In Mind; days within today ± 7).
       editable: function (el) {
         if (!user || !el || !el.closest) return false;
         if (KIM && el.closest('#kimScroll')) return true;
+        if (focus && el.closest('.fx')) return true; // D2: Focus + Inbox save offline (queued)
+        if (inbox && el.closest('#inboxPanel')) return true;
         return !!(days && days.editable(el));
       },
       offlineText: function () {
         if (!user) return 'Offline · read-only';
-        return 'Offline · only ' + (KIM && DAYS ? 'Keep In Mind + today ± 7 days save' : KIM ? 'Keep In Mind saves' : 'today ± 7 days save');
+        var parts = [];
+        if (KIM) parts.push('Keep In Mind'); if (focus) parts.push('Focus'); if (inbox) parts.push('Inbox'); if (DAYS) parts.push('today ± 7 days');
+        return 'Offline · only ' + parts.join(' + ') + ' save' + (parts.length === 1 && !DAYS ? 's' : '');
       },
       // Server answers that carry days: edits not yet in the database stay on top.
       overlay: function (name, r) {
@@ -898,17 +1251,8 @@
         return days.overlay(name, r);
       },
       run: function (name, args) {
-        return withTimeout(boot, 4000).then(function () {
-          if (!user) return null;
-          if (name === 'getWorkspaceData') return withTimeout(opening(args[0]), 6000);
-          if (name === 'getDaysRange') return withTimeout(days.range(String(args[0]), String(args[1])), 5000);
-          if (DAY_NAMES[name]) return days.run(name, args);
-          if (REF_NAMES[name]) return refs.run(name, args);
-          if (KV_NAMES[name]) return kv.run(name, args);
-          if (CAL_NAMES[name]) return cal.run(name, args);
-          return name === 'getKim' ? read() : save(args[0], args[1]);
-        }).catch(function (e) { console.warn('Firestore → server: ' + (e && e.message || e)); return null; })
-          .then(function (r) { return r || call(name, args); });
+        if (name === 'batchCalls') return batch(args[0]);
+        return dbRun(name, args).then(function (r) { if (r) fromDb[name] = 1; return r || call(name, args); });
       }
     };
   })();

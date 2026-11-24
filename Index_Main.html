@@ -5879,15 +5879,18 @@
     load();
     render();
     // Back to the app → pull the latest list so this device starts from the newest copy (only when idle).
-    window.fwResume && fwResume.add('nextSteps', () => { // calm-return queue
-      if(document.visibilityState !== 'visible' || !data || pending || saving || conflict || !(window.google && google.script)) return;
+    // D2: the PWA calls this after a queued offline Focus save was merged again in the background.
+    window.fwFocusReload = () => { if(!pending && !saving && !conflict) pullFocus(); };
+    window.fwResume && fwResume.add('nextSteps', () => pullFocus(true)); // calm-return queue
+    function pullFocus(onlyVisible){
+      if((onlyVisible && document.visibilityState !== 'visible') || !data || pending || saving || conflict || !(window.google && google.script)) return;
       const host = document.querySelector('.fx'); if(host && host.contains(document.activeElement)) return;
       google.script.run.withSuccessHandler(d => {
         if(!valid(d) || pending || saving) return;
         if(JSON.stringify(d) === JSON.stringify(base)) return;
         data = d; base = copy(d); snapshot(); render();
       }).getFocus();
-    });
+    }
   })();
   /* Done → Dailies matches (2026-11-05, Julius: "a task done today should tick its daily habit, just double check").
      Finished lines today (History / Today cell + Blocks pad) are matched by words to today's open Dailies; each match

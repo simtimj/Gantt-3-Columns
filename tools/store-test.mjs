@@ -70,9 +70,9 @@ g = ctx.getKim(); assert.equal(g.html, '<div>legacy</div>'); assert.equal(g.at, 
 // Database backend without a Firebase project fails loudly instead of silently using the Sheet.
 vm.runInContext("STORE_BACKEND.kim = 'db'", ctx);
 assert.throws(() => ctx.getKim(), /FIREBASE_PROJECT_ is empty/);
-vm.runInContext("STORE_BACKEND.plan = 'db'", ctx);
-assert.throws(() => vm.runInContext("storeBackend_('plan')", ctx), /not built yet/);
-vm.runInContext("STORE_BACKEND.plan = 'sheet'", ctx);
+vm.runInContext("STORE_BACKEND.timer = 'db'", ctx);
+assert.throws(() => vm.runInContext("storeBackend_('timer')", ctx), /not built yet/);
+vm.runInContext("STORE_BACKEND.timer = 'sheet'", ctx);
 console.log('✓ store-test: Keep In Mind through Store.kim');
 
 // Database step (2026-11-22, NOTES H3): Keep In Mind on Firestore (fake REST), Sheet mirror, lost-edit backups.
@@ -239,7 +239,7 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
         return res(200, Object.keys(fsDocs).filter(k => k.startsWith(coll) && hit(fsDocs[k], q.where)).map(k => ({ document: { name: 'x/' + k, fields: fsDocs[k] } })).concat([{ readTime: 'now' }]));
       }
       const [path, qs] = url.split('/documents/')[1].split('?'), p = decodeURIComponent(path);
-      if (o.method === 'get' && (p === 'ganttBackup' || p === 'gantt')) return res(200, { documents: Object.keys(fsDocs).filter(k => k.startsWith(p + '/')).map(k => ({ name: 'x/' + k, fields: fsDocs[k] })) });
+      if (o.method === 'get' && !p.includes('/')) return res(200, { documents: Object.keys(fsDocs).filter(k => k.startsWith(p + '/')).map(k => ({ name: 'x/' + k, fields: fsDocs[k] })) });
       if (o.method === 'get') return fsDocs[p] ? res(200, { name: 'x/' + p, fields: fsDocs[p] }) : res(404, { error: 1 });
       if (o.method === 'patch') {
         const f = JSON.parse(o.payload).fields;
@@ -393,5 +393,93 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
     evs[0].title = 'Dentist 2'; dctx.__evs = JSON.stringify(evs);
     r = dctx.calSyncNow(); assert.equal(r.written, 1); assert.equal(ev('2026-11')[0].title, 'Dentist 2');
     console.log('✓ store-test: calendar copy on Firestore (window, month docs, only changed months, color urgency flag)');
+  }
+
+  // D2 (2026-11-23): Focus doc, Inbox docs, Plan docs + Cal Backlog doc; seeds, server paths on the docs, mirror back.
+  {
+    const P = {}, svc = pre => ({ getProperty: k => P[pre + k] ?? null, getProperties: () => Object.fromEntries(Object.keys(P).filter(k => k.startsWith(pre)).map(k => [k.slice(pre.length), P[k]])),
+      setProperty: (k, v) => { P[pre + k] = String(v); }, setProperties: o => { Object.keys(o).forEach(k => { P[pre + k] = String(o[k]); }); }, deleteProperty: k => { delete P[pre + k]; } });
+    dctx.PropertiesService = { getScriptProperties: () => svc(''), getUserProperties: () => svc('u:') };
+    dctx.LockService = { getScriptLock: () => ({ waitLock: () => {}, tryLock: () => true, releaseLock: () => {} }), getUserLock: () => ({ waitLock: () => {}, tryLock: () => true, releaseLock: () => {} }) };
+    Object.keys(fsDocs).filter(k => /^(ganttFocus|ganttInbox|ganttPlan)\//.test(k) || /^gantt\/(inboxMeta|planMeta|calBacklog)$/.test(k)).forEach(k => delete fsDocs[k]);
+    const eq = (a, b, m) => assert.deepEqual(JSON.parse(JSON.stringify(a)), b, m);
+    const S = v => ({ stringValue: v }), I = v => ({ integerValue: String(v) });
+    vm.runInContext("todayString_ = () => '2026-11-23'; Utilities.getUuid = () => 'g' + Math.random().toString(36).slice(2); EVENT_CALENDARS[0] = 'main';", dctx);
+    // ---- Focus: seed from the properties, read the doc, server save writes both, newer app doc → properties.
+    dctx.writeFocusProps_({ v: 1, cats: [{ id: 'c1', name: 'Work', items: [{ id: 'i1', t: 'One' }] }] });
+    assert.equal(dctx.focusMirror_(), 'seeded');
+    assert.equal(fsDocs['ganttFocus/main'].at.integerValue, '1');
+    assert.equal(dctx.getFocus().cats[0].name, 'Work');
+    const base = dctx.getFocus(), mine = JSON.parse(JSON.stringify(base)); mine.cats[0].items.push({ id: 'i2', t: 'Two' });
+    const saved = dctx.saveFocus(mine, { base });
+    assert.equal(saved.data.cats[0].items.length, 2);
+    assert.equal(JSON.parse(fsDocs['ganttFocus/main'].v.stringValue).cats[0].items.length, 2);
+    assert.equal(fsDocs['ganttFocus/main'].base.integerValue, '1', 'server write records the version it merged against');
+    assert.equal(dctx.readFocusProps_().cats[0].items.length, 2);
+    // The app saves a newer copy → the trigger copies it into the properties.
+    const appAt = Number(fsDocs['ganttFocus/main'].at.integerValue) + 10;
+    fsDocs['ganttFocus/main'] = { v: S(JSON.stringify({ v: 1, cats: [{ id: 'c1', name: 'Work (phone)', items: [] }] })), at: I(appAt), base: I(appAt - 10) };
+    assert.equal(dctx.focusMirror_(), 1); assert.equal(dctx.readFocusProps_().cats[0].name, 'Work (phone)'); assert.equal(dctx.focusMirror_(), 0);
+    // Same merge on the device: Code.gs mergeFocus_ and the shim's mergeFocus agree on many random edits.
+    const shim = fs.readFileSync('tools/pwa/shim.js.txt', 'utf8'), body = shim.slice(shim.indexOf('/* mergeFocus:start */'), shim.indexOf('/* mergeFocus:end */'));
+    const devMerge = new Function(body + '; return mergeFocus;')();
+    let seed = 7; const rnd = n => (seed = (seed * 1103515245 + 12345) % 2147483648) % n;
+    const edit = l => { l = JSON.parse(JSON.stringify(l)); for (let k = rnd(4); k >= 0; k--) { const c = l.cats[rnd(l.cats.length)], op = rnd(5);
+      if (op === 0) c.items.push({ id: 'n' + rnd(1e6), t: 'x' + rnd(9) }); else if (op === 1 && c.items.length) c.items.splice(rnd(c.items.length), 1);
+      else if (op === 2 && c.items.length) c.items[rnd(c.items.length)].t = 'e' + rnd(9); else if (op === 3) c.items.reverse(); else { c.name = 'n' + rnd(9); c.u = rnd(50); } } return l; };
+    for (let i = 0; i < 300; i++) {
+      const b = { v: 1, cats: [0, 1, 2].map(j => ({ id: 'c' + j, name: 'C' + j, items: [0, 1, 2, 3].map(x => ({ id: 'i' + j + x, t: 't' + x })) })) };
+      const m = edit(b), t = edit(b);
+      assert.deepStrictEqual(JSON.parse(JSON.stringify(devMerge(b, m, t))), JSON.parse(JSON.stringify(dctx.mergeFocus_(b, m, t))), 'merge differs on case ' + i);
+    }
+    // ---- Inbox: seed from properties + inbox.js, same answers, server edits on the docs, new Claude item, properties rebuilt.
+    dctx.CLAUDE_INBOX = [{ id: 'ai1', title: 'From Claude', added: '2026-11-20' }, { id: 'ai2', title: 'Dismissed one' }];
+    P['u:inboxItems'] = JSON.stringify([{ id: 'a100', title: 'Mine', details: 'd', added: '2026-11-21' }]);
+    P['u:inboxDone'] = '["ai2"]'; P['u:inboxOver'] = '{"ai1":{"title":"From Claude (edited)"}}';
+    const before = JSON.stringify(dctx.getInbox());
+    vm.runInContext('Store.inbox.mirror()', dctx);
+    assert.equal(P.inboxSeeded, '1'); assert.equal(fsDocs['ganttInbox/ai2'].gone.integerValue, '1');
+    assert.equal(JSON.stringify(dctx.getInbox()), before, 'same Inbox before and after the move');
+    let inb = dctx.addInboxItem('New', '');
+    eq(inb.map(x => x.title), ['From Claude (edited)', 'Mine', 'New']);
+    inb = dctx.updateInboxItem('a100', { done: true, title: 'Mine!' });
+    assert.equal(inb[1].done, true); assert.equal(inb[1].title, 'Mine!');
+    inb = dctx.dismissInboxItem('ai1'); eq(inb.map(x => x.id).slice(0, 1), ['a100']);
+    dctx.CLAUDE_INBOX.push({ id: 'ai3', title: 'Fresh from Claude' });
+    assert.equal(dctx.getInbox()[0].id, 'ai3', 'new inbox.js item shows before the trigger copies it');
+    assert.equal(fsDocs['ganttInbox/ai3'], undefined);
+    vm.runInContext('Store.inbox.mirror()', dctx);
+    assert.equal(fsDocs['ganttInbox/ai3'].from.stringValue, 'claude');
+    eq(JSON.parse(P['u:inboxItems']).map(x => x.title), ['Mine!', 'New']); assert.equal(JSON.parse(P['u:inboxItems'])[0].done, true);
+    eq(JSON.parse(P['u:inboxDone']).sort(), ['ai1', 'ai2']);
+    // Updating a Claude item the trigger hasn't copied yet creates its doc.
+    dctx.CLAUDE_INBOX.push({ id: 'ai4', title: 'Later' });
+    dctx.updateInboxItem('ai4', { arch: 'x' }); assert.equal(fsDocs['ganttInbox/ai4'].title.stringValue, 'Later'); assert.equal(fsDocs['ganttInbox/ai4'].arch.stringValue, 'x');
+    // ---- Plan: seed from the Plan tab, planSave on the docs, mirror rewrites the tab, event info cached.
+    const ptab = ss.insertSheet('Plan'); ptab.rows.push(['Id', 'Date', 'Group', 'Rank', 'Ref', 'Title', 'Target', 'Event', 'Updated'], ['p1', '', 'big', '1', 'tid:aa', 'One', '', 'ev1@100', '']);
+    vm.runInContext("planEventInfo_ = s => ({ eventId: s.split('@')[0], startMs: 100, title: 'Ev', done: false, date: '2026-11-23', allDay: true, recurring: false, time: '' });", dctx);
+    let plan = dctx.getPlan('2026-11-23');
+    assert.equal(P.planSeeded, '1'); assert.equal(fsDocs['ganttPlan/p1'].ref.stringValue, 'tid:aa'); assert.equal(plan.items[0].title, 'One');
+    plan = dctx.planSave({ type: 'upsert', date: '2026-11-23', item: { group: 'next', ref: 'tid:bb', title: 'Two' } });
+    eq(plan.items.map(x => x.title).sort(), ['One', 'Two']);
+    const two = plan.items.find(x => x.title === 'Two');
+    plan = dctx.planSave({ type: 'moveup', date: '2026-11-23', doneId: 'p1', upId: two.id });
+    eq(plan.items.map(x => x.group + ':' + x.title), ['big:Two']); assert.equal(fsDocs['ganttPlan/p1'].del.integerValue, '1');
+    assert.throws(() => dctx.planSave({ type: 'target', date: '2026-11-23', id: 'nope', target: 'x' }), /not found/);
+    vm.runInContext('Store.plan.mirror()', dctx);
+    eq(ptab.rows.slice(1).filter(r => r[0]).map(r => r[2] + ':' + r[5]), ['big:Two']);
+    assert.equal(dctx.planEvRefresh_().written, 0); // Two has no event
+    dctx.planSave({ type: 'upsert', date: '2026-11-23', item: { group: 'next', ref: 'tid:cc', title: 'Three', event: 'ev9@5' } });
+    assert.equal(dctx.planEvRefresh_().written, 1); assert.equal(dctx.planEvRefresh_().written, 0);
+    assert.equal(JSON.parse(Object.values(fsDocs).find(d => d.ref && d.ref.stringValue === 'tid:cc').ev.stringValue).eventId, 'ev9');
+    // ---- Cal Backlog: a change publishes gantt/calBacklog; the trigger republishes after 15 min.
+    dctx.Store.calBacklog.add([['u1|2026-11-01', '2026-11-01', 'Old task', '11', '0', 's', '']]);
+    dctx.calBacklogPublishIfDirty_();
+    eq(JSON.parse(fsDocs['gantt/calBacklog'].items.stringValue).map(x => x.title), ['Old task']);
+    assert.equal(vm.runInContext('Store.calBacklog.dirty', dctx), false);
+    vm.runInContext("calBacklogSweep_ = () => ({ swept: 2 }); calBacklogRoll_ = () => {};", dctx);
+    const tick = dctx.calBacklogTick_();
+    assert.equal(tick.swept, 2); assert.equal(JSON.parse(fsDocs['gantt/calBacklog'].sweep.stringValue).swept, 2);
+    console.log('✓ store-test: Focus / Inbox / Plan + Cal Backlog on Firestore (seeds, server saves, device merge = server merge, mirror back, event cache, backlog publish)');
   }
 }

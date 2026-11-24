@@ -236,3 +236,6 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 
 ## Speed plan G — editable local-first opening (2026-11-23, implemented + tested in smoke pwa-hist, not yet tested live)
 - PWA: a new-day open no longer shows the read-only picture and waits on getWorkspaceData; the device's copy (≤ 7 days) is re-dated to today and opened live, then one getSyncState catches up changed days. Expected: time-to-editable on a new day ≈ same-day open. Details: docs/NOTES.md → H5 G.
+
+## Speed plan D2 — Focus, Inbox, Plan + Cal Backlog on Firestore (2026-11-23, implemented + tested in store-test / smoke pwa-d2, not yet tested live)
+- PWA: getFocus / saveFocus (3-way merge on the device, rules check the base version), getInbox + add / update / dismiss, getPlan / planSave, calBacklogSync answer from Firestore. batchCalls (calm return) now only sends what the database can't answer. Expected: opening and coming back no longer wait on Apps Script for these panels; Cal Backlog's sweep moved off the request path to the 5-min trigger. Server cost: Focus / Inbox reads are one Firestore call each; plan event info refreshed by the trigger (≤ 60 calendar lookups per run, writes only changes). Details: docs/NOTES.md → D2.

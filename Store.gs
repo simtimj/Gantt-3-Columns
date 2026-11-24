@@ -14,7 +14,7 @@
    Sheet. Set = the areas in STORE_DB_AREAS_ live in Firestore, and the timed trigger storeMirror() copies them
    into the Sheet (backup mirror) and moves lost edits from Firestore into the Backup tab. */
 const FIREBASE_PROJECT_ = 'gantt-2ee94';
-const STORE_DB_AREAS_ = ['kim', 'days', 'ref', 'kv', 'cal']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
+const STORE_DB_AREAS_ = ['kim', 'days', 'ref', 'kv', 'cal', 'focus', 'inbox', 'plan']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
 const STORE_BACKEND = {
   kim: 'sheet',
   days: 'sheet',
@@ -25,6 +25,8 @@ const STORE_BACKEND = {
   timer: 'sheet',
   kv: 'properties',
   cal: 'sheet', // calendar copy (H5 B2): off = the app reads Google Calendar through the server, as before
+  focus: 'properties', // D2: Focus list doc ganttFocus/main
+  inbox: 'properties', // D2: Inbox docs ganttInbox/<id>
   props: 'properties'
   // calBacklog, timer, props, study, logs: still direct, moving in this order
 };
@@ -32,7 +34,7 @@ const STORE_BACKEND = {
 if (FIREBASE_PROJECT_) STORE_DB_AREAS_.forEach(a => { STORE_BACKEND[a] = 'db'; });
 // Archive = Reference cards marked deleted in the same docs (NOTES H5 C), so it follows Reference.
 if (STORE_BACKEND.ref === 'db') STORE_BACKEND.archive = 'db';
-const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true, kv: true, cal: true };
+const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true, kv: true, cal: true, focus: true, inbox: true, plan: true };
 
 function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
@@ -133,6 +135,16 @@ const StoreFs = {
     }
   },
   list(coll) { return ((this.req_('get', coll + '?pageSize=100') || {}).documents || []).map(d => this.dec_(d)); },
+  // Every doc of a collection (pages of 300).
+  listAll(coll) {
+    let out = [], tok = '';
+    for (let i = 0; i < 50; i++) {
+      const r = this.req_('get', coll + '?pageSize=300' + (tok ? '&pageToken=' + encodeURIComponent(tok) : '')) || {};
+      out = out.concat((r.documents || []).map(d => this.dec_(d)));
+      if (!(tok = r.nextPageToken)) break;
+    }
+    return out;
+  },
   del(path) { this.req_('delete', path); }
 };
 
@@ -704,9 +716,14 @@ const Store = {
   /* Daily plan (Big Three / Stretch / Next / Backlog). Record = { id, date, group, rank, ref, title, target, event,
      updated, ref_ }. Sheet: tab "Plan" (all text). Schedule links (task → its calendar event) live in script
      properties planEv:<tid>. */
+  /* Plan (Big Three / Waiting / Backlog rows). D2 (2026-11-23): on the database (area 'plan') each row is doc
+     ganttPlan/<id> = { id, date, group, rank, ref, title, target, event, updated, del (1 = removed), ev (JSON of the
+     linked event's live info, refreshed by the trigger: Code.gs planEvRefresh_), at, up, dev }; ref_ = the id. The app
+     reads / edits the docs itself; the Plan tab is the backup mirror (rewritten by the trigger when it differs). */
   plan: {
+    COLL: 'ganttPlan',
+    db_() { return storeBackend_('plan') === 'db'; },
     sheet_(create) {
-      storeBackend_('plan');
       const ss = ss_();
       let sh = ss.getSheetByName(PLAN_SHEET);
       if (!sh && create !== false) {
@@ -717,9 +734,10 @@ const Store = {
       }
       return sh;
     },
-    exists() { return !!this.sheet_(false); },
-    list() {
-      const sh = this.sheet_();
+    exists() { return this.db_() ? true : !!this.sheet_(false); },
+    sheetList_(create) {
+      const sh = this.sheet_(create);
+      if (!sh) return [];
       const n = sh.getLastRow() - 1;
       if (n < 1) return [];
       const tz = Session.getScriptTimeZone();
@@ -730,22 +748,153 @@ const Store = {
         title: String(r[5] || ''), target: String(r[6] || ''), event: String(r[7] || ''), updated: String(r[8] || '')
       })).filter(x => x.ref && PLAN_GROUPS[x.group] !== undefined);
     },
+    docs_() { return StoreFs.listAll(this.COLL); },
+    row_(d) {
+      return { ref_: String(d.id || d.id_), id: String(d.id || d.id_), date: String(d.date || ''), group: String(d.group || '').toLowerCase(),
+        rank: Number(d.rank) || 0, ref: String(d.ref || ''), title: String(d.title || ''), target: String(d.target || ''),
+        event: String(d.event || ''), updated: String(d.updated || ''), at_: Number(d.at) || 0 };
+    },
+    // First database read: copy the Plan tab in once (at = 1, so any real edit beats it).
+    seed_() {
+      if (Store.props.getProperty('planSeeded') === '1') return 0;
+      const have = {}; this.docs_().forEach(d => { have[d.id || d.id_] = 1; });
+      const list = this.sheetList_(false).filter(x => x.id && !have[x.id]).map(x => [this.COLL + '/' + x.id,
+        { id: x.id, date: x.date, group: x.group, rank: x.rank, ref: x.ref, title: x.title, target: x.target, event: x.event, updated: x.updated, del: 0, at: 1, up: new Date(1000), dev: 'server' }]);
+      if (list.length) StoreFs.patchMany(list);
+      StoreFs.set('gantt/planMeta', { seeded: Date.now(), cal: String(typeof EVENT_CALENDARS !== 'undefined' ? EVENT_CALENDARS[0] : ''), at: Date.now() });
+      Store.props.setProperty('planSeeded', '1');
+      return list.length;
+    },
+    list() {
+      if (!this.db_()) return this.sheetList_();
+      this.seed_();
+      return this.docs_().filter(d => !Number(d.del)).map(d => this.row_(d)).filter(x => x.ref && PLAN_GROUPS[x.group] !== undefined);
+    },
+    stamp_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'); },
     // Insert or update (x.ref_ set = existing). Stamps Updated.
     write(x) {
+      x.updated = this.stamp_();
+      if (this.db_()) {
+        const at = Math.max(Date.now(), (Number(x.at_) || 0) + 1);
+        StoreFs.patch(this.COLL + '/' + x.id, { id: x.id, date: x.date || '', group: x.group, rank: Number(x.rank) || 0, ref: x.ref, title: x.title || '',
+          target: x.target || '', event: x.event || '', updated: x.updated, del: 0, at: at, up: new Date(at), dev: 'server' });
+        x.at_ = at; x.ref_ = x.id;
+        return;
+      }
       const sh = this.sheet_();
-      const vals = [[x.id, x.date || '', x.group, String(x.rank || 0), x.ref, x.title || '', x.target || '', x.event || '',
-        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')]];
+      const vals = [[x.id, x.date || '', x.group, String(x.rank || 0), x.ref, x.title || '', x.target || '', x.event || '', x.updated]];
       if (x.ref_) sh.getRange(x.ref_, 1, 1, PLAN_HEAD.length).setValues(vals);
       else { sh.appendRow(vals[0]); x.ref_ = sh.getLastRow(); }
     },
     // Remove one row; others in `rows` (from list()) keep valid handles.
     remove(x, rows) {
+      if (this.db_()) {
+        const at = Math.max(Date.now(), (Number(x.at_) || 0) + 1);
+        StoreFs.patch(this.COLL + '/' + x.id, { del: 1, at: at, up: new Date(at), dev: 'server' });
+        return;
+      }
       const at = x.ref_;
       this.sheet_().deleteRow(at);
       (rows || []).forEach(r => { if (r.ref_ > at) r.ref_--; });
     },
+    // Event info cache (trigger): [[id, evJson], …] → only the ev field changes (no `at`, so app edits still win).
+    setEv(list) { if (list.length) StoreFs.patchMany(list.map(x => [this.COLL + '/' + x[0], { ev: x[1] }])); },
+    // Trigger: Plan tab = the live rows (rewritten only when different).
+    mirror() {
+      if (!this.db_()) return 0;
+      this.seed_();
+      const rows = this.list().sort((a, b) => (a.group < b.group ? -1 : a.group > b.group ? 1 : 0) || a.rank - b.rank)
+        .map(x => [x.id, x.date, x.group, String(x.rank || 0), x.ref, x.title, x.target, x.event, x.updated]);
+      const sh = this.sheet_(rows.length > 0);
+      if (!sh) return 0;
+      const n = sh.getLastRow() - 1;
+      const cur = (n > 0 ? sh.getRange(2, 1, n, PLAN_HEAD.length).getDisplayValues() : []).filter(r => r[0]);
+      if (JSON.stringify(cur) === JSON.stringify(rows)) return 0;
+      const out = rows.concat(Array.from({ length: Math.max(0, n - rows.length) }, () => PLAN_HEAD.map(() => ''))); // blanks over left-over rows
+      if (out.length) sh.getRange(2, 1, out.length, PLAN_HEAD.length).setValues(out);
+      return rows.length;
+    },
     link(tid) { return PropertiesService.getScriptProperties().getProperty('planEv:' + tid); },
     setLink(tid, link) { PropertiesService.getScriptProperties().setProperty('planEv:' + tid, link); }
+  },
+
+  /* Focus list (D2, 2026-11-23): doc ganttFocus/main = { v (the list as JSON), at, base (the `at` it was edited
+     from), up, dev }. The app merges on the device (same 3-way merge as Code.gs mergeFocus_) and the rules refuse a
+     write whose base isn't the stored `at`, so two devices never overwrite each other blind. The script properties
+     stay the backup copy (Code.gs focusMirror_, from the trigger). */
+  focus: {
+    PATH: 'ganttFocus/main',
+    db_() { return storeBackend_('focus') === 'db'; },
+    get() {
+      if (!this.db_()) return null;
+      try { return StoreFs.get(this.PATH); } catch (e) { console.error('focus read: ' + e.message); return null; }
+    },
+    put(text, prevAt, seed) {
+      if (!this.db_()) return 0;
+      const at = seed ? 1 : Math.max(Date.now(), (Number(prevAt) || 0) + 1);
+      StoreFs.set(this.PATH, { v: String(text), at: at, base: Number(prevAt) || 0, up: new Date(seed ? 1000 : at), dev: 'server' });
+      Store.props.setProperty('focusAt', String(at));
+      return at;
+    },
+    mirror() { return this.db_() && typeof focusMirror_ === 'function' ? focusMirror_() : 0; }
+  },
+
+  /* Inbox (D2, 2026-11-23): one doc per item ganttInbox/<id> = { id, from ('app' | 'claude'), title, details, added,
+     arch, done (0/1), gone (1 = dismissed / deleted), ord (claude: its place in inbox.js; app: added-at ms), at, up, dev }.
+     Seeded once from the user properties; the trigger copies new CLAUDE_INBOX items in and rewrites the properties
+     (inboxItems / inboxDone / inboxOver = the backup copy) from the docs. */
+  inbox: {
+    COLL: 'ganttInbox',
+    db_() { return storeBackend_('inbox') === 'db' && Store.props.getProperty('inboxSeeded') === '1'; },
+    on_() { return storeBackend_('inbox') === 'db'; },
+    list() { return StoreFs.listAll(this.COLL); },
+    put(id, fields, prevAt) {
+      const at = Math.max(Date.now(), (Number(prevAt) || 0) + 1);
+      const rec = Object.assign({ id: String(id) }, fields, { at: at, up: new Date(at), dev: 'server' });
+      StoreFs.patch(this.COLL + '/' + encodeURIComponent(String(id)), rec);
+      return rec;
+    },
+    claude_() { return (typeof CLAUDE_INBOX !== 'undefined' && Array.isArray(CLAUDE_INBOX)) ? CLAUDE_INBOX.filter(x => x && x.id) : []; },
+    docFrom_(x, from, ord, over, gone) {
+      const o = Object.assign({}, x, over || {});
+      return { id: String(x.id), from: from, title: String(o.title || ''), details: String(o.details || ''), added: String(o.added || ''),
+        arch: String(o.arch || ''), done: o.done ? 1 : 0, gone: gone ? 1 : 0, ord: ord };
+    },
+    seed_() {
+      if (!this.on_() || Store.props.getProperty('inboxSeeded') === '1') return 0;
+      const u = Store.userProps, j = (k, d) => { try { const v = u.getProperty(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+      const mine = j('inboxItems', []), done = j('inboxDone', []), over = j('inboxOver', {}), have = {};
+      this.list().forEach(d => { have[d.id || d.id_] = 1; });
+      const list = [];
+      this.claude_().forEach((x, i) => { if (!have[x.id]) list.push(this.docFrom_(x, 'claude', i, over[String(x.id)], done.indexOf(String(x.id)) >= 0)); });
+      mine.forEach((x, i) => { if (x && x.id && !have[x.id]) list.push(this.docFrom_(x, 'app', Number(String(x.id).replace(/^a/, '')) || i, null, false)); });
+      if (list.length) StoreFs.patchMany(list.map(d => [this.COLL + '/' + encodeURIComponent(d.id), Object.assign(d, { at: 1, up: new Date(1000), dev: 'server' })]));
+      StoreFs.set('gantt/inboxMeta', { seeded: Date.now(), at: Date.now() });
+      Store.props.setProperty('inboxSeeded', '1');
+      return list.length;
+    },
+    // Trigger: seed once, copy new Claude items in, rewrite the property backup from the docs.
+    mirror() {
+      if (!this.on_()) return 0;
+      const seeded = this.seed_();
+      const docs = this.list(), have = {};
+      docs.forEach(d => { have[d.id] = d; });
+      const add = [];
+      this.claude_().forEach((x, i) => { if (!have[x.id]) { const d = this.docFrom_(x, 'claude', i, null, false); add.push(d); docs.push(d); } });
+      if (add.length) StoreFs.patchMany(add.map(d => [this.COLL + '/' + encodeURIComponent(d.id), Object.assign(d, { at: Date.now(), up: new Date(), dev: 'server' })]));
+      const items = docs.filter(d => d.from === 'app' && !Number(d.gone)).sort((a, b) => a.ord - b.ord).map(d => {
+        const o = { id: d.id, title: d.title || '', details: d.details || '', added: d.added || '' };
+        if (d.arch) o.arch = d.arch; if (Number(d.done)) o.done = true;
+        return o;
+      });
+      const doneIds = docs.filter(d => d.from === 'claude' && Number(d.gone)).map(d => d.id);
+      const over = {};
+      docs.filter(d => d.from === 'claude' && !Number(d.gone)).forEach(d => { over[d.id] = { title: d.title || '', details: d.details || '', arch: d.arch || '', done: !!Number(d.done) }; });
+      const want = { inboxItems: JSON.stringify(items), inboxDone: JSON.stringify(doneIds.slice(-300)), inboxOver: JSON.stringify(over) }, cur = Store.userProps.getProperties(), set = {};
+      Object.keys(want).forEach(k => { if (cur[k] !== want[k]) set[k] = want[k]; });
+      if (Object.keys(set).length) Store.userProps.setProperties(set);
+      return seeded + add.length;
+    }
   },
 
   /* Calendar backlog (swept past all-day tasks). Rows are tuples of display text
@@ -773,8 +922,20 @@ const Store = {
       if (!tuples.length) return;
       const sh = this.sheet_();
       sh.getRange(sh.getLastRow() + 1, 1, tuples.length, CAL_BACKLOG_HEAD.length).setValues(tuples);
+      this.dirty = true;
     },
-    setPlaced(index, value) { this.sheet_().getRange(index + 2, 7).setValue(value); }
+    setPlaced(index, value) { this.sheet_().getRange(index + 2, 7).setValue(value); this.dirty = true; },
+    // D2: the open list as doc gantt/calBacklog = { items (JSON, calBacklogSync's shape), sweep (JSON, last sweep that
+    // moved something: { swept, at }), at, up }, written by Code.gs calBacklogPublish_ after a change and by the trigger.
+    dirty: false,
+    publish(items, sweep) {
+      if (storeBackend_('plan') !== 'db') return false;
+      const now = Date.now(), rec = { items: JSON.stringify(items || []), at: now, up: new Date(now) };
+      if (sweep && sweep.swept) rec.sweep = JSON.stringify({ swept: sweep.swept, at: now });
+      StoreFs.patch('gantt/calBacklog', rec);
+      this.dirty = false;
+      return true;
+    }
   },
 
   /* Block timer events (Timer.gs). Tuples [op, date, at, action, block, item, name, value, device];
@@ -953,8 +1114,10 @@ const Store = {
     if (!storeDbReady_()) return { off: true, reason: 'database not reachable' };
     return storeLocked_(() => {
       const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), ref: Store.ref.mirror(), kv: Store.kv.mirror(), backups: 0 };
+      // D2: Focus, Inbox, Plan (each guarded: one failing area never stops the others).
+      ['focus', 'inbox', 'plan'].forEach(a => { try { out[a] = Store[a].mirror(); } catch (e) { out[a] = 'error: ' + e.message; console.error(a + ' mirror: ' + e.message); } });
       StoreFs.list('ganttBackup').forEach(b => {
-        const where = b.area === 'kim' ? Store.kim.SHEET : b.area === 'days' && b.date ? b.date : b.area === 'ref' && b.card ? 'Reference ' + b.card : 'Database: ' + b.area;
+        const where = b.area === 'focus' ? 'Focus' : b.area === 'kim' ? Store.kim.SHEET : b.area === 'days' && b.date ? b.date : b.area === 'ref' && b.card ? 'Reference ' + b.card : 'Database: ' + b.area;
         const col = b.area === 'kim' ? 'A2' : b.area === 'days' ? (Store.days.LABEL[b.field] || b.field || '') : b.area === 'ref' ? 'Content' : '';
         backupCell_(where, col, (b.reason || 'lost edit') + (b.dev ? ' · ' + b.dev : ''), b.html || '');
         StoreFs.del('ganttBackup/' + b.id_);
@@ -970,6 +1133,9 @@ function storeMirror() {
   try { console.log(JSON.stringify(Store.mirror())); } catch (e) { console.error('storeMirror: ' + e.message); }
   // Calendar copy (H5 B2): outside the script lock (a calendar read takes a few seconds; saves shouldn't wait).
   try { if (typeof calCopySync_ === 'function') console.log(JSON.stringify({ cal: calCopySync_() })); } catch (e) { console.error('calendar copy: ' + e.message); }
+  // D2: Cal Backlog sweep + roll run here (not on opening) and publish the list; Plan rows get their event info.
+  try { if (typeof calBacklogTick_ === 'function') console.log(JSON.stringify({ backlog: calBacklogTick_() })); } catch (e) { console.error('backlog: ' + e.message); }
+  try { if (typeof planEvRefresh_ === 'function') console.log(JSON.stringify({ planEv: planEvRefresh_() })); } catch (e) { console.error('plan events: ' + e.message); }
 }
 
 /* Run once from the editor after FIREBASE_PROJECT_ is set (docs/NOTES.md → "H3"): asks for the new permissions

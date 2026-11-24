@@ -1100,7 +1100,40 @@ function focusGenerationText_(all, head) {
   if (raw.length !== head.len || cellHash_(raw) !== head.h) fail();
   return raw;
 }
+/* D2 (2026-11-23): on the database, the Focus list is doc ganttFocus/main (Store.focus); the properties below stay
+   the backup copy. readFocus_ / writeFocus_ keep their contract (read → list, write → saved), so saveFocus, the
+   recovery tools and the tests don't change. */
+let focusDocAt__ = 0;
 function readFocus_() {
+  const d = Store.focus.get();
+  if (d && d.v) {
+    try { const v = JSON.parse(d.v); if (v && Array.isArray(v.cats)) { focusDocAt__ = Number(d.at) || 0; return v; } } catch (e) {}
+    console.error('Focus doc unreadable; using the property copy');
+  }
+  focusDocAt__ = d ? Number(d.at) || 0 : 0;
+  return readFocusProps_();
+}
+function writeFocus_(data) {
+  writeFocusProps_(data);
+  if (Store.focus.db_()) {
+    try { focusDocAt__ = Store.focus.put(JSON.stringify(data || { v: 1, cats: [] }), focusDocAt__); }
+    catch (e) { console.error('Focus doc not saved: ' + e.message); }
+  }
+  return true;
+}
+// Trigger (Store.mirror): seed the doc once from the properties; afterwards copy a newer doc (app edit) into them.
+function focusMirror_() {
+  const d = Store.focus.get();
+  if (!d) { Store.focus.put(JSON.stringify(readFocusProps_()), 0, true); return 'seeded'; }
+  const at = Number(d.at) || 0, have = Number(Store.props.getProperty('focusAt')) || 0;
+  if (at <= have) return 0;
+  const v = JSON.parse(d.v);
+  if (!v || !Array.isArray(v.cats)) throw new Error('Focus doc unreadable');
+  writeFocusProps_(v);
+  Store.props.setProperty('focusAt', String(at));
+  return 1;
+}
+function readFocusProps_() {
   const sp = Store.props, all = sp.getProperties();
   let raw = '';
   try {
@@ -1203,7 +1236,7 @@ function saveFocus(data, opts) {
   } finally { lock.releaseLock(); }
 }
 
-function writeFocus_(data) {
+function writeFocusProps_(data) {
   const json = JSON.stringify(data || { v: 1, cats: [] });
   if (json.length > 200000) throw new Error('Focus data too big (' + json.length + ' chars)');
   const sp = Store.props;
@@ -1294,7 +1327,28 @@ function saveNewThings(data) {
     return out;
   } finally { lock.releaseLock(); }
 }
+/* D2 (2026-11-23): on the database every item is a doc (Store.inbox); the user properties are the backup copy the
+   trigger rewrites. Claude items not copied in yet (inbox.js changed < 5 min ago) are shown from inbox.js. */
+function inboxOut_(x) {
+  return { id: String(x.id), title: String(x.title || ''), details: String(x.details || ''), added: String(x.added || ''),
+    from: x.from, arch: String(x.arch || ''), done: !!(x.done && Number(x.done) !== 0) };
+}
+function inboxFromDocs_(docs) {
+  const have = {};
+  docs.forEach(d => { have[d.id] = 1; });
+  const extra = Store.inbox.claude_().map((x, i) => have[x.id] ? null : Store.inbox.docFrom_(x, 'claude', i, null, false)).filter(Boolean);
+  return docs.concat(extra).filter(d => !Number(d.gone))
+    .sort((a, b) => (a.from === 'claude' ? 0 : 1) - (b.from === 'claude' ? 0 : 1) || (Number(a.ord) || 0) - (Number(b.ord) || 0))
+    .map(inboxOut_);
+}
+function inboxDoc_(id) {
+  const docs = Store.inbox.list(), d = docs.find(x => x.id === id);
+  if (d) return d;
+  const i = Store.inbox.claude_().findIndex(x => String(x.id) === id);
+  return i >= 0 ? Object.assign(Store.inbox.docFrom_(Store.inbox.claude_()[i], 'claude', i, null, false), { at: 0 }) : null;
+}
 function getInbox() {
+  if (Store.inbox.db_()) return inboxFromDocs_(Store.inbox.list());
   // These three fields belong to the same user settings store. Read them once
   // per response; keep individual-read fallback if the bulk read is unavailable.
   let settings = null;
@@ -1318,6 +1372,15 @@ function updateInboxItem(id, fields) {
   const pick = {};
   ['title', 'details', 'arch'].forEach(k => { if (k in fields) pick[k] = String(fields[k] || '').slice(0, 4000); });
   if ('done' in fields) pick.done = !!fields.done;
+  if (Store.inbox.db_()) {
+    const d = inboxDoc_(id);
+    if (d) {
+      const f = Object.assign({}, pick); if ('done' in f) f.done = f.done ? 1 : 0;
+      if (!d.at) Object.assign(f, { from: d.from, title: 'title' in f ? f.title : d.title, details: 'details' in f ? f.details : d.details, added: d.added, ord: d.ord, gone: 0 });
+      Store.inbox.put(id, f, d.at);
+    }
+    return getInbox();
+  }
   const lock = LockService.getUserLock();
   lock.waitLock(10000);
   try {
@@ -1336,6 +1399,11 @@ function addInboxItem(title, details) {
   title = String(title || '').trim();
   details = String(details || '').trim();
   if (!title && !details) return getInbox();
+  if (Store.inbox.db_()) {
+    const now = Date.now();
+    Store.inbox.put('a' + now, { from: 'app', title: title, details: details, added: todayString_(), arch: '', done: 0, gone: 0, ord: now }, 0);
+    return getInbox();
+  }
   const lock = LockService.getUserLock();
   lock.waitLock(10000);
   try {
@@ -1347,6 +1415,11 @@ function addInboxItem(title, details) {
 }
 function dismissInboxItem(id) {
   id = String(id || '');
+  if (Store.inbox.db_()) {
+    const d = inboxDoc_(id);
+    if (d) Store.inbox.put(id, d.at ? { gone: 1 } : { from: d.from, title: d.title, details: d.details, added: d.added, ord: d.ord, gone: 1 }, d.at);
+    return getInbox();
+  }
   const lock = LockService.getUserLock();
   lock.waitLock(10000);
   try {
@@ -3428,12 +3501,41 @@ function calBacklogSync() {
   let sweep = {};
   try { sweep = calBacklogSweep_(); } catch (e) { console.error('calBacklogSweep_: ' + e); sweep = { error: String(e.message || e) }; }
   try { calBacklogRoll_(); } catch (e) { console.error('calBacklogRoll_: ' + e); }
-  return { items: calBacklogList_(), sweep: sweep };
+  const items = calBacklogList_();
+  try { if (Store.calBacklog.dirty || sweep.swept) Store.calBacklog.publish(items, sweep); } catch (e) { console.error('backlog publish: ' + e.message); }
+  return { items: items, sweep: sweep };
+}
+/* D2 (2026-11-23): the app reads the open backlog from doc gantt/calBacklog. Every change publishes it; the 5-min
+   trigger runs the sweep + roll (so opening never waits on them) and republishes at least every 15 min. */
+function calBacklogPublishIfDirty_() {
+  try { if (Store.calBacklog.dirty) Store.calBacklog.publish(calBacklogList_()); } catch (e) { console.error('backlog publish: ' + e.message); }
+}
+function calBacklogTick_() {
+  if (!Store.plan.db_()) return { off: true };
+  const r = calBacklogSync(), last = Number(Store.props.getProperty('calBacklogPub')) || 0;
+  if (Date.now() - last > 15 * 60000) { Store.calBacklog.publish(r.items); }
+  Store.props.setProperty('calBacklogPub', String(Date.now()));
+  return { items: r.items.length, swept: r.sweep && r.sweep.swept || 0 };
+}
+/* D2: each Plan row's linked event info (getPlan's `ev`) cached on its doc, so the app has it without a calendar
+   read; the app prefers the calendar copy when the event is in it. Only changed ones are written. */
+function planEvRefresh_() {
+  if (!Store.plan.db_()) return { off: true };
+  const docs = Store.plan.docs_().filter(d => !Number(d.del) && d.event).slice(0, 60), list = [];
+  docs.forEach(d => {
+    const ev = planEventInfo_(d.event), txt = JSON.stringify(ev);
+    if (txt !== String(d.ev || '')) list.push([d.id || d.id_, txt]);
+  });
+  Store.plan.setEv(list);
+  return { rows: docs.length, written: list.length };
 }
 // Drop onto a day: MOVE the real ↪ event there (strip "↪ ", its own color kept — 2026-11-13) and mark
 // the row placed (or 'dropped' when cleared, which also deletes the ↪ event). Falls back to a new event if the
 // original is gone. 2026-11-12, Julius.
 function calBacklogPlace(req) {
+  try { return calBacklogPlace__(req); } finally { calBacklogPublishIfDirty_(); }
+}
+function calBacklogPlace__(req) {
   const r = req || {};
   if (!String(r.id || '')) throw new Error('Missing backlog id');
   const lock = LockService.getScriptLock();
@@ -3445,6 +3547,9 @@ function calBacklogPlace(req) {
 // Bulk send (2026-11-15, Julius: "select a bunch at once, then send"): one lock and one sheet read for the batch.
 // Returns {ok, done: [ids], failed: [{id, error}]} — one bad row doesn't stop the rest.
 function calBacklogPlaceMany(reqs) {
+  try { return calBacklogPlaceMany__(reqs); } finally { calBacklogPublishIfDirty_(); }
+}
+function calBacklogPlaceMany__(reqs) {
   const list = (Array.isArray(reqs) ? reqs : []).filter(r => r && r.id).slice(0, 100);
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -3507,6 +3612,9 @@ function calBacklogPlaceIn_(r, rows) {
    - delete: the event is removed, row marked 'deleted', nothing logged.
    The client holds the call ~6 s for Undo, so the server never needs to reverse it. */
 function calBacklogComplete(req) {
+  try { return calBacklogComplete__(req); } finally { calBacklogPublishIfDirty_(); }
+}
+function calBacklogComplete__(req) {
   const r = req || {}, id = String(r.id || ''), mode = r.mode === 'delete' ? 'delete' : 'archive';
   if (!id) throw new Error('Missing backlog id');
   const tz = Session.getScriptTimeZone();

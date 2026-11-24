@@ -3720,6 +3720,177 @@ if (only('pwa-cal')) {
 }
 // One calm return (2026-11-21, speed item M; batched 2026-11-23, speed plan E): coming back runs ONE queue — registered
 // jobs in order, their reads in one batchCalls, skipping ones refreshed < 60 s ago; Speed Log 'resume' row only when something ran.
+// D2 (2026-11-23): Focus (device merge, base check), Inbox (offline too), Plan + Cal Backlog from the database; batched reads split.
+if (only('pwa-d2')) {
+  const { execFileSync } = await import('child_process');
+  const http = await import('http');
+  const dist = path.join(os.tmpdir(), 'gantt-pwa-d2-smoke');
+  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['focus', 'inbox', 'plan'], apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
+  execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
+  const FAKE = `if (!window.firebase) window.firebase = (function () {
+    const now = Date.now();
+    const S = window.__fs = { refuseOnce: 0, writes: [], backups: [],
+      docs: {
+        'ganttFocus/main': { v: JSON.stringify({ v: 1, cats: [{ id: 'c1', name: 'Work', items: [{ id: 'i1', t: 'One' }] }] }), at: 10, base: 0 },
+        'gantt/inboxMeta': { seeded: 1 }, 'gantt/planMeta': { seeded: 1, cal: 'main' },
+        'ganttInbox/ai1': { id: 'ai1', from: 'claude', title: 'From Claude', details: '', added: '2026-11-20', arch: '', done: 0, gone: 0, ord: 0, at: 1 },
+        'ganttInbox/ai2': { id: 'ai2', from: 'claude', title: 'Gone', gone: 1, ord: 1, at: 1 },
+        'ganttInbox/a100': { id: 'a100', from: 'app', title: 'Mine', details: 'd', added: '2026-11-21', arch: '', done: 0, gone: 0, ord: 100, at: 1 },
+        'ganttPlan/p1': { id: 'p1', date: '', group: 'big', rank: 1, ref: 'tid:aa', title: 'One', target: '', event: 'ev1@100', updated: '', del: 0, at: 1,
+          ev: JSON.stringify({ eventId: 'ev1', startMs: 100, title: 'Ev', done: false, date: '2026-11-23', allDay: true, recurring: false, time: '' }) },
+        'ganttPlan/p2': { id: 'p2', date: '', group: 'next', rank: 1, ref: 'tid:bb', title: 'Two', target: '', event: '', updated: '', del: 0, at: 1 },
+        'ganttPlan/p0': { id: 'p0', date: '', group: 'next', rank: 2, ref: 'tid:zz', title: 'Removed', del: 1, at: 1 },
+        'gantt/calBacklog': { items: JSON.stringify([{ id: 'u1', date: '2026-11-01', title: 'Old task', colorId: '11', urg: '0', color: '#f00' }]),
+          sweep: JSON.stringify({ swept: 2, at: now }), at: now - Number(localStorage.getItem('fake.blAge') || 0) } } };
+    const snap = (id, d) => ({ id, exists: !!d, data: () => d && JSON.parse(JSON.stringify(d)) });
+    const refuse = () => Promise.reject(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    function docRef(coll, id) {
+      const k = coll + '/' + id;
+      return {
+        get: () => Promise.resolve(snap(id, S.docs[k])),
+        set: (rec, o) => {
+          const cur = S.docs[k];
+          if (cur && !(rec.at > cur.at)) return refuse();
+          if (coll === 'ganttFocus' && cur && rec.base !== cur.at) return refuse();
+          if (coll === 'ganttFocus' && S.refuseOnce) { S.refuseOnce--; S.docs[k] = Object.assign({}, cur, { at: cur.at + 1 }); return refuse(); } // someone saved in between
+          S.docs[k] = o && o.merge && cur ? Object.assign({}, cur, rec) : Object.assign({}, rec);
+          S.writes.push(k);
+          return Promise.resolve();
+        },
+        onSnapshot: () => () => {}
+      };
+    }
+    const collRef = n => ({ doc: id => docRef(n, id), add: r => { S.backups.push(r); return Promise.resolve(); },
+      get: () => Promise.resolve({ docs: Object.keys(S.docs).filter(k => k.startsWith(n + '/')).map(k => snap(k.slice(n.length + 1), S.docs[k])) }),
+      where: () => ({ onSnapshot: () => () => {} }), onSnapshot: () => () => {} });
+    const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com' }), 0), signOut: () => {} });
+    auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
+    const firestore = () => ({ enablePersistence: () => Promise.resolve(), collection: collRef });
+    firestore.FieldValue = { serverTimestamp: () => Date.now() };
+    return { initializeApp: () => {}, auth, firestore };
+  })();`;
+  const srv = http.createServer((qq, r) => {
+    let f = decodeURIComponent(new URL(qq.url, 'http://x').pathname); if (f.endsWith('/')) f += 'index.html';
+    if (f.startsWith('/fb/')) { r.writeHead(200, { 'Content-Type': 'text/javascript' }); return r.end(FAKE); }
+    const fp = path.join(dist, f);
+    if (!fp.startsWith(dist) || !fs.existsSync(fp)) { r.writeHead(404); return r.end(); }
+    r.writeHead(200, { 'Content-Type': f.endsWith('.html') ? 'text/html' : 'text/javascript' }); r.end(fs.readFileSync(fp));
+  });
+  await new Promise(ok => srv.listen(0, '127.0.0.1', ok));
+  const base = 'http://127.0.0.1:' + srv.address().port + '/';
+  const errs = [], calls = [], batches = [];
+  const ctx = await b.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, timezoneId: 'America/Los_Angeles', serviceWorkers: 'block' });
+  await ctx.route('https://api.test/**', route => {
+    const req = JSON.parse(route.request().postData() || '{}'); calls.push(req.fn);
+    if (req.fn === 'batchCalls') batches.push(req.a[0].map(c => c[0]));
+    const one = fn => fn === 'getWorkspaceData' ? data : fn === 'getSyncState' ? { build: 'smoke', ref: {}, inbox: [], days: {} } : fn === 'getFocus' ? focus
+      : fn === 'getPlan' ? { date: today, cal: 'main', items: [], srv: 1 } : fn === 'calBacklogSync' ? { items: [], sweep: {}, srv: 1 } : fn === 'getInbox' ? [] : fn === 'getMainCalendarEvents' ? { date: today, events: [] }
+      : fn === 'getCalendarRange' ? { events: [], calendars: [], failed: [], via: 'api' } : fn === 'getTimerEvents' ? [] : null;
+    const r = req.fn === 'batchCalls' ? req.a[0].map(c => ({ ok: true, r: one(c[0]) })) : one(req.fn);
+    route.fulfill({ contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ ok: true, r }) });
+  });
+  const pg = await ctx.newPage();
+  pg.on('pageerror', e => errs.push('page error: ' + e.message + (process.env.SMOKE_STACK ? ' ' + e.stack : '')));
+  await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
+  const run = (fn, ...a) => pg.evaluate(([fn, a]) => new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(e => bad(e.message))[fn](...a)), [fn, a]);
+  const fsd = k => pg.evaluate(k => __fs.docs[k], k);
+  // ---- Focus
+  calls.length = 0;
+  const f0 = await run('getFocus');
+  if (calls.includes('getFocus') || !f0 || f0.cats[0].name !== 'Work') errs.push('getFocus not from the doc: ' + JSON.stringify(f0) + ' ' + calls.join());
+  // Another device added an item since this device's base; this device renames the category → both kept.
+  await pg.evaluate(() => { const d = __fs.docs['ganttFocus/main'], v = JSON.parse(d.v); v.cats[0].items.push({ id: 'i2', t: 'Phone add' }); __fs.docs['ganttFocus/main'] = { v: JSON.stringify(v), at: 20, base: 10 }; });
+  const mine = JSON.parse(JSON.stringify(f0)); mine.cats[0].name = 'Work (pc)';
+  const s1 = await run('saveFocus', mine, { base: f0 });
+  const d1 = await fsd('ganttFocus/main'), v1 = JSON.parse(d1.v);
+  if (calls.includes('saveFocus')) errs.push('saveFocus went to the server');
+  if (v1.cats[0].name !== 'Work (pc)' || v1.cats[0].items.length !== 2) errs.push('Focus merge lost an edit: ' + d1.v);
+  if (d1.base !== 20 || !(d1.at > 20)) errs.push('Focus write base/at: ' + JSON.stringify({ at: d1.at, base: d1.base }));
+  if (!s1 || JSON.stringify(s1.data) !== d1.v) errs.push('saveFocus answer ≠ saved list');
+  // Someone saves between this device's read and write → refused (base) → merged again and saved.
+  await pg.evaluate(() => { __fs.refuseOnce = 1; });
+  const mine2 = JSON.parse(JSON.stringify(v1)); mine2.cats[0].items.push({ id: 'i3', t: 'Three' });
+  await run('saveFocus', mine2, { base: v1 });
+  const v2 = JSON.parse((await fsd('ganttFocus/main')).v);
+  if (v2.cats[0].items.length !== 3 || calls.includes('saveFocus')) errs.push('refused Focus save not merged again: ' + JSON.stringify(v2) + ' ' + calls.join());
+  // Same value on both sides changed differently → newer wins, the loser goes to Backup.
+  await pg.evaluate(() => { const d = __fs.docs['ganttFocus/main'], v = JSON.parse(d.v); v.cats[0].items[0].t = 'Phone edit'; __fs.docs['ganttFocus/main'] = { v: JSON.stringify(v), at: d.at + 5, base: d.at }; });
+  const mine3 = JSON.parse(JSON.stringify(v2)); mine3.cats[0].items[0].t = 'PC edit';
+  await run('saveFocus', mine3, { base: v2 }); await pg.waitForTimeout(200);
+  if (!(await pg.evaluate(() => __fs.backups.some(b => b.area === 'focus')))) errs.push('Focus merge loser not backed up');
+  // ---- Inbox
+  calls.length = 0;
+  let inb = await run('getInbox');
+  if (calls.includes('getInbox') || JSON.stringify(inb.map(x => x.id)) !== '["ai1","a100"]') errs.push('getInbox from docs: ' + JSON.stringify(inb) + ' ' + calls.join());
+  inb = await run('addInboxItem', 'New one', '');
+  if (inb.length !== 3 || inb[2].title !== 'New one' || inb[2].from !== 'app') errs.push('addInboxItem: ' + JSON.stringify(inb));
+  inb = await run('updateInboxItem', 'a100', { done: true, title: 'Mine!' });
+  if (!inb[1].done || inb[1].title !== 'Mine!' || (await fsd('ganttInbox/a100')).done !== 1) errs.push('updateInboxItem: ' + JSON.stringify(inb[1]));
+  inb = await run('dismissInboxItem', 'ai1');
+  if (inb.some(x => x.id === 'ai1') || (await fsd('ganttInbox/ai1')).gone !== 1) errs.push('dismissInboxItem');
+  if (calls.some(c => /Inbox/.test(c))) errs.push('Inbox calls reached the server: ' + calls.join());
+  // ---- Plan
+  calls.length = 0;
+  let pl = await run('getPlan', today);
+  if (calls.includes('getPlan') || !pl || pl.srv) errs.push('getPlan not from docs: ' + JSON.stringify(pl));
+  else {
+    if (pl.items.map(x => x.title).join() !== 'One,Two' || pl.cal !== 'main') errs.push('getPlan items: ' + JSON.stringify(pl.items.map(x => x.title)));
+    if (!pl.items[0].ev || pl.items[0].ev.eventId !== 'ev1' || pl.items[1].ev !== null) errs.push('getPlan ev: ' + JSON.stringify(pl.items.map(x => x.ev)));
+  }
+  pl = await run('planSave', { date: today, type: 'upsert', item: { group: 'next', ref: 'tid:cc', title: 'Three' } });
+  const three = pl && pl.items.find(x => x.title === 'Three');
+  if (!three || three.rank !== 2 || calls.includes('planSave')) errs.push('planSave upsert: ' + JSON.stringify(pl));
+  pl = await run('planSave', { date: today, type: 'moveup', doneId: 'p1', upId: 'p2' });
+  if (JSON.stringify(pl.items.filter(x => x.group === 'big').map(x => x.title)) !== '["Two"]' || (await fsd('ganttPlan/p1')).del !== 1) errs.push('planSave moveup: ' + JSON.stringify(pl.items));
+  pl = await run('planSave', { date: today, type: 'order', group: 'next', ids: [three.id] });
+  // A change the device refuses (bad group, Big Three full…) goes to the server, which says why.
+  calls.length = 0;
+  await run('planSave', { date: today, type: 'upsert', item: { group: 'nope', ref: 'tid:dd' } }).catch(() => {});
+  if (!calls.includes('planSave') || (await pg.evaluate(() => Object.values(__fs.docs).some(d => d.ref === 'tid:dd')))) errs.push('bad group: not left to the server');
+  // A linked event the device knows nothing about → saved on the device, the list (only) from the server.
+  calls.length = 0;
+  pl = await run('planSave', { date: today, type: 'upsert', item: { group: 'next', ref: 'tid:ee', title: 'Linked', event: 'new@5' } });
+  if (calls.includes('planSave') || !calls.includes('getPlan') || !pl.srv) errs.push('unknown event: expected device save + server list: ' + calls.join());
+  if (!(await pg.evaluate(() => Object.values(__fs.docs).some(d => d.ref === 'tid:ee')))) errs.push('linked row not saved');
+  // ---- Cal Backlog
+  calls.length = 0;
+  let bl = await run('calBacklogSync');
+  if (calls.includes('calBacklogSync') || !bl || bl.items[0].title !== 'Old task' || !bl.sweep || bl.sweep.swept !== 2) errs.push('calBacklogSync from doc: ' + JSON.stringify(bl));
+  bl = await run('calBacklogSync');
+  if (bl.sweep.swept) errs.push('sweep count shown twice');
+  if (calls.includes('calSyncNow')) errs.push('database backlog read asked for a calendar re-copy');
+  // The trigger caches the linked event's info on the row.
+  await pg.evaluate(() => { const d = Object.values(__fs.docs).find(x => x.ref === 'tid:ee'); d.ev = JSON.stringify({ eventId: 'new', startMs: 5, title: 'L', done: false, date: '2026-11-23', allDay: true, recurring: false, time: '' }); });
+  // ---- Batched reads: the database answers what it can; only the rest goes to the server.
+  batches.length = 0; calls.length = 0;
+  const bo = await run('batchCalls', [['getFocus', []], ['getInbox', []], ['getSyncState', [{}]], ['getPlan', [today]]]);
+  if (!Array.isArray(bo) || bo.length !== 4 || !bo.every(x => x && x.ok)) errs.push('batch answer: ' + JSON.stringify(bo).slice(0, 200));
+  else if (!bo[0].r.cats || !Array.isArray(bo[1].r) || bo[2].r.build !== 'smoke' || bo[3].r.srv) errs.push('batch answers mixed up');
+  if (JSON.stringify(batches) !== '[["getSyncState"]]') errs.push('batch to the server: ' + JSON.stringify(batches) + ' ' + calls.join());
+  // ---- Offline: Focus + Inbox save (queued), Plan read-only; banner says so.
+  await ctx.setOffline(true); await pg.evaluate(() => window.dispatchEvent(new Event('offline'))); await pg.waitForTimeout(200);
+  const banner = await pg.evaluate(() => (document.getElementById('pwaOffline') || {}).textContent || '');
+  if (!/Focus/.test(banner) || !/Inbox/.test(banner)) errs.push('offline banner: ' + banner);
+  calls.length = 0;
+  inb = await run('addInboxItem', 'Offline add', '').catch(e => 'ERR ' + e);
+  if (!Array.isArray(inb) || !inb.some(x => x.title === 'Offline add')) errs.push('offline Inbox add: ' + JSON.stringify(inb));
+  const f3 = await run('getFocus').catch(e => 'ERR ' + e), m4 = JSON.parse(JSON.stringify(f3)); m4.cats[0].name = 'Offline name';
+  const s4 = await run('saveFocus', m4, { base: f3 }).catch(e => 'ERR ' + e);
+  if (!s4 || !s4.data || JSON.parse((await fsd('ganttFocus/main')).v).cats[0].name !== 'Offline name') errs.push('offline Focus save: ' + JSON.stringify(s4).slice(0, 120));
+  await run('planSave', { date: today, type: 'target', id: 'p2', target: 'x' }).catch(() => {});
+  if ((await fsd('ganttPlan/p2')).target === 'x' || !calls.includes('planSave')) errs.push('offline Plan edit was saved on the device');
+  if (calls.some(c => c !== 'planSave')) errs.push('offline: other calls tried the server: ' + calls.join());
+  await ctx.setOffline(false);
+  // ---- Stale backlog doc (trigger stopped) → server.
+  await pg.evaluate(() => localStorage.setItem('fake.blAge', String(30 * 60000)));
+  await pg.reload(); await pg.waitForTimeout(2500);
+  calls.length = 0;
+  bl = await run('calBacklogSync');
+  if (!calls.includes('calBacklogSync') || !bl.srv) errs.push('stale backlog doc did not go to the server');
+  await ctx.close(); srv.close();
+  if (errs.length) { fails += errs.length; console.error('✗ pwa-d2:\n  ' + errs.join('\n  ')); }
+  else console.log('✓ pwa-d2: Focus (device merge, base refusal re-merge, loser backup), Inbox, Plan + Cal Backlog from the database; batch split; offline Focus + Inbox saves, Plan read-only');
+}
 for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
   const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' });
   const pg = await ctx.newPage(), errs = [];

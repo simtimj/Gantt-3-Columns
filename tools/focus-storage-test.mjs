@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { extractFocus } from './focus-recovery.mjs';
-const source = (fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8'));
+const source = (fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8').replace(/const FIREBASE_PROJECT_ = '[^']*';/, "const FIREBASE_PROJECT_ = '';"));
 const clone = v => JSON.parse(JSON.stringify(v));
 const old = {v:1,cats:[{id:'c',name:'Original',items:[{id:'a',t:'Keep this',d:0}]}]};
 const next = {v:1,cats:[{id:'c',name:'Updated',items:[{id:'a',t:'😀日本語 café '.repeat(2800),d:0}]}]};

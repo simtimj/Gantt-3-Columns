@@ -2562,7 +2562,8 @@ function calPanelRangeApi_(from, to, tz) {
             location: it.location || '', desc: calPanelDesc_(it.description), recurring: recurring, link: it.htmlLink || '',
             editable: canEdit,
             sched: !allDay && !!(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_SCHED_TAG] === '1'),
-            ord: allDay ? Number(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_ORD_TAG]) || 0 : 0
+            ord: allDay ? Number(it.extendedProperties && it.extendedProperties.private && it.extendedProperties.private[CAL_ORD_TAG]) || 0 : 0,
+            life: allDay && id === EVENT_CALENDARS[1] // Events calendar = birthdays etc. (2026-11-23)
           });
         });
         token = r.nextPageToken;

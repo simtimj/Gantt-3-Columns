@@ -18,5 +18,5 @@
   "storageBucket": "gantt-2ee94.firebasestorage.app",
   "messagingSenderId": "269617310727",
   "appId": "1:269617310727:web:c78078b8c26e5b915d0ea2",
-  "calFn": ""
+  "calFn": "https://us-west1-gantt-2ee94.cloudfunctions.net/cal"
 }

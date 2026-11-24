@@ -37,6 +37,16 @@ export const cal = onRequest({ region: REGION, serviceAccount: SA, memory: '256M
       try { await api.events.list({ calendarId: id, maxResults: 1, timeMin: new Date().toISOString() }); out[k] = true; } catch (e) { out[k] = 'no (' + (e.code || e.message) + ')'; }
     }
     try { out.copy = (await getFirestore().doc('ganttCal/meta').get()).exists; } catch (e) { out.copy = 'no (' + e.message + ')'; }
+    // Which database parts the Apps Script side has written (exists + how old, minutes).
+    if (req.query.check === '2') {
+      const fdb = getFirestore(), age = d => d.exists ? Math.round((Date.now() - (Number(d.data().at) || 0)) / 60000) : null;
+      for (const p of ['gantt/kim', 'ganttCal/meta', 'gantt/calEvents', 'gantt/planMeta', 'gantt/inboxMeta', 'gantt/timerMeta', 'gantt/calBacklog', 'ganttFocus/main']) {
+        try { const d = await fdb.doc(p).get(); out[p] = d.exists ? 'yes, ' + age(d) + ' min' : 'no'; } catch (e) { out[p] = 'err'; }
+      }
+      for (const c of ['ganttDays', 'ganttRef', 'ganttInbox', 'ganttPlan', 'ganttCal']) {
+        try { out[c] = (await fdb.collection(c).count().get()).data().count; } catch (e) { out[c] = 'err'; }
+      }
+    }
     return res.json(out);
   }
   if (req.method !== 'POST') return res.status(405).json({ ok: false, e: 'POST only' });

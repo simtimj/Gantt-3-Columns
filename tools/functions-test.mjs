@@ -181,3 +181,41 @@ console.log('✓ functions: calendar edits on Cloud Functions (constants = Apps 
   assert.equal((await cal.OPS.setCalendarEventDone(core.MAIN, a.eventId, a.startMs, false)).color, '9');
 }
 console.log('✓ functions J: add all-day task, all-day order, linked rename, color (urgency follows, done keeps Graphite)');
+
+// ---- M: hold-menu fields in gantt/calMeta (transaction-free fake), urgency recolors, color updates the doc
+{
+  const { S, db, cal } = setup();
+  const a = await cal.OPS.calPanelCreateEvent({ title: 'Essay', allDay: true, start: '2026-11-25', end: '2026-11-26' });
+  // not seeded yet → Apps Script does it
+  await assert.rejects(cal.OPS.setCalendarEventMeta(a.eventId, a.startMs, false, { urg: '1' }), e => e.fallback === true);
+  const old = Date.now() - 90 * 864e5;
+  db.D['gantt/calMeta'] = { v: JSON.stringify({ 'calMeta:stale@google.com': { s: old, urg: '2' } }), at: 1 };
+  let r = await cal.OPS.setCalendarEventMeta(a.eventId, a.startMs, false, { urg: '1', due: '2026-11-30', dur: '45', cat: 'code', junk: 'x' });
+  assert.deepEqual(Object.keys(r).filter(k => k !== 'copyAt').sort(), ['cat', 'due', 'dur', 'urg']); assert.ok(r.copyAt);
+  let m = JSON.parse(db.D['gantt/calMeta'].v);
+  assert.deepEqual(m['calMeta:' + a.eventId], { s: a.startMs, urg: '1', due: '2026-11-30', dur: '45', cat: 'code' });
+  assert.equal(m['calMeta:stale@google.com'], undefined, 'older than 60 days dropped');
+  const evA = () => Object.values(S.items).find(i => i.summary === 'Essay');
+  assert.equal(evA().colorId, '11', 'urgency 1 → Tomato');
+  let ce = copyEv(db).find(e => e.id === a.id); assert.deepEqual([ce.urg, ce.due, ce.dur, ce.cat, ce.uc, ce.colorId], ['1', '2026-11-30', '45', 'code', undefined, '11']);
+  // same urgency, new due → no color call
+  const n0 = S.calls.length; await cal.OPS.setCalendarEventMeta(a.eventId, a.startMs, false, { urg: '1', due: '2026-12-01' });
+  assert.equal(S.calls.slice(n0).filter(c => c === 'update' || c === 'patch').length, 0);
+  // done event: urgency change keeps Graphite, saves the color for "not done"
+  await cal.OPS.setCalendarEventDone(core.MAIN, a.eventId, a.startMs, true);
+  await cal.OPS.setCalendarEventMeta(a.eventId, a.startMs, false, { urg: '3' });
+  assert.equal(evA().colorId, '8'); assert.equal(evA().extendedProperties.private.fwPrev, '9');
+  await cal.OPS.setCalendarEventDone(core.MAIN, a.eventId, a.startMs, false); assert.equal(evA().colorId, '9');
+  // cleared → entry removed, color cleared, copy has no urgency
+  await cal.OPS.setCalendarEventMeta(a.eventId, a.startMs, false, {});
+  m = JSON.parse(db.D['gantt/calMeta'].v); assert.equal(m['calMeta:' + a.eventId], undefined); assert.equal(evA().colorId, undefined);
+  ce = copyEv(db).find(e => e.id === a.id); assert.equal(ce.urg, undefined);
+  // repeating: key per occurrence
+  const rs = Date.now() + 864e5;
+  await cal.OPS.setCalendarEventMeta('r9@google.com', rs, true, { cat: 'home' }, 'other@cal');
+  assert.deepEqual(JSON.parse(db.D['gantt/calMeta'].v)['calMeta:r9@google.com:' + rs], { s: rs, cat: 'home' });
+  // color on main now updates the doc itself (no background call)
+  const c = await cal.OPS.calPanelSetColor({ eventId: a.eventId, startMs: a.startMs, colorId: '5' });
+  assert.equal(c.metaSync, undefined); assert.equal(JSON.parse(db.D['gantt/calMeta'].v)['calMeta:' + a.eventId].urg, '2');
+}
+console.log('✓ functions M: hold-menu fields on the database (save, prune, urgency recolor, done keeps Graphite, clear, repeating key, color updates it, not seeded → Apps Script)');

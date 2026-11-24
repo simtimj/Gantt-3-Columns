@@ -4066,6 +4066,9 @@ if (only('pwa-d2')) {
   calls.length = 0;
   fr = await run('calPanelSetColor', { eventId: 'e1@google.com', startMs: 5, colorId: '11' }); await pg.waitForTimeout(300);
   if ('metaSync' in fr || fr.colorId !== '11' || !calls.includes('calMetaUrgFromColor') || calls.includes('calPanelSetColor')) errs.push('fn color: urgency sync in the background: ' + JSON.stringify(fr) + ' ' + calls.join());
+  calls.length = 0; fnCalls.length = 0;
+  await run('setCalendarEventMeta', 'e1@google.com', 5, false, { urg: '1' }, 'main');
+  if (!fnCalls.some(x => /^setCalendarEventMeta:/.test(x)) || calls.includes('setCalendarEventMeta')) errs.push('hold menu not on the function: ' + fnCalls.join() + ' ' + calls.join());
   fnMode = 'fallback'; calls.length = 0;
   await run('setCalendarEventDone', 'main', 'e1@google.com', 5, true);
   if (!calls.includes('setCalendarEventDone')) errs.push('fn fallback did not go to Apps Script');

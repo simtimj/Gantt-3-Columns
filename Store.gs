@@ -839,6 +839,67 @@ const Store = {
     setLink(tid, link) { PropertiesService.getScriptProperties().setProperty('planEv:' + tid, link); }
   },
 
+  /* Hold-menu fields for calendar events (M, 2026-11-24): urgency / due / length / subject, keyed like Code.gs
+     calMetaKey_ ('calMeta:<eventId>[:<start>]' → { s, urg, due, dur, cat }). On the database: ONE doc gantt/calMeta =
+     { v (the whole map as JSON), at, up, dev } — one read per calendar copy, and the Cloud Function edits it in a
+     transaction. The calMeta:* script properties stay the backup copy (mirror() rewrites them when the doc is newer)
+     and are the seed. Entries for events more than 60 days past are dropped on every write. */
+  calMeta: {
+    PATH: 'gantt/calMeta', PRE: 'calMeta:',
+    db_() { return storeBackend_('cal') === 'db'; },
+    fromProps_() {
+      const all = Store.props.getProperties(), out = {};
+      Object.keys(all).forEach(k => { if (k.indexOf(this.PRE) === 0) try { out[k] = JSON.parse(all[k]); } catch (e) {} });
+      return out;
+    },
+    // The map (seeds the doc from the properties the first time).
+    all() {
+      if (!this.db_()) return this.fromProps_();
+      const d = StoreFs.get(this.PATH);
+      if (d && d.v) { try { return JSON.parse(d.v) || {}; } catch (e) { console.error('calMeta doc unreadable: ' + e.message); return this.fromProps_(); } }
+      const m = this.fromProps_();
+      this.write_(m);
+      return m;
+    },
+    // getProperties-style view (key → JSON text) for the old readers.
+    asProps() { const m = this.all(), out = {}; Object.keys(m).forEach(k => { out[k] = JSON.stringify(m[k]); }); return out; },
+    get(key) { return this.all()[key] || null; },
+    prune_(m) { const cut = Date.now() - 60 * 864e5; Object.keys(m).forEach(k => { if (!(Number(m[k] && m[k].s) >= cut)) delete m[k]; }); return m; },
+    write_(m) {
+      const at = Date.now();
+      StoreFs.set(this.PATH, { v: JSON.stringify(m), at: at, up: new Date(at), dev: 'server' });
+      Store.props.setProperty('calMetaAt', String(at));
+    },
+    // value null / {} = remove. Writes the doc (database) and the property (backup / old pages).
+    put(key, value) {
+      const has = value && Object.keys(value).some(k => k !== 's');
+      if (has) Store.props.setProperty(key, JSON.stringify(value)); else Store.props.deleteProperty(key);
+      if (!this.db_()) { this.pruneProps_(); return; }
+      const m = this.all();
+      if (has) m[key] = value; else delete m[key];
+      this.write_(this.prune_(m));
+      this.pruneProps_();
+    },
+    pruneProps_() {
+      const cut = Date.now() - 60 * 864e5, all = Store.props.getProperties();
+      Object.keys(all).forEach(k => { if (k.indexOf(this.PRE) !== 0) return; try { if (!(JSON.parse(all[k]).s >= cut)) Store.props.deleteProperty(k); } catch (e) { Store.props.deleteProperty(k); } });
+    },
+    // Trigger: a doc the Cloud Function changed → the properties follow (backup copy for old pages).
+    mirror() {
+      if (!this.db_()) return 0;
+      const d = StoreFs.get(this.PATH);
+      if (!d) { this.all(); return 'seeded'; }
+      if (!(Number(d.at) > (Number(Store.props.getProperty('calMetaAt')) || 0))) return 0;
+      let m = {}; try { m = JSON.parse(d.v) || {}; } catch (e) { return 'unreadable'; }
+      const all = Store.props.getProperties(), set = {};
+      Object.keys(all).forEach(k => { if (k.indexOf(this.PRE) === 0 && !m[k]) Store.props.deleteProperty(k); });
+      Object.keys(m).forEach(k => { const v = JSON.stringify(m[k]); if (all[k] !== v) set[k] = v; });
+      if (Object.keys(set).length) Store.props.setProperties(set);
+      Store.props.setProperty('calMetaAt', String(d.at));
+      return Object.keys(set).length;
+    }
+  },
+
   /* Focus list (D2, 2026-11-23): doc ganttFocus/main = { v (the list as JSON), at, base (the `at` it was edited
      from), up, dev }. The app merges on the device (same 3-way merge as Code.gs mergeFocus_) and the rules refuse a
      write whose base isn't the stored `at`, so two devices never overwrite each other blind. The script properties
@@ -1208,7 +1269,7 @@ const Store = {
     return storeLocked_(() => {
       const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), ref: Store.ref.mirror(), kv: Store.kv.mirror(), backups: 0 };
       // D2: Focus, Inbox, Plan (each guarded: one failing area never stops the others).
-      ['focus', 'inbox', 'plan', 'timer'].forEach(a => { try { out[a] = Store[a].mirror(); } catch (e) { out[a] = 'error: ' + e.message; console.error(a + ' mirror: ' + e.message); } });
+      ['focus', 'inbox', 'plan', 'timer', 'calMeta'].forEach(a => { try { out[a] = Store[a].mirror(); } catch (e) { out[a] = 'error: ' + e.message; console.error(a + ' mirror: ' + e.message); } });
       StoreFs.list('ganttBackup').forEach(b => {
         const where = b.area === 'focus' ? 'Focus' : b.area === 'kim' ? Store.kim.SHEET : b.area === 'days' && b.date ? b.date : b.area === 'ref' && b.card ? 'Reference ' + b.card : 'Database: ' + b.area;
         const col = b.area === 'kim' ? 'A2' : b.area === 'days' ? (Store.days.LABEL[b.field] || b.field || '') : b.area === 'ref' ? 'Content' : '';

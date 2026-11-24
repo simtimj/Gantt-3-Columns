@@ -181,6 +181,29 @@ export function makeCal(api, db) {
     await Promise.all(Array.from({ length: Math.min(5, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await f(items[k]).then(v => ({ ok: true, v }), e => ({ ok: false, e })); } }));
     return out;
   }
+  /* Hold-menu fields (M): doc gantt/calMeta = { v: JSON map 'calMeta:<eventId>[:<start>]' → { s, urg, due, dur, cat } }
+     (Code.gs calMetaKey_ / Store.calMeta). Edited in a transaction; not seeded yet → Apps Script does it (Fallback). */
+  const META = 'gantt/calMeta';
+  function metaKey(eventId, start, recurring) { return 'calMeta:' + String(eventId).slice(0, 60) + (recurring ? ':' + Number(start) : ''); }
+  async function editMeta(fn) {
+    const ref = db.doc(META), apply = (snap) => {
+      if (!snap.exists || !snap.data().v) throw new Fallback('hold-menu data not on the database yet');
+      let m; try { m = JSON.parse(snap.data().v) || {}; } catch (e) { throw new Fallback('hold-menu data unreadable'); }
+      const r = fn(m), cut = Date.now() - 60 * DAY;
+      Object.keys(m).forEach(k => { if (!(Number(m[k] && m[k].s) >= cut)) delete m[k]; });
+      return { r, rec: { v: JSON.stringify(m), at: Date.now(), dev: 'fn' } };
+    };
+    if (db.runTransaction) return db.runTransaction(async t => { const x = apply(await t.get(ref)); t.set(ref, x.rec, { merge: true }); return x.r; });
+    const x = apply(await ref.get()); await ref.set(x.rec, { merge: true }); return x.r;
+  }
+  // Main-calendar urgency color (Code.gs syncCalUrgencyColor_): a done event keeps Graphite, "not done" brings the new color.
+  async function urgColor(it, calId, urg) {
+    const c = URG_COLOR[urg] || '';
+    if (String(it.colorId || '') === '8') { await ev.patch({ calendarId: calId, eventId: it.id, requestBody: { extendedProperties: { private: { [PREV_TAG]: c || 'default' } } } }); return null; }
+    const body = Object.assign({}, it);
+    if (c) body.colorId = c; else delete body.colorId;
+    return (await ev.update({ calendarId: calId, eventId: it.id, requestBody: body })).data;
+  }
   function withCopy(r, at) { return Object.assign({}, r, { copyAt: at || undefined }); }
 
   // calRecurringEdit_: 'one' = this day's instance, 'all' = the series (same shift of start, same length).
@@ -294,6 +317,33 @@ export function makeCal(api, db) {
       const id = String(eventId) + '|' + startOf(it);
       return withCopy({ title: name }, await intoCopy([id], await panel(res, calId, await oldEntry(id))));
     },
+    // Hold menu (Code.gs setCalendarEventMeta): urgency / due / length / subject; urgency recolors main-calendar events.
+    async setCalendarEventMeta(eventId, start, recurring, meta, calId) {
+      calId = String(calId || MAIN);
+      const m = meta || {}, clean = {};
+      if (/^[123]$/.test(m.urg || '')) clean.urg = m.urg;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(m.due || '')) clean.due = m.due;
+      if (/^\d{1,4}$/.test(String(m.dur || ''))) clean.dur = String(m.dur);
+      if (/^[a-z]{2,12}$/.test(m.cat || '')) clean.cat = m.cat;
+      if (!eventId) throw new Error('Missing event id');
+      const key = metaKey(eventId, start, recurring);
+      const oldUrg = await editMeta(map => {
+        const old = (map[key] && map[key].urg) || '';
+        if (Object.keys(clean).length) map[key] = Object.assign({ s: Number(start) }, clean); else delete map[key];
+        return old;
+      });
+      let it = null, res = null;
+      if ((clean.urg || '') !== oldUrg && calId === MAIN) { it = await find(calId, eventId, start); res = await urgColor(it, calId, clean.urg || ''); }
+      if (recurring) return clean; // repeating: no copyAt → the app has the server re-copy, as before
+      const at = await patchCopy([String(eventId) + '|' + Number(start)], e => {
+        ['urg', 'due', 'dur', 'cat', 'uc'].forEach(k => { delete e[k]; });
+        Object.assign(e, clean);
+        if (res) { e.colorId = String(res.colorId || ''); e.color = COLORS[e.colorId] || UNASSIGNED; }
+        if (!e.urg) { const u = Object.keys(URG_COLOR).find(k => URG_COLOR[k] === e.colorId); if (u) { e.urg = u; e.uc = 1; } }
+        return e;
+      });
+      return withCopy(Object.assign({}, clean), at);
+    },
     // Quick add from Cal Events (Code.gs addAllDayTask): one-day all-day event on the main calendar, no reminders.
     async addAllDayTask(dateString, title) {
       const date = String(dateString || '');
@@ -349,7 +399,20 @@ export function makeCal(api, db) {
         await ev.update({ calendarId: calId, eventId: it.id, requestBody: body });
       }
       const out = { colorId: c };
-      if (calId === MAIN) out.metaSync = { eventId: String(r.eventId), startMs: Number(r.startMs), recurring: !!it.recurringEventId, colorId: c };
+      if (calId === MAIN) {
+        // Saved urgency follows the color (Code.gs calMetaUrgFromColor) — in the database doc; not seeded → Apps Script.
+        const key = metaKey(r.eventId, r.startMs, !!it.recurringEventId), u0 = Object.keys(URG_COLOR).find(k => URG_COLOR[k] === c) || '';
+        try {
+          await editMeta(map => {
+            const e = Object.assign({}, map[key] || {});
+            if (u0) e.urg = u0; else delete e.urg;
+            if (Object.keys(e).some(k => k !== 's')) map[key] = Object.assign(e, { s: Number(r.startMs) }); else delete map[key];
+          });
+        } catch (e) {
+          if (!e.fallback) throw e;
+          out.metaSync = { eventId: String(r.eventId), startMs: Number(r.startMs), recurring: !!it.recurringEventId, colorId: c };
+        }
+      }
       if (it.recurringEventId || wasDone) return out; // repeating: the server re-copies; done: nothing visible changed
       const id = String(r.eventId) + '|' + startOf(it), u = Object.keys(URG_COLOR).find(k => URG_COLOR[k] === c) || '';
       const at = await patchCopy([id], e => {

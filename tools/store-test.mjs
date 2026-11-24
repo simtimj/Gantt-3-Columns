@@ -522,4 +522,33 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
     assert.ok(Number(ce.at.integerValue) >= Number(fsDocs['ganttCal/meta'].at.integerValue), 'list stamped after the copy');
     console.log('✓ store-test: timer events in day docs (seed 30 days, read merge, mirror, server save) + Cal Events list doc');
   }
+
+  // M (2026-11-24): hold-menu fields in one doc gantt/calMeta (seeded from the calMeta:* properties, props = backup).
+  {
+    const SP = dctx.PropertiesService.getScriptProperties();
+    const soon = Date.now() + 864e5, old = Date.now() - 90 * 864e5;
+    delete fsDocs['gantt/calMeta'];
+    SP.setProperty('calMeta:ev1@google.com', JSON.stringify({ s: soon, urg: '1' })); SP.setProperty('calMeta:gone@google.com', JSON.stringify({ s: old, urg: '2' }));
+    const m0 = JSON.parse(vm.runInContext("JSON.stringify(Store.calMeta.all())", dctx));
+    assert.equal(m0['calMeta:ev1@google.com'].urg, '1'); assert.ok(fsDocs['gantt/calMeta'], 'seeded on first read');
+    vm.runInContext("syncCalUrgencyColor_ = () => {};", dctx);
+    const clean = dctx.setCalendarEventMeta('ev2@google.com', soon, false, { due: '2026-12-01', cat: 'code' }, 'main');
+    assert.equal(clean.due, '2026-12-01');
+    const doc = JSON.parse(fsDocs['gantt/calMeta'].v.stringValue);
+    assert.deepEqual(doc['calMeta:ev2@google.com'], { s: soon, due: '2026-12-01', cat: 'code' });
+    assert.equal(doc['calMeta:gone@google.com'], undefined, 'older than 60 days dropped from the doc');
+    assert.equal(SP.getProperty('calMeta:gone@google.com'), null, '…and from the properties');
+    assert.equal(JSON.parse(SP.getProperty('calMeta:ev2@google.com')).cat, 'code', 'property backup written');
+    // The Cloud Function edits the doc → the trigger copies it into the properties; readers use the doc.
+    const fnMap = Object.assign({}, doc, { 'calMeta:ev3@google.com': { s: soon, urg: '3' } }); delete fnMap['calMeta:ev1@google.com'];
+    fsDocs['gantt/calMeta'] = { v: { stringValue: JSON.stringify(fnMap) }, at: { integerValue: String(Date.now() + 5000) } };
+    assert.equal(JSON.parse(vm.runInContext("JSON.stringify(Store.calMeta.asProps())", dctx))['calMeta:ev3@google.com'], JSON.stringify({ s: soon, urg: '3' }));
+    vm.runInContext('Store.calMeta.mirror()', dctx);
+    assert.equal(JSON.parse(SP.getProperty('calMeta:ev3@google.com')).urg, '3'); assert.equal(SP.getProperty('calMeta:ev1@google.com'), null);
+    assert.equal(vm.runInContext('Store.calMeta.mirror()', dctx), 0, 'nothing newer → nothing to do');
+    // color → saved urgency follows (calMetaUrgFromColor on the doc)
+    dctx.calMetaUrgFromColor({ eventId: 'ev2@google.com', startMs: soon, recurring: false, colorId: '5' });
+    assert.equal(JSON.parse(fsDocs['gantt/calMeta'].v.stringValue)['calMeta:ev2@google.com'].urg, '2');
+    console.log('✓ store-test: hold-menu fields in gantt/calMeta (seed, save + prune, property backup, mirror from the function, color → urgency)');
+  }
 }

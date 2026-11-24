@@ -2398,9 +2398,9 @@ function getMainCalendarEvents(dateString) {
       time: allDay ? 'All day' : Utilities.formatDate(s, tz, 'h:mm a') + '–' + Utilities.formatDate(e, tz, 'h:mm a') });
     });
   });
-  const saved = Store.props.getProperties();
+  const saved = Store.calMeta.asProps();
   events.forEach(ev => {
-    try { Object.assign(ev, JSON.parse(saved[calMetaKey_(ev.id, ev.start, ev.recurring)] || '{}')); } catch (e) { console.error(e); }
+    try { const m = JSON.parse(saved[calMetaKey_(ev.id, ev.start, ev.recurring)] || '{}'); delete m.s; Object.assign(ev, m); } catch (e) { console.error(e); }
     // Color = urgency both ways (2026-11-05, Julius): an event colored red / yellow / blue elsewhere (Calendar app,
     // Claude, ChatGPT) shows with that urgency here when the app hasn't saved one for it.
     if (!ev.urg && ev.main) { const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === ev.color); if (u) ev.urg = u; }
@@ -2435,6 +2435,7 @@ function syncCalUrgencyColor_(calId, eventId, start, urg) {
   const ev = calEventAt_(calId, eventId, start), color = URG_EVENT_COLOR_[urg] || '';
   if (String(ev.getColor() || '') === '8') { // done stays Graphite; unticking brings back the new urgency color
     Store.props.setProperty('calPrev:' + eventId.slice(0, 60) + ':' + Number(start), color || 'default');
+    try { ev.setTag('fwPrev', color || 'default'); } catch (e) { console.error(e); } // same tag the Cloud Function reads
     return;
   }
   ev.setColor(color || '0');
@@ -2446,18 +2447,10 @@ function setCalendarEventMeta(eventId, start, recurring, meta, calId) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(m.due || '')) clean.due = m.due;
   if (/^\d{1,4}$/.test(String(m.dur || ''))) clean.dur = String(m.dur);
   if (/^[a-z]{2,12}$/.test(m.cat || '')) clean.cat = m.cat;
-  const props = Store.props, key = calMetaKey_(eventId, start, recurring);
-  let oldUrg = '';
-  try { oldUrg = (JSON.parse(props.getProperty(key) || '{}').urg) || ''; } catch (e) {}
+  const key = calMetaKey_(eventId, start, recurring), oldUrg = ((Store.calMeta.get(key) || {}).urg) || '';
   if ((clean.urg || '') !== oldUrg) syncCalUrgencyColor_(calId, eventId, start, clean.urg || '');
-  if (Object.keys(clean).length) props.setProperty(key, JSON.stringify(Object.assign({ s: Number(start) }, clean)));
-  else props.deleteProperty(key);
-  // Drop saved fields for events more than 60 days past.
-  const cutoff = Date.now() - 60 * DAY_MS, all = props.getProperties();
-  Object.keys(all).forEach(k => {
-    if (k.indexOf('calMeta:') !== 0) return;
-    try { if (JSON.parse(all[k]).s < cutoff) props.deleteProperty(k); } catch (e) { props.deleteProperty(k); }
-  });
+  // Saved in gantt/calMeta (M) + the property; events more than 60 days past are dropped.
+  Store.calMeta.put(key, Object.keys(clean).length ? Object.assign({ s: Number(start) }, clean) : null);
   return clean;
 }
 
@@ -2604,7 +2597,7 @@ function calPanelRead_(from, to, tz) {
 // Blueberry), like getMainCalendarEvents.
 function calPanelAttachMeta_(events, markColor) {
   let saved = {};
-  try { saved = Store.props.getProperties(); } catch (err) { console.error(err); }
+  try { saved = Store.calMeta.asProps(); } catch (err) { console.error(err); }
   (events || []).forEach(ev => {
     let m = {};
     try { m = JSON.parse(saved[calMetaKey_(ev.eventId, ev.startMs, ev.recurring)] || '{}'); } catch (err) { m = {}; }
@@ -2858,13 +2851,11 @@ function calPanelSetColor(req) {
 }
 // Saved urgency follows a new color (main calendar). Also called by the app after the Cloud Function set the color (I).
 function calMetaUrgFromColor(x) {
-  const r = x || {}, c = String(r.colorId || ''), props = Store.props, key = calMetaKey_(String(r.eventId), Number(r.startMs), !!r.recurring);
-  let m = {};
-  try { m = JSON.parse(props.getProperty(key) || '{}'); } catch (e) { m = {}; }
+  const r = x || {}, c = String(r.colorId || ''), key = calMetaKey_(String(r.eventId), Number(r.startMs), !!r.recurring);
+  const m = Object.assign({}, Store.calMeta.get(key) || {});
   const u = Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === c) || '';
   if (u) m.urg = u; else delete m.urg;
-  if (Object.keys(m).some(k => k !== 's')) props.setProperty(key, JSON.stringify(Object.assign(m, { s: Number(r.startMs) })));
-  else props.deleteProperty(key);
+  Store.calMeta.put(key, Object.keys(m).some(k => k !== 's') ? Object.assign(m, { s: Number(r.startMs) }) : null);
   return { ok: true };
 }
 // Duplicate (Google's ⋮ → Duplicate): same calendar, title, times, location, notes and color; a done copy starts open.

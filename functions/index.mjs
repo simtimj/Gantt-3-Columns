@@ -40,7 +40,7 @@ export const cal = onRequest({ region: REGION, serviceAccount: SA, memory: '256M
     // Which database parts the Apps Script side has written (exists + how old, minutes).
     if (req.query.check === '2') {
       const fdb = getFirestore(), age = d => d.exists ? Math.round((Date.now() - (Number(d.data().at) || 0)) / 60000) : null;
-      for (const p of ['gantt/kim', 'ganttCal/meta', 'gantt/calEvents', 'gantt/planMeta', 'gantt/inboxMeta', 'gantt/timerMeta', 'gantt/calBacklog', 'ganttFocus/main']) {
+      for (const p of ['gantt/kim', 'ganttCal/meta', 'gantt/calEvents', 'gantt/planMeta', 'gantt/inboxMeta', 'gantt/timerMeta', 'gantt/calBacklog', 'ganttFocus/main', 'gantt/calMeta']) {
         try { const d = await fdb.doc(p).get(); out[p] = d.exists ? 'yes, ' + age(d) + ' min' : 'no'; } catch (e) { out[p] = 'err'; }
       }
       for (const c of ['ganttDays', 'ganttRef', 'ganttInbox', 'ganttPlan', 'ganttCal']) {

@@ -1142,7 +1142,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## Maintenance batch (2026-11-23 evening, Julius: "keep going")
 - **Old failing tests fixed**: `initial-read-test`, `reference-save-test`, `study-read-test` loaded Store.gs with the real `FIREBASE_PROJECT_`, so the database probe ran with no fake UrlFetch → they now load it with the project blanked (Sheet backend, like store-test). `save-timing-test`: the sliced page code now registers window / document listeners and uses localStorage → stubs added. All four pass.
 - **Phone "scheduled → back to all day" doesn't stick**: not reproduced (calendar phone smoke passes; the 2026-11-21 hold-timer fix stands). Found and fixed a real way for it to happen with B2: a 5-min copy that read the calendar *before* the drag but finished *after* it was taken as caught up, so the event jumped back. Now `calSyncNow` answers with its copy's `at` (server clock) and the app uses the copy again only once `ganttCal/meta.at` ≥ that; re-copy failed → server path for 6 min. Smoke `pwa-cal` covers the "older copy finished late" case. If it still happens on the phone, note the time and whether it was in the docked or big calendar.
-- **Flaky (not fixed)**: smoke `pwa-cal` showed once in ~7 runs a page error at calendar start-up (`panel` = null, `#calPanel` missing while the calendar script ran) — in start-up code B2 doesn't touch; `SMOKE_STACK=1` prints the stack. Watch for it in other suites.
+- **Flaky (guarded since; 2026-11-24 check: `calInit` waits for DOMContentLoaded / load when `#calPanel` is missing)**: smoke `pwa-cal` showed once in ~7 runs a page error at calendar start-up (`panel` = null, `#calPanel` missing while the calendar script ran) — in start-up code B2 doesn't touch; `SMOKE_STACK=1` prints the stack. Watch for it in other suites.
 
 ## D2. Focus, Inbox, Plan + Cal Backlog on Firestore (2026-11-23 21:50, Julius; continues "H5", all recommended picks)
 - **Focus**: same 3-way merge (`mergeFocus_`) ported to the device, run in a Firestore transaction; losing values → Backup tab.
@@ -1266,3 +1266,10 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Saves one by one with `calPanelMoveEvent` (same id, scope one); toast "Filled N gaps · Undo" 8 s (`fillJob`, Undo = old ends). Hooks: `fwCalendar.fill.{start,cancel,active,plan,run,undo}`; smoke (calendar suite) uses `window.__fwFillMain` because the stub has no calendar list.
 ## Fun rows slimmer (2026-11-24 10:05, Julius: "the date column is taking up too much space… and the x")
 - `funDate` → M/D; LateCss end block: smaller date, ✕ with no min size / padding.
+
+## Unattended batch (2026-11-24 13:31, Julius: "keep it rolling … optimization and UI cleanup")
+- Card corners 8 → 6 px (`--card-r`, Index_LateCss "4 + 5. Cards"): the README To-do "Sharper card corners" (2026-10-27).
+- README To-do tidy: "Backlog hold menu: Mark complete" was already built (🧪 "Backlog: mark complete") → removed.
+- Looked at, nothing to do: archive is a manual button (no background Apps Script call); PWA opening already reads every area from Firestore (pwa-d2 shows only the fake's fallbacks); `calInit` start-up race already guarded.
+- **Idea, not done (needs Julius's OK)**: the built PWA `index.html` is ~1.7 MB of unminified inline JS / CSS, parsed on every open. Stripping comments + whitespace at build time (esbuild `minifyWhitespace` in tools/build-pwa.mjs, smoke runs on the built page) should cut parse time noticeably on the phone. Installing the build tool was blocked in this session.
+

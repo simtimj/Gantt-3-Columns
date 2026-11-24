@@ -79,6 +79,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-24)
+- **Sharper card corners** (2026-11-24 13:40, from the To-do list): one corner rounding for every card went from 8 px to 6 px (task cards, title boxes, Next Steps groups, calendar events, Cal Events boxes).
 - **Keep In Mind Completed section** (2026-11-24 10:15): ticked tasks drop to the bottom of their category under "Completed · n"; tap it to fold / unfold (remembered per category on this device). Unticking brings a task back up.
 - **Tighter timeline labels** (2026-11-24 10:05): hour labels sit at the left edge with less room before the color bar (docked + full screen), so events get that width.
 - **Calendar: Fill gaps** (2026-11-24): ⇕ in the calendar header → tap where it starts, tap where it ends on the timeline. Your **main** calendar's timed events in that range keep their start times and each one's end stretches to the next event's start. Left alone: other calendars, all-day, done (Graphite) and repeating events (they still count as "the next event"), and the last event in the range. Undo on the toast for 8 s; tap ⇕ again or Esc to cancel picking.
@@ -773,8 +774,6 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 
 - **Follow the now line** (2026-11-21, idea): a setting that keeps the calendar's current-time line in view through the day when zoomed in (auto-scroll as time passes). Open questions in docs/NOTES.md → Google-style event pop-up section.
 
-- **Backlog hold menu: Mark complete** (2026-11-15, Julius): add to the backlog hold menu once he decides what "complete" does (e.g. Graphite + Done Log, or just drop it).
-
 - **Blocks timer next (2026-11-12):** child item timers + Break polish; Quick Add while a block runs (comma-split into lines).
 - **Calendar backlog (2026-11-12, captured):** pop-out events panel that covers the middle column for long titles; Cal Events always shows Soon + Later lines (drag in = set priority); small calendar = 1:1 mini of the big calendar, with hold-drag move, top/bottom resize handles and Google Calendar sync.
 
@@ -796,7 +795,6 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **Center Up / Center Down (2026-11-01, Julius: spec saved; phases 1–2 done)**: hourly Weather built (Open-Meteo, to confirm); Center Down contents still to decide. **Make sure you do**: repeating marker ↻ built for daily starters (other repeat rules still to work out). Spec: `docs/NOTES.md` → "Center Up / Down + planning pause".
 - **Auto-reshuffle, Motion/Reclaim-style (Julius, 2026-10-28)**: ✅ step 1 task fields (duration above) · step 2 `Code.gs` reads today's calendar and finds free gaps, skipping the Chill and Repeat Tasks calendars · step 3 scheduler sorts by deadline + priority and puts each task in the first gap it fits · step 4 **Reshuffle** button that reruns it (auto-run later). Keep a manual mode too: set the parameters together with Claude in conversation. Target: Fri Nov 6.
 - **Calendar column, like Google Calendar** (Julius, 2026-10-28): a full calendar view as its own column (or swipe in from the right / a button that swaps it in for Reference), so while scheduling with Claude he can see the day at a glance on phone, tablet and computer. Details to settle: day vs 3-day vs week view, read-only first or drag tasks onto it.
-- **Sharper card corners (2026-10-27)**: make card corners a little less round (currently 8px)
 - **Hold anywhere on a card to move it (2026-10-27)**: hold and grab a card (not just its checkbox) to drag it; a plain tap on the card still goes into the text for editing, selecting, highlighting
 - **Idea: built-in time tracking → plan vs actual (2026-10-27)** (step 1 = Block timer MVP, 2026-11-05): own timekeeping in the app (Toggl-style); send it to Claude to compare the plan with what actually happened, for a more detailed look at habits and pitfalls (could feed the nightly wrap-up)
 - **Mirrored tasks (Today ↔ Reference)**: send a carry-over to Today but keep it tracked in its Reference area (e.g. CDCR under State / IT Associate); one linked task in both places, so checking it off in Today also checks it in Reference. Approach to work out (shared task id, show it in both, one source of truth)

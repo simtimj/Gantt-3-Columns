@@ -4041,6 +4041,7 @@ if (only('pwa-d2')) {
   const pg = await ctx.newPage();
   pg.on('pageerror', e => errs.push('page error: ' + e.message + (process.env.SMOKE_STACK ? ' ' + e.stack : '')));
   await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
+  if (process.env.SMOKE_OPENCALLS) console.log('OPEN CALLS', JSON.stringify(calls), JSON.stringify(batches), JSON.stringify(fnCalls));
   const run = (fn, ...a) => pg.evaluate(([fn, a]) => new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(e => bad(e.message))[fn](...a)), [fn, a]);
   const fsd = k => pg.evaluate(k => __fs.docs[k], k);
   // ---- Cal Events list (H5 B): the server's published list when it's today's.

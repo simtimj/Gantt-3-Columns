@@ -780,12 +780,15 @@
   <div class="cp-fbtns"><button type="button" data-cal-refresh title="Reload events from Google Calendar" aria-label="Reload events">↻</button><button type="button" data-cal-close title="Close (Esc) and go back to the Gantt" aria-label="Close calendar">✕</button></div>
 </aside>
 <script>
-(function(){
+(function calInit(){
   const TZ = 'America/Los_Angeles';
   const LIBS = ['https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js',
     'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js',
     'https://cdn.jsdelivr.net/npm/@fullcalendar/luxon3@6.1.15/index.global.min.js'];
   const panel = document.getElementById('calPanel'), backdrop = document.getElementById('calPanelBackdrop');
+  // Rare start-up race (smoke pwa-cal, ~1 in 7, 2026-11-23): the panel not in the DOM yet → start once the page is ready.
+  if(!panel){ if(!calInit.waited){ calInit.waited = 1; document.addEventListener('DOMContentLoaded', calInit, {once: true}); window.addEventListener('load', () => { if(!calInit.ran && document.getElementById('calPanel')) calInit(); }, {once: true}); } return; }
+  calInit.ran = 1;
   /* 3 / 4-day views (2026-11-21, Julius; NOTES "3/4-day views"): big calendar only (pop-out + full screen; docked stays Day).
      One button cycles Day → 3D → 4D → Wk (its label = where a tap goes); hold it / right-click = a picker. 3D / 4D start on
      the day being looked at, and ‹ › / a sideways swipe move one day. Remembered per screen like Day / Week. */

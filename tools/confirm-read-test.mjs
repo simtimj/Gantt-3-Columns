@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
-const source = (fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8'));
+const source = (fs.readFileSync('Code.gs','utf8')+'\n'+fs.readFileSync('Store.gs','utf8').replace(/const FIREBASE_PROJECT_ = '[^']*';/, "const FIREBASE_PROJECT_ = '';"));
 const HEAD = ['Date','Project','Change','How to check','Status','Checked on'];
 export function fixture(serverSource = source) {
   const reads=[],writes=[],cache=new Map(),props={},stats={lookups:0,locks:0,hashes:0},faults={};
@@ -25,7 +25,7 @@ export function fixture(serverSource = source) {
   const ctx=vm.createContext({console,SpreadsheetApp:{getActiveSpreadsheet:()=>ss},
     CacheService:{getScriptCache:()=>({getAll:keys=>{if(faults.cache)throw Error('cache down');return Object.fromEntries(keys.filter(k=>cache.has(k)).map(k=>[k,cache.get(k)]));},putAll:values=>{if(faults.cache)throw Error('cache down');for(const [k,v] of Object.entries(values))cache.set(k,v);},get:k=>{if(faults.cache)throw Error('cache down');return cache.get(k)||null;},put:(k,v)=>{if(faults.cache)throw Error('cache down');cache.set(k,v);},remove:k=>cache.delete(k)})},
     LockService:{getScriptLock:()=>({tryLock(){stats.locks++;if(faults.busy)return false;if(faults.onLock)faults.onLock();return true;},releaseLock(){stats.released=true;}})},
-    PropertiesService:{getScriptProperties:()=>({setProperty:(k,v)=>props[k]=v})}});
+    PropertiesService:{getScriptProperties:()=>({setProperty:(k,v)=>props[k]=v,getProperty:k=>props[k]??null,getProperties:()=>({...props}),setProperties:o=>Object.assign(props,o)})}});
   vm.runInContext(serverSource,ctx);
   ctx.cellHash_=s=>{stats.hashes++;return crypto.createHash('sha256').update(String(s)).digest('hex').slice(0,16);};
   ctx.getOrCreateSheet_=(name)=>ss.getSheetByName(name);

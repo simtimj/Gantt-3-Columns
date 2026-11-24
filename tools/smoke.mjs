@@ -3486,9 +3486,35 @@ if (only('pwa-hist')) {
   const lf = await pg.evaluate(([t, f]) => { const ed = document.querySelector('#todayScroll .day-editor[data-date="' + t + '"]'), fu = document.querySelector('#todayScroll .day-editor[data-date="' + f + '"]');
     return { today: !!ed, editable: !!ed && ed.isContentEditable, future: !!fu, redated: window.__PWA__ && window.__PWA__.redated, snap: !!document.getElementById('fwSnap') }; }, [today, addD(today, 3)]);
   if (!lf.today || !lf.editable || !lf.future || !lf.redated || lf.snap) errs.push('yesterday\'s copy not opened editable at once: ' + JSON.stringify(lf));
+  // H (2026-11-23): sync from the database. First sync of a session = server; next ones from the docs, same answer shape.
+  await pg.evaluate(() => { localStorage.removeItem('fake.unseeded'); });
+  await pg.reload(); await pg.waitForTimeout(2500);
+  const sreq = await pg.evaluate(t => { const d = window.__fs.days[t]; return { days: {}, ref: {}, refSync: 2, refManifestHash: '', inbox: false }; }, today);
+  const dayNow = await pg.evaluate(t => window.__fs.days[t], today);
+  sreq.days[today] = { th: md5(dayNow.tasks), jh: md5(dayNow.journal || '') };
+  sreq.ref = { r1: md5('<h2>Db card</h2>') };
+  calls.length = 0;
+  await run('getSyncState', sreq);
+  if (!calls.includes('getSyncState')) await run('getSyncState', sreq); // the page may already have done its server sync
+  calls.length = 0;
+  let sy = await run('getSyncState', sreq);
+  if (calls.includes('getSyncState') || !sy || !sy.timing || !sy.timing.fromDb) errs.push('sync not from the database: ' + JSON.stringify(sy).slice(0, 200) + ' ' + calls.join());
+  else {
+    if (Object.keys(sy.days).length || Object.keys(sy.ref).length) errs.push('unchanged sync not empty: ' + JSON.stringify(sy).slice(0, 200));
+    if (!sy.refManifest || sy.refManifest.items.map(x => x.id).join() !== 'r1') errs.push('manifest: ' + JSON.stringify(sy.refManifest));
+  }
+  // Another device changes today's Today + the card → the next sync brings exactly those.
+  await pg.evaluate(t => { const n = Date.now(); Object.assign(window.__fs.days[t], { tasks: '<div>other device</div>', tasksAt: n, up: n });
+    Object.assign(window.__fs.ref.r1, { content: '<h2>Edited elsewhere</h2>', at: n, up: n }); }, today);
+  sy = await run('getSyncState', sreq);
+  const e = sy && sy.days && sy.days[today];
+  if (!e || e.tasks !== '<div>other device</div>' || e.th !== md5('<div>other device</div>') || e.journal !== undefined) errs.push('changed day: ' + JSON.stringify(e));
+  if (!sy.ref.r1 || sy.ref.r1.content !== '<h2>Edited elsewhere</h2>' || sy.ref.r1.ch !== md5('<h2>Edited elsewhere</h2>')) errs.push('changed card: ' + JSON.stringify(sy.ref));
+  const gH = await pg.evaluate(() => window.__fs.gets.slice(-6));
+  if (gH.some(x => /^ref:server:$/.test(x))) errs.push('sync re-read every card: ' + gH.join(' | '));
   await ctx.close(); srv.close();
   if (errs.length) { fails += errs.length; console.error('✗ pwa-hist:\n  ' + errs.join('\n  ')); }
-  else console.log('✓ pwa-hist: opening + past days from the database (dates, hashes, Urgent, seeds, cards, pins + subjects), `up` catch-up, empty day saves, settings (Fun merge, pins, hide list), server before the seed, yesterday\'s copy opens editable at once');
+  else console.log('✓ pwa-hist: opening + past days from the database (dates, hashes, Urgent, seeds, cards, pins + subjects), `up` catch-up, empty day saves, settings (Fun merge, pins, hide list), server before the seed, yesterday\'s copy opens editable at once, sync from the docs (only changes read)');
 }
 // Reference on Firestore in the PWA (2026-11-23, NOTES H5 C), fake Firebase SDK: card saves (server hashes), new cards,
 // delete → Archive (del on the subtree), restore, order, expand all go to ganttRef docs, never the server; another
@@ -3596,10 +3622,10 @@ if (only('pwa-ref')) {
   for (const fn of ['addReferenceItem', 'saveReferenceOrder', 'saveReferenceExpanded', 'deleteReferenceItem', 'getArchive', 'restoreArchivedItem'])
     if (calls.includes(fn)) errs.push(fn + ' went to the server');
   // Another device edits a card → a sync runs.
-  const before = calls.filter(x => x === 'getSyncState').length;
+  const before = calls.filter(x => x === 'getSyncState').length + await pg.evaluate(() => window.__PWA_SYNCDB || 0);
   await pg.evaluate(() => __fs.push('r1', { content: '<h2>From the tablet</h2>', at: Date.now() + 5000, dev: 'pc-other' }));
   await pg.waitForTimeout(1200);
-  if (calls.filter(x => x === 'getSyncState').length <= before) errs.push('live sync: other device\'s card edit did not start a sync');
+  if (calls.filter(x => x === 'getSyncState').length + await pg.evaluate(() => window.__PWA_SYNCDB || 0) <= before) errs.push('live sync: other device\'s card edit did not start a sync');
   // Refused (newer copy elsewhere) → the edit goes to ganttBackup.
   await pg.evaluate(() => { __fs.refuse = true; });
   const cur = (await fsr()).r1.content;
@@ -3729,7 +3755,7 @@ if (only('pwa-d2')) {
   execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
   const FAKE = `if (!window.firebase) window.firebase = (function () {
     const now = Date.now();
-    const S = window.__fs = { refuseOnce: 0, writes: [], backups: [],
+    const S = window.__fs = { refuseOnce: 0, writes: [], backups: [], subs: {},
       docs: {
         'ganttFocus/main': { v: JSON.stringify({ v: 1, cats: [{ id: 'c1', name: 'Work', items: [{ id: 'i1', t: 'One' }] }] }), at: 10, base: 0 },
         'gantt/inboxMeta': { seeded: 1 }, 'gantt/planMeta': { seeded: 1, cal: 'main' },
@@ -3764,6 +3790,7 @@ if (only('pwa-d2')) {
           if (coll === 'ganttDays' && (!rec.date || rec.date !== id)) return refuse();
           S.docs[k] = o && o.merge && cur ? deep(cur, rec) : deep({}, rec);
           S.writes.push(k);
+          (S.subs[coll] || []).forEach(cb => cb({ docs: all(coll) }));
           return Promise.resolve();
         },
         onSnapshot: () => () => {}
@@ -3773,7 +3800,8 @@ if (only('pwa-d2')) {
     const collRef = n => ({ doc: id => docRef(n, id), add: r => { S.backups.push(r); return Promise.resolve(); },
       get: () => Promise.resolve({ docs: all(n) }),
       where: (f, op, v) => ({ get: () => Promise.resolve({ docs: all(n).filter(x => x.data()[f] >= v) }), onSnapshot: () => () => {} }),
-      onSnapshot: (cb) => { if (n === 'ganttCal') setTimeout(() => cb({ docChanges: () => [] }), 0); return () => {}; } });
+      onSnapshot: (cb) => { if (n === 'ganttCal') setTimeout(() => cb({ docChanges: () => [] }), 0);
+        else { (S.subs[n] = S.subs[n] || []).push(cb); setTimeout(() => cb({ docs: all(n) }), 0); } return () => {}; } });
     const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com' }), 0), signOut: () => {} });
     auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
     const firestore = () => ({ enablePersistence: () => Promise.resolve(), collection: collRef });

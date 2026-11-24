@@ -126,6 +126,7 @@
     Object.keys(D2_NAMES).forEach(function (n) { NAMES[n] = 1; });
     // Batched reads (speed plan E): the ones the database can answer leave the batch.
     NAMES.batchCalls = 1;
+    if (DAYS && REF) NAMES.getSyncState = 1; // H: sync from the database
     var fromDb = {};
     // Calendar edits: the copy is out of date until the server re-copies (asked for right away, see cal.touch).
     var CAL_WRITES = { addAllDayTask: 1, setCalendarEventMeta: 1, calPanelSetOrder: 1, calPanelCreateEvent: 1, calPanelUpdateEvent: 1,
@@ -840,7 +841,22 @@
             from: x.from, arch: String(x.arch || ''), done: !!Number(x.done) };
         });
       }
-      function items() { return getColl(coll()).then(function (r) { return build(r.list); }); }
+      // One live listener on the whole collection: N reads once per app start, then only changes (the periodic Inbox
+      // check every 3 min costs nothing). Refused / failed → null (server).
+      var mem = null, live = null;
+      function listen() {
+        if (live) return live;
+        live = new Promise(function (ok) {
+          try {
+            coll().onSnapshot(function (qs) {
+              mem = qs.docs.map(function (sn) { var d = sn.data(); d.id = String(d.id || sn.id); return d; });
+              ok(true);
+            }, function (e) { mem = null; live = null; console.warn('Inbox → server: ' + (e && e.code || e)); ok(false); });
+          } catch (e) { live = null; ok(false); }
+        });
+        return live;
+      }
+      function items() { return withTimeout(listen(), 5000).then(function (on) { if (!on || !mem) throw new Error('Inbox listener off'); return build(mem); }); }
       function put(id, fields, prevAt) {
         var rec = Object.assign({ id: String(id) }, fields, { at: Math.max(Date.now(), (Number(prevAt) || 0) + 1), up: firebase.firestore.FieldValue.serverTimestamp(), dev: dev });
         var p = coll().doc(String(id)).set(rec, { merge: true });
@@ -851,7 +867,7 @@
         // Online: wait for it (the list read next comes from the server); offline: queued, the cache already has it.
         return navigator.onLine ? withTimeout(p, 8000) : Promise.resolve();
       }
-      function one(id) { return getColl(coll()).then(function (r) { return r.list.filter(function (d) { return d.id === id; })[0] || null; }); }
+      function one(id) { return withTimeout(listen(), 5000).then(function (on) { return on && mem ? mem.filter(function (d) { return d.id === id; })[0] || null : null; }); }
       var RUN = {
         getInbox: items,
         addInboxItem: function (title, details) {
@@ -1217,6 +1233,66 @@
        opening refreshes everything). Missing any part → the server answers as before. */
     var PAST = 7, FUTURE = 3;
     function addDays(d, n) { var t = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) + n * 864e5); return t.toISOString().slice(0, 10); }
+    // Reference cards in the server's shape (getReference_ order) + its manifest (referenceManifest_).
+    function refShape(cards) {
+      var reference = cards.map(function (d) {
+        return { ref_: null, id: String(d.id), parentId: String(d.parentId || ''), type: String(d.type || 'item'), title: String(d.title || ''),
+          content: String(d.content || ''), expanded: Number(d.expanded) !== 0, sort: Number(d.sort) || 0, row: null, ch: hash(String(d.content || '')) };
+      }).sort(function (a, b) { return a.sort - b.sort; });
+      var items = reference.map(function (r) { return { id: r.id, parentId: r.parentId, type: r.type, title: r.title, expanded: r.expanded, sort: r.sort }; });
+      return { reference: reference, items: items, hash: hash(JSON.stringify(items)) };
+    }
+    /* Sync from the database (H, 2026-11-23): getSyncState's answer (changed days, changed / new cards, manifest, Inbox)
+       built from the docs, same hashes as the server. The server still answers the first sync of a session and then
+       one every 10 min (new-version check; the schedule move runs on its 5-min trigger anyway), and whenever a part
+       isn't on the database here (not seeded, offline, Inbox asked for but not ready). */
+    var lastSrvSync = 0, refMem = null, refUp = 0;
+    function upMs(v) { return v && typeof v.toMillis === 'function' ? v.toMillis() : Number(v) || 0; }
+    // Cards: one full read per session, then only cards changed since (up > last seen − 10 min).
+    function refCards() {
+      var keep = function (d) { refMem[d.id] = d; refUp = Math.max(refUp, upMs(d.up)); };
+      var vals = function () { return Object.keys(refMem).map(function (k) { return refMem[k]; }); };
+      if (!refMem) return refs.cards().then(function (list) { if (!list) return null; refMem = {}; list.forEach(keep); return vals(); });
+      return db.collection('ganttRef').where('up', '>', new Date(refUp - 600000)).get({ source: 'server' }).then(function (qs) {
+        qs.docs.forEach(function (sn) { var d = sn.data(); d.id = String(d.id || sn.id); if (d.del) delete refMem[d.id]; else keep(d); });
+        return vals();
+      });
+    }
+    function syncDb(req) {
+      if (!days || !refs || !navigator.onLine || Date.now() - lastSrvSync > 10 * 60000) return Promise.resolve(null);
+      req = req || {};
+      var t0 = Date.now(), dates = Object.keys(req.days || {}).filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+      var refWant = req.ref || {}, wantRef = req.refSync === 2 || Object.keys(refWant).length > 0;
+      // Reads only what changed since the last look (cost: ~1–3 doc reads a minute, not the whole collections).
+      return Promise.all([dates.length ? days.history() : {}, wantRef ? refCards() : 'skip', req.inbox ? (inbox ? inbox.opening() : null) : 'skip']).then(function (x) {
+        var by = x[0], cards = x[1], inb = x[2];
+        var list = by && dates.length ? days.build(by, dates[0], dates[dates.length - 1]) : by ? [] : null;
+        if (!list || !cards || !inb) return null;
+        var out = { build: '', days: {}, ref: {} };
+        list.forEach(function (d) {
+          var want = req.days[d.date];
+          if (!want) return;
+          var e = { th: d.th, jh: d.jh, ph: d.ph, hh: d.hh };
+          if (want.th !== d.th) e.tasks = d.tasks;
+          if (want.jh !== d.jh) e.journal = d.journal;
+          if (want.ph !== undefined && want.ph !== d.ph) e.plan = d.plan;
+          if (want.hh !== undefined && want.hh !== d.hh) e.tho = d.tho;
+          if (e.tasks !== undefined || e.journal !== undefined || e.plan !== undefined || e.tho !== undefined) out.days[d.date] = e;
+        });
+        if (cards !== 'skip') {
+          var rs = refShape(cards);
+          rs.reference.forEach(function (r) {
+            var known = Object.prototype.hasOwnProperty.call(refWant, r.id);
+            if ((known && refWant[r.id] !== r.ch) || (!known && req.refSync === 2)) out.ref[r.id] = { content: r.content, ch: r.ch };
+          });
+          if (req.refSync === 2 && req.refManifestHash !== rs.hash) out.refManifest = { hash: rs.hash, items: rs.items };
+        }
+        if (inb !== 'skip') out.inbox = inb;
+        out.timing = { total: Date.now() - t0, steps: {}, fromDb: true };
+        window.__PWA_SYNCDB = (window.__PWA_SYNCDB || 0) + 1; // tests: syncs answered here
+        return out;
+      });
+    }
     function opening(opts) {
       if (!days || !refs || !(opts && opts.fast) || !navigator.onLine) return Promise.resolve(null);
       var last = null;
@@ -1232,11 +1308,7 @@
         var today = days.ymd(Date.now()), out = days.build(by, addDays(today, -PAST), addDays(today, FUTURE));
         if (!out) return null;
         var t1 = Date.now();
-        var reference = cards.map(function (d) {
-          return { ref_: null, id: String(d.id), parentId: String(d.parentId || ''), type: String(d.type || 'item'), title: String(d.title || ''),
-            content: String(d.content || ''), expanded: Number(d.expanded) !== 0, sort: Number(d.sort) || 0, row: null, ch: hash(String(d.content || '')) };
-        }).sort(function (a, b) { return a.sort - b.sort; });
-        var manifest = reference.map(function (r) { return { id: r.id, parentId: r.parentId, type: r.type, title: r.title, expanded: r.expanded, sort: r.sort }; });
+        var rs = refShape(cards), reference = rs.reference, manifest = rs.items;
         var urgent = [], seeds = {}, has = function (h) { return h.indexOf('data-urg=') >= 0 || h.indexOf('data-due=') >= 0; };
         Object.keys(by).sort().forEach(function (date) {
           var d = by[date], tasks = String(d.tasks || ''), journal = String(d.journal || ''), plan = String(d.plan || '');
@@ -1245,7 +1317,7 @@
             if (new RegExp('data-nsec=["\']' + k + '["\']').test(journal)) seeds[k] = { date: date, journal: journal };
           });
         });
-        return { days: out, reference: reference, refManifestHash: hash(JSON.stringify(manifest)), urgent: urgent, inbox: inboxList,
+        return { days: out, reference: reference, refManifestHash: rs.hash, urgent: urgent, inbox: inboxList,
           cardCats: set.cardCats, refPins: set.refPins, notesSeeds: seeds, today: today,
           timing: { total: Date.now() - t0, steps: { dbRead: t1 - t0, build: Date.now() - t1 }, release: '', fast: true, fromDb: true,
             dayRows: Object.keys(by).length, refRows: reference.length } };
@@ -1257,6 +1329,7 @@
         if (!user) return null;
         if (name === 'getWorkspaceData') return withTimeout(opening(args[0]), 6000);
         if (name === 'getDaysRange') return withTimeout(days.range(String(args[0]), String(args[1])), 5000);
+        if (name === 'getSyncState') return withTimeout(syncDb(args[0]), 6000);
         if (DAY_NAMES[name]) return days.run(name, args);
         if (REF_NAMES[name]) return refs.run(name, args);
         if (KV_NAMES[name]) return kv.run(name, args);
@@ -1276,6 +1349,7 @@
         var out = got.map(function (r) { return r == null ? null : { ok: true, r: r }; });
         if (!rest.length) return out;
         return call('batchCalls', [rest]).then(function (srv) {
+          if (rest.some(function (c) { return c[0] === 'getSyncState'; })) lastSrvSync = Date.now();
           at.forEach(function (i, j) { out[i] = Array.isArray(srv) && srv[j] ? srv[j] : { ok: false, e: 'No answer' }; });
           return out;
         });
@@ -1312,7 +1386,10 @@
       },
       run: function (name, args) {
         if (name === 'batchCalls') return batch(args[0]);
-        return dbRun(name, args).then(function (r) { if (r) fromDb[name] = 1; return r || call(name, args); });
+        return dbRun(name, args).then(function (r) {
+          if (r) { fromDb[name] = 1; return r; }
+          return call(name, args).then(function (x) { if (name === 'getSyncState') lastSrvSync = Date.now(); return x; });
+        });
       }
     };
   })();

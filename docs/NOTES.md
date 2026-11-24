@@ -1163,3 +1163,10 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - **Cal Events list**: `calCopySync_` (5-min trigger + `calSyncNow` after app edits) runs `getCalendarEvents()` first (so its auto archive lands in the copy), then after the month docs writes `gantt/calEvents` = { json (the answer), today, at }. PWA (cal area): used when `today` = the device's day, ≤ 20 min old (online), and after a calendar edit only once it's the re-copy that edit asked for (`okAt`). Else server.
 - Not moved: `getCalendarPicker` (only when the calendars panel opens).
 - Tests: store-test (timer + Cal Events block), smoke `pwa-d2` (timer + Cal Events parts).
+
+## H. Sync from the database (2026-11-23 23:20, Julius: "keep it rolling")
+- Built unattended, untested live. Shim `syncDb(req)` answers `getSyncState` (NAMES when days + ref are on): `days.history()` (incremental `up` catch-up, cache for the rest) → `days.build` for the requested dates → per-field hash diff (th / jh / ph / hh, same as `syncDiff_`); cards via `refCards()` (first call `refs.cards()`, then `ganttRef where up > last − 10 min`, `del` drops a card) → changed / new cards + `refManifest` when the hash differs; `inbox` from the Inbox listener when asked. `build: ''` (page ignores), `timing.fromDb`.
+- Server instead when: first sync of the page session, > 10 min since the last server sync (`lastSrvSync`, set by any server getSyncState incl. batches), offline, a part not ready. The schedule move (`moveScheduleToNotes_`) still runs in `importsTick` every 5 min.
+- Inbox (D2 change): one `onSnapshot` on `ganttInbox` keeps the items in memory; reads / writes answer from it (no full read every 3 min).
+- Read budget note: Firestore free tier = 50k reads/day; keep periodic paths incremental or listener-based.
+- Tests: smoke `pwa-hist` (sync part: unchanged → empty, other device's day + card edit → exactly those, no full card re-read).

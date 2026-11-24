@@ -14,7 +14,7 @@
    Sheet. Set = the areas in STORE_DB_AREAS_ live in Firestore, and the timed trigger storeMirror() copies them
    into the Sheet (backup mirror) and moves lost edits from Firestore into the Backup tab. */
 const FIREBASE_PROJECT_ = 'gantt-2ee94';
-const STORE_DB_AREAS_ = ['kim', 'days', 'ref', 'kv', 'cal', 'focus', 'inbox', 'plan']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
+const STORE_DB_AREAS_ = ['kim', 'days', 'ref', 'kv', 'cal', 'focus', 'inbox', 'plan', 'timer']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
 const STORE_BACKEND = {
   kim: 'sheet',
   days: 'sheet',
@@ -34,7 +34,7 @@ const STORE_BACKEND = {
 if (FIREBASE_PROJECT_) STORE_DB_AREAS_.forEach(a => { STORE_BACKEND[a] = 'db'; });
 // Archive = Reference cards marked deleted in the same docs (NOTES H5 C), so it follows Reference.
 if (STORE_BACKEND.ref === 'db') STORE_BACKEND.archive = 'db';
-const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true, kv: true, cal: true, focus: true, inbox: true, plan: true };
+const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true, kv: true, cal: true, focus: true, inbox: true, plan: true, timer: true };
 
 function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
@@ -94,7 +94,7 @@ const StoreFs = {
     Object.keys((doc && doc.fields) || {}).forEach(k => {
       const v = doc.fields[k];
       out[k] = 'integerValue' in v ? Number(v.integerValue) : 'doubleValue' in v ? Number(v.doubleValue) : 'stringValue' in v ? v.stringValue
-        : 'timestampValue' in v ? Date.parse(v.timestampValue) : null;
+        : 'timestampValue' in v ? Date.parse(v.timestampValue) : 'mapValue' in v ? this.dec_(v.mapValue) : null;
     });
     if (doc && doc.name) out.id_ = doc.name.split('/').pop();
     return out;
@@ -104,7 +104,8 @@ const StoreFs = {
     Object.keys(obj).forEach(k => {
       const v = obj[k];
       fields[k] = v instanceof Date ? { timestampValue: v.toISOString() }
-        : typeof v === 'number' && Math.floor(v) === v ? { integerValue: String(v) } : { stringValue: String(v == null ? '' : v) };
+        : typeof v === 'number' && Math.floor(v) === v ? { integerValue: String(v) }
+        : v && typeof v === 'object' ? { mapValue: this.enc_(v) } : { stringValue: String(v == null ? '' : v) };
     });
     return { fields: fields };
   },
@@ -113,6 +114,11 @@ const StoreFs = {
   // Only the given fields change; the doc's other fields stay (created when missing).
   patch(path, obj) {
     const mask = Object.keys(obj).map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&');
+    this.req_('patch', path + '?' + mask, this.enc_(obj)); return obj;
+  },
+  // Only the listed field paths change (nested ones like 'tmr.`op`' too); obj holds their values as maps.
+  patchPaths(path, obj, paths) {
+    const mask = paths.map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&');
     this.req_('patch', path + '?' + mask, this.enc_(obj)); return obj;
   },
   // Docs of one collection matching every [field, op, value] (op: >, >=, <, <=, ==), decoded.
@@ -952,12 +958,62 @@ const Store = {
       const n = sh.getLastRow() - 1;
       return new Set(n > 0 ? sh.getRange(2, 1, n, 1).getValues().map(r => String(r[0])) : []);
     },
-    append(tuples) {
+    append(tuples, sheetOnly) {
       if (!tuples.length) return;
       const sh = this.sheet_();
       const range = sh.getRange(sh.getLastRow() + 1, 1, tuples.length, TIMER_HEADERS.length);
       range.setNumberFormat('@'); // Date/At stay text, never turned into dates in another time zone
       range.setValues(tuples);
+      if (!sheetOnly && this.db_()) { try { this.putDb_(tuples); } catch (e) { console.error('timer doc write: ' + e.message); } }
+    },
+    /* Database (H5 B, 2026-11-23): each event also sits in its day's doc ganttDays/<date> as map field tmr.<op> = the
+       event JSON (getTimerEvents' shape). The existing day rules allow it (sections untouched), so no rules change;
+       a map merge never loses another device's event. Seeded once (last 30 days, gantt/timerMeta { seeded, from });
+       the trigger copies events the app wrote into the Timer Log tab. */
+    db_() { return storeBackend_('timer') === 'db'; },
+    ready_() { return this.db_() && Store.props.getProperty('timerSeeded') === '1'; },
+    ev_(t) { return { op: String(t[0]), date: String(t[1]), at: Date.parse(t[2]), act: String(t[3]), blk: String(t[4] || ''), item: String(t[5] || ''),
+      name: String(t[6] || ''), value: t[7] === '' || t[7] === null ? null : Number(t[7]), dev: String(t[8] || '') }; },
+    q_(op) { return 'tmr.`' + String(op).replace(/[`\\]/g, '_') + '`'; },
+    putDb_(tuples) {
+      const by = {};
+      tuples.forEach(t => { const d = String(t[1]).slice(0, 10); if (/^\d{4}-\d{2}-\d{2}$/.test(d)) (by[d] = by[d] || []).push(t); });
+      Object.keys(by).forEach(date => {
+        const path = 'ganttDays/' + date, has = StoreFs.get(path), tmr = {}, paths = by[date].map(t => this.q_(t[0]));
+        by[date].forEach(t => { tmr[String(t[0]).replace(/[`\\]/g, '_')] = JSON.stringify(this.ev_(t)); });
+        const obj = { tmr: tmr };
+        if (!has) { obj.date = date; obj.at = 0; paths.push('date', 'at'); }
+        StoreFs.patchPaths(path, obj, paths);
+      });
+    },
+    // Events in the day docs on or after `since` (yyyy-MM-dd).
+    dbEvents(since) {
+      const out = [];
+      StoreFs.query('ganttDays', [['date', '>=', since || '0000-00-00']]).forEach(d => {
+        Object.keys(d.tmr || {}).forEach(k => { try { const e = JSON.parse(d.tmr[k]); if (e && e.op) out.push(e); } catch (x) {} });
+      });
+      return out;
+    },
+    seed_() {
+      if (!this.db_() || Store.props.getProperty('timerSeeded') === '1') return 0;
+      const from = Utilities.formatDate(new Date(Date.now() - 30 * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      const rows = this.rows().map(r => [String(r[0]), r[1] instanceof Date ? Utilities.formatDate(r[1], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(r[1]),
+        r[2] instanceof Date ? r[2].toISOString() : String(r[2]), r[3], r[4], r[5], r[6], r[7], r[8]]).filter(t => t[0] && t[1] >= from);
+      this.putDb_(rows);
+      StoreFs.set('gantt/timerMeta', { seeded: Date.now(), from: from, at: Date.now() });
+      Store.props.setProperty('timerSeeded', '1');
+      return rows.length;
+    },
+    // Trigger: seed once, then events the app wrote (last 14 days) that the tab doesn't have → appended.
+    mirror() {
+      if (!this.db_()) return 0;
+      const n = this.seed_();
+      const since = Utilities.formatDate(new Date(Date.now() - 14 * 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      const have = this.ops(), add = this.dbEvents(since).filter(e => !have.has(String(e.op)) && e.at > 0).sort((a, b) => a.at - b.at)
+        .map(e => [String(e.op), String(e.date), new Date(Number(e.at)).toISOString(), String(e.act), e.blk || '', e.item || '', e.name || '',
+          e.value === null || e.value === undefined ? '' : Number(e.value), e.dev || '']);
+      this.append(add, true);
+      return n + add.length;
     }
   },
 
@@ -1104,6 +1160,14 @@ const Store = {
         failed: JSON.stringify(info.failed || []), main: String(info.main || ''), tz: String(info.tz || ''), via: String(info.via || ''), at: now, up: new Date(now) });
       props.setProperty('calSyncH', JSON.stringify(hs));
       return { months: Object.keys(hs).length, written: list.length, big: big, at: now };
+    },
+    // H5 B: the finished Cal Events list (getCalendarEvents' answer) as doc gantt/calEvents = { json, today, at, up };
+    // written after the month docs, so its `at` is ≥ the copy's (the app waits for that after an edit).
+    events(r) {
+      if (!this.db_() || !r) return false;
+      const now = Date.now();
+      StoreFs.set('gantt/calEvents', { json: JSON.stringify(r), today: String(r.today || ''), at: now, up: new Date(now) });
+      return true;
     }
   },
 
@@ -1115,7 +1179,7 @@ const Store = {
     return storeLocked_(() => {
       const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), ref: Store.ref.mirror(), kv: Store.kv.mirror(), backups: 0 };
       // D2: Focus, Inbox, Plan (each guarded: one failing area never stops the others).
-      ['focus', 'inbox', 'plan'].forEach(a => { try { out[a] = Store[a].mirror(); } catch (e) { out[a] = 'error: ' + e.message; console.error(a + ' mirror: ' + e.message); } });
+      ['focus', 'inbox', 'plan', 'timer'].forEach(a => { try { out[a] = Store[a].mirror(); } catch (e) { out[a] = 'error: ' + e.message; console.error(a + ' mirror: ' + e.message); } });
       StoreFs.list('ganttBackup').forEach(b => {
         const where = b.area === 'focus' ? 'Focus' : b.area === 'kim' ? Store.kim.SHEET : b.area === 'days' && b.date ? b.date : b.area === 'ref' && b.card ? 'Reference ' + b.card : 'Database: ' + b.area;
         const col = b.area === 'kim' ? 'A2' : b.area === 'days' ? (Store.days.LABEL[b.field] || b.field || '') : b.area === 'ref' ? 'Content' : '';

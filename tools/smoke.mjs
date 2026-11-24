@@ -3725,7 +3725,7 @@ if (only('pwa-d2')) {
   const { execFileSync } = await import('child_process');
   const http = await import('http');
   const dist = path.join(os.tmpdir(), 'gantt-pwa-d2-smoke');
-  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['focus', 'inbox', 'plan'], apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
+  const cfg = { owner: 'juliussimtim@gmail.com', areas: ['focus', 'inbox', 'plan', 'timer', 'cal'], apiKey: 'AIzaTEST', authDomain: 'g.firebaseapp.com', projectId: 'g-test', appId: '1:2:web:3' };
   execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec', PWA_FIREBASE_CONFIG: JSON.stringify(cfg) }, stdio: 'pipe' });
   const FAKE = `if (!window.firebase) window.firebase = (function () {
     const now = Date.now();
@@ -3740,6 +3740,11 @@ if (only('pwa-d2')) {
           ev: JSON.stringify({ eventId: 'ev1', startMs: 100, title: 'Ev', done: false, date: '2026-11-23', allDay: true, recurring: false, time: '' }) },
         'ganttPlan/p2': { id: 'p2', date: '', group: 'next', rank: 1, ref: 'tid:bb', title: 'Two', target: '', event: '', updated: '', del: 0, at: 1 },
         'ganttPlan/p0': { id: 'p0', date: '', group: 'next', rank: 2, ref: 'tid:zz', title: 'Removed', del: 1, at: 1 },
+        'gantt/timerMeta': { seeded: 1, from: '2020-01-01' },
+        ['ganttDays/' + ${JSON.stringify(today)}]: { date: ${JSON.stringify(today)}, at: 5, tasks: 'x', tasksAt: 5,
+          tmr: { o1: JSON.stringify({ op: 'o1', date: ${JSON.stringify(today)}, at: now - 60000, act: 'start', blk: 'b1', item: '', name: '', value: null, dev: 'pc' }) } },
+        'gantt/calEvents': { json: JSON.stringify({ today: ${JSON.stringify(today)}, events: [{ id: 'e1', title: 'Dentist' }], archive: { ready: 0, auto: false } }),
+          today: localStorage.getItem('fake.ceDay') || ${JSON.stringify(today)}, at: now },
         'gantt/calBacklog': { items: JSON.stringify([{ id: 'u1', date: '2026-11-01', title: 'Old task', colorId: '11', urg: '0', color: '#f00' }]),
           sweep: JSON.stringify({ swept: 2, at: now }), at: now - Number(localStorage.getItem('fake.blAge') || 0) } } };
     const snap = (id, d) => ({ id, exists: !!d, data: () => d && JSON.parse(JSON.stringify(d)) });
@@ -3750,23 +3755,29 @@ if (only('pwa-d2')) {
         get: () => Promise.resolve(snap(id, S.docs[k])),
         set: (rec, o) => {
           const cur = S.docs[k];
-          if (cur && !(rec.at > cur.at)) return refuse();
+          if (cur && typeof rec.at === 'number' && !(rec.at > cur.at)) return refuse();
           if (coll === 'ganttFocus' && cur && rec.base !== cur.at) return refuse();
           if (coll === 'ganttFocus' && S.refuseOnce) { S.refuseOnce--; S.docs[k] = Object.assign({}, cur, { at: cur.at + 1 }); return refuse(); } // someone saved in between
-          S.docs[k] = o && o.merge && cur ? Object.assign({}, cur, rec) : Object.assign({}, rec);
+          const inc = v => v && v.__inc !== undefined;
+          const deep = (a, r) => { const out = Object.assign({}, a); Object.keys(r).forEach(f => { const v = r[f];
+            out[f] = inc(v) ? (Number(a && a[f]) || 0) + v.__inc : v && typeof v === 'object' && !Array.isArray(v) && a && typeof a[f] === 'object' ? deep(a[f], v) : v; }); return out; };
+          if (coll === 'ganttDays' && (!rec.date || rec.date !== id)) return refuse();
+          S.docs[k] = o && o.merge && cur ? deep(cur, rec) : deep({}, rec);
           S.writes.push(k);
           return Promise.resolve();
         },
         onSnapshot: () => () => {}
       };
     }
+    const all = n => Object.keys(S.docs).filter(k => k.startsWith(n + '/')).map(k => snap(k.slice(n.length + 1), S.docs[k]));
     const collRef = n => ({ doc: id => docRef(n, id), add: r => { S.backups.push(r); return Promise.resolve(); },
-      get: () => Promise.resolve({ docs: Object.keys(S.docs).filter(k => k.startsWith(n + '/')).map(k => snap(k.slice(n.length + 1), S.docs[k])) }),
-      where: () => ({ onSnapshot: () => () => {} }), onSnapshot: () => () => {} });
+      get: () => Promise.resolve({ docs: all(n) }),
+      where: (f, op, v) => ({ get: () => Promise.resolve({ docs: all(n).filter(x => x.data()[f] >= v) }), onSnapshot: () => () => {} }),
+      onSnapshot: (cb) => { if (n === 'ganttCal') setTimeout(() => cb({ docChanges: () => [] }), 0); return () => {}; } });
     const auth = () => ({ onAuthStateChanged: cb => setTimeout(() => cb({ email: 'juliussimtim@gmail.com' }), 0), signOut: () => {} });
     auth.GoogleAuthProvider = function () { this.setCustomParameters = () => {}; };
     const firestore = () => ({ enablePersistence: () => Promise.resolve(), collection: collRef });
-    firestore.FieldValue = { serverTimestamp: () => Date.now() };
+    firestore.FieldValue = { serverTimestamp: () => Date.now(), increment: n => ({ __inc: n }) };
     return { initializeApp: () => {}, auth, firestore };
   })();`;
   const srv = http.createServer((qq, r) => {
@@ -3794,6 +3805,10 @@ if (only('pwa-d2')) {
   await pg.goto(base + '#k=smokekey'); await pg.waitForTimeout(3000);
   const run = (fn, ...a) => pg.evaluate(([fn, a]) => new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(e => bad(e.message))[fn](...a)), [fn, a]);
   const fsd = k => pg.evaluate(k => __fs.docs[k], k);
+  // ---- Cal Events list (H5 B): the server's published list when it's today's.
+  calls.length = 0;
+  const ce = await run('getCalendarEvents');
+  if (calls.includes('getCalendarEvents') || !ce || ce.events[0].title !== 'Dentist') errs.push('getCalendarEvents from doc: ' + JSON.stringify(ce) + ' ' + calls.join());
   // ---- Focus
   calls.length = 0;
   const f0 = await run('getFocus');
@@ -3861,6 +3876,18 @@ if (only('pwa-d2')) {
   if (calls.includes('calSyncNow')) errs.push('database backlog read asked for a calendar re-copy');
   // The trigger caches the linked event's info on the row.
   await pg.evaluate(() => { const d = Object.values(__fs.docs).find(x => x.ref === 'tid:ee'); d.ev = JSON.stringify({ eventId: 'new', startMs: 5, title: 'L', done: false, date: '2026-11-23', allDay: true, recurring: false, time: '' }); });
+  // ---- Block timer (H5 B): read from the day docs, save as one map key per event (merge keeps the others).
+  calls.length = 0;
+  let te = await run('getTimerEvents', today);
+  if (calls.includes('getTimerEvents') || !Array.isArray(te) || te.map(e => e.op).join() !== 'o1') errs.push('getTimerEvents from docs: ' + JSON.stringify(te) + ' ' + calls.join());
+  const ts = await run('saveTimerEvents', [{ op: 'o2', act: 'pause', date: today, at: Date.now(), blk: 'b1' }, { op: 'o3', act: 'start', date: '2026-12-30', at: Date.now(), blk: 'b2' }, { op: 'bad', act: 'nope', date: today, at: 1 }]);
+  if (!ts || ts.saved.join() !== 'o2,o3' || calls.includes('saveTimerEvents')) errs.push('saveTimerEvents: ' + JSON.stringify(ts));
+  const td = await fsd('ganttDays/' + today);
+  if (!td.tmr.o1 || !td.tmr.o2 || td.tasks !== 'x' || td.at !== 5) errs.push('timer save changed more than its key: ' + JSON.stringify(td).slice(0, 200));
+  const nd = await fsd('ganttDays/2026-12-30');
+  if (!nd || nd.at !== 0 || !nd.tmr.o3) errs.push('timer save on a day with no doc: ' + JSON.stringify(nd));
+  te = await run('getTimerEvents', today);
+  if (te.map(e => e.op).join() !== 'o1,o2,o3') errs.push('timer read after save: ' + te.map(e => e.op).join());
   // ---- Batched reads: the database answers what it can; only the rest goes to the server.
   batches.length = 0; calls.length = 0;
   const bo = await run('batchCalls', [['getFocus', []], ['getInbox', []], ['getSyncState', [{}]], ['getPlan', [today]]]);
@@ -3879,17 +3906,20 @@ if (only('pwa-d2')) {
   if (!s4 || !s4.data || JSON.parse((await fsd('ganttFocus/main')).v).cats[0].name !== 'Offline name') errs.push('offline Focus save: ' + JSON.stringify(s4).slice(0, 120));
   await run('planSave', { date: today, type: 'target', id: 'p2', target: 'x' }).catch(() => {});
   if ((await fsd('ganttPlan/p2')).target === 'x' || !calls.includes('planSave')) errs.push('offline Plan edit was saved on the device');
-  if (calls.some(c => c !== 'planSave')) errs.push('offline: other calls tried the server: ' + calls.join());
+  if (calls.some(c => c !== 'planSave' && c !== 'calSyncNow')) errs.push('offline: other calls tried the server: ' + calls.join());
   await ctx.setOffline(false);
-  // ---- Stale backlog doc (trigger stopped) → server.
-  await pg.evaluate(() => localStorage.setItem('fake.blAge', String(30 * 60000)));
+  // ---- Stale backlog doc (trigger stopped) → server; yesterday's Cal Events list → server.
+  await pg.evaluate(() => { localStorage.setItem('fake.blAge', String(30 * 60000)); localStorage.setItem('fake.ceDay', '2020-01-01'); });
   await pg.reload(); await pg.waitForTimeout(2500);
   calls.length = 0;
   bl = await run('calBacklogSync');
   if (!calls.includes('calBacklogSync') || !bl.srv) errs.push('stale backlog doc did not go to the server');
+  calls.length = 0;
+  await run('getCalendarEvents');
+  if (!calls.includes('getCalendarEvents')) errs.push("yesterday's Cal Events list was used");
   await ctx.close(); srv.close();
   if (errs.length) { fails += errs.length; console.error('✗ pwa-d2:\n  ' + errs.join('\n  ')); }
-  else console.log('✓ pwa-d2: Focus (device merge, base refusal re-merge, loser backup), Inbox, Plan + Cal Backlog from the database; batch split; offline Focus + Inbox saves, Plan read-only');
+  else console.log('✓ pwa-d2: Focus (device merge, base refusal re-merge, loser backup), Inbox, Plan + Cal Backlog, timer events, Cal Events list from the database; batch split; offline Focus + Inbox saves, Plan read-only');
 }
 for (const [name, view] of (only('resume') ? [['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
   const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' });

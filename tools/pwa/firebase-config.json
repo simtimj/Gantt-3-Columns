@@ -9,7 +9,8 @@
     "cal",
     "focus",
     "inbox",
-    "plan"
+    "plan",
+    "timer"
   ],
   "apiKey": "AIzaSyCOBC30XwNl_2wiAszDSmMUdoQTu1gMe18",
   "authDomain": "gantt-2ee94.firebaseapp.com",

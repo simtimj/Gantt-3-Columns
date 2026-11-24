@@ -21,9 +21,16 @@ function timerRowToEvent_(r) {
 // Events for days on or after `since` (yyyy-MM-dd). Read after the page has drawn, never during the load.
 function getTimerEvents(since) {
   const from = String(since || '');
-  return Store.timer.rows()
+  const list = Store.timer.rows()
     .map(timerRowToEvent_)
     .filter(e => e.op && TIMER_ACTIONS[e.act] && !isNaN(e.at) && (!from || e.date >= from));
+  if (!Store.timer.ready_()) return list;
+  // Database (H5 B): events the app saved straight to the day docs, not in the tab yet.
+  const have = new Set(list.map(e => e.op));
+  let extra = [];
+  try { extra = Store.timer.dbEvents(from).filter(e => !have.has(e.op) && TIMER_ACTIONS[e.act] && Number(e.at) > 0); } catch (e) { console.error('timer read: ' + e.message); }
+  return list.concat(extra.map(e => ({ op: String(e.op), date: String(e.date), at: Number(e.at), act: String(e.act), blk: String(e.blk || ''),
+    item: String(e.item || ''), name: String(e.name || ''), value: e.value === null || e.value === undefined || isNaN(Number(e.value)) ? null : Number(e.value), dev: String(e.dev || '') })));
 }
 
 // Appends the events whose op id isn't in the tab yet. Returns the op ids now stored (new + already there),

@@ -2681,12 +2681,16 @@ function calCopySync_() {
   if (!lock.tryLock(25000)) return { busy: true };
   try {
     const t0 = Date.now(), w = calCopyWindow_(), tz = Session.getScriptTimeZone();
+    // H5 B (2026-11-23): the Cal Events list (with its auto archive) first, so the copy below already shows the archive.
+    let ce = null;
+    try { ce = getCalendarEvents(); } catch (e) { console.error('Cal Events copy: ' + e.message); }
     const r = calPanelRead_(parseDate_(w.from), parseDate_(w.to), tz);
     calPanelAttachMeta_(r.events, true);
     const by = {};
     w.months.forEach(m => { by[m] = []; });
     r.events.forEach(ev => calCopyMonths_(ev, w.months).forEach(m => by[m].push(ev)));
     const out = Store.cal.sync(by, { from: w.from, to: w.to, tz: tz, cals: r.calendars, failed: r.failed, main: EVENT_CALENDARS[0], via: r.via });
+    if (ce) try { Store.cal.events(ce); } catch (e) { console.error('Cal Events copy: ' + e.message); }
     out.ms = Date.now() - t0;
     return out;
   } finally { lock.releaseLock(); }

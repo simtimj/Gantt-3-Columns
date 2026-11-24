@@ -70,9 +70,9 @@ g = ctx.getKim(); assert.equal(g.html, '<div>legacy</div>'); assert.equal(g.at, 
 // Database backend without a Firebase project fails loudly instead of silently using the Sheet.
 vm.runInContext("STORE_BACKEND.kim = 'db'", ctx);
 assert.throws(() => ctx.getKim(), /FIREBASE_PROJECT_ is empty/);
-vm.runInContext("STORE_BACKEND.timer = 'db'", ctx);
-assert.throws(() => vm.runInContext("storeBackend_('timer')", ctx), /not built yet/);
-vm.runInContext("STORE_BACKEND.timer = 'sheet'", ctx);
+vm.runInContext("STORE_BACKEND.calBacklog = 'db'", ctx);
+assert.throws(() => vm.runInContext("storeBackend_('calBacklog')", ctx), /not built yet/);
+vm.runInContext("STORE_BACKEND.calBacklog = 'sheet'", ctx);
 console.log('✓ store-test: Keep In Mind through Store.kim');
 
 // Database step (2026-11-22, NOTES H3): Keep In Mind on Firestore (fake REST), Sheet mirror, lost-edit backups.
@@ -481,5 +481,38 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
     const tick = dctx.calBacklogTick_();
     assert.equal(tick.swept, 2); assert.equal(JSON.parse(fsDocs['gantt/calBacklog'].sweep.stringValue).swept, 2);
     console.log('✓ store-test: Focus / Inbox / Plan + Cal Backlog on Firestore (seeds, server saves, device merge = server merge, mirror back, event cache, backlog publish)');
+  }
+
+  // H5 B (2026-11-23): Block timer events in the day docs (map tmr.<op>), seed, read merge, mirror; Cal Events list doc.
+  {
+    const eq = (a, b, m) => assert.deepEqual(JSON.parse(JSON.stringify(a)), b, m);
+    const tday = new Date().toISOString().slice(0, 10);
+    vm.runInContext(fs.readFileSync('Timer.gs', 'utf8'), dctx);
+    vm.runInContext("Utilities.formatDate = (d, tz, f) => f === 'yyyy-MM-dd' ? new Date(d).toISOString().slice(0, 10) : new Date(d).toISOString().slice(0, 16).replace('T', ' ');", dctx);
+    const tl = ss.getSheetByName('Timer Log') || ss.insertSheet('Timer Log');
+    tl.rows.length = 0; tl.rows.push(['Op', 'Date', 'At', 'Action', 'Block', 'Item', 'Name', 'Value', 'Device'],
+      ['o1', tday, new Date().toISOString(), 'start', 'b1', '', '', '', 'pc'], ['old', '2020-01-01', '2020-01-01T10:00:00Z', 'start', 'b0', '', '', '', 'pc']);
+    vm.runInContext('Store.timer.mirror()', dctx);
+    assert.equal(dctx.PropertiesService.getScriptProperties().getProperty('timerSeeded'), '1');
+    const tdoc = () => fsDocs['ganttDays/' + tday];
+    assert.ok(tdoc() && tdoc().tmr && tdoc().tmr.mapValue.fields.o1, 'seeded event in the day doc');
+    assert.equal(Object.keys(fsDocs).filter(k => k === 'ganttDays/2020-01-01').length, 0, 'only the last 30 days seeded');
+    // The app adds an event straight to the doc → read merges it; the trigger copies it into the tab once.
+    tdoc().tmr.mapValue.fields.o2 = { stringValue: JSON.stringify({ op: 'o2', date: tday, at: Date.now(), act: 'pause', blk: 'b1', item: '', name: '', value: null, dev: 'phone' }) };
+    eq(dctx.getTimerEvents(tday).map(e => e.op), ['o1', 'o2']);
+    vm.runInContext('Store.timer.mirror()', dctx); vm.runInContext('Store.timer.mirror()', dctx);
+    eq(tl.rows.slice(1).map(r => r[0]), ['o1', 'old', 'o2']);
+    // Server save (old page) → tab + day doc; a day with no doc gets one (date + at).
+    dctx.saveTimerEvents([{ op: 'o3', act: 'finish', date: '2026-12-30', at: Date.now(), blk: 'b9' }]);
+    assert.ok(fsDocs['ganttDays/2026-12-30'].tmr.mapValue.fields.o3); assert.equal(fsDocs['ganttDays/2026-12-30'].date.stringValue, '2026-12-30');
+    assert.equal(fsDocs['ganttDays/2026-12-30'].at.integerValue, '0');
+    eq(dctx.getTimerEvents('2026-12-30').map(e => e.op), ['o3'], 'no double from tab + doc');
+    // Cal Events list published with the calendar copy, after the month docs.
+    vm.runInContext("getCalendarEvents = () => ({ today: '2026-11-23', events: [{ id: 'x', title: 'Dentist' }], archive: { ready: 0, auto: false } });", dctx);
+    dctx.calSyncNow();
+    const ce = fsDocs['gantt/calEvents'];
+    assert.equal(JSON.parse(ce.json.stringValue).events[0].title, 'Dentist'); assert.equal(ce.today.stringValue, '2026-11-23');
+    assert.ok(Number(ce.at.integerValue) >= Number(fsDocs['ganttCal/meta'].at.integerValue), 'list stamped after the copy');
+    console.log('✓ store-test: timer events in day docs (seed 30 days, read merge, mirror, server save) + Cal Events list doc');
   }
 }

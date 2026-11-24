@@ -110,6 +110,10 @@
     var REF = AREAS.indexOf('ref') >= 0;
     var REF_NAMES = { saveReferenceItem: 1, addReferenceItem: 1, saveReferenceOrder: 1, saveReferenceExpanded: 1, deleteReferenceItem: 1, getArchive: 1, restoreArchivedItem: 1 };
     if (REF) Object.keys(REF_NAMES).forEach(function (n) { NAMES[n] = 1; });
+    // App settings (H5 F): Fun, New things, Cal Events hide list, pins, auto-archive.
+    var KV = AREAS.indexOf('kv') >= 0;
+    var KV_NAMES = { getFun: 1, saveFun: 1, getNewThings: 1, saveNewThings: 1, getCalEventsHide: 1, setCalEventsHide: 1, setReferencePin: 1, setArchiveAuto: 1 };
+    if (KV) Object.keys(KV_NAMES).forEach(function (n) { NAMES[n] = 1; });
     var OWNER = String(FB_CFG.owner || '').toLowerCase(), cfg = Object.assign({}, FB_CFG);
     delete cfg.owner; delete cfg._note; delete cfg.areas;
     var db = null, user = null, lastAt = null, watching = false;
@@ -481,6 +485,77 @@
        deleteReferenceItem / getArchive / restoreArchivedItem. A deleted card keeps its doc with del = deleted-at (that's
        the Archive). Online only (offline, Reference stays read-only); not seeded yet / card not in the database → the
        server. Newest wins: every write carries a newer `at`; a refused write → the losing copy to ganttBackup + a sync. */
+    /* ---------- App settings (H5 F, 2026-11-23) ----------
+       Doc gantt/kv_<key> = { key, v (the same JSON string the server keeps in a property), at, up, dev }; same rules
+       as gantt/kim (newest `at` wins). Only once gantt/kvMeta.seeded (the server copied the properties in); else, or
+       refused / offline → the server. Answers match the server functions exactly (Fun / New things merge by id,
+       newest u wins, 30-day tombstones). */
+    function kvArea() {
+      var seeded = false;
+      function kdoc(k) { return db.collection('gantt').doc('kv_' + k); }
+      function ready() {
+        if (!navigator.onLine) return Promise.resolve(false);
+        if (seeded) return Promise.resolve(true);
+        return db.collection('gantt').doc('kvMeta').get({ source: 'server' }).then(function (s) { return (seeded = !!(s.exists && s.data().seeded)); });
+      }
+      function get(k) { return kdoc(k).get({ source: 'server' }).then(function (s) { return s.exists ? s.data() : null; }); }
+      function put(k, v, prev) {
+        var at = Math.max(Date.now(), (prev && Number(prev.at) || 0) + 1);
+        return kdoc(k).set({ key: k, v: String(v), at: at, up: firebase.firestore.FieldValue.serverTimestamp(), dev: dev });
+      }
+      function json(d, def) { try { return d && d.v ? JSON.parse(d.v) : def; } catch (e) { return def; } }
+      function mergeList(a, b) {
+        var by = {}, cut = Date.now() - 30 * 864e5;
+        (a || []).forEach(function (i) { if (i && i.id) by[i.id] = i; });
+        (b || []).forEach(function (i) { if (i && i.id && (!by[i.id] || Number(i.u || 0) >= Number(by[i.id].u || 0))) by[i.id] = i; });
+        return Object.keys(by).map(function (k) { return by[k]; }).filter(function (i) { return !(i.x && Number(i.u || 0) < cut); });
+      }
+      function merged(key, def, what) {
+        return function (data) {
+          return get(key).then(function (d) {
+            var cur = json(d, def), out = { v: 1, items: mergeList(cur.items, data && data.items), cats: mergeList(cur.cats, data && data.cats) }, txt = JSON.stringify(out);
+            if (txt.length > 8500) throw new Error(what + ' too big (' + txt.length + ' chars)');
+            return put(key, txt, d).then(function () { return out; });
+          });
+        };
+      }
+      function hide(d) { var h = json(d, null); return h && Array.isArray(h.cals) && Array.isArray(h.words) ? h : { cals: [], words: [] }; }
+      function pinsOf(d) { var v = json(d, []); return Array.isArray(v) ? v.map(String) : []; }
+      var RUN = {
+        getFun: function () { return get('funData').then(function (d) { return json(d, { v: 1, items: [], cats: [] }); }); },
+        saveFun: merged('funData', { v: 1, items: [], cats: [] }, 'Fun list'),
+        getNewThings: function () { return get('newData').then(function (d) { return json(d, { v: 1, items: [] }); }); },
+        saveNewThings: merged('newData', { v: 1, items: [] }, 'New things log'),
+        getCalEventsHide: function () { return get('ceHide').then(hide); },
+        setCalEventsHide: function (h) {
+          var out = { cals: (h && Array.isArray(h.cals) ? h.cals : []).filter(function (c) { return c && c.id; }).slice(0, 30).map(function (c) { return { id: String(c.id).slice(0, 200), name: String(c.name || c.id).slice(0, 80) }; }),
+            words: (h && Array.isArray(h.words) ? h.words : []).map(function (w) { return String(w || '').trim().slice(0, 40); }).filter(Boolean).slice(0, 60) };
+          return get('ceHide').then(function (d) { return put('ceHide', JSON.stringify(out), d); }).then(function () { return out; });
+        },
+        setReferencePin: function (id, on) {
+          id = String(id || '');
+          return get('refPinned').then(function (d) {
+            var list = pinsOf(d); if (!id) return list;
+            list = list.filter(function (x) { return x !== id; }); if (on) list.unshift(id);
+            list = list.slice(0, 200);
+            return put('refPinned', JSON.stringify(list), d).then(function () { return list; });
+          });
+        },
+        setArchiveAuto: function (on) { return get('archiveAuto').then(function (d) { return put('archiveAuto', on ? '1' : '0', d); }).then(function () { return !!on; }); }
+      };
+      return {
+        run: function (name, a) { return ready().then(function (ok) { return ok ? RUN[name].apply(null, a || []) : null; }); },
+        // Pins + card categories for the opening, or null (→ the device's last opening).
+        opening: function () {
+          return ready().then(function (ok) {
+            if (!ok) return null;
+            return Promise.all([get('refPinned'), get('cardCats')]).then(function (x) { return { refPins: pinsOf(x[0]), cardCats: json(x[1], null), has: !!(x[0] && x[1]) }; });
+          }).catch(function () { return null; });
+        }
+      };
+    }
+    var kv = KV ? kvArea() : null;
+
     function refArea() {
       var seeded = false, watching = false, syncT = 0;
       function coll() { return db.collection('ganttRef'); }
@@ -646,7 +721,7 @@
     /* ---------- Opening from the database (H5 D) ----------
        Same answer as the server's getWorkspaceData({ fast }): days (today −7 … +3, with hashes), Reference (live
        cards), Urgent (every day with an urgency or due tag), Notes seeds (newest must / focus section), plus the
-       card categories and pins from this device's last opening (they move with step F; the sync right after the
+       card categories and pins from the database (H5 F; before its seed: this device's last opening; the sync right after the
        opening refreshes everything). Missing any part → the server answers as before. */
     var PAST = 7, FUTURE = 3;
     function addDays(d, n) { var t = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) + n * 864e5); return t.toISOString().slice(0, 10); }
@@ -655,10 +730,12 @@
       var last = null;
       try { last = JSON.parse(ls.get(DATA_LS) || 'null'); } catch (e) {}
       last = last && last.data;
-      if (!last || !last.cardCats) return Promise.resolve(null);
+      if (!kv && !(last && last.cardCats)) return Promise.resolve(null);
       var t0 = Date.now();
-      return Promise.all([days.history(), refs.cards()]).then(function (x) {
-        var by = x[0], cards = x[1];
+      return Promise.all([days.history(), refs.cards(), kv ? kv.opening() : null]).then(function (x) {
+        var by = x[0], cards = x[1], set = x[2] && x[2].has ? x[2] : null;
+        // Pins + card categories: from the database (H5 F), else this device's last opening, else the server.
+        if (!set) { if (!last || !last.cardCats) return null; set = { cardCats: last.cardCats, refPins: last.refPins || [] }; }
         if (!by || !cards) return null;
         var today = days.ymd(Date.now()), out = days.build(by, addDays(today, -PAST), addDays(today, FUTURE));
         if (!out) return null;
@@ -677,7 +754,7 @@
           });
         });
         return { days: out, reference: reference, refManifestHash: hash(JSON.stringify(manifest)), urgent: urgent, inbox: [],
-          cardCats: last.cardCats, refPins: last.refPins || [], notesSeeds: seeds, today: today,
+          cardCats: set.cardCats, refPins: set.refPins, notesSeeds: seeds, today: today,
           timing: { total: Date.now() - t0, steps: { dbRead: t1 - t0, build: Date.now() - t1 }, release: '', fast: true, fromDb: true,
             dayRows: Object.keys(by).length, refRows: reference.length } };
       });
@@ -712,6 +789,7 @@
           if (name === 'getDaysRange') return withTimeout(days.range(String(args[0]), String(args[1])), 5000);
           if (DAY_NAMES[name]) return days.run(name, args);
           if (REF_NAMES[name]) return refs.run(name, args);
+          if (KV_NAMES[name]) return kv.run(name, args);
           return name === 'getKim' ? read() : save(args[0], args[1]);
         }).catch(function (e) { console.warn('Firestore → server: ' + (e && e.message || e)); return null; })
           .then(function (r) { return r || call(name, args); });

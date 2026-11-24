@@ -14,7 +14,7 @@
    Sheet. Set = the areas in STORE_DB_AREAS_ live in Firestore, and the timed trigger storeMirror() copies them
    into the Sheet (backup mirror) and moves lost edits from Firestore into the Backup tab. */
 const FIREBASE_PROJECT_ = 'gantt-2ee94';
-const STORE_DB_AREAS_ = ['kim', 'days', 'ref']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
+const STORE_DB_AREAS_ = ['kim', 'days', 'ref', 'kv']; // same list as `areas` in tools/pwa/firebase-config.json (check.mjs)
 const STORE_BACKEND = {
   kim: 'sheet',
   days: 'sheet',
@@ -23,6 +23,7 @@ const STORE_BACKEND = {
   plan: 'sheet',
   calBacklog: 'sheet',
   timer: 'sheet',
+  kv: 'properties',
   props: 'properties'
   // calBacklog, timer, props, study, logs: still direct, moving in this order
 };
@@ -30,7 +31,7 @@ const STORE_BACKEND = {
 if (FIREBASE_PROJECT_) STORE_DB_AREAS_.forEach(a => { STORE_BACKEND[a] = 'db'; });
 // Archive = Reference cards marked deleted in the same docs (NOTES H5 C), so it follows Reference.
 if (STORE_BACKEND.ref === 'db') STORE_BACKEND.archive = 'db';
-const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true };
+const STORE_DB_BUILT_ = { kim: true, days: true, ref: true, archive: true, kv: true };
 
 function storeBackend_(area) {
   const b = STORE_BACKEND[area] || 'sheet';
@@ -849,13 +850,78 @@ const Store = {
 
   locked: storeLocked_,
 
+  /* App settings on the database (H5 F, 2026-11-23): Reference pins, card categories (subjects), Fun list, New things
+     log, Cal Events hide list, auto-archive. Each is one JSON string in a property AND doc gantt/kv_<key> = { key, v,
+     at, up, dev } (same "newest wins" rules as gantt/kim, so no rules change). The PWA reads / writes the docs; the
+     server keeps reading properties, but a doc newer than the property's stamp (kvAt:<key>) wins and is copied in
+     (one Firestore list per run, memoized). Writes go to both. gantt/kvMeta.seeded = the docs exist (seeded once by
+     the mirror). Focus, Inbox, calendar picks, Plan + Cal Backlog stay on the server (merge / calendar side effects). */
+  kv: {
+    KEYS: { refPinned: 'script', cardCats: 'user', funData: 'script', newData: 'script', ceHide: 'script', archiveAuto: 'script' },
+    SEED_KEY: 'kvSeeded',
+    docs__: null,
+    db_() { return storeBackend_('kv') === 'db'; },
+    props_(key) { return this.KEYS[key] === 'user' ? Store.userProps : Store.props; },
+    docs_() {
+      if (this.docs__) return this.docs__;
+      const by = {};
+      try { StoreFs.list('gantt').forEach(d => { if (d.key && this.KEYS[d.key] && String(d.id_ || '').indexOf('kv_') === 0) by[d.key] = d; }); }
+      catch (e) { console.error('kv read: ' + e.message); }
+      return (this.docs__ = by);
+    },
+    get(key) {
+      if (!this.KEYS[key]) throw new Error('Store.kv: unknown key ' + key);
+      const p = this.props_(key), v = p.getProperty(key);
+      if (!this.db_()) return v;
+      const d = this.docs_()[key], at = Number(p.getProperty('kvAt:' + key)) || 0;
+      if (d && d.v != null && Number(d.at) > at) {
+        const o = {}; o[key] = String(d.v); o['kvAt:' + key] = String(d.at);
+        p.setProperties(o);
+        return String(d.v);
+      }
+      return v;
+    },
+    set(key, v) {
+      if (!this.KEYS[key]) throw new Error('Store.kv: unknown key ' + key);
+      const p = this.props_(key), prev = this.db_() ? this.docs_()[key] : null;
+      const at = Math.max(Date.now(), (prev && Number(prev.at) || 0) + 1), o = {};
+      o[key] = String(v); o['kvAt:' + key] = String(at);
+      p.setProperties(o);
+      if (!this.db_()) return v;
+      const rec = { key: key, v: String(v), at: at, up: new Date(at), dev: 'server' };
+      try { StoreFs.set('gantt/kv_' + key, rec); this.docs_()[key] = rec; } catch (e) { console.error('kv write ' + key + ': ' + e.message); }
+      return v;
+    },
+    seed_() {
+      if (!this.db_() || Store.props.getProperty(this.SEED_KEY) === '1') return 0;
+      const docs = this.docs_(); let n = 0;
+      Object.keys(this.KEYS).forEach(key => {
+        if (docs[key]) return;
+        const p = this.props_(key), at = Number(p.getProperty('kvAt:' + key)) || 1;
+        const rec = { key: key, v: String(p.getProperty(key) || ''), at: at, up: new Date(1000), dev: 'server' };
+        StoreFs.set('gantt/kv_' + key, rec); docs[key] = rec; n++;
+      });
+      StoreFs.set('gantt/kvMeta', { seeded: Date.now(), at: Date.now() });
+      Store.props.setProperty(this.SEED_KEY, '1');
+      return n;
+    },
+    // Trigger: seed once, then copy any newer doc (PWA edit) into its property.
+    mirror() {
+      if (!this.db_()) return 0;
+      this.docs__ = null;
+      const n = this.seed_();
+      Object.keys(this.KEYS).forEach(key => this.get(key));
+      return n;
+    }
+  },
+
   /* Database mirror (timed trigger, every 5 min): each database area copied into its Sheet tab, then edits that
      lost under "newest edit wins" (written to Firestore ganttBackup by the app) moved into the Backup tab. */
   mirror() {
     if (!FIREBASE_PROJECT_) return { off: true };
     if (!storeDbReady_()) return { off: true, reason: 'database not reachable' };
     return storeLocked_(() => {
-      const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), ref: Store.ref.mirror(), backups: 0 };
+      const out = { kim: Store.kim.mirror(), days: Store.days.mirror(), ref: Store.ref.mirror(), kv: Store.kv.mirror(), backups: 0 };
       StoreFs.list('ganttBackup').forEach(b => {
         const where = b.area === 'kim' ? Store.kim.SHEET : b.area === 'days' && b.date ? b.date : b.area === 'ref' && b.card ? 'Reference ' + b.card : 'Database: ' + b.area;
         const col = b.area === 'kim' ? 'A2' : b.area === 'days' ? (Store.days.LABEL[b.field] || b.field || '') : b.area === 'ref' ? 'Content' : '';

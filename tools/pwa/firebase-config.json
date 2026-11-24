@@ -1,10 +1,11 @@
 {
-  "_note": "Firebase web config (public by design; the Firestore rules lock the data to owner). Empty apiKey = database step off. projectId must equal FIREBASE_PROJECT_ in Store.gs (check.mjs). areas = what lives in the database, same list as STORE_DB_AREAS_ (check.mjs). docs/NOTES.md \u2192 H3, H4, H5 C.",
+  "_note": "Firebase web config (public by design; the Firestore rules lock the data to owner). Empty apiKey = database step off. projectId must equal FIREBASE_PROJECT_ in Store.gs (check.mjs). areas = what lives in the database, same list as STORE_DB_AREAS_ (check.mjs). docs/NOTES.md \u2192 H3, H4, H5 C, F.",
   "owner": "juliussimtim@gmail.com",
   "areas": [
     "kim",
     "days",
-    "ref"
+    "ref",
+    "kv"
   ],
   "apiKey": "AIzaSyCOBC30XwNl_2wiAszDSmMUdoQTu1gMe18",
   "authDomain": "gantt-2ee94.firebaseapp.com",

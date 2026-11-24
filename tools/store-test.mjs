@@ -36,7 +36,9 @@ const { tabs, ss } = fakeSheet(), props = {};
 const ctx = vm.createContext({
   console,
   SpreadsheetApp: { getActiveSpreadsheet: () => ss },
-  PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = v; } }) },
+  PropertiesService: (() => { const sv = pre => ({ getProperty: k => props[pre + k] ?? null, setProperty: (k, v) => { props[pre + k] = v; },
+    setProperties: o => { Object.keys(o).forEach(k => { props[pre + k] = o[k]; }); }, getProperties: () => Object.fromEntries(Object.keys(props).filter(k => k.startsWith(pre)).map(k => [k.slice(pre.length), props[k]])) });
+    return { getScriptProperties: () => sv(''), getUserProperties: () => sv('u:') }; })(),
   CacheService: { getScriptCache: () => ({ get: k => (k === 'appBuild' ? 'b1' : null), put: () => {} }) },
   LockService: { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) },
   Session: { getScriptTimeZone: () => 'America/Los_Angeles' },
@@ -237,7 +239,7 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
         return res(200, Object.keys(fsDocs).filter(k => k.startsWith(coll) && hit(fsDocs[k], q.where)).map(k => ({ document: { name: 'x/' + k, fields: fsDocs[k] } })).concat([{ readTime: 'now' }]));
       }
       const [path, qs] = url.split('/documents/')[1].split('?'), p = decodeURIComponent(path);
-      if (o.method === 'get' && p === 'ganttBackup') return res(200, { documents: Object.keys(fsDocs).filter(k => k.startsWith('ganttBackup/')).map(k => ({ name: 'x/' + k, fields: fsDocs[k] })) });
+      if (o.method === 'get' && (p === 'ganttBackup' || p === 'gantt')) return res(200, { documents: Object.keys(fsDocs).filter(k => k.startsWith(p + '/')).map(k => ({ name: 'x/' + k, fields: fsDocs[k] })) });
       if (o.method === 'get') return fsDocs[p] ? res(200, { name: 'x/' + p, fields: fsDocs[p] }) : res(404, { error: 1 });
       if (o.method === 'patch') {
         const f = JSON.parse(o.payload).fields;
@@ -342,5 +344,31 @@ console.log('✓ store-test: Sheet-first tabs only through Store.sheetFirst');
     dctx.restoreArchivedItem('c3', a.deletedAt);
     assert.equal(rs('c3', 'del'), ''); assert.ok(R().some(r => r[0] === 'c3'));
     console.log('✓ store-test: Reference + Archive on Firestore (seed, overlay, saves, PWA delete/restore, mirror)');
+  }
+  // App settings on Firestore (H5 F): pins, card categories, Fun… = property + gantt/kv_<key>; newer doc wins.
+  {
+    const P = {}, svc = pre => ({ getProperty: k => P[pre + k] ?? null, getProperties: () => Object.fromEntries(Object.keys(P).filter(k => k.startsWith(pre)).map(k => [k.slice(pre.length), P[k]])),
+      setProperty: (k, v) => { P[pre + k] = String(v); }, setProperties: o => { Object.keys(o).forEach(k => { P[pre + k] = String(o[k]); }); }, deleteProperty: k => { delete P[pre + k]; } });
+    dctx.PropertiesService = { getScriptProperties: () => svc(''), getUserProperties: () => svc('u:') };
+    Object.keys(fsDocs).filter(k => /^gantt\/kv/.test(k)).forEach(k => delete fsDocs[k]); // earlier mirrors seeded empty ones
+    P.refPinned = '["a"]'; P.funData = '{"v":1,"items":[{"id":"f1","t":"Hike","u":5}],"cats":[]}';
+    const kv = () => vm.runInContext('Store.kv', dctx), fresh = () => { kv().docs__ = null; };
+    kv().mirror();
+    assert.equal(fsDocs['gantt/kv_refPinned'].v.stringValue, '["a"]'); assert.ok(fsDocs['gantt/kvMeta'].seeded); assert.equal(P.kvSeeded, '1');
+    assert.equal(fsDocs['gantt/kv_cardCats'].v.stringValue, '');
+    // Server write → property + doc.
+    fresh(); dctx.setReferencePin('b', true);
+    assert.deepEqual(JSON.parse(fsDocs['gantt/kv_refPinned'].v.stringValue), ['b', 'a']); assert.deepEqual(JSON.parse(P.refPinned), ['b', 'a']);
+    // PWA edit (newer doc) → the server reads it and copies it in.
+    fsDocs['gantt/kv_funData'] = { key: { stringValue: 'funData' }, v: { stringValue: '{"v":1,"items":[{"id":"f2","t":"Swim","u":9}],"cats":[]}' }, at: { integerValue: String(Date.now() + 5000) }, dev: { stringValue: 'phone-1' } };
+    fresh(); const fun = dctx.getFun();
+    assert.equal(fun.items[0].id, 'f2'); assert.match(P.funData, /Swim/);
+    fresh(); const merged = dctx.saveFun({ items: [{ id: 'f3', t: 'Read', u: 10 }] });
+    assert.equal(merged.items.map(i => i.id).sort().join(), 'f2,f3'); assert.match(fsDocs['gantt/kv_funData'].v.stringValue, /Read/);
+    // Card categories live in user properties.
+    fresh(); dctx.inboxWrite_('cardCats', [{ key: 'code', name: 'Code', color: '#111111', words: '' }]);
+    assert.match(P['u:cardCats'], /Code/); assert.match(fsDocs['gantt/kv_cardCats'].v.stringValue, /Code/);
+    fresh(); dctx.setArchiveAuto(true); assert.equal(fsDocs['gantt/kv_archiveAuto'].v.stringValue, '1');
+    console.log('✓ store-test: app settings on Firestore (seed, server writes, newer PWA doc wins, Fun merge)');
   }
 }

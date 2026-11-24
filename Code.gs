@@ -696,7 +696,7 @@ function addToScheduleCell_(notes, date, linesHtml) {
 /* Pinned Reference cards (2026-11-04, Julius): ids in script property refPinned, so pins follow him across
    devices. Pinned cards sort to the top in every sort mode (Index.html sortedReferenceItems). */
 function getRefPins_() {
-  try { const v = JSON.parse(Store.props.getProperty('refPinned') || '[]'); return Array.isArray(v) ? v.map(String) : []; }
+  try { const v = JSON.parse(Store.kv.get('refPinned') || '[]'); return Array.isArray(v) ? v.map(String) : []; }
   catch (e) { return []; }
 }
 function setReferencePin(id, on) {
@@ -707,7 +707,7 @@ function setReferencePin(id, on) {
   try {
     const list = getRefPins_().filter(x => x !== id);
     if (on) list.unshift(id);
-    Store.props.setProperty('refPinned', JSON.stringify(list.slice(0, 200)));
+    Store.kv.set('refPinned', JSON.stringify(list.slice(0, 200)));
     return list;
   } finally { lock.releaseLock(); }
 }
@@ -975,6 +975,7 @@ function inboxRead_(key, def, snapshot) {
   } catch (e) { return def; }
 }
 function inboxWrite_(key, value) {
+  if (key === 'cardCats') return Store.kv.set('cardCats', JSON.stringify(value)); // on the database too (H5 F)
   Store.userProps.setProperty(key, JSON.stringify(value));
 }
 // Urgent batches (2026-10-30, Julius): Music + Productivity subjects, Career shown as
@@ -990,7 +991,7 @@ function getCardCats_() {
   const props = Store.userProps;
   const all = props.getProperties();
   let list = null;
-  try { list = all.cardCats ? JSON.parse(all.cardCats) : null; } catch (e) { list = null; }
+  try { const raw = Store.kv.get('cardCats'); list = raw ? JSON.parse(raw) : null; } catch (e) { list = null; }
   if (!Array.isArray(list) || !list.length) return list;
   let out = list;
   if (!all.cardCatsBatch1) { out = cardCatsBatch1_(out); inboxWrite_('cardCats', out); props.setProperty('cardCatsBatch1', '1'); }
@@ -1248,7 +1249,7 @@ function writeFocus_(data) {
 // {v:1, items:[{id, t, d:0|1, u:ms, x?:1}]} in script property funData. saveFun merges by id with the
 // newest u winning (x = deleted tombstone), so two devices never wipe each other's items.
 function getFun() {
-  try { const raw = Store.props.getProperty('funData'); return raw ? JSON.parse(raw) : { v: 1, items: [], cats: [] }; }
+  try { const raw = Store.kv.get('funData'); return raw ? JSON.parse(raw) : { v: 1, items: [], cats: [] }; }
   catch (e) { return { v: 1, items: [], cats: [] }; }
 }
 function saveFun(data) {
@@ -1265,14 +1266,14 @@ function saveFun(data) {
     const out = { v: 1, items: mergeList(cur.items, data && data.items), cats: mergeList(cur.cats, data && data.cats) };
     const json = JSON.stringify(out);
     if (json.length > 8500) throw new Error('Fun list too big (' + json.length + ' chars)');
-    Store.props.setProperty('funData', json);
+    Store.kv.set('funData', json);
     return out;
   } finally { lock.releaseLock(); }
 }
 // New things log (2026-11-07, Julius): ✨ tab left of 🌴 Fun = "last time I did something new".
 // {v:1, items:[{id, t, w:'YYYY-MM-DD' (day it was done), g?, c, u, x?}], cats:[...]} in script property newData; merged like the Fun list.
 function getNewThings() {
-  try { const raw = Store.props.getProperty('newData'); return raw ? JSON.parse(raw) : { v: 1, items: [] }; }
+  try { const raw = Store.kv.get('newData'); return raw ? JSON.parse(raw) : { v: 1, items: [] }; }
   catch (e) { return { v: 1, items: [] }; }
 }
 function saveNewThings(data) {
@@ -1289,7 +1290,7 @@ function saveNewThings(data) {
     const out = { v: 1, items: mergeList(cur.items, data && data.items), cats: mergeList(cur.cats, data && data.cats) };
     const json = JSON.stringify(out);
     if (json.length > 8500) throw new Error('New things log too big (' + json.length + ' chars)');
-    Store.props.setProperty('newData', json);
+    Store.kv.set('newData', json);
     return out;
   } finally { lock.releaseLock(); }
 }
@@ -1829,7 +1830,7 @@ function confirmCardWork_(dryRun,sources,timer) {
       Store.ref.add({ id: CONFIRM_CARD_ID, parentId: '', type: 'item', title: 'To Confirm', content: html, expanded: true, sort: 0 });
       const pins = getRefPins_().filter(x => x !== CONFIRM_CARD_ID);
       pins.unshift(CONFIRM_CARD_ID);
-      Store.props.setProperty('refPinned', JSON.stringify(pins.slice(0, 200)));
+      Store.kv.set('refPinned', JSON.stringify(pins.slice(0, 200)));
     }
     return true;
   }
@@ -2280,7 +2281,7 @@ function setCalendarPicked(ids) {
 // Cal Events hide list (2026-11-11, Julius): calendars and title words kept off the Cal Events list (the timeline
 // still shows them). {cals:[{id,name}], words:[string]} in script property ceHide, same on every device.
 function getCalEventsHide() {
-  try { const raw = Store.props.getProperty('ceHide'); const h = raw ? JSON.parse(raw) : null;
+  try { const raw = Store.kv.get('ceHide'); const h = raw ? JSON.parse(raw) : null;
     return h && Array.isArray(h.cals) && Array.isArray(h.words) ? h : { cals: [], words: [] }; }
   catch (e) { return { cals: [], words: [] }; }
 }
@@ -2289,7 +2290,7 @@ function setCalEventsHide(h) {
     .map(c => ({ id: String(c.id).slice(0, 200), name: String(c.name || c.id).slice(0, 80) }));
   const words = (h && Array.isArray(h.words) ? h.words : []).map(w => String(w || '').trim().slice(0, 40)).filter(Boolean).slice(0, 60);
   const out = { cals: cals, words: words };
-  Store.props.setProperty('ceHide', JSON.stringify(out));
+  Store.kv.set('ceHide', JSON.stringify(out));
   return out;
 }
 
@@ -2983,9 +2984,9 @@ const ARCHIVE_PREFIX = '✅ Completed Tasks — ';
 const ARCHIVE_DAYS_BACK = 14;
 const ARCHIVE_MIN = 3;
 
-function archiveAuto_() { return Store.props.getProperty('archiveAuto') === '1'; }
+function archiveAuto_() { return Store.kv.get('archiveAuto') === '1'; }
 function setArchiveAuto(on) {
-  Store.props.setProperty('archiveAuto', on ? '1' : '0');
+  Store.kv.set('archiveAuto', on ? '1' : '0');
   return archiveAuto_();
 }
 

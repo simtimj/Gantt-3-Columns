@@ -3477,9 +3477,18 @@ if (only('pwa-hist')) {
   if (!calls.includes('getWorkspaceData')) errs.push('not seeded: opening did not go to the server');
   const r2 = await run('getDaysRange', old, old);
   if (!r2.length || r2[0].tasks !== 'srv') errs.push('not seeded: getDaysRange did not go to the server');
+  // Editable local-first (H5 G): yesterday's device copy opens at once, re-dated to today, editable; then the sync.
+  await pg.evaluate(([y, gone]) => { const c = JSON.parse(localStorage.getItem('pwa.initial.v1')); c.data.today = y; c.data.days = c.data.days.filter(d => d.date !== gone); localStorage.setItem('pwa.initial.v1', JSON.stringify(c)); }, [addD(today, -1), addD(today, 3)]);
+  calls.length = 0;
+  await pg.reload(); await pg.waitForTimeout(1500);
+  if (calls.includes('getWorkspaceData')) errs.push('yesterday\'s copy: opening waited on the server');
+  if (!calls.includes('getSyncState')) errs.push('yesterday\'s copy: no sync right after opening: ' + calls.join());
+  const lf = await pg.evaluate(([t, f]) => { const ed = document.querySelector('#todayScroll .day-editor[data-date="' + t + '"]'), fu = document.querySelector('#todayScroll .day-editor[data-date="' + f + '"]');
+    return { today: !!ed, editable: !!ed && ed.isContentEditable, future: !!fu, redated: window.__PWA__ && window.__PWA__.redated, snap: !!document.getElementById('fwSnap') }; }, [today, addD(today, 3)]);
+  if (!lf.today || !lf.editable || !lf.future || !lf.redated || lf.snap) errs.push('yesterday\'s copy not opened editable at once: ' + JSON.stringify(lf));
   await ctx.close(); srv.close();
   if (errs.length) { fails += errs.length; console.error('✗ pwa-hist:\n  ' + errs.join('\n  ')); }
-  else console.log('✓ pwa-hist: opening + past days from the database (dates, hashes, Urgent, seeds, cards, pins + subjects), `up` catch-up, empty day saves, settings (Fun merge, pins, hide list), server before the seed');
+  else console.log('✓ pwa-hist: opening + past days from the database (dates, hashes, Urgent, seeds, cards, pins + subjects), `up` catch-up, empty day saves, settings (Fun merge, pins, hide list), server before the seed, yesterday\'s copy opens editable at once');
 }
 // Reference on Firestore in the PWA (2026-11-23, NOTES H5 C), fake Firebase SDK: card saves (server hashes), new cards,
 // delete → Archive (del on the subtree), restore, order, expand all go to ganttRef docs, never the server; another

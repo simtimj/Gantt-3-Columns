@@ -233,3 +233,6 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 
 ## Speed plan B2 — calendar copy on Firestore (2026-11-23, implemented + tested in store-test / smoke pwa-cal, not yet tested live)
 - Server copies the calendar window into `ganttCal` month docs every 5 min (mirror trigger) and after each app edit (`calSyncNow`, fired in the background by the PWA). PWA `getCalendarRange` / `getMainCalendarEvents` answer from memory (one live listener) instead of ~1–3 s Apps Script + Calendar API calls. Cost: one calendar read per 5 min on the server, writes only for changed months. Details: docs/NOTES.md → H5 B.
+
+## Speed plan G — editable local-first opening (2026-11-23, implemented + tested in smoke pwa-hist, not yet tested live)
+- PWA: a new-day open no longer shows the read-only picture and waits on getWorkspaceData; the device's copy (≤ 7 days) is re-dated to today and opened live, then one getSyncState catches up changed days. Expected: time-to-editable on a new day ≈ same-day open. Details: docs/NOTES.md → H5 G.

@@ -963,8 +963,12 @@
   if (PAGE === 'index') {
     var cached = null;
     try { cached = JSON.parse(ls.get(DATA_LS) || 'null'); } catch (e) {}
-    if (cached && cached.data && (cached.data.today === today() || offline)) {
-      window.__PWA_INITIAL__ = fb.overlay('getWorkspaceData', cached.data);
+    // Editable local-first (H5 G, 2026-11-23): a copy from an earlier day (≤ 7 days) is re-dated to today and opened
+    // editable at once, like a same-day copy; the sync right after brings in every day that changed elsewhere.
+    var fresh = cached && cached.data && Array.isArray(cached.data.days) ? redate(cached.data, today()) : null;
+    if (fresh) window.__PWA__.redated = cached.data.today;
+    if (fresh || (cached && cached.data && offline)) {
+      window.__PWA_INITIAL__ = fb.overlay('getWorkspaceData', fresh || cached.data);
       window.__PWA__.fromCache = cached.at;
       window.addEventListener('load', function () {
         // Catch up right away (days, Reference, imports); the stored copy refreshes a bit later.
@@ -974,6 +978,22 @@
     } else {
       window.addEventListener('load', function () { setTimeout(refreshCopy, 20000); });
     }
+  }
+  // The device's last opening, moved to `day`: days day − 7 … day + 3 (dates the copy lacks start empty, with the
+  // empty-text hash, so the sync fetches them if they have text). Same day → as is; older than 7 days / future → null.
+  function redate(data, day) {
+    var EMPTY_H = 'd41d8cd98f00b204'; // cellHash_('') (MD5, first 16 hex)
+    if (!data.today || data.today === day) return data;
+    var ms = function (d) { return Date.parse(d + 'T00:00:00Z'); }, gap = (ms(day) - ms(data.today)) / 864e5;
+    if (!(gap > 0 && gap <= 7)) return null;
+    var by = {}, out = Object.assign({}, data), days = [];
+    data.days.forEach(function (d) { by[d.date] = d; });
+    for (var i = -7; i <= 3; i++) {
+      var d = new Date(ms(day) + i * 864e5).toISOString().slice(0, 10);
+      days.push(by[d] || { date: d, tasks: '', journal: '', plan: '', tho: '', th: EMPTY_H, jh: EMPTY_H, ph: EMPTY_H, hh: EMPTY_H });
+    }
+    out.days = days; out.today = day;
+    return out;
   }
   function refreshCopy() {
     if (offline || document.hidden) return;

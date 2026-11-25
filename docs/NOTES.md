@@ -1309,3 +1309,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 ## CI-only Cal Events failures (2026-11-25 08:20)
 - Cause: the main smoke suite let the page fetch the calendar libraries from jsdelivr. CI has internet → Cal Events docks the big calendar (no `.ce-day` mini timeline) → 4 checks failed; cloud sessions have no CDN → mini timeline → passed. Fix: main suite aborts jsdelivr, so every machine tests the same page (the dock stays the calendar suite's job).
+- CI job limit 10 → 20 min: the full suite takes ~10 min since it runs on every push, and the 08:20 run was cancelled with every test passed.

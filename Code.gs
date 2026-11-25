@@ -3144,6 +3144,17 @@ const ARCHIVE_DAYS_BACK = 14;
 const ARCHIVE_MIN = 3;
 
 function archiveAuto_() { return Store.kv.get('archiveAuto') === '1'; }
+// Auto archive from the 5-min trigger (2026-11-25, NOTES "Auto archive on the trigger"): in the PWA, mark done runs on the
+// Cloud Function and the event list comes from the database copy, so the two server spots that ran the auto archive
+// (setCalendarEventDone, getCalendarEvents) are mostly skipped. The trigger runs it instead, at most every 15 min.
+function archiveTick_() {
+  if (!archiveAuto_()) return { skipped: 'off' };
+  const last = Number(Store.props.getProperty('archiveTickAt') || 0);
+  if (Date.now() - last < 15 * 60 * 1000) return { skipped: 'recent' };
+  Store.props.setProperty('archiveTickAt', String(Date.now()));
+  const r = archiveCompletedTasks({});
+  return { ready: r.ready, errors: r.errors.length + r.dates.reduce((n, d) => n + d.errors.length, 0) };
+}
 function setArchiveAuto(on) {
   Store.kv.set('archiveAuto', on ? '1' : '0');
   return archiveAuto_();

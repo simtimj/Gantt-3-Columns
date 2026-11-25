@@ -1292,3 +1292,6 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## Code cache (2026-11-25 01:20, Julius picked "Split opening code" for the PWA focus)
 - Deferring code isn't worth it (docked calendar is on screen at opening; NOTES "Lighter PWA page"). Real win instead: scripts out of the HTML → `js/<hash>.js`, precached by the SW → Chrome code cache (inline scripts never get one). Order / globals unchanged (sync `<script src>` at the same spot). Content-hashed names, so a new build never mixes files. Smoke `pwa` checks ≥ 3 split files, precached, index.html < 450 KB. `PWA_INLINE=1` turns it off.
 - Smoke on this box: `SMOKE_CHROME=/usr/bin/google-chrome` (bundled Playwright browser missing). Don't `npm install --no-save` here: it prunes the committed node_modules (restore with `git checkout -- node_modules`).
+
+## Auto archive on the trigger (2026-11-25 07:00)
+- Found: mark done goes through the Cloud Function and the event list comes from the calendar copy, so `archiveCompletedTasks` (auto mode) rarely ran in the PWA. `archiveTick_` (Code.gs) runs it from `storeMirror` when `archiveAuto` is on, at most every 15 min (`archiveTickAt` prop). Old server spots unchanged.

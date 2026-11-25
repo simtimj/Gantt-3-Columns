@@ -1317,6 +1317,7 @@ function storeMirror() {
   try { if (typeof calCopySync_ === 'function') console.log(JSON.stringify({ cal: calCopySync_() })); } catch (e) { console.error('calendar copy: ' + e.message); }
   // D2: Cal Backlog sweep + roll run here (not on opening) and publish the list; Plan rows get their event info.
   try { if (typeof calBacklogTick_ === 'function') console.log(JSON.stringify({ backlog: calBacklogTick_() })); } catch (e) { console.error('backlog: ' + e.message); }
+  try { if (typeof archiveTick_ === 'function') console.log(JSON.stringify({ archive: archiveTick_() })); } catch (e) { console.error('archive: ' + e.message); }
   try { if (typeof planEvRefresh_ === 'function') console.log(JSON.stringify({ planEv: planEvRefresh_() })); } catch (e) { console.error('plan events: ' + e.message); }
 }
 

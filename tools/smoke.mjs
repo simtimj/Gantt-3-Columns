@@ -1666,7 +1666,8 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           if (!M || !S || !W || !P || !B) out.push('back-to-back events not drawn');
           else { const r = x => x.getBoundingClientRect(), gap = r(S).top - r(M).bottom, ins = x => x.parentElement.getAttribute('style'), off = x => r(x).left > r(S).left + 2;
             if (gap < 1.5 || gap > 4) out.push('touching events gap ' + gap.toFixed(1) + ' px (want a small gap)');
-            if (Math.abs(r(S).left - r(M).left) > 1 || Math.abs(r(S).right - r(M).right) > 1) out.push('touching events offset like an overlap');
+            if (Math.abs(r(S).left - r(M).left) > 1) out.push('touching events offset like an overlap'); // right edge may differ: Sleep shares its time with Walk (side by side since 2026-11-25)
+            if (r(W).left < r(S).right - 1) out.push('overlapping events not side by side (Walk over Sleep)');
             if (!off(W)) out.push('overlap not Google-style (offset over Sleep)');
             if (!/color\(srgb [\d.]+ [\d.]+ [\d.]+\)$|^rgb\(/.test(getComputedStyle(W).backgroundColor)) out.push('overlapping event not solid: ' + getComputedStyle(W).backgroundColor);
             if (!/^rgb\(|color\(srgb [\d.]+ [\d.]+ [\d.]+\)$/.test(getComputedStyle(S).backgroundColor)) out.push('plain event not solid (Google style, 2026-11-21): ' + getComputedStyle(S).backgroundColor);

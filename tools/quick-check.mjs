@@ -27,7 +27,7 @@ const MAP = [
   [/^Store\.gs$/, ['main', ...PWA]],
   [/^Code\.gs$/, ['main', 'resume', 'calendar']],
   [/^Index_Calendar\.html$/, ['calendar', 'calcache', 'pwa-cal']],
-  [/^Index_Main\.html$/, ['main', 'snap', 'resume', 'calcache']],
+  [/^Index_(Main|Editors|Sync|Reference|Search|NextSteps|CalEvents|RefOptions)\.html$/, ['main', 'snap', 'resume', 'calcache']],
   [/^(Index\.html|Index_(Css|LateCss|Cards|Extras|Layout)\.html|WeekdayIcons\.html)$/, ['main', 'pwa']],
   [/^Drafts\.html$/, ['drafts', 'pwa-days']],
   [/^tracker\//, ['tracker']],

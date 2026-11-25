@@ -1300,3 +1300,9 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Quick wins done: `docs/STATE.md` (short current state, read first), NEXT_SESSION.md rewritten, `tools/quick-check.mjs` (changed files → smoke suites; full run in CI on push to main via reference-checks.yaml).
 - /dev retirement: plan + questions in NEXT_SESSION.md §1, waiting on Julius. Index_Main split = §2, after it.
 - 07:10 answers: /dev = emergency backup · keep Apps Script fallback · keep it rolling. Result: freeze rule only (CLAUDE.md "PWA-first"); the bigger cuts would remove the safety nets he chose to keep.
+
+## Index_Main split (2026-11-25 08:00, NEXT_SESSION §2, "keep it rolling")
+- 525 KB → 8 parts at section banners (Index_Main / Editors / Sync / Reference / Search / NextSteps / CalEvents / RefOptions, 55–88 KB). Each part is its own `<script>`; listed in Index.html, Code.gs `INDEX_PARTS_`, tools/index-html.mjs, quick-check MAP.
+- Code moved unchanged except `loadColumnWidths` (COLUMN RESIZING → STATE): `let columnWidths = loadColumnWidths()` runs at load, before the later part exists. Found with a parse check (load-time code per part → transitive calls → names declared in a later part); that was the only real hit.
+- Checks: check + full smoke passed. PWA build now externalizes more, smaller script files (same order).
+

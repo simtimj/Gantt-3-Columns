@@ -1,0 +1,1335 @@
+<script>
+  /* =========================================================
+     DAY HEIGHT / SCROLL
+     ========================================================= */
+  function syncDayHeightsRaw(){
+    /*
+     * Every pass measures the real content height. Rows do not keep
+     * a previously larger height after text or trailing lines are removed.
+     */
+    state.days.forEach(
+      d => syncDayHeight(d.date)
+    );
+  }
+  function syncDayHeights(){
+    // Row heights can change above the visible area; keep the same day under the
+    // top edge of the pane instead of letting the view slide.
+    withScrollAnchor(syncDayHeightsRaw);
+  }
+  function visibleDayScroller(){
+    const a = document.getElementById('todayScroll');
+    const b = document.getElementById('journalScroll');
+    if(a && a.clientHeight > 0) return a;
+    if(b && b.clientHeight > 0) return b;
+    return null;
+  }
+  function withScrollAnchor(fn){
+    const a = document.getElementById('todayScroll');
+    const b = document.getElementById('journalScroll');
+    const ref = visibleDayScroller();
+    if(!ref){ fn(); return; }
+    const refTop = ref.getBoundingClientRect().top;
+    let anchor = null;
+    for(const row of ref.querySelectorAll('.day-row')){
+      if(row.getBoundingClientRect().bottom > refTop + 1){ anchor = row; break; }
+    }
+    if(!anchor){ fn(); return; }
+    const date = anchor.dataset.date;
+    const before = anchor.getBoundingClientRect().top - refTop;
+    fn();
+    const again = ref.querySelector(`.day-row[data-date="${CSS.escape(date)}"]`);
+    if(!again) return;
+    const after = again.getBoundingClientRect().top - ref.getBoundingClientRect().top;
+    const delta = after - before;
+    if(Math.abs(delta) > 0.5){
+      ref.scrollTop += delta;
+      [a,b].forEach(el => { if(el && el !== ref && el.clientHeight > 0) el.scrollTop = ref.scrollTop; });
+    }
+  }
+  /* Tapping into a Today or Notes cell must not move the view (2026-10-26,
+     Julius: tapping Notes jumped the panel). Remember both scroll positions
+     on pointerdown; for the next ~400ms, if they change without the person
+     scrolling (wheel / touch move), put them back. */
+  let dayViewHold = null;
+  function holdDayView(){
+    const a = document.getElementById('todayScroll');
+    const b = document.getElementById('journalScroll');
+    if(!a || !b) return;
+    const hold = dayViewHold = {a:a.scrollTop, b:b.scrollTop, moved:false};
+    const mark = () => { hold.moved = true; };
+    ['wheel','touchmove'].forEach(t => window.addEventListener(t, mark, {once:true, passive:true, capture:true}));
+    const fix = () => {
+      if(dayViewHold !== hold || hold.moved) return;
+      if(Math.abs(a.scrollTop - hold.a) > 0.5) a.scrollTop = hold.a;
+      if(Math.abs(b.scrollTop - hold.b) > 0.5) b.scrollTop = hold.b;
+    };
+    requestAnimationFrame(() => { fix(); requestAnimationFrame(fix); });
+    [60, 150, 300, 400].forEach(ms => setTimeout(fix, ms));
+    setTimeout(() => { if(dayViewHold === hold) dayViewHold = null; }, 450);
+  }
+  function syncDayHeightStable(date){
+    if(!date) return;
+    const a = document.getElementById('todayScroll');
+    const b = document.getElementById('journalScroll');
+    const aTop = a ? a.scrollTop : 0;
+    const bTop = b ? b.scrollTop : 0;
+    syncDayHeight(date);
+    // Height changes are allowed, but editing must never navigate/recenter the view.
+    if(a && a.scrollTop !== aTop) a.scrollTop = aTop;
+    if(b && b.scrollTop !== bTop) b.scrollTop = bTop;
+  }
+  function syncDayHeight(date){
+    if(!date) return;
+    if(document.body.classList.contains('one-day')){
+      document.querySelectorAll(`.day-row[data-date="${CSS.escape(date)}"]`).forEach(r => { r.style.height = ''; });
+      return;
+    }
+    const rows = ['todayScroll','journalScroll'].map(id =>
+      document.querySelector(`#${id} .day-row[data-date="${CSS.escape(date)}"]`)
+    ).filter(Boolean);
+    rows.forEach(row => {
+      row.style.height = 'auto';
+      const ed = row.querySelector('.editor');
+      if(!ed) return;
+      const style = getComputedStyle(ed);
+      const lineHeight = parseFloat(style.lineHeight) || (parseFloat(style.fontSize) || 16) * 1.35;
+      ed.style.minHeight = Math.ceil(lineHeight * 5) + 'px';
+    });
+    const visible = rows.filter(row => row.getClientRects().length);
+    if(!visible.length) return;
+    const h = Math.ceil(Math.max(...visible.map(row => row.getBoundingClientRect().height)));
+    visible.forEach(row => row.style.height = h + 'px');
+  }
+  /* Remember where the day lists were, so hiding/showing a pane (which resets a
+     hidden scroller to 0 = the oldest loaded day) can put the view back. */
+  function noteDayScroll(el){
+    if(el.clientHeight > 0 && (el.scrollTop > 0 || recentUserScroll())) lastDayTop = el.scrollTop;
+  }
+  function restoreDayScroll(){
+    const els = ['todayScroll','journalScroll']
+      .map(id => document.getElementById(id))
+      .filter(el => el && el.clientHeight > 0);
+    if(!els.length) return;
+    let target = Math.max(...els.map(el => el.scrollTop));
+    if(!target && lastDayTop) target = lastDayTop;
+    els.forEach(el => { if(Math.abs(el.scrollTop - target) > 0.5) el.scrollTop = target; });
+  }
+  function syncDailyScroll(){
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    a.onscroll = () => {
+      if(!syncing){
+        syncing = true;
+        if(Math.abs(b.scrollTop - a.scrollTop) > 0.5) b.scrollTop = a.scrollTop;
+        syncing = false;
+      }
+      noteDayScroll(a);
+      updateVisibleDate();
+      maybeLoadMore(a);
+    };
+    /* Today intentionally has no visible scrollbar. Wheel/trackpad input over
+       Today is forwarded to Journal, which owns the shared scrollbar. */
+    a.onwheel = e => {
+      if(document.body.classList.contains('one-day')) return; // each section scrolls on its own
+      if(Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const before = b.scrollTop;
+      b.scrollTop += e.deltaY;
+      maybeLoadMore(b);
+      if(b.scrollTop !== before) e.preventDefault();
+    };
+    b.onscroll = () => {
+      if(!syncing){
+        syncing = true;
+        if(Math.abs(a.scrollTop - b.scrollTop) > 0.5) a.scrollTop = b.scrollTop;
+        syncing = false;
+      }
+      noteDayScroll(b);
+      updateVisibleDate();
+      maybeLoadMore(b);
+    };
+  }
+  function updateVisibleDate(){
+    if(document.body.classList.contains('one-day') && window.odDate){
+      const l = document.getElementById('dateLabel'); if(l) l.textContent = formatDate(window.odDate); return;
+    }
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const rows =
+      [
+        ...a.querySelectorAll(
+          '.day-row'
+        )
+      ];
+    let best = null;
+    let bestDist = Infinity;
+    for(const r of rows){
+      const d =
+        Math.abs(
+          r.offsetTop -
+          a.scrollTop
+        );
+      if(d < bestDist){
+        bestDist = d;
+        best = r;
+      }
+    }
+    if(best){
+      document.getElementById(
+        'dateLabel'
+      ).textContent =
+        formatDate(
+          best.dataset.date
+        );
+    }
+  }
+  /* =========================================================
+     LAZY WEEK LOADING
+     ========================================================= */
+  function recentUserScroll(){
+    return Date.now() - lastUserScrollAt < 1500;
+  }
+  function maybeLoadMore(scroll){
+    if(document.body.classList.contains('one-day')) return; // ▲ ▼ load days instead
+    if(!state.days.length){
+      return;
+    }
+    // Only a person scrolling may load more days. Typing, caret-into-view,
+    // layout changes and code-driven scrolling never do.
+    if(!recentUserScroll()){
+      return;
+    }
+    const now = Date.now();
+    const threshold = 80;
+    const nearTop =
+      scroll.scrollTop <= threshold;
+    const nearBottom =
+      scroll.scrollHeight -
+      scroll.scrollTop -
+      scroll.clientHeight <=
+      threshold;
+    if(
+      nearTop &&
+      !loadingPrev &&
+      now >= prevBlockedUntil
+    ){
+      loadPreviousWeek();
+    }
+    if(
+      nearBottom &&
+      !loadingNext &&
+      now >= nextBlockedUntil
+    ){
+      loadNextWeek();
+    }
+  }
+  function loadPreviousWeek(){
+    loadingPrev = true;
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    const first =
+      state.days[0].date;
+    const start =
+      addDays(first,-7);
+    const end =
+      addDays(first,-1);
+    setStatus(
+      'Loading earlier week…'
+    );
+    google.script.run
+      .withSuccessHandler(days => {
+        if(!days?.length){
+          loadingPrev = false;
+          prevBlockedUntil = Date.now() + 5000;
+          setStatus('Ready');
+          return;
+        }
+        // Measure at the moment of insertion (the person may have scrolled
+        // while the request was in flight), and size the new rows BEFORE
+        // computing how far the content moved.
+        const ref = (a.clientHeight > 0) ? a : b;
+        const oldH = ref.scrollHeight;
+        const oldTop = ref.scrollTop;
+        mergeDays(days);
+        prependDays(days);
+        syncDayHeightsRaw();
+        const delta = ref.scrollHeight - oldH;
+        [a,b].forEach(el => { if(el.clientHeight > 0) el.scrollTop = oldTop + delta; });
+        lastDayTop = oldTop + delta;
+        loadingPrev = false;
+        setStatus('Ready');
+      })
+      .withFailureHandler(e => {
+        loadingPrev = false;
+        prevBlockedUntil = Date.now() + 5000;
+        setStatus(
+          'Load error: ' +
+          e.message
+        );
+      })
+      .getDaysRange(
+        start,
+        end
+      );
+  }
+  function loadNextWeek(){
+    loadingNext = true;
+    const first =
+      state.days[
+        state.days.length - 1
+      ].date;
+    const start =
+      addDays(first,1);
+    const end =
+      addDays(first,7);
+    setStatus(
+      'Loading later week…'
+    );
+    google.script.run
+      .withSuccessHandler(days => {
+        if(!days?.length){
+          loadingNext = false;
+          nextBlockedUntil = Date.now() + 5000;
+          setStatus('Ready');
+          return;
+        }
+        mergeDays(days);
+        appendDays(days);
+        requestAnimationFrame(() => {
+          syncDayHeights();
+          loadingNext = false;
+          setStatus('Ready');
+        });
+      })
+      .withFailureHandler(e => {
+        loadingNext = false;
+        nextBlockedUntil = Date.now() + 5000;
+        setStatus(
+          'Load error: ' +
+          e.message
+        );
+      })
+      .getDaysRange(
+        start,
+        end
+      );
+  }
+  function prependDays(days){
+    const sorted =
+      [...days].sort(
+        (a,b) =>
+          a.date.localeCompare(b.date)
+      );
+    const left =
+      document.getElementById(
+        'todayScroll'
+      );
+    const right =
+      document.getElementById(
+        'journalScroll'
+      );
+    const fragL =
+      document.createDocumentFragment();
+    const fragR =
+      document.createDocumentFragment();
+    sorted.forEach(d => {
+      appendDayRow(
+        d,
+        fragL,
+        'day'
+      );
+      appendDayRow(
+        d,
+        fragR,
+        'journal'
+      );
+    });
+    left.prepend(fragL);
+    right.prepend(fragR);
+    if(window.odApply) odApply();
+  }
+  function appendDays(days){
+    const sorted =
+      [...days].sort(
+        (a,b) =>
+          a.date.localeCompare(b.date)
+      );
+    const left =
+      document.getElementById(
+        'todayScroll'
+      );
+    const right =
+      document.getElementById(
+        'journalScroll'
+      );
+    sorted.forEach(d => {
+      if(
+        !left.querySelector(
+          `.day-row[data-date="${CSS.escape(d.date)}"]`
+        )
+      ){
+        appendDayRow(
+          d,
+          left,
+          'day'
+        );
+        appendDayRow(
+          d,
+          right,
+          'journal'
+        );
+      }
+    });
+    if(window.odApply) odApply();
+  }
+  function jumpToday(
+    announce = true
+  ){
+    if(document.body.classList.contains('one-day') && window.odGo){ odGo(state.today); if(announce) setStatus('Today'); return; }
+    const row =
+      document.querySelector(
+        `#todayScroll .day-row[data-date="${CSS.escape(state.today)}"]`
+      );
+    if(!row){
+      return;
+    }
+    const a =
+      document.getElementById(
+        'todayScroll'
+      );
+    const b =
+      document.getElementById(
+        'journalScroll'
+      );
+    /* Align the top border of today's row directly beneath the pane header. */
+    const todayRowTop = row.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop;
+    const journalRow = b.querySelector(`.day-row[data-date="${CSS.escape(state.today)}"]`);
+    const journalRowTop = journalRow
+      ? journalRow.getBoundingClientRect().top - b.getBoundingClientRect().top + b.scrollTop
+      : todayRowTop;
+    a.scrollTop = Math.max(0,todayRowTop);
+    b.scrollTop = Math.max(0,journalRowTop);
+    lastDayTop = a.scrollTop || b.scrollTop || lastDayTop;
+    updateVisibleDate();
+    if(announce){
+      setStatus('Today');
+    }
+  }
+  /* =========================================================
+     DAY SAVING
+     ========================================================= */
+  let fwDraftStarted=false;
+  function fwDraftCaptureDay(date){
+    if(!window.fwDrafts || !fwDraftStarted)return null;
+    const base=fwDayBase(date),info=daySaveState.get(date),prior=fwDrafts.peek('day',date)?.payload,fields={};
+    for(const col of ['tasks','journal']){
+      const ed=dayEditorFor(date,col);if(!ed)continue;
+      const mine=cardCleanHtml(ed),sent=info?.sent;
+      let from={...base[col]};
+      if(prior?.fields?.[col]?.sourceHash===base[col].h)from={...prior.fields[col].base};
+      const changed=col==='tasks'?sent?.ct:sent?.cj;
+      if(info?.inFlight && changed && mine!==sent[col])from={t:sent[col],h:null};
+      if(mine!==from.t || prior?.fields?.[col])fields[col]={base:from,mine,sourceHash:base[col].h};
+    }
+    if(!Object.keys(fields).length)return null;
+    return fwDrafts.put('day',date,{fields},'Day '+date);
+  }
+  function fwDraftCaptureRef(item){
+    if(!window.fwDrafts || !fwDraftStarted)return null;
+    const b=refBase(item),prior=fwDrafts.peek('ref',String(item.id))?.payload;
+    let base={...b};
+    if(prior?.sourceHash===b.h)base={...prior.base};
+    if(item._refSaving && item._refSent?.contentChanged && item.content!==item._refSent.content)base={c:item._refSent.content,h:null};
+    if(item.content===base.c && !prior && !item._refDeleted)return null;
+    return fwDrafts.put('ref',String(item.id),{base,sourceHash:b.h,content:item.content || ''},'Reference: '+referenceTitle(item).slice(0,100));
+  }
+  function fwDraftPrepareDay(date){
+    const fields=window.fwDrafts?.peek('day',date)?.payload?.fields,b=fwDayBase(date);
+    for(const col of ['tasks','journal'])if(fields?.[col]?.sourceHash===b[col].h)b[col].t=fields[col].base.t;
+  }
+  function fwDraftPrepareRef(item){
+    const p=window.fwDrafts?.peek('ref',String(item.id))?.payload,b=refBase(item);
+    if(p && p.sourceHash===b.h)b.c=p.base.c;
+  }
+  function fwDraftInit(){
+    if(fwDraftStarted || !window.fwDrafts)return;fwDraftStarted=true;
+    const notice=document.createElement('div');notice.id='fwDraftNotice';
+    notice.style.cssText='position:fixed;bottom:44px;right:8px;z-index:99998;background:var(--bg,#fff);color:var(--text,#111);border:1px solid #888;border-radius:8px;padding:8px;max-width:min(420px,calc(100vw - 16px));font-size:12px;display:none';
+    const text=document.createElement('span'),review=document.createElement('button');review.className='btn tiny';review.textContent='Review';review.onclick=fwDraftReview;notice.append(text,review);document.body.append(notice);
+    const update=()=>{const all=fwDrafts.list(),n=all.filter(e=>!fwDraftSame(e)).length,problem=fwDrafts.problem();text.textContent=problem || (n+' unsaved '+(n===1?'copy':'copies')+' from this device. ');notice.style.display=n||problem?'':'none';if(all.length)fwDraftAutoSoon();};
+    fwDrafts.subscribe(update);fwDrafts.init(document.querySelector('.refresh-btn')?.getAttribute('href') || location.href);update();
+    const capture=()=>{for(const [date,info] of daySaveState)if(info.pending||info.inFlight)fwDraftCaptureDay(date);
+      (state.reference||[]).forEach(item=>{if(item._timer||item._refSaving||item._refDeleted)fwDraftCaptureRef(item);});};
+    window.addEventListener('pagehide',capture);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')capture();});
+  }
+  function fwDraftPreview(entry){
+    const p=entry.payload,html=entry.kind==='ref'?p.content:Object.entries(p.fields||{}).map(([k,f])=>k+':\n'+f.mine).join('\n\n');
+    return String(html || '').replace(/<br\b[^>]*>/gi,'\n').replace(/<\/(?:div|p|h[1-6]|li)>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  }
+  function fwDraftReview(){
+    const dialog=document.createElement('dialog');dialog.style.cssText='width:min(640px,90vw);max-height:80vh;overflow:auto;border:1px solid #888;border-radius:10px;background:var(--bg,#fff);color:var(--text,#111)';
+    const heading=document.createElement('h3');heading.textContent='Unsaved device copies';dialog.append(heading);
+    for(const entry of fwDrafts.list()){
+      const row=document.createElement('div');row.dataset.draftKind=entry.kind;row.style.cssText='border-top:1px solid #aaa;padding:10px 0';
+      const label=document.createElement('p');label.textContent=entry.label+' · '+new Date(entry.at).toLocaleString();row.append(label);
+      const preview=document.createElement('textarea');preview.readOnly=true;preview.value=fwDraftPreview(entry);preview.style.cssText='width:100%;height:110px;box-sizing:border-box';row.append(preview);
+      const restore=document.createElement('button');restore.className='btn';restore.textContent='Restore';
+      restore.onclick=async()=>{restore.disabled=true;try{if(await fwDraftRestore(entry)){dialog.close();dialog.remove();}}catch(e){setStatus('Recovery kept: '+e.message);}finally{restore.disabled=false;}};
+      const discard=document.createElement('button');discard.className='btn';discard.textContent='Discard';discard.onclick=()=>{if(confirm('Discard this saved device copy?') && fwDrafts.discard(entry))row.remove();};
+      row.append(restore,discard);dialog.append(row);
+    }
+    const download=document.createElement('button');download.className='btn';download.textContent='Download copies';download.onclick=()=>{
+      const url=URL.createObjectURL(new Blob([fwDrafts.exportData()],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='gantt-recovery-copies.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    };
+    const close=document.createElement('button');close.className='btn';close.textContent='Close';close.onclick=()=>dialog.close();dialog.append(download,close);dialog.onclose=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
+  }
+  async function fwDraftRestore(entry,auto){
+    if(fwUnsaved()){setStatus('Finish saving current edits before restoring a copy');return false;}
+    if(entry.kind==='day'){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(entry.id))throw Error('Invalid day');
+      if(!state.days.some(d=>d.date===entry.id)){
+        const rows=await new Promise((ok,bad)=>google.script.run.withSuccessHandler(ok).withFailureHandler(bad).getDaysRange(entry.id,entry.id));
+        if(fwUnsaved()){setStatus('Finish saving current edits before restoring a copy');return false;}
+        const row=rows.find(d=>d.date===entry.id)||{date:entry.id,tasks:'',journal:'',th:null,jh:null};mergeDays([row]);fwSetDayBase(row,true);renderDays();
+      }
+      const pending=[];let conflict=false;
+      for(const col of ['tasks','journal']){
+        const f=entry.payload.fields?.[col];if(!f)continue;
+        if(typeof f.mine!=='string' || typeof f.base?.t!=='string')throw Error('Unreadable copy');
+        const ed=dayEditorFor(entry.id,col);if(!ed)throw Error('Open this day before restoring it');
+        const m=fwMerge3(fwBlocks(f.base.t),fwBlocks(f.mine),fwBlocks(cardCleanHtml(ed)));conflict ||= m.conflict;pending.push([ed,m.blocks.join('')]);
+      }
+      if(!pending.length)throw Error('No saved text');
+      if(conflict && !auto && !confirm('These lines also changed elsewhere. Restore both versions for review?'))return false;
+      if(!fwDrafts.adopt(entry))throw Error('Could not keep a recovery copy; download it first');
+      pending.forEach(([ed,html])=>replaceEditorHtml(ed,html));scheduleDaySave(entry.id);
+    }else if(entry.kind==='ref'){
+      const item=state.reference.find(it=>String(it.id)===entry.id),p=entry.payload;
+      if(!item){setStatus('This card was deleted. Copy its preview or download it before adding a new card.');return false;}
+      if(typeof p.content!=='string' || typeof p.base?.c!=='string')throw Error('Unreadable copy');
+      const cell=document.querySelector('#referenceTree .ref-cell-wrapper[data-id="'+CSS.escape(entry.id)+'"] > .ref-cell');if(!cell)throw Error('Open Reference before restoring');
+      const m=fwMerge3(fwBlocks(p.base.c),fwBlocks(p.content),fwBlocks(cardCleanHtml(cell)));
+      if(m.conflict && !auto && !confirm('These lines also changed elsewhere. Restore both versions for review?'))return false;
+      if(!fwDrafts.adopt(entry))throw Error('Could not keep a recovery copy; download it first');
+      replaceEditorHtml(cell,m.blocks.join(''));saveRefFromDom(item.id);
+    }else throw Error('Unknown copy type');
+    setStatus(auto ? 'Restored an unsaved copy automatically — saving' : 'Recovered device copy — saving');return true;
+  }
+  /* Auto-restore (2026-11-13, Julius: "always automatically restore them"): unsaved device copies merge back in on
+     their own (a clash keeps both versions, so nothing is lost). Copies that can't go back yet (day not loaded, card
+     deleted) stay listed under Review and are retried every minute. */
+  /* Quiet recovery (2026-11-24, GANTT-010 "frequent recovery prompts"): a copy left by an earlier page (phone
+     discarded the app before the save's answer came back) whose text already matches what's on screen holds nothing
+     to recover, so it's dropped silently instead of showing "1 unsaved copy" until the 90 s auto-restore. */
+  function fwDraftSame(entry){
+    try{
+      if(entry.kind==='day'){
+        const f=entry.payload?.fields||{},cols=Object.keys(f);if(!cols.length)return false;
+        return cols.every(col=>{const ed=dayEditorFor(entry.id,col);return !!ed && typeof f[col]?.mine==='string' && cardCleanHtml(ed)===f[col].mine;});
+      }
+      if(entry.kind==='ref'){
+        const cell=document.querySelector('#referenceTree .ref-cell-wrapper[data-id="'+CSS.escape(entry.id)+'"] > .ref-cell');
+        return !!cell && typeof entry.payload?.content==='string' && cardCleanHtml(cell)===entry.payload.content;
+      }
+    }catch(e){}
+    return false;
+  }
+  let fwAutoBusy=false, fwAutoTimer=0;
+  const fwAutoTried=new Map();
+  function fwDraftAutoSoon(ms){ clearTimeout(fwAutoTimer); fwAutoTimer=setTimeout(fwDraftAuto,ms||1500); }
+  async function fwDraftAuto(){
+    if(fwAutoBusy || !window.fwDrafts) return;
+    if(fwUnsaved()){ fwDraftAutoSoon(4000); return; }
+    fwAutoBusy=true;
+    try{
+      for(const entry of fwDrafts.list()){
+        if(fwDraftSame(entry)){ fwDrafts.discard(entry); continue; } // already on screen = already saved: nothing to recover
+        if(Date.now()-entry.at<90000) continue; // still fresh: may belong to another open tab that is mid-save
+        const k=entry.kind+':'+entry.id+':'+entry.at, last=fwAutoTried.get(k)||0;
+        if(Date.now()-last<60000) continue;
+        fwAutoTried.set(k,Date.now());
+        try{ await fwDraftRestore(entry,true); }catch(e){}
+        if(fwUnsaved()) break; // let that save finish first
+      }
+    }finally{ fwAutoBusy=false; }
+    if(fwDrafts.list().length) fwDraftAutoSoon(fwUnsaved() ? 4000 : 61000);
+  }
+  function scheduleDaySave(date){
+    if(!date) return;
+    clearTimeout(saveTimers[date]);
+    const info=daySaveState.get(date)||{inFlight:false,pending:false};
+    info.pending=true;
+    daySaveState.set(date,info);
+    fwDraftCaptureDay(date);
+    setStatus('Unsaved…');
+    saveTimers[date]=setTimeout(()=>saveDay(date),700);
+  }
+  /* Focus ring on the task/subtask line holding the caret (Julius, 2026-10-28). */
+  (function initLineFocus(){
+    let cur = null, raf = 0, picked = null, pickMark = null;
+    /* Copies = task rows outside the cells: Urgent / Inbox rows in Reference, Due-today rows in Notes. */
+    const COPY_SEL = '#urgentPanel .urg-text[contenteditable="true"], #inboxPanel .urg-text[contenteditable="true"], .due-notes .di-text[contenteditable="true"]';
+    // Structural test (not the contenteditable state: a copy is briefly non-editable during a first tap).
+    const COPY_ANY = '#urgentPanel .urg-text, #inboxPanel .urg-text, .due-notes .di-text';
+    const isCopy = el => !!(el && el.matches && el.matches(COPY_ANY));
+    const update = () => {
+      raf = 0;
+      let line = null;
+      try{
+        const sel = window.getSelection();
+        if(sel && sel.rangeCount && document.hasFocus()){
+          const n = sel.focusNode, el = n && (n.nodeType === 1 ? n : n.parentElement);
+          const l = el && el.closest ? el.closest('.check-line') : null;
+          const ed = l && l.closest('.editor,.ref-cell');
+          const act = document.activeElement;
+          if(l && ed && ed.isContentEditable && act && (act === ed || ed.contains(act)) && !l.closest('#urgentPanel,#inboxPanel,.due-notes')) line = l;
+        }
+      }catch(e){}
+      const act = document.activeElement;
+      let typingCopy = isCopy(act) ? act : null;
+      // Focus that landed in pick mode (inputmode=none, no keyboard) is a pick, not typing.
+      const pickMode = el => !!(el && el.getAttribute && el.getAttribute('inputmode') === 'none');
+      if(line && pickMode(line.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell,.thought-editor,.kim-editor'))){ picked = line; line = null; }
+      if(typingCopy && pickMode(typingCopy)){ picked = typingCopy; typingCopy = null; }
+      // Picked card (first tap) shows the ring + grip until you type somewhere or tap elsewhere.
+      if(line || typingCopy) picked = null;
+      else if(picked && !picked.isConnected) picked = null;
+      if(!line && picked && !isCopy(picked)) line = picked;
+      if(line !== cur){
+        const was = cur;
+        if(cur) cur.removeAttribute('data-tcfocus');
+        cur = line;
+        if(cur) cur.setAttribute('data-tcfocus','1');
+        // Title cells: a picked title rings its whole box (2026-11-21).
+        if(window.tboxPaint) [was,cur].forEach(x => { const e = x && x.parentElement; if(e && window.tboxTitle(x)) try{ tboxPaint(e); }catch(err){} });
+      }
+      // Ring on a picked copy row (render-only rows, never saved).
+      const pc = picked && isCopy(picked) ? picked : null;
+      if(pc !== pickMark){
+        if(pickMark) pickMark.removeAttribute('data-tcpick');
+        pickMark = pc;
+        if(pickMark) pickMark.setAttribute('data-tcpick','1');
+      }
+      // Copies: the grip goes on the row you're typing in or have picked (not Inbox rows: drag those by the box).
+      let copy = line ? null : (typingCopy || pc);
+      if(copy && copy.classList.contains('inbox-text')) copy = null;
+      if(typeof window.tcGripPlace === 'function') window.tcGripPlace(cur,copy);
+    };
+    const later = () => { if(!raf) raf = requestAnimationFrame(update); };
+    /* Tap once = pick the card (ring + grip, no keyboard); tap it again = type in it (Julius, 2026-10-28).
+       Same for every card: tasks and subtasks in Today, Notes and Reference cells (nested too),
+       Urgent and Inbox rows, and the Due-today rows in Notes. */
+    function hitAt(t){
+      if(!t || t.closest('#tcGrip,input,button,a,select,textarea,[data-tlhid],.urg-box,.di-box,.inbox-box,.urg-fold,.urg-meta,.inbox-from,.di-from')) return null;
+      const act = document.activeElement;
+      const tx = t.closest(COPY_SEL);
+      if(tx) return {el:tx,editing:act === tx};
+      const line = t.closest('.check-line');
+      const root = line && line.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell,.thought-editor,.kim-editor');
+      if(!line || !root || !root.isContentEditable || line.closest('[data-render-due],table[data-cnote]')) return null;
+      return {el:line,editing:!picked && line === cur && act && (act === root || root.contains(act))};
+    }
+    // Returns true when the tap only picked (caller stops the caret / keyboard).
+    function tap(t){
+      const hit = hitAt(t);
+      if(!hit){ if(picked){ picked = null; later(); } return false; }
+      if(hit.el === picked || hit.editing){ picked = null; later(); return false; } // second tap: type as usual
+      try{ const a = document.activeElement; if(a && a !== document.body && a.blur) a.blur(); }catch(err){}
+      try{ const sel = window.getSelection(); if(sel) sel.removeAllRanges(); }catch(err){}
+      try{ const r = rootOf(hit.el); if(r) r.setAttribute('inputmode','none'); }catch(err){} // even if the phone focuses it
+      picked = hit.el;
+      later();
+      return true;
+    }
+    /* Touch: decide on touchend and preventDefault it. That is what reliably stops the phone
+       from focusing the text and opening the keyboard (mousedown alone didn't on his phone). */
+    /* Belt and braces (2026-10-28, Julius: keyboard still opened): a card's editable gets
+       inputmode="none" before a first tap, so even if the phone focuses it, no keyboard shows.
+       The second tap on the picked card clears it (and re-focuses), so the keyboard comes up. */
+    const rootOf = el => isCopy(el) ? el : el.closest('.day-editor,.journal-editor,.plan-editor,.ref-cell,.thought-editor,.kim-editor');
+    /* First tap must not put the cursor in the card at all (Julius, 2026-10-28): during that
+       touch the card's cell is made non-editable, so the phone has nothing to focus; it is
+       editable again right after. The second tap on the picked card is left alone → cursor + keyboard. */
+    let tp = null, lastTouch = 0, lockedRoot = null;
+    const unlock = (root,ms) => {
+      if(!root || root.dataset.tcLock !== '1') return;
+      const go = () => { if(root.dataset.tcLock === '1'){ delete root.dataset.tcLock; root.contentEditable = 'true'; later(); } };
+      if(ms) setTimeout(go,ms); else go();
+    };
+    document.addEventListener('touchstart',e => {
+      lastTouch = Date.now();
+      if(tp && tp.root) unlock(tp.root);
+      if(lockedRoot){ unlock(lockedRoot); lockedRoot = null; } // a quick second tap types right away
+      if(e.touches.length !== 1){ tp = null; return; }
+      const p = e.touches[0];
+      tp = {x:p.clientX,y:p.clientY,t:Date.now(),target:e.target,fold:window.__tlFoldAt || 0};
+      const t = e.target instanceof Element ? e.target : (e.target && e.target.parentElement);
+      const hit = hitAt(t);
+      if(!hit){
+        // Plain text (not a card) in a cell: normal typing, keyboard allowed.
+        const r = t && t.closest ? t.closest('[inputmode="none"]') : null;
+        if(r) r.removeAttribute('inputmode');
+        return;
+      }
+      const root = rootOf(hit.el);
+      if(!root) return;
+      if(hit.el === picked){
+        root.removeAttribute('inputmode');
+        return; // second tap: type
+      }
+      if(hit.editing) return;
+      tp.hit = hit;
+      const a = document.activeElement; // leave whatever you were typing in (any cell or row)
+      if(a && a !== document.body && a.blur) try{ a.blur(); }catch(err){}
+      root.setAttribute('inputmode','none');
+      root.dataset.tcLock = '1';
+      root.contentEditable = 'false';
+      tp.root = lockedRoot = root;
+    },{capture:true,passive:true});
+    // Leaving a cell drops pick mode, so ordinary (non-card) taps type as usual.
+    document.addEventListener('focusout',e => {
+      const el = e.target;
+      if(el && el.getAttribute && el.getAttribute('inputmode') === 'none') el.removeAttribute('inputmode');
+    },true);
+    document.addEventListener('touchmove',e => {
+      if(!tp) return;
+      const p = e.touches[0];
+      if(!p || Math.abs(p.clientX - tp.x) > 10 || Math.abs(p.clientY - tp.y) > 10){ unlock(tp.root); tp = null; }
+    },{capture:true,passive:true});
+    document.addEventListener('touchcancel',() => { if(tp) unlock(tp.root); tp = null; },{capture:true,passive:true});
+    document.addEventListener('touchend',e => {
+      lastTouch = Date.now();
+      const s = tp; tp = null;
+      if(!s || e.touches.length){ if(s) unlock(s.root); return; }
+      // The − / + of a title line was tapped: don't open the keyboard, don't pick.
+      if((window.__tlFoldAt || 0) !== s.fold){ if(e.cancelable) e.preventDefault(); unlock(s.root,350); return; }
+      if(Date.now() - s.t > 400 || document.body.classList.contains('tc-dragging')){ unlock(s.root); return; } // holds: menus / selection / drag
+      if(s.hit){
+        if(e.cancelable) e.preventDefault();
+        try{ const sel = window.getSelection(); if(sel) sel.removeAllRanges(); }catch(err){}
+        picked = s.hit.el;
+        later();
+        unlock(s.root,350); // after the tap's focus / click would have happened
+        return;
+      }
+      const t = s.target instanceof Element ? s.target : (s.target && s.target.parentElement);
+      if(t && t.closest && t.closest('#tcGrip')){ later(); return; } // pressed the grip without dragging: keep the pick + grip
+      if(tap(t) && e.cancelable) e.preventDefault();
+    },{capture:true,passive:false});
+    // Mouse (desktop): same rule on mousedown. Skipped right after a touch (that was handled above).
+    document.addEventListener('mousedown',e => {
+      if(e.button !== 0 || Date.now() - lastTouch < 1000) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if(t && t.closest('#tcGrip')) return;
+      if(tap(t)) e.preventDefault();
+    },true);
+    document.addEventListener('selectionchange',later);
+    document.addEventListener('focusout',() => setTimeout(later,0),true);
+    document.addEventListener('focusin',later,true);
+    document.addEventListener('scroll',later,true);
+    window.addEventListener('resize',later);
+    document.addEventListener('input',later,true);
+  })();
+  /* Task cards (2026-10-27) are drawn with render-only data-tc* attributes; never save them. */
+  const CARD_ATTRS = ['data-tc','data-tchead','data-tcrel','data-tcstep','data-tccat','data-tcdrag','data-tcfocus','data-blk','data-blkn','data-blkph','data-tbf','data-tbl'];
+  function cardCleanHtml(el){
+    if(!el.querySelector('input[data-wired],[data-tbf],[data-tbl],[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph],[data-render-due],[data-render-kd],[data-kdhid],[data-tlon],[data-tlhid],[data-tsf],.tc-holdready')) return el.innerHTML;
+    const c = el.cloneNode(true);
+    c.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
+    c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => { ['data-tlon','data-tlinfo','data-tlhid','data-tlsum','data-tlbox','data-tlcnt'].forEach(a => n.removeAttribute(a)); n.querySelectorAll(':scope > .tl-sum').forEach(x => x.remove()); });
+    c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
+    c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
+    c.querySelectorAll('[data-render-kd]').forEach(n => n.remove()); // Keep In Mind "Completed" header is render-only
+    c.querySelectorAll('[data-kdhid]').forEach(n => n.removeAttribute('data-kdhid')); // folded = this device only
+    c.querySelectorAll('[data-tc],[data-tccat],[data-tcdrag],[data-tcfocus],[data-blk],[data-blkn],[data-blkph]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    c.querySelectorAll('[data-tbl]').forEach(n => { n.style.removeProperty('--tbs'); if(!n.getAttribute('style')) n.removeAttribute('style'); });
+    c.querySelectorAll('[data-tbf],[data-tbl]').forEach(n => CARD_ATTRS.forEach(a => n.removeAttribute(a)));
+    return c.innerHTML;
+  }
+  function saveDay(date){
+    clearTimeout(saveTimers[date]);
+    const info=daySaveState.get(date)||{inFlight:false,pending:true};
+    if(info.inFlight){
+      info.pending=true;
+      daySaveState.set(date,info);
+      return;
+    }
+    const t=document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+    const j=document.querySelector(`#journalScroll .journal-editor[data-date="${CSS.escape(date)}"]`);
+    /* Runtime wiring markers must never be persisted. */
+    t?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    j?.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
+    const tasks=t?cardCleanHtml(t):'';
+    const journal=j?cardCleanHtml(j):'';
+    const d=state.days.find(x=>x.date===date);
+    if(d){d.tasks=tasks;d.journal=journal;}
+    if(j) noteUrgentDay(date,journal,false,'journal');
+    noteUrgentDay(date,tasks);
+    info.inFlight=true;
+    info.pending=false;
+    daySaveState.set(date,info);
+    setStatus('Saving…');
+    /* Safe save (2026-10-29): send the version each column started from; the server only writes a
+       column that hasn't changed elsewhere, and sends back anything that did so it can be merged. */
+    const b=fwDayBase(date);
+    fwDraftPrepareDay(date);
+    const opts={th:b.tasks.h,jh:b.journal.h,ct:!!t&&tasks!==b.tasks.t,cj:!!j&&journal!==b.journal.t};
+    info.sent={tasks,journal,ct:opts.ct,cj:opts.cj};
+    const draft=fwDraftCaptureDay(date);
+    const saveStarted=performance.now();
+    google.script.run
+      .withSuccessHandler(res=>{
+        if(opts.ct || opts.cj)fwObserveSave('day',saveStarted,res);
+        info.inFlight=false;
+        info.sent=null;
+        let note='';
+        if(res && typeof res==='object'){
+          fwCheckBuild(res.build);
+          if(opts.ct && !res.conflictT) b.tasks={t:tasks,h:res.th};
+          if(opts.cj && !res.conflictJ) b.journal={t:journal,h:res.jh};
+          if(res.tasks!==undefined) note=fwReconcileDay(date,'tasks',res.tasks,res.th)||note;
+          if(res.journal!==undefined) note=fwReconcileDay(date,'journal',res.journal,res.jh)||note;
+          if(!res.conflictT && !res.conflictJ) window.fwDrafts?.ack(draft);
+        }
+        if(info.pending){
+          saveDay(date);
+        }else{
+          setStatus(note||'Saved');
+        }
+      })
+      .withFailureHandler(e=>{
+        if(opts.ct || opts.cj)fwObserveSave('day',saveStarted,null,e);
+        info.inFlight=false;
+        setStatus('Save error: '+e.message+' — retrying');
+        // Never drop an edit: keep it pending and try again (offline, timeouts, lock waits).
+        info.pending=true;
+        daySaveState.set(date,info);
+        clearTimeout(saveTimers[date]);
+        saveTimers[date]=setTimeout(()=>saveDay(date),5000);
+      })
+      .saveDay(date,tasks,journal,opts);
+  }
+  /* =========================================================
+     SAFE SYNC (Julius, 2026-10-29: "bulletproof — never lose anything")
+     Every cell remembers the version it was loaded/saved at (base). Saves send that version; if the
+     cell changed elsewhere the server refuses to overwrite and sends its copy back, and the app does a
+     three-way, line-by-line merge: lines either side added are kept, lines either side deleted go,
+     and when both sides changed the same line BOTH versions are kept (nothing is ever dropped).
+     The merged cell is re-drawn (Ctrl+Z undoes it) and saved again on top of the new version.
+     When the tab comes back into view (and every 3 min) fwSync() pulls changes made elsewhere.
+     ========================================================= */
+  const dayBase = new Map();
+  let fwLastSync = 0;
+  let fwSyncBusy = false;
+  let refInFlight = 0;
+  let fwRefEpoch = 0;
+  let fwRefStructurePending = 0;
+  function fwSetDayBase(d, force){
+    if(!d || !d.date || d.th === undefined) return;
+    if(!force && dayBase.has(d.date)) return;
+    dayBase.set(d.date,{tasks:{t:d.tasks||'',h:d.th},journal:{t:d.journal||'',h:d.jh}});
+  }
+  function fwDayBase(date){
+    if(!dayBase.has(date)) dayBase.set(date,{tasks:{t:'',h:null},journal:{t:'',h:null}});
+    return dayBase.get(date);
+  }
+  function refBase(item){
+    if(!item._b) item._b = {c:item.content || '',h:item.ch || null};
+    if(!item._mb) item._mb = {parentId:String(item.parentId || ''),expanded:item.expanded !== false};
+    return item._b;
+  }
+  /* Cell HTML → list of top-level lines in one normal form, so the server's copy, the loaded copy and
+     what's on screen compare the same way. */
+  function fwBlocks(html){
+    const div = document.createElement('div');
+    div.innerHTML = storedToHtml(stripReferenceMetadata(html || ''));
+    div.querySelectorAll('[data-render-due]').forEach(n => n.remove());
+    normalizeEditorTasks(div,false);
+    div.querySelectorAll('input[data-wired]').forEach(cb => cb.removeAttribute('data-wired'));
+    const clean = document.createElement('div');
+    clean.innerHTML = cardCleanHtml(div);
+    const out = [];
+    clean.childNodes.forEach(n => {
+      if(n.nodeType === 1) out.push(n.outerHTML);
+      else if(n.nodeType === 3 && n.textContent.trim()) out.push(esc(n.textContent));
+    });
+    return out;
+  }
+  function fwSame(a,b){
+    if(a.length !== b.length) return false;
+    for(let i = 0; i < a.length; i++) if(a[i] !== b[i]) return false;
+    return true;
+  }
+  // Which base lines survive in `other`, and what `other` inserted in each gap (gap g = before base[g]).
+  function fwAlign(base,other){
+    const n = base.length, m = other.length;
+    let pre = 0;
+    while(pre < n && pre < m && base[pre] === other[pre]) pre++;
+    let suf = 0;
+    while(suf < n - pre && suf < m - pre && base[n - 1 - suf] === other[m - 1 - suf]) suf++;
+    const a = base.slice(pre,n - suf), b = other.slice(pre,m - suf);
+    const kept = new Array(n).fill(false);
+    const ins = Array.from({length:n + 1},() => []);
+    for(let i = 0; i < pre; i++) kept[i] = true;
+    for(let i = 0; i < suf; i++) kept[n - 1 - i] = true;
+    // LCS on the middle part.
+    const A = a.length, B = b.length;
+    const dp = Array.from({length:A + 1},() => new Uint16Array(B + 1));
+    for(let i = A - 1; i >= 0; i--) for(let j = B - 1; j >= 0; j--)
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j],dp[i][j + 1]);
+    let i = 0, j = 0, gap = pre;
+    while(i < A || j < B){
+      if(i < A && j < B && a[i] === b[j]){ kept[pre + i] = true; i++; j++; gap = pre + i; }
+      else if(j < B && (i >= A || dp[i][j + 1] >= dp[i + 1][j])){ ins[gap].push(b[j]); j++; }
+      else { i++; }
+    }
+    return {kept,ins};
+  }
+  function fwMerge3(base,mine,theirs){
+    const M = fwAlign(base,mine), T = fwAlign(base,theirs);
+    const out = [];
+    let conflict = false;
+    for(let g = 0; g <= base.length; g++){
+      const tIns = T.ins[g], left = tIns.slice();
+      tIns.forEach(x => out.push(x));
+      M.ins[g].forEach(x => {
+        const k = left.indexOf(x);
+        if(k >= 0){ left.splice(k,1); return; } // both made the same change
+        if(tIns.length) conflict = true;
+        out.push(x);
+      });
+      if(g < base.length && M.kept[g] && T.kept[g]) out.push(base[g]);
+    }
+    // Structural lines (sections, Claude's lines and boxes) must never be doubled.
+    const seen = new Set();
+    const merged = out.filter(x => {
+      if(!/data-(sec|secend|cid|tid|cgrp|cnote)=/.test(x.slice(0,300))) return true;
+      if(seen.has(x)) return false;
+      seen.add(x); return true;
+    });
+    return {blocks:merged,conflict};
+  }
+  // Caret as a text offset, so a re-drawn cell keeps the cursor about where it was.
+  function fwCaretOffset(ed){
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount || !ed.contains(sel.anchorNode)) return -1;
+    const r = document.createRange();
+    r.selectNodeContents(ed);
+    try{ r.setEnd(sel.anchorNode,sel.anchorOffset); }catch(e){ return -1; }
+    return r.toString().length;
+  }
+  function fwSetCaret(ed,off){
+    const walk = document.createTreeWalker(ed,NodeFilter.SHOW_TEXT);
+    let n, left = off;
+    while((n = walk.nextNode())){
+      if(left <= n.textContent.length){
+        const r = document.createRange(); r.setStart(n,left); r.collapse(true);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); return;
+      }
+      left -= n.textContent.length;
+    }
+  }
+  function replaceEditorHtml(ed,html){
+    const focused = document.activeElement === ed;
+    const off = focused ? fwCaretOffset(ed) : -1;
+    // A caret in an empty task has no text to re-find, so remember which task it was.
+    const anchor = focused && window.getSelection().anchorNode;
+    const anchorEl = anchor ? (anchor.nodeType === 3 ? anchor.parentElement : anchor) : null;
+    const emptyTask = anchorEl && anchorEl.closest ? anchorEl.closest('.check-line') : null;
+    const emptyIdx = emptyTask && ed.contains(emptyTask) && !emptyTask.textContent.trim() ? [...ed.querySelectorAll('.check-line')].indexOf(emptyTask) : -1;
+    const sc = [...document.querySelectorAll('#todayScroll,#journalScroll,#referenceScroll')].map(x => [x,x.scrollTop]);
+    captureBeforeEdit(ed); // Ctrl+Z / undo brings back what was on screen before the merge
+    const h = ensureEditorHistory(ed);
+    h.restoring = true;
+    ed.innerHTML = html;
+    normalizeEditorTasks(ed);
+    window.ensureFocusHost && window.ensureFocusHost(ed); // Focus dashboard is render-only
+    h.last = ed.innerHTML;
+    h.restoring = false;
+    const backTo = emptyIdx >= 0 ? ed.querySelectorAll('.check-line')[emptyIdx] : null;
+    const backText = backTo && !backTo.textContent.trim() ? backTo.querySelector('.check-text') : null;
+    if(backText){ if(!backText.firstChild) backText.innerHTML = '<br>'; placeCaretInsideCheckbox(backText); }
+    else if(off >= 0) fwSetCaret(ed,off);
+    sc.forEach(([x,t]) => { if(x.scrollTop !== t) x.scrollTop = t; });
+  }
+  function dayEditorFor(date,col){
+    return col === 'tasks'
+      ? document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`)
+      : document.querySelector(`#journalScroll .journal-editor[data-date="${CSS.escape(date)}"]`);
+  }
+  /* The server has `theirs` (version h) for this day column: merge it with what's on screen. */
+  function fwReconcileDay(date,col,theirs,h){
+    const b = fwDayBase(date);
+    const baseText = b[col].t;
+    b[col] = {t:theirs,h};
+    const d = state.days.find(x => x.date === date);
+    const ed = dayEditorFor(date,col);
+    if(!ed){ if(d) d[col] = theirs; return ''; }
+    const mineBlocks = fwBlocks(cardCleanHtml(ed));
+    const theirBlocks = fwBlocks(theirs);
+    const m = fwMerge3(fwBlocks(baseText),mineBlocks,theirBlocks);
+    if(!fwSame(m.blocks,mineBlocks)){
+      replaceEditorHtml(ed,m.blocks.join(''));
+      if(d) d[col] = cardCleanHtml(ed);
+      if(col === 'journal') noteUrgentDay(date,cardCleanHtml(ed),true,'journal'); else noteUrgentDay(date,cardCleanHtml(ed));
+      requestAnimationFrame(() => syncDayHeightStable(date));
+      try{ renderDueBlocks(); }catch(e){}
+    }
+    if(!fwSame(m.blocks,theirBlocks)) scheduleDaySave(date); // our side still has something to add
+    return m.conflict ? 'Merged with changes from elsewhere — check for doubled lines' : 'Synced changes from elsewhere';
+  }
+  function fwReconcileRef(item,theirs,h){
+    const baseText = refBase(item).c;
+    item._b = {c:theirs,h};
+    const wrap = document.querySelector(`#referenceTree .ref-cell-wrapper[data-id="${CSS.escape(String(item.id))}"]`);
+    const cell = wrap && wrap.querySelector(':scope > .ref-cell');
+    if(!cell){ item.content = theirs; return ''; }
+    const mineBlocks = fwBlocks(cardCleanHtml(cell));
+    const theirBlocks = fwBlocks(theirs);
+    const m = fwMerge3(fwBlocks(baseText),mineBlocks,theirBlocks);
+    if(!fwSame(m.blocks,mineBlocks)){
+      replaceEditorHtml(cell,m.blocks.join(''));
+      if(isBacklogItem(item)) noteUrgentDay('backlog',cell.innerHTML,true,'backlog');
+    }
+    if(!fwSame(m.blocks,theirBlocks)) saveRefFromDom(item.id);
+    else item.content = theirs;
+    const msg = m.conflict ? 'Merged with changes from elsewhere — check for doubled lines' : 'Synced changes from elsewhere';
+    setStatus(msg);
+    return msg;
+  }
+  /* Every Reference save goes through here (text, open/close, moves). */
+  function sendRefItem(item,onOk,onErr){
+    if(item._refDeleted){ setStatus('Card deleted elsewhere — copy your text or remove this local card before refreshing'); return; }
+    if(item._refSaving){
+      (item._refQueue || (item._refQueue = [])).push({onOk,onErr});
+      return;
+    }
+    item._refSaving = true;
+    fwRefEpoch++;
+    const next = () => {
+      item._refSaving = false;
+      item._refSent = null;
+      const queued = item._refQueue || [];
+      item._refQueue = [];
+      if(queued.length) sendRefItem(item,
+        id => queued.forEach(cb => { if(cb.onOk) cb.onOk(id); }),
+        err => { queued.forEach(cb => { if(cb.onErr) cb.onErr(err); }); setStatus('Save error: ' + err.message); });
+    };
+    fwDraftPrepareRef(item);
+    const b = refBase(item);
+    const meta = {parentId:String(item.parentId || ''),expanded:item.expanded !== false};
+    const metaChanges = {};
+    Object.keys(meta).forEach(key => { if(meta[key] !== item._mb[key]) metaChanges[key] = {before:item._mb[key],after:meta[key]}; });
+    const payload = {
+      id:item.id, parentId:item.parentId, type:item.type, title:item.title, content:item.content,
+      expanded:item.expanded, sort:item.sort,
+      fwSync:1, expectedExisting:true, baseHash:b.h, contentChanged:(item.content || '') !== b.c, metaChanges
+    };
+    // Cell made in this tab: no server hash yet, so let the server check against the text it was made with (2026-10-31).
+    if(!b.h) payload.baseText = b.c;
+    item._refSent = {content:payload.content,contentChanged:payload.contentChanged};
+    const draft = fwDraftCaptureRef(item);
+    const saveStarted = performance.now();
+    refInFlight++;
+    google.script.run
+      .withSuccessHandler(res => {
+        if(payload.contentChanged || Object.keys(metaChanges).length)fwObserveSave('reference',saveStarted,res);
+        refInFlight--;
+        try {
+        if(res && typeof res === 'object'){
+          fwCheckBuild(res.build);
+          if(res.deleted){
+            item._refDeleted = true;
+            fwDraftCaptureRef(item);
+            item._refQueue = [];
+            setStatus('Card deleted elsewhere — your text is kept here; copy it or remove this local card before refreshing');
+            return;
+          }
+          if(res.meta){
+            Object.keys(meta).forEach(key => {
+              if(!Object.prototype.hasOwnProperty.call(res.meta,key)) return;
+              item._mb[key] = res.meta[key];
+              // A newer local click remains pending; an older acknowledgement cannot undo it.
+              if(item[key] === meta[key] || (key === 'parentId' && String(item[key] || '') === meta[key])) item[key] = res.meta[key];
+            });
+            const wrap = document.querySelector(`#referenceTree .ref-cell-wrapper[data-id="${CSS.escape(String(item.id))}"]`);
+            if(wrap){
+              wrap.classList.toggle('ref-collapsed',item.expanded === false);
+              const toggle = wrap.querySelector(':scope > [data-toggle]');
+              if(toggle) toggle.textContent = item.expanded === false ? '▸' : '▾';
+            }
+          }
+          if(payload.contentChanged && !res.conflict) item._b = {c:payload.content || '',h:res.ch};
+          else if(!payload.contentChanged && res.content === undefined) item._b.h = res.ch;
+          if(res.content !== undefined){ fwReconcileRef(item,res.content,res.ch); if(!res.conflict && !res.metaConflicts?.length) window.fwDrafts?.ack(draft); return; }
+          if(!res.conflict && !res.metaConflicts?.length) window.fwDrafts?.ack(draft);
+        }
+        if(res && res.metaConflicts && res.metaConflicts.length){
+          setStatus('Reference changed elsewhere — refresh to check its location/open state');
+          return;
+        }
+        if(onOk) onOk(res && res.id || res);
+        } finally { next(); }
+      })
+      .withFailureHandler(err => {
+        if(payload.contentChanged || Object.keys(metaChanges).length)fwObserveSave('reference',saveStarted,null,err);
+        refInFlight--;
+        try { if(onErr) onErr(err); else setStatus('Save error: ' + err.message); }
+        finally { next(); }
+      })
+      .saveReferenceItem(payload);
+  }
+  /* Newer app version pushed while this tab was open → banner to reload. */
+  function fwCheckBuild(build){
+    if(!build || !window.__FW_BUILD__ || build === window.__FW_BUILD__) return;
+    if(document.getElementById('fwUpdateBar')) return;
+    const bar = document.createElement('a');
+    bar.id = 'fwUpdateBar';
+    bar.textContent = '↻ New version — tap to reload (your edits are saved first)';
+    const r = document.querySelector('.refresh-btn');
+    bar.href = r ? r.href : '#';
+    bar.target = '_top';
+    bar.addEventListener('click',e => fwGuardReload(e,bar));
+    document.body.appendChild(bar);
+  }
+  function fwUnsaved(){
+    if(fwRefStructurePending) return true;
+    if(window.odPadUnsaved && odPadUnsaved()) return true;
+    if(window.odThoughtUnsaved && odThoughtUnsaved()) return true;
+    if(window.kimUnsaved && kimUnsaved()) return true;
+    for(const [date,info] of daySaveState) if(info.inFlight || info.pending) return true;
+    if(refInFlight > 0) return true;
+    return (state.reference || []).some(it => it._timer || it._refDeleted);
+  }
+  function fwFlushAll(){
+    if(window.odPadFlush) odPadFlush();
+    if(window.odThoughtFlush) odThoughtFlush();
+    if(window.kimFlush) kimFlush();
+    for(const [date,info] of daySaveState) if(info.pending && !info.inFlight) saveDay(date);
+    (state.reference || []).forEach(it => { if(it._timer){ clearTimeout(it._timer); it._timer = 0; sendRefItem(it); } });
+  }
+  /* ↻ (and the update banner) wait for pending saves before reloading, so a refresh never eats an edit. */
+  function fwGuardReload(e,link){
+    if(link.dataset.fwGo === '1' || !fwUnsaved()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    setStatus('Saving before refresh…');
+    fwFlushAll();
+    const started = Date.now();
+    const wait = () => {
+      if(fwUnsaved() && Date.now() - started < 10000){ setTimeout(wait,250); return; }
+      if(fwUnsaved()){ setStatus('Still saving — tap ↻ again in a moment'); link.classList.remove('spin'); return; }
+      link.dataset.fwGo = '1';
+      link.click();
+    };
+    wait();
+  }
+  document.addEventListener('click',e => {
+    const a = e.target && e.target.closest && e.target.closest('.refresh-btn');
+    if(a) fwGuardReload(e,a);
+  },true);
+  /* Pull what changed elsewhere. Cells with a save waiting or in flight are skipped (that save merges). */
+  function fwRefStructureStart(){ fwRefEpoch++; fwRefStructurePending++; state.refManifestHash = ''; }
+  function fwRefStructureEnd(){ fwRefEpoch++; fwRefStructurePending = Math.max(0,fwRefStructurePending - 1); }
+  function fwApplyReferenceSync(out){
+    // Defer the whole Reference snapshot while editing/saving/dragging. Do not acknowledge it,
+    // so the next ordinary sync retries without spinning extra requests in the background.
+    if(refInFlight || fwRefStructurePending || document.querySelector('#referenceTree .ref-dragging') ||
+      document.activeElement?.closest?.('#referenceTree .ref-cell') ||
+      (state.reference || []).some(it => it._timer || it._refSaving || it._refDeleted || (it._b && it.content !== it._b.c))) return '';
+    const manifest = out.refManifest;
+    if(manifest && (!Array.isArray(manifest.items) || manifest.items.some(m =>
+      !(state.reference || []).some(it => String(it.id) === String(m.id)) && !out.ref?.[m.id]))) return '';
+    let note = '';
+    Object.keys(out.ref || {}).forEach(id => {
+      const item = (state.reference || []).find(it => String(it.id) === String(id));
+      if(item) note = fwReconcileRef(item,out.ref[id].content,out.ref[id].ch) || note;
+    });
+    if(!manifest){
+      if(Object.keys(out.ref || {}).length){ applyReferenceSort(); filterReference(); }
+      return note;
+    }
+    const tree = document.getElementById('referenceTree');
+    const nodes = new Map([...tree.querySelectorAll('.ref-cell-wrapper')].map(n => [String(n.dataset.id),n]));
+    const byId = new Map((state.reference || []).map(it => [String(it.id),it]));
+    const ids = new Set(manifest.items.map(m => String(m.id)));
+    state.reference = manifest.items.map(meta => {
+      let item = byId.get(String(meta.id));
+      if(!item){ item = {...meta,...out.ref[meta.id]}; refBase(item); }
+      else {
+        const oldTitle = item.title;
+        Object.assign(item,meta);
+        if(!item.content && oldTitle !== item.title){
+          const cell = nodes.get(String(item.id))?.querySelector(':scope > .ref-cell');
+          if(cell){ replaceEditorHtml(cell,storedToHtml(stripReferenceMetadata(item.title || ''))); ensureReferenceTitle(cell); }
+        }
+      }
+      item._mb = {parentId:String(item.parentId || ''),expanded:item.expanded !== false};
+      return item;
+    });
+    nodes.forEach((node,id) => { if(!ids.has(id)) node.remove(); });
+    tree.querySelector(':scope > .empty')?.remove();
+    // Reuse existing editor nodes (and their undo history); only new cards get new editors.
+    const items = sortedReferenceItems(), children = new Map();
+    items.forEach(item => {
+      let pid = String(item.parentId || '');
+      const seen = new Set([String(item.id)]);
+      for(let p = pid; ids.has(p); p = String(byId.get(p)?.parentId || manifest.items.find(m => String(m.id) === p)?.parentId || '')){
+        if(seen.has(p)){ pid = ''; break; } seen.add(p);
+      }
+      if(!ids.has(pid)) pid = '';
+      if(!children.has(pid)) children.set(pid,[]);
+      children.get(pid).push(item);
+    });
+    const attached = new Set();
+    const attach = (pid,container) => (children.get(pid) || []).forEach(item => {
+      const id = String(item.id); if(attached.has(id)) return; attached.add(id);
+      const node = nodes.get(id) || createReferenceCell(item,container);
+      container.appendChild(node);
+      attach(id,node.querySelector(':scope > .ref-children'));
+    });
+    attach('',tree);
+    if(!items.length) renderReference();
+    applyReferenceCollapseState(); filterReference();
+    state.refManifestHash = manifest.hash;
+    return note || 'Synced Reference changes from elsewhere';
+  }
+  // Speed plan E (2026-11-23): runImports left the page (timed trigger importsTick); withImports now only adds the Inbox.
+  // Was (2026-11-05): runImports() first writes the Done Log / AI tasks / To Confirm / study log into the
+  // sheet, then returns the same diff as getSyncState. Light syncs skip the imports.
+  let fwLastImport = 0, fwSyncLogAt = 0;
+  function fwSync(withImports){
+    if(fwSyncBusy || !state.days || !state.days.length) return;
+    withImports = withImports === true;
+    if(withImports) fwLastImport = Date.now();
+    const req = {days:{},ref:{},refSync:2,refManifestHash:state.refManifestHash || '',inbox:withImports};
+    const refEpoch = fwRefEpoch;
+    state.days.forEach(d => {
+      const b = dayBase.get(d.date);
+      if(b && b.tasks.h) req.days[d.date] = {th:b.tasks.h,jh:b.journal.h};
+      if(window.odPadHash){ const ph = odPadHash(d.date); if(ph !== undefined && req.days[d.date]) req.days[d.date].ph = ph; }
+      if(window.odThoughtHash){ const hh = odThoughtHash(d.date); if(hh !== undefined && req.days[d.date]) req.days[d.date].hh = hh; }
+    });
+    (state.reference || []).forEach(it => { const b = refBase(it); req.ref[it.id] = b.h; });
+    fwSyncBusy = true;
+    const rpcStarted = performance.now();
+    google.script.run
+      .withSuccessHandler(out => {
+        const rpcMs = Math.round(performance.now() - rpcStarted), applyStarted = performance.now();
+        fwSyncBusy = false;
+        fwLastSync = Date.now();
+        if(!out) return;
+        fwCheckBuild(out.build);
+        let note = '', retry = false;
+        Object.keys(out.days || {}).forEach(date => {
+          const e = out.days[date];
+          if(e.plan !== undefined && window.odPadTheirs) odPadTheirs(date,e.plan,e.ph);
+          if(e.tho !== undefined && window.odThoughtTheirs) odThoughtTheirs(date,e.tho,e.hh);
+          const info = daySaveState.get(date);
+          if(info && (info.inFlight || info.pending)){ retry = true; return; } // that save merges; check again shortly
+          if(e.tasks !== undefined) note = fwReconcileDay(date,'tasks',e.tasks,e.th) || note;
+          if(e.journal !== undefined) note = fwReconcileDay(date,'journal',e.journal,e.jh) || note;
+        });
+        if(refEpoch === fwRefEpoch) note = fwApplyReferenceSync(out) || note;
+        if(note) setStatus(note);
+        if(Array.isArray(out.inbox)) try{ setInbox(out.inbox); }catch(e){}
+        if(retry) setTimeout(() => fwSync(false),2500);
+        // New AI tasks arrive with data-ai-new: sort them into today's time sections.
+        if(Object.keys(out.days || {}).length && typeof tsecPlaceAi === 'function') setTimeout(() => { try{ tsecPlaceAi(); }catch(e){} },0);
+        if(Object.keys(out.days || {}).length || note) { if(window.fwSnapSoon) fwSnapSoon('sync'); }
+        // Fewer Speed Log rows (2026-11-24): an open page synced every minute and logged every one (a second server
+        // call + a Sheet write each time, ~1,000 rows a day). Now: slow ones (> 4 s), a pile of save timings, or
+        // one sample per 30 min.
+        if(out.timing && (rpcMs > 4000 || fwSaveSamples.length >= 10 || Date.now() - fwSyncLogAt > 1800000)){
+          fwSyncLogAt = Date.now();
+          fwSendSpeed(withImports ? 'imports' : 'sync',out.timing,
+            fwSpeedContext({rpcMs,applyMs:Math.round(performance.now() - applyStarted)}));
+        }
+      })
+      .withFailureHandler(() => { fwSyncBusy = false; })
+      .getSyncState(req); // speed plan E: imports run on the server's 5-min trigger; withImports = also bring the Inbox
+  }
+  // Live updates while the app is open (2026-11-05, Julius: "update what it needs, without a reset"): a light check
+  // every minute (every 5 when idle), Inbox every 5 minutes and whenever the tab comes back into view.
+  // Inbox check every 5 min (was 3): the server's import trigger only refills it every 5 min (2026-11-24).
+  const fwImportsDue = () => Date.now() - fwLastImport > 300000;
+  // Idle backoff (2026-11-24): a page left open and untouched (a computer tab all afternoon) checked every minute,
+  // each check ~2 s of server time. After 10 min without a tap or key it checks every 5 min; any touch = back to 1 min.
+  let fwLastInput = Date.now();
+  ['pointerdown','keydown','wheel','touchstart'].forEach(t => window.addEventListener(t,() => { fwLastInput = Date.now(); },{passive:true,capture:true}));
+  const fwSyncEvery = () => Date.now() - fwLastInput > 600000 ? 295000 : 55000;
+  // Back in view: first in the calm-return queue (fwResume skips it if synced < 60 s ago; the 55 s timer covers the rest).
+  fwResume.add('sync', () => fwSync(fwImportsDue() || Date.now() - fwLastSync > 60000), () => fwLastSync);
+  window.addEventListener('focus',() => { if(Date.now() - fwLastSync > 15000) fwSync(fwImportsDue()); });
+  setInterval(() => { if(document.visibilityState === 'visible' && Date.now() - fwLastSync > fwSyncEvery()) fwSync(fwImportsDue()); },15000);
+  window.addEventListener('pagehide',() => { try{ fwFlushAll(); }catch(e){} });
+  /* No stray bold (2026-10-29, Julius: Urgent rows were bold when they shouldn't be). Typing into an empty
+     line/task whose only content is a leftover <b>/<strong> (the browser carries bold over from the line
+     above on Enter) unwraps it first, so new tasks start plain. Ctrl+B on purpose still works: the bold is
+     only dropped while the line is still empty. */
+  document.addEventListener('beforeinput',e => {
+    if(!/^insert(Text|CompositionText|ReplacementText)$/.test(e.inputType)) return;
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    const b = node && node.closest && node.closest('b,strong');
+    if(!b || !b.closest('[contenteditable="true"]')) return;
+    const holder = b.closest('.check-text,.urg-text,.di-text,.inbox-text') || b.parentElement;
+    if(!holder || (holder.textContent || '').replace(/[\s\u200b\u00a0]/g,'')) return; // line has text: leave it
+    if(b.dataset.fwKeep) return;
+    if(holder.closest('.editor,.ref-cell')) captureBeforeEdit(holder.closest('.editor,.ref-cell'));
+    const parent = b.parentNode;
+    while(b.firstChild) parent.insertBefore(b.firstChild,b);
+    const mark = document.createTextNode('');
+    parent.insertBefore(mark,b);
+    b.remove();
+    const r = document.createRange(); r.setStart(mark,0); r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    try{ if(document.queryCommandState('bold')) document.execCommand('bold'); }catch(err){}
+  },true);
+  /* Write in the empty space (2026-10-29, Julius): Today and Notes cells fill their whole row, and a tap
+     below the last line puts the cursor on an empty line at the bottom (reusing one if it's there, else
+     adding one — above the end marker), so a short cell next to a long one is writable all the way down. */
+  document.addEventListener('click',e => {
+    const ed = e.target;
+    if(!ed || !ed.matches || !ed.matches('#todayScroll .day-editor, #journalScroll .journal-editor, #todayScroll .plan-editor')) return;
+    // Only what the current tab shows (Dailies / Keep In Mind), so a new line lands in that section.
+    const kids = [...ed.children].filter(n => !n.matches('[data-render-due],.due-notes') && n.offsetParent !== null);
+    if(!kids.length) return;
+    const end = kids[kids.length - 1].matches('[data-secend]') ? kids[kids.length - 1] : null;
+    let target = end ? end.previousElementSibling : kids[kids.length - 1];
+    const ref = target || end;
+    if(ref && e.clientY <= ref.getBoundingClientRect().bottom + 2) return; // tapped next to text, not below it
+    const blank = n => n && !n.matches('[data-sec],[data-secend],[data-tlhid],[data-tl],table,.check-line') &&
+      !n.querySelector('input,img,table') && !(n.textContent || '').replace(/[\s​ ]/g,'');
+    if(!blank(target)){
+      captureBeforeEdit(ed);
+      target = document.createElement('div');
+      target.innerHTML = '<br>';
+      let at = kids[kids.length - 1];
+      while(at.nextElementSibling && at.nextElementSibling.matches('[data-render-due],.due-notes')) at = at.nextElementSibling;
+      if(end) end.before(target); else at.after(target);
+      finishEditorEdit(ed);
+      saveEditorOwner(ed);
+    }
+    ed.focus({preventScroll:true});
+    const r = document.createRange();
+    r.setStart(target,0); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    rememberSelection(ed);
+  });
+</script>

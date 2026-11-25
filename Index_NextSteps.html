@@ -1,0 +1,1009 @@
+<script>
+  /* =========================================================
+     URGENCY (2026-10-26, Julius — like TickTick)
+     Hold a checkbox (or right-click it) to set urgency 1 red / 2 yellow /
+     3 blue. Stored on the task line as data-urg="1|2|3", so it saves with
+     the day. The Urgent panel at the top of Reference lists every open
+     urgent task from every day, with the subtasks under it.
+     ========================================================= */
+  const URG_NAMES = {1:'Urgent',2:'Soon',3:'Can be later'};
+  const urgentSource = new Map();   // date (Today) or date+'|j' (Notes) -> html that has urgency
+  // Urgency set on a task in Notes counts too (Julius, 2026-10-27: it showed, then vanished on save).
+  function urgKey(date,pane){ return pane === 'journal' ? date + '|j' : pane === 'plan' ? date + '|p' : pane === 'backlog' ? 'backlog|b' : date; }
+  function urgKeyParts(key){ const i = key.indexOf('|'); if(i < 0) return {date:key,pane:'today'}; const t = key.slice(i + 1); return {date:key.slice(0,i),pane:t === 'b' ? 'backlog' : t === 'p' ? 'plan' : 'journal'}; }
+  /* Backlog (2026-10-28, Julius): a Reference cell titled "Backlog" holds urgent tasks that
+     aren't for any day yet. They show in Urgent like the rest (pane 'backlog', date 'backlog'). */
+  // Renamed "Undated Tasks" (Julius, 2026-11-01); the old "Backlog" title still works.
+  const BACKLOG_NAME = 'Undated Tasks';
+  function isBacklogItem(item){ return !!item && /^(backlog|undated tasks)$/i.test(referenceTitle(item)); }
+  function backlogItem(){ return (state.reference || []).find(isBacklogItem) || null; }
+  function backlogCell(){
+    const it = backlogItem();
+    return it ? document.querySelector(`#referenceTree .ref-cell-wrapper[data-id="${CSS.escape(String(it.id))}"] > .ref-cell`) : null;
+  }
+  function isBacklogCell(el){ return !!el && el === backlogCell(); }
+  function urgWhere(date){ return date === 'backlog' ? BACKLOG_NAME : shortDate(date); }
+  // Where a cell's tasks live, for the Urgent list: {date,pane} or null.
+  function ownerKey(owner){
+    if(!owner) return null;
+    if(owner.classList && (owner.classList.contains('thought-editor') || owner.classList.contains('kim-editor'))) return null; // not in Next Steps
+    if(owner.dataset && owner.dataset.date) return {date:owner.dataset.date,pane:owner.classList.contains('journal-editor') ? 'journal' : owner.classList.contains('plan-editor') ? 'plan' : 'today'};
+    if(isBacklogCell(owner)) return {date:'backlog',pane:'backlog'};
+    return null;
+  }
+  // Finds or makes the Backlog cell, then calls back with it.
+  function withBacklog(cb,fail){
+    const cell = backlogCell();
+    if(cell){ cb(cell); return; }
+    setStatus('Making the ' + BACKLOG_NAME + ' cell…');
+    google.script.run.withSuccessHandler(id => {
+      const item = {id,parentId:'',type:'item',title:BACKLOG_NAME,content:'<h2>' + BACKLOG_NAME + '</h2>',expanded:true,sort:Date.now()};
+      item._b = {c:item.content,h:null}; // base = what the server holds; without it the first save was dropped and the cell reverted (2026-10-31)
+      refBase(item);
+      state.reference.push(item);
+      document.querySelector('#referenceTree > .empty')?.remove();
+      createReferenceCell(item);
+      const c = backlogCell();
+      if(c) cb(c); else { setStatus('Couldn’t find the ' + BACKLOG_NAME + ' cell'); if(fail) fail(); }
+    }).withFailureHandler(e => { setStatus(BACKLOG_NAME + ' error: ' + e.message); if(fail) fail(); }).addReferenceItem('',BACKLOG_NAME,'<h2>' + BACKLOG_NAME + '</h2>');
+  }
+  function urgEditor(date,pane){
+    if(pane === 'backlog') return backlogCell();
+    if(pane === 'plan') return document.querySelector(`#todayScroll .plan-editor[data-date="${CSS.escape(date)}"]`);
+    return pane === 'journal'
+      ? document.querySelector(`#journalScroll .journal-editor[data-date="${CSS.escape(date)}"]`)
+      : document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+  }
+  let urgentOpen = true;
+  try{ urgentOpen = localStorage.getItem('fw.urgentOpen') !== '0'; }catch(e){}
+  function urgencyCheckbox(t){
+    const box = t && t.closest ? t.closest('#urgentPanel .urg-box, .due-notes .di-box, #inboxPanel .inbox-box, #centerCalendarList .ce-check, #calPanel .cp-chk') : null;
+    if(box) return box;
+    // Hold anywhere on a Cal Events row opens its menu (2026-11-04, Julius): the box alone is a small target. Not while typing a title.
+    const ceRow = t && t.closest ? t.closest('#centerCalendarList .ce-event') : null;
+    if(ceRow) return ceRow.matches('[data-ce-editing]') || ceRow.querySelector('[data-ce-editing]') ? null : ceRow.querySelector('.ce-check');
+    const cb = t && t.closest ? t.closest('input[type=checkbox]') : null;
+    if(!cb) return null;
+    const line = cb.closest('.check-line');
+    if(!line || !line.closest('.editor,.ref-cell')) return null;
+    return cb;
+  }
+  function initUrgentSource(list){
+    urgentSource.clear();
+    (Array.isArray(list) ? list : []).forEach(d => { noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); if(d.plan) noteUrgentDay(d.date,d.plan,false,'plan'); });
+    (state.days || []).forEach(d => { noteUrgentDay(d.date,d.tasks,false); noteUrgentDay(d.date,d.journal,false,'journal'); noteUrgentDay(d.date,d.plan || '',false,'plan'); });
+    const bl = backlogItem();
+    if(bl) noteUrgentDay('backlog',storedToHtml(stripReferenceMetadata(bl.content || '')),false,'backlog');
+    renderUrgent();
+  }
+  function noteUrgentDay(date,html,render=true,pane='today'){
+    if(!date) return;
+    const key = urgKey(date,pane);
+    if(html && /data-(urg|due|arch)=/.test(html)) urgentSource.set(key,String(html));
+    else urgentSource.delete(key);
+    if(render) renderUrgent();
+  }
+  // Open urgent tasks with their subtasks (lines below with a deeper level).
+  function collectUrgent(){
+    const out = [];
+    [...urgentSource.keys()].sort().forEach(key => {
+      const {date,pane} = urgKeyParts(key);
+      const tpl = document.createElement('template');
+      tpl.innerHTML = urgentSource.get(key);
+      const lines = [...tpl.content.querySelectorAll('.check-line')];
+      // Subtasks already shown under a listed parent aren't listed again on
+      // their own, even with the parent's urgency (2026-10-27, Julius).
+      let nestedUntil = -1;
+      lines.forEach((line,i) => {
+        if(i <= nestedUntil) return;
+        const urg = /^[123]$/.test(line.dataset.urg || '') ? line.dataset.urg : '0';
+        const hasDue = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '');
+        const cb = line.querySelector('input[type=checkbox]');
+        const done = !!(cb && cb.hasAttribute('checked')); // Stays listed until urgency is cleared.
+        // Archived (2026-10-27, Julius): out of the levels, into the Archive log under them.
+        const arch = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.arch || '') ? line.dataset.arch : '';
+        // Due date but no urgency → the "Due" group at the bottom, while open (2026-10-26, Julius).
+        if(!arch && urg === '0' && (!hasDue || done)) return;
+        const level = Number(line.dataset.level) || 0;
+        const subs = [];
+        for(let j = i + 1; j < lines.length; j++){
+          const l2 = Number(lines[j].dataset.level) || 0;
+          if(l2 <= level) break;
+          subs.push({text:lineText(lines[j]),html:lineHtml(lines[j]),level:l2 - level,index:j,due:/^\d{4}-\d{2}-\d{2}$/.test(lines[j].dataset.due || '') ? lines[j].dataset.due : '',urg:/^[123]$/.test(lines[j].dataset.urg || '') ? Number(lines[j].dataset.urg) : 0,dur:durMin(lines[j].dataset.dur),done:!!(lines[j].classList.contains('done') || lines[j].querySelector('input[checked]'))});
+          nestedUntil = j;
+        }
+        const due = /^\d{4}-\d{2}-\d{2}$/.test(line.dataset.due || '') ? line.dataset.due : '';
+        // Sort by the soonest open date of the task or any of its subtasks (2026-10-28, Julius:
+        // subtasks are sometimes due before the task).
+        const soon = [due].concat(subs.filter(x => !x.done).map(x => x.due)).filter(Boolean).sort()[0] || '';
+        out.push({date,pane,arch,urg:Number(urg),index:i,text:lineText(line),html:lineHtml(line),subs,done,due,soon,dur:durMin(line.dataset.dur),cat:urgItemCat(line,subs)});
+      });
+    });
+    return out;
+  }
+  // Subject of an Urgent task (2026-10-30, Julius: batches): the one set from the hold
+  // menu, else the same guess the cards use (" · Music" tag at the end wins). '' = Other.
+  function urgItemCat(line,subs){
+    try{
+      const d = line.dataset.cat || '';
+      if(d === 'none' || d === 'life') return '';
+      let known = false; try{ known = !!CARD_CAT_BY_KEY[d]; }catch(e){} // not declared yet during early startup
+      if(known) return d;
+      if(!cardsAuto) return '';
+      return guessCardCat(lineText(line),'',false,(subs || []).map(x => x.text).join(' ')) || '';
+    }catch(e){ return ''; }
+  }
+  function lineHtml(line){
+    const t = line.querySelector('.check-text');
+    return t ? t.innerHTML : '';
+  }
+  function lineText(line){
+    const t = line.querySelector('.check-text');
+    return ((t ? t.textContent : line.textContent) || '').replace(/\s+/g,' ').trim() || '(empty task)';
+  }
+  // Due dates (2026-10-26): "Wed, Oct 29".
+  function dueLabel(s){
+    return dateObj(s).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  }
+  // Stacked label for task lines (2026-10-27): two short lines, shown by CSS white-space:pre.
+  function dueLabelStack(s){
+    const d = dateObj(s);
+    return '📅 ' + d.toLocaleDateString(undefined,{weekday:'short'}) + '\n' + d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  }
+  // Duration (2026-10-28, Julius: auto-reshuffle step 1): optional minutes on a task line,
+  // saved as data-dur in the Sheet. Shown with the due date in the same corner label.
+  // Up to 100h for big projects (Julius 2026-10-28: 10h, 15h, 20h+).
+  const DUR_MAX = 6000;
+  function durMin(v){ const n = Math.round(Number(v)); return n >= 1 && n <= DUR_MAX ? n : 0; }
+  // Typed length → minutes: "90", "1h 30m", "1.5h", "15h", "2h15". 0 = none / unreadable.
+  function parseDur(v){
+    const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g,'');
+    if(!s) return 0;
+    if(/^\d+(\.\d+)?$/.test(s)) return durMin(s);
+    const m = /^(?:(\d+(?:\.\d+)?)h(?:ours?|rs?)?)?(?:(\d+)m?(?:in(?:utes?|s)?)?)?$/.exec(s);
+    if(!m || (!m[1] && !m[2])) return 0;
+    return durMin((Number(m[1]) || 0) * 60 + (Number(m[2]) || 0));
+  }
+  function durLabel(m){
+    m = durMin(m); if(!m) return '';
+    const h = Math.floor(m / 60), r = m % 60;
+    return h ? h + 'h' + (r ? ' ' + r + 'm' : '') : r + 'm';
+  }
+  // Corner label = due (stacked) + duration; '' when neither is set.
+  function lineMetaLabel(due,dur){
+    const parts = [];
+    if(/^\d{4}-\d{2}-\d{2}$/.test(due || '')) parts.push(dueLabelStack(due));
+    if(durMin(dur)) parts.push('⏱ ' + durLabel(dur));
+    return parts.join('\n');
+  }
+  function syncMetaLabel(line){
+    const v = lineMetaLabel(line.dataset.due,line.dataset.dur);
+    if(v){ if(line.dataset.dueLabel !== v) line.dataset.dueLabel = v; }
+    else if(line.hasAttribute('data-due-label')) delete line.dataset.dueLabel;
+  }
+  function setDue(line,iso){
+    if(iso) line.dataset.due = iso; else delete line.dataset.due;
+    syncMetaLabel(line);
+  }
+  function setDur(line,min){
+    const m = durMin(min);
+    if(m) line.dataset.dur = String(m); else delete line.dataset.dur;
+    syncMetaLabel(line);
+  }
+  // Task fields that must travel when a line is rebuilt somewhere else (Notes → day /
+  // Reference, 2026-10-28): urgency, subject, due, duration.
+  function lineMeta(n){
+    const d = (n && n.dataset) || {};
+    return {
+      urg: /^[123]$/.test(d.urg || '') ? d.urg : '',
+      cat: /^[a-z]{2,12}$/.test(d.cat || '') ? d.cat : '',
+      due: /^\d{4}-\d{2}-\d{2}$/.test(d.due || '') ? d.due : '',
+      dur: durMin(d.dur) || ''
+    };
+  }
+  function applyLineMeta(c,m){
+    if(!m) return;
+    if(m.urg) c.dataset.urg = m.urg;
+    if(m.cat) c.dataset.cat = m.cat;
+    if(m.due) c.dataset.due = m.due;
+    if(durMin(m.dur)) c.dataset.dur = String(durMin(m.dur));
+    syncMetaLabel(c);
+  }
+  function localToday(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function shortDate(s){
+    const d = dateObj(s);
+    return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  }
+  // Top half of Reference (2026-10-31): panels live here, cells stay in #referenceScroll.
+  function refTopHost(tree){
+    return document.getElementById('refTopScroll') || tree.parentNode;
+  }
+  // Keep the Reference header numbers on one line: step the size down until they fit (2026-11-03, Julius).
+  function fitUrgCounts(){
+    const c = document.querySelector('#referencePane .ref-pane-header .urg-counts');
+    if(!c) return;
+    c.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(c).fontSize) || 13;
+    while(c.scrollWidth > c.clientWidth && size > 8){ size -= .5; c.style.fontSize = size + 'px'; }
+    if(!fitUrgCounts.watch && window.ResizeObserver){
+      fitUrgCounts.watch = new ResizeObserver(() => fitUrgCounts());
+      fitUrgCounts.watch.observe(c.closest('.ref-pane-header'));
+    }
+  }
+  // Urgent tab (2026-11-15, Julius): while the middle column's 🔴 tab is open, #urgentPanel lives in #urgTabScroll
+  // (a placeholder marks its home in Reference); leaving the tab puts it back. Always unfolded there.
+  const urgInTab = () => { const p = document.getElementById('journalPane'); return !!(p && p.dataset.ctab === 'urgent'); };
+  let urgHome = null;
+  window.urgTabSync = function(){
+    const panel = document.getElementById('urgentPanel'), host = document.getElementById('urgTabScroll');
+    if(!panel || !host) return;
+    if(urgInTab()){
+      if(panel.parentNode !== host){ if(!urgHome){ urgHome = document.createComment('urgentPanel home'); } panel.parentNode && panel.parentNode.insertBefore(urgHome, panel); host.appendChild(panel); }
+    } else if(panel.parentNode === host){
+      if(urgHome && urgHome.parentNode){ urgHome.parentNode.insertBefore(panel, urgHome); urgHome.remove(); }
+      else { const tree = document.getElementById('referenceTree'); if(tree) refTopHost(tree).appendChild(panel); }
+    }
+    renderUrgent();
+  };
+  function renderUrgent(){
+    try{ renderDueBlocks(); }catch(e){}
+    const tree = document.getElementById('referenceTree');
+    if(!tree) return;
+    let panel = document.getElementById('urgentPanel');
+    if(!panel){
+      panel = document.createElement('div');
+      panel.id = 'urgentPanel';
+      // calPanel may already live elsewhere (docked) when data arrives late (instant screen): only use it as the anchor if it's here.
+      const top = refTopHost(tree), cp = document.getElementById('calPanel');
+      top.insertBefore(panel,cp && cp.parentNode === top ? cp : null);
+    }
+    { const host = document.getElementById('urgTabScroll'); // opened on the 🔴 tab → lives there (2026-11-15)
+      if(host && urgInTab() && panel.parentNode !== host){ urgHome = urgHome || document.createComment('urgentPanel home'); panel.parentNode.insertBefore(urgHome, panel); host.appendChild(panel); } }
+    // Editing a task's text right in the panel: don't rebuild under the cursor;
+    // it redraws when you leave the line (2026-10-27, Julius).
+    const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#urgentPanel .urg-text[contenteditable="true"]');
+    if(editing){ urgRedrawLater = true; return; }
+    urgRedrawLater = false;
+    const all = collectUrgent();
+    const items = all.filter(x => !x.arch), archived = all.filter(x => x.arch);
+    // Keep a half-typed task and the keyboard in an inline add line across re-renders.
+    const act = document.activeElement;
+    const actAdd = act && act.closest ? act.closest('#urgentPanel .urg-adder') : null;
+    let focusAdd = urgAddWant || (actAdd ? Number(actAdd.dataset.urg) : 0);
+    const caret = actAdd && !urgAddWant ? act.selectionStart : null;
+    urgAddWant = 0;
+    panel.innerHTML = '';
+    panel.hidden = false; // Always shown, so you can add a task even when it's empty.
+    panel.classList.toggle('wrap', urgWrap());
+    const headRow = document.createElement('div');
+    headRow.className = 'urg-head-row';
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'urg-head';
+    // Per-level counts in each level's color (Julius, 2026-10-27): red · yellow · blue (+ grey Due).
+    // Tasks counted, not subtasks; subtask progress shown as (done/total) after the number.
+    // A subtask with its own different color counts as an item in that color (Julius, 2026-10-27).
+    const tally = {0:{n:0,d:0,t:0},1:{n:0,d:0,t:0},2:{n:0,d:0,t:0},3:{n:0,d:0,t:0}};
+    items.forEach(x => {
+      const u = x.urg || 0; tally[u].n++;
+      (x.subs || []).forEach(s => {
+        if(s.urg && s.urg !== u){ if(!s.done) tally[s.urg].n++; return; }
+        tally[u].t++; if(s.done) tally[u].d++;
+      });
+    });
+    const cnt = u => tally[u].n;
+    const counts = document.createElement('span'); counts.className = 'urg-counts';
+    [[1,'Urgent'],[2,'Soon'],[3,'Can be later']].concat(cnt(0) ? [[0,'Due']] : []).forEach(([u,name]) => {
+      const t = tally[u], n = document.createElement('span'); n.className = 'urg-count'; n.dataset.urg = u;
+      n.textContent = t.n;
+      if(t.t){ const sp = document.createElement('small'); sp.className = 'urg-sub'; sp.textContent = '(' + t.d + '/' + t.t + ')'; n.append(sp); }
+      n.title = name + ': ' + t.n + (t.t ? ' · subtasks ' + t.d + '/' + t.t + ' done' : '');
+      counts.append(n);
+    });
+    const label = document.createElement('span'); label.className = 'next-steps-label'; label.textContent = 'Next Steps';
+    head.append(label, counts); // section name plus existing colored counts; tap still folds
+    head.setAttribute('aria-label','Next Steps');
+    head.title = 'Tap to collapse/expand · hold to zoom';
+    head.addEventListener('click',() => {
+      if(urgCreateSuppress){ urgCreateSuppress = false; return; }
+      urgentOpen = !urgentOpen;
+      try{ localStorage.setItem('fw.urgentOpen',urgentOpen ? '1' : '0'); }catch(e){}
+      renderUrgent();
+    });
+    // Create menu moved off the numbers onto a + button (2026-11-06, Julius): holding the numbers now only zooms Urgent.
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button'; addBtn.className = 'urg-add-btn'; addBtn.textContent = '+';
+    addBtn.title = 'Create a Next Steps task: Urgent / Soon / Can be later'; addBtn.setAttribute('aria-label','Create a Next Steps task');
+    addBtn.addEventListener('click',() => openCreateMenu(addBtn,null));
+    headRow.append(head, addBtn);
+    // Put Urgent and its live counts directly below the Reference heading.
+    const refHeader = document.querySelector('#referencePane .ref-pane-header');
+    const previousHead = refHeader && refHeader.querySelector('.urg-head-row');
+    if(previousHead) previousHead.remove();
+    if(refHeader) refHeader.appendChild(headRow);
+    else panel.appendChild(headRow);
+    fitUrgCounts();
+    if(!urgentOpen && !urgInTab()) return;
+    window.__urgAddOpen = window.__urgAddOpen || new Set(); const urgAddOpen = window.__urgAddOpen;
+    [1,2,3,0].forEach(u => {
+      const group = items.filter(x => x.urg === u)
+        .sort((a,b) => (a.soon ? 0 : 1) - (b.soon ? 0 : 1) || (a.soon || '').localeCompare(b.soon || ''));
+      // Urgent / Soon / Can be later always show (with their add line), even when empty (Julius, 2026-10-27).
+      if(!group.length && !u) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'urg-group';
+      wrap.dataset.urg = u;
+      panel.appendChild(wrap);
+      const sub = document.createElement('div');
+      sub.className = 'urg-sub';
+      if(u){
+        sub.textContent = (u - 1) + ' · ' + URG_NAMES[u];
+        sub.title = 'Hold (or right-click) to make a ' + URG_NAMES[u] + ' task';
+        holdForCreate(sub,u);
+      } else {
+        sub.textContent = 'Due';
+        sub.title = 'Tasks with a due date but no urgency, soonest first';
+      }
+      wrap.appendChild(sub);
+      // Cleanup (2026-11-09): the empty "Add … task" line shows only on hover / when the box has focus, or after a tap
+      // on its heading (phones). Remembered for this session.
+      if(urgAddOpen.has(u)) wrap.classList.add('show-add');
+      sub.addEventListener('click', e => {
+        if(e.target.closest('button,input,a')) return;
+        const on = !wrap.classList.contains('show-add');
+        wrap.classList.toggle('show-add', on);
+        if(on){ urgAddOpen.add(u); const inp = wrap.querySelector('.urg-adder textarea'); if(inp) setTimeout(() => { try { inp.focus({preventScroll: true}); } catch (err) {} }, 0); }
+        else urgAddOpen.delete(u);
+      });
+      const addItem = item => {
+        wrap.appendChild(urgItemRow(item,u,item.index,item.html,item.text,0,item.done,true));
+        // Subtasks: real checkbox rows like their task, indented under it
+        // (2026-10-27, Julius). Same hold-for-urgency box, editable text.
+        // Folded tasks (− / +, 2026-10-28, Julius) hide their subtasks here only.
+        if(!urgFolded(item)) item.subs.forEach(st => wrap.appendChild(urgItemRow(item,u,st.index,st.html,st.text,st.level,st.done,false)));
+      };
+      // Batches (2026-10-30, Julius): inside each level, tasks are grouped by subject
+      // (Music, Productivity, Career / IT, …) so he can work one batch at a time.
+      // Batch order = its soonest task; Other (no subject) last. Fold per batch.
+      const batches = urgBatches(group);
+      if(!urgBatchOn() || (batches.length === 1 && !batches[0].cat)) group.forEach(addItem);
+      else batches.forEach(b => {
+        const folded = urgBatchFolded(u,b.cat);
+        wrap.appendChild(urgBatchHead(u,b,folded));
+        if(!folded) b.items.forEach(addItem);
+      });
+      if(u) wrap.appendChild(urgAdderRow(u));
+    });
+    if(archived.length) panel.appendChild(urgArchiveGroup(archived));
+    // Open a line just added from the panel for typing (2026-10-28, Julius).
+    if(urgFocusWant){
+      const w = urgFocusWant; urgFocusWant = null;
+      const el = panel.querySelector(`.urg-text[data-date="${CSS.escape(w.date)}"][data-pane="${w.pane}"][data-index="${w.index}"]`);
+      if(el && el.isContentEditable){
+        try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); }
+        try{ const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }catch(e){}
+        el.scrollIntoView({block:'nearest'});
+        focusAdd = 0;
+      }
+    }
+    if(focusAdd){
+      const inp = panel.querySelector(`.urg-adder[data-urg="${focusAdd}"] textarea`);
+      if(inp){
+        const grp = inp.closest('.urg-group'); if(grp) grp.classList.add('show-add'); // stays visible while you keep typing
+        try{ inp.focus({preventScroll:true}); }catch(e){ inp.focus(); }
+        const n = caret == null ? inp.value.length : Math.min(caret,inp.value.length);
+        try{ inp.setSelectionRange(n,n); }catch(e){}
+      }
+    }
+  }
+  // Urgent batches by subject (2026-10-30, Julius). Option "Group by subject"
+  // (localStorage fw.urgBatch, default on); folded batches in fw.urgBatchFold ("u|cat").
+  function urgBatchOn(){ return urgOpt('fw.urgBatch','1') !== '0'; }
+  // Subjects load in a later script; before that there are no batches yet.
+  function urgCatInfo(k){ try{ return k && CARD_CAT_BY_KEY[k] || null; }catch(e){ return null; } }
+  let urgBatchFoldSet = new Set();
+  try{ urgBatchFoldSet = new Set(JSON.parse(localStorage.getItem('fw.urgBatchFold') || '[]')); }catch(e){}
+  function urgBatchFolded(u,cat){ return urgBatchFoldSet.has(u + '|' + (cat || 'other')); }
+  function urgBatches(group){
+    const map = new Map();
+    group.forEach(item => {
+      // Cert studies sit in the Career / IT batch (2026-10-30, Julius).
+      const k = item.cat === 'study' && urgCatInfo('career') ? 'career' : item.cat;
+      const c = urgCatInfo(k) ? k : '';
+      if(!map.has(c)) map.set(c,{cat:c,items:[]});
+      map.get(c).items.push(item);
+    });
+    const list = [...map.values()];
+    const pos = b => group.indexOf(b.items[0]);
+    return list.sort((a,b) => (a.cat ? 0 : 1) - (b.cat ? 0 : 1) || pos(a) - pos(b));
+  }
+  function urgBatchHead(u,b,folded){
+    const c = urgCatInfo(b.cat);
+    const h = document.createElement('button');
+    h.type = 'button'; h.className = 'urg-batch'; h.dataset.cat = b.cat || 'other';
+    if(c) h.style.setProperty('--bc',c.color);
+    const name = document.createElement('span'); name.className = 'urg-batch-name'; name.textContent = c ? c.name : 'Other';
+    const n = document.createElement('small'); n.textContent = b.items.length;
+    h.append(name,n,pmBox(!folded));
+    h.title = (folded ? 'Show ' : 'Hide ') + (c ? c.name : 'Other') + ' tasks · change a task\'s subject from its checkbox hold menu';
+    h.addEventListener('pointerdown',e => e.stopPropagation());
+    h.addEventListener('click',e => {
+      e.preventDefault(); e.stopPropagation();
+      const k = u + '|' + (b.cat || 'other');
+      if(urgBatchFoldSet.has(k)) urgBatchFoldSet.delete(k); else urgBatchFoldSet.add(k);
+      try{ localStorage.setItem('fw.urgBatchFold',JSON.stringify([...urgBatchFoldSet])); }catch(e){}
+      renderUrgent();
+    });
+    return h;
+  }
+  /* ---------------------------------------------------------
+     Type tasks straight into the Urgent panel (2026-10-27, Julius):
+     each level ends with an add line (dashed box in the level's color).
+     Type → Enter = a new task at the end of today's Today cell with that
+     urgency already set; the line stays focused for the next one.
+     "Title: details" makes the title bold. Esc clears.
+     --------------------------------------------------------- */
+  let urgRedrawLater = false;
+  // Per-task fold in the Urgent panel (2026-10-28, Julius): key = day + pane + task text,
+  // saved per device in localStorage fw.urgFold. Open by default.
+  let urgFocusWant = null; // {date,pane,index} of a line just added from the panel
+  let urgFoldSet = new Set();
+  try{ urgFoldSet = new Set(JSON.parse(localStorage.getItem('fw.urgFold') || '[]')); }catch(e){}
+  function urgFoldKey(item){ return item.date + '|' + item.pane + '|' + item.text; }
+  function urgFolded(item){
+    if(!(item.subs && item.subs.length) || !urgFoldSet.has(urgFoldKey(item))) return false;
+    // A subtask just added under a folded task opens it (2026-10-28).
+    const w = urgFocusWant;
+    if(w && w.date === item.date && w.pane === item.pane && item.subs.some(s => s.index === w.index)){ urgFoldSet.delete(urgFoldKey(item)); try{ localStorage.setItem('fw.urgFold',JSON.stringify([...urgFoldSet])); }catch(e){} return false; }
+    return true;
+  }
+  function urgToggleFold(item){
+    const k = urgFoldKey(item);
+    if(urgFoldSet.has(k)) urgFoldSet.delete(k); else urgFoldSet.add(k);
+    try{ localStorage.setItem('fw.urgFold',JSON.stringify([...urgFoldSet].slice(-300))); }catch(e){}
+    renderUrgent();
+  }
+  // One task / subtask row. Tap the box = done, tap the text = edit it (writes to
+  // the real task; its day must be loaded), tap elsewhere on the row = go to it.
+  // Hold the box = urgency / due / subject / Archive / Go to task (2026-10-27, Julius).
+  function urgItemRow(item,u,index,html,text,level,done,isHead){
+    const row = document.createElement('div');
+    row.className = 'urg-row' + (level ? ' urg-subrow' : '') + (done ? ' done' : '');
+    row.dataset.urg = u;
+    if(item.cat) row.dataset.tccat = item.cat;
+    if(level) row.style.paddingLeft = (level * 21) + 'px';
+    row.title = 'Tap the text to edit · tap the box to tick · tap the date side to go to it';
+    const box = document.createElement('span'); box.className = 'urg-box';
+    box.dataset.date = item.date; box.dataset.pane = item.pane; box.dataset.index = index;
+    box.title = 'Tap = done · hold (or right-click) = urgency, due date, archive';
+    box.addEventListener('click',e => {
+      e.stopPropagation();
+      // One tap = done + logged + archived (2026-11-05, Julius) for an urgent task's own box; subtasks just tick.
+      if(isHead && !level && (item.urg > 0 || item.arch)) urgDoneLogArchive(item,index);
+      else toggleDueTask(item.date,index,item.pane);
+    });
+    const tx = document.createElement('span'); tx.className = 'urg-text';
+    tx.dataset.date = item.date; tx.dataset.pane = item.pane; tx.dataset.index = index;
+    if(html) tx.innerHTML = html; else if(text !== '(empty task)') tx.textContent = text;
+    tx.dataset.ph = level ? 'Subtask' : 'Task';
+    const loaded = !!urgEditor(item.date,item.pane);
+    tx.contentEditable = loaded ? 'true' : 'false';
+    tx.spellcheck = true;
+    row.append(box,tx);
+    // Dates stack in a narrow column on the right (Julius, 2026-10-27): due date,
+    // then days left, then the day made — so the task text keeps the width.
+    const meta = document.createElement('span'); meta.className = 'urg-meta';
+    const rowDue = isHead ? item.due : ((item.subs || []).find(x => x.index === index) || {}).due;
+    const rowDone = isHead ? item.done : done;
+    if(rowDue && !item.arch){
+      const today = localToday();
+      const date = document.createElement('span'); date.className = 'urg-date';
+      // Parts: weekday / date / days left (e.g. Fri · 10/30 · 3d); stacked only when narrow.
+      const dparts = dueText(rowDue,today).split(' · ');
+      const first = dparts[0], cut = first.indexOf(' ');
+      const pieces = (cut > 0 ? [[first.slice(0,cut).replace(/,$/,''),'ud-wd'],[first.slice(cut + 1),'ud-md']] : [[first,'ud-md']])
+        .concat(dparts.slice(1).map(t => [t,'ud-rel']));
+      pieces.forEach(([t,c]) => { const sp = document.createElement('span'); sp.className = c; sp.textContent = t; date.append(sp); });
+      date.title = 'Due ' + dueLabel(rowDue);
+      if(!rowDone && rowDue < today) date.classList.add('overdue');
+      else if(!rowDone && rowDue === today) date.classList.add('due-today');
+      meta.append(date);
+    }
+    if(isHead && !item.arch && showMadeDate() && item.date !== 'backlog'){
+      const made = document.createElement('span'); made.className = 'urg-made';
+      made.textContent = md(item.date); made.title = 'Made ' + wd(item.date) + ' ' + md(item.date);
+      meta.append(made);
+    }
+    if(meta.childNodes.length) row.insertBefore(meta,tx); // before the text so it can float top-right when narrow (order:2 keeps it last when wide)
+    // − / + fold for a task with subtasks (2026-10-28, Julius): right after the text when
+    // wide (order:1), floated right beside the dates when narrow. Folded shows done/total.
+    if(isHead && item.subs && item.subs.length){
+      const folded = urgFolded(item);
+      const fb = document.createElement('button');
+      fb.type = 'button'; fb.className = 'urg-fold' + (folded ? ' folded' : '');
+      fb.append(pmBox(!folded));
+      if(folded){
+        const d = item.subs.filter(s => s.done).length;
+        const n = document.createElement('small'); n.textContent = d + '/' + item.subs.length; fb.append(n);
+      }
+      fb.title = folded ? 'Show subtasks' : 'Hide subtasks';
+      fb.addEventListener('pointerdown',e => e.stopPropagation());
+      fb.addEventListener('click',e => { e.preventDefault(); e.stopPropagation(); urgToggleFold(item); });
+      tx.after(fb); // right after the text, not pushed to the edge (Julius 2026-11-01)
+    }
+    row.addEventListener('click',e => {
+      if(e.target.closest('.urg-box')) return;
+      if(e.target.closest('.urg-text') && tx.isContentEditable) return;
+      goToTask(item.date,index,item.pane);
+    });
+    return row;
+  }
+  // Archive log (2026-10-27, Julius): finished work kept as a dated log under
+  // the levels, newest first; collapsed by default.
+  let urgArchOpen = false;
+  try{ urgArchOpen = localStorage.getItem('fw.urgArchOpen') === '1'; }catch(e){}
+  function urgArchiveGroup(list){
+    const wrap = document.createElement('div');
+    wrap.className = 'urg-group urg-arch';
+    wrap.dataset.urg = '0';
+    const head = document.createElement('button');
+    head.type = 'button'; head.className = 'urg-sub urg-arch-head';
+    head.append(pmBox(urgArchOpen),document.createTextNode(' Archive · ' + list.length));
+    head.title = 'Finished work kept as a log, by the day it was archived';
+    head.addEventListener('click',() => {
+      urgArchOpen = !urgArchOpen;
+      try{ localStorage.setItem('fw.urgArchOpen',urgArchOpen ? '1' : '0'); }catch(e){}
+      renderUrgent();
+    });
+    wrap.appendChild(head);
+    if(!urgArchOpen) return wrap;
+    const byDay = new Map();
+    list.forEach(x => { if(!byDay.has(x.arch)) byDay.set(x.arch,[]); byDay.get(x.arch).push(x); });
+    [...byDay.keys()].sort().reverse().forEach(day => {
+      const d = document.createElement('div'); d.className = 'urg-arch-day';
+      d.textContent = '🗄 ' + wd(day) + ' ' + md(day);
+      wrap.appendChild(d);
+      byDay.get(day).forEach(item => {
+        wrap.appendChild(urgItemRow(item,item.urg || 0,item.index,item.html,item.text,0,item.done,true));
+        if(!urgFolded(item)) item.subs.forEach(st => wrap.appendChild(urgItemRow(item,item.urg || 0,st.index,st.html,st.text,st.level,st.done,false)));
+      });
+    });
+    return wrap;
+  }
+  // Delete a task and its subtasks. Undo: tap the status message within 30 s
+  // (or Ctrl+Z in that cell). Asks first when it has subtasks.
+  let lastTaskDelete = null;
+  function deleteTaskLine(line,owner){
+    if(!line || !owner) return;
+    const nodes = urgSubtree(line);
+    if(nodes.length > 1 && !confirm('Delete this task and its ' + (nodes.length - 1) + ' subtask' + (nodes.length > 2 ? 's' : '') + '?')) return;
+    captureBeforeEdit(owner);
+    const html = owner.innerHTML;
+    nodes.forEach(n => n.remove());
+    if(!owner.children.length) owner.innerHTML = '<p><br></p>';
+    if(typeof refreshCards === 'function') try{ refreshCards(owner); }catch(e){}
+    finishEditorEdit(owner);
+    urgChanged(owner);
+    if(typeof renderDueBlocks === 'function') try{ renderDueBlocks(); }catch(e){}
+    lastTaskDelete = {owner,html,at:Date.now()};
+    setStatus('Deleted' + (nodes.length > 1 ? ' (' + nodes.length + ' lines)' : '') + ' — tap here to undo');
+  }
+  document.addEventListener('click',e => {
+    const st = e.target && e.target.closest ? e.target.closest('#status,#focusStatus') : null;
+    if(!st || !lastTaskDelete || Date.now() - lastTaskDelete.at > 30000) return;
+    const d = lastTaskDelete; lastTaskDelete = null;
+    if(!document.contains(d.owner)){ setStatus('Can’t undo — that cell was reloaded'); return; }
+    captureBeforeEdit(d.owner);
+    d.owner.innerHTML = d.html;
+    if(typeof normalizeEditorTasks === 'function') try{ normalizeEditorTasks(d.owner); }catch(err){}
+    if(typeof refreshCards === 'function') try{ refreshCards(d.owner); }catch(err){}
+    finishEditorEdit(d.owner);
+    urgChanged(d.owner);
+    if(typeof renderDueBlocks === 'function') try{ renderDueBlocks(); }catch(err){}
+    setStatus('Delete undone');
+  });
+  /* Urgent tick = log + archive (2026-11-05, Julius). Ticking an urgent task in the Urgent panel:
+     1) ticks the real task, 2) puts a done copy in today's History (current time section) unless the task already
+     lives in today's cell (that one is logged by its own tick), 3) archives it (Urgent → Archive).
+     Unticking it from the Archive reverses all three. The copy is tied to the task by data-ulog / data-ulogof. */
+  function urgDoneLogArchive(item,index){
+    const ed = urgEditor(item.date,item.pane);
+    const line = ed ? ed.querySelectorAll('.check-line')[index] : null;
+    const cb = line ? line.querySelector('input[type=checkbox]') : null;
+    if(!cb){ setStatus('That day isn’t loaded — scroll to ' + urgWhere(item.date)); return; }
+    const today = localToday();
+    const tEd = document.querySelector('#todayScroll .day-editor[data-date="' + CSS.escape(today) + '"]');
+    const wasDone = cb.checked;
+    if(wasDone && !item.arch){ toggleDueTask(item.date,index,item.pane); return; } // done but never archived: plain untick
+    if(!wasDone){
+      toggleDueTask(item.date,index,item.pane);
+      if(tEd && ed !== tEd){
+        if(!line.dataset.ulog) line.dataset.ulog = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+        if(!tEd.querySelector('[data-ulogof="' + CSS.escape(line.dataset.ulog) + '"]')){
+          captureBeforeEdit(tEd);
+          const n = createCheckboxLine(0);
+          const src = line.querySelector('.check-text');
+          n.querySelector('.check-text').innerHTML = src ? src.innerHTML : esc(lineText(line));
+          n.classList.add('done');
+          const c2 = n.querySelector('input'); c2.checked = true; c2.setAttribute('checked','');
+          const hm = tsecNow();
+          n.dataset.at = hm; n.dataset.dt = hm; n.dataset.ulogof = line.dataset.ulog;
+          if(line.dataset.cat) n.dataset.cat = line.dataset.cat;
+          tEd.appendChild(n);
+          tsecArrange(tEd);
+          if(typeof refreshCards === 'function') try{ refreshCards(tEd); }catch(e){}
+          saveEditorOwner(tEd);
+        }
+      }
+      setArchived(line,ed,true);
+      setStatus('Done · logged in today’s History · archived (Urgent → Archive)');
+    } else {
+      toggleDueTask(item.date,index,item.pane);
+      const copy = tEd && line.dataset.ulog ? tEd.querySelector('[data-ulogof="' + CSS.escape(line.dataset.ulog) + '"]') : null;
+      if(copy){ captureBeforeEdit(tEd); copy.remove(); saveEditorOwner(tEd); }
+      setArchived(line,ed,false);
+      setStatus('Back in Urgent · removed from today’s History');
+    }
+  }
+  function setArchived(line,owner,on){
+    const day = localToday();
+    // Title cells (2026-11-21): a title archives its whole box.
+    const grp = new Set(urgSubtree(line)); if(window.tboxTitle && tboxTitle(line)) titleCovered(line).forEach(l => grp.add(l));
+    grp.forEach(l => { if(l.nodeType === 1 && l.dataset){ if(on) l.dataset.arch = day; else delete l.dataset.arch; } });
+    urgChanged(owner);
+    setStatus(on ? 'Archived ' + md(day) + ' — in Next Steps → Archive' : 'Back in Next Steps');
+  }
+  const urgDraft = {1:'',2:'',3:''};
+  let urgAddWant = 0;
+  // After adding from the box, keep typing in the real task line (checkbox, Tab / Shift+Tab indent,
+  // hold menus, Enter = next task) instead of the box (2026-11-05, Julius).
+  function urgFocusMade(made){
+    if(!(made && made.nodeType === 1)) return;
+    const ed = made.parentElement, ok = ed && ownerKey(ed);
+    if(ok){ urgFocusWant = {date:ok.date,pane:ok.pane,index:[...ed.querySelectorAll('.check-line')].indexOf(made)}; urgAddWant = 0; }
+  }
+  function urgAdderRow(u){
+    const row = document.createElement('form');
+    row.className = 'urg-row urg-adder';
+    row.dataset.urg = u;
+    row.title = 'Type a ' + URG_NAMES[u] + ' task, Enter to add (goes in today)';
+    // Wraps onto new lines and grows downward instead of running past the cell (2026-10-31, Julius).
+    const inp = document.createElement('textarea');
+    inp.rows = 1;
+    const fit = () => { inp.style.height = 'auto'; inp.style.height = inp.scrollHeight + 'px'; };
+    inp.value = urgDraft[u] || '';
+    inp.placeholder = 'Add ' + URG_NAMES[u].toLowerCase() + ' task…';
+    inp.enterKeyHint = 'enter';
+    inp.autocomplete = 'off';
+    inp.setAttribute('aria-label','New ' + URG_NAMES[u] + ' task');
+    inp.addEventListener('input',() => { if(/\n/.test(inp.value)) inp.value = inp.value.replace(/\s*\n\s*/g,' '); urgDraft[u] = inp.value; fit(); });
+    inp.addEventListener('focus',fit);
+    requestAnimationFrame(fit);
+    inp.addEventListener('keydown',e => {
+      e.stopPropagation(); // the page's shortcuts / undo shouldn't act on this box
+      if(e.key === 'Escape'){ urgDraft[u] = ''; inp.value = ''; fit(); inp.blur(); }
+      else if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); row.requestSubmit ? row.requestSubmit() : row.dispatchEvent(new Event('submit',{cancelable:true})); }
+    });
+    row.addEventListener('pointerdown',e => { if(e.target !== inp){ e.preventDefault(); inp.focus(); } });
+    row.addEventListener('submit',e => {
+      e.preventDefault();
+      const p = splitTitle(inp.value);
+      if(!p.title && !p.details) return;
+      const was = inp.value;
+      urgDraft[u] = '';
+      urgAddWant = u; // keep typing in this level after the panel re-renders
+      const made = addTaskToBacklog(p.title,p.details,u,urgFocusMade);
+      if(made) setStatus(URG_NAMES[u] + ' task added to ' + BACKLOG_NAME);
+      else { urgDraft[u] = was; urgAddWant = 0; }
+      urgFocusMade(made);
+      renderUrgent();
+    });
+    // A checkbox in front (2026-11-05, Julius): the new task looks like the others while typing.
+    const ab = document.createElement('span'); ab.className = 'urg-box urg-addbox2'; ab.setAttribute('aria-hidden','true');
+    row.append(ab,inp); // dashed box removed: on narrow panes it sat alone on a line above the input as stray red dots (2026-10-31, Julius)
+    return row;
+  }
+  /* ---------------------------------------------------------
+     Make tasks right in the Urgent panel (2026-10-26, Julius).
+     Hold (or right-click) a level heading or the panel head, or tap
+     + Task → Create Urgent / Soon / Can be later task → type → Enter.
+     The task goes at the end of today's Today cell with that urgency.
+     "Title: details" makes the title bold.
+     --------------------------------------------------------- */
+  let urgCreating = 0, urgCreateSuppress = false, urgCreateMenu = null;
+  // Zooming a folded Urgent showed an empty box (2026-11-06, Julius): the zoom opens it first.
+  window.urgEnsureOpen = () => { if(urgentOpen) return; urgentOpen = true; try{ localStorage.setItem('fw.urgentOpen','1'); }catch(e){} renderUrgent(); };
+  // A small boxed minus / plus (collapse / expand).
+  function pmBox(open){
+    const b = document.createElement('span');
+    b.className = 'pm-box';
+    b.textContent = open ? '−' : '+';
+    b.setAttribute('aria-hidden','true');
+    return b;
+  }
+  function holdForCreate(el,level){
+    let timer = null, start = null;
+    const fire = () => { timer = null; urgCreateSuppress = el.classList.contains('urg-head'); openCreateMenu(el,level); };
+    el.addEventListener('pointerdown',e => {
+      if(e.button > 0) return;
+      start = {x:e.clientX,y:e.clientY};
+      timer = setTimeout(fire,500);
+    });
+    el.addEventListener('pointermove',e => {
+      if(timer && start && Math.hypot(e.clientX - start.x,e.clientY - start.y) > 8){ clearTimeout(timer); timer = null; }
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(t => el.addEventListener(t,() => { if(timer){ clearTimeout(timer); timer = null; } }));
+    el.addEventListener('contextmenu',e => { e.preventDefault(); urgCreateSuppress = false; openCreateMenu(el,level); });
+    el.style.webkitTouchCallout = 'none';
+  }
+  function closeCreateMenu(){ if(urgCreateMenu){ urgCreateMenu.remove(); urgCreateMenu = null; } }
+  function openCreateMenu(anchor,level){
+    closeCreateMenu();
+    const m = document.createElement('div');
+    m.className = 'urg-create-menu';
+    const levels = level ? [level].concat([1,2,3].filter(x => x !== level)) : [1,2,3];
+    levels.forEach(u => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.urg = u;
+      b.className = 'ucm-item' + (u === level ? ' first' : '');
+      b.textContent = 'Create ' + URG_NAMES[u] + ' task';
+      b.addEventListener('click',() => {
+        closeCreateMenu();
+        // Jump into that level's inline add line (2026-10-27).
+        urgentOpen = true;
+        try{ localStorage.setItem('fw.urgentOpen','1'); }catch(e){}
+        urgAddWant = u;
+        renderUrgent();
+      });
+      m.appendChild(b);
+    });
+    document.body.appendChild(m);
+    const r = anchor.getBoundingClientRect();
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(8,Math.min(r.left,window.innerWidth - w - 8)) + 'px';
+    m.style.top = (r.bottom + h + 8 < window.innerHeight ? r.bottom + 4 : Math.max(8,r.top - h - 4)) + 'px';
+    urgCreateMenu = m;
+    setTimeout(() => {
+      const off = e => { if(urgCreateMenu && !urgCreateMenu.contains(e.target)){ closeCreateMenu(); document.removeEventListener('pointerdown',off,true); } };
+      document.addEventListener('pointerdown',off,true);
+    },0);
+  }
+  function createRow(u){
+    const row = document.createElement('form');
+    row.className = 'urg-create urg-group';
+    row.dataset.urg = u;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = 'New ' + URG_NAMES[u] + ' task — Title: details';
+    inp.enterKeyHint = 'done';
+    const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'btn tiny'; ok.textContent = 'Add';
+    const no = document.createElement('button'); no.type = 'button'; no.className = 'btn tiny'; no.textContent = '✕';
+    no.title = 'Cancel';
+    no.addEventListener('click',() => { urgCreating = 0; renderUrgent(); });
+    inp.addEventListener('keydown',e => { if(e.key === 'Escape'){ urgCreating = 0; renderUrgent(); } });
+    row.addEventListener('submit',e => {
+      e.preventDefault();
+      const p = splitTitle(inp.value);
+      if(!p.title && !p.details){ inp.focus(); return; }
+      if(addTaskToBacklog(p.title,p.details,u)){
+        urgCreating = 0;
+        renderUrgent();
+        setStatus(URG_NAMES[u] + ' task added to ' + BACKLOG_NAME);
+      }
+    });
+    row.append(inp,ok,no);
+    return row;
+  }
+  // "Fix calendar: find which calendar the nap block is on" → title + details.
+  function splitTitle(text){
+    const t = String(text || '').trim();
+    const i = t.indexOf(':');
+    if(i > 0 && i < 80) return {title:t.slice(0,i).trim(),details:t.slice(i + 1).trim()};
+    return {title:t,details:''};
+  }
+  // Add a task (checkbox line) at the end of today's Today cell.
+  function addTaskToToday(title,details,urg){ return addTaskToDay(localToday(),title,details,urg); }
+  // Tasks typed straight into Urgent go to the Backlog cell, not today (Julius, 2026-10-28).
+  function addTaskToBacklog(title,details,urg,onMade){
+    const cell = backlogCell();
+    if(cell) return addTaskToEditor(cell,title,details,urg);
+    withBacklog(c => { const n = addTaskToEditor(c,title,details,urg); if(onMade) onMade(n); renderUrgent(); },
+      () => { if(!urgDraft[urg]) urgDraft[urg] = details ? (title ? title + ': ' + details : details) : title; renderUrgent(); });
+    return true;
+  }
+  function addTaskToDay(date,title,details,urg,textHtml){
+    const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+    if(!ed){ setStatus('Today isn’t loaded — tap Today, then try again'); return false; }
+    return addTaskToEditor(ed,title,details,urg,textHtml);
+  }
+  function addTaskToEditor(ed,title,details,urg,textHtml){
+    captureBeforeEdit(ed);
+    const c = document.createElement('div');
+    c.className = 'check-line';
+    c.dataset.level = '0';
+    if(urg) c.dataset.urg = String(urg);
+    c.innerHTML = '<input type="checkbox"><span class="check-text"></span>';
+    const t = c.querySelector('.check-text');
+    if(textHtml) t.innerHTML = textHtml;
+    else if(title && details){
+      const b = document.createElement('b'); b.textContent = title;
+      t.append(b,document.createTextNode(': ' + details));
+    } else t.textContent = title || details; // no "Title:" → plain text, not bold (Julius 2026-11-01)
+    const blank = !ed.textContent.trim() && !ed.querySelector('input,img,hr');
+    if(blank && !ed.classList.contains('ref-cell')) ed.replaceChildren(c); else ed.appendChild(c);
+    wireCheckbox(c.querySelector('input'));
+    if(typeof refreshCards === 'function') try{ refreshCards(ed); }catch(err){}
+    finishEditorEdit(ed);
+    if(typeof tsecStampNew === 'function') try{ if(tsecIsToday(ed)){ tsecStampNew(ed); tsecArrange(ed); } }catch(err){}
+    urgChanged(ed);
+    return c; // the new line (truthy)
+  }
+
+  /* ---------------------------------------------------------
+     SEND CARRY-OVERS (2026-10-26, Julius): tasks in Claude's note blocks
+     (check-line[data-send]) show a small → button on the right. Tap it → Today,
+     Tomorrow or a picked date; the task moves to that day's Today cell.
+     --------------------------------------------------------- */
+  function maybeOpenSendMenu(e, ed){
+    const line = e.target.closest?.('table[data-cnote] .check-line[data-send]');
+    if(!line || !ed.contains(line)) return;
+    const r = line.getBoundingClientRect();
+    // Only the small → button at the top-right of the line (Julius, 2026-10-27: was "→ Day").
+    if(e.clientX < r.right - 34 || e.clientY > r.top + 26) return;
+    e.preventDefault(); e.stopPropagation();
+    openSendMenu(line, ed, e.clientX, e.clientY);
+  }
+  function closeSendMenu(){ document.querySelector('.send-menu')?.remove(); }
+  // Short date under Today / Tomorrow so it's clear which day (Julius, 2026-10-26): "10/27 Tue".
+  function shortDayLabel(s){
+    const d = new Date(s + 'T00:00:00');
+    return `${d.getMonth()+1}/${d.getDate()} ${d.toLocaleDateString(undefined,{weekday:'short'})}`;
+  }
+  // Reference cells in tree order, for the "→ Reference" picker.
+  function referenceTargets(){
+    return Array.from(document.querySelectorAll('#referenceTree .ref-cell-wrapper')).map(w => {
+      let depth = 0;
+      for(let p = w.parentElement?.closest('.ref-cell-wrapper'); p; p = p.parentElement?.closest('.ref-cell-wrapper')) depth++;
+      const cell = w.querySelector(':scope > .ref-cell');
+      const title = (cell?.querySelector(':scope > h2')?.textContent || cell?.textContent || '').trim().slice(0,40) || 'Untitled';
+      return { id:w.dataset.id, title, depth, cell };
+    });
+  }
+  // Preselect the cell whose title shares the most words with the task (e.g. "CDCR IT application" → IT Associate);
+  // otherwise the last cell picked.
+  function guessReferenceTarget(text, targets){
+    const words = new Set(String(text).toLowerCase().match(/[a-z0-9+]{2,}/g) || []);
+    let best = null, bestScore = 0;
+    targets.forEach(t => {
+      const score = (t.title.toLowerCase().match(/[a-z0-9+]{2,}/g) || []).filter(w => words.has(w)).length;
+      if(score > bestScore){ best = t.id; bestScore = score; }
+    });
+    if(best) return best;
+    try{ const last = localStorage.getItem('fw.sendRef'); if(targets.some(t => t.id === last)) return last; }catch(e){}
+    return targets[0]?.id || '';
+  }
+  function openSendMenu(line, ed, x, y){
+    closeSendMenu();
+    const today = localToday(), tomorrow = addDays(today,1);
+    const targets = referenceTargets();
+    const m = document.createElement('div');
+    m.className = 'send-menu';
+    m.innerHTML =
+      '<div class="send-row">' +
+        `<button data-d="0">Today<small>${shortDayLabel(today)}</small></button>` +
+        `<button data-d="1">Tomorrow<small>${shortDayLabel(tomorrow)}</small></button>` +
+        '<input type="date"><button data-go>Send</button><button data-x>✕</button>' +
+      '</div>' +
+      (targets.length ? '<div class="send-row"><span class="send-lbl">Reference</span><select></select><button data-ref>Add</button></div>' : '');
+    const pick = m.querySelector('input'); pick.value = addDays(today,2);
+    const sel = m.querySelector('select');
+    if(sel){
+      targets.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.id; o.textContent = '  '.repeat(t.depth) + t.title;
+        sel.appendChild(o);
+      });
+      sel.value = guessReferenceTarget(line.textContent, targets);
+    }
+    m.addEventListener('pointerdown', ev => ev.stopPropagation());
+    m.addEventListener('click', ev => {
+      const b = ev.target.closest('button'); if(!b) return;
+      if(b.hasAttribute('data-x')) return closeSendMenu();
+      if(b.hasAttribute('data-ref')){
+        const t = targets.find(t => t.id === sel.value);
+        closeSendMenu();
+        if(t) sendNoteToReference(line, ed, t);
+        return;
+      }
+      const date = b.hasAttribute('data-go') ? pick.value : addDays(today, Number(b.dataset.d));
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+      closeSendMenu();
+      sendNoteTask(line, ed, date);
+    });
+    document.body.appendChild(m);
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(16, Math.min(x - w + 20, innerWidth - w - 16)) + 'px';
+    m.style.top = Math.max(8, Math.min(y + 12, innerHeight - h - 8)) + 'px';
+    setTimeout(() => document.addEventListener('pointerdown', closeSendMenu, {once:true}), 0);
+  }
+  // → Reference (Julius, 2026-10-26): the task (and its subtasks) goes to the end of the picked
+  // Reference cell as open check-lines, and leaves the note — same as sending to a day.
+  function sendNoteToReference(line, ed, target){
+    const cell = target.cell;
+    if(!cell || !document.contains(cell)){ setStatus('That Reference cell isn’t loaded'); return; }
+    const tree = noteTaskTree(line);
+    captureBeforeEdit(cell);
+    tree.forEach(t => {
+      const c = document.createElement('div');
+      c.className = 'check-line';
+      c.dataset.level = String(t.level);
+      if(t.level) c.style.marginLeft = `${t.level * 24}px`;
+      c.innerHTML = '<input type="checkbox"><span class="check-text"></span>';
+      c.querySelector('.check-text').innerHTML = t.html;
+      applyLineMeta(c,t.meta);
+      cell.appendChild(c);
+      wireCheckbox(c.querySelector('input'));
+    });
+    finishEditorEdit(cell);
+    saveEditorOwner(cell);
+    captureBeforeEdit(ed); tree.forEach(t => t.node.remove()); finishEditorEdit(ed); saveEditorOwner(ed);
+    try{ localStorage.setItem('fw.sendRef', target.id); }catch(e){}
+    setStatus(`Sent ${tree.length > 1 ? tree.length + ' tasks' : 'task'} to ${target.title}`);
+  }
+  // A carry-over task plus the subtasks nested under it (Julius, 2026-10-26): sending a
+  // parent takes all its subtasks; sending a subtask takes only it and what's below it.
+  function noteTaskTree(line){
+    const lvl = n => Number(n.dataset.level) || 0;
+    const base = lvl(line), out = [line];
+    for(let n = line.nextElementSibling; n; n = n.nextElementSibling){
+      if(!n.classList.contains('check-line') || lvl(n) <= base) break;
+      out.push(n);
+    }
+    return out.map(n => ({ node:n, level: lvl(n) - base, html: n.querySelector('.check-text')?.innerHTML || '', meta: lineMeta(n) }));
+  }
+  function addTasksToDay(date, items){
+    const ed = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+    if(!ed){ setStatus('That day isn’t loaded'); return false; }
+    captureBeforeEdit(ed);
+    const blank = !ed.textContent.trim() && !ed.querySelector('input,img,hr');
+    if(blank) ed.replaceChildren();
+    items.forEach(it => {
+      const c = document.createElement('div');
+      c.className = 'check-line';
+      c.dataset.level = String(it.level);
+      if(it.level) c.style.marginLeft = `${it.level * 24}px`;
+      c.innerHTML = '<input type="checkbox"><span class="check-text"></span>';
+      c.querySelector('.check-text').innerHTML = it.html;
+      applyLineMeta(c,it.meta);
+      ed.appendChild(c);
+      wireCheckbox(c.querySelector('input'));
+    });
+    finishEditorEdit(ed);
+    saveEditorOwner(ed);
+    noteUrgentDay(date,ed.innerHTML);
+    return true;
+  }
+  function sendNoteTask(line, ed, date){
+    const tree = noteTaskTree(line);
+    const items = tree.map(t => ({ level:t.level, html:t.html, meta:t.meta }));
+    const label = formatDate(date);
+    const what = items.length > 1 ? `${items.length} tasks` : 'task';
+    const removeLines = () => {
+      captureBeforeEdit(ed); tree.forEach(t => t.node.remove()); finishEditorEdit(ed); saveEditorOwner(ed);
+    };
+    const loaded = document.querySelector(`#todayScroll .day-editor[data-date="${CSS.escape(date)}"]`);
+    if(loaded){
+      if(addTasksToDay(date, items)){ removeLines(); setStatus(`Sent ${what} to ${label}`); }
+      return;
+    }
+    setStatus('Sending…');
+    google.script.run
+      .withSuccessHandler(() => { removeLines(); setStatus(`Sent ${what} to ${label}`); })
+      .withFailureHandler(err => setStatus('Send error: ' + (err.message || err)))
+      .appendTasksToDay(date, items);
+  }
+</script>

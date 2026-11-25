@@ -1,0 +1,1310 @@
+<script>
+  /* =========================================================
+     REFERENCE SEARCH
+     ========================================================= */
+  function filterReference(){
+    const q =
+      document
+        .getElementById(
+          'refSearch'
+        )
+        .value
+        .trim()
+        .toLowerCase();
+    document
+      .querySelectorAll(
+        '#referenceTree .ref-cell-wrapper'
+      )
+      .forEach(w => {
+        const matches =
+          !q ||
+          w.innerText
+            .toLowerCase()
+            .includes(q);
+        w.classList.toggle(
+          'hidden',
+          !matches
+        );
+        const disclosure =
+          w.querySelector(':scope > [data-toggle]');
+        if(q && matches){
+          /* Search expansion is temporary: reveal deep matches without
+             changing the item's saved expanded/collapsed preference. */
+          w.classList.remove('ref-collapsed');
+          if(disclosure){
+            disclosure.textContent = '▾';
+          }
+        }else if(!q){
+          const item = state.reference.find(
+            ref => String(ref.id) === String(w.dataset.id)
+          );
+          const expanded = !item || item.expanded !== false;
+          w.classList.toggle(
+            'ref-collapsed',
+            !expanded
+          );
+          if(disclosure){
+            disclosure.textContent = expanded ? '▾' : '▸';
+          }
+        }
+      });
+  }
+  document
+    .getElementById(
+      'refSearch'
+    )
+    .addEventListener(
+      'input',
+      filterReference
+    );
+  /* Reorder by the dedicated handle, without interfering with text selection.
+     Nesting (2026-10-26, Julius): hold the dragged cell over another cell's
+     title for a moment → that cell opens and lights up blue → drop to put the
+     dragged cell inside it (as its last child). Dropping above/below a cell
+     puts it next to that cell at the same level, which is also how a cell
+     comes back out of a folder. Children always move with their parent. */
+  const REF_NEST_HOLD_MS = 550;
+  let refDragState=null;
+  function refClearDropMarks(){
+    document.querySelectorAll('.ref-drop-before,.ref-drop-after,.ref-drop-into,.ref-hold').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after','ref-drop-into','ref-hold'));
+  }
+  function refOwnerId(container){
+    return container?.classList?.contains('ref-children') ? String(container.parentElement.dataset.id) : '';
+  }
+  function refExpand(wrap){
+    const item=state.reference.find(x=>String(x.id)===String(wrap.dataset.id));
+    if(!item||item.expanded!==false)return;
+    item.expanded=true;
+    wrap.classList.remove('ref-collapsed');
+    const arrow=wrap.querySelector(':scope > [data-toggle]');if(arrow)arrow.textContent='▾';
+    sendRefItem(item);
+  }
+  function initReferenceDragHandle(wrap){
+    const handle=wrap.querySelector(':scope > .ref-drag');
+    handle?.addEventListener('pointerdown',e=>{
+      if(e.button!==0 || referenceSortMode!=='original'){
+        if(referenceSortMode!=='original')setStatus('Choose Original order to rearrange cells');
+        return;
+      }
+      e.preventDefault();handle.setPointerCapture(e.pointerId);
+      refDragState={wrap,handle,target:null,after:false,into:false,hold:null,holdTimer:null,fromX:e.clientX,fromY:e.clientY,moved:false};
+      wrap.classList.add('ref-dragging');
+    });
+    handle?.addEventListener('pointermove',e=>{
+      const d=refDragState;if(!d||d.handle!==handle)return;
+      if(Math.abs(e.clientY-d.fromY)>4||Math.abs(e.clientX-d.fromX)>4)d.moved=true;
+      document.querySelectorAll('.ref-drop-before,.ref-drop-after').forEach(n=>n.classList.remove('ref-drop-before','ref-drop-after'));
+      const sc=document.getElementById('referenceScroll'),r=sc.getBoundingClientRect();
+      if(e.clientY<r.top+32)sc.scrollTop-=16;else if(e.clientY>r.bottom-32)sc.scrollTop+=16;
+      const candidate=document.elementFromPoint(e.clientX,e.clientY)?.closest('#referenceTree .ref-cell-wrapper');
+      const valid=candidate&&!wrap.contains(candidate)&&!candidate.classList.contains('hidden');
+      // Over a cell's title line? Start (or keep) the hold-to-nest timer.
+      let onTitle=false;
+      if(valid){
+        const cell=candidate.querySelector(':scope > .ref-cell');
+        const title=cell?.firstElementChild;
+        const tr=(title||cell).getBoundingClientRect();
+        onTitle=e.clientY>=tr.top-4&&e.clientY<=tr.bottom+4;
+      }
+      if(!onTitle||d.hold!==candidate){
+        clearTimeout(d.holdTimer);d.holdTimer=null;
+        if(d.hold&&d.hold!==candidate){d.hold.classList.remove('ref-hold','ref-drop-into');}
+        if(d.into&&d.hold!==candidate)d.into=false;
+        d.hold=null;
+      }
+      if(onTitle&&!d.hold){
+        d.hold=candidate;candidate.classList.add('ref-hold');
+        d.holdTimer=setTimeout(()=>{
+          if(refDragState!==d||d.hold!==candidate)return;
+          d.into=true;d.target=candidate;
+          candidate.classList.remove('ref-hold');candidate.classList.add('ref-drop-into');
+          refExpand(candidate);
+          if(navigator.vibrate)try{navigator.vibrate(12);}catch(err){}
+        },REF_NEST_HOLD_MS);
+      }
+      if(d.into&&d.hold===candidate)return; // Stay in "drop inside" while on that title.
+      if(!valid){d.target=null;return;}
+      d.target=candidate;const cr=candidate.getBoundingClientRect();
+      d.after=e.clientY>cr.top+cr.height/2;
+      candidate.classList.add(d.after?'ref-drop-after':'ref-drop-before');
+    });
+    const end=()=>{
+      const d=refDragState;if(!d||d.handle!==handle)return;
+      refDragState=null;clearTimeout(d.holdTimer);wrap.classList.remove('ref-dragging');
+      refClearDropMarks();
+      if(!d.moved||!d.target)return;
+      const item=state.reference.find(x=>String(x.id)===String(wrap.dataset.id));
+      if(d.into){
+        d.target.querySelector(':scope > .ref-children').appendChild(wrap);
+      }else{
+        d.target.parentNode.insertBefore(wrap,d.after?d.target.nextSibling:d.target);
+      }
+      const newParent=refOwnerId(wrap.parentNode);
+      const parentChanged=item&&String(item.parentId||'')!==newParent;
+      if(item)item.parentId=newParent;
+      // Document order = sort order (siblings keep their relative order).
+      const ids=[...document.querySelectorAll('#referenceTree .ref-cell-wrapper')].map(n=>String(n.dataset.id));
+      const order=ids.map((id,index)=>({id,sort:(index+1)*1000}));
+      order.forEach(entry=>{
+        const it=state.reference.find(x=>String(x.id)===entry.id);
+        if(it) it.sort=entry.sort; // Pending text saves keep running.
+      });
+      setStatus(d.into?'Moved inside — saving…':'Saving reference order…');
+      const saveOrder=()=>{ fwRefStructureStart(); google.script.run
+        .withSuccessHandler(()=>{ fwRefStructureEnd(); setStatus('Saved'); })
+        .withFailureHandler(err=>{ fwRefStructureEnd(); setStatus('Order save error: '+err.message); })
+        .saveReferenceOrder(order); };
+      if(parentChanged){
+        sendRefItem(item,saveOrder,err=>setStatus('Move save error: '+err.message));
+      }else saveOrder();
+    };
+    handle?.addEventListener('pointerup',end);
+    handle?.addEventListener('pointercancel',()=>{if(refDragState?.handle===handle){clearTimeout(refDragState.holdTimer);refDragState=null;wrap.classList.remove('ref-dragging');refClearDropMarks();}});
+  }
+  // Pull tab on a tucked column (2026-11-06, Julius): give just that column room back.
+  window.tuckRestorePane = name => {
+    if(isSplitActive()){
+      const slots = [splitOptions.first,splitOptions.second].concat(splitOptions.third !== 'none' ? [splitOptions.third] : []);
+      const i = slots.indexOf(name);
+      if(isRowLayout()){ mobileSplitRatio = .5; splitColsRatio = .5; }
+      else if(slots.length === 2) mobileSplitRatio = .5;
+      else if(i >= 0){ const want = 1/3, take = want - split3[i], others = split3.reduce((a,v,k) => k === i ? a : a + v,0) || 1;
+        split3 = split3.map((v,k) => k === i ? want : Math.max(.003,v - take * v / others)); }
+      try{ localStorage.setItem(MOBILE_SPLIT_SIZE_KEY,String(mobileSplitRatio)); localStorage.setItem(SPLIT_COLS_KEY,String(splitColsRatio)); localStorage.setItem(SPLIT3_KEY,JSON.stringify(split3)); }catch(e){}
+      updateWorkspaceLayout(); return;
+    }
+    const names = visiblePanes.filter(n => n !== name), wide = names.sort((a,b) => (columnWidths[b] || 0) - (columnWidths[a] || 0))[0];
+    const cur = columnWidths[name] || TUCK, want = Math.min(360,Math.max(200,Math.round(((columnWidths[wide] || 400) + cur) / 2)));
+    if(wide) columnWidths[wide] = Math.max(TUCK,(columnWidths[wide] || 400) - (want - cur));
+    columnWidths[name] = want;
+    try{ localStorage.setItem(COLUMN_STORAGE_KEY,JSON.stringify(columnWidths)); }catch(e){}
+    applyColumnWidths(); requestAnimationFrame(syncDayHeights);
+  };
+  function resetColumnSizes(){
+    // Even columns (Julius, 2026-11-01): equal widths, stretched to fill the window.
+    columnWidths={today:420,journal:420,reference:420};
+    localStorage.removeItem(COLUMN_STORAGE_KEY);
+    applyColumnWidths();
+    try{ fitColumnsToWindow(); }catch(e){}
+    // Also put every horizontal / phone split back to half and half (Julius, 2026-10-31).
+    try{ if(typeof window.resetSplitBars === 'function') window.resetSplitBars(); }catch(e){}
+    mobileSplitRatio = .5; splitColsRatio = .5; split3 = [1/3,1/3,1/3];
+    try{ localStorage.setItem(MOBILE_SPLIT_SIZE_KEY,'.5'); localStorage.setItem(SPLIT_COLS_KEY,'.5'); localStorage.setItem(SPLIT3_KEY,JSON.stringify(split3)); }catch(e){}
+    try{ updateWorkspaceLayout(); }catch(e){}
+    setStatus('Column and split sizes reset');
+  }
+  function fitColumnsToWindow(){
+    const names=visiblePanes;
+    const available=Math.max(240,document.getElementById('workspace').clientWidth-(names.length-1));
+    const sum=names.reduce((n,k)=>n+(Number(columnWidths[k])||420),0);
+    const min=120;
+    let remaining=available;
+    names.forEach((k,i)=>{
+      const rest=names.length-i-1;
+      const desired=i===names.length-1?remaining:Math.round(available*(Number(columnWidths[k])||420)/sum);
+      columnWidths[k]=Math.max(min,Math.min(desired,remaining-rest*min));remaining-=columnWidths[k];
+    });
+    localStorage.setItem(COLUMN_STORAGE_KEY,JSON.stringify(columnWidths));applyColumnWidths();
+  }
+  function insertJournalTemplate(){
+    const template=state.reference.find(x=>referenceTitle(x).trim().toLowerCase()==='journal template');
+    if(!template){setStatus('Create a Reference cell titled Journal Template first');return;}
+    const editor=document.querySelector('#journalScroll .journal-editor:focus') || (activeEditor?.matches?.('.journal-editor') && activeEditor.isConnected ? activeEditor : null);
+    if(!editor){setStatus('Tap inside a Notes day first, then press + Template');return;}
+    const html=storedToHtml(stripReferenceMetadata(template.content||''));
+    const temp=document.createElement('div');temp.innerHTML=html;
+    temp.firstElementChild?.remove(); // Do not copy the title.
+    if(!temp.innerHTML.trim()){setStatus('Journal Template has no body content');return;}
+    if(editor.textContent.trim() && !confirm('Append Journal Template to this journal entry?'))return;
+    captureBeforeEdit(editor);editor.insertAdjacentHTML('beforeend',temp.innerHTML);
+    normalizeEditorTasks(editor);finishEditorEdit(editor);
+    // Grow the row now (and again after layout settles) so it never spills.
+    syncDayHeightStable(editor.dataset.date);
+    saveEditorOwner(editor);
+    setStatus('Journal template inserted');
+  }
+  document.getElementById('journalTemplateButton')?.addEventListener('pointerdown',e=>e.preventDefault());
+  document.getElementById('journalTemplateButton')?.addEventListener('click',insertJournalTemplate);
+  (function initCenterTabs(){ // Center Up tabs (2026-11-01, Julius); last tab remembered per device
+    const pane = document.getElementById('journalPane');
+    if(!pane) return;
+    const set = t => {
+      pane.dataset.ctab = t;
+      pane.querySelectorAll('.center-tabs button').forEach(b => b.classList.toggle('on', b.dataset.ctab === t));
+      try{ localStorage.setItem('fw.centerTab', t); }catch(e){}
+      if(window.renderDayReview) renderDayReview();
+      if(window.urgTabSync) urgTabSync();
+    };
+    let t = 'focus'; try{ t = localStorage.getItem('fw.centerTab') || 'focus'; }catch(e){} // new device opens on ⭐ Keep In Mind (2026-11-16)
+    if(t === 'wxdaily') t = 'weather'; // daily tab merged into Weather (2026-11-07)
+    if(t === 'new') t = 'fun'; // New things merged into the Fun tab (cleanup 2026-11-09)
+    set(t === 'weather' || t === 'focus' || t === 'review' || t === 'fun' || t === 'urgent' ? t : 'notes');
+    pane.querySelector('.center-tabs')?.addEventListener('click', e => {
+      const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
+    });
+  })();
+  /* Reference tabs + daily Scratch Pad (2026-11-03, Julius): 📚 Reference cells, 📝 a pad for the day shown
+     (follows ▲ ▼). Last tab remembered per device. Pad = Days column E, loaded only when shown; saves like
+     the Plan pad (hash check, three-way merge on a conflict, retry, never drop an edit). */
+  (function initRefTabs(){
+    const pane = document.getElementById('referencePane'), ed = document.getElementById('scratchPad');
+    if(!pane || !ed) return;
+    let date = '', base = {c:'',h:null}, timer = 0, dirty = false, sending = false, loadSeq = 0;
+    const cur = () => window.odDate || (typeof state !== 'undefined' && state && state.today) || '';
+    function send(){
+      clearTimeout(timer); timer = 0;
+      if(!dirty || sending || !date) return;
+      const d = date, html = cardCleanHtml(ed);
+      dirty = false; sending = true;
+      google.script.run
+        .withFailureHandler(err => {
+          sending = false; dirty = true;
+          setStatus('Save error: ' + (err && err.message || err) + ' — retrying');
+          timer = setTimeout(send,5000); // never drop an edit
+        })
+        .withSuccessHandler(res => {
+          sending = false;
+          if(res && res.conflict){
+            const m = fwMerge3(fwBlocks(base.c),fwBlocks(d === date ? cardCleanHtml(ed) : html),fwBlocks(res.html || ''));
+            base = {c:res.html || '',h:res.h};
+            if(d === date){ ed.innerHTML = m.blocks.join(''); dirty = true; setStatus('Merged with changes from elsewhere'); send(); }
+            return;
+          }
+          if(d === date) base = {c:html,h:res && res.h};
+          setStatus('Saved');
+          if(dirty && d === date) send();
+        })
+        .saveScratchPad(d,html,base.h);
+    }
+    function show(force){
+      if(pane.dataset.rtab !== 'scratch') return;
+      const d = cur();
+      if(!d || (d === date && !force)) return;
+      if(dirty || sending){ if(dirty) send(); setTimeout(() => show(force),300); return; }
+      const seq = ++loadSeq;
+      ed.setAttribute('contenteditable','false');
+      if(d !== date) ed.innerHTML = '';
+      date = d;
+      ed.dataset.placeholder = 'Write anything for ' + formatDate(d) + '…';
+      google.script.run
+        .withFailureHandler(err => { if(seq === loadSeq) setStatus('Could not load the Scratch Pad: ' + (err && err.message || err)); })
+        .withSuccessHandler(res => {
+          if(seq !== loadSeq || dirty) return;
+          res = res || {};
+          ed.innerHTML = res.html || '';
+          base = {c:ed.innerHTML,h:res.h};
+          normalizeEditorTasks(ed);
+          ed.setAttribute('contenteditable','true');
+        })
+        .getScratchPad(d);
+    }
+    window.scratchShow = show;
+    // A full editor like Blocks: checkboxes, task cells, hold menu, drag (2026-11-04, Julius).
+    wireEditor(ed,'scratch');
+    pane.querySelector('[data-sp-task]')?.addEventListener('click',() => {
+      if(ed.getAttribute('contenteditable') !== 'true') return;
+      captureBeforeEdit(ed);
+      const n = createCheckboxLine(0);
+      ed.appendChild(n);
+      ed.focus({preventScroll:true});
+      placeCaretInsideCheckbox(n.querySelector('.check-text'));
+      ed.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    ed.addEventListener('input',() => {
+      if(ed.textContent.trim() === '' && !ed.querySelector('img,input')) ed.innerHTML = ''; // keeps the placeholder
+      dirty = true; setStatus('Unsaved scratch pad…');
+      clearTimeout(timer); timer = setTimeout(send,700);
+    });
+    ed.addEventListener('blur',() => { if(dirty) send(); });
+    document.addEventListener('visibilitychange',() => { if(document.hidden && dirty) send(); });
+    fwResume.add('reference', () => { if(!dirty && !sending) show(true); }); // back in view: calm-return queue
+    const set = t => {
+      pane.dataset.rtab = t;
+      pane.querySelectorAll('.ref-tabs button').forEach(b => b.classList.toggle('on', b.dataset.rtab === t));
+      try{ localStorage.setItem('fw.refTab', t); }catch(e){}
+      show();
+    };
+    let t = 'reference'; try{ t = localStorage.getItem('fw.refTab') || t; }catch(e){}
+    set(t === 'scratch' ? t : 'reference');
+    pane.querySelector('.ref-tabs')?.addEventListener('click', e => {
+      const b = e.target.closest('button[data-rtab]'); if(b) set(b.dataset.rtab);
+    });
+  })();
+  /* Focus Tracking dashboard (2026-11-01, Julius: phase 1). Categories → project cards, each with an
+     editable title + "Why focus" (2 lines). Collapse state saved with the data. Data from getFocus /
+     saveFocus (script property focusData), not the Notes cell. Phases 2–5 (tasks with data-tid, drag,
+     priority/progress, temporary urgency, expand) come later. */
+  (function initFocus(){
+    let data = null, base = null, saveT = null, saving = false, pending = false, conflict = null, loadError = false;
+    const DRAFT = 'fw.focus.draft.v1', RECOVERY = 'fw.focus.recovery.v1';
+    const copy = v => JSON.parse(JSON.stringify(v));
+    const valid = v => v && Array.isArray(v.cats);
+    const draft = () => { try { return JSON.parse(localStorage.getItem(DRAFT) || 'null'); } catch(e){ return null; } };
+    const recovery = () => { try { const a = JSON.parse(localStorage.getItem(RECOVERY) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } };
+    function keepDraft(){
+      try { localStorage.setItem(DRAFT,JSON.stringify({base,data})); return true; }
+      catch(e){ setStatus('Focus draft could not be kept on this device — keep the app open until saved'); return false; }
+    }
+    function retainConflict(){
+      try {
+        const old = recovery(); old.push({at:Date.now(),base,data,shared:conflict && conflict.data});
+        localStorage.setItem(RECOVERY,JSON.stringify(old.slice(-3))); return true;
+      } catch(e){ setStatus('Focus recovery copy could not be kept — keep this list open'); return false; }
+    }
+    const wired = new WeakSet();
+    const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    /* Recently updated (2026-11-09, Julius): each item carries u = when it was last changed, so the server can let the
+       newer edit win and the list can show a small "5m" tag on lines changed in the last day. */
+    let snap = null;
+    const itemKey = t => { const {u, ...rest} = t; return JSON.stringify(rest); };
+    function snapshot(){ snap = new Map(); if(data) data.cats.forEach(c => (c.items || []).forEach(t => snap.set(t.id,itemKey(t)))); }
+    function stampChanges(){
+      if(!data) return;
+      if(!snap) { snapshot(); return; }
+      const now = Date.now();
+      data.cats.forEach(c => (c.items || []).forEach(t => { if(snap.get(t.id) !== itemKey(t) && (t.t || '').trim()) t.u = now; }));
+      snapshot();
+    }
+    const ago = u => { const m = Math.max(0,Math.round((Date.now() - u) / 60000)); return m < 1 ? 'now' : m < 60 ? m + 'm' : Math.round(m / 60) + 'h'; };
+    function save(){
+      pending = true;
+      stampChanges();
+      if(base) keepDraft();
+      clearTimeout(saveT);
+      if(!conflict) saveT = setTimeout(send,700);
+    }
+    function send(){
+      if(saving || !pending || !base || conflict || !(window.google && google.script)) return;
+      saving = true; pending = false;
+      const sent = copy(data), before = copy(base);
+      google.script.run.withSuccessHandler(r => {
+        saving = false;
+        if(r && r.conflict){
+          conflict = r; pending = true;
+          const retained = retainConflict(), stored = keepDraft(); render();
+          setStatus(retained && stored ? 'Focus changed elsewhere — both versions kept; choose which list to use' : 'Focus conflict — keep this app open; device storage could not retain both versions');
+          return;
+        }
+        const changed = JSON.stringify(data) !== JSON.stringify(sent);
+        if(changed){
+          // New typing is based on the sent snapshot; the next merge also brings in remote additions.
+          base = sent; pending = true; keepDraft(); saveT = setTimeout(send,0);
+        } else {
+          const remote = valid(r && r.data) && JSON.stringify(r.data) !== JSON.stringify(sent);
+          data = valid(r && r.data) ? r.data : sent; base = copy(data); pending = false; snapshot();
+          try { localStorage.removeItem(DRAFT); } catch(e){}
+          render(); setStatus(remote ? 'Keep In Mind saved — merged in changes from another device' : 'Focus saved');
+        }
+      }).withFailureHandler(e => {
+        saving = false; pending = true; const stored = keepDraft();
+        setStatus('Focus not saved: ' + (e && e.message || e) + (stored ? ' — draft kept, retrying' : ' — keep this app open, retrying'));
+        saveT = setTimeout(send,5000);
+      }).saveFocus(sent,{base:before});
+    }
+    function find(id){ for(const c of data.cats) if(c.id === id) return {c}; return {}; }
+    /* Free list under each category (2026-11-05, Julius: "a category, then just tasks and subtasks, nested how I
+       want"). c.items = [{id, t, d, lv, n?}]: lv = nesting depth (0–8), n = a note line without a box. Older data
+       (projects with title / why / tasks) converts once on load; the old shape is kept in c.legacy. */
+    const itemsOf = c => c.items || (c.items = []);
+    function migrate(d){
+      let ch = false;
+      d.cats.forEach(c => {
+        if(Array.isArray(c.items)) return;
+        const items = [];
+        (c.projects || []).forEach(p => {
+          const head = !!(p.title || '').trim(), base = head ? 1 : 0;
+          if(head) items.push({id:tid(),t:p.title,d:0,lv:0});
+          if((p.why || '').trim()) items.push({id:tid(),t:p.why,d:0,lv:base,n:1});
+          (p.tasks || []).forEach(t => items.push({id:t.id || tid(),t:t.t || '',d:t.d ? 1 : 0,lv:base}));
+        });
+        c.items = items;
+        if((c.projects || []).length) c.legacy = c.projects;
+        delete c.projects;
+        ch = true;
+      });
+      return ch;
+    }
+    function findItem(id){
+      for(const c of data.cats){ const i = itemsOf(c).findIndex(t => t.id === id); if(i >= 0) return {c,i,t:c.items[i],list:c.items}; }
+      return null;
+    }
+    // The line plus everything nested under it.
+    function subtreeEnd(list,i){ let j = i + 1; while(j < list.length && (list[j].lv || 0) > (list[i].lv || 0)) j++; return j; }
+    // In / out by one, children along with it; never deeper than one past the line above.
+    function shift(list,i,d){
+      const t = list[i], lv = t.lv || 0, end = subtreeEnd(list,i);
+      if(d > 0){ const prev = list[i - 1]; if(!prev || lv > (prev.lv || 0)) return; }
+      if(d < 0 && !lv) return;
+      for(let k = i; k < end; k++) list[k].lv = Math.max(0,Math.min(8,(list[k].lv || 0) + d));
+    }
+    function html(){
+      let out = conflict ? '<div class="fx-sub" role="status">This list changed on another device. Your draft is kept here. <button type="button" data-fx="shared">Use shared list</button> <button type="button" data-fx="mine">Replace shared list with mine</button></div>' : '';
+      data.cats.forEach(c => {
+        const items = itemsOf(c), open = items.filter(t => !t.n && !t.d).length;
+        out += '<div class="fx-cat' + (c.col ? ' fx-col' : '') + (c.color ? ' fx-colored' : '') + (!c.name && items.length ? ' fx-ungrouped' : '') + '" data-fid="' + c.id + '" style="--fx-category-color:' + h(c.color || '#70baff') + '"><div class="fx-ch"><button type="button" class="fx-tg" data-fx="tg">' + (c.col ? '▸' : '▾') + '</button>' +
+          '<span class="fx-name" contenteditable="true" data-fx="name" data-fph="Category">' + h(c.name) + '</span>' +
+          (c.col && items.length ? '<span class="fx-sub">' + open + ' open</span>' : '') + '</div><div class="fx-body">';
+        // Cells (2026-11-06, Julius): each top line + its subtasks sit in one bordered cell. No ‹ › 📌 on the
+        // line: hold the checkbox for Send to Today / indent. + Task shows only while the category is empty.
+        let cell = false;
+        items.forEach(t => {
+          if(!(t.lv > 0) || !cell){ if(cell) out += '</div>'; out += '<div class="fx-cell">'; cell = true; }
+          out += '<div class="fx-task' + (t.d ? ' fx-done' : '') + (t.n ? ' fx-note' : '') + '" data-ftid="' + h(t.id) + '" style="--lv:' + (t.lv || 0) + '">' +
+            (t.n ? '' : '<input type="checkbox" data-fx="tick"' + (t.d ? ' checked' : '') + '>') +
+            '<span class="fx-tt" contenteditable="true" data-fx="tt" data-fph="' + (t.lv ? 'Subtask' : 'Task') + '">' + h(t.t) + '</span>' +
+            (t.u && Date.now() - t.u < 864e5 ? '<span class="fx-ago" title="Last changed ' + h(new Date(t.u).toLocaleString()) + '">' + ago(t.u) + '</span>' : '') + '</div>';
+        });
+        if(cell) out += '</div>';
+        out += (items.length ? '' : '<button type="button" class="fx-add" data-fx="addt">+ Task</button>') + '</div></div>';
+      });
+      return out + '<button type="button" class="fx-add" data-fx="addh">+ Category</button>' +
+        (recovery().length ? '<button type="button" class="fx-add" data-fx="recover">Recover earlier device draft</button>' : '');
+    }
+    function render(){
+      document.querySelectorAll('.journal-editor .fx[data-render-due]').forEach(host => {
+        if(!data){
+          host.innerHTML = loadError ? '<span class="fx-sub">Focus could not load. <button type="button" data-fx="reload">Retry</button></span>' : '<span class="fx-sub">Loading focus…</span>';
+          if(loadError) host.querySelector('[data-fx="reload"]').onclick = load;
+          return;
+        }
+        if(host.contains(document.activeElement)) return; // don't redraw while typing
+        host.innerHTML = html();
+        if(!wired.has(host)){ wire(host); wired.add(host); }
+      });
+    }
+    window.renderFocus = render;
+    // Put the host back if a sync / undo rebuilt the Notes cell without it.
+    window.ensureFocusHost = ed => {
+      if(!ed || !ed.classList.contains('journal-editor')) return;
+      ed.querySelectorAll(':scope > .fx').forEach((x,i) => { if(i) x.remove(); });
+      const fh = ed.querySelector(':scope > [data-nsec="focus"]');
+      if(fh && !ed.querySelector(':scope > .fx')) fh.insertAdjacentHTML('afterend','<div class="fx" data-render-due contenteditable="false"></div>');
+      render();
+    };
+    // Hold menu (2026-11-03, Julius): same look as the checkbox menu. Color is right at the top, with quick
+    // picks, a hue slider and the full color chooser; it changes all the text inside.
+    const FX_COLORS = ['#ff6b6b','#ffa94d','#ffd43b','#69db7c','#4dd4c6','#70baff','#b197fc','#f783ac'];
+    function fxHue(hue){
+      const l = .68, a = .8 * Math.min(l,1 - l);
+      const c = n => { const k = (n + hue / 30) % 12; return Math.round(255 * (l - a * Math.max(-1,Math.min(k - 3,9 - k,1)))).toString(16).padStart(2,'0'); };
+      return '#' + c(0) + c(8) + c(4);
+    }
+    function showFxMenu(id,f,x,y){
+      hideUrgencyPicker();
+      const o = f.p || f.c, active = document.activeElement;
+      if(active && active.closest && active.closest('.fx')) active.blur();
+      const m = document.createElement('div');
+      m.className = 'urg-picker fx-menu';
+      const paint = (color,keep) => {
+        if(color) o.color = color; else delete o.color;
+        save(); render();
+        m.querySelectorAll('.fx-swatch').forEach(b => b.classList.toggle('on',(b.dataset.c || '') === (o.color || '')));
+        if(!keep && color) well.value = color;
+      };
+      const row = document.createElement('div'); row.className = 'fx-swatches';
+      FX_COLORS.concat('').forEach(c => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'fx-swatch' + (c === (o.color || '') ? ' on' : ''); b.dataset.c = c;
+        if(c) b.style.background = c; else b.textContent = '✕';
+        b.title = c || 'No color'; b.setAttribute('aria-label',c ? 'Color ' + c : 'No color');
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',() => paint(c));
+        row.appendChild(b);
+      });
+      const well = document.createElement('input');
+      well.type = 'color'; well.className = 'fx-well'; well.value = o.color || '#70baff'; well.title = 'Choose any color'; well.setAttribute('aria-label','Choose any color');
+      well.addEventListener('input',() => paint(well.value,true));
+      row.appendChild(well);
+      m.appendChild(row);
+      const hue = document.createElement('input');
+      hue.type = 'range'; hue.className = 'fx-hue'; hue.min = 0; hue.max = 359; hue.value = 210; hue.setAttribute('aria-label','Color slider');
+      hue.addEventListener('input',() => paint(fxHue(Number(hue.value))));
+      m.appendChild(hue);
+      const item = (label,fn) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'urg-goto'; b.textContent = label;
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',() => { hideUrgencyPicker(); fn(); save(); render(); });
+        m.appendChild(b);
+      };
+      item('✎ Rename',() => setTimeout(() => focusNew(id,f.p ? 'title' : 'name')));
+      if(!f.p) item('+ Add task',() => { const n = {id:tid(),t:'',d:0,lv:0}; itemsOf(f.c).push(n); f.c.col = false; setTimeout(() => focusTask(n.id)); });
+      const arr = f.p ? f.c.projects : data.cats, at = arr.indexOf(o);
+      const move = d => () => { arr.splice(at,1); arr.splice(at + d,0,o); };
+      if(at > 0) item('↑ Move up',move(-1));
+      if(at < arr.length - 1) item('↓ Move down',move(1));
+      item(o.col ? '▾ Expand' : '▸ Collapse',() => { o.col = !o.col; });
+      document.body.appendChild(m);
+      placeUrgPicker(m,x,y);
+      urgPicker = m;
+    }
+    function showTaskMenu(id,x,y){
+      const r0 = findItem(id); if(!r0) return;
+      hideUrgencyPicker();
+      const m = document.createElement('div'); m.className = 'urg-picker fx-menu';
+      const item = (label,fn) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'urg-goto'; b.textContent = label;
+        b.addEventListener('pointerdown',e => e.preventDefault());
+        b.addEventListener('click',() => { hideUrgencyPicker(); const r = findItem(id); if(r) fn(r); });
+        m.appendChild(b);
+      };
+      if(!r0.t.n) item('📌 Send to Today',r => { if(!r.t.t){ setStatus && setStatus('Give the task a name first'); return; } window.tidPlace && window.tidPlace(r.t.id, h(r.t.t), !!r.t.d); });
+      const prev = r0.list[r0.i - 1];
+      if(prev && (r0.t.lv || 0) <= (prev.lv || 0)) item('→ Make subtask',r => edit(() => shift(r.list,r.i,1)));
+      if(r0.t.lv) item('← Less indent',r => edit(() => shift(r.list,r.i,-1)));
+      item('✕ Remove',r => edit(() => { const end = subtreeEnd(r.list,r.i); for(let k = r.i + 1; k < end; k++) r.list[k].lv = Math.max(0,(r.list[k].lv || 0) - 1); r.list.splice(r.i,1); }));
+      document.body.appendChild(m);
+      placeUrgPicker(m,x,y);
+      urgPicker = m;
+    }
+    function wire(host){
+      // Hold the fold arrow to manage a category/task without extra visible buttons.
+      let holdTimer = null, suppressToggle = false, downX = 0, downY = 0;
+      host.addEventListener('pointerdown', e => {
+        const toggle = e.target.closest('.fx-tg'); if(!toggle) return;
+        downX=e.clientX; downY=e.clientY; clearTimeout(holdTimer);
+        holdTimer=setTimeout(()=>{
+          const id=toggle.closest('[data-fid]')?.dataset.fid, f=id?find(id):{};
+          if(!(f.p||f.c))return;
+          suppressToggle=true;
+          if(navigator.vibrate) try{ navigator.vibrate(15); }catch(err){}
+          showFxMenu(id,f,downX,downY);
+        },450);
+      },true);
+      host.addEventListener('contextmenu',e=>{if(e.target.closest('.fx-tg,[data-fx="tick"]'))e.preventDefault();},true);
+      // Hold a task's checkbox (2026-11-06, Julius): Send to Today, Indent, Less indent, Remove.
+      let cbTimer = null, cbHeld = false;
+      host.addEventListener('pointerdown', e => {
+        const cb = e.target.closest('[data-fx="tick"]'); if(!cb) return;
+        downX = e.clientX; downY = e.clientY; cbHeld = false; clearTimeout(cbTimer);
+        cbTimer = setTimeout(() => {
+          cbHeld = true;
+          if(navigator.vibrate) try{ navigator.vibrate(15); }catch(err){}
+          showTaskMenu(cb.closest('[data-ftid]').dataset.ftid, downX, downY);
+        },450);
+      },true);
+      host.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-downX)>10||Math.abs(e.clientY-downY)>10)clearTimeout(cbTimer);},true);
+      ['pointerup','pointercancel'].forEach(t=>host.addEventListener(t,()=>clearTimeout(cbTimer),true));
+      host.addEventListener('click', e => { if(cbHeld && e.target.closest('[data-fx="tick"]')){ cbHeld = false; e.preventDefault(); e.stopImmediatePropagation(); } },true);
+      host.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-downX)>10||Math.abs(e.clientY-downY)>10)clearTimeout(holdTimer);},true);
+      ['pointerup','pointercancel'].forEach(t=>host.addEventListener(t,()=>clearTimeout(holdTimer),true));
+      // Enter = new line (first child if it has any), Tab / Shift+Tab = in / out, Backspace on an empty line = remove.
+      host.addEventListener('keydown', e => {
+        const tt = e.target.closest && e.target.closest('[data-fx="tt"]'); if(!tt) return;
+        const r = findItem(tt.closest('[data-ftid]').dataset.ftid); if(!r) return;
+        const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); e.stopPropagation(); };
+        if(e.key === 'Enter' && !e.shiftKey){
+          stop();
+          if(!readText(tt)){ if(r.t.lv) edit(() => shift(r.list,r.i,-1),r.t.id); else tt.blur(); return; }
+          const next = r.list[r.i + 1], lv = next && (next.lv || 0) > (r.t.lv || 0) ? next.lv : (r.t.lv || 0);
+          const n = {id:tid(),t:'',d:0,lv};
+          edit(() => r.list.splice(r.i + 1,0,n),n.id);
+        } else if(e.key === 'Tab'){
+          stop();
+          edit(() => shift(r.list,r.i,e.shiftKey ? -1 : 1),r.t.id);
+        } else if(e.key === 'Backspace' && !readText(tt)){
+          stop();
+          const prev = r.list[r.i - 1];
+          r.t.t = ''; tt.textContent = '';
+          edit(() => { const k = r.list.indexOf(r.t); if(k >= 0) r.list.splice(k,1); },prev && prev.id);
+        }
+      });
+      // Keep the Notes editor's own key / tap / drag handlers out of the dashboard.
+      ['keydown','keyup','keypress','beforeinput','input','paste','cut','pointerdown','mousedown','touchstart','dragstart','contextmenu'].forEach(t =>
+        host.addEventListener(t, e => { e.stopPropagation(); if(t === 'keydown' && e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); e.target.blur && e.target.blur(); } }));
+      host.addEventListener('paste', e => { e.preventDefault(); const t = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, t.replace(/\s+/g,' ')); });
+      host.addEventListener('click', e => {
+        e.stopPropagation();
+        const b = e.target.closest('[data-fx]'); if(!b) return;
+        if(b.dataset.fx === 'recover'){
+          const saved = recovery().slice(-1)[0];
+          if(saved && valid(saved.data) && valid(saved.base)){
+            if(!retainConflict()) return;
+            data = copy(saved.data); base = copy(saved.base); conflict = null;
+            save(); render();
+          }
+          return;
+        }
+        if(conflict && (b.dataset.fx === 'shared' || b.dataset.fx === 'mine')){
+          if(!retainConflict()) return;
+          const shared = copy(conflict.data); conflict = null;
+          if(b.dataset.fx === 'shared'){
+            data = shared; base = copy(shared); pending = false;
+            try { localStorage.removeItem(DRAFT); } catch(err){}
+            render(); setStatus('Using shared Focus list — earlier draft kept on this device');
+          } else { base = shared; save(); render(); }
+          return;
+        }
+        const id = b.closest('[data-fid]')?.dataset.fid, f = id ? find(id) : {};
+        if(b.dataset.fx === 'tg'){ if(suppressToggle){suppressToggle=false;return;} const o=f.p||f.c; if(o){o.col=!o.col;save();render();} }
+        else if(b.dataset.fx === 'addh'){ const c = {id:uid('c'),name:'',col:false,items:[{id:tid(),t:'',d:0,lv:0}]}; edit(() => data.cats.push(c),() => focusNew(c.id,'name')); }
+        else if(b.dataset.fx === 'addt' && f.c){ const n = {id:tid(),t:'',d:0,lv:0}; itemsOf(f.c).push(n); f.c.col = false; edit(() => {},n.id); }
+        else if(b.dataset.fx === 'in' || b.dataset.fx === 'out'){
+          const r = findItem(b.closest('[data-ftid]').dataset.ftid);
+          if(r) edit(() => shift(r.list,r.i,b.dataset.fx === 'in' ? 1 : -1),r.t.id);
+        }
+        else if(b.dataset.fx === 'send'){
+          const r = findItem(b.closest('[data-ftid]').dataset.ftid), t = r && r.t; if(!t) return;
+          if(!t.t){ setStatus && setStatus('Give the task a name first'); return; }
+          window.tidPlace && window.tidPlace(t.id, h(t.t), !!t.d);
+        }
+      });
+      // Tick a focus task → every mirror copy follows; done → a history line in today's Completed.
+      host.addEventListener('change', e => {
+        e.stopPropagation();
+        const cb = e.target.closest('[data-fx="tick"]'); if(!cb) return;
+        const r = findItem(cb.closest('[data-ftid]').dataset.ftid), t = r && r.t;
+        if(!t) return;
+        t.d = cb.checked ? 1 : 0; save();
+        cb.closest('.fx-task').classList.toggle('fx-done', !!t.d);
+        window.tidSet && window.tidSet(t.id, !!t.d, h(t.t));
+      });
+      host.addEventListener('focusout', e => {
+        if(quiet) return;
+        const tt = e.target.closest && e.target.closest('[data-fx="tt"]');
+        if(tt){
+          const r = findItem(tt.closest('[data-ftid]').dataset.ftid), t = r && r.t;
+          if(!t) return;
+          const v = readText(tt);
+          // An empty line goes away (its nested lines stay, one level up).
+          if(!v){ const end = subtreeEnd(r.list,r.i); for(let k = r.i + 1; k < end; k++) r.list[k].lv = Math.max(0,(r.list[k].lv || 0) - 1); r.list.splice(r.i,1); save(); setTimeout(render); return; }
+          if(v !== t.t){ t.t = v; save(); window.tidRetitle && window.tidRetitle(t.id, h(v)); }
+          return;
+        }
+        const el = e.target.closest && e.target.closest('[data-fx="name"]'); if(!el) return;
+        const f = find(el.closest('[data-fid]').dataset.fid), v = el.textContent.replace(/\s+/g,' ').trim();
+        if(!f.c) return;
+        const n = itemsOf(f.c).length;
+        if(!v && !n){ data.cats = data.cats.filter(x => x !== f.c); save(); setTimeout(render); return; }
+        if(!v && n){ el.textContent = f.c.name; return; }
+        if(v !== f.c.name){ f.c.name = v; save(); }
+      });
+    }
+    function focusNew(id,k){
+      const el = document.querySelector('.fx [data-fid="' + id + '"] [data-fx="' + k + '"]');
+      if(el){ el.focus(); }
+    }
+    // Phase 2 (2026-11-01): tasks. id = the task's data-tid (same 'm-' form as Task mirrors).
+    const tid = () => 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    function findTask(id){ const r = findItem(id); return r ? r.t : null; }
+    function focusTask(id){
+      const el = document.querySelector('.fx [data-ftid="' + id + '"] [data-fx="tt"]'); if(!el) return;
+      el.focus();
+      try{ const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); }catch(err){}
+    }
+    const readText = el => el.textContent.replace(/\s+/g,' ').trim().slice(0,300);
+    // Structural change: keep what's typed in the current line, change the list, redraw, put the caret back.
+    let quiet = false;
+    function edit(fn,focusId){
+      const a = document.activeElement;
+      if(a && a.matches && a.matches('.fx [data-fx="tt"]')){
+        const r = findItem(a.closest('[data-ftid]').dataset.ftid), v = readText(a);
+        if(r && v !== r.t.t){ r.t.t = v; window.tidRetitle && window.tidRetitle(r.t.id, h(v)); }
+      }
+      // Anything focused inside (a line, a category name, a button) would stop the redraw.
+      if(a && a.closest && a.closest('.fx')){ quiet = true; a.blur(); quiet = false; }
+      fn(); save(); render();
+      if(typeof focusId === 'function') focusId(); else if(focusId) focusTask(focusId);
+    }
+    // A copy ticked / unticked elsewhere (Today, Plan / think, Reference) → the focus task follows.
+    // Daily plan (2026-11-08): open items for the 📅 plan's + Add list, and a lookup by id.
+    window.focusOpenItems = () => !data ? [] : data.cats.flatMap(c => itemsOf(c).filter(t => !t.n && !t.d && String(t.t || '').trim()).map(t => ({id:t.id, t:String(t.t).replace(/\s+/g,' ').trim(), cat:c.name})));
+    window.focusFindItem = id => { const t = data ? findTask(id) : null; return t ? {t:t.t, d:t.d} : null; };
+    window.focusTidToggled = (id,on) => {
+      if(!data) return;
+      const t = findTask(id); if(!t || !!t.d === on) return;
+      t.d = on ? 1 : 0; save(); render();
+    };
+    // Load-time catch-up, done wins: an open focus task whose loaded copy is ticked becomes done.
+    window.focusReconcile = anyOn => {
+      if(!data || !anyOn) return;
+      let ch = false;
+      data.cats.forEach(c => itemsOf(c).forEach(t => { if(!t.n && !t.d && anyOn(t.id)){ t.d = 1; ch = true; } }));
+      if(ch){ save(); render(); }
+    };
+    function load(){
+      loadError = false;
+      if(window.google && google.script) google.script.run.withSuccessHandler(d => {
+        const stored = draft();
+        data = valid(d) ? d : {v:1,cats:[]}; base = copy(data); snapshot();
+        if(stored && valid(stored.data) && valid(stored.base)){ data = stored.data; base = stored.base; pending = true; snapshot(); }
+        if(migrate(data) || pending) save();
+        render(); window.tidAnyOn && window.focusReconcile(window.tidAnyOn);
+      }).withFailureHandler(() => {
+        loadError = true;
+        // A failed load is not a new empty list and must never be saved as one.
+        const stored = draft();
+        if(stored && valid(stored.data) && valid(stored.base)){ data = stored.data; base = stored.base; save(); }
+        render();
+      }).getFocus();
+      else { data = {v:1,cats:[]}; base = copy(data); }
+    }
+    load();
+    render();
+    // Back to the app → pull the latest list so this device starts from the newest copy (only when idle).
+    // D2: the PWA calls this after a queued offline Focus save was merged again in the background.
+    window.fwFocusReload = () => { if(!pending && !saving && !conflict) pullFocus(); };
+    window.fwResume && fwResume.add('nextSteps', () => pullFocus(true)); // calm-return queue
+    function pullFocus(onlyVisible){
+      if((onlyVisible && document.visibilityState !== 'visible') || !data || pending || saving || conflict || !(window.google && google.script)) return;
+      const host = document.querySelector('.fx'); if(host && host.contains(document.activeElement)) return;
+      google.script.run.withSuccessHandler(d => {
+        if(!valid(d) || pending || saving) return;
+        if(JSON.stringify(d) === JSON.stringify(base)) return;
+        data = d; base = copy(d); snapshot(); render();
+      }).getFocus();
+    }
+  })();
+  /* Done → Dailies matches (2026-11-05, Julius: "a task done today should tick its daily habit, just double check").
+     Finished lines today (History / Today cell + Blocks pad) are matched by words to today's open Dailies; each match
+     shows "Stretch — done: Morning stretch 10 min? ✓ Tick / ✕ Not this" above the Notes cell. Tick = clicks the
+     daily's own checkbox (normal save). Answers are kept per device (fw.dailyMatch.v1): "yes" pairs are the start of a
+     learned map, "no" pairs never ask again. Render-only, never saved in a cell. */
+  (function initDailyMatch(){
+    const box = document.getElementById('dailyMatch'); if(!box) return;
+    const KEY = 'fw.dailyMatch.v1';
+    let mem = {yes:{}, no:{}, used:{}};
+    try{ const m = JSON.parse(localStorage.getItem(KEY) || 'null'); if(m && m.yes && m.no) mem = Object.assign({used:{}}, m); }catch(e){}
+    const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(mem)); }catch(e){} };
+    const STOP = new Set('the and for with from into this that min mins minute minutes hour hours daily done take took make sure get got all one two three oz ounces day today before after then also some more less'.split(' '));
+    const WHEN = {morning:'am', morn:'am', wake:'am', breakfast:'am', afternoon:'pm', lunch:'pm', evening:'eve', night:'eve', bed:'eve', bedtime:'eve', dinner:'eve'};
+    const SYN = {exercise:['workout','gym','lift','lifting','exercise','exercises','train','training','pushup','pushups','squat','squats'],
+      stretch:['stretch','stretching','yoga','mobility','pt'], supplement:['supplement','supplements','vitamin','vitamins','pill','pills','creatine','magnesium'],
+      water:['water','hydrate','hydration','drink'], meditate:['meditate','meditation','mindfulness','breathe','breathing'],
+      walk:['walk','walking','walked','steps'], read:['read','reading','book'], journal:['journal','journaling']};
+    const norm = t => String(t || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+    const words = t => norm(t).split(' ').filter(w => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w));
+    const stem = w => w.replace(/(ing|ings|es|s|ed)$/,'').slice(0,6);
+    const syn = w => { const st = stem(w); for(const k in SYN) if(SYN[k].some(x => stem(x) === st)) return k; return st; };
+    const txt = l => ((l.querySelector(':scope > .check-text') || l).textContent || '').replace(/\s+/g,' ').trim().replace(/^\*+/,'');
+    const isDone = l => l.classList.contains('done') || !!(l.querySelector(':scope > input[type=checkbox]') || {}).checked;
+    function dailies(date){
+      const ed = document.querySelector('#journalScroll .journal-editor[data-date="' + date + '"]'); if(!ed) return [];
+      const head = ed.querySelector(':scope > [data-nsec="must"]'); if(!head) return [];
+      const out = [];
+      for(let n = head.nextElementSibling; n && !n.matches('[data-nsec],table'); n = n.nextElementSibling)
+        if(n.matches('.check-line') && txt(n)) out.push(n);
+      return out;
+    }
+    function doneLines(date){
+      const eds = document.querySelectorAll('#todayScroll .day-editor[data-date="' + date + '"], #todayScroll .plan-editor[data-date="' + date + '"]');
+      // Only his own lines (2026-11-07, Julius: Claude's "*…no longer stretches Blocks" was matching Morning · Stretch):
+      // skip AI Done Log lines (text starts with "*") and IT study entries.
+      const ai = l => /^\s*\*/.test(((l.querySelector(':scope > .check-text') || l).textContent || '')) || l.hasAttribute('data-study');
+      const out = []; eds.forEach(ed => ed.querySelectorAll('.check-line').forEach(l => { if(isDone(l) && txt(l) && !ai(l)) out.push(l); }));
+      return out;
+    }
+    // Time of day: a daily's "Morning · " / "Before bed · " words, a done line's own words or its tick time (data-dt).
+    const whenOf = (t,dt) => { for(const w of norm(t).split(' ')) if(WHEN[w]) return WHEN[w];
+      const m = /^(\d\d):/.exec(dt || ''); if(!m) return ''; const h = +m[1]; return h < 12 ? 'am' : h < 17 ? 'pm' : 'eve'; };
+    let shown = [];
+    function scan(){
+      const date = localToday(), ds = dailies(date);
+      const open = ds.filter(d => !isDone(d)), done = doneLines(date);
+      // Score every (daily, done line) pair; each done line goes to its best daily, each daily shows once.
+      const pairs = [];
+      open.forEach(d => {
+        const dt = txt(d), dk = norm(dt), dw = new Set(words(dt).filter(w => !WHEN[w]).map(syn)), dwhen = whenOf(dt);
+        if(!dw.size) return;
+        done.forEach(l => {
+          const lt = txt(l), pair = dk + '|' + norm(lt);
+          if(mem.no[pair] || mem.used[date + '|' + norm(lt)]) return; // one done line ticks one daily
+          let sc = mem.yes[pair] ? 100 : words(lt).filter(w => dw.has(syn(w))).length;
+          if(!sc) return;
+          const lwhen = whenOf(lt, l.dataset.dt);
+          if(dwhen && lwhen) sc += dwhen === lwhen ? 0.5 : -0.75;
+          if(sc > 0) pairs.push({d, dt, l, lt, pair, sc});
+        });
+      });
+      pairs.sort((a,b) => b.sc - a.sc);
+      const usedD = new Set(), usedL = new Set(), list = [];
+      pairs.forEach(p => { if(usedD.has(p.d) || usedL.has(p.l)) return; usedD.add(p.d); usedL.add(p.l); list.push(p); });
+      list.sort((a,b) => open.indexOf(a.d) - open.indexOf(b.d));
+      shown = list;
+      const h = list.map((m,i) => '<div class="dm-row"><span>✓? <b>' + esc(m.dt) + '</b> <small>— done: ' + esc(m.lt.slice(0,80)) + '</small></span>' +
+        '<span class="dm-btns"><button type="button" class="dm-yes" data-dm="' + i + '" data-a="y" title="Tick this daily" aria-label="Tick">✓</button><button type="button" data-dm="' + i + '" data-a="n" title="Not this" aria-label="Not this">✕</button></span></div>').join('');
+      if(box.dataset.h !== h){ box.dataset.h = h; box.innerHTML = h; }
+      box.hidden = !list.length;
+    }
+    box.addEventListener('pointerdown', e => { if(e.target.closest('button')) e.preventDefault(); });
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-dm]'); if(!b) return;
+      const m = shown[+b.dataset.dm]; if(!m) return;
+      if(b.dataset.a === 'y'){
+        mem.yes[m.pair] = Date.now();
+        const today = localToday(); mem.used[today + '|' + norm(m.lt)] = 1;
+        Object.keys(mem.used).forEach(k => { if(k.slice(0,10) < today) delete mem.used[k]; });
+        const cb = m.d.querySelector(':scope > input[type=checkbox]');
+        if(cb && !cb.checked) cb.click();
+        setStatus && setStatus('Daily ticked: ' + m.dt);
+      } else mem.no[m.pair] = Date.now();
+      keep(); scan();
+    });
+    let t = null;
+    const soon = () => { clearTimeout(t); t = setTimeout(scan, 400); };
+    document.addEventListener('change', e => { if(e.target && e.target.matches && e.target.matches('input[type=checkbox]')) soon(); }, true);
+    setInterval(() => { if(!document.hidden) scan(); }, 20000);
+    setTimeout(scan, 2500);
+    window.fwDailyMatch = {scan, get shown(){ return shown; }, mem:() => mem};
+  })();
+  /* New things (2026-11-07, Julius): ✨ tab, left of 🌴 = "last time I did something new". Each line has the day
+     it was done (w, YYYY-MM-DD; defaults to today, tap the date to change it) and a type (g: Game, Book, Manga,
+     Light novel…; tap the icon to change it). Top: one muted "N days since new thing" line (goal 14 days), then
+     small per-type "since" chips (longest gap first; tap = pick that type for adding). View: Date (months) or
+     Type (one section per type), remembered per device. Device first (fw.new.v1), then getNewThings / saveNewThings. */
+  (function initNewThings(){
+    const list = document.getElementById('newList'), inp = document.getElementById('newInput'), dIn = document.getElementById('newDate'), sel = document.getElementById('newCat');
+    if(!list || !inp || !dIn || !sel) return;
+    const KEY = 'fw.new.v1';
+    const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const today = () => ymd(new Date());
+    const parse = w => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(w || ''); return m ? new Date(+m[1], m[2] - 1, +m[3]) : new Date(); };
+    const label = w => { const d = parse(w); return d.toLocaleDateString('en-US',{month:'short'}).toUpperCase() + ' ' + d.getDate(); };
+    const since = w => Math.max(0, Math.round((parse(today()) - parse(w)) / 864e5));
+    const ago = w => { const n = since(w); return n === 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago'; };
+    const short = n => n < 60 ? n + 'd' : n < 730 ? Math.round(n / 30.4) + 'mo' : Math.round(n / 365) + 'y';
+    // Guideline (2026-11-07, Julius: 7 was a lot): something new at least every 14 days, any type.
+    const GOAL = 14;
+    // Starter types: fixed ids + u:1 so every device seeds the same ones and any rename / delete wins.
+    const SEED = [['gGame','🎮','Game'],['gBook','📖','Book'],['gManga','📚','Manga'],['gLN','📘','Light novel'],['gShow','📺','Show'],['gMovie','🎬','Movie'],['gMusic','🎵','Music'],['gPlace','📍','Place'],['gFood','🍜','Food'],['gSkill','🛠️','Skill']];
+    let data = {v:1, items:[], cats:[]}, saveT = null;
+    try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = Object.assign({cats:[]}, c); }catch(e){}
+    const seed = () => { SEED.forEach(([id, e, name], k) => { if(!data.cats.some(c => c.id === id)) data.cats.push({id, e, name, c:k + 1, u:1}); }); };
+    seed();
+    const mergeL = (a,b) => { const by = {}; (a || []).forEach(i => by[i.id] = i); (b || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); return Object.values(by); };
+    const merge = srv => { data = {v:1, items:mergeL(data.items, srv && srv.items), cats:mergeL(data.cats, srv && srv.cats)}; seed(); };
+    const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} };
+    const idle = () => !list.contains(document.activeElement) && !document.querySelector('.nw-menu');
+    let view = 'date', pick = ''; try{ view = localStorage.getItem('fw.newView') || 'date'; pick = localStorage.getItem('fw.newCat') || ''; }catch(e){}
+    const liveCats = () => data.cats.filter(c => !c.x).sort((a,b) => (a.c || 0) - (b.c || 0));
+    const catOf = it => data.cats.find(c => c.id === it.g && !c.x) || null;
+    const icon = c => c ? (c.e || '•') : '✨';
+    function save(){
+      keep(); clearTimeout(saveT);
+      saveT = setTimeout(() => { if(window.google && google.script) google.script.run
+        .withSuccessHandler(d => { merge(d); keep(); if(idle()) render(); })
+        .withFailureHandler(e => { window.setStatus && setStatus('New things not saved: ' + (e && e.message || e)); setTimeout(save, 15000); })
+        .saveNewThings(data); }, 600);
+    }
+    function fillSel(){
+      const cs = liveCats();
+      if(pick && !cs.some(c => c.id === pick)) pick = '';
+      sel.innerHTML = '<option value="">✨ Other</option>' + cs.map(c => '<option value="' + h(c.id) + '">' + h(icon(c) + ' ' + c.name) + '</option>').join('') + '<option value="+">+ New type…</option>';
+      sel.value = pick;
+    }
+    function newCat(){
+      const raw = (prompt('New type, with an emoji first if you like (e.g. "🎲 Board game"):') || '').trim().slice(0,40);
+      if(!raw) return '';
+      const m = /^(\p{Extended_Pictographic}️?)\s*(.*)$/u.exec(raw), now = Date.now();
+      const c = {id:'g' + now.toString(36) + Math.random().toString(36).slice(2,5), e:m ? m[1] : '•', name:(m ? m[2] : raw) || raw, c:now, u:now};
+      data.cats.push(c); save(); return c.id;
+    }
+    const setPick = id => { pick = id; try{ localStorage.setItem('fw.newCat', pick); }catch(e){} };
+    function render(){
+      if(!dIn.value) dIn.value = today();
+      fillSel();
+      const now = today(), live = data.items.filter(i => !i.x).sort((a,b) => (b.w || '').localeCompare(a.w || '') || (b.c || 0) - (a.c || 0));
+      const past = live.filter(i => (i.w || '') <= now), last = past[0];
+      // 1) one muted line overall
+      let html = !last ? '<div class="nw-timer">✨ No new thing yet · goal: one every ' + GOAL + ' days</div>'
+        : '<div class="nw-timer" title="Last: ' + h(last.t) + '">✨ <b>' + since(last.w) + (since(last.w) === 1 ? ' day' : ' days') + '</b> since new thing · ' + (since(last.w) > GOAL ? 'past ' : 'goal ') + GOAL + ' days · ' + live.length + ' logged</div>';
+      // 2) per-type chips: only types with something logged, longest gap first
+      const lastBy = {}; past.forEach(i => { const k = catOf(i) ? i.g : ''; if(!(k in lastBy)) lastBy[k] = i; });
+      const chips = Object.keys(lastBy).map(k => ({k, c:data.cats.find(c => c.id === k) || null, n:since(lastBy[k].w)})).sort((a,b) => b.n - a.n);
+      if(chips.length) html += '<div class="nw-chips">' + chips.map(x => '<button type="button" class="nw-chip' + (pick === x.k ? ' on' : '') + '" data-pick="' + h(x.k) + '" title="' + h((x.c ? x.c.name : 'Other') + ': last ' + lastBy[x.k].t + ' (' + ago(lastBy[x.k].w) + ')') + '">' + icon(x.c) + ' ' + short(x.n) + '</button>').join('') + '</div>';
+      // 3) view switch
+      html += '<div class="nw-view"><button type="button" data-view="date"' + (view === 'date' ? ' class="on"' : '') + '>By date</button><button type="button" data-view="type"' + (view === 'type' ? ' class="on"' : '') + '>By type</button></div>';
+      const row = i => '<div class="nw-item" data-id="' + h(i.id) + '"><button type="button" class="nw-ic" title="' + h((catOf(i) || {name:'Other'}).name) + ' · tap to change">' + icon(catOf(i)) + '</button><div class="nw-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div><span class="nw-d" title="' + h(ago(i.w)) + ' · tap to change">' + label(i.w) + '</span><button type="button" class="nw-x" aria-label="Remove" title="Remove">✕</button></div>';
+      if(!live.length) html += '<div class="center-placeholder">Nothing yet. Started a new game, book, manga or show? Pick the type, type it in, + — it keeps the day.</div>';
+      else if(view === 'type'){
+        const groups = liveCats().map(c => ({c, items:live.filter(i => i.g === c.id)})).concat([{c:null, items:live.filter(i => !catOf(i))}]).filter(g => g.items.length);
+        groups.sort((a,b) => (b.items[0].w || '').localeCompare(a.items[0].w || '')); // most recent type on top
+        groups.forEach(g => {
+          const lp = g.items.find(i => (i.w || '') <= now);
+          html += '<div class="nw-month nw-cat"' + (g.c ? ' data-cat="' + h(g.c.id) + '"' : '') + '><span>' + icon(g.c) + ' ' + h(g.c ? g.c.name : 'Other') + '</span> <small>' + g.items.length + (lp ? ' · ' + ago(lp.w) : '') + '</small>' + (g.c ? '<button type="button" class="nw-cat-x" title="Delete type (items move to Other)">✕</button>' : '') + '</div>' + g.items.map(row).join('');
+        });
+      } else {
+        let month = '';
+        live.forEach(i => { const m = parse(i.w).toLocaleDateString('en-US',{month:'long', year:'numeric'}); if(m !== month){ month = m; html += '<div class="nw-month">' + h(m) + '</div>'; } html += row(i); });
+      }
+      list.innerHTML = html;
+    }
+    const byId = id => data.items.find(i => i.id === id);
+    function add(){
+      const t = inp.value.trim(); if(!t) return;
+      const now = Date.now(), it = {id:'n' + now.toString(36) + Math.random().toString(36).slice(2,5), t, w:dIn.value || today(), c:now, u:now};
+      if(sel.value && sel.value !== '+') it.g = sel.value;
+      data.items.push(it); inp.value = ''; dIn.value = today(); render(); save();
+    }
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); add(); } });
+    dIn.addEventListener('keydown', e => e.stopPropagation());
+    document.getElementById('newAddBtn').addEventListener('click', add);
+    sel.addEventListener('change', () => { if(sel.value === '+'){ const id = newCat(); setPick(id || pick); render(); } else { setPick(sel.value); render(); } inp.focus(); });
+    function pickDate(it, anchor){
+      const p = document.createElement('input'); p.type = 'date'; p.value = it.w || today();
+      p.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;';
+      const r = anchor.getBoundingClientRect(); p.style.left = r.left + 'px'; p.style.top = r.bottom + 'px';
+      document.body.appendChild(p);
+      p.addEventListener('change', () => { if(p.value && p.value !== it.w){ it.w = p.value; it.u = Date.now(); render(); save(); } p.remove(); });
+      p.addEventListener('blur', () => setTimeout(() => p.remove(), 300));
+      try{ p.showPicker ? p.showPicker() : p.focus(); }catch(e){ p.focus(); }
+    }
+    function typeMenu(it, anchor){
+      document.querySelectorAll('.nw-menu').forEach(m => m.remove());
+      const m = document.createElement('div'); m.className = 'fun-menu nw-menu';
+      m.innerHTML = '<div class="fun-menu-h">Type</div>' + liveCats().map(c => '<button type="button" data-g="' + h(c.id) + '"' + (it.g === c.id ? ' class="on"' : '') + '>' + h(icon(c) + ' ' + c.name) + '</button>').join('') + '<button type="button" data-g="">✨ Other</button><button type="button" data-g="+">+ New type…</button>';
+      document.body.appendChild(m);
+      const r = anchor.getBoundingClientRect();
+      m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + 'px';
+      m.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - m.offsetHeight - 8)) + 'px';
+      m.addEventListener('click', e => {
+        const b = e.target.closest('[data-g]'); if(!b) return;
+        let g = b.dataset.g; if(g === '+'){ g = newCat(); if(!g){ m.remove(); return; } }
+        if(g) it.g = g; else delete it.g;
+        it.u = Date.now(); m.remove(); render(); save();
+      });
+      setTimeout(() => { const off = e => { if(!m.contains(e.target)){ m.remove(); document.removeEventListener('pointerdown', off, true); } }; document.addEventListener('pointerdown', off, true); }, 0);
+    }
+    list.addEventListener('click', e => {
+      const v = e.target.closest('[data-view]');
+      if(v){ view = v.dataset.view; try{ localStorage.setItem('fw.newView', view); }catch(err){} render(); return; }
+      const ch = e.target.closest('[data-pick]');
+      if(ch){ setPick(pick === ch.dataset.pick ? '' : ch.dataset.pick); render(); inp.focus(); return; }
+      const cx = e.target.closest('.nw-cat-x');
+      if(cx){ const c = data.cats.find(x => x.id === cx.closest('[data-cat]').dataset.cat); if(c && confirm('Delete the type "' + c.name + '"? Its items stay, under Other.')){ c.x = 1; c.u = Date.now(); render(); save(); } return; }
+      const row = e.target.closest('.nw-item'); if(!row) return;
+      const it = byId(row.dataset.id); if(!it) return;
+      if(e.target.closest('.nw-x')){ it.x = 1; it.u = Date.now(); render(); save(); }
+      else if(e.target.closest('.nw-d')) pickDate(it, e.target.closest('.nw-d'));
+      else if(e.target.closest('.nw-ic')) typeMenu(it, e.target.closest('.nw-ic'));
+    });
+    list.addEventListener('keydown', e => { if(e.target.closest('.nw-t')){ e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); } } });
+    list.addEventListener('focusout', e => {
+      const t = e.target.closest('.nw-t'); if(!t) return;
+      const it = byId(t.closest('.nw-item').dataset.id); if(!it) return;
+      const v = t.textContent.trim();
+      if(!v){ it.x = 1; it.u = Date.now(); save(); render(); }
+      else if(v !== it.t){ it.t = v; it.u = Date.now(); save(); }
+    });
+    render();
+    const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(idle()) render(); }).getNewThings(); };
+    pull();
+    fwResume.add('newThings', () => { pull(); if(idle()) render(); }); // back in view: calm-return queue
+    let shownDay = today(); setInterval(() => { if(today() !== shownDay && idle()){ shownDay = today(); render(); } }, 60000);
+    window.fwNew = {get data(){ return data; }, render};
+  })();
+  /* Fun for later (2026-11-05, Julius): 🌴 tab = "I want to do this for fun later" (e.g. play Stardew's update).
+     Device first: localStorage fw.fun.v1, then getFun / saveFun (server merges by id, newest u wins). */
+  (function initFun(){
+    const list = document.getElementById('funList'), inp = document.getElementById('funInput');
+    if(!list || !inp) return;
+    const KEY = 'fw.fun.v1';
+    const h = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    let data = {v:1, items:[], cats:[]}, saveT = null, doneOpen = false;
+    try{ const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if(c && Array.isArray(c.items)) data = Object.assign({cats:[]}, c); }catch(e){}
+    // Categories (2026-11-05, Julius: video games, shows, movies…): cats [{id, name, u, x?}], item.g = category id.
+    const mergeL = (a,b) => { const by = {}; (a || []).forEach(i => by[i.id] = i); (b || []).forEach(i => { if(i && i.id && (!by[i.id] || (i.u || 0) > (by[i.id].u || 0))) by[i.id] = i; }); return Object.values(by); };
+    const merge = srv => { data = {v:1, items:mergeL(data.items, srv && srv.items), cats:mergeL(data.cats, srv && srv.cats)}; };
+    const catSel = document.getElementById('funCat');
+    // Date added as "NOV 5" (2026-11-06, Julius: month name, not 11/5).
+    const funDate = ms => { const d = new Date(ms); return (d.getMonth() + 1) + '/' + d.getDate(); }; // short M/D (2026-11-24, Julius: date column too wide)
+    // Order: dragged items get o (lower = higher up); the rest keep newest first.
+    const okey = i => i.o != null ? i.o : -(i.c || 0);
+    const fid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    const liveCats = () => (data.cats || []).filter(c => !c.x).sort((a,b) => (a.c || 0) - (b.c || 0));
+    let lastCat = ''; try{ lastCat = localStorage.getItem('fw.funCat') || ''; }catch(e){}
+    function fillSel(){
+      const cs = liveCats();
+      if(lastCat && !cs.some(c => c.id === lastCat)) lastCat = '';
+      catSel.innerHTML = '<option value="">No category</option>' + cs.map(c => '<option value="' + h(c.id) + '">' + h(c.name) + '</option>').join('') + '<option value="+">+ New category…</option>';
+      catSel.value = lastCat;
+    }
+    function newCat(){
+      const name = (prompt('New category (e.g. Video games, Shows, Movies, Books):') || '').trim().slice(0,40);
+      if(!name) return '';
+      const now = Date.now(), c = {id:fid('g'), name, c:now, u:now};
+      data.cats = data.cats || []; data.cats.push(c); save();
+      return c.id;
+    }
+    const keep = () => { try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} };
+    function save(){
+      keep(); clearTimeout(saveT);
+      saveT = setTimeout(() => { if(window.google && google.script) google.script.run
+        .withSuccessHandler(d => { merge(d); keep(); if(!drag && !list.contains(document.activeElement)) render(); })
+        .withFailureHandler(e => { window.setStatus && setStatus('Fun list not saved: ' + (e && e.message || e)); setTimeout(save, 15000); })
+        .saveFun(data); }, 600);
+    }
+    function render(){
+      fillSel();
+      const cs = liveCats(), catIds = new Set(cs.map(c => c.id));
+      const live = data.items.filter(i => !i.x), open = live.filter(i => !i.d), done = live.filter(i => i.d);
+      open.sort((a,b) => okey(a) - okey(b)); done.sort((a,b) => (b.u || 0) - (a.u || 0));
+      const row = i => '<div class="fun-item' + (i.d ? ' done' : '') + '" data-id="' + h(i.id) + '"><input type="checkbox"' + (i.d ? ' checked' : '') + ' aria-label="Done"><div class="fun-t" contenteditable="true" spellcheck="true">' + h(i.t) + '</div>' + (i.c ? '<span class="fun-date" title="Added ' + h(new Date(i.c).toLocaleDateString()) + '">' + funDate(i.c) + '</span>' : '') + '<button type="button" class="fun-x" aria-label="Remove" title="Remove">✕</button></div>';
+      // One section per category (order made), then items without one.
+      const groups = cs.map(c => ({c, items:open.filter(i => i.g === c.id)})).concat([{c:null, items:open.filter(i => !i.g || !catIds.has(i.g))}]);
+      const body = groups.filter(gr => gr.c || gr.items.length).map(gr => gr.c
+        ? '<div class="fun-cat" data-cat="' + h(gr.c.id) + '"><div class="fun-cat-h"><span class="fun-cat-n" contenteditable="true" spellcheck="false" title="Tap to rename">' + h(gr.c.name) + '</span><small>' + gr.items.length + '</small><button type="button" class="fun-cat-add" title="Add to ' + h(gr.c.name) + '">+</button><button type="button" class="fun-cat-x" title="Delete category (items stay)">✕</button></div>' + gr.items.map(row).join('') + '</div>'
+        : (cs.length ? '<div class="fun-cat fun-cat-none"><div class="fun-cat-h"><span>No category</span><small>' + gr.items.length + '</small></div>' : '<div>') + gr.items.map(row).join('') + '</div>').join('');
+      list.innerHTML = '<div class="fun-head">🌴 Fun · ' + open.length + '<button type="button" class="fun-newcat" title="New category">+ Category</button></div>'
+        + (open.length || cs.length ? body : '<div class="center-placeholder">Nothing yet. When something fun pops into your head while working, drop it here.</div>')
+        + (done.length ? '<div class="fun-done-head" data-fun-done>' + (doneOpen ? '▾' : '▸') + ' Done ' + done.length + '</div>' + (doneOpen ? done.map(row).join('') : '') : '');
+    }
+    const byId = id => data.items.find(i => i.id === id);
+    function add(){
+      const t = inp.value.trim(); if(!t) return;
+      const now = Date.now();
+      const it = {id:'f' + now.toString(36) + Math.random().toString(36).slice(2,5), t, d:0, c:now, u:now};
+      if(catSel.value && catSel.value !== '+') it.g = catSel.value;
+      data.items.push(it);
+      inp.value = ''; render(); save();
+    }
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); add(); } });
+    document.getElementById('funAddBtn').addEventListener('click', add);
+    catSel.addEventListener('change', () => {
+      if(catSel.value === '+'){ const id = newCat(); lastCat = id || lastCat; render(); }
+      else lastCat = catSel.value;
+      try{ localStorage.setItem('fw.funCat', lastCat); }catch(e){}
+      inp.focus();
+    });
+    /* Hold (2026-11-06, Julius: like every other task): hold the CHECKBOX → Move to menu (categories, + New, Remove);
+       hold the TEXT → drag it: drop on a task (above / below, takes its category) or on a category header (top of it). */
+    let holdT = null, held = false, hx = 0, hy = 0, drag = null;
+    list.addEventListener('pointerdown', e => {
+      const row = e.target.closest('.fun-item'); if(!row || e.target.closest('button') || e.button) return;
+      const box = e.target.matches('input[type=checkbox]');
+      held = false; hx = e.clientX; hy = e.clientY; clearTimeout(holdT);
+      holdT = setTimeout(() => { held = true; if(box || row.classList.contains('done')) moveMenu(row.dataset.id, hx, hy); else startDrag(row, hx, hy); }, box ? 450 : 500);
+    });
+    list.addEventListener('pointermove', e => { if(!drag && (Math.abs(e.clientX - hx) > 9 || Math.abs(e.clientY - hy) > 9)) clearTimeout(holdT); });
+    ['pointerup','pointercancel'].forEach(t => list.addEventListener(t, () => clearTimeout(holdT)));
+    function startDrag(row, x, y){
+      document.activeElement && document.activeElement.blur && document.activeElement.blur();
+      try{ getSelection().removeAllRanges(); }catch(e){}
+      const r = row.getBoundingClientRect(), ghost = row.cloneNode(true);
+      ghost.className = 'fun-item fun-ghost'; ghost.style.cssText = 'width:' + r.width + 'px;left:' + r.left + 'px;top:' + r.top + 'px';
+      document.body.appendChild(ghost); row.classList.add('fun-dragging');
+      drag = {row, id:row.dataset.id, ghost, dx:x - r.left, dy:y - r.top, at:null};
+      navigator.vibrate && navigator.vibrate(15);
+    }
+    const clearMarks = () => list.querySelectorAll('.fun-drop-b,.fun-drop-a,.fun-drop-in').forEach(n => n.classList.remove('fun-drop-b','fun-drop-a','fun-drop-in'));
+    function dragTo(x, y){
+      drag.ghost.style.left = (x - drag.dx) + 'px'; drag.ghost.style.top = (y - drag.dy) + 'px';
+      clearMarks(); drag.at = null;
+      const el = document.elementFromPoint(x, y), t = el && el.closest && el.closest('#funList .fun-item:not(.done):not(.fun-dragging), #funList .fun-cat-h');
+      if(!t) return;
+      if(t.classList.contains('fun-cat-h')){ t.classList.add('fun-drop-in'); drag.at = {head:t.closest('.fun-cat')}; return; }
+      const r = t.getBoundingClientRect(), after = y > r.top + r.height / 2;
+      t.classList.add(after ? 'fun-drop-a' : 'fun-drop-b'); drag.at = {row:t, after};
+    }
+    function drop(){
+      const d = drag; drag = null; clearMarks(); d.ghost.remove(); d.row.classList.remove('fun-dragging');
+      const it = byId(d.id); if(!it || !d.at) return;
+      const now = Date.now(), groupOf = el => el ? (el.dataset.cat || '') : '';
+      let g, ids;
+      if(d.at.head){ g = groupOf(d.at.head); ids = [...d.at.head.querySelectorAll('.fun-item')].map(n => n.dataset.id).filter(x => x !== d.id); ids.unshift(d.id); }
+      else {
+        const sec = d.at.row.closest('.fun-cat'); g = groupOf(sec);
+        ids = [...d.at.row.parentElement.querySelectorAll(':scope > .fun-item:not(.done)')].map(n => n.dataset.id).filter(x => x !== d.id);
+        ids.splice(ids.indexOf(d.at.row.dataset.id) + (d.at.after ? 1 : 0), 0, d.id);
+      }
+      if(g) it.g = g; else delete it.g;
+      ids.forEach((id, k) => { const x = byId(id); if(x && (x.o !== k || x === it)){ x.o = k; x.u = now; } });
+      render(); save();
+    }
+    document.addEventListener('pointermove', e => { if(drag){ e.preventDefault(); dragTo(e.clientX, e.clientY); } }, {passive:false});
+    document.addEventListener('touchmove', e => { if(drag) e.preventDefault(); }, {passive:false});
+    document.addEventListener('pointerup', () => { if(drag) drop(); });
+    document.addEventListener('pointercancel', () => { if(drag){ drag.at = null; drop(); } });
+    function moveMenu(id,x,y){
+      const it = byId(id); if(!it) return;
+      document.activeElement && document.activeElement.blur && document.activeElement.blur();
+      document.querySelectorAll('.fun-menu').forEach(m => m.remove());
+      const m = document.createElement('div'); m.className = 'fun-menu';
+      m.innerHTML = '<div class="fun-menu-h">Move to</div>' + liveCats().map(c => '<button type="button" data-g="' + h(c.id) + '"' + (it.g === c.id ? ' class="on"' : '') + '>' + h(c.name) + '</button>').join('') +
+        '<button type="button" data-g=""' + (!it.g ? ' class="on"' : '') + '>No category</button><button type="button" data-g="+">+ New category…</button><button type="button" data-g="x">🗑 Remove</button>';
+      document.body.appendChild(m);
+      m.style.left = Math.max(8, Math.min(x, innerWidth - m.offsetWidth - 8)) + 'px';
+      m.style.top = Math.max(8, Math.min(y, innerHeight - m.offsetHeight - 8)) + 'px';
+      m.addEventListener('click', e => {
+        const b = e.target.closest('[data-g]'); if(!b) return;
+        let g = b.dataset.g;
+        if(g === 'x'){ it.x = 1; it.u = Date.now(); m.remove(); render(); save(); return; }
+        if(g === '+'){ g = newCat(); if(!g){ m.remove(); return; } }
+        if(g) it.g = g; else delete it.g;
+        it.u = Date.now(); m.remove(); render(); save();
+      });
+      setTimeout(() => { const off = e => { if(!m.contains(e.target)){ m.remove(); document.removeEventListener('pointerdown', off, true); } }; document.addEventListener('pointerdown', off, true); }, 0);
+    }
+    list.addEventListener('click', e => {
+      if(held){ held = false; e.preventDefault(); return; }
+      if(e.target.closest('[data-fun-done]')){ doneOpen = !doneOpen; render(); return; }
+      if(e.target.closest('.fun-newcat')){ const id = newCat(); if(id){ lastCat = id; try{ localStorage.setItem('fw.funCat', id); }catch(err){} } render(); return; }
+      const ch = e.target.closest('.fun-cat[data-cat]');
+      if(ch && e.target.closest('.fun-cat-add')){ lastCat = ch.dataset.cat; try{ localStorage.setItem('fw.funCat', lastCat); }catch(err){} fillSel(); inp.focus(); return; }
+      if(ch && e.target.closest('.fun-cat-x')){
+        const c = (data.cats || []).find(x => x.id === ch.dataset.cat); if(!c) return;
+        if(!confirm('Delete the category "' + c.name + '"? Its items stay, under No category.')) return;
+        c.x = 1; c.u = Date.now(); render(); save(); return;
+      }
+      const row = e.target.closest('.fun-item'); if(!row) return;
+      const it = byId(row.dataset.id); if(!it) return;
+      if(e.target.matches('input[type=checkbox]')){ it.d = e.target.checked ? 1 : 0; it.u = Date.now(); render(); save(); }
+      else if(e.target.closest('.fun-x')){ it.x = 1; it.u = Date.now(); render(); save(); }
+    });
+    list.addEventListener('keydown', e => { if(e.target.closest('.fun-t')){ e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); } } });
+    list.addEventListener('keydown', e => { if(e.target.closest('.fun-cat-n')){ e.stopPropagation(); if(e.key === 'Enter'){ e.preventDefault(); e.target.blur(); } } });
+    list.addEventListener('focusout', e => {
+      const cn = e.target.closest('.fun-cat-n');
+      if(cn){ const c = (data.cats || []).find(x => x.id === cn.closest('[data-cat]').dataset.cat), v = cn.textContent.trim().slice(0,40);
+        if(c && v && v !== c.name){ c.name = v; c.u = Date.now(); save(); render(); } else if(c && !v) cn.textContent = c.name; return; }
+      const t = e.target.closest('.fun-t'); if(!t) return;
+      const it = byId(t.closest('.fun-item').dataset.id); if(!it) return;
+      const v = t.textContent.trim();
+      if(!v){ it.x = 1; it.u = Date.now(); save(); render(); }
+      else if(v !== it.t){ it.t = v; it.u = Date.now(); save(); }
+    });
+    render();
+    const pull = () => { if(window.google && google.script) google.script.run.withSuccessHandler(d => { merge(d); keep(); if(!drag && !list.contains(document.activeElement)) render(); }).getFun(); };
+    pull();
+    fwResume.add('fun', pull); // back in view: calm-return queue
+    window.fwFun = {get data(){ return data; }, render};
+  })();
+  /* Hourly weather (2026-11-01, Julius): ☁️ tab. Open-Meteo (free, no key), Vallejo/Benicia area,
+     next 24 hours. Daily tab (2026-11-04, Julius): next 7 days from the same fetch. Loads when either
+     tab is shown; refreshes if older than 30 min. */
+  (function initWeather(){
+    const box = document.getElementById('weatherScroll'), pane = document.getElementById('journalPane');
+    if(!box || !pane) return;
+    const LAT = 38.08, LON = -122.19, PLACE = 'Vallejo';
+    let at = 0, busy = false, data = null;
+    const isWx = () => pane.dataset.ctab === 'weather' || pane.dataset.ctab === 'wxdaily';
+    const icon = (c,day) => c === 0 ? (day ? '☀️' : '🌙') : c <= 2 ? (day ? '🌤️' : '☁️') : c === 3 ? '☁️' : c <= 48 ? '🌫️' :
+      c <= 57 ? '🌦️' : c <= 67 ? '🌧️' : c <= 77 ? '❄️' : c <= 82 ? '🌧️' : c <= 86 ? '🌨️' : '⛈️';
+    const hr = h => (h % 12 || 12) + (h < 12 ? ' am' : ' pm');
+    function load(force){
+      if(busy || (!force && Date.now() - at < 30 * 60 * 1000)) return;
+      busy = true;
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=' + LAT + '&longitude=' + LON +
+        '&hourly=temperature_2m,precipitation_probability,weather_code,is_day' +
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
+        '&temperature_unit=fahrenheit&timezone=America%2FLos_Angeles&forecast_days=7')
+        .then(r => r.json()).then(d => { at = Date.now(); data = d; chip(); if(isWx()) draw(); })
+        .catch(() => { box.innerHTML = '<div class="center-placeholder">☁️ Weather didn\'t load. <button type="button" class="btn" data-wx-retry>Retry</button></div>'; })
+        .finally(() => { busy = false; });
+    }
+    // One tab (2026-11-07, Julius): next 24 hours on top, the 7 days under it.
+    // Mode (2026-11-07, Julius): Hourly | Daily | Both, remembered per device (fw.wxMode).
+    let mode = 'both'; try{ mode = localStorage.getItem('fw.wxMode') || 'both'; }catch(e){}
+    const draw = () => { if(!data || !isWx()) return;
+      box.innerHTML = head() + (mode !== 'daily' ? hourlyHtml(data, mode === 'both' ? 12 : 24) : '') +
+        (mode !== 'hourly' ? '<div class="wx-day' + (mode === 'both' ? ' wx-sec' : '') + '">7 days</div>' + dailyHtml(data) : ''); };
+    const mb = (m,l) => '<button type="button" data-wx-mode="' + m + '" aria-pressed="' + (mode === m) + '">' + l + '</button>';
+    const head = () => '<div class="wx-head"><span>' + PLACE + '</span><span class="wx-modes">' + mb('hourly','Hourly') + mb('daily','Daily') + mb('both','Both') + '</span><button type="button" data-wx-retry title="Refresh">↻</button></div>';
+    function dailyHtml(d){
+      const w = d.daily;
+      return w.time.map((t,k) => {
+        const [y,m,dd] = t.split('-').map(Number), day = new Date(y,m - 1,dd), p = w.precipitation_probability_max[k];
+        return '<div class="wx-row wx-d' + (k ? '' : ' wx-now') + '"><span class="wx-t">' + (k ? day.toLocaleDateString('en-US',{weekday:'short'}) + '<span class="wx-date"> ' + m + '/' + dd + '</span>' : 'Tod<span class="wx-date">ay</span>') + '</span><span>' + icon(w.weather_code[k],1) +
+          '</span><span>' + Math.round(w.temperature_2m_max[k]) + '° <span class="wx-lo">' + Math.round(w.temperature_2m_min[k]) + '°</span></span><span class="wx-p">' + (p >= 10 ? '<span class="wx-drop">💧</span>' + p + '%' : '') + '</span></div>';
+      }).join('');
+    }
+    function hourlyHtml(d, hours){
+      const h = d.hourly, now = new Date(), key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + 'T' + String(now.getHours()).padStart(2,'0');
+      let i = h.time.findIndex(t => t.slice(0,13) === key); if(i < 0) i = 0;
+      let html = '', lastDay = h.time[i].slice(0,10);
+      for(let k = i; k < Math.min(i + hours, h.time.length); k++){
+        const d = h.time[k].slice(0,10), H = +h.time[k].slice(11,13);
+        if(d !== lastDay){ html += '<div class="wx-day">Tomorrow</div>'; lastDay = d; }
+        const p = h.precipitation_probability[k];
+        html += '<div class="wx-row' + (k === i ? ' wx-now' : '') + '"><span class="wx-t">' + (k === i ? 'Now' : hr(H)) + '</span><span>' + icon(h.weather_code[k], h.is_day[k]) +
+          '</span><span>' + Math.round(h.temperature_2m[k]) + '°</span><span class="wx-p">' + (p >= 10 ? '💧' + p + '%' : '') + '</span></div>';
+      }
+      return html;
+    }
+    box.addEventListener('click', e => {
+      const m = e.target.closest('[data-wx-mode]');
+      if(m){ mode = m.dataset.wxMode; try{ localStorage.setItem('fw.wxMode', mode); }catch(err){} draw(); return; }
+      if(e.target.closest('[data-wx-retry]')) load(true);
+    });
+    // Weather chip (cleanup 2026-11-09): the ☁️ tab button shows the current icon + temperature (e.g. "☀️ 64°");
+    // tap it for the full view. Fetched once at start-up and at most every 30 min.
+    function chip(){
+      const b = pane.querySelector('.center-tabs button[data-ctab="weather"]'), h = data && data.hourly;
+      if(!b || !h || !h.time) return;
+      const now = new Date(), key = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + 'T' + String(now.getHours()).padStart(2,'0');
+      let i = h.time.findIndex(t => t.slice(0,13) === key); if(i < 0) i = 0;
+      const t = Math.round(h.temperature_2m[i]);
+      if(!isFinite(t)) return;
+      b.textContent = icon(h.weather_code[i], h.is_day[i]) + ' ' + t + '°';
+      b.classList.add('wx-chip'); b.title = 'Weather in ' + PLACE + ' now: ' + t + '° · tap for the next 24 h + 7 days';
+    }
+    setTimeout(() => load(false), 4000);
+    setInterval(() => { if(!document.hidden){ load(false); chip(); } }, 10 * 60 * 1000);
+    const check = () => { if(isWx()){ draw(); load(false); } else chip(); };
+    new MutationObserver(check).observe(pane, {attributes:true, attributeFilter:['data-ctab']});
+    fwResume.add('weather', check); // back in view: calm-return queue (load() itself waits 30 min between fetches)
+    check();
+  })();
+  /* =========================================================
+     TOP-BAR BUTTONS (none of these need the keyboard)
+     ========================================================= */
+  /* Today/Tasks header text jumps to today (replaced the top-bar Today button, 2026-10-29). */
+  document.querySelector('[data-jump-today]')?.addEventListener('click',()=>jumpToday());
+  document.querySelector('[data-jump-today]')?.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); jumpToday(); } });
+  function runLayoutAction(action){
+    if(action === 'today') jumpToday();
+    else if(action === 'scale') toggleTypeSettings();
+    else if(action === 'fit'){ fitColumnsToWindow(); setStatus('Columns fitted to window'); }
+    else if(action === 'reset-columns') resetColumnSizes();
+    else if(action === 'reference') toggleReferenceCollapse();
+    else if(action === 'focus') setFocusMode(true);
+    else if(action === 'show-toolbar') setFocusMode(false);
+  }
+  function initLayoutButtons(){
+    document.querySelectorAll('[data-layout]').forEach(btn => btn.addEventListener('click',() => {
+      releaseEditor();
+      runLayoutAction(btn.dataset.layout);
+    }));
+  }
+  /* =========================================================
+     ON-SCREEN KEYBOARD
+     ========================================================= */
+  /* When the phone keyboard is closed with its own button, the cell keeps focus
+     and Chrome can need extra taps. Watching the visible area grow back lets the
+     app release the cell, so one tap closes the keyboard. */
+  /* Voice typing fix (2026-11-13, Julius: "I tap the mic and it disappears, inconsistently"): pressing the mic swaps
+     the keyboard for the shorter voice panel, so the visible area grew by >120px and the old rule blurred the cell —
+     killing voice input. Now the cell is released only when the area is back to (nearly) its full, keyboard-free
+     height, i.e. the keyboard is really gone. Full height = the tallest seen at this width (resets on rotate). */
+  let lastViewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  let fullViewport = {w:window.innerWidth,h:lastViewportHeight};
+  function onViewportChange(){
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    const zoomed = vv && vv.scale > 1.02;
+    if(Math.abs(window.innerWidth - fullViewport.w) > 40) fullViewport = {w:window.innerWidth,h:h};
+    else if(!zoomed && h > fullViewport.h) fullViewport.h = h;
+    if(!zoomed && h - lastViewportHeight > 120 && h >= fullViewport.h - 90 && (navigator.maxTouchPoints || 0) > 0 && editableFocused()){
+      document.activeElement.blur();
+    }
+    lastViewportHeight = h;
+    positionTypeSettings();
+    positionContextMenu();
+  }
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',onViewportChange);
+  }
+  window.addEventListener('resize',onViewportChange);
+  /* =========================================================
+     START
+     ========================================================= */
+  initTypographyControls();
+  initReferenceSort();
+  initMobileScale();
+  initPadScale();
+  initAppDisplay();
+  initLayoutButtons();
+
+</script>

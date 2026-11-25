@@ -491,7 +491,7 @@ function cellHash_(s) {
 }
 
 // The page's parts, pulled into Index.html with createHtmlOutputFromFile (keep in step with tools/index-html.mjs).
-const INDEX_PARTS_ = ['Index_Css', 'Index_LateCss', 'Index_Main', 'Index_Cards', 'Index_Extras', 'Index_Calendar', 'Index_Layout'];
+const INDEX_PARTS_ = ['Index_Css', 'Index_LateCss', 'Index_Main', 'Index_Editors', 'Index_Sync', 'Index_Reference', 'Index_Search', 'Index_NextSteps', 'Index_CalEvents', 'Index_RefOptions', 'Index_Cards', 'Index_Extras', 'Index_Calendar', 'Index_Layout'];
 
 // Version of the app's page code, so an open tab can tell a newer version was pushed.
 function appBuild_(fresh) {

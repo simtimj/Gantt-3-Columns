@@ -259,3 +259,7 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 
 ## Dev speed: quick-check + STATE.md (2026-11-25, implemented + tested locally)
 - Pre-push runs only affected smoke suites (a docs change: none; one calendar file: 3 suites instead of 19). Full suite moved to CI on push. Sessions start from the short docs/STATE.md instead of grepping 280 KB of NOTES.
+
+## Dev speed: Index_Main split (2026-11-25, implemented + tested in full smoke, not yet tested live)
+Main script split into 8 files of 55–88 KB (CODE_MAP.md), so a session greps / reads a small file instead of a 525 KB one. No behavior change intended; one function moved for load order (NOTES "Index_Main split").
+

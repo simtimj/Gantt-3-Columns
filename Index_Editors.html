@@ -1,0 +1,1727 @@
+<script>
+  /* =========================================================
+     EDITORS
+     ========================================================= */
+  const editorHistories = new WeakMap();
+  /* Runtime-only checkbox listener tracking. Never serialize this state into saved HTML. */
+  const wiredCheckboxes = new WeakSet();
+  function ensureEditorHistory(el){
+    if(!editorHistories.has(el)){
+      editorHistories.set(el,{undo:[],redo:[],last:el.innerHTML,restoring:false});
+    }
+    return editorHistories.get(el);
+  }
+  function captureBeforeEdit(el){
+    const h=ensureEditorHistory(el);
+    if(h.restoring) return;
+    const current=el.innerHTML;
+    if(!h.undo.length || h.undo[h.undo.length-1]!==current){
+      h.undo.push(current);
+      if(h.undo.length>100) h.undo.shift();
+    }
+    h.redo.length=0;
+  }
+  function finishEditorEdit(el){
+    const h=ensureEditorHistory(el);
+    h.last=el.innerHTML;
+  }
+  function restoreEditorSnapshot(el,html){
+    const h=ensureEditorHistory(el);
+    h.restoring=true;
+    el.innerHTML=html;
+    normalizeEditorTasks(el);
+    h.last=el.innerHTML;
+    h.restoring=false;
+    el.focus({preventScroll:true});
+    placeEnd(el);
+    saveEditorOwner(el);
+  }
+  function undoEditor(el){
+    const h=ensureEditorHistory(el);
+    if(!h.undo.length) return;
+    h.redo.push(el.innerHTML);
+    restoreEditorSnapshot(el,h.undo.pop());
+  }
+  function redoEditor(el){
+    const h=ensureEditorHistory(el);
+    if(!h.redo.length) return;
+    h.undo.push(el.innerHTML);
+    restoreEditorSnapshot(el,h.redo.pop());
+  }
+  function wireEditorHistory(el){
+    ensureEditorHistory(el);
+    el.addEventListener('beforeinput',()=>captureBeforeEdit(el));
+    el.addEventListener('input',()=>finishEditorEdit(el));
+  }
+  function wireEditor(
+    el,
+    type
+  ){
+    normalizeEditorTasks(el);
+    wireCodeBlocks(el);
+    wireEditorHistory(el);
+    el.addEventListener(
+      'input',
+      e => {
+        if(!e.isComposing) autoFormat(el); // voice typing / IME: never reshape the DOM mid-composition
+        if(type === 'scratch' || type === 'thought' || type === 'kim') return; // saved by its own listener
+        if(type === 'plan'){ if(window.odPadSave) odPadSave(el.dataset.date); return; }
+        if(el.dataset.date){
+          requestAnimationFrame(() => syncDayHeightStable(el.dataset.date));
+        }
+        scheduleDaySave(
+          el.dataset.date
+        );
+      }
+    );
+    el.addEventListener('blur', () => {
+      // Stable: resizing the row you just left must not move the view (2026-10-26).
+      if(el.dataset.date) requestAnimationFrame(() => syncDayHeightStable(el.dataset.date));
+    });
+    el.addEventListener('pointerdown', holdDayView, {passive:true});
+    if(type === 'journal') el.addEventListener('pointerdown', e => maybeOpenSendMenu(e, el), true);
+    el.addEventListener(
+      'keydown',
+      e => {
+        handleEditorKey(
+          e,
+          el,
+          type
+        );
+      }
+    );
+    el.addEventListener(
+      'focus',
+      () => {
+        activeRefId = null;
+        activeEditor = el;
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'keyup',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'mouseup',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener(
+      'input',
+      () => {
+        rememberSelection(el);
+      }
+    );
+    el.addEventListener('touchend',() => setTimeout(() => rememberSelection(el),0),{passive:true});
+    el.addEventListener('paste', e => pasteRichClipboard(e, el));
+    el.addEventListener('cut', e => copyStructuredText(e, el, true));
+    el.addEventListener(
+      'copy',
+      e => copyStructuredText(e, el)
+    );
+    el.querySelectorAll(
+      'input[type=checkbox]'
+    ).forEach(
+      wireCheckbox
+    );
+  }
+  // Canonical task markup is shared by loaded content, copy/cut and paste.
+  // Browser clipboards can omit a row wrapper or introduce nested block tags.
+  function normalizeEditorTasks(root, wire = true){
+    root.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      if(cb.closest('pre')) return;
+      if(cb.closest('.check-line')) return;
+      let container = cb.parentElement;
+      if(container === root || container.tagName === 'SPAN' && !container.classList.contains('check-text')){
+        const row = root.ownerDocument.createElement('div');
+        cb.before(row); row.appendChild(cb);
+        const sibling = row.nextSibling;
+        if(sibling?.nodeType === 1 && sibling.classList.contains('check-text')) row.appendChild(sibling);
+        else while(row.nextSibling && (row.nextSibling.nodeType === 3 || row.nextSibling.nodeType === 1 && /^(SPAN|B|STRONG|I|EM|U|S|DEL|CODE)$/.test(row.nextSibling.tagName))) row.appendChild(row.nextSibling);
+        container = row;
+      }
+      if(container.tagName !== 'DIV'){
+        const row = root.ownerDocument.createElement('div');
+        while(container.firstChild) row.appendChild(container.firstChild);
+        container.replaceWith(row); container = row;
+      }
+      container.classList.remove('check-text');
+      container.classList.add('check-line');
+    });
+    // Undo old pastes that nested a task inside another task's text.
+    [...root.querySelectorAll('.check-text .check-line')].reverse().forEach(line => {
+      const parent = line.parentElement.closest('.check-line');
+      if(parent) parent.after(line);
+    });
+    root.querySelectorAll('.check-line').forEach(line => {
+      line.classList.remove('check-text');
+      const cb = line.querySelector('input[type=checkbox]');
+      if(!cb){ line.classList.remove('check-line','done','task-struck'); return; }
+      let text = [...line.children].find(n => n.classList.contains('check-text'));
+      if(!text){ text = root.ownerDocument.createElement('span'); text.className = 'check-text'; }
+      // Keep all selected text and inline formatting in a single flex item.
+      const nodes = [...line.childNodes];
+      for(const node of nodes){
+        if(node === cb || node === text) continue;
+        if(node.nodeType === 1 && node.classList.contains('check-text')){
+          while(node.firstChild) text.appendChild(node.firstChild); node.remove();
+        }else text.appendChild(node);
+      }
+      line.prepend(cb); line.appendChild(text);
+      const level = Math.min(6,Math.max(0,Math.floor(Number(line.dataset.level) || 0)));
+      line.dataset.level = String(level);
+      // Clipboard presentation must not override the editor's task geometry.
+      for(const node of [line,text,cb]){
+        for(const name of ['display','width','height','max-width','padding','padding-left','text-indent','white-space','vertical-align','margin-left']) node.style.removeProperty(name);
+      }
+      line.style.marginLeft = level ? `${level * 24}px` : '';
+      cb.toggleAttribute('checked',cb.checked);
+      line.classList.toggle('done',cb.checked);
+      if(!text.firstChild) text.appendChild(root.ownerDocument.createElement('br'));
+      if(wire) wireCheckbox(cb);
+    });
+    syncCompletionAppearance(root);
+  }
+
+  function syncCompletionAppearance(root){
+    root.querySelectorAll('.done').forEach(node => {
+      const cb = node.classList.contains('check-line') ? node.querySelector('input[type=checkbox]') : null;
+      node.classList.toggle('done',!!cb?.checked);
+    });
+    root.querySelectorAll('[style],.check-text').forEach(node => {
+      // Strip only the app's generated completion paint; bold, underline,
+      // highlights and independent strike formatting remain intact.
+      const color = node.style.color.replace(/\s/g,'').toLowerCase();
+      if(['#666','#666666','rgb(102,102,102)','var(--done)'].includes(color)) node.style.removeProperty('color');
+      if(node.style.opacity === '0.82' || node.style.opacity === '.82') node.style.removeProperty('opacity');
+      if(node.classList.contains('check-text') && !node.closest('.check-line')) node.classList.remove('check-text');
+    });
+  }
+
+  function toggleTaskStrike(el){
+    const sel = window.getSelection();
+    if(!sel?.rangeCount || !el.contains(sel.anchorNode) || !el.contains(sel.focusNode)) return;
+    const range = sel.getRangeAt(0);
+    const tasks = [...el.querySelectorAll('.check-line')].filter(line => {
+      if(sel.isCollapsed) return line.contains(sel.anchorNode);
+      return range.intersectsNode(line);
+    });
+    captureBeforeEdit(el);
+    if(tasks.length){
+      const strike = !tasks.every(line => line.classList.contains('task-struck'));
+      tasks.forEach(line => line.classList.toggle('task-struck',strike));
+    }else{
+      document.execCommand('strikeThrough');
+    }
+    finishEditorEdit(el); rememberSelection(el); saveEditorOwner(el);
+  }
+
+  function currentCodeBlock(el){
+    const node = window.getSelection()?.anchorNode;
+    const element = node?.nodeType === 3 ? node.parentElement : node;
+    const pre = element?.closest?.('pre');
+    return pre && el.contains(pre) ? pre : null;
+  }
+
+  function insertCodeText(el,text){
+    const selection = window.getSelection();
+    if(!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if(!el.contains(range.startContainer) || !el.contains(range.endContainer)) return;
+    captureBeforeEdit(el);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    const pre = node.parentElement?.closest('pre');
+    if(pre && (pre.textContent.endsWith('\n') || !pre.textContent) && pre.lastChild?.nodeName !== 'BR') pre.appendChild(document.createElement('br'));
+    range.setStart(node,node.length); range.collapse(true);
+    selection.removeAllRanges(); selection.addRange(range);
+    finishEditorEdit(el); rememberSelection(el); saveEditorOwner(el);
+  }
+
+  function handleCodeEnter(el){
+    const pre = currentCodeBlock(el);
+    const sel = window.getSelection();
+    if(!sel?.rangeCount || !sel.isCollapsed) return false;
+    const range = sel.getRangeAt(0);
+    if(pre){
+      const prefix = document.createRange(); prefix.selectNodeContents(pre);
+      prefix.setEnd(range.startContainer,range.startOffset);
+      const before = prefix.toString();
+      const after = pre.textContent.slice(before.length);
+      const last = before.split('\n').pop();
+      if(/^\s*```\s*$/.test(last) && !after.trim()){
+        captureBeforeEdit(el);
+        pre.textContent = before.slice(0,before.length-last.length).replace(/\n$/,'');
+        const paragraph = document.createElement('p'); paragraph.innerHTML = '<br>';
+        pre.after(paragraph); placeEnd(paragraph);
+        finishEditorEdit(el); saveEditorOwner(el);
+        return true;
+      }
+      insertCodeText(el,'\n'); return true;
+    }
+    let line = getCurrentLine(el);
+    if(!line || line.closest('.check-line')) return false;
+    // A fresh editor may contain only a text node, with no paragraph yet.
+    const text = line.textContent || '';
+    const fence = text.match(/^\s*```([\w+-]*)\s*$/);
+    if(!fence) return false;
+    captureBeforeEdit(el);
+    const block = document.createElement('pre'); block.className = 'code-block';
+    if(fence[1]) block.dataset.language = fence[1];
+    block.appendChild(document.createElement('br'));
+    if(line === el) el.replaceChildren(block); else line.replaceWith(block);
+    const caret = document.createRange(); caret.setStart(block,0); caret.collapse(true);
+    sel.removeAllRanges(); sel.addRange(caret);
+    el.focus({preventScroll:true}); rememberSelection(el);
+    finishEditorEdit(el); saveEditorOwner(el);
+    return true;
+  }
+
+  function handleCodeKey(e,el){
+    if(e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return false;
+    const pre=currentCodeBlock(el);
+    if((e.key === 'Backspace' || e.key === 'Delete') && pre && !pre.textContent.trim()){
+      e.preventDefault(); captureBeforeEdit(el);
+      const paragraph=document.createElement('p'); paragraph.innerHTML='<br>';
+      pre.replaceWith(paragraph); placeEnd(paragraph);
+      finishEditorEdit(el); saveEditorOwner(el);
+      return true;
+    }
+    if(e.key === 'Enter' && handleCodeEnter(el)){e.preventDefault();return true;}
+    if(e.key === 'Tab' && currentCodeBlock(el)){
+      e.preventDefault();
+      if(!e.shiftKey) insertCodeText(el,'  ');
+      return true;
+    }
+    return false;
+  }
+
+  function wireCodeBlocks(el){
+    el.querySelectorAll('pre').forEach(pre => pre.classList.add('code-block'));
+    // Android keyboards often emit beforeinput rather than an Enter keydown.
+    el.addEventListener('beforeinput',event => {
+      if(!event.isComposing && (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') && handleCodeEnter(el)) event.preventDefault();
+    });
+    el.addEventListener('input',() => syncCompletionAppearance(el));
+  }
+
+  function escapeHtml(text){
+    return String(text)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+  function structuredClipboardTextFromRange(range){
+    const fragment = range.cloneContents();
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(fragment);
+    const codeTokens = new Map();
+    wrapper.querySelectorAll('pre').forEach((pre,index) => {
+      const token = '\uE000FWCODE' + index + '\uE001';
+      codeTokens.set(token,'```' + (pre.dataset.language || '') + '\n' + pre.textContent + '\n```');
+      const row = document.createElement('div'); row.textContent = token; pre.replaceWith(row);
+    });
+
+    /* Convert visual checkbox rows into portable text before reading textContent.
+       Native <input type=checkbox> elements contribute no [ ]/[x] text by themselves. */
+    wrapper.querySelectorAll('.check-line').forEach(line => {
+      const level = Math.max(0, Math.min(6, Number(line.dataset.level || 0)));
+      const checkbox = line.querySelector('input[type=checkbox]');
+      const text = line.querySelector('.check-text');
+      const prefix = '    '.repeat(level) + (checkbox?.checked ? '[x] ' : '[ ] ');
+      /* Keep the replacement as a block-level row so copied tasks keep their own lines. */
+      const replacement = document.createElement('div');
+      replacement.textContent = prefix + (text?.textContent || '');
+      line.replaceWith(replacement);
+    });
+
+    /* Preserve line boundaries for the block-level elements used by the editor. */
+    wrapper.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+    wrapper.querySelectorAll('p,h1,h2,h3,blockquote,li,div').forEach(node => {
+      if(node !== wrapper && node.parentNode){
+        node.appendChild(document.createTextNode('\n'));
+      }
+    });
+
+    let result = (wrapper.textContent || '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{2,}/g, '\n')
+      .replace(/^\n+|\n+$/g, '');
+    for(const [token,code] of codeTokens) result = result.replace(token,() => code);
+    return result;
+  }
+
+  function copyStructuredText(e, el, cutting = false){
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount || !el.contains(sel.anchorNode) || !el.contains(sel.focusNode) || sel.isCollapsed){
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    let text = structuredClipboardTextFromRange(range);
+    if(!text){
+      return;
+    }
+
+    if(!e.clipboardData) return;
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(range.cloneContents());
+    const ancestor = range.commonAncestorContainer.nodeType === 3
+      ? range.commonAncestorContainer.parentElement : range.commonAncestorContainer;
+    const task = ancestor.closest?.('.check-line');
+    // A Range inside a task omits its outer row. Restore that row if the
+    // checkbox was selected, so it cannot become a separate pasted line.
+    if(task && wrapper.querySelector('input[type=checkbox]') && !wrapper.querySelector('.check-line')){
+      const row = task.cloneNode(false);
+      while(wrapper.firstChild) row.appendChild(wrapper.firstChild);
+      wrapper.appendChild(row);
+    }
+    normalizeEditorTasks(wrapper, false);
+    const textRange = document.createRange();
+    textRange.selectNodeContents(wrapper);
+    text = structuredClipboardTextFromRange(textRange);
+    // A partial selection can omit its surrounding <b>, <u>, or styled span.
+    // Carry those inherited text styles in a wrapper as well as the selected HTML.
+    const source = range.commonAncestorContainer.nodeType === 3
+      ? range.commonAncestorContainer.parentElement : range.commonAncestorContainer;
+    if(source && el.contains(source)){
+      const styles = getComputedStyle(source);
+      ['font-family','font-size','font-weight','font-style','color',
+       'text-decoration-line','text-decoration-color','text-decoration-style',
+       'letter-spacing','white-space'].forEach(name => {
+        if(name === 'color' && source.closest('.check-line.done,.check-text')) return;
+        wrapper.style.setProperty(name, styles.getPropertyValue(name));
+      });
+      // Underline and strike-through propagate from ancestors without inheritance.
+      const decorations = new Set();
+      for(let node=source; node && el.contains(node); node=node.parentElement){
+        getComputedStyle(node).textDecorationLine.split(/\s+/).forEach(value => {
+          if(value === 'underline' || value === 'line-through') decorations.add(value);
+        });
+      }
+      if(decorations.size) wrapper.style.textDecorationLine = [...decorations].join(' ');
+    }
+    wrapper.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.toggleAttribute('checked', cb.checked);
+      cb.removeAttribute('data-wired');
+    });
+    // Use an inline wrapper so copying part of a sentence does not create a row.
+    const span = document.createElement('span');
+    span.style.cssText = wrapper.style.cssText;
+    while(wrapper.firstChild) span.appendChild(wrapper.firstChild);
+    removeClipboardCellBackgrounds(span);
+    const html = sanitizeClipboardHtml(span.outerHTML);
+    e.clipboardData.setData('text/plain', text);
+    e.clipboardData.setData('text/html', html);
+    e.preventDefault();
+    if(cutting){
+      captureBeforeEdit(el);
+      range.deleteContents();
+      range.collapse(true);
+      sel.removeAllRanges(); sel.addRange(range);
+      normalizeEditorTasks(el);
+      finishEditorEdit(el);
+      rememberSelection(el);
+      saveEditorOwner(el);
+    }
+  }
+
+  function removeClipboardCellBackgrounds(wrapper){
+    [wrapper,...wrapper.querySelectorAll('*')].forEach(node => {
+      const color = node.style.backgroundColor.replace(/\s/g,'').toLowerCase();
+      const block = /^(DIV|P|H[1-6]|BLOCKQUOTE|UL|OL|LI|TABLE|TR|TD|TH)$/.test(node.tagName);
+      if(block || color === 'white' || color === '#fff' || color === '#ffffff' || color === 'rgb(255,255,255)' || color === 'rgba(255,255,255,1)'){
+        node.style.removeProperty('background');
+        node.style.removeProperty('background-color');
+      }
+      if(block || (node.getAttribute('bgcolor') || '').toLowerCase() === 'white' || /^#?fff(?:fff)?$/i.test(node.getAttribute('bgcolor') || '')) node.removeAttribute('bgcolor');
+    });
+  }
+  function sanitizeClipboardHtml(html){
+    // Parse in an inert document; retain text formatting, never scripts or handlers.
+    const doc = new DOMParser().parseFromString(String(html), 'text/html');
+    doc.querySelectorAll('script,style,iframe,object,embed,link,meta,base,svg,math,template').forEach(n => n.remove());
+    const tags = new Set('span div p br b strong i em u s strike del sub sup mark small big font h1 h2 h3 h4 h5 h6 ul ol li blockquote pre code a hr table thead tbody tfoot tr th td caption colgroup col img input'.split(' '));
+    const styles = new Set('font-family font-size font-weight font-style font-variant color background-color text-decoration text-decoration-line text-decoration-color text-decoration-style text-align text-indent line-height letter-spacing word-spacing white-space vertical-align margin-left padding-left list-style-type border-collapse border border-color border-style border-width padding width height max-width'.split(' '));
+    const safeUrl = (value, image=false) => {
+      try{
+        const url = new URL(value); // Do not resolve relative URLs against the app.
+        return image ? ['https:','http:'].includes(url.protocol) || /^data:image\/(png|jpeg|gif|webp);base64,/i.test(value)
+          : ['https:','http:','mailto:','tel:'].includes(url.protocol);
+      }catch(_){ return false; }
+    };
+    Array.from(doc.body.querySelectorAll('*')).forEach(node => {
+      const tag = node.localName;
+      if(!tags.has(tag)){
+        node.replaceWith(...node.childNodes);
+        return;
+      }
+      if(tag === 'input' && node.getAttribute('type')?.toLowerCase() !== 'checkbox'){
+        node.remove(); return;
+      }
+      const keep = {};
+      const cleanStyle = document.createElement('span').style;
+      for(const name of Array.from(node.style)){
+        const value = node.style.getPropertyValue(name);
+        if(styles.has(name) && !/url\s*\(|expression\s*\(|@import|[<>]/i.test(value)) cleanStyle.setProperty(name, value);
+      }
+      if(cleanStyle.cssText) keep.style = cleanStyle.cssText;
+      const classes = ['check-line','check-text','done','task-struck','code-block'].filter(c => node.classList.contains(c));
+      if(classes.length) keep.class = classes.join(' ');
+      if(node.classList.contains('check-line')){
+        const level = Math.max(0, Math.min(6, Math.floor(Number(node.dataset.level) || 0)));
+        keep['data-level'] = String(level);
+        if(/^[123]$/.test(node.dataset.urg || '')) keep['data-urg'] = node.dataset.urg;
+        if(/^[a-z]{2,12}$/.test(node.dataset.cat || '')) keep['data-cat'] = node.dataset.cat;
+        if(/^\d{4}-\d{2}-\d{2}$/.test(node.dataset.due || '')) keep['data-due'] = node.dataset.due;
+        if(durMin(node.dataset.dur)) keep['data-dur'] = String(durMin(node.dataset.dur));
+        {
+          const ml = lineMetaLabel(keep['data-due'],keep['data-dur']);
+          if(ml) keep['data-due-label'] = ml;
+        }
+        cleanStyle.marginLeft = level ? `${level * 24}px` : '';
+        keep.style = cleanStyle.cssText;
+      }
+      if(tag === 'pre'){
+        keep.class = 'code-block';
+        if(/^[\w+-]{1,30}$/.test(node.dataset.language || '')) keep['data-language'] = node.dataset.language;
+      }
+      if(tag === 'input'){
+        keep.type = 'checkbox';
+        if(node.hasAttribute('checked')) keep.checked = '';
+      }
+      if(tag === 'a' && safeUrl(node.getAttribute('href') || '')){
+        keep.href = node.getAttribute('href'); keep.target = '_blank'; keep.rel = 'noopener noreferrer';
+      }
+      if(tag === 'img'){
+        const src = node.getAttribute('src') || '';
+        if(!safeUrl(src,true)){ node.replaceWith(doc.createTextNode(node.getAttribute('alt') || '')); return; }
+        keep.src = src; keep.alt = node.getAttribute('alt') || '';
+        cleanStyle.maxWidth = '100%'; keep.style = cleanStyle.cssText;
+      }
+      if(tag === 'font') for(const attr of ['color','face','size']){
+        if(node.hasAttribute(attr)) keep[attr] = node.getAttribute(attr);
+      }
+      for(const attr of ['colspan','rowspan','start','value']){
+        if(/^-?\d{1,4}$/.test(node.getAttribute(attr) || '')) keep[attr] = node.getAttribute(attr);
+      }
+      if(node.getAttribute('dir') === 'rtl' || node.getAttribute('dir') === 'ltr') keep.dir = node.getAttribute('dir');
+      for(const attr of Array.from(node.attributes)) node.removeAttribute(attr.name);
+      for(const [name,value] of Object.entries(keep)) node.setAttribute(name,value);
+    });
+    removeClipboardCellBackgrounds(doc.body);
+    normalizeEditorTasks(doc.body, false);
+    return doc.body.innerHTML;
+  }
+
+  function pasteRichClipboard(e, el){
+    const clipboard = e.clipboardData || window.clipboardData;
+    if(!clipboard) return; // Allow native paste if clipboard access is unavailable.
+    let html = '', text = '';
+    try{ html = clipboard.getData('text/html'); }catch(_){}
+    try{ text = clipboard.getData('text/plain'); }catch(_){}
+    if(!text) try{ text = clipboard.getData('Text'); }catch(_){}
+    if(!html && !text) return;
+    activeEditor = el;
+    if(currentCodeBlock(el)){
+      e.preventDefault();
+      insertCodeText(el,text || new DOMParser().parseFromString(html,'text/html').body.textContent || '');
+      return;
+    }
+    if(!html && /(?:^|\n)\s*```/.test(text)){
+      e.preventDefault(); pasteStructuredText(el,text); return;
+    }
+    if(html){
+      const clean = sanitizeClipboardHtml(html);
+      if(clean && insertClipboardHtml(el, clean)){
+        e.preventDefault();
+        return;
+      }
+    }
+    if(text){
+      e.preventDefault();
+      pasteStructuredText(el, text);
+    }
+  }
+
+  function insertClipboardHtml(el, html){
+    const selection = window.getSelection();
+    let range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const inside = r => r && el.contains(r.startContainer) && el.contains(r.endContainer);
+    if(!inside(range)) range = inside(savedRange) ? savedRange.cloneRange() : null;
+    if(!range) return false;
+    captureBeforeEdit(el);
+    el.focus({preventScroll:true});
+    const fragment = range.createContextualFragment(html);
+    const hasBlocks = !!fragment.querySelector('div,p,h1,h2,h3,ul,ol,pre,blockquote,.check-line');
+    range.deleteContents();
+    const anchor = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+    // Block tasks must be siblings of the destination task, never children of
+    // its flex text span. Split the surrounding line and preserve both halves.
+    let block = anchor.closest?.('.check-line,p,h1,h2,h3,blockquote,li');
+    if(!block){
+      let candidate = anchor;
+      while(candidate && candidate.parentElement !== el) candidate = candidate.parentElement;
+      if(candidate && candidate !== el && candidate.tagName === 'DIV') block = candidate;
+    }
+    if(hasBlocks && block && block !== el && el.contains(block)){
+      const tailRange = document.createRange();
+      tailRange.selectNodeContents(block);
+      tailRange.setStart(range.startContainer,range.startOffset);
+      const tail = block.cloneNode(false);
+      tail.removeAttribute('data-tid'); // a split-off line is a new task, not a mirror (2026-11-01)
+      tail.appendChild(tailRange.extractContents());
+      const task = block.classList.contains('check-line');
+      const originalCheckbox = block.querySelector('input[type=checkbox]') || tail.querySelector('input[type=checkbox]');
+      if(task && originalCheckbox){
+        const text = tail.querySelector('.check-text') || document.createElement('span');
+        text.className = 'check-text';
+        if(!tail.contains(text)) tail.appendChild(text);
+        if(!tail.querySelector('input[type=checkbox]')) tail.prepend(originalCheckbox.cloneNode(true));
+      }
+      const meaningful = node => !!node.textContent.trim() || !!node.querySelector('img,pre');
+      let insertion = block;
+      const keepHead = meaningful(block);
+      const keepTail = meaningful(tail);
+      if(keepTail) block.after(tail);
+      const lastNode = fragment.lastChild;
+      insertion.after(fragment);
+      if(!keepHead) block.remove();
+      if(lastNode){ range.setStartAfter(lastNode); range.collapse(true); }
+    }else{
+      const lastNode = fragment.lastChild;
+      if(!lastNode) return false;
+      range.insertNode(fragment);
+      range.setStartAfter(lastNode); range.collapse(true);
+    }
+    selection.removeAllRanges(); selection.addRange(range);
+    normalizeEditorTasks(el);
+    finishEditorEdit(el);
+    rememberSelection(el);
+    saveEditorOwner(el);
+    return true;
+  }
+
+  function pasteStructuredText(el, text){
+    const normalized = String(text || '').replace(/\r\n?/g,'\n');
+    if(!/^[ \t]*(?:\[\]|\[ \]|\[[xX]\]|```)(?:\s|$|[\w+-])/m.test(normalized)){
+      document.execCommand('insertText',false,normalized);
+      return;
+    }
+    const lines = normalized.split('\n');
+    let html = '', code = null, language = '';
+    const flushCode = () => {
+      html += '<pre class="code-block"' + (language ? ' data-language="' + escapeHtml(language) + '"' : '') + '>' + escapeHtml(code.join('\n')) + '</pre>';
+      code = null;
+    };
+    for(const line of lines){
+      if(code !== null){
+        if(/^\s*```\s*$/.test(line)) flushCode(); else code.push(line);
+        continue;
+      }
+      const fence = line.match(/^\s*```([\w+-]*)\s*$/);
+      if(fence){ code = []; language = fence[1]; continue; }
+      const match = line.match(/^([ \t]*)(\[\]|\[ \]|\[[xX]\])(?:[ \t]+)?(.*)$/);
+      if(match){
+        const columns = [...match[1]].reduce((n,ch) => n + (ch === '\t' ? 4 : 1),0);
+        const level = Math.min(6,Math.floor(columns / 4));
+        const checked = /^\[[xX]\]$/.test(match[2]);
+        html += `<div class="check-line${checked ? ' done' : ''}" data-level="${level}" style="margin-left:${level * 24}px"><input type="checkbox"${checked ? ' checked' : ''}><span class="check-text">${escapeHtml(match[3])}</span></div>`;
+      }else html += '<div>' + (line ? escapeHtml(line) : '<br>') + '</div>';
+    }
+    if(code !== null) flushCode();
+    insertClipboardHtml(el,html);
+  }
+  function handleEditorKey(
+    e,
+    el,
+    type
+  ){
+    const key=e.key.toLowerCase();
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && key === 'x'){
+      e.preventDefault(); toggleTaskStrike(el); return;
+    }
+    if(handleCodeKey(e,el)) return;
+    if((e.metaKey || e.ctrlKey) && key === 'z'){
+      e.preventDefault();
+      if(e.shiftKey) redoEditor(el); else undoEditor(el);
+      return;
+    }
+    if(e.ctrlKey && !e.metaKey && key === 'y'){
+      e.preventDefault();
+      redoEditor(el);
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      key === 'b'
+    ){
+      e.preventDefault();
+      document.execCommand(
+        'bold'
+      );
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      key === 'u'
+    ){
+      e.preventDefault();
+      document.execCommand(
+        'underline'
+      );
+      return;
+    }
+    if(e.key === 'Tab'){
+      e.preventDefault();
+      rememberSelection(el);
+      const line =
+        getCurrentLine(el);
+      if(line){
+        changeIndent(
+          line,
+          e.shiftKey ? -1 : 1
+        );
+      }
+      return;
+    }
+    if(
+      (e.metaKey || e.ctrlKey) &&
+      e.key === 'Enter' &&
+      type === 'reference'
+    ){
+      e.preventDefault();
+      addReferenceCell(
+        activeRefId
+      );
+      return;
+    }
+    /*
+     * Enter on a checkbox creates another checkbox.
+     *
+     * Normal Enter:
+     *   same indentation level.
+     *
+     * Shift+Enter:
+     *   one level deeper, acting like a subtask.
+     */
+    if(e.key === 'Enter'){
+      const currentLine = getCurrentLine(el);
+      if(type === 'reference' && !e.shiftKey && currentLine && currentLine.tagName === 'H2'){
+        e.preventDefault();
+        captureBeforeEdit(el);
+        const paragraph = document.createElement('p');
+        paragraph.innerHTML = '<br>';
+        currentLine.insertAdjacentElement('afterend', paragraph);
+        placeEnd(paragraph);
+        finishEditorEdit(el);
+        saveEditorOwner(el);
+        return;
+      }
+      const line =
+        getCurrentLine(el);
+      if(
+        line &&
+        line.classList.contains('check-line')
+      ){
+        e.preventDefault();
+        const checkText =
+          line.querySelector(
+            '.check-text'
+          );
+        /*
+         * Google-Docs-style list exit:
+         * pressing Enter on an EMPTY checkbox removes
+         * the checkbox and leaves a normal blank line.
+         *
+         * Shift+Enter still creates an indented checkbox,
+         * even if the current checkbox is empty.
+         */
+        if(
+          !e.shiftKey &&
+          !(checkText?.textContent || '').trim()
+        ){
+          exitEmptyCheckbox(
+            line
+          );
+          return;
+        }
+        captureBeforeEdit(el);
+        const currentLevel =
+          Number(
+            line.dataset.level || 0
+          );
+        if(!e.shiftKey && selectionAtStartOfCheckboxText(line)){
+          const previous = createCheckboxLine(currentLevel);
+          line.insertAdjacentElement('beforebegin',previous);
+          placeCaretInsideCheckbox(previous.querySelector('.check-text'));
+          finishEditorEdit(el);
+          saveEditorOwner(el);
+          return;
+        }
+        const nextLevel =
+          e.shiftKey
+            ? Math.min(
+                6,
+                currentLevel + 1
+              )
+            : currentLevel;
+        insertCheckboxAfter(
+          line,
+          nextLevel
+        );
+        return;
+      }
+      /*
+       * Normal Enter in other content
+       * keeps the existing auto-format behavior.
+       */
+      setTimeout(
+        () => autoFormat(el),
+        0
+      );
+    }
+  }
+  function getCurrentLine(root){
+    const sel =
+      window.getSelection();
+    let n =
+      sel?.anchorNode;
+    if(
+      !n ||
+      !root.contains(n)
+    ){
+      return null;
+    }
+    if(n.nodeType === 3){
+      n = n.parentElement;
+    }
+    const task = n.closest('.check-line');
+    return task && root.contains(task) ? task : n.closest('pre,p,h1,h2,h3,div,blockquote,li') || null;
+  }
+  function selectionAtStartOfCheckboxText(line){
+    const text = line.querySelector('.check-text');
+    const selection = window.getSelection();
+    if(!text || !selection?.isCollapsed || !text.contains(selection.anchorNode)){
+      return false;
+    }
+    const prefix = document.createRange();
+    prefix.selectNodeContents(text);
+    prefix.setEnd(selection.anchorNode,selection.anchorOffset);
+    return prefix.toString().length === 0;
+  }
+  function changeIndent(
+    line,
+    delta
+  ){
+    let level =
+      Math.max(
+        0,
+        Math.min(
+          6,
+          Number(line.dataset.level || 0) +
+          delta
+        )
+      );
+    line.dataset.level =
+      String(level);
+    line.style.marginLeft =
+      level
+        ? `${level * 24}px`
+        : '';
+    /*
+     * No color manipulation happens here.
+     */
+    saveEditorOwner(
+      line.closest(
+        '.editor,.ref-cell'
+      )
+    );
+  }
+  /* Save whichever cell an edit happened in, and (for day cells) grow or shrink
+     the row to fit, so programmatic inserts never spill into the next day. */
+  function saveEditorOwner(el){
+    if(!el){
+      return;
+    }
+    if(el.id === 'scratchPad'){ el.dispatchEvent(new Event('input',{bubbles:true})); return; }
+    if(el.classList && el.classList.contains('plan-editor')){ if(window.odPadSave) odPadSave(el.dataset.date); return; }
+    if(el.classList && el.classList.contains('thought-editor')){ if(window.odThoughtSave) odThoughtSave(el.dataset.date); return; }
+    if(el.classList && el.classList.contains('kim-editor')){ if(window.kimSave) kimSave(); return; }
+    if(
+      el.closest('.day-row')
+    ){
+      const date = el.dataset.date;
+      scheduleDaySave(date);
+      requestAnimationFrame(() => syncDayHeightStable(date));
+    }else{
+      const id =
+        el.closest(
+          '.ref-cell-wrapper'
+        )?.dataset.id;
+      if(id){
+        saveRefFromDom(
+          id
+        );
+      }
+    }
+  }
+  /* =========================================================
+     AUTO FORMATTING
+     ========================================================= */
+  function autoFormat(el){
+    if(currentCodeBlock(el)) return;
+    const sel =
+      window.getSelection();
+    if(
+      !sel ||
+      !sel.rangeCount ||
+      !el.contains(sel.anchorNode)
+    ){
+      return;
+    }
+    let node =
+      sel.anchorNode;
+    let line =
+      node.nodeType === 3
+        ? node.parentElement
+        : node;
+    line =
+      line?.closest(
+        'p,div,li,h1,h2,h3,blockquote'
+      );
+    if(
+      !line ||
+      !el.contains(line) ||
+      line.closest('.check-line,pre')
+    ){
+      return;
+    }
+    const text =
+      line.textContent || '';
+    /*
+     * Checkbox. Accept both the compact form `[] task` and the
+     * spaced clipboard form `[ ] task`, plus completed `[x] task`.
+     */
+    const checkboxMatch = text.match(/^([ \t]*)(\[\]|\[ \]|\[[xX]\])(?:[ \t]+)?(.*)$/);
+    if(checkboxMatch){
+      const indent = checkboxMatch[1] || '';
+      let columns = 0;
+      for(const ch of indent){
+        columns += ch === '\t' ? 4 : 1;
+      }
+      const level = Math.max(0, Math.min(6, Math.floor(columns / 4)));
+      const checked = /^\[[xX]\]$/.test(checkboxMatch[2]);
+      const caretWas = checkCharOffset(line, sel.anchorNode, sel.anchorOffset);
+      const caretAt = Math.max(0, (caretWas == null ? text.length : caretWas) - (text.length - (checkboxMatch[3] || '').length));
+      const c = document.createElement('div');
+      c.className = 'check-line' + (checked ? ' done' : '');
+      c.dataset.level = String(level);
+      c.style.marginLeft = level ? `${level * 24}px` : '';
+      c.innerHTML =
+        `<input type="checkbox"${checked ? ' checked' : ''}>` +
+        '<span class="check-text"></span>';
+      c.querySelector('.check-text').textContent = checkboxMatch[3] || '';
+      if(line === el) el.replaceChildren(c); else line.replaceWith(c);
+      wireCheckbox(c.querySelector('input'));
+      // Empty task: a <br> gives the phone's cursor a spot inside the text, not before the box (2026-11-01, Julius).
+      const taskText = c.querySelector('.check-text');
+      if(!taskText.textContent) taskText.innerHTML = '<br>';
+      placeCaretInsideCheckbox(taskText, caretAt);
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Headings
+     */
+    if(
+      /^#{1,3}\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      if(el.classList.contains('ref-cell')){
+        const paragraph = document.createElement('p');
+        paragraph.textContent = text.replace(/^#{1,3}\s/,'');
+        line.replaceWith(paragraph);
+        placeEnd(paragraph);
+        saveEditorOwner(el);
+        return;
+      }
+      const n =
+        (
+          text.match(/^#+/)[0]
+        ).length;
+      const h =
+        document.createElement(
+          'h' + n
+        );
+      h.textContent =
+        text.replace(
+          /^#{1,3}\s/,
+          ''
+        );
+      line.replaceWith(h);
+      placeEnd(h);
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Bullet
+     */
+    if(
+      /^(?:[-*])\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      const ul =
+        document.createElement('ul');
+      const li =
+        document.createElement('li');
+      li.textContent =
+        text.replace(
+          /^[-*]\s/,
+          ''
+        );
+      ul.appendChild(li);
+      line.replaceWith(ul);
+      placeEnd(li);
+      saveEditorOwner(el);
+      return;
+    }
+    /*
+     * Blockquote
+     */
+    if(
+      /^>\s/.test(text) &&
+      !line.querySelector('input')
+    ){
+      const q =
+        document.createElement(
+          'blockquote'
+        );
+      q.textContent =
+        text.replace(
+          /^>\s/,
+          ''
+        );
+      line.replaceWith(q);
+      placeEnd(q);
+      saveEditorOwner(el);
+    }
+  }
+  function createCheckboxLine(level = 0){
+    const c =
+      document.createElement('div');
+    c.className =
+      'check-line';
+    c.dataset.level =
+      String(
+        Math.max(
+          0,
+          Math.min(
+            6,
+            Number(level) || 0
+          )
+        )
+      );
+    c.style.marginLeft =
+      c.dataset.level !== '0'
+        ? `${Number(c.dataset.level) * 24}px`
+        : '';
+    c.innerHTML =
+      '<input type="checkbox">' +
+      '<span class="check-text"></span>';
+    wireCheckbox(
+      c.querySelector('input')
+    );
+    return c;
+  }
+  function exitEmptyCheckbox(line){
+    const editor =
+      line.closest(
+        '.editor,.ref-cell'
+      );
+    if(!editor){
+      return;
+    }
+    captureBeforeEdit(editor);
+    /*
+     * Replace the empty checkbox row with an ordinary
+     * blank paragraph. A <br> gives contenteditable a
+     * stable caret target without displaying any text.
+     */
+    const paragraph =
+      document.createElement('p');
+    paragraph.appendChild(
+      document.createElement('br')
+    );
+    line.replaceWith(
+      paragraph
+    );
+    editor.focus({
+      preventScroll:true
+    });
+    const range =
+      document.createRange();
+    range.setStart(
+      paragraph,
+      0
+    );
+    range.collapse(true);
+    const sel =
+      window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    activeEditor =
+      editor;
+    savedRange =
+      range.cloneRange();
+    finishEditorEdit(editor);
+    saveEditorOwner(editor);
+  }
+  function insertCheckboxAfter(
+    line,
+    level
+  ){
+    const editor =
+      line.closest(
+        '.editor,.ref-cell'
+      );
+    if(!editor){
+      return;
+    }
+    captureBeforeEdit(editor);
+    const next =
+      createCheckboxLine(level);
+    /* Split at the caret rather than dropping the rest of the sentence.
+       Moving DOM nodes (instead of plain text) retains inline formatting. */
+    const oldText=line.querySelector('.check-text');
+    const selection=window.getSelection();
+    if(oldText && selection?.rangeCount){
+      const selected=selection.getRangeAt(0);
+      if((selected.startContainer===oldText || oldText.contains(selected.startContainer)) &&
+         (selected.endContainer===oldText || oldText.contains(selected.endContainer))){
+        const caret=selected.cloneRange();
+        if(!caret.collapsed) caret.deleteContents();
+        caret.collapse(true);
+        const tail=document.createRange();
+        tail.selectNodeContents(oldText);
+        tail.setStart(caret.startContainer,caret.startOffset);
+        next.querySelector('.check-text').appendChild(tail.extractContents());
+      }
+    }
+    line.insertAdjacentElement(
+      'afterend',
+      next
+    );
+    const text =
+      next.querySelector(
+        '.check-text'
+      );
+    editor.focus({preventScroll:true});
+    placeCaretInsideCheckbox(text);
+    finishEditorEdit(editor);
+    saveEditorOwner(editor);
+  }
+  /* Checkbox cursor (2026-11-21, Julius; NOTES "F. Checkbox cursor"): an empty inline .check-text has no box, so the
+     phone put the caret before the checkbox. Every new checkbox now gets a <br> to stand on, the caret goes to a real
+     spot inside the text (char offset `at`, default 0 = right of the box), and it is set again after the next frame
+     and once the keyboard has settled — unless the caret has already moved into that text. */
+  function checkCharOffset(root, node, off){
+    if(!root || !node || !root.contains(node)) return null;
+    const r=document.createRange();
+    try{ r.selectNodeContents(root); r.setEnd(node, off); }catch(e){ return null; }
+    return r.toString().length;
+  }
+  function checkRangeAt(text, at){
+    const r=document.createRange();
+    let n=Math.max(0, at|0);
+    const w=document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+    let t, last=null;
+    while((t=w.nextNode())){
+      last=t;
+      if(n<=t.data.length){ r.setStart(t,n); r.collapse(true); return r; }
+      n-=t.data.length;
+    }
+    if(last && at>0){ r.setStart(last,last.data.length); }
+    else r.setStart(text,0);
+    r.collapse(true);
+    return r;
+  }
+  function placeCaretInsideCheckbox(text, at){
+    const editor=text.closest('.editor,.ref-cell');
+    if(!editor) return;
+    if(!text.textContent && !text.querySelector('br')) text.innerHTML='<br>';
+    const want=Math.max(0, Math.min(at|0, (text.textContent||'').length));
+    let first=true;
+    const setCaret=()=>{
+      if(!text.isConnected) return; // the line was replaced before the next frame
+      const sel=window.getSelection();
+      if(!first && sel.rangeCount && text.contains(sel.anchorNode)) return; // already inside (maybe typing): leave it
+      first=false;
+      editor.focus({preventScroll:true});
+      const range=checkRangeAt(text, want);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      activeEditor=editor;
+      savedRange=range.cloneRange();
+    };
+    setCaret();
+    requestAnimationFrame(setCaret);
+    setTimeout(setCaret, 120);
+  }
+  window.fwPlaceCaretInCheck = placeCaretInsideCheckbox;
+  /* Guard for every other path (keyboard quirks, paths we don't know): a collapsed caret that sits in a .check-line
+     but outside its .check-text (before / after the box) moves into the text; letters a phone typed left of the box
+     move into the text too, caret after them. */
+  (function checkCaretGuard(){
+    const lineOf = n => { const e = n && (n.nodeType === 1 ? n : n.parentElement); return e && e.closest ? e.closest('.check-line') : null; };
+    const editable = l => { const ed = l && l.closest('.editor,.ref-cell'); return ed && ed.isContentEditable ? ed : null; };
+    let composing = false;
+    document.addEventListener('compositionstart', () => { composing = true; }, true);
+    document.addEventListener('compositionend', () => { composing = false; setTimeout(fixStray, 0); }, true);
+    function fixCaret(){
+      if(composing) return;
+      const sel = window.getSelection();
+      if(!sel || !sel.rangeCount || !sel.isCollapsed) return;
+      const a = sel.anchorNode, line = lineOf(a);
+      if(!line || !editable(line)) return;
+      const text = line.querySelector(':scope > .check-text');
+      if(!text || text.contains(a)) return;
+      if(a !== line && a.parentNode !== line) return; // inside some other child (a nested widget): leave it
+      const kids = [...line.childNodes], ti = kids.indexOf(text);
+      const at = a === line ? sel.anchorOffset : kids.indexOf(a) + (sel.anchorOffset > 0 ? 1 : 0);
+      const r = document.createRange();
+      if(at <= ti) r.setStart(text, 0); else { r.selectNodeContents(text); r.collapse(false); }
+      if(at <= ti){ const w = document.createTreeWalker(text, NodeFilter.SHOW_TEXT), t = w.nextNode(); if(t) r.setStart(t, 0); }
+      r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+    function fixStray(){
+      if(composing) return;
+      const sel = window.getSelection();
+      if(!sel || !sel.rangeCount) return;
+      const line = lineOf(sel.anchorNode);
+      if(!line || !editable(line)) return;
+      const text = line.querySelector(':scope > .check-text');
+      if(!text) return;
+      const before = [], after = [];
+      let seenText = false;
+      [...line.childNodes].forEach(n => {
+        if(n === text){ seenText = true; return; }
+        if(n.nodeType === 3 && n.data.replace(/[\u200b\s]/g, '')) (seenText ? after : before).push(n);
+      });
+      if(!before.length && !after.length) return;
+      const wasIn = before.concat(after).find(n => n === sel.anchorNode);
+      const off = wasIn ? sel.anchorOffset : null;
+      const onlyBr = text.childNodes.length === 1 && text.firstChild.nodeName === 'BR';
+      if(onlyBr) text.innerHTML = '';
+      if(before.length){ const f = document.createDocumentFragment(); before.forEach(n => f.appendChild(n)); text.insertBefore(f, text.firstChild); }
+      after.forEach(n => text.appendChild(n));
+      if(wasIn){ const r = document.createRange(); r.setStart(wasIn, Math.min(off, wasIn.data.length)); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); }
+      const ed = editable(line);
+      if(ed && typeof saveEditorOwner === 'function') saveEditorOwner(ed);
+    }
+    document.addEventListener('selectionchange', fixCaret);
+    document.addEventListener('input', e => { if(!e.isComposing) fixStray(); }, true);
+    window.fwCheckCaretFix = () => { fixStray(); fixCaret(); };
+  })();
+  function placeEnd(el){
+    const editor =
+      el.closest(
+        '.editor,.ref-cell'
+      );
+    if(editor){
+      editor.focus({
+        preventScroll:true
+      });
+    }
+    const r =
+      document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    const s =
+      window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+    if(editor){
+      activeEditor =
+        editor;
+      savedRange =
+        r.cloneRange();
+    }
+  }
+  function wireCheckbox(cb){
+    if(!cb || wiredCheckboxes.has(cb)){
+      return;
+    }
+    wiredCheckboxes.add(cb);
+    /* Remove the old persisted listener marker from previously saved content. */
+    cb.removeAttribute('data-wired');
+    /* Keep restored/saved checkbox markup and its visual state aligned. */
+    const initialLine =
+      cb.closest('.check-line');
+    if(initialLine){
+      initialLine.classList.toggle('done', cb.checked);
+    }
+    cb.addEventListener(
+      'change',
+      () => {
+        const line =
+          cb.closest(
+            '.check-line'
+          );
+        if(!line){
+          return;
+        }
+        line.classList.toggle(
+          'done',
+          cb.checked
+        );
+        /*
+         * checked is normally a live DOM property. Mirror it to the
+         * HTML attribute so innerHTML saves/undo snapshots retain it.
+         */
+        if(cb.checked){
+          cb.setAttribute('checked', '');
+        }else{
+          cb.removeAttribute('checked');
+        }
+        const root =
+          cb.closest(
+            '.editor,.ref-cell'
+          );
+        if(typeof tsecToggled === 'function') try{ tsecToggled(line,cb.checked,root); }catch(err){}
+        // Task mirrors (2026-11-01): same data-tid elsewhere follows this tick.
+        if(window.tidToggled) try{ tidToggled(line,cb.checked,root); }catch(err){}
+        saveEditorOwner(root);
+        // Urgent follows the tick at once (2026-11-04): it used to wait ~1.5 s for the save to come round. Same cell
+        // content as the source, so there's still one completion state.
+        const uk = typeof ownerKey === 'function' ? ownerKey(root) : null;
+        if(uk && root && /data-(urg|due|arch)=/.test(root.innerHTML)) try{ noteUrgentDay(uk.date,root.innerHTML,true,uk.pane); }catch(err){}
+      }
+    );
+  }
+  /* =========================================================
+     FORMATTING ACTIONS (used by the right-click / long-press menu)
+     ========================================================= */
+  /* Keep In Mind pin (2026-11-21, Julius; NOTES "B. Keep In Mind pin"): hold an item → 📌 Pin to top / Unpin. The item
+     = its title box (title + its lines, outermost title), else the task + its subtasks, else the line. Pinned heads carry
+     data-kpin="<time pinned>" (saved, so it syncs) and sit at the top in pin order, each followed by a blank line;
+     unpinning moves the item just below the pinned ones. */
+  function kimPinUnit(ed, node){
+    let n = node && (node.nodeType === 1 ? node : node.parentElement);
+    while(n && n.parentElement !== ed) n = n.parentElement;
+    if(!n || n === ed || isEmptyLine(n)) return null;
+    let head = null;
+    for(let p = n; p && !isEmptyLine(p); p = p.previousElementSibling){
+      if(isTitleLine(p) && (p === n || titleCovered(p).includes(n))) head = p;
+    }
+    if(head) return [head].concat(titleCovered(head));
+    if(n.classList.contains('check-line')){
+      let r = n;
+      while(r && (Number(r.dataset.level) || 0) > 0 && r.previousElementSibling && r.previousElementSibling.classList.contains('check-line')) r = r.previousElementSibling;
+      return urgSubtree(r);
+    }
+    return [n];
+  }
+  function kimPinnedBlockEnd(ed){
+    // The node after the last pinned unit's trailing blank line (or the first child when nothing is pinned).
+    let n = ed.firstElementChild;
+    while(n && n.hasAttribute('data-kpin')){
+      const u = kimPinUnit(ed, n) || [n];
+      n = u[u.length - 1].nextElementSibling;
+      while(n && isEmptyLine(n)) n = n.nextElementSibling;
+    }
+    return n;
+  }
+  window.kimUnpinHead = head => { const ed = head && head.parentElement; if(!ed || !head.hasAttribute('data-kpin')) return; const u = kimPinUnit(ed, head); if(u) kimTogglePin(ed, u); };
+  function kimTogglePin(ed, unit){
+    captureBeforeEdit(ed);
+    const head = unit[0], pin = !head.hasAttribute('data-kpin');
+    // Take the unit out, closing the gap it leaves (no doubled blank lines).
+    const before = head.previousElementSibling, after = unit[unit.length - 1].nextElementSibling;
+    unit.forEach(x => x.remove());
+    if(before && after && isEmptyLine(before) && isEmptyLine(after)) after.remove();
+    else if(!before && after && isEmptyLine(after)) after.remove();
+    if(pin) head.setAttribute('data-kpin', String(Date.now())); else head.removeAttribute('data-kpin');
+    // Pinned: after the pinned block (newest pin last). Unpinned: first item below the pinned block.
+    const at = kimPinnedBlockEnd(ed);
+    const gap = document.createElement('div'); gap.innerHTML = '<br>';
+    const frag = document.createDocumentFragment(); unit.forEach(x => frag.appendChild(x)); frag.appendChild(gap);
+    ed.insertBefore(frag, at);
+    if(gap.nextElementSibling && isEmptyLine(gap.nextElementSibling)) gap.nextElementSibling.remove();
+    if(typeof refreshCards === 'function') try{ refreshCards(ed); }catch(e){}
+    if(typeof refreshTitleLines === 'function') try{ refreshTitleLines(ed); }catch(e){}
+    finishEditorEdit(ed);
+    saveEditorOwner(ed);
+    setStatus(pin ? 'Pinned to the top of Keep In Mind' : 'Unpinned');
+  }
+  /* Keep In Mind border color (2026-11-21, Julius; NOTES "G."): hold a title → 🎨 Border color → swatches, the full
+     color picker (the phone's color wheel) or Reset. Saved on the title line as data-tbc="#rrggbb" (syncs); the group
+     box and the title box use it. */
+  function kimColorPicker(ed, title, at){
+    document.querySelectorAll('.kc-pop').forEach(p => p.remove());
+    const SW = ['#e53935','#fb8c00','#fdd835','#43a047','#00acc1','#1e88e5','#8e24aa','#ec407a','#9e9e9e'];
+    const pop = document.createElement('div'); pop.className = 'kc-pop'; pop.setAttribute('role','dialog'); pop.setAttribute('aria-label','Border color');
+    const cur = title.getAttribute('data-tbc') || '';
+    pop.innerHTML = '<div class="kc-sw">' + SW.map(c => '<button type="button" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>').join('') + '</div>'
+      + '<div class="kc-row"><label class="kc-wheel">🎨 Any color<input type="color" value="' + (cur || '#fdd835') + '"></label>'
+      + '<button type="button" class="btn tiny" data-reset>Reset</button><button type="button" class="btn tiny" data-done>Done</button></div>';
+    document.body.appendChild(pop);
+    const vw = window.innerWidth, vh = window.innerHeight, r = pop.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(at.x, vw - r.width - 8)) + 'px';
+    pop.style.top = Math.max(8, Math.min(at.y, vh - r.height - 8)) + 'px';
+    let snap = false;
+    const apply = (c, final) => {
+      if(!snap){ captureBeforeEdit(ed); snap = true; }
+      if(c) title.setAttribute('data-tbc', c); else title.removeAttribute('data-tbc');
+      if(window.tboxPaint) try{ tboxPaint(ed); }catch(e){}
+      if(window.kimRepaintGroups) try{ kimRepaintGroups(); }catch(e){}
+      if(final){ finishEditorEdit(ed); saveEditorOwner(ed); snap = false; setStatus(c ? 'Border color set' : 'Border color reset'); }
+    };
+    const close = () => { pop.remove(); document.removeEventListener('pointerdown', outside, true); };
+    const outside = e => { if(!pop.contains(e.target)) close(); };
+    setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
+    pop.addEventListener('click', e => {
+      const b = e.target.closest('button'); if(!b) return;
+      if(b.dataset.c){ apply(b.dataset.c, true); close(); }
+      else if(b.hasAttribute('data-reset')){ apply('', true); close(); }
+      else if(b.hasAttribute('data-done')) close();
+    });
+    const inp = pop.querySelector('input[type=color]');
+    inp.addEventListener('input', () => apply(inp.value, false));
+    inp.addEventListener('change', () => apply(inp.value, true));
+    return pop;
+  }
+  window.fwKimColor = kimColorPicker;
+  /* Which line holds the color (2026-11-21 UI batch, Julius: "still not working"): a title (data-tl) when the held line
+     is in a title box, else the header line of the bordered group (the first line after an empty line, when it isn't a
+     task). Before, only data-tl titles got the option, so plain header lines like "Weekend" never showed 🎨. The target
+     is picked when the hold menu opens, so a phone selection that moves before the tap can't lose it. */
+  function kimColorTarget(ed, node){
+    const u = kimPinUnit(ed, node);
+    if(u && isTitleLine(u[0])) return u[0];
+    let n = node && (node.nodeType === 1 ? node : node.parentElement);
+    while(n && n.parentElement !== ed) n = n.parentElement;
+    if(!n || isEmptyLine(n)) return null;
+    while(n.previousElementSibling && !isEmptyLine(n.previousElementSibling)) n = n.previousElementSibling;
+    return n.classList.contains('check-line') ? null : n;
+  }
+  let kimColorHeld = null;
+  function runEditAction(action, ed){
+    if(!ed || !ed.isConnected){
+      setStatus('Select text or a task first');
+      return;
+    }
+    if(action === 'kimPin'){
+      const u = kimPinUnit(ed, savedRange && savedRange.startContainer);
+      if(!u){ setStatus('Tap an item first'); return; }
+      kimTogglePin(ed, u);
+      return;
+    }
+    if(action === 'kimColor'){
+      let t = kimColorHeld && kimColorHeld.isConnected && ed.contains(kimColorHeld) ? kimColorHeld : null;
+      if(!t) t = kimColorTarget(ed, savedRange && savedRange.startContainer);
+      kimColorHeld = null;
+      if(!t){ setStatus('Hold a title or header line first'); return; }
+      kimColorPicker(ed, t, window.fwCtxLastAt || {x:60, y:120});
+      return;
+    }
+    if(action === 'refArchive'){
+      const w = ed.closest('.ref-cell-wrapper');
+      if(w) deleteReference(w.dataset.id, {archive:true});
+      return;
+    }
+    activeEditor = ed;
+    ed.focus({preventScroll:true});
+    if(!savedRange || !ed.contains(savedRange.startContainer) || !ed.contains(savedRange.endContainer)){
+      setStatus('Tap where you want to edit first');
+      return;
+    }
+    restoreSelection();
+    if(action === 'title'){
+      if(flattenLooseLines(ed)){ const sel = window.getSelection(); if(sel && sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange(); }
+      let n = savedRange.startContainer; if(n.nodeType !== 1 || n === ed) n = n === ed ? (ed.childNodes[savedRange.startOffset] || ed.lastChild) : n.parentElement;
+      if(n && n.nodeType !== 1) n = n.parentElement;
+      while(n && n.parentElement !== ed) n = n.parentElement;
+      if(!n || n === ed){ setStatus('Tap a line first'); return; }
+      toggleTitleLine(n,ed);
+      return;
+    }
+    if(action === 'strike'){
+      toggleTaskStrike(ed);
+      return;
+    }
+    if(action === 'bold' || action === 'underline'){
+      captureBeforeEdit(ed);
+      document.execCommand(action,false,null);
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
+      return;
+    }
+    if(action === 'rule'){
+      captureBeforeEdit(ed);
+      document.execCommand('insertHTML',false,'<hr><p><br></p>');
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
+      return;
+    }
+    const line = getCurrentLine(ed);
+    /* Insert line above / below (2026-11-21, Julius; NOTES "Insert line above/below"): a plain empty line next to the
+       held line, cursor in it, so the top / bottom of a list is never out of reach. Below a title = right under the
+       title (unfolded), at its lines' indent, so what's typed there joins the title's group. */
+    if(action === 'lineAbove' || action === 'lineBelow'){
+      let n = line;
+      while(n && n !== ed && n.parentElement !== ed) n = n.parentElement;
+      if(!n || n === ed){ setStatus('Tap a line first'); return; }
+      const above = action === 'lineAbove';
+      if(above && ed.classList.contains('ref-cell') && n === ed.firstElementChild && n.tagName === 'H2'){ setStatus('The card title stays on top'); return; }
+      captureBeforeEdit(ed);
+      const nl = document.createElement(ed.classList.contains('ref-cell') ? 'p' : 'div'); nl.innerHTML = '<br>';
+      if(!above && isTitleLine(n)){
+        if(n.dataset.fold === '1') delete n.dataset.fold;
+        const c = titleCovered(n)[0], lv = c ? Number(c.dataset.level) || 0 : 0;
+        if(lv){ nl.dataset.level = String(lv); nl.style.marginLeft = (24 * lv) + 'px'; }
+      }
+      n.insertAdjacentElement(above ? 'beforebegin' : 'afterend', nl);
+      const r = document.createRange(); r.setStart(nl, 0); r.collapse(true);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      finishEditorEdit(ed);
+      if(typeof refreshTitleLines === 'function') refreshTitleLines(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
+      return;
+    }
+    if(action === 'indent' || action === 'outdent'){
+      if(!line || line === ed){
+        setStatus('Place the cursor on a text or task line');
+        return;
+      }
+      captureBeforeEdit(ed);
+      changeIndent(line,action === 'indent' ? 1 : -1);
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      return;
+    }
+    // Turn the current line into a task (2026-10-26, Julius): same result as
+    // typing [] + Space at its start; the line's text and formatting stay.
+    if(action === 'checkbox'){
+      if(line && line.classList.contains('check-line')){ setStatus('That line is already a task'); return; }
+      if(line && line.closest('pre')){ setStatus('Not inside a code block'); return; }
+      if(ed.classList.contains('ref-cell') && line && line === ed.firstElementChild && line.tagName === 'H2'){ setStatus('The title line can’t be a task'); return; }
+      captureBeforeEdit(ed);
+      const level = line && line !== ed ? Math.max(0,Math.min(6,Number(line.dataset.level) || Math.round((parseFloat(line.style.marginLeft) || 0) / 24))) : 0;
+      const task = createCheckboxLine(level);
+      const text = task.querySelector('.check-text');
+      let caretAt = 0;
+      if(line && line !== ed){
+        const ws = window.getSelection();
+        let o = ws && ws.rangeCount ? checkCharOffset(line, ws.anchorNode, ws.anchorOffset) : null;
+        if(o == null && savedRange) o = checkCharOffset(line, savedRange.startContainer, savedRange.startOffset);
+        caretAt = o == null ? (line.textContent || '').length : o;
+      }
+      if(line && line !== ed && line.parentNode){
+        while(line.firstChild) text.appendChild(line.firstChild);
+        if(text.childNodes.length === 1 && text.firstChild.nodeName === 'BR') text.innerHTML = '';
+        if(line.tagName === 'LI'){
+          const list = line.parentElement;
+          list.after(task); line.remove();
+          if(list && !list.children.length) list.remove();
+        }else line.replaceWith(task);
+      }else{
+        ed.appendChild(task);
+      }
+      wireCheckbox(task.querySelector('input'));
+      if(!text.textContent) text.innerHTML = '<br>';
+      placeCaretInsideCheckbox(text, caretAt);
+      finishEditorEdit(ed);
+      rememberSelection(ed);
+      saveEditorOwner(ed);
+      return;
+    }
+    if(action === 'subtask'){
+      if(line && line.classList.contains('check-line')){
+        insertCheckboxAfter(line,Math.min(6,Number(line.dataset.level || 0) + 1));
+        return;
+      }
+      const task = createCheckboxLine(1);
+      captureBeforeEdit(ed);
+      if(line && line !== ed) line.insertAdjacentElement('afterend',task);
+      else ed.appendChild(task);
+      placeCaretInsideCheckbox(task.querySelector('.check-text'));
+      finishEditorEdit(ed);
+      saveEditorOwner(ed);
+    }
+  }
+  /* =========================================================
+     RIGHT-CLICK / LONG-PRESS MENU
+     ========================================================= */
+  const ctxMenu = document.getElementById('contextMenu');
+  let ctxEditor = null;
+  let ctxAnchor = null;
+  let lastPointerType = 'mouse';
+  let longPress = null;
+  function editorFromTarget(target){
+    const el = target instanceof Element ? target : target?.parentElement;
+    let ed = el?.closest?.('.editor,.ref-cell');
+    // Reference card chrome (2026-11-21, Julius: hold a card → Archive): a hold on the card's frame, not a button,
+    // opens the menu for that card.
+    if(!ed && el?.closest && !el.closest('button,input,select,a')){
+      const w = el.closest('#referenceTree .ref-cell-wrapper');
+      if(w && !el.closest('.ref-children')) ed = w.querySelector(':scope > .ref-cell');
+      else if(w){ const inner = el.closest('.ref-cell-wrapper'); ed = inner && inner.querySelector(':scope > .ref-cell'); }
+    }
+    // Read-only split copies are not editable and get the normal browser menu.
+    return ed && ed.isContentEditable ? ed : null;
+  }
+  function visibleBox(){
+    const vv = window.visualViewport;
+    return {
+      width:Math.min(window.innerWidth, vv ? vv.width : Infinity),
+      height:Math.min(window.innerHeight, vv ? vv.height : Infinity)
+    };
+  }
+  function positionContextMenu(){
+    if(ctxMenu.hidden || !ctxAnchor) return;
+    const {x,y,touch} = ctxAnchor;
+    const box = visibleBox();
+    const r = ctxMenu.getBoundingClientRect();
+    let left = touch ? x - r.width / 2 : x;
+    let top = y;
+    if(touch){
+      /* Keep clear of the phone's own Cut / Copy / Paste bar (2026-10-26, Julius:
+         they overlapped). That bar sits just above the selection, or just below it
+         when the selection is near the top. Work from the real selection box, leave
+         room for that bar (~60px) and the selection handles (~30px), and put ours
+         on the other side. */
+      const sel = selectionRect();
+      const sTop = sel ? sel.top : y - 12, sBottom = sel ? sel.bottom : y + 12;
+      const BAR = 64, HANDLES = 34;
+      const nativeBelow = sTop < BAR + 16;           // no room above → the bar goes below
+      let below = sBottom + HANDLES + (nativeBelow ? BAR : 0);
+      let above = (nativeBelow ? sTop : sTop - BAR) - 8 - r.height;
+      if(below + r.height <= box.height - 8) top = below;
+      else if(above >= 8) top = above;
+      else top = below;                              // tall menu on a short screen: scroll-free best effort
+    } else if(top + r.height > box.height - 8) top = y - r.height;
+    left = Math.max(8, Math.min(left, box.width - r.width - 8));
+    top = Math.max(8, Math.min(top, box.height - r.height - 8));
+    ctxMenu.style.left = Math.round(left) + 'px';
+    ctxMenu.style.top = Math.round(top) + 'px';
+  }
+  function selectionRect(){
+    const sel = window.getSelection && window.getSelection();
+    if(!sel || !sel.rangeCount) return null;
+    const rg = sel.getRangeAt(0);
+    let rc = rg.getBoundingClientRect();
+    if(!rc || (!rc.width && !rc.height)){
+      const rs = rg.getClientRects();
+      rc = rs && rs.length ? rs[0] : null;
+    }
+    return rc && (rc.width || rc.height) ? rc : null;
+  }
+  // The phone may grow the selection (and move its bar) after the menu opens.
+  document.addEventListener('selectionchange',() => {
+    if(ctxAnchor && ctxAnchor.touch && !ctxMenu.hidden) requestAnimationFrame(positionContextMenu);
+  });
+  function showContextMenu(ed,x,y,touch){
+    ctxEditor = ed;
+    const isRef = !!(ed && ed.classList && ed.classList.contains('ref-cell') && ed.closest('#referenceTree .ref-cell-wrapper'));
+    const ra = ctxMenu.querySelector('[data-ctx="refArchive"]'); if(ra) ra.hidden = !isRef;
+    const kp = ctxMenu.querySelector('[data-ctx="kimPin"]');
+    if(kp){
+      const isKim = !!(ed && ed.classList && ed.classList.contains('kim-editor'));
+      kp.hidden = !isKim;
+      if(isKim){ const sel = window.getSelection(), u = sel && sel.rangeCount ? kimPinUnit(ed, sel.anchorNode) : null;
+        kp.textContent = u && u[0].hasAttribute('data-kpin') ? '📌 Unpin' : '📌 Pin to top'; }
+      const kc = ctxMenu.querySelector('[data-ctx="kimColor"]');
+      if(kc){ const sel = window.getSelection();
+        kimColorHeld = isKim && sel && sel.rangeCount ? kimColorTarget(ed, sel.anchorNode) : null;
+        kc.hidden = !kimColorHeld; }
+    }
+    ctxAnchor = {x,y,touch:!!touch}; window.fwCtxLastAt = {x,y}; // pop-ups opened from a menu item go here
+    rememberSelection(ed);
+    activeEditor = ed;
+    ctxMenu.classList.toggle('ctx-touch',!!touch);
+    ctxMenu.hidden = false;
+    positionContextMenu();
+    if(touch) setTimeout(positionContextMenu,250); // after the phone's selection settles
+  }
+  function hideContextMenu(){
+    if(ctxMenu.hidden) return;
+    ctxMenu.hidden = true;
+    ctxEditor = null;
+    ctxAnchor = null;
+  }
+  function cancelLongPress(){
+    if(longPress){
+      clearTimeout(longPress.timer);
+      longPress = null;
+    }
+  }
+  function initContextMenu(){
+    document.addEventListener('pointerdown',e => { lastPointerType = e.pointerType || 'mouse'; },true);
+    // Hold-to-expand labels open the zoomed cell, not the format menu (2026-11-04, Julius).
+    const expandLabel = n => !!n?.closest?.('.ce-head strong,.urg-head,.today-jump,.od-pad-head,[data-nsec="must"],#journalPane button[data-ctab],#referencePane button[data-rtab]');
+    document.addEventListener('contextmenu',e => {
+      if(expandLabel(e.target)){ e.preventDefault(); cancelLongPress(); return; }
+      if(urgencyCheckbox(e.target)){ e.preventDefault(); cancelLongPress(); return; }
+      const ed = editorFromTarget(e.target);
+      if(!ed) return;
+      const type = e.pointerType || lastPointerType;
+      const touch = type === 'touch' || type === 'pen';
+      if(!touch){
+        if(e.shiftKey) return;      // Shift+right-click keeps the browser's menu.
+        e.preventDefault();
+      }
+      // Touch: leave Chrome's own selection bar alone, and show ours as well.
+      cancelLongPress();
+      const x = e.clientX, y = e.clientY;
+      // The browser may move the selection to the pressed word after this event.
+      requestAnimationFrame(() => showContextMenu(ed,x,y,touch));
+    });
+    // Fallback for touch browsers that never send a contextmenu event.
+    document.addEventListener('touchstart',e => {
+      cancelLongPress();
+      if(e.touches.length !== 1) return;
+      if(urgencyCheckbox(e.target) || expandLabel(e.target)) return;
+      const ed = editorFromTarget(e.target);
+      if(!ed) return;
+      const t = e.touches[0];
+      const press = {x:t.clientX,y:t.clientY,ed};
+      press.timer = setTimeout(() => {
+        if(longPress !== press) return;
+        longPress = null;
+        if(ctxMenu.hidden) showContextMenu(press.ed,press.x,press.y,true);
+      },650);
+      longPress = press;
+    },{capture:true,passive:true});
+    document.addEventListener('touchmove',e => {
+      if(!longPress) return;
+      const t = e.touches[0];
+      if(!t || Math.abs(t.clientX - longPress.x) > 10 || Math.abs(t.clientY - longPress.y) > 10) cancelLongPress();
+    },{capture:true,passive:true});
+    document.addEventListener('touchend',cancelLongPress,{capture:true,passive:true});
+    document.addEventListener('wheel',hideContextMenu,{capture:true,passive:true});
+    ctxMenu.addEventListener('contextmenu',e => e.preventDefault());
+    ctxMenu.querySelectorAll('[data-ctx]').forEach(btn => {
+      // Keep the text selection while the button is pressed.
+      btn.addEventListener('pointerdown',e => e.preventDefault());
+      btn.addEventListener('mousedown',e => e.preventDefault());
+      btn.addEventListener('click',() => {
+        const ed = ctxEditor;
+        hideContextMenu();
+        runEditAction(btn.dataset.ctx, ed);
+      });
+    });
+  }
+</script>

@@ -17,7 +17,7 @@ Questions (ask as one batch with clickable answers):
 2. When Firestore or the Function fails, keep falling back to Apps Script (safer, more code) or show an error and retry (less code)?
 3. Do it in one long unattended run ("keep it rolling"), or one step per session with a test in between?
 
-## 2. Split Index_Main.html (525 KB)
+## 2. Split Index_Main.html (525 KB) — DONE 2026-11-25 (8 parts, see CODE_MAP.md)
 Into areas from docs/CODE_MAP.md (days/editors, saving/sync, Reference, layout, Next Steps, Cal Events). Same include pattern as the 2026-11-21 split (`INDEX_PARTS_` in Code.gs, `tools/index-html.mjs`). Do after 1 (less code to move).
 
 ## 3. Speed Log check

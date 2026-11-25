@@ -1,6 +1,6 @@
 # Gantt 3 Columns — notes for Claude
 
-Google Apps Script web app (Today / Notes / Reference columns over a Google Sheet). Files: `Code.gs` (server), `Index.html` (UI shell) + `Index_*.html` parts (Css / Main / Cards / Extras / Calendar / Layout — see docs/CODE_MAP.md; grep, never read whole), `WeekdayIcons.html`, `appsscript.json`. Push to `main` → `clasp push` (deploy.yaml); Julius tests on the **/dev link** (~30 s, tap ↻), mostly from his phone.
+Google Apps Script web app (Today / Notes / Reference columns over a Google Sheet). Files: `Code.gs` (server), `Index.html` (UI shell) + `Index_*.html` parts (Css / Main + 7 main-script parts / Cards / Extras / Calendar / Layout — see docs/CODE_MAP.md; grep, never read whole), `WeekdayIcons.html`, `appsscript.json`. Push to `main` → `clasp push` (deploy.yaml); Julius tests on the **/dev link** (~30 s, tap ↻), mostly from his phone.
 
 ## Token-lean coding (Julius 2026-11-21: usage efficiency matters)
 - **One feature = one session.** When Julius brings a new feature idea mid-session, suggest a new session in one line; fixes to the feature in hand stay.

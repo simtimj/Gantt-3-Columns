@@ -1,4 +1,4 @@
-# Current state (read this first; updated 2026-11-25)
+# Current state (read this first; updated 2026-11-25 08:00)
 
 Short and current. History and build details live in `docs/NOTES.md` (1,300 lines: `grep -n "^## "`, open one section, never read whole).
 
@@ -15,8 +15,10 @@ Short and current. History and build details live in `docs/NOTES.md` (1,300 line
 - Captured for later (New Tasks, Can be later): multi-select mode, collapse/expand subtasks, Keep In Mind tab beside Backlog in the full calendar.
 
 ## Next (in order)
-1. **Split Index_Main.html** (525 KB) into smaller parts (NEXT_SESSION §2).
-2. Read the Speed Log after a day of use (did the code cache help?).
+1. Read the Speed Log after a day of use (did the code cache help?).
+
+## Index_Main split (done 2026-11-25)
+- Main script = 8 parts (Index_Main, _Editors, _Sync, _Reference, _Search, _NextSteps, _CalEvents, _RefOptions; 55–88 KB each). Load-order rule in CODE_MAP.md.
 
 ## Working rules that changed recently
 - PWA-first: new features PWA only; /dev = emergency backup; Apps Script fallback stays (Julius 2026-11-25).

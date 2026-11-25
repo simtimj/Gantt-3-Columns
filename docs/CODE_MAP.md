@@ -15,7 +15,16 @@ Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.m
 | `Index.html` | head, theme script, `<body>` markup, `__FW_INITIAL__` / build scriptlets, WeekdayIcons + Drafts includes |
 | `Index_LateCss.html` | (2026-11-24) the CSS of Cards / Extras / Calendar / Layout (incl. `#uiBatchCss`), at the top of `<body>` so the first paint has it; add feature CSS here, not in script parts |
 | `Index_Css.html` | base CSS + light / dark theme; last block `#wsFrame` = workspace frame + `--ws-*` tokens (head on purpose) |
-| `Index_Main.html` | main app script (`STATE` banner) |
+| `Index_Main.html` | main app script, part 1 (split 2026-11-25): STATE, BASIC HELPERS, LOAD, DAYS, SELECTION |
+| `Index_Editors.html` | EDITORS, AUTO FORMATTING, FORMATTING ACTIONS, RIGHT-CLICK / LONG-PRESS MENU |
+| `Index_Sync.html` | DAY HEIGHT / SCROLL, LAZY WEEK LOADING, DAY SAVING, SAFE SYNC |
+| `Index_Reference.html` | REFERENCE, MOBILE MODE / SPLIT, ARCHIVE, REFERENCE COLLAPSE, WORKSPACE VIEW, COLUMN RESIZING / FOCUS MODE |
+| `Index_Search.html` | REFERENCE SEARCH, TOP-BAR BUTTONS, ON-SCREEN KEYBOARD, START (the `init*()` calls) |
+| `Index_NextSteps.html` | URGENCY / Next Steps, urgent batches by subject, urgent tick = log + archive, send-to |
+| `Index_CalEvents.html` | INBOX + Cal Events column (`Calendar panel back`, `loadCenterCalendar`, pinch zoom) |
+| `Index_RefOptions.html` | Reference options panel, indent / outdent, Urgent text menu, end of start-up (`loadWorkspace()`) |
+
+**Main-script parts are separate `<script>` blocks in this order** (shared globals, same as one script once all have loaded). Rule: code that runs *while a part loads* (top-level calls, `let x = f()`) may only use functions from that part or earlier ones; anything later must be called from an event, a timer or the final `loadWorkspace()`. (`loadColumnWidths` sits in STATE for this reason.)
 | `Index_Cards.html` | side space slider, task cards + subject colors, theme select, card fill, saved looks |
 | `Index_Extras.html` | task mirrors, block borders, title cells, block timer, header swipe, pull tabs, long-press panes |
 | `Index_Calendar.html` | calendar module (FullCalendar) + Big Three strip |
@@ -26,7 +35,7 @@ Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.m
 |---|---|---|
 | Base CSS + light / dark theme | `Light / dark toggle, saved per device` | 1–2320 |
 | Page markup (header, columns, panes) | `<body>` | 2324–2600 |
-| **Main app script** (one big block) | `STATE` banner | 2610–11720 |
+| **Main app script** (8 parts, see table above; line numbers below are from before the split) | `STATE` banner | 2610–11720 |
 | Instant screen (snapshot paint / save, early data request) | `INSTANT SCREEN` | 2615 |
 | One calm return (`fwResume` queue on coming back; reads batched via `fwBatchStart` / `batchCalls`) | `ONE CALM RETURN`, `Batched calls (speed plan E` | 3058 |
 | · state, helpers, first load | `BASIC HELPERS`, `LOAD` | 2750 |

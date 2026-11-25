@@ -1363,9 +1363,12 @@
   }
   // Tap the checkbox: Graphite (done) ⇄ back to its color. Drawn at once, then re-read from Google.
   function toggleDone(ev){
-    if(pending || moveBusy) return;
+    // Never fail silently (2026-11-24, Julius: "tapping the box does nothing"): say why it didn't tick.
+    if(pending){ flash('Still saving — tap again in a sec'); return; }
+    if(moveBusy){ flash('Still saving a move — tap again in a sec'); return; }
     const x = ev.extendedProps || {}, on = !x.done;
-    if(!x.eventId || !canRun()) return;
+    if(!x.eventId){ flash(x.fqTmp || x.blTmp ? 'Still saving — tap again in a sec' : 'This one can’t be ticked here'); return; }
+    if(!canRun()) return;
     ev.setExtendedProp('done', on); ev.setProp('classNames', on ? ['cp-done'] : []);
     google.script.run.withSuccessHandler(() => refetchFresh()).withFailureHandler(err => {
       ev.setExtendedProp('done', !on); ev.setProp('classNames', on ? [] : ['cp-done']);
@@ -2215,10 +2218,16 @@
     if(e.target.closest('[data-fad-done]')){ lsSet('fw.calFadDoneFold', lsGet('fw.calFadDoneFold') === '1' ? '0' : '1'); fadRender(); return; }
     const it = e.target.closest('[data-fa]'); if(!it) return; const ev = schOrig(fadList[Number(it.dataset.fa)]); if(!ev) return;
     e.stopPropagation();
-    if(e.target.closest('.cp-chk')){ if(!document.querySelector('.urg-picker') && Date.now() - (fadEl.__downAt || 0) < 450) { toggleDone(ev); fadSoon(); } return; }
+    if(e.target.closest('.cp-chk')){ const dn = fadDown; fadDown = null; if(!document.querySelector('.urg-picker') && !(dn && dn.held)) { toggleDone(ev); fadSoon(); } return; }
     if(!pending) showDetail(ev, it);
   });
-  fadEl.addEventListener('pointerdown', () => { fadEl.__downAt = Date.now(); }, true);
+  /* Tap vs hold on a row's box (2026-11-24 fix, Julius: "marking a task done in the full calendar's all-day column does
+     nothing"): it used to time press → click with Date.now(), so on a slow phone a normal tap (finger down ~0.4 s, plus
+     the click arriving late) counted as a hold and nothing happened. Now held = finger down ≥ 450 ms by the events' own
+     input times (press → release), like the half calendar's boxes. */
+  let fadDown = null;
+  fadEl.addEventListener('pointerdown', e => { fadDown = {t: e.timeStamp, held: false}; }, true);
+  document.addEventListener('pointerup', e => { if(fadDown && e.timeStamp - fadDown.t >= 450) fadDown.held = true; }, true);
   /* Quick add (2026-11-15, Julius: "a button on the all-day section to make a task quickly — an empty cell with a
      checkbox, I fill it and send, it saves"): + in the All day header → a blank row (box + text + ➤) above the list.
      Enter / ➤ = all-day event on the day shown (main calendar, reminders off), drawn at once; a fresh blank row

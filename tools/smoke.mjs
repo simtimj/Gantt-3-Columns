@@ -3094,6 +3094,29 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
               }
               await pg.evaluate(() => window.fwCalendar.api().today());
             }
+            // Full-screen All day box checkbox (2026-11-24, Julius: "marking a task done in the full calendar's all-day
+            // column does nothing"): a real tap (touch on phone) on a row's box = done, saved.
+            {
+              const day = '2026-11-20';
+              const at = await pg.evaluate(async d => { const w = ms => new Promise(r => setTimeout(r, ms)); const cal = window.fwCalendar.api();
+                if (cal.view.type !== 'timeGridDay' || cal.view.currentStart.toISOString().slice(0, 10) !== d) { cal.changeView('timeGridDay', d); await w(600); }
+                window.__calls = window.__calls.filter(c => c[0] !== 'setCalendarEventDone');
+                const row = [...document.querySelectorAll('#calPanel .cp-fad .cp-fai:not(.cp-fasch):not(.cp-done)')].find(x => /All-day A/.test(x.textContent));
+                const b = row && row.querySelector('.cp-chk'); if (!b) return null; b.scrollIntoView({block: 'center'}); await w(150);
+                const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, day);
+              if (!at) errs.push('fad checkbox: open All-day A row not found');
+              else {
+                if (name === 'phone') { const cdp = await pg.context().newCDPSession(pg);
+                  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] }); await pg.waitForTimeout(120);
+                  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); }
+                else await pg.mouse.click(at.x, at.y);
+                let ok = false; for (let k = 0; k < 10 && !ok; k++) { ok = await pg.evaluate(() => window.__calls.some(c => c[0] === 'setCalendarEventDone' && c[1][3] === true)); if (!ok) await pg.waitForTimeout(200); }
+                if (!ok) errs.push('fad checkbox: tap did not mark the task done');
+                else await pg.evaluate(async () => { const c = window.__calls.find(c => c[0] === 'setCalendarEventDone' && c[1][3] === true); const e = window.__cal.ev[c[1][1]]; if (e) { e.colorId = e.prev || ''; e.done = false; }
+                  window.__calls = window.__calls.filter(c => c[0] !== 'setCalendarEventDone'); });
+              }
+              await pg.evaluate(() => window.fwCalendar.api().today());
+            }
             // All-day Ordered / Unordered groups (2026-11-22, Julius): new = Unordered; drag onto the Ordered header =
             // Ordered (numbered); drag above another Ordered row = new order, kept after a re-read; drag down to Unordered = out.
             {

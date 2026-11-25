@@ -1,6 +1,39 @@
 name: Workspace save checks
+# Runs on every push to main too (2026-11-25): local pre-push is tools/quick-check.mjs (touched suites only); this is the full net.
 on:
   pull_request:
+    paths:
+      - 'Code.gs'
+      - 'StudyLog.gs'
+      - 'Store.gs'
+      - 'tools/store-test.mjs'
+      - 'tools/store-guard.mjs'
+      - 'tools/store-baseline.json'
+      - 'Index.html'
+      - 'Index_*.html'
+      - 'tools/index-html.mjs'
+      - 'Drafts.html'
+      - 'tools/draft-test.mjs'
+      - 'tools/save-timing-test.mjs'
+      - 'tools/speed-summary.mjs'
+      - 'tools/speed-summary-test.mjs'
+      - 'tools/reference-save-test.mjs'
+      - 'tools/focus-save-test.mjs'
+      - 'tools/focus-storage-test.mjs'
+      - 'tools/focus-recovery.mjs'
+      - 'tools/import-read-test.mjs'
+      - 'tools/confirm-read-test.mjs'
+      - 'tools/sync-test.mjs'
+      - 'tools/setup-test.mjs'
+      - 'tools/initial-read-test.mjs'
+      - 'tools/done-read-test.mjs'
+      - 'tools/study-read-test.mjs'
+      - 'tools/deploy-log-test.py'
+      - 'tools/smoke.mjs'
+      - '.github/scripts/build_deploy_log.py'
+      - '.github/workflows/reference-checks.yaml'
+  push:
+    branches: [main]
     paths:
       - 'Code.gs'
       - 'StudyLog.gs'

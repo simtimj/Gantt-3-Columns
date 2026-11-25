@@ -1295,3 +1295,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 
 ## Auto archive on the trigger (2026-11-25 07:00)
 - Found: mark done goes through the Cloud Function and the event list comes from the calendar copy, so `archiveCompletedTasks` (auto mode) rarely ran in the PWA. `archiveTick_` (Code.gs) runs it from `storeMirror` when `archiveAuto` is on, at most every 15 min (`archiveTickAt` prop). Old server spots unchanged.
+
+## Dev speed (2026-11-25 07:05, Julius: "I might have introduced a lot of bloat"; picked quick wins + /dev retirement plan + Index_Main split)
+- Quick wins done: `docs/STATE.md` (short current state, read first), NEXT_SESSION.md rewritten, `tools/quick-check.mjs` (changed files → smoke suites; full run in CI on push to main via reference-checks.yaml).
+- /dev retirement: plan + questions in NEXT_SESSION.md §1, waiting on Julius. Index_Main split = §2, after it.

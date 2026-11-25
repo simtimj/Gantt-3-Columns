@@ -4,7 +4,8 @@ Google Apps Script web app (Today / Notes / Reference columns over a Google Shee
 
 ## Token-lean coding (Julius 2026-11-21: usage efficiency matters)
 - **One feature = one session.** When Julius brings a new feature idea mid-session, suggest a new session in one line; fixes to the feature in hand stay.
-- Start from `docs/CODE_MAP.md` (area → grep word), then grep and read only that range. `docs/NOTES.md`: `grep -n "^## "` then read the one section. Vague request → one short question first.
+- **Start from `docs/STATE.md`** (current state + next jobs, short), then `docs/NEXT_SESSION.md` for the job. Keep STATE.md current at the end of each session.
+- Then `docs/CODE_MAP.md` (area → grep word), then grep and read only that range. `docs/NOTES.md` = history (big): `grep -n "^## "` then read the one section, never the whole file. Vague request → one short question first.
 - Write decisions to NOTES / README as they're made (the next session only knows what's written).
 - Non-code jobs (Sheets rows, calendar, Done Log, Reference cards, Central Data Hub, userscripts, IT study log): rules in `docs/RULES.md`, open the section you need.
 
@@ -14,7 +15,7 @@ Google Apps Script web app (Today / Notes / Reference columns over a Google Shee
 
 ## Git + checks
 - **Commit as Julius**: `git -c user.name="Julius Simtim" -c user.email="juliussimtim@gmail.com" commit ...`; Claude only in Co-Authored-By.
-- **Before every push**: `node tools/check.mjs && node tools/smoke.mjs` (`SMOKE_ONLY=calendar` etc. to run one suite while iterating). Extend `tools/smoke.mjs`, don't build a new harness.
+- **Before every push**: `node tools/quick-check.mjs` (check + only the smoke suites the changed files touch; `--full` = everything). CI runs the full suite on every push to main. Add new file → suite mappings in quick-check's `MAP`. Extend `tools/smoke.mjs`, don't build a new harness.
 - **Ship small, confirm big**: small changes go straight to `main` once checks pass. Big (new feature, rewrite, multi-file, risky) → one short confirm (what + plan bullets) first.
 - **Build your own ideas**: just ship them, mention in one line.
 - Every push to `main` auto-logs a Done Log row; if you write one by hand, add trailer `Done-Log: manual`.

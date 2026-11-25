@@ -256,3 +256,6 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 
 ## Code cache for the PWA scripts (2026-11-25, implemented + tested in smoke pwa*, not yet tested live)
 - `tools/build-pwa.mjs` moves every inline script ≥ 10 KB (and the shim) to `js/<sha1-12>.js`, same spot, plain sync `<script src>`; precached by the service worker. Chrome keeps V8 code cache for scripts in the worker's Cache Storage → later opens skip parse/compile of ~850 KB. index.html 1.14 MB → ~340 KB (rest = CSS + small scripts). `PWA_INLINE=1` = old single file. Expected: open-to-usable faster on the phone; measure with the Speed Log load rows.
+
+## Dev speed: quick-check + STATE.md (2026-11-25, implemented + tested locally)
+- Pre-push runs only affected smoke suites (a docs change: none; one calendar file: 3 suites instead of 19). Full suite moved to CI on push. Sessions start from the short docs/STATE.md instead of grepping 280 KB of NOTES.

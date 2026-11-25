@@ -1306,3 +1306,6 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Code moved unchanged except `loadColumnWidths` (COLUMN RESIZING → STATE): `let columnWidths = loadColumnWidths()` runs at load, before the later part exists. Found with a parse check (load-time code per part → transitive calls → names declared in a later part); that was the only real hit.
 - Checks: check + full smoke passed. PWA build now externalizes more, smaller script files (same order).
 
+
+## CI-only Cal Events failures (2026-11-25 08:20)
+- Cause: the main smoke suite let the page fetch the calendar libraries from jsdelivr. CI has internet → Cal Events docks the big calendar (no `.ce-day` mini timeline) → 4 checks failed; cloud sessions have no CDN → mini timeline → passed. Fix: main suite aborts jsdelivr, so every machine tests the same page (the dock stays the calendar suite's job).

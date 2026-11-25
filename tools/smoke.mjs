@@ -59,7 +59,11 @@ const only = part => !process.env.SMOKE_ONLY || process.env.SMOKE_ONLY.split(','
 const b = await chromium.launch(process.env.SMOKE_CHROME ? { executablePath: process.env.SMOKE_CHROME } : {});
 let fails = 0;
 for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
-  const pg = await (await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' })).newPage(); // Julius's browser clock
+  const mainCtx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' }); // Julius's browser clock
+  // Calendar libraries off (2026-11-25): with them (CI has internet) Cal Events docks the big calendar instead of the
+  // mini timeline these checks test; cloud sessions have no CDN access. Same page everywhere; the dock is the calendar suite's job.
+  await mainCtx.route('https://cdn.jsdelivr.net/npm/**', r => r.abort());
+  const pg = await mainCtx.newPage();
   const errs = [];
   pg.on('pageerror', e => errs.push(e.message + (process.env.STK ? ' @ ' + (e.stack || '').split('\n').slice(1,4).join(' | ') : '')));
   await pg.goto('file://' + out);

@@ -1489,4 +1489,33 @@
   /* Fun rows (2026-11-24, Julius: "date column and the x take up too much space"): both hug their content */
   html body .fun-item .fun-date{margin-left:2px;font-size:.72em;letter-spacing:-.01em;}
   html body .fun-item .fun-x{flex:0 0 auto;width:auto!important;min-width:0!important;min-height:0!important;height:auto!important;padding:0 1px!important;margin:0 -2px 0 -3px;line-height:1.2;font-size:.8em;}
+  /* Full screen tidy (2026-11-24 night, Julius): no white column line left of the hour labels; a slimmer date header
+     row; smaller header buttons (toolbar + ↻ ✕); a little room on both sides of the hour labels. */
+  #calPanel.cp-full .cp-flgrip::after,#calPanel.cp-full .cp-flgrip::before{display:none!important;}
+  #calPanel.cp-full .fc .fc-toolbar.fc-header-toolbar{margin:1px 2px 0 3px!important;padding-bottom:2px!important;gap:2px!important;row-gap:1px!important;}
+  #calPanel.cp-full .fc .fc-toolbar-title{font-size:12.5px!important;line-height:1.1;}
+  #calPanel.cp-full .fc .fc-button{padding:0 5px!important;min-height:20px!important;height:20px!important;font-size:11px!important;line-height:1!important;margin:0!important;}
+  #calPanel.cp-full .fc .fc-cpView-button{padding:0 6px!important;}
+  #calPanel.cp-full .cp-fbtns{top:1px!important;right:2px!important;gap:0!important;}
+  #calPanel.cp-full .cp-fbtns button{width:22px!important;height:22px!important;border-radius:11px!important;font-size:13px!important;}
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar{padding-right:46px!important;}
+  #calPanel.cp-full .cp-plan.folded ~ #calMount .fc-header-toolbar > .fc-toolbar-chunk:first-child{margin-right:0!important;}
+  #calPanel.cp-full .fc .fc-timegrid-slot-label .fc-timegrid-slot-label-cushion{padding-left:4px!important;padding-right:11px!important;}
+  /* Checkboxes like Google Calendar (2026-11-25, Julius: "make the outline white like in the Google Calendar"; "the
+     color-tagged boxes are smaller than the untagged ones"): every task box (Today, Notes, Reference, Keep In Mind…)
+     is drawn the same way at the same size — white outline in dark mode (dark gray in light), subject boxes keep their
+     fill with a white edge, done = check mark. The old "urgency border" look (urg-mark-box) is left as it was. */
+  .check-line > input[type=checkbox]{--cb-sz:calc(17px * var(--workspace-scale,1));-webkit-appearance:none!important;appearance:none!important;box-sizing:border-box!important;
+    width:var(--cb-sz)!important;height:var(--cb-sz)!important;min-width:var(--cb-sz)!important;min-height:var(--cb-sz)!important;
+    border:2px solid rgba(32,33,36,.75);border-radius:3px;background:transparent;display:inline-grid;place-content:center;cursor:pointer;}
+  html[data-theme=dark] .check-line > input[type=checkbox]{border-color:#fff;}
+  body:not(.urg-mark-box) .check-line > input[type=checkbox],
+  body:not(.urg-mark-box) .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{border-color:rgba(32,33,36,.75)!important;background:transparent!important;}
+  html[data-theme=dark] body:not(.urg-mark-box) .check-line > input[type=checkbox],
+  html[data-theme=dark] body:not(.urg-mark-box) .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{border-color:#fff!important;}
+  body.tc-boxfill:not(.urg-mark-box) .check-line[data-tccat] > input[type=checkbox]{background:var(--tc-cat)!important;border-color:#fff!important;box-shadow:0 0 0 .5px rgba(0,0,0,.35)!important;}
+  .check-line > input[type=checkbox]:checked::after{content:"";width:.28em;height:.55em;border:solid currentColor;border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-8%,-12%);}
+  .check-line > input[type=checkbox]{color:rgba(32,33,36,.9);}
+  html[data-theme=dark] .check-line > input[type=checkbox]{color:#fff;}
+  body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]{color:#fff;}
 </style>

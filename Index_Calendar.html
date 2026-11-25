@@ -1369,9 +1369,15 @@
     const x = ev.extendedProps || {}, on = !x.done;
     if(!x.eventId){ flash(x.fqTmp || x.blTmp ? 'Still saving — tap again in a sec' : 'This one can’t be ticked here'); return; }
     if(!canRun()) return;
-    ev.setExtendedProp('done', on); ev.setProp('classNames', on ? ['cp-done'] : []);
+    // A scheduled task has two faces: the timed event and its all-day "Scheduled" copy ('sch|<id>'). Tick both at once
+    // (2026-11-24, Julius: "marks it complete on the timeline, but not in the all-day box").
+    const cp = cal && cal.getEventById('sch|' + ev.id);
+    const mark = v => { ev.setExtendedProp('done', v); ev.setProp('classNames', v ? ['cp-done'] : []);
+      if(cp){ cp.setExtendedProp('done', v); cp.setProp('classNames', v ? ['cp-done', 'cp-schc'] : ['cp-schc']); }
+      if(typeof fadSoon === 'function') fadSoon(); };
+    mark(on);
     google.script.run.withSuccessHandler(() => refetchFresh()).withFailureHandler(err => {
-      ev.setExtendedProp('done', !on); ev.setProp('classNames', on ? [] : ['cp-done']);
+      mark(!on);
       setState('error', 'Couldn’t mark it ' + (on ? 'done' : 'not done') + ': ' + errText(err));
     }).setCalendarEventDone(x.calId, x.eventId, x.startMs, on);
   }
@@ -2208,7 +2214,7 @@
         if(!doneFold) dn.forEach(e => row(e, 0)); else { fadList.push(...dn); total += dn.length; } } // folded (2026-11-14, Julius): only the "Done · n" line stays
       if(sl.length){ h += '<div class="cp-fads cp-fasg" data-fa-sch>Scheduled · ' + sl.length + '</div>';
         sl.forEach(e => { const x = e.extendedProps || {}, i = fadList.push(e) - 1, t = L().fromISO(String(x.start || '')).setZone(TZ); total++;
-          h += '<div class="cp-ev cp-fai cp-fasch" data-fa="' + i + '" data-fa-sch' + (x.editable && !x.recurring ? ' data-fa-drag' : '') + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
+          h += '<div class="cp-ev cp-fai cp-fasch' + (x.done ? ' cp-done' : '') + '" data-fa="' + i + '" data-fa-sch' + (x.editable && !x.recurring ? ' data-fa-drag' : '') + cpEvAttrs(e) + ' style="background:' + esc(e.backgroundColor || 'var(--cp-soft)') + ';color:' + esc(e.textColor || 'inherit') + '">' +
             cpChk(e) + '<span class="cp-ev-t">' + esc(e.title || '(no title)') + (t.isValid ? '<span class="cp-scht"> · ' + esc(t.toFormat('h:mm a').replace(':00', '')) + '</span>' : '') + '</span></div>'; }); }
     });
     if(!total && days.length === 1) h = '<div class="cp-fadmsg">No all-day tasks.</div>';

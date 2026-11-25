@@ -2,7 +2,7 @@
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-24
+Last updated: 2026-11-25
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -77,6 +77,12 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **+ Cell**, search box, drag handle to reorder (in Original order).
 - Sort: Original order, Title A–Z, Last modified.
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
+
+## 🧪 To be confirmed (2026-11-25)
+
+- **Full calendar All day box**: ticking a scheduled task (timeline or box) now shows it done in the box's Scheduled group too.
+- **Full calendar tidy**: no white column line left of the hour labels; slimmer date header row; smaller header buttons (toolbar + ↻ ✕); a little side room on the hour labels.
+- **Checkboxes like Google Calendar**: every task box drawn the same way — white outline in dark mode, subject boxes filled with a white edge, same size tagged or not.
 
 ## 🧪 To be confirmed (2026-11-24)
 - **Fix: ticking a task in the full calendar's All day box** (2026-11-24 23:00): on a slow phone a normal tap on a row's box could count as a hold, so nothing happened. Tap vs hold is now judged by how long the finger was down (like the half calendar). If a tick can't go through (still saving, or a calendar it can't edit), a short message says why instead of nothing.

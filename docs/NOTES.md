@@ -1299,3 +1299,4 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## Dev speed (2026-11-25 07:05, Julius: "I might have introduced a lot of bloat"; picked quick wins + /dev retirement plan + Index_Main split)
 - Quick wins done: `docs/STATE.md` (short current state, read first), NEXT_SESSION.md rewritten, `tools/quick-check.mjs` (changed files → smoke suites; full run in CI on push to main via reference-checks.yaml).
 - /dev retirement: plan + questions in NEXT_SESSION.md §1, waiting on Julius. Index_Main split = §2, after it.
+- 07:10 answers: /dev = emergency backup · keep Apps Script fallback · keep it rolling. Result: freeze rule only (CLAUDE.md "PWA-first"); the bigger cuts would remove the safety nets he chose to keep.

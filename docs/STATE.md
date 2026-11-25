@@ -15,10 +15,10 @@ Short and current. History and build details live in `docs/NOTES.md` (1,300 line
 - Captured for later (New Tasks, Can be later): multi-select mode, collapse/expand subtasks, Keep In Mind tab beside Backlog in the full calendar.
 
 ## Next (in order)
-1. **Dev speed**: plan retiring the old /dev code paths (needs Julius's OK) → see NEXT_SESSION.md.
-2. **Split Index_Main.html** (525 KB) into smaller parts.
-3. Read the Speed Log after a day of use (did the code cache help?).
+1. **Split Index_Main.html** (525 KB) into smaller parts (NEXT_SESSION §2).
+2. Read the Speed Log after a day of use (did the code cache help?).
 
 ## Working rules that changed recently
+- PWA-first: new features PWA only; /dev = emergency backup; Apps Script fallback stays (Julius 2026-11-25).
 - Pre-push: `node tools/quick-check.mjs` (only the suites the changed files touch). CI runs the full suite on every push to main.
 - Cloud sessions: no Playwright browser → quick-check uses /usr/bin/google-chrome. Never `npm install --no-save` here (prunes the committed node_modules; restore with `git checkout -- node_modules`).

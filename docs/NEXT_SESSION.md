@@ -2,7 +2,8 @@
 
 One job per session. Read `docs/STATE.md` first.
 
-## 1. Retire the old /dev paths (dev speed; plan below, Julius OKs the questions first)
+## 1. Retire the old /dev paths — ANSWERED 2026-11-25 07:10: keep /dev as emergency backup · keep the Apps Script fallback · keep it rolling
+Outcome: with both safety nets kept, steps 2–3 stay (the fallback *is* that code) and step 4 is mostly /dev-backup code too. Done: step 1 (freeze rule in CLAUDE.md). Remaining dev-speed win = §2 split. Revisit 2–4 only if the PWA runs a month without needing a fallback.
 Why: almost every feature has two paths (Apps Script page / server + PWA / Firestore / Function) with fallbacks between them. Every change costs double code, double tests, double risk.
 
 Plan (proposed, not approved):

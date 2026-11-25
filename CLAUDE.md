@@ -17,6 +17,7 @@ Google Apps Script web app (Today / Notes / Reference columns over a Google Shee
 - **Commit as Julius**: `git -c user.name="Julius Simtim" -c user.email="juliussimtim@gmail.com" commit ...`; Claude only in Co-Authored-By.
 - **Before every push**: `node tools/quick-check.mjs` (check + only the smoke suites the changed files touch; `--full` = everything). CI runs the full suite on every push to main. Add new file → suite mappings in quick-check's `MAP`. Extend `tools/smoke.mjs`, don't build a new harness.
 - **Ship small, confirm big**: small changes go straight to `main` once checks pass. Big (new feature, rewrite, multi-file, risky) → one short confirm (what + plan bullets) first.
+- **PWA-first (Julius 2026-11-25)**: new features are built for the PWA only. The /dev page is an emergency backup (keeps working, not kept at parity); the Apps Script fallback for failed Firestore / Function calls stays. Don't add new /dev-only code or tests.
 - **Build your own ideas**: just ship them, mention in one line.
 - Every push to `main` auto-logs a Done Log row; if you write one by hand, add trailer `Done-Log: manual`.
 

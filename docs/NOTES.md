@@ -1284,3 +1284,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 - Still open in GANTT-010: "disappearing text" itself. Known by-design path: Firestore day writes are newest-wins; the losing device's text goes to `ganttBackup` ("older edit lost (newest wins)"), not to the screen. If it happens again, check `ganttBackup` for that date first.
 - **Size round 2 (A′) — not done**: esbuild `minifySyntax` measured only 1,141 KB → 1,119 KB (−2 %, gzip −0.7 %); 846 KB of the page is real script, nothing big left to strip. Not worth the risk. Next real size win would be splitting code that isn't needed at opening.
 
+
+## Quieter background checks (2026-11-24 22:50, Julius: "keep going with the optimization")
+- Found in the Speed Log: 11:50–16:29 one open, untouched page ran `getSyncState` every ~70 s and the Inbox version every ~3.3 min (2–7 s server time each) and logged every one (`logSpeed` = a second call + a Sheet row; the tab filled the 308-row log).
+- Changes (Index_Main, grep `fwSyncEvery` / `fwSyncLogAt`): idle > 10 min (no pointer / key / wheel / touch) → check every 5 min; `fwImportsDue` 3 → 5 min (matches the server trigger); sync / imports Speed Log rows only when rpc > 4 s, ≥ 10 save timings waiting, or once per 30 min. Coming back to the tab still syncs at once (fwResume / focus unchanged).

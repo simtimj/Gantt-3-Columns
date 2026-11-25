@@ -3427,7 +3427,7 @@ if (only('pwa')) {
   if (first.keyBox) errs.push('key box shown even though the key was given');
   if (!/Pay rent/.test(first.text)) errs.push('first open: today\'s tasks did not show');
   if (!calls.includes('getWorkspaceData')) errs.push('first open: getWorkspaceData was not called through the API');
-  if (first.title !== 'Gantt') errs.push('title is ' + first.title);
+  if (first.title !== 'Cairn') errs.push('title is ' + first.title);
   await pg.evaluate(() => navigator.serviceWorker.ready);
   // Store a copy as the background refresh would (it waits 20 s), then reopen: it must open from that copy and sync.
   await pg.evaluate(() => new Promise(ok => google.script.run.withSuccessHandler(ok).getWorkspaceData({ fast: true })));

@@ -1,4 +1,6 @@
-# Gantt 3 Columns (Focus Workspace)
+# Cairn (formerly Gantt / Gaunt, Gantt 3 Columns, Focus Workspace)
+
+Search aliases: Gantt, Gaunt, Gantt 3 Columns, Focus Workspace. Repo and Sheet keep their old names for now (rename step 2, later).
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
@@ -60,6 +62,8 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 🧪 To be confirmed (2026-11-25)
 
+- **App renamed to Cairn, step 1** (2026-11-25): tab title, installed-app name + home-screen icon label (manifest name / short_name), /dev page title, setup page ("Open the Cairn app"), and a small "Cairn" wordmark at the left of the toolbar (hidden under 340 px). /dev URL unchanged. The installed app may keep its old icon label until Android refreshes the install (or reinstall).
+- **Phone calendar text size** (2026-11-25): on phones (≤480 px) calendar text uses one scale — titles 13 px, time / meta 11 px, hour labels 9 px (CSS vars `--cal-title / --cal-meta / --cal-axis`); all-day titles were 14 px. Desktop unchanged. Line counts still follow "Event titles fill the card".
 - **Event titles fill the card** (2026-11-25 08:45): in the docked / big / full calendar, a timed event's title now wraps onto as many lines as the card has room for (was capped at 3, then 2 / 1 as the card got shorter), with the time under it; "…" only on the last line that fits. Re-fits when you zoom or resize. 30-minute events now use the same layout (title over time when there's room, one line when there isn't).
 - **PWA openings in the Speed Log** (2026-11-25): opening the installed app from the phone's saved copy now writes a `load` row (Total ms 0, Client `source: device`, `drawEnd` / `screen` = ms until the page drew). Before, only /dev logged openings, so the code-cache speed couldn't be checked.
 - **📥 Send to Backlog** (backlog batch, 2026-11-25): hold an open all-day task (e.g. in the full calendar's All day box) → **📥 Send to Backlog**: it leaves the calendar and shows in the Backlog list at once. Dragging it back onto a day (or Send to Today) makes a fresh event with its title and color. Not for repeating, done or Events-calendar items.

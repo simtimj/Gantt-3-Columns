@@ -83,10 +83,10 @@ function pwaSetupPage_(page) {
     'if(n){a.href+="&s="+encodeURIComponent(JSON.stringify(s));document.getElementById("n").textContent=n+" look and layout settings from this browser come along.";}' +
     '})();</script>';
   const html = '<p style="font:18px system-ui;margin:24px">' +
-    '<a id="go" href="' + url + '" target="_top" style="font-size:22px">📲 Open the Gantt app</a><br><br>' +
+    '<a id="go" href="' + url + '" target="_top" style="font-size:22px">📲 Open the Cairn app</a><br><br>' +
     'Opens the hosted app and saves this device\'s key there. <span id="n"></span> ' +
     'Then use your browser menu → <b>Install app</b> / <b>Add to Home screen</b>.</p>' + script;
-  return HtmlService.createHtmlOutput(html).setTitle('Gantt app setup')
+  return HtmlService.createHtmlOutput(html).setTitle('Cairn app setup')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -129,7 +129,7 @@ function doGet(e) {
   try { template.appUrl = ScriptApp.getService().getUrl(); } catch (err) { template.appUrl = ''; }
 
   const page = template.evaluate()
-    .setTitle('Focus Workspace')
+    .setTitle('Cairn')
     .addMetaTag('viewport', VIEWPORT)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   try { CacheService.getScriptCache().put('speedPageMs', String(Date.now() - evalStart), 3600); } catch (e) {}

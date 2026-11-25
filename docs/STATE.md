@@ -1,4 +1,6 @@
-# Current state (read this first; updated 2026-11-25 10:30)
+# Current state (read this first; updated 2026-11-25, Cairn rename)
+
+App name: **Cairn** (aliases Gantt, Gaunt). Rename step 1 done 2026-11-25 (title, manifest, toolbar wordmark, setup page). Step 2 later: repo + Sheet names (and icon file names `gantt-*`, Firestore `gantt*` collections stay as they are).
 
 Short and current. History and build details live in `docs/NOTES.md` (1,300 lines: `grep -n "^## "`, open one section, never read whole).
 
@@ -17,6 +19,7 @@ Short and current. History and build details live in `docs/NOTES.md` (1,300 line
 - Dropped by Julius 2026-11-25: Soon / Later drag lanes (Ordered / Unordered replaced them). Already built before: quick-add on the empty all-day strip, small calendar drag / resize, pop-out panel (📅 = full screen), Blocks child timers + Break.
 
 ## Next (in order)
+0. Phone check: Cairn name on the installed app + phone calendar text size (README 🧪 2026-11-25).
 1. Speed Log: PWA openings now log `load` rows (source device, from 2026-11-25). After a day, read their `screen` / `drawEnd` (no older PWA rows to compare against; /dev rows are the only before).
 
 ## Index_Main split (done 2026-11-25)

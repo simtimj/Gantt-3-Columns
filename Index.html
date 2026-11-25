@@ -5,7 +5,7 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" id="themeColorMeta" content="#f6f7f8">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Focus Workspace">
+  <meta name="apple-mobile-web-app-title" content="Cairn">
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <?!= HtmlService.createHtmlOutputFromFile('Index_Css').getContent() ?>
@@ -193,6 +193,7 @@
     </div>
   </div>
   <div id="toolbar">
+    <span class="app-brand" aria-label="Cairn">Cairn</span>
     <a class="btn refresh-btn" href="<?= appUrl ?>" target="_top" role="button" title="Refresh (reload the app and data)" aria-label="Refresh" onclick="this.classList.add('spin')">↻</a>
     <button class="btn theme-toggle" type="button" id="themeToggle" aria-label="Light / dark">☾</button>
     <button class="btn cal-open-btn" type="button" data-cal-open aria-haspopup="dialog" aria-expanded="false" title="Calendar (Google Calendar)" aria-label="Open Calendar">📅</button>

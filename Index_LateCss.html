@@ -1539,4 +1539,19 @@
   .check-line > input[type=checkbox]{color:rgba(32,33,36,.9);}
   html[data-theme=dark] .check-line > input[type=checkbox]{color:#fff;}
   body.tc-boxfill .check-line[data-tccat] > input[type=checkbox]{color:#fff;}
+  /* App name (2026-11-25, rename step 1: Gantt / Gaunt → Cairn): small muted wordmark at the start of the toolbar. */
+  #toolbar .app-brand{flex:0 0 auto;font-weight:700;font-size:12px;letter-spacing:.3px;color:var(--muted);user-select:none;padding:0 2px;}
+  @media (max-width:340px){ #toolbar .app-brand{display:none;} }
+  /* Phone calendar text size (2026-11-25, New Tasks batch item): phones ≤480px only, desktop unchanged. One size scale
+     as CSS vars (reusable by the PWA): event titles ≈ task-line size, meta one step smaller, hour axis smallest.
+     Line counts are left to "Event titles fill the card" (2026-11-25 08:45, newer than this spec's 1 / 2-line caps). */
+  @media (max-width:480px){
+    #calPanel{--cal-title:13px;--cal-meta:11px;--cal-axis:9px;}
+    #calPanel .cp-ev{font-size:var(--cal-title);}
+    #calPanel .cp-ev-m{font-size:var(--cal-meta);}
+    #calPanel .fc .fc-timegrid-event .cp-ev{font-size:clamp(9px, 6.5px + 6.3cqi, var(--cal-title));}
+    #calPanel .fc .fc-timegrid-event .cp-ev-m{font-size:min(.88em, var(--cal-meta));}
+    #calPanel .fc .fc-timegrid-slot-label-cushion,#calPanel .fc .fc-timegrid-axis-cushion,
+    #calPanel .fc .fc-timegrid-slot-label-cushion .cp-sl b,#calPanel.cp-docked .fc .fc-timegrid-slot-label-cushion .cp-sl b{font-size:var(--cal-axis);}
+  }
 </style>

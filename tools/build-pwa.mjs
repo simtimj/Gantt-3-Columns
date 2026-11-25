@@ -46,7 +46,7 @@ const CSS = `<style id="pwaCss">
 
 const shimSrc = read('tools/pwa/shim.js.txt');
 const pages = [
-  { file: 'index.html', src: 'Index.html', page: 'index', name: 'Gantt', manifest: 'manifest.webmanifest', icon: 'gantt' },
+  { file: 'index.html', src: 'Index.html', page: 'index', name: 'Cairn', manifest: 'manifest.webmanifest', icon: 'gantt' },
   { file: 'tracker.html', src: 'tracker/App.html', page: 'tracker', name: 'Time Tracker', manifest: 'tracker.webmanifest', icon: 'tracker' }
 ];
 

@@ -78,7 +78,7 @@
       var box = document.createElement('div');
       box.id = 'pwaKeyBox';
       box.innerHTML = '<div><b>App key needed</b><p>' + (msg || 'This device has no key yet.') +
-        ' Easiest: open your private /dev link with <code>?app=pwa</code> at the end, then tap “Open the Gantt app”.</p>' +
+        ' Easiest: open your private /dev link with <code>?app=pwa</code> at the end, then tap “Open the Cairn app”.</p>' +
         '<input id="pwaKeyIn" type="password" autocomplete="off" placeholder="…or paste the key"><button id="pwaKeyOk">Save</button></div>';
       document.body.appendChild(box);
       document.getElementById('pwaKeyOk').onclick = function () {

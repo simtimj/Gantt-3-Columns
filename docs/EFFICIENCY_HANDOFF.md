@@ -254,3 +254,5 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 ## Quieter background checks (2026-11-24, implemented + tested in smoke / save-timing-test, not yet tested live)
 - Idle page (10 min no input) syncs every 5 min instead of 1; Inbox check 3 → 5 min; routine sync Speed Log rows sampled (slow > 4 s always, else one per 30 min). Expected: an untouched open tab goes from ~60 server calls + ~60 log writes an hour to ~12 calls + ~2 writes. Details: NOTES "Quieter background checks".
 
+## Code cache for the PWA scripts (2026-11-25, implemented + tested in smoke pwa*, not yet tested live)
+- `tools/build-pwa.mjs` moves every inline script ≥ 10 KB (and the shim) to `js/<sha1-12>.js`, same spot, plain sync `<script src>`; precached by the service worker. Chrome keeps V8 code cache for scripts in the worker's Cache Storage → later opens skip parse/compile of ~850 KB. index.html 1.14 MB → ~340 KB (rest = CSS + small scripts). `PWA_INLINE=1` = old single file. Expected: open-to-usable faster on the phone; measure with the Speed Log load rows.

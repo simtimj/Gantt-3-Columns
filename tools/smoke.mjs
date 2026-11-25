@@ -3303,9 +3303,14 @@ if (only('pwa')) {
   const dist = path.join(os.tmpdir(), 'gantt-pwa-smoke');
   execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec' }, stdio: 'pipe' });
   { // Lighter page (2026-11-24, K): small weekday icons always; minified when esbuild is installed (CI installs it).
-    const page = fs.readFileSync(path.join(dist, 'index.html'), 'utf8'), icons = page.match(/['"][A-Za-z0-9+/=]{200,}['"]/g) || [];
+    const jsDir = path.join(dist, 'js'), jsList = fs.existsSync(jsDir) ? fs.readdirSync(jsDir) : [];
+    // Split opening code (2026-11-25): big scripts live in js/<hash>.js, precached by the worker.
+    if (jsList.length < 3) throw new Error('pwa: big scripts not split into js/ (' + jsList.length + ')');
+    if (!fs.readFileSync(path.join(dist, 'sw.js'), 'utf8').includes('js/' + jsList[0])) throw new Error('pwa: split scripts not precached');
+    const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8'), page = html + [...html.matchAll(/<script src="(js\/[^"]+)"/g)].map(m => fs.readFileSync(path.join(dist, m[1]), 'utf8')).join(''), icons = page.match(/['"][A-Za-z0-9+/=]{200,}['"]/g) || [];
     if (icons.length < 7 || Math.max(...icons.map(q => q.length)) > 8000) throw new Error('pwa: weekday icons not the small copies');
     let hasEsb = true; try { (await import('module')).createRequire(path.resolve('tools/build-pwa.mjs'))('esbuild'); } catch (e) { hasEsb = false; }
+    if (hasEsb && html.length > 450000) throw new Error('pwa: index.html still carries the big scripts (' + html.length + ' bytes)');
     if (hasEsb && page.length > 1300000) throw new Error('pwa: page not minified (' + page.length + ' bytes)');
   }
   const types = { html: 'text/html', js: 'text/javascript', webmanifest: 'application/manifest+json', png: 'image/png' };

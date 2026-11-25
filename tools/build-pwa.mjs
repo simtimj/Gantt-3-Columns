@@ -89,7 +89,18 @@ const minify = html => {
     .replace(/(<style[^>]*>)([\s\S]*?)<\/style>/g, (m, tag, css) => tag + esbuild.transformSync(css, { ...opts, loader: 'css' }).code.trim() + '</style>');
 };
 
-const built = pages.map(p => ({ p, html: minify(smallIcons(render(read(p.src)))) }));
+// Split opening code (2026-11-25, NOTES "Code cache"): every big inline <script> (≥ 10 KB, plus the shim) becomes an external file
+// js/<content hash>.js loaded at the same spot (plain synchronous <script src>, so order, globals and the DOM-at-that-point
+// stay exactly as before). The service worker precaches them; Chrome keeps compiled code for scripts in the worker's
+// cache, so each open skips re-parsing ~850 KB of script. PWA_INLINE=1 keeps everything inline (debugging).
+const JS_MIN = 10000, jsFiles = new Map();
+const externalize = html => process.env.PWA_INLINE ? html : html.replace(/<script>([\s\S]*?)<\/script>/g, (m, js) => {
+  if (js.length < JS_MIN) return m;
+  const name = 'js/' + crypto.createHash('sha1').update(js).digest('hex').slice(0, 12) + '.js';
+  jsFiles.set(name, js);
+  return '<script src="' + name + '"></script>';
+});
+const built = pages.map(p => ({ p, html: externalize(minify(smallIcons(render(read(p.src))))) }));
 const build = crypto.createHash('sha1').update(api + JSON.stringify(fbCfg) + shimSrc + read('tools/pwa/sw.js.txt') + built.map(b => b.html).join('')).digest('hex').slice(0, 12);
 
 for (const { p, html } of built) {
@@ -101,7 +112,7 @@ for (const { p, html } of built) {
   <link rel="apple-touch-icon" href="icons/${p.icon}-apple-180.png">
   <meta name="mobile-web-app-capable" content="yes">
   ${CSS}
-  <script>${shim}</script>`;
+  ${externalize('<script>' + shim + '</script>')}`;
   let doc = html.replace(/<head>/i, '<head>' + head)
     .replace(/<meta name="apple-mobile-web-app-title" content="[^"]*">/, `<meta name="apple-mobile-web-app-title" content="${p.name}">`);
   doc = /<title>/i.test(doc) ? doc.replace(/<title>[^<]*<\/title>/i, `<title>${p.name}</title>`) : doc.replace(/<\/head>/i, `  <title>${p.name}</title>\n</head>`);
@@ -119,8 +130,10 @@ for (const { p, html } of built) {
   }, null, 2));
 }
 
+if (jsFiles.size) fs.mkdirSync(path.join(out, 'js'), { recursive: true });
+for (const [name, js] of jsFiles) fs.writeFileSync(path.join(out, name), js);
 const shell = ['./', 'index.html', 'tracker.html', ...pages.map(p => p.manifest), ...fs.readdirSync(path.join(out, 'icons')).map(f => 'icons/' + f),
-  ...(fbCfg ? FB_FILES.map(f => 'fb/' + f) : [])];
+  ...(fbCfg ? FB_FILES.map(f => 'fb/' + f) : []), ...jsFiles.keys()];
 fs.writeFileSync(path.join(out, 'sw.js'), read('tools/pwa/sw.js.txt').replace('__BUILD__', build).replace('__SHELL__', JSON.stringify(shell)));
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
 console.log('✓ PWA built → ' + out + ' (build ' + build + ', API ' + (api ? 'set' : 'missing') + ', Firebase ' + (fbCfg ? 'on' : 'off') + ')');

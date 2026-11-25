@@ -83,6 +83,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - **Full calendar All day box**: ticking a scheduled task (timeline or box) now shows it done in the box's Scheduled group too.
 - **Full calendar tidy**: no white column line left of the hour labels; slimmer date header row; smaller header buttons (toolbar + ↻ ✕); a little side room on the hour labels.
 - **Calendar overlaps side by side**: events that overlap now sit in their own columns (left / right) instead of stacking over each other — every calendar view.
+- **PWA opens faster (code cache)**: the app's big scripts now ship as separate files the app keeps on the phone, so Chrome can reuse their compiled code instead of re-reading ~850 KB of script on every open. Nothing looks different; first open after this update is normal speed, later opens should be quicker.
 - **Checkboxes like Google Calendar**: every task box drawn the same way — white outline in dark mode, subject boxes filled with a white edge, same size tagged or not.
 
 ## 🧪 To be confirmed (2026-11-24)

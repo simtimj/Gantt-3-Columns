@@ -1288,3 +1288,7 @@ Ask: "the pop-up when I click something in the calendar — as close to Google C
 ## Quieter background checks (2026-11-24 22:50, Julius: "keep going with the optimization")
 - Found in the Speed Log: 11:50–16:29 one open, untouched page ran `getSyncState` every ~70 s and the Inbox version every ~3.3 min (2–7 s server time each) and logged every one (`logSpeed` = a second call + a Sheet row; the tab filled the 308-row log).
 - Changes (Index_Main, grep `fwSyncEvery` / `fwSyncLogAt`): idle > 10 min (no pointer / key / wheel / touch) → check every 5 min; `fwImportsDue` 3 → 5 min (matches the server trigger); sync / imports Speed Log rows only when rpc > 4 s, ≥ 10 save timings waiting, or once per 30 min. Coming back to the tab still syncs at once (fwResume / focus unchanged).
+
+## Code cache (2026-11-25 01:20, Julius picked "Split opening code" for the PWA focus)
+- Deferring code isn't worth it (docked calendar is on screen at opening; NOTES "Lighter PWA page"). Real win instead: scripts out of the HTML → `js/<hash>.js`, precached by the SW → Chrome code cache (inline scripts never get one). Order / globals unchanged (sync `<script src>` at the same spot). Content-hashed names, so a new build never mixes files. Smoke `pwa` checks ≥ 3 split files, precached, index.html < 450 KB. `PWA_INLINE=1` turns it off.
+- Smoke on this box: `SMOKE_CHROME=/usr/bin/google-chrome` (bundled Playwright browser missing). Don't `npm install --no-save` here: it prunes the committed node_modules (restore with `git checkout -- node_modules`).

@@ -1335,6 +1335,11 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
     if(await pg.evaluate(()=>(window.__calls||[]).filter(c=>c[0]==='addReferenceItem').length)!==count)throw Error('deleted Reference was recreated automatically');
     await pg.locator('dialog [data-draft-kind="ref"] button').nth(1).click();
     if(!await pg.evaluate(()=>fwDrafts.list().length===0))throw Error('explicit discard did not remove the selected copy');
+    // Quiet recovery (GANTT-010): a leftover copy whose text is already on screen is dropped without a notice.
+    await pg.close();draftPage(true);pg=await open();
+    await pg.evaluate(()=>{const cell=document.querySelector('#referenceTree .ref-cell-wrapper[data-id="recover-ref"] > .ref-cell');fwDrafts.put('ref','recover-ref',{base:{c:'',h:'old'},sourceHash:'old',content:cardCleanHtml(cell)},'Reference: same');});
+    await pg.close();draftPage(true);pg=await open();
+    if(!await pg.evaluate(()=>fwDrafts.list().length===0 && document.getElementById('fwDraftNotice').style.display==='none'))throw Error('already-saved copy still listed / notice shown');
   }catch(e){errors.push(e.message);}
   if(errors.length){fails+=errors.length;console.error('✗ drafts '+name+': '+errors.join(' | '));}else console.log('✓ drafts '+name+': closed-page recovery, remote merge, reviewed saves and deleted-card retention');
   await ctx.close();

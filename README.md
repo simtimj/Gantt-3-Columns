@@ -79,6 +79,7 @@ Details: [engineering handoff](docs/EFFICIENCY_HANDOFF.md). Product requirements
 - Delete asks to confirm; deleted cells go to the **Archive** (restore any time, children come back with them).
 
 ## 🧪 To be confirmed (2026-11-24)
+- **Fewer recovery prompts** (2026-11-24 20:10, GANTT-010): when the phone closes the app before a save's answer comes back, the next open used to show "1 unsaved copy … Review" for at least 90 s even though the text was already saved. A leftover copy whose text already matches what's on screen is now dropped quietly; the notice only shows for copies that really hold something not on screen (those still auto-restore as before).
 - **Lighter app page** (2026-11-24 16:30, speed item K): the installed app's page went from 1.7 MB to about 1.1 MB, so it opens and starts faster on the phone. Code and styles are stripped of comments and spaces when the app is built (nothing else changes), and the weekday icons ship as small copies (13 KB instead of 190 KB; same shapes, still sharp). The /dev Apps Script page is unchanged.
 - **Sharper card corners** (2026-11-24 13:40, from the To-do list): one corner rounding for every card went from 8 px to 6 px (task cards, title boxes, Next Steps groups, calendar events, Cal Events boxes).
 - **Keep In Mind Completed section** (2026-11-24 10:15): ticked tasks drop to the bottom of their category under "Completed · n"; tap it to fold / unfold (remembered per category on this device). Unticking brings a task back up.

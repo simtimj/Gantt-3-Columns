@@ -3184,7 +3184,7 @@
     const notice=document.createElement('div');notice.id='fwDraftNotice';
     notice.style.cssText='position:fixed;bottom:44px;right:8px;z-index:99998;background:var(--bg,#fff);color:var(--text,#111);border:1px solid #888;border-radius:8px;padding:8px;max-width:min(420px,calc(100vw - 16px));font-size:12px;display:none';
     const text=document.createElement('span'),review=document.createElement('button');review.className='btn tiny';review.textContent='Review';review.onclick=fwDraftReview;notice.append(text,review);document.body.append(notice);
-    const update=()=>{const n=fwDrafts.list().length,problem=fwDrafts.problem();text.textContent=problem || (n+' unsaved '+(n===1?'copy':'copies')+' from this device. ');notice.style.display=n||problem?'':'none';if(n)fwDraftAutoSoon();};
+    const update=()=>{const all=fwDrafts.list(),n=all.filter(e=>!fwDraftSame(e)).length,problem=fwDrafts.problem();text.textContent=problem || (n+' unsaved '+(n===1?'copy':'copies')+' from this device. ');notice.style.display=n||problem?'':'none';if(all.length)fwDraftAutoSoon();};
     fwDrafts.subscribe(update);fwDrafts.init(document.querySelector('.refresh-btn')?.getAttribute('href') || location.href);update();
     const capture=()=>{for(const [date,info] of daySaveState)if(info.pending||info.inFlight)fwDraftCaptureDay(date);
       (state.reference||[]).forEach(item=>{if(item._timer||item._refSaving||item._refDeleted)fwDraftCaptureRef(item);});};
@@ -3246,6 +3246,22 @@
   /* Auto-restore (2026-11-13, Julius: "always automatically restore them"): unsaved device copies merge back in on
      their own (a clash keeps both versions, so nothing is lost). Copies that can't go back yet (day not loaded, card
      deleted) stay listed under Review and are retried every minute. */
+  /* Quiet recovery (2026-11-24, GANTT-010 "frequent recovery prompts"): a copy left by an earlier page (phone
+     discarded the app before the save's answer came back) whose text already matches what's on screen holds nothing
+     to recover, so it's dropped silently instead of showing "1 unsaved copy" until the 90 s auto-restore. */
+  function fwDraftSame(entry){
+    try{
+      if(entry.kind==='day'){
+        const f=entry.payload?.fields||{},cols=Object.keys(f);if(!cols.length)return false;
+        return cols.every(col=>{const ed=dayEditorFor(entry.id,col);return !!ed && typeof f[col]?.mine==='string' && cardCleanHtml(ed)===f[col].mine;});
+      }
+      if(entry.kind==='ref'){
+        const cell=document.querySelector('#referenceTree .ref-cell-wrapper[data-id="'+CSS.escape(entry.id)+'"] > .ref-cell');
+        return !!cell && typeof entry.payload?.content==='string' && cardCleanHtml(cell)===entry.payload.content;
+      }
+    }catch(e){}
+    return false;
+  }
   let fwAutoBusy=false, fwAutoTimer=0;
   const fwAutoTried=new Map();
   function fwDraftAutoSoon(ms){ clearTimeout(fwAutoTimer); fwAutoTimer=setTimeout(fwDraftAuto,ms||1500); }
@@ -3255,6 +3271,7 @@
     fwAutoBusy=true;
     try{
       for(const entry of fwDrafts.list()){
+        if(fwDraftSame(entry)){ fwDrafts.discard(entry); continue; } // already on screen = already saved: nothing to recover
         if(Date.now()-entry.at<90000) continue; // still fresh: may belong to another open tab that is mid-save
         const k=entry.kind+':'+entry.id+':'+entry.at, last=fwAutoTried.get(k)||0;
         if(Date.now()-last<60000) continue;

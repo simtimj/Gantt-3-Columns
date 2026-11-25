@@ -2420,7 +2420,15 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
         await center('11:00');
         a = await evPt('Dentist'); b = await allDayPt(day);
         if (a && b) { await gesture(a, b); await waitIdle(); await pg.waitForTimeout(200);
-          const e = await ev('b-' + day); if (!e || !e.allDay || e.start !== day) out.push('timed → all-day failed: ' + JSON.stringify(e && [e.allDay, e.start, e.end])); }
+          let e = await ev('b-' + day);
+          // CI-only flake (2026-11-25, failed 2 of ~10 CI runs, never locally): the drag sometimes lands short of the
+          // all-day row on the CI runner. One retry from fresh positions; a real break still fails twice.
+          if (!e || !e.allDay || e.start !== day) {
+            await center('11:00'); await pg.waitForTimeout(300);
+            const a2 = await evPt('Dentist'), b2 = await allDayPt(day);
+            if (a2 && b2) { await gesture(a2, b2); await waitIdle(); await pg.waitForTimeout(300); e = await ev('b-' + day); }
+          }
+          if (!e || !e.allDay || e.start !== day) out.push('timed → all-day failed: ' + JSON.stringify(e && [e.allDay, e.start, e.end])); }
         // All-day → 9:00 slot (gets 15 min).
         await center('09:00');
         a = await evPt('All-day A'); b = await slotPt(day, '09:00');

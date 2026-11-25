@@ -1334,3 +1334,8 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 - **Unaccounted time**: `fwGaps` in the timer IIFE. Covered = block runs (start → pause / finish / another start) + ticks (data-dt on checked lines in that day's Today cell). Gaps ≥ 20 min in 8:00–22:00 (today: up to now, open end left out). Guess = the tick / block start within 15 min after the gap. Answer = timer event `act: 'est'`, item = "HH:MM-HH:MM", name = label or "(skip)", value = gap ms; `est` added to TIMER_ACTIONS (Timer.gs) and the shim's ACTS; replay ignores it (no blk), so measured time never changes. Julius picked "timer + done ticks".
 - Dropped: Soon / Later lanes (Julius). Already built earlier: all-day strip quick-add (11-23), small calendar move / resize (11-13), pop-out panel (📅 = full screen, 11-24), child timers + Break (Block timer MVP).
 
+
+## Cairn rename step 1 + phone calendar text + CI flake (2026-11-25 09:20–10:45, Julius: "keep it rolling", then "keep going")
+- Rename step 1: name "Cairn" in build-pwa page name (tab title, manifest name / short_name = icon label), /dev setTitle, setup page, toolbar wordmark `.app-brand`. Not renamed: repo, Sheet, /dev URL, icon files `gantt-*`, Firestore `gantt*` collections, cache prefix `gantt-` (step 2 later).
+- Phone calendar text (New Tasks row 31): ≤480px CSS vars `--cal-title` 13 / `--cal-meta` 11 / `--cal-axis` 9 px. Skipped the spec's 1-line (week) / 2-line (day) caps: they would undo "Event titles fill the card" (08:45, newer). Skipped ≥40px tap targets (short timed events can't be that tall).
+- CI flake: calendar 3b "timed → all-day" failed on CI only (70aeac5, fd63c99; rerun passed, never fails locally). Smoke now retries that drag once.

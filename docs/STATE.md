@@ -19,6 +19,7 @@ Short and current. History and build details live in `docs/NOTES.md` (1,300 line
 - Dropped by Julius 2026-11-25: Soon / Later drag lanes (Ordered / Unordered replaced them). Already built before: quick-add on the empty all-day strip, small calendar drag / resize, pop-out panel (📅 = full screen), Blocks child timers + Break.
 
 ## Next (in order)
+- CI: calendar 3b timed → all-day drag retries once (CI-only flake, NOTES "Cairn rename step 1").
 0. Phone check: Cairn name on the installed app + phone calendar text size (README 🧪 2026-11-25).
 1. Speed Log: PWA openings now log `load` rows (source device, from 2026-11-25). After a day, read their `screen` / `drawEnd` (no older PWA rows to compare against; /dev rows are the only before).
 

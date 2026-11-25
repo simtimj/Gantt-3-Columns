@@ -1621,6 +1621,23 @@
   });
   let adTap = 0;
   function adReset(){ adRatio = AD_DEF; panel.classList.remove('cp-adset'); try { localStorage.removeItem(AD_KEY); } catch (e) {} adLayout(); if(cal) cal.updateSize(); }
+  /* Title fills the card (2026-11-25, Julius: "it sticks to 1 or 2 lines; use as much of the block as possible"): the title
+     wraps onto as many whole lines as the card's height leaves above the time line (was a fixed 3 / 2 / 1 by height),
+     re-measured whenever a card changes size (zoom, resize, drag). Ellipsis only on the last line that fits. */
+  const cpFitRO = window.ResizeObserver ? new ResizeObserver(list => list.forEach(e => cpFit(e.target))) : null;
+  function cpFitWatch(el, on){ if(!el || !el.classList.contains('fc-timegrid-event')) return; if(cpFitRO) { if(on) cpFitRO.observe(el); else cpFitRO.unobserve(el); } if(on) cpFit(el); }
+  function cpFit(el){
+    try {
+      const t = el.querySelector('.cp-evc .cp-ev-t'), m = el.querySelector('.cp-evc .cp-ev-m'), main = el.querySelector('.fc-event-main');
+      if(!t || !main) return;
+      const cs = getComputedStyle(main), pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      const lh = parseFloat(getComputedStyle(t).lineHeight) || 16;
+      const stacked = m && m.offsetHeight && m.offsetTop > t.offsetTop; // time on its own line under the title
+      const room = el.clientHeight - pad - (stacked ? m.offsetHeight : 0) - 1;
+      const n = Math.max(1, Math.floor(room / lh));
+      if(t.style.getPropertyValue('--cp-tl') !== String(n)) t.style.setProperty('--cp-tl', String(n));
+    } catch (e) {}
+  }
   function build(){
     const phone = window.matchMedia('(max-width:720px)').matches;
     const saved = cpvFix(lsGet('fw.calView'));
@@ -1693,7 +1710,7 @@
       // itself still moves it.
       eventContent: a => {
         const t = esc(a.event.title || '(no title)'), tm = a.event.allDay ? '' : cpRangeHtml(a);
-        const short = !a.event.allDay && a.event.end && (a.event.end - a.event.start) <= 30 * 60000;
+        const short = false; // 2026-11-25 (Julius): every timed card = title over time; the title fills the card (cpFit), very short cards go one line by CSS
         const sx = a.event.extendedProps || {}, st = sx.schCopy ? L().fromISO(String(sx.start || '')).setZone(TZ) : null;
         const body = a.event.allDay ? (isOrd(sx) ? '<span class="cp-ordn">' + (ordNum(a.event) || '') + '</span>' : '') + '<span class="cp-ev-t">' + t + (st && st.isValid ? '<span class="cp-scht"> · ' + esc(st.toFormat('h:mm a').replace(':00', '')) + '</span>' : '') + '</span>'
           : short ? '<span class="cp-ev-t">' + t + '</span><span class="cp-ev-m">, ' + tm + '</span>'
@@ -1737,7 +1754,7 @@
         const onBox = (info.jsEvent.target.closest && info.jsEvent.target.closest('.cp-chk')) || (dn && dn.id === x.eventId && dn.ms === String(x.startMs) && Date.now() - dn.t < 1200);
         if(onBox){ if(!document.querySelector('.urg-picker') && !(dn && dn.held)) toggleDone(schOrig(info.event)); return; }
         if(!pending) showDetail(schOrig(info.event), info.el); },
-      eventDidMount: a => { a.el.dataset.lkEv = a.event.id; if(a.el.classList.contains('cp-glass')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpGroupsSoon(); }, eventWillUnmount: () => cpGroupsSoon(),
+      eventDidMount: a => { a.el.dataset.lkEv = a.event.id; if(a.el.classList.contains('cp-glass')) a.el.style.setProperty('--cp-evbg', a.event.backgroundColor || a.el.style.backgroundColor || 'var(--cp-blue,#1a73e8)'); cpFitWatch(a.el, true); cpGroupsSoon(); }, eventWillUnmount: a => { cpFitWatch(a.el, false); cpGroupsSoon(); },
       datesSet: info => { if(docked){ const t = document.querySelector('[data-ce-title]'); if(t) t.textContent = info.view.title; } const vb = panel.querySelector('.fc-cpView-button'); if(vb) vb.dataset.label = CP_VLBL[cpvNext(info.view.type)]; { const dw = info.view.type === 'timeGridDay' ? String(luxon.DateTime.fromJSDate(info.view.currentStart, {zone: 'UTC'}).weekday % 7) : ''; setTimeout(() => { [panel.querySelector('.fc-toolbar-title'), document.querySelector('[data-ce-title]')].forEach(t => { if(!t) return; if(dw) t.dataset.dow = dw; else delete t.dataset.dow; }); }, 0); } /* label via CSS: writing text doubled it ("DayWk") when FullCalendar re-rendered */ viewStart = info.startStr.slice(0, 10); viewEnd = info.endStr.slice(0, 10); if(typeof qaClose === 'function') qaClose(); if(!docked) lsSet(full ? 'fw.calFullView' : 'fw.calView', info.view.type); setTimeout(refreshState, 0); setTimeout(adLayout, 0); setTimeout(() => loadPlan(false), 0); if(typeof fadSoon === 'function') fadSoon(); if(full && typeof fullWkSync === 'function') fullWkSync(); }
     });
     cal.render();

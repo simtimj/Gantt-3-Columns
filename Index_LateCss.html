@@ -750,10 +750,8 @@
   #calPanel .fc .fc-timegrid-event{container:cpev / size;}
   #calPanel .fc .fc-timegrid-event .cp-ev{font-size:clamp(10px, 7.5px + 7cqi, 14px);}
   #calPanel .fc .fc-timegrid-event .cp-ev-m{font-size:max(10px, .88em);}
-  #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere;}
+  #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--cp-tl,3);overflow:hidden;overflow-wrap:anywhere;} /* --cp-tl = lines that fit, set by cpFit (2026-11-25) */
   #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  @container cpev (max-height:62px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:2;} }
-  @container cpev (max-height:46px){ #calPanel .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{-webkit-line-clamp:1;} }
   /* Nothing spills out of a card (2026-11-14, Julius: "some text is spilling out"): the card clips its own content, and
      as it gets shorter (zoomed out / 15-min events) the time line goes first, then text + box shrink to one tight line;
      very narrow cards (phone Week) drop the time and the box and wrap the title small. */

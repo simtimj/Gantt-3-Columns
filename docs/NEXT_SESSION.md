@@ -21,7 +21,7 @@ Questions (ask as one batch with clickable answers):
 Into areas from docs/CODE_MAP.md (days/editors, saving/sync, Reference, layout, Next Steps, Cal Events). Same include pattern as the 2026-11-21 split (`INDEX_PARTS_` in Code.gs, `tools/index-html.mjs`). Do after 1 (less code to move).
 
 ## 3. Speed Log check
-After a day of use with the code-cache build: compare PWA load rows before / after 2026-11-25.
+2026-11-25: there were no PWA load rows (fixed, they log from now on). After a day of use: read the `load` rows with `source: device`.
 
 ## Parked (Calendar focus is parked behind the PWA)
 - O — follow the now line (questions in docs/NOTES.md history / ask fresh).

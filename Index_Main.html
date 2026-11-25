@@ -397,8 +397,8 @@
       const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
       const client = fwSpeedContext({ render: render, drawEnd:Math.round(t0 + render), frameFirstByte: Math.round(nav.responseStart || 0), frameDone: Math.round(nav.responseEnd || 0),
         dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()),
-        navType: nav.type || '', ...(kind === 'load' ? fwStartInfo : {}), ...(kind === 'load' ? fwSnapInfo(Math.round(t0 + render)) : {}) });
-      setStatus('Ready · screen ' + (client.screen != null ? (client.screen / 1000).toFixed(1) + 's · ' : '') + 'server ' + (timing.total / 1000).toFixed(1) + 's · draw ' + (render / 1000).toFixed(1) + 's');
+        navType: nav.type || '', ...(timing.source ? { source: timing.source, pwa: 1 } : {}), ...(kind === 'load' ? fwStartInfo : {}), ...(kind === 'load' ? fwSnapInfo(Math.round(t0 + render)) : {}) });
+      setStatus('Ready · screen ' + (client.screen != null ? (client.screen / 1000).toFixed(1) + 's · ' : '') + (timing.source === 'device' ? 'from device · draw ' : 'server ' + (timing.total / 1000).toFixed(1) + 's · draw ') + (render / 1000).toFixed(1) + 's');
       fwSendSpeed(kind,timing,client);
     },1500);
   }
@@ -408,7 +408,8 @@
     if(initial && Array.isArray(initial.days) && initial.today){
       const t0 = performance.now();
       applyWorkspaceData(initial);
-      fwSpeedLog('load',initial.timing,t0);
+      // PWA opening from the phone's saved copy has no server timing (2026-11-25: so no load row was ever logged); log it as cache.
+      fwSpeedLog('load',initial.timing || (window.__PWA__ ? {total:0,steps:{},source:'device'} : null),t0);
       return;
     }
     // The early script (Index.html) already asked for the data; use its answer.

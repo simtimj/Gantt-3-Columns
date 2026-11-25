@@ -1694,6 +1694,13 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
             else {
               if (!/(^|[^\d:])9(:00)?\s?am/i.test(timed.textContent)) out.push('timed event not at 9:00 Los Angeles time: ' + timed.textContent);
               if (getComputedStyle(timed).backgroundColor !== 'rgb(213, 0, 0)') out.push('timed event not solid in its color (2026-11-21 11:30): ' + getComputedStyle(timed).backgroundColor);
+              // Title fills the card (2026-11-25): --cp-tl = whole lines that fit above the time; the title stays inside the card.
+              await until(() => timed.querySelector('.cp-ev-t').style.getPropertyValue('--cp-tl'), 1500);
+              const ft = timed.querySelector('.cp-ev-t'), fm = timed.querySelector('.cp-ev-m'), fn = Number(ft.style.getPropertyValue('--cp-tl'));
+              const flh = parseFloat(getComputedStyle(ft).lineHeight), fr = timed.getBoundingClientRect();
+              const fRoom = timed.clientHeight - (fm.offsetTop > ft.offsetTop ? fm.offsetHeight : 0);
+              if (!(fn >= 1) || (fn > 1 && fn * flh > fRoom) || (fRoom - fn * flh) >= flh + 4) out.push('title lines do not fill the card: ' + JSON.stringify({ fn, flh, fRoom }));
+              if (fm.getBoundingClientRect().bottom > fr.bottom + 1) out.push('time spills out of the card');
             }
             const allDay = [...panel.querySelectorAll('.fc-daygrid-event')].find(x => /All-day A/.test(x.textContent));
             if (!allDay) out.push('all-day event not in the all-day row');

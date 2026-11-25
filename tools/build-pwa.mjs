@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { createRequire } from 'module';
 
 const out = process.argv[2] || 'dist';
 const read = f => fs.readFileSync(f, 'utf8');
@@ -57,7 +58,38 @@ if (fbCfg) {
   for (const f of FB_FILES) fs.copyFileSync(path.join('tools/pwa/vendor', f + '.txt'), path.join(out, 'fb', f));
 }
 
-const built = pages.map(p => ({ p, html: render(read(p.src)) }));
+// Lighter page (2026-11-24, speed item K, NOTES "Lighter PWA page"):
+// 1) weekday icons: small alpha-only copies (tools/pwa/wd-icons.json, ~13 KB) instead of the 190 KB originals, only
+//    while the json matches the current WeekdayIcons.html (else the originals ship and a warning says re-run the script).
+// 2) minify: every inline <script> / <style> is stripped of comments + whitespace by esbuild (names untouched, so the
+//    global functions, onclick attributes and cross-script names keep working). No esbuild installed → full-size page.
+let wd = null;
+try { wd = JSON.parse(read('tools/pwa/wd-icons.json')); } catch (e) {}
+const wdSrc = crypto.createHash('sha1').update(read('WeekdayIcons.html')).digest('hex');
+if (wd && wd.src !== wdSrc) { console.warn('⚠ WeekdayIcons.html changed: run python3 tools/pwa/wd-icons.py (shipping the full-size icons).'); wd = null; }
+const smallIcons = html => {
+  if (!wd) return html;
+  let i = 0;
+  return html.replace(/(window\.WD_ICON_B64\s*=\s*\[)([\s\S]*?)(\n\s*\];)/, (m, a, body, z) =>
+    a + body.replace(/'[A-Za-z0-9+/=]{200,}'/g, q => (i < wd.icons.length ? "'" + wd.icons[i++] + "'" : q)) + z);
+};
+let esbuild = null;
+try { esbuild = createRequire(path.resolve('tools/build-pwa.mjs'))('esbuild'); } catch (e) {
+  console.warn('⚠ esbuild not installed (npm install --no-save esbuild@0.25.12): page not minified.');
+}
+const minify = html => {
+  if (!esbuild || process.env.PWA_NO_MINIFY) return html;
+  const opts = { minifyWhitespace: true, legalComments: 'none', charset: 'utf8' };
+  return html
+    .replace(/<script>([\s\S]*?)<\/script>/g, (m, js) => {
+      const r = esbuild.transformSync(js, { ...opts, loader: 'js' }).code.trim();
+      if (/<\/script/i.test(r)) throw new Error('minify: </script inside a script');
+      return '<script>' + r + '</script>';
+    })
+    .replace(/(<style[^>]*>)([\s\S]*?)<\/style>/g, (m, tag, css) => tag + esbuild.transformSync(css, { ...opts, loader: 'css' }).code.trim() + '</style>');
+};
+
+const built = pages.map(p => ({ p, html: minify(smallIcons(render(read(p.src)))) }));
 const build = crypto.createHash('sha1').update(api + JSON.stringify(fbCfg) + shimSrc + read('tools/pwa/sw.js.txt') + built.map(b => b.html).join('')).digest('hex').slice(0, 12);
 
 for (const { p, html } of built) {

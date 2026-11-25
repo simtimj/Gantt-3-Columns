@@ -59,6 +59,6 @@ jobs:
       - run: node tools/done-read-test.mjs
       - run: node tools/study-read-test.mjs
       - run: python3 tools/deploy-log-test.py
-      - run: npm install --no-save playwright@1.62.1
+      - run: npm install --no-save playwright@1.62.1 esbuild@0.25.12
       - run: npx playwright install --with-deps chromium
       - run: node tools/smoke.mjs

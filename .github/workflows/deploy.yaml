@@ -71,7 +71,9 @@ jobs:
         with:
           node-version: 20
       - name: Build PWA
-        run: node tools/build-pwa.mjs dist
+        run: |
+          npm install --no-save --no-audit --no-fund esbuild@0.25.12
+          node tools/build-pwa.mjs dist
         env:
           PWA_API_URL: ${{ needs.deploy.outputs.api_url }}
       - uses: actions/upload-pages-artifact@v3

@@ -3273,6 +3273,12 @@ if (only('pwa')) {
   const http = await import('http');
   const dist = path.join(os.tmpdir(), 'gantt-pwa-smoke');
   execFileSync('node', ['tools/build-pwa.mjs', dist], { env: { ...process.env, PWA_API_URL: 'https://api.test/exec' }, stdio: 'pipe' });
+  { // Lighter page (2026-11-24, K): small weekday icons always; minified when esbuild is installed (CI installs it).
+    const page = fs.readFileSync(path.join(dist, 'index.html'), 'utf8'), icons = page.match(/['"][A-Za-z0-9+/=]{200,}['"]/g) || [];
+    if (icons.length < 7 || Math.max(...icons.map(q => q.length)) > 8000) throw new Error('pwa: weekday icons not the small copies');
+    let hasEsb = true; try { (await import('module')).createRequire(path.resolve('tools/build-pwa.mjs'))('esbuild'); } catch (e) { hasEsb = false; }
+    if (hasEsb && page.length > 1300000) throw new Error('pwa: page not minified (' + page.length + ' bytes)');
+  }
   const types = { html: 'text/html', js: 'text/javascript', webmanifest: 'application/manifest+json', png: 'image/png' };
   const srv = http.createServer((q, r) => {
     let f = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (f.endsWith('/')) f += 'index.html';

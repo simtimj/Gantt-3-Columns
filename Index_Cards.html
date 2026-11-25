@@ -686,6 +686,11 @@
     if(ed) ed.__composing = t === 'compositionstart';
   },true));
   function isTitleLine(n){ return n.nodeType === 1 && (n.dataset.tl === '1' || n.hasAttribute('data-cgrp')); }
+  function isParentTask(n){
+    if(n.nodeType !== 1 || !n.classList.contains('check-line') || n.dataset.sec || n.dataset.tsec || n.dataset.study) return false;
+    const nx = n.nextElementSibling, lv = x => Number(x.dataset && x.dataset.level) || 0;
+    return !!(nx && !isEmptyLine(nx) && lv(nx) > lv(n));
+  }
   function isEmptyLine(n){
     if(n.tagName === 'BR' || n.tagName === 'HR') return true;
     if(n.querySelector && n.querySelector('input,img,table,video,iframe')) return false;
@@ -1213,7 +1218,11 @@
     let changed = false;
     const hide = new Set(), on = new Map();
     for(const n of ed.children){
-      if(!isTitleLine(n)) continue;
+      // Any task with subtasks folds them too (2026-11-25, Julius: "collapse / expand subtasks on any task"): same − / +
+      // and saved data-fold as a title line; titleCovered gives just its deeper lines.
+      const sub = !isTitleLine(n) && isParentTask(n);
+      if(setAttr(n,'data-tlsub',sub ? '1' : '')) changed = true;
+      if(!isTitleLine(n) && !sub) continue;
       const cov = titleCovered(n);
       // Project headers share their tasks' category, including the folded summary.
       if(n.hasAttribute('data-cgrp')) setAttr(n,'data-tccat',cardCatFromName(n.dataset.cgrp || tcText(n)) || '');
@@ -1221,7 +1230,7 @@
       const fold = (histForced(n,ed) ? !histIsOpen(ed,histKey(n)) : n.dataset.fold === '1') && cov.length > 0;
       const tasks = cov.filter(x => x.classList.contains('check-line'));
       const done = tasks.filter(x => x.classList.contains('done') || (x.querySelector(':scope > input[type=checkbox]') || {}).checked).length;
-      on.set(n,{state:fold ? 'c' : 'o', cnt:ed.matches('.thought-editor,.kim-editor') ? (!tasks.length ? '0/0 ✓' : done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : '', /* 0/0 once every task under it is deleted (2026-11-15, Julius) */ info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden',
+      on.set(n,{state:fold ? 'c' : 'o', cnt:!sub && ed.matches('.thought-editor,.kim-editor') ? (!tasks.length ? '0/0 ✓' : done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : '', /* 0/0 once every task under it is deleted (2026-11-15, Julius) */ info:tasks.length ? (done === tasks.length ? done + ' ✓' : done + '/' + tasks.length + ' ✓') : cov.length + ' hidden',
         // History list modes, Done Log project groups (3-row box) and IT study entries keep their summary; every other title uses its own look (Hidden by default).
         sum:!fold ? '' : (histForced(n,ed) || n.dataset.study || n.hasAttribute('data-cgrp')) ? (HIST_SHUT() ? '' : titleSummary(cov)) : n.dataset.tlmode === 'c' ? titleCompactSum(cov) : ''});
       if(fold){

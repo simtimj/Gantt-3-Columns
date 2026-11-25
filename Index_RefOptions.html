@@ -575,6 +575,16 @@
         p.appendChild(xb);
       }
     }
+    // Send to Backlog (2026-11-25, Julius: "hold, click, Backlog" from the full calendar's day list): an open all-day task
+    // leaves the calendar and goes to the calendar Backlog list.
+    if(isCal && line && window.fwCalendar && window.fwCalendar.canBacklog && window.fwCalendar.canBacklog(line)){
+      const bb = document.createElement('button');
+      bb.type = 'button'; bb.className = 'urg-goto';
+      bb.textContent = '📥 Send to Backlog';
+      bb.addEventListener('pointerdown',e => e.preventDefault());
+      bb.addEventListener('click',() => { hideUrgencyPicker(); window.fwCalendar.sendToBacklog(line); });
+      p.appendChild(bb);
+    }
     // Archive / unarchive the task + its subtasks (2026-10-27, Julius).
     // Delete a calendar event (2026-11-13, Julius): hold it → 🗑 Delete; asks once, then removes it from Google Calendar too.
     if(isCal && line && window.fwCalendar && window.fwCalendar.askDeleteLine){

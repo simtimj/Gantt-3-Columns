@@ -1434,6 +1434,7 @@
       kimColorPicker(ed, t, window.fwCtxLastAt || {x:60, y:120});
       return;
     }
+    if(action === 'select'){ if(window.fwMultiSel) window.fwMultiSel.start(ed); return; }
     if(action === 'refArchive'){
       const w = ed.closest('.ref-cell-wrapper');
       if(w) deleteReference(w.dataset.id, {archive:true});

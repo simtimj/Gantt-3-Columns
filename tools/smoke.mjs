@@ -200,6 +200,45 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
       return out; });
     k.forEach(x => errs.push('Nested titles: ' + x));
   }
+  // Subtask fold on any task + multi-select delete (2026-11-25, Julius).
+  {
+    const k = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      document.querySelector('[data-ctab="focus"]').click(); await wait(400);
+      const ed = document.querySelector('#kimScroll .kim-editor'); if (!ed) return ['no Keep In Mind editor'];
+      const L = (t, lv, tl) => '<div class="check-line" data-level="' + lv + '"' + (tl ? ' data-tl="1"' : '') + '><input type="checkbox"><span class="check-text">' + t + '</span></div>';
+      ed.insertAdjacentHTML('beforeend', '<div><br></div>' + L('SF parent', 0) + L('SF kid A', 1) + L('SF kid B', 1) + L('SF next', 0) + '<div><br></div>' + L('MS label', 0, true) + L('MS one', 0) + L('MS two', 0) + L('MS keep', 0));
+      refreshCards(ed); await wait(200);
+      const f = t => [...ed.querySelectorAll('.check-line')].find(l => l.textContent.trim() === t);
+      const p = f('SF parent');
+      if (p.dataset.tlsub !== '1' || p.dataset.tlon !== 'o') out.push('parent task has no fold (' + p.dataset.tlsub + '/' + p.dataset.tlon + ')');
+      if (f('SF next').hasAttribute('data-tlsub')) out.push('task without subtasks got a fold');
+      toggleTitleFold(p, ed); refreshTitleLines(ed);
+      if (!f('SF kid A').hasAttribute('data-tlhid') || !f('SF kid B').hasAttribute('data-tlhid') || f('SF next').hasAttribute('data-tlhid')) out.push('subtask fold hid the wrong lines');
+      if (p.dataset.tlon !== 'c') out.push('folded parent not shown as +');
+      const saved = cardCleanHtml(ed);
+      if (/data-tlsub|data-msel/.test(saved)) out.push('render-only fold mark saved');
+      if (!/data-fold="1"[^>]*>[\s\S]{0,60}SF parent/.test(saved)) out.push('fold state not saved');
+      toggleTitleFold(p, ed); refreshTitleLines(ed);
+      // Multi-select: tap a label = its lines (label kept); 🗑 deletes them.
+      if (!window.fwMultiSel) out.push('no multi-select');
+      else {
+        fwMultiSel.start(ed); await wait(50);
+        f('MS label').querySelector('.check-text').click(); await wait(50);
+        const picked = [...ed.querySelectorAll('[data-msel]')].map(x => x.textContent.trim()).join(',');
+        if (picked !== 'MS one,MS two,MS keep') out.push('label picked: ' + picked);
+        f('MS keep').querySelector('.check-text').click(); await wait(50);
+        const bar = document.querySelector('.msel-bar'); if (!bar) out.push('no select bar');
+        else { bar.querySelector('[data-ms-del]').click(); await wait(100); }
+        if (f('MS one') || f('MS two')) out.push('picked lines not deleted');
+        if (!f('MS label') || !f('MS keep')) out.push('label or unpicked line deleted');
+        if (fwMultiSel.active() || document.querySelector('.msel-bar')) out.push('select mode still on after delete');
+      }
+      captureBeforeEdit(ed); ['SF parent', 'SF kid A', 'SF kid B', 'SF next', 'MS label', 'MS keep'].forEach(t => { const n = f(t); if (n) n.remove(); });
+      [...ed.children].slice(-3).forEach(n => { if (!n.textContent.trim() && !n.classList.contains('check-line') && ed.children.length > 1) n.remove(); }); finishEditorEdit(ed);
+      document.querySelector('[data-ctab="notes"]').click(); await wait(200);
+      return out; });
+    k.forEach(x => errs.push('Subtask fold / select: ' + x));
+  }
   // Insert line above / below (2026-11-21, Julius): hold menu → empty line above the first line / below the last one,
   // cursor in it; below a title = right under it, unfolded, at its lines' indent.
   {
@@ -1160,6 +1199,18 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     if (s.blocks[title.dataset.tmr].run || !s.blocks[title.dataset.tmr].paused || s.cur) out.push('Pause did not pause');
     tap('block'); await wait(700); s = fwTimer.replay();
     if (!s.blocks[title.dataset.tmr].run || s.blocks[title.dataset.tmr].child !== 'break') out.push('Resume did not bring back the block + break');
+    // Quick Add while running (2026-11-25): ＋ Add → "QA one, QA two" → two tasks in this block, timer untouched.
+    { tap('qadd'); await wait(100);
+      const qa = bar().nextElementSibling;
+      if (!qa || !qa.classList.contains('tmr-qa')) out.push('Quick Add row did not open');
+      else { const runs0 = fwTimer.events().length; qa.querySelector('input').value = 'QA one, QA two'; qa.querySelector('[data-qa="here"]').click(); await wait(150);
+        const names = [...pad.querySelectorAll('.check-line')].map(l => l.textContent.trim());
+        const i1 = names.indexOf('QA one'), i2 = names.indexOf('QA two'), ie = names.indexOf('Email');
+        if (i1 < 0 || i2 !== i1 + 1) out.push('Quick Add lines: ' + names.join('|'));
+        else if (ie > i1) out.push('Quick Add went above the block\'s tasks');
+        if (fwTimer.events().length !== runs0 || !fwTimer.replay().blocks[title.dataset.tmr].run) out.push('Quick Add touched the timer');
+        qa.querySelector('[data-qa="x"]').click(); await wait(50);
+        [...pad.querySelectorAll('.check-line')].filter(l => /^QA (one|two)$/.test(l.textContent.trim())).forEach(l => l.remove()); } }
     window.prompt = () => '45m';
     bar().querySelector('[data-tact="fix-blk"]').click(); await wait(100); s = fwTimer.replay();
     if (s.blocks[title.dataset.tmr].ms !== 45 * 60e3 || s.blocks[title.dataset.tmr].raw > 60e3) out.push('correction: ' + JSON.stringify(s.blocks[title.dataset.tmr]));
@@ -1191,6 +1242,30 @@ for (const [name, view] of (only('main') ? [['desktop', { width: 1300, height: 9
     return out;
   });
   tmr.forEach(x => errs.push('Timer: ' + x));
+  // Unaccounted time (2026-11-25): gaps between timer runs (20 min+, 8 am – 10 pm); an answer is an 'est' event, not measured time.
+  {
+    const g = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+      if (!window.fwGaps) return ['no gaps view'];
+      const y = new Date(Date.now() - 864e5), T = (h, m) => new Date(y.getFullYear(), y.getMonth(), y.getDate(), h, m).getTime(), D = y.getFullYear() + '-' + String(y.getMonth() + 1).padStart(2, '0') + '-' + String(y.getDate()).padStart(2, '0');
+      fwTimer.merge([{ op: 'g1', date: D, at: T(9, 0), act: 'start', blk: 'b-g', name: 'Gap block' }, { op: 'g2', date: D, at: T(10, 0), act: 'pause', blk: 'b-g', name: 'Gap block' },
+        { op: 'g3', date: D, at: T(12, 0), act: 'start', blk: 'b-g', name: 'Gap block' }, { op: 'g4', date: D, at: T(13, 0), act: 'finish', blk: 'b-g', name: 'Gap block' }]);
+      const d = fwGaps.data(D), keys = d.gaps.map(x => x.key).join(',');
+      if (keys !== '08:00-09:00,10:00-12:00,13:00-22:00') out.push('gaps: ' + keys);
+      if (d.measured !== 2 * 3600e3) out.push('measured ' + d.measured);
+      if (d.gaps[1] && d.gaps[1].guess !== 'Gap block') out.push('guess: ' + (d.gaps[1] && d.gaps[1].guess));
+      const ms0 = fwTimer.replay().blocks['b-g'].ms;
+      fwGaps.open(D); await wait(50);
+      const row = document.querySelector('.gap-view [data-gi="1"]');
+      if (!row) out.push('gaps view has no rows');
+      else { row.querySelector('input').value = 'Lunch'; row.querySelector('[data-gap="ok"]').click(); await wait(100);
+        const e = fwTimer.events().find(x => x.act === 'est' && x.item === '10:00-12:00');
+        if (!e || e.name !== 'Lunch' || e.value !== 2 * 3600e3) out.push('estimate not recorded: ' + JSON.stringify(e));
+        if (fwTimer.replay().blocks['b-g'].ms !== ms0) out.push('estimate changed measured time');
+        if (!/≈ Lunch/.test(document.querySelector('.gap-view').textContent)) out.push('answered gap not shown'); }
+      fwGaps.close();
+      return out; });
+    g.forEach(x => errs.push('Gaps: ' + x));
+  }
 
   // Thoughts pad (2026-11-12): bottom-left free writing, saves to its own column; Blocks sits in the middle column.
   const tho = await pg.evaluate(async () => {
@@ -2947,6 +3022,28 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
                 if (!res.p || !res.p.allDay || res.p.start !== res.today || res.p.id !== 'bl-1') errs.push('backlog menu: Send to Today sent ' + JSON.stringify(res.p));
                 if (res.left) errs.push('backlog menu: row still in the backlog after Send to Today');
               }
+            }
+            // Send to Backlog (2026-11-25, Julius: "hold, click, Backlog"): an open all-day task → hold menu → 📥 Send to Backlog.
+            {
+              const sb = await pg.evaluate(async () => { const w = ms => new Promise(r => setTimeout(r, ms)), out = [], api = window.fwCalendar.api(), srv = window.__calSrv;
+                window.__calSrv = (m, a) => m === 'calBacklogSend' ? (window.__blSent = a[0], { ok: true, item: { id: 'blsendx|2026-11-25', date: '2026-11-25', title: 'Send BL Z', urg: '2', color: '#f6bf26' } }) : srv(m, a);
+                const st = api.view.currentStart, ev = api.addEvent({ title: 'Send BL Z', allDay: true, start: st, extendedProps: { eventId: 'evSendZ', startMs: st.getTime(), calId: 'main', editable: true, urg: '2' } });
+                const line = document.createElement('div'); line.className = 'cp-ev'; line.dataset.ceId = 'evSendZ'; line.dataset.ceStart = String(st.getTime());
+                line.innerHTML = '<span class="cp-chk"></span>'; document.body.appendChild(line);
+                showUrgencyPicker(line.querySelector('.cp-chk'), 40, 40); await w(100);
+                const b = [...document.querySelectorAll('.urg-picker button')].find(x => /Send to Backlog/.test(x.textContent));
+                if (!b) out.push('menu has no Send to Backlog');
+                else { b.click(); await w(500);
+                  if (!window.__blSent || window.__blSent.eventId !== 'evSendZ') out.push('server not called: ' + JSON.stringify(window.__blSent));
+                  if (api.getEvents().some(e => e.title === 'Send BL Z')) out.push('task still on the calendar');
+                  if (!window.fwCalendar.canBacklog || window.fwCalendar.canBacklog(line)) out.push('canBacklog true after send'); }
+                if (typeof hideUrgencyPicker === 'function') hideUrgencyPicker(); line.remove(); try { ev.remove(); } catch (e) {}
+                // A repeating event gets no Send to Backlog.
+                const rv = api.addEvent({ title: 'Rep BL', allDay: true, start: st, extendedProps: { eventId: 'evRep', startMs: st.getTime() + 1, calId: 'main', editable: true, recurring: true } });
+                const l2 = document.createElement('div'); l2.className = 'cp-ev'; l2.dataset.ceId = 'evRep'; l2.dataset.ceStart = String(st.getTime() + 1);
+                if (window.fwCalendar.canBacklog(l2)) out.push('repeating event offered Send to Backlog');
+                rv.remove(); window.__calSrv = srv; return out; });
+              errs.push(...sb.map(x => 'send to backlog: ' + x));
             }
             // ✕ on a backlog row removes it — real tap / click (2026-11-21, Julius: "pressing X doesn't get rid of them").
             {

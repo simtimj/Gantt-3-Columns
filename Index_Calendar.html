@@ -1160,6 +1160,23 @@
       .calBacklogPlaceMany(reqs);
   }
   function blSendToday(id, day){ blSendMany([id], day); }
+  /* Send to Backlog (2026-11-25, Julius: "hold, click, Backlog" on a task in the full calendar's day list): an all-day
+     task leaves the calendar and lands in the Backlog list. Optimistic: off the day and into the list at once; the
+     server (calBacklogSend) deletes the event and adds the row; a failure puts it back. */
+  function canBacklog(line){ const ev = lineEvent(line), x = ev && ev.extendedProps || {}; return !!(ev && ev.allDay && x.editable && !x.recurring && !x.schCopy && !x.done && !isLife(x)); }
+  function lineEvent(line){ const d = line && line.dataset || {}; return cal && cal.getEvents().find(e => (e.extendedProps || {}).eventId === d.ceId && String(e.extendedProps.startMs) === String(d.ceStart)); }
+  function sendToBacklog(line){
+    const ev = lineEvent(line); if(!ev || !canBacklog(line)){ flash('Only open all-day tasks can go to the backlog'); return; }
+    const x = ev.extendedProps || {}, tmpId = 'bltmp-send-' + Date.now(), day = (ev.startStr || '').slice(0, 10);
+    const tmp = {id: tmpId, date: day, title: String(ev.title || '(no title)'), urg: String(x.urg || ''), color: ev.backgroundColor || '', colorId: ''};
+    const req = {eventId: x.eventId, startMs: x.startMs, calId: x.calId, urg: x.urg || ''};
+    ev.remove(); if(!blData) blData = {items: []}; blData.items.push(tmp); blRender(); if(typeof fadSoon === 'function') fadSoon();
+    flash('Sent to Backlog ✓');
+    const drop = () => { if(blData) blData.items = blData.items.filter(i => i.id !== tmpId); };
+    google.script.run.withSuccessHandler(res => { drop(); if(res && res.item && blData) blData.items.push(res.item); blRender(); refetchFresh(); })
+      .withFailureHandler(err => { drop(); blRender(); refetchFresh(); moveFail('Couldn’t send to the backlog — ' + errText(err)); })
+      .calBacklogSend(req);
+  }
   function blSendMany(ids, day){
     const today = L().now().setZone(TZ).toISODate(); day = day || today;
     blSendReqs(ids.map(id => Object.assign({id: id}, slotReq(true, day, '', 0))),
@@ -1982,7 +1999,15 @@
     if(bh && !bh.querySelector('[data-bl-selmode]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blsort" data-bl-selmode title="Tick several rows, then send them together">Select</button>');
     if(bh && !bh.querySelector('[data-bl-sort]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blsort" data-bl-sort title="Group by date (newest first) / by urgency">Date</button>');
     if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blside" data-bl-side title="Phone: show the backlog on the left or under the calendar"></button><button type="button" class="cp-blclose" data-bl-close title="Close the backlog" aria-label="Close the backlog">✕</button>');
+    if(bh && !bh.querySelector('[data-bl-tab]')){ const b0 = bh.querySelector(':scope > b'); if(b0) b0.insertAdjacentHTML('beforebegin', '<button type="button" class="cp-bltab" data-bl-tab="kim" title="Show Keep In Mind here">Keep In Mind</button>'); }
     blEl.addEventListener('click', e => {
+      // Keep In Mind tab (2026-11-25): a tab switches (and opens the box if minimized); tapping the open tab again minimizes, as before.
+      const tk = full && e.target.closest('[data-bl-tab="kim"]'), tb = full && kimTabOn() && e.target.closest('.cp-blh > b');
+      if(tk || tb){
+        e.stopPropagation();
+        if(tk && kimTabOn() && !panel.classList.contains('cp-blmin')){ panel.classList.add('cp-blmin'); lsSet('fw.calFullBlMin', '1'); return; }
+        kimTabSet(!!tk); panel.classList.remove('cp-blmin'); lsSet('fw.calFullBlMin', '0'); return;
+      }
       if(e.target.closest('[data-bl-selmode]')){ e.stopPropagation(); blSelSet(!blSel); }
       else if(e.target.closest('[data-bl-sort]')){ e.stopPropagation(); lsSet('fw.blSort', lsGet('fw.blSort') === 'date' ? 'urg' : 'date'); blRender(); }
       else if(e.target.closest('[data-bl-side]')){ e.stopPropagation(); lsSet('fw.blPhone', lsGet('fw.blPhone') === 'below' ? 'left' : 'below'); blPlace(); setTimeout(() => cal && cal.updateSize(), 0); }
@@ -1991,6 +2016,34 @@
       else if(e.target.closest('[data-bl-close]')){ e.stopPropagation(); if(!blEl.hidden) blToggle(); }
     });
   }
+  /* Keep In Mind tab beside Backlog (2026-11-25, Julius: "bottom-left box of the full-screen calendar gets tabs: Keep In
+     Mind first, then Backlog (count)"). Full screen only. The view is a copy of the Keep In Mind list; ticking a box in
+     it ticks the real line (same position), so the list itself is still edited in one place. */
+  const kimView = document.createElement('div'); kimView.className = 'cp-kimv kim-copy'; kimView.setAttribute('data-bl-kim', '');
+  if(blEl && blBody) blBody.after(kimView);
+  const kimSrc = () => document.querySelector('#kimScroll .kim-editor');
+  function kimTabOn(){ return panel.classList.contains('cp-kimtab'); }
+  function kimTabSet(on){ panel.classList.toggle('cp-kimtab', !!on); lsSet('fw.calFullTab', on ? 'kim' : 'bl'); if(on) kimRender(); }
+  function kimRender(){
+    if(!kimTabOn()) return;
+    const src = kimSrc();
+    if(!src){ kimView.innerHTML = '<div class="cp-blmsg">Keep In Mind isn’t loaded yet.</div>'; return; }
+    const c = src.cloneNode(true);
+    c.removeAttribute('contenteditable'); c.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
+    c.querySelectorAll('[id]').forEach(n => n.removeAttribute('id')); c.removeAttribute('id');
+    kimView.replaceChildren(...c.childNodes);
+    if(!kimView.firstChild) kimView.innerHTML = '<div class="cp-blmsg">Keep In Mind is empty.</div>';
+  }
+  let kimObsT = 0;
+  new MutationObserver(ms => { if(!full || !kimTabOn() || !ms.some(m => !kimView.contains(m.target) && !!(m.target.closest ? m.target : m.target.parentElement || document.body).closest('#kimScroll'))) return; clearTimeout(kimObsT); kimObsT = setTimeout(kimRender, 250); })
+    .observe(document.body, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'checked', 'data-fold', 'data-tlhid']});
+  kimView.addEventListener('click', e => {
+    const box = e.target.closest('input[type=checkbox]'); e.preventDefault(); if(!box) return;
+    const line = [...kimView.children].find(n => n.contains(box)), src = kimSrc(); if(!line || !src) return;
+    const i = [...kimView.children].indexOf(line), real = src.children[i], rb = real && real.querySelector(':scope > input[type=checkbox], input[type=checkbox]');
+    if(rb && (real.textContent || '') === (line.textContent || '')) { rb.click(); setTimeout(kimRender, 120); }
+    else { kimRender(); flash('Keep In Mind changed — try again'); }
+  });
   const blWidth = () => blCol ? (blCol.getBoundingClientRect().width || 260) : 260;
   function blMode(){
     if(!docked) return 'home';
@@ -2059,6 +2112,7 @@
     panel.classList.toggle('cp-blmin', lsGet('fw.calFullBlMin') !== '0'); // minimized by default (2026-11-14, Julius)
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     blPlace(); blRender(); if(!blEl.hidden) blLoad(false);
+    if(typeof kimTabSet === 'function') kimTabSet(lsGet('fw.calFullTab') === 'kim');
     setTimeout(() => { try { cal.updateSize(); } catch (e) {} }, 0);
     return true;
   }
@@ -2714,7 +2768,7 @@
     mount.addEventListener('click', e => { if(fill && mount.contains(e.target) && e.target.closest && e.target.closest('.fc-timegrid-body')){ e.stopPropagation(); e.preventDefault(); } }, true);
     document.addEventListener('keydown', e => { if(fill && e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); fillCancel(); } }, true);
   })();
-  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, mountCals, blToggle: () => blToggle(), blReload: () => blLoad(true), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : openNewest(); }, openNewest, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag, fill: {start: () => fillStart(), cancel: () => fillCancel(), active: () => !!fill, plan: (a, b, m) => fillPlan(L().fromISO(a, {zone: TZ}), L().fromISO(b, {zone: TZ}), m), run: (a, b, m) => { const p = fillPlan(L().fromISO(a, {zone: TZ}), L().fromISO(b, {zone: TZ}), m); if(p.list.length) fillApply(p.list, false); return p.list.length; }, undo: () => { if(fillJob && !moveBusy) fillApply(fillJob, true); }} };
+  window.fwCalendar = { canFull, openFull, fadRender, isFull: () => full, askDeleteLine, sendToBacklog, canBacklog, mountCals, blToggle: () => blToggle(), blReload: () => blLoad(true), dockTo, park, dockReady, prepareDock, isDocked: () => docked, saveMeta, open, close, toggle(){ isOpen() ? close() : openNewest(); }, openNewest, isOpen, refresh: retry, plan: () => { if(cal) loadPlan(true); }, newEvent: () => { if(cal && !pending) newEvent(); }, api: () => cal, planDrag: () => planDrag, fill: {start: () => fillStart(), cancel: () => fillCancel(), active: () => !!fill, plan: (a, b, m) => fillPlan(L().fromISO(a, {zone: TZ}), L().fromISO(b, {zone: TZ}), m), run: (a, b, m) => { const p = fillPlan(L().fromISO(a, {zone: TZ}), L().fromISO(b, {zone: TZ}), m); if(p.list.length) fillApply(p.list, false); return p.list.length; }, undo: () => { if(fillJob && !moveBusy) fillApply(fillJob, true); }} };
   // One delegated listener each (never re-bound), so opening / closing repeatedly can't stack handlers.
   document.addEventListener('click', e => {
     const t = e.target.closest && e.target.closest('[data-cal-open],[data-cal-close],[data-cal-retry],[data-cal-refresh],[data-cal-detail-close],[data-cal-new],[data-cal-edit],[data-cal-del],[data-cal-del-yes]');

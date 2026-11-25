@@ -107,6 +107,27 @@
   /* Subject-only border mode: no subject fill; urgency remains independently marked. */
   body.tc-borderonly .check-line[data-tccat]{--tc-tint:transparent!important;border:1px solid color-mix(in srgb,var(--tc-cat) 38%,transparent)!important;border-radius:7px;}
   /* Keep subject colors readable without the bright outlines/fold controls. */
+  .tmr-qa{display:flex;gap:6px;align-items:center;margin:4px 0 6px;}
+  .tmr-qa input{flex:1 1 auto;min-width:0;font:inherit;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);}
+  .tmr-qa button{font:inherit;font-size:13px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:inherit;cursor:pointer;white-space:nowrap;}
+  .gap-view{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:max(24px,env(safe-area-inset-top)) 12px 12px;overflow:auto;}
+  .gap-card{width:min(440px,100%);background:var(--panel,#222);color:var(--text,#eee);border:1px solid var(--border,#444);border-radius:14px;padding:10px 12px 12px;box-shadow:0 10px 32px rgba(0,0,0,.4);font-size:14px;}
+  .gap-h{display:flex;align-items:center;gap:4px;margin-bottom:4px;}
+  .gap-x{margin-left:auto;border:0;background:transparent;color:inherit;font-size:16px;cursor:pointer;}
+  .gap-sum,.gap-note,.gap-msg{font-size:12px;color:var(--muted,#999);margin:2px 0 8px;}
+  .gap-note{margin:10px 0 0;}
+  .gap-row{border-top:1px solid var(--border,#444);padding:7px 0;}
+  .gap-t{font-weight:600;margin-bottom:4px;}
+  .gap-f{display:flex;gap:6px;}
+  .gap-f input{flex:1 1 auto;min-width:0;font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--border,#444);background:var(--bg,#111);color:inherit;}
+  .gap-f button,.gap-a button{font:inherit;font-size:13px;padding:4px 9px;border-radius:8px;border:1px solid var(--border,#444);background:transparent;color:inherit;cursor:pointer;}
+  .gap-done .gap-a{color:var(--muted,#999);}
+  .msel-on > *{cursor:pointer;}
+  .msel-on > [data-msel]{outline:2px solid #4a90e2;outline-offset:-1px;background:color-mix(in srgb,#4a90e2 18%,transparent);border-radius:4px;}
+  .msel-bar{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:9000;display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:var(--panel,#222);color:var(--text,#eee);border:1px solid var(--border,#444);box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:14px;max-width:calc(100vw - 24px);}
+  .msel-bar [data-ms-n]{min-width:7em;}
+  .msel-bar button[disabled]{opacity:.45;}
+  [data-tlsub][data-tlon="o"]::before{opacity:.5;} /* subtask fold (2026-11-25): quieter than a title's − */
   [data-tlon]::before{border-color:color-mix(in srgb,var(--tc-cat,var(--border)) 38%,transparent);color:color-mix(in srgb,var(--tc-cat,var(--muted)) 60%,var(--muted));}
   [data-tlon="c"][data-tlsum]:not([data-due-label])::after{border-left-color:color-mix(in srgb,var(--tc-cat,var(--border)) 38%,transparent);}
   .editor > [data-cgrp]{margin-top:12px!important;}
@@ -470,6 +491,15 @@
   /* Tight cells (2026-11-14 night, Julius: "squeeze more room out, get rid of empty space and margin, text can go
      under the checkbox"): full screen only; font size unchanged for now (he wants to see this first). */
   #calPanel.cp-full .cp-fadh,#calPanel.cp-full .cp-blh{padding:2px 4px 1px;}
+  /* Keep In Mind tab beside Backlog (2026-11-25): full screen only */
+  #calPanel .cp-bltab,#calPanel .cp-kimv{display:none;}
+  #calPanel.cp-full .cp-bltab{display:inline-block;font:inherit;font-weight:400;font-size:12px;padding:1px 7px;border-radius:7px;border:1px solid var(--cp-line,var(--border));background:transparent;color:var(--cp-muted,var(--muted));cursor:pointer;}
+  #calPanel.cp-full.cp-kimtab .cp-bltab{font-weight:700;color:inherit;border-color:currentColor;}
+  #calPanel.cp-full.cp-kimtab .cp-blh > b{font-weight:400;color:var(--cp-muted,var(--muted));cursor:pointer;}
+  #calPanel.cp-full.cp-kimtab:not(.cp-blmin) .cp-kimv{display:block;flex:1 1 auto;min-height:0;overflow:auto;padding:2px 8px 8px;font-size:13px;}
+  #calPanel.cp-full.cp-kimtab .cp-blb,#calPanel.cp-full.cp-kimtab .cp-blbar,#calPanel.cp-full.cp-kimtab .cp-blhint,#calPanel.cp-full.cp-kimtab [data-bl-selmode],#calPanel.cp-full.cp-kimtab [data-bl-sort]{display:none!important;}
+  #calPanel .cp-kimv .check-line{display:flex;align-items:flex-start;gap:5px;}
+  #calPanel .cp-kimv .check-line.done > .check-text{opacity:.55;text-decoration:line-through;}
   #calPanel.cp-full .cp-fadh{padding:1px 3px 0;}
   #calPanel.cp-full .cp-fadb,#calPanel.cp-full .cp-blb{padding:0 2px 2px;}
   #calPanel.cp-full .cp-fadb{padding:0 1px 1px;}

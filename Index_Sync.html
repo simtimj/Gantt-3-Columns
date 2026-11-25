@@ -750,7 +750,7 @@
     const c = el.cloneNode(true);
     c.querySelectorAll('input[data-wired]').forEach(cb=>cb.removeAttribute('data-wired'));
     c.querySelectorAll('.tc-holdready').forEach(n => n.classList.remove('tc-holdready')); // hold-to-drag ring is render-only
-    c.querySelectorAll('[data-tlon],[data-tlhid]').forEach(n => { ['data-tlon','data-tlinfo','data-tlhid','data-tlsum','data-tlbox','data-tlcnt'].forEach(a => n.removeAttribute(a)); n.querySelectorAll(':scope > .tl-sum').forEach(x => x.remove()); });
+    c.querySelectorAll('[data-tlon],[data-tlhid],[data-tlsub],[data-msel]').forEach(n => { ['data-tlon','data-tlinfo','data-tlhid','data-tlsum','data-tlbox','data-tlcnt','data-tlsub','data-msel'].forEach(a => n.removeAttribute(a)); n.querySelectorAll(':scope > .tl-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-tsf]').forEach(n => { ['data-tsf','data-tsinfo','data-tssum'].forEach(a => n.removeAttribute(a)); n.querySelectorAll('.ts-sum').forEach(x => x.remove()); });
     c.querySelectorAll('[data-render-due]').forEach(n => n.remove()); // Due group in Notes is render-only
     c.querySelectorAll('[data-render-kd]').forEach(n => n.remove()); // Keep In Mind "Completed" header is render-only

@@ -62,6 +62,12 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 - **Event titles fill the card** (2026-11-25 08:45): in the docked / big / full calendar, a timed event's title now wraps onto as many lines as the card has room for (was capped at 3, then 2 / 1 as the card got shorter), with the time under it; "…" only on the last line that fits. Re-fits when you zoom or resize. 30-minute events now use the same layout (title over time when there's room, one line when there isn't).
 - **PWA openings in the Speed Log** (2026-11-25): opening the installed app from the phone's saved copy now writes a `load` row (Total ms 0, Client `source: device`, `drawEnd` / `screen` = ms until the page drew). Before, only /dev logged openings, so the code-cache speed couldn't be checked.
+- **📥 Send to Backlog** (backlog batch, 2026-11-25): hold an open all-day task (e.g. in the full calendar's All day box) → **📥 Send to Backlog**: it leaves the calendar and shows in the Backlog list at once. Dragging it back onto a day (or Send to Today) makes a fresh event with its title and color. Not for repeating, done or Events-calendar items.
+- **Fold subtasks on any task** (backlog batch): any task with indented subtasks gets the small − / + (quieter than a title's); folded = "+ n hidden". Saved like a title's fold.
+- **☑ Select (multi-select)** (backlog batch): hold a line → ☑ Select → tap lines to pick them; tap a title / label (e.g. Weekend in Keep In Mind) to pick everything under it, the label stays → 🗑 Delete (one undo). Done or Esc leaves.
+- **Keep In Mind tab in the full calendar** (backlog batch): the bottom-left box has tabs **Keep In Mind** · **Backlog**. Keep In Mind shows the list; ticking a box there ticks the real line. Tap the open tab again to minimize. Remembered per device.
+- **Blocks: ＋ Add while the timer runs** (backlog batch): ＋ Add on the timer bar opens a row: "task, another, …" → **→ Here** (Enter) adds them to the running block, **→ Next** to Next Block. The timer isn't touched.
+- **🕳 Unaccounted time** (backlog batch): tap a block title → 🕳 Unaccounted time (or 🕳 Gaps on the day's timer bar). Lists 20 min+ gaps between 8 am and 10 pm (now, today) that neither the block timer nor a ticked task covers, with a guess (what came right after) → ✓ / change / Skip. Answers are kept as estimates (`est` rows in the Timer Log), never added to measured time.
 - **Full calendar All day box**: ticking a scheduled task (timeline or box) now shows it done in the box's Scheduled group too.
 - **Full calendar tidy**: no white column line left of the hour labels; slimmer date header row; smaller header buttons (toolbar + ↻ ✕); a little side room on the hour labels.
 - **Calendar overlaps side by side**: events that overlap now sit in their own columns (left / right) instead of stacking over each other — every calendar view.
@@ -173,8 +179,6 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 - **Follow the now line** (2026-11-21, idea): a setting that keeps the calendar's current-time line in view through the day when zoomed in (auto-scroll as time passes). Open questions in docs/NOTES.md → Google-style event pop-up section.
 
-- **Blocks timer next (2026-11-12):** child item timers + Break polish; Quick Add while a block runs (comma-split into lines).
-- **Calendar backlog (2026-11-12, captured):** pop-out events panel that covers the middle column for long titles; Cal Events always shows Soon + Later lines (drag in = set priority); small calendar = 1:1 mini of the big calendar, with hold-drag move, top/bottom resize handles and Google Calendar sync.
 
 - **Calendar backlog** (wanted 2026-11-11, design pending): unfinished calendar tasks from past days go to a backlog (kept, struck through on their old day, colors kept); a Backlog button opens a list on the left of the 📅 panel to drag tasks back onto a day. Built 2026-11-11 (see 🧪). See `docs/NOTES.md` → "Calendar backlog".
 - **App cleanup** (wanted 2026-11-08): hide what isn't used, better grouping and sorting of the many panels / tabs First candidate: the **Cal Events** panel (center bottom), now covered by the 📅 calendar; decide what takes its spot.

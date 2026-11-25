@@ -132,7 +132,7 @@
     var CAL_WRITES = { addAllDayTask: 1, setCalendarEventMeta: 1, calPanelSetOrder: 1, calPanelCreateEvent: 1, calPanelUpdateEvent: 1,
       calPanelMoveEvent: 1, calPanelSetColor: 1, calPanelDuplicateEvent: 1, calPanelDeleteEvent: 1, planSchedule: 1, setCalendarEventTitle: 1,
       setCalendarEventDone: 1, archiveCompletedTasks: 1, calBacklogComplete: 1, planSave: 1, planMoveEvent: 1, calBacklogSync: 1,
-      calBacklogPlace: 1, calBacklogPlaceMany: 1, calRetitleLinked: 1 };
+      calBacklogPlace: 1, calBacklogPlaceMany: 1, calRetitleLinked: 1, calBacklogSend: 1 };
     var OWNER = String(FB_CFG.owner || '').toLowerCase(), cfg = Object.assign({}, FB_CFG);
     delete cfg.owner; delete cfg._note; delete cfg.areas; delete cfg.calFn;
     // I (2026-11-24): calendar edits on the Cloud Function (config calFn = its URL; empty = off, Apps Script as before).
@@ -1051,7 +1051,7 @@
        (the event JSON); set with merge adds one key, so two devices never lose each other's taps and it queues offline.
        Reads: day docs from `since` on, once the server seeded the last 30 days (gantt/timerMeta). */
     function timerArea() {
-      var ACTS = { start: 1, pause: 1, finish: 1, istart: 1, istop: 1, fix: 1 };
+      var ACTS = { start: 1, pause: 1, finish: 1, istart: 1, istop: 1, fix: 1, est: 1 };
       function key(op) { return String(op).slice(0, 64).replace(/[`\\]/g, '_'); }
       function meta() { return getDoc(db.collection('gantt').doc('timerMeta')); }
       var RUN = {

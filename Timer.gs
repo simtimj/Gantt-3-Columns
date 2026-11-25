@@ -4,7 +4,8 @@
    appends them to the "Timer Log" tab, skipping op ids it already has, so a retry or a second device never
    doubles anything. The page rebuilds all totals from the events; nothing here computes time. */
 const TIMER_HEADERS = ['Op', 'Date', 'At', 'Action', 'Block', 'Item', 'Name', 'Value', 'Device'];
-const TIMER_ACTIONS = { start: 1, pause: 1, finish: 1, istart: 1, istop: 1, fix: 1 };
+// est = an estimate for unaccounted time (2026-11-25, gaps view): its own record, never added to measured time.
+const TIMER_ACTIONS = { start: 1, pause: 1, finish: 1, istart: 1, istop: 1, fix: 1, est: 1 };
 
 // Storage: Store.timer (Store.gs, 2026-11-21 H2).
 

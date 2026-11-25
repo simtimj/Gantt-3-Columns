@@ -3689,6 +3689,37 @@ function calBacklogComplete__(req) {
     return { ok: true, mode: mode, day: day };
   } finally { lock.releaseLock(); }
 }
+/* Send to Backlog (2026-11-25, Julius: "send tasks from my current day in the full calendar to the backlog — hold,
+   click, Backlog"): an all-day task leaves the calendar and becomes an open Backlog row. The row gets its own id
+   ("blsend…|<day>"), not the event's, so the reconcile never sees the deleted event and drops the row; placing it
+   later (drag / Send to Today) makes a fresh event, since that id was never on the calendar. */
+function calBacklogSend(req) {
+  try { return calBacklogSend__(req); } finally { calBacklogPublishIfDirty_(); }
+}
+function calBacklogSend__(req) {
+  const r = req || {};
+  const ev = calPanelEditable_(r.eventId, r.startMs, r.calId);
+  if (!ev.isAllDayEvent()) throw new Error('Only all-day tasks can go to the backlog');
+  if (ev.isRecurringEvent()) throw new Error('Repeating events can’t go to the backlog');
+  const tz = Session.getScriptTimeZone(), day = Utilities.formatDate(ev.getAllDayStartDate(), tz, 'yyyy-MM-dd');
+  const title = String(ev.getTitle() || '').replace(/^\[x\]\s*/i, '').trim() || '(no title)';
+  const colorId = String(ev.getColor() || '') === '8' ? '' : String(ev.getColor() || '');
+  const u = URG_EVENT_COLOR_[String(r.urg || '')] ? String(r.urg) : (Object.keys(URG_EVENT_COLOR_).find(k => URG_EVENT_COLOR_[k] === colorId) || '');
+  const id = 'blsend' + Date.now().toString(32) + Math.floor(Math.random() * 1024).toString(32) + '|' + day;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    calBacklogApplyOps_();
+    Store.calBacklog.add([[id, day, title, colorId, u, Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm'), '']]);
+    try { ev.deleteEvent(); }
+    catch (e) { // keep it on the calendar → close the new row so the task isn't in two places
+      const rows = Store.calBacklog.rows(), i = rows.findIndex(x => x[0] === id);
+      if (i >= 0) Store.calBacklog.setPlaced(i, 'dropped');
+      throw new Error('Couldn’t take it off the calendar — ' + (e && e.message || e));
+    }
+  } finally { lock.releaseLock(); }
+  return { ok: true, item: { id: id, date: day, title: title, colorId: colorId, urg: u, color: CAL_PANEL_COLORS_[colorId] || CAL_PANEL_UNASSIGNED_COLOR_ } };
+}
 
 /* =========================================================
    KEEP IN MIND — one shared list (2026-11-13, Julius: "shared between all days, should not change its contents";

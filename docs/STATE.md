@@ -1,4 +1,4 @@
-# Current state (read this first; updated 2026-11-25 09:15)
+# Current state (read this first; updated 2026-11-25 10:30)
 
 Short and current. History and build details live in `docs/NOTES.md` (1,300 lines: `grep -n "^## "`, open one section, never read whole).
 
@@ -12,7 +12,9 @@ Short and current. History and build details live in `docs/NOTES.md` (1,300 line
 ## Focus (Gaunt rules)
 - Active focus: **PWA upgrade** (Calendar, Timer/Blocks parked).
 - Waiting on Julius's phone test: event titles fill the card, calendar tidy, Google-style checkboxes, side-by-side overlaps, code cache, auto archive (README 🧪 2026-11-24 / 25).
-- Captured for later (New Tasks, Can be later): Fun tab thumbnails + episode tracking, multi-select mode, collapse/expand subtasks, Keep In Mind tab beside Backlog in the full calendar.
+- Captured for later (New Tasks, Can be later): Fun tab thumbnails + episode tracking.
+- **Backlog batch done 2026-11-25** (Julius overrode the one-focus rule for one session, "do it anyway, all of it"): Send to Backlog, subtask fold, multi-select, Keep In Mind tab in the full calendar, Blocks Quick Add, Unaccounted time view. All 🧪 in README. NOTES → "Backlog batch 2026-11-25".
+- Dropped by Julius 2026-11-25: Soon / Later drag lanes (Ordered / Unordered replaced them). Already built before: quick-add on the empty all-day strip, small calendar drag / resize, pop-out panel (📅 = full screen), Blocks child timers + Break.
 
 ## Next (in order)
 1. Speed Log: PWA openings now log `load` rows (source device, from 2026-11-25). After a day, read their `screen` / `drawEnd` (no older PWA rows to compare against; /dev rows are the only before).

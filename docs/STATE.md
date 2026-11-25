@@ -1,4 +1,4 @@
-# Current state (read this first; updated 2026-11-25 08:00)
+# Current state (read this first; updated 2026-11-25 09:00)
 
 Short and current. History and build details live in `docs/NOTES.md` (1,300 lines: `grep -n "^## "`, open one section, never read whole).
 
@@ -11,7 +11,7 @@ Short and current. History and build details live in `docs/NOTES.md` (1,300 line
 
 ## Focus (Gaunt rules)
 - Active focus: **PWA upgrade** (Calendar, Timer/Blocks parked).
-- Waiting on Julius's phone test: calendar tidy, Google-style checkboxes, side-by-side overlaps, code cache, auto archive (README 🧪 2026-11-24 / 25).
+- Waiting on Julius's phone test: bloat cleanup (nothing should look different), calendar tidy, Google-style checkboxes, side-by-side overlaps, code cache, auto archive (README 🧪 2026-11-24 / 25).
 - Captured for later (New Tasks, Can be later): multi-select mode, collapse/expand subtasks, Keep In Mind tab beside Backlog in the full calendar.
 
 ## Next (in order)
@@ -19,6 +19,9 @@ Short and current. History and build details live in `docs/NOTES.md` (1,300 line
 
 ## Index_Main split (done 2026-11-25)
 - Main script = 8 parts (Index_Main, _Editors, _Sync, _Reference, _Search, _NextSteps, _CalEvents, _RefOptions; 55–88 KB each). Load-order rule in CODE_MAP.md.
+
+## Bloat cleanup (done 2026-11-25)
+- Dead UI code gone (instant screen, old Calendar / Inbox panels, unused functions, dead CSS; ~43 KB). Details NOTES "Bloat cleanup". Store sheet-mode bodies kept (they are the fallback).
 
 ## Working rules that changed recently
 - PWA-first: new features PWA only; /dev = emergency backup; Apps Script fallback stays (Julius 2026-11-25).

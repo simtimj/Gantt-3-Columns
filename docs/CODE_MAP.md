@@ -21,7 +21,7 @@ Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.m
 | `Index_Reference.html` | REFERENCE, MOBILE MODE / SPLIT, ARCHIVE, REFERENCE COLLAPSE, WORKSPACE VIEW, COLUMN RESIZING / FOCUS MODE |
 | `Index_Search.html` | REFERENCE SEARCH, TOP-BAR BUTTONS, ON-SCREEN KEYBOARD, START (the `init*()` calls) |
 | `Index_NextSteps.html` | URGENCY / Next Steps, urgent batches by subject, urgent tick = log + archive, send-to |
-| `Index_CalEvents.html` | INBOX + Cal Events column (`Calendar panel back`, `loadCenterCalendar`, pinch zoom) |
+| `Index_CalEvents.html` | Cal Events column (`loadCenterCalendar`, pinch zoom) + inbox → Backlog move (old Calendar / Inbox panels removed 2026-11-25) |
 | `Index_RefOptions.html` | Reference options panel, indent / outdent, Urgent text menu, end of start-up (`loadWorkspace()`) |
 
 **Main-script parts are separate `<script>` blocks in this order** (shared globals, same as one script once all have loaded). Rule: code that runs *while a part loads* (top-level calls, `let x = f()`) may only use functions from that part or earlier ones; anything later must be called from an event, a timer or the final `loadWorkspace()`. (`loadColumnWidths` sits in STATE for this reason.)
@@ -36,7 +36,7 @@ Only file allowed to touch the Sheet / Properties (ratchet: `tools/store-guard.m
 | Base CSS + light / dark theme | `Light / dark toggle, saved per device` | 1–2320 |
 | Page markup (header, columns, panes) | `<body>` | 2324–2600 |
 | **Main app script** (8 parts, see table above; line numbers below are from before the split) | `STATE` banner | 2610–11720 |
-| Instant screen (snapshot paint / save, early data request) | `INSTANT SCREEN` | 2615 |
+| Early data request (the instant-screen picture was removed 2026-11-25) | `Early data request` (Index.html) | 2615 |
 | One calm return (`fwResume` queue on coming back; reads batched via `fwBatchStart` / `batchCalls`) | `ONE CALM RETURN`, `Batched calls (speed plan E` | 3058 |
 | · state, helpers, first load | `BASIC HELPERS`, `LOAD` | 2750 |
 | · day rows (History / Today), editors | `DAYS`, `EDITORS`, `AUTO FORMATTING` | 2920–4700 |

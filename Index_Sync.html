@@ -1250,7 +1250,6 @@
         if(retry) setTimeout(() => fwSync(false),2500);
         // New AI tasks arrive with data-ai-new: sort them into today's time sections.
         if(Object.keys(out.days || {}).length && typeof tsecPlaceAi === 'function') setTimeout(() => { try{ tsecPlaceAi(); }catch(e){} },0);
-        if(Object.keys(out.days || {}).length || note) { if(window.fwSnapSoon) fwSnapSoon('sync'); }
         // Fewer Speed Log rows (2026-11-24): an open page synced every minute and logged every one (a second server
         // call + a Sheet write each time, ~1,000 rows a day). Now: slow ones (> 4 s), a pile of save timings, or
         // one sample per 30 min.

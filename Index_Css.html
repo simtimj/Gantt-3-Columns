@@ -323,10 +323,6 @@
     .pane-narrow .day-label{white-space:nowrap;}
     .pane-narrow .day-date .dd-long{display:none;}
     .pane-narrow .day-date .dd-short{display:inline;}
-    .today-pill{font-size:.75em;vertical-align:.1em;
-      color:var(--accent);
-      margin-left:6px;
-    }
     .top-select{
       border:1px solid #c9c9c9;
       background:#fff;
@@ -519,12 +515,6 @@
      * Indentation only changes horizontal position.
      * It NEVER changes text color.
      */
-    .indent-1{margin-left:24px}
-    .indent-2{margin-left:48px}
-    .indent-3{margin-left:72px}
-    .indent-4{margin-left:96px}
-    .indent-5{margin-left:120px}
-    .indent-6{margin-left:144px}
     /* =========================================================
        REFERENCE
        ========================================================= */
@@ -837,11 +827,6 @@
       font-size:11px;
       padding:3px 6px;
     }
-    .format-hint{
-      color:#888;
-      font-size:11px;
-      padding:3px 2px 10px;
-    }
     .hidden{
       display:none!important;
     }
@@ -901,7 +886,6 @@
     .day-row.today.journal-pane-row{box-shadow:inset 0 1px 0 var(--today-border-adj),inset 0 -1px 0 var(--today-border-adj),inset -1px 0 0 var(--today-border-adj);}
     #todayPane,#journalPane{border-right:0;}
     .day-row.today .day-label{color:var(--note-line-adj);}
-    .day-row.today .today-pill{color:var(--today-border-adj);font-weight:700;}
     .editor.day-editor,.editor.journal-editor{min-height:5.9em;flex-shrink:0;flex-grow:1;}
     .pane,.scroll{overscroll-behavior:contain;}
     @media(max-width:900px){
@@ -935,14 +919,10 @@
       .ref-toolbar .btn{min-height:calc(44px * var(--mobile-scale,1));}
       .ref-actions{position:static;justify-content:flex-end;margin-top:calc(5px * var(--mobile-scale,1));}
       .ref-actions .btn{min-height:calc(36px * var(--mobile-scale,1));}
-      .format-hint{font-size:calc(12px * var(--mobile-scale,1));line-height:1.4;}
     }
-    .reference-sort-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;}
     /* 2026-10-26: dropdown only as wide/tall as its text. */
-    .reference-sort-bar #referenceSort{flex:0 0 auto;width:auto;max-width:100%;min-width:0;min-height:0!important;height:auto;padding:2px 6px!important;font-size:inherit!important;line-height:1.3;}
     #mobileScale{width:100%;min-width:0;}
     @media(max-width:900px){
-      .reference-sort-bar{font-size:calc(14px * var(--mobile-scale,1));}
       #mobileScaleValue{font-size:13px;}
     }
 
@@ -1057,7 +1037,6 @@
     #focusControls .btn{min-height:calc(34px * var(--workspace-scale));font-size:calc(13px * var(--workspace-scale));}
     .pane-header{font-size:calc(14px * var(--workspace-scale));}
     .day-label,body.mobile-mode .day-label{font-size:calc(17px * var(--workspace-scale))!important;line-height:1.3!important;}
-    .today-pill{font-size:inherit;}
     .editor,.ref-cell,
     .editor :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
     .ref-cell :is(p,div,h1,h2,h3,span,strong,b,em,i,u,s,strike,del,li),
@@ -1323,7 +1302,6 @@
     /* Range sliders in Options get real width (the checkbox sizing above made them 16px and stuck, 2026-10-31). */
     body #typeSettings .ts-check input[type=range]{width:auto!important;flex:1 1 140px;min-width:120px;height:22px!important;margin:0!important;touch-action:pan-y;}
     #lineStrengthVal{min-width:3em;text-align:right;font-variant-numeric:tabular-nums;}
-    #typeSettings .ts-hint{font-size:11px;color:var(--muted);margin:2px 0 6px;}
     #typeSettings .ts-cat{display:grid;grid-template-columns:34px minmax(0,1fr) 28px;gap:4px 6px;align-items:center;margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
     #typeSettings .ts-cat input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;}
     #typeSettings .ts-cat input[type=text]{min-width:0;min-height:30px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:13px;background:transparent;color:inherit;}
@@ -1375,8 +1353,6 @@
     .dash-chip:empty{display:none;}
     .editor[data-dash]:not(:empty)::before{content:attr(data-dash);display:block;margin:0 0 4px;font-size:12px;font-weight:400;color:var(--muted);white-space:nowrap;pointer-events:none;-webkit-user-select:none;user-select:none;}
     .dash-chip b{color:inherit;}
-    .dash-chip .dash-bar{display:inline-block;vertical-align:middle;width:46px;height:5px;margin-left:6px;border-radius:3px;background:rgba(127,127,127,.25);overflow:hidden;}
-    .dash-chip .dash-bar i{display:block;height:100%;background:#22a06b;}
     /* Title lines (2026-10-27): − / + at the right end folds the lines under it. */
     [data-tlon]{display:flex!important;align-items:center;}
     [data-tlon] > .check-text{flex:0 1 auto;}
@@ -1415,9 +1391,6 @@
     /* Reference options, Urgent create, Inbox, −/+ toggles (2026-10-26, Julius). */
     /* Sort-row buttons match the Sort dropdown's size, and the row wraps instead
        of running off a phone screen (2026-10-26, Julius). */
-    .reference-sort-bar{flex-wrap:wrap;row-gap:4px;max-width:100%;min-width:0;box-sizing:border-box;}
-    .reference-sort-bar .btn{flex:0 0 auto;min-height:0!important;height:auto!important;padding:2px 6px!important;font-size:inherit!important;line-height:1.3!important;border-radius:4px;}
-    .reference-sort-bar .ref-collapse-all{min-width:0;width:auto;font-weight:700;}
     .ref-options{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;}
     .ref-options .ts-check{flex-wrap:wrap;}
     .ref-options .ts-check select{max-width:100%;}
@@ -1514,36 +1487,14 @@
     .urg-create{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:4px;}
     .urg-create input,.inbox-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;}
     #calPanel{margin:0 0 6px;padding:4px 7px 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
-    .cal-sub.cal-today{color:var(--text,#222);}
-    .cal-row{display:flex;align-items:flex-start;gap:6px;width:100%;text-align:left;background:none;border:0;padding:3px 0;color:inherit;font-size:13px;}
     /* Calendar event cards use the same Options typography as the rest of Gantt. */
     #calPanel{font-size:var(--paragraph-size);font-family:var(--paragraph-font);}
-    #calPanel .cal-row{box-sizing:border-box;gap:8px;margin:4px 0;padding:7px 9px;border:1px solid color-mix(in srgb,var(--border) 75%,transparent);border-radius:7px;background:var(--panel);font-size:var(--paragraph-size);font-family:var(--paragraph-font);line-height:1.3;}
-    #calPanel .cal-time{font-size:inherit;min-width:0;max-width:42%;overflow-wrap:anywhere;}
-    #calPanel .cal-title{font-size:inherit;overflow-wrap:anywhere;}
-    #calPanel .cal-sub.cal-block{font-size:inherit;margin-top:8px;}
-    #calPanel .cal-arch-item{font-size:inherit;}
-    #calPanel .cal-row.now{border-color:var(--accent);}
-    .cal-row .cal-box{margin-top:2px;flex:0 0 auto;}
-    .cal-row .cal-time,.cal-row .cal-title{cursor:pointer;}
-    .cal-row.done .cal-title,.cal-row.done .cal-time{text-decoration:line-through;opacity:.55;}
-    .cal-sub.cal-block{padding-left:4px;font-size:11px;opacity:.8;}
-    .cal-arch-item{padding-left:18px;font-size:12px;}
-    .cal-archive-bar{display:flex;align-items:center;gap:8px;margin:4px 0 2px;flex-wrap:wrap;}
-    .cal-auto{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--muted);}
-    .cal-sub.cal-donehead{cursor:pointer;display:flex;align-items:center;gap:4px;}
-    .cal-time{flex:0 0 auto;min-width:6.4em;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
-    .cal-title{flex:1;min-width:0;}
-    .cal-row.past{opacity:.5;}
-    .cal-row.now .cal-title{font-weight:700;}
-    .cal-now{flex:0 0 auto;font-size:10px;font-weight:700;text-transform:uppercase;color:#fff;background:#3b82f6;border-radius:4px;padding:0 5px;}
     #inboxPanel{margin:0 0 6px;padding:4px calc(7px * var(--side-k,1)) 5px;border:1px solid var(--border);border-radius:8px;background:#fff;}
     /* Inbox rows = task rows (2026-10-27, Julius): box + always-editable text, same as Urgent. */
     #inboxPanel .inbox-row{display:flex;align-items:flex-start;gap:6px;padding:4px 0;cursor:default;}
     #inboxPanel .inbox-row > .urg-box{margin-top:2px;touch-action:none;}
     #inboxPanel .inbox-text{flex:1 1 0;min-width:4em;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;cursor:text;outline:none;border-radius:3px;}
     #inboxPanel .inbox-text:focus{box-shadow:0 0 0 1.5px var(--urg);border-radius:4px;padding:1px 4px;margin:-1px -4px;}
-    #inboxPanel .inbox-row.inbox-dragging{opacity:.3;}
     .inbox-from{order:2;flex:0 0 auto;margin-left:auto;font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;}
     /* Narrow Reference: text runs under the box, the Claude tag floats right (same as Urgent). */
     .pane-narrow #inboxPanel .inbox-row{display:flow-root;}
@@ -1551,7 +1502,6 @@
     .pane-narrow #inboxPanel .inbox-row > .inbox-from{float:right;margin:1px 0 0 6px;}
     .pane-narrow #inboxPanel .inbox-row > .inbox-text{display:block;}
     .urg-picker .urg-del{color:#c0392b;}
-    .inbox-add{display:flex;gap:6px;margin-top:6px;}
     /* Reference cell toggles: boxed − / + instead of ▾ / ▸. Done in CSS so every
        code path that sets the arrow text still works. */
     #referenceTree .ref-disclosure{font-size:0!important;color:#777;}
@@ -1562,11 +1512,7 @@
     /* (Julius, 2026-10-27) Reference: Sort / − / Options sit in the REFERENCE header
        on the right; search row is shorter; Reference has its own padding sliders. */
     .ref-pane-header{gap:6px;min-width:0;}
-    .ref-pane-title{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .ref-pane-header .reference-sort-bar{margin:0 0 0 auto;flex-wrap:nowrap;font-weight:400;gap:5px;min-width:0;}
-    .ref-pane-header .ref-sort-label{display:none;}
     .ref-pane-header #referenceSort{flex:0 1 auto;min-width:3.5em;max-width:42vw;text-overflow:ellipsis;}
-    .ref-pane-header .reference-sort-bar .btn{flex:0 0 auto;}
     .ref-toolbar .btn{white-space:nowrap;}
     .ref-toolbar{padding-bottom:4px;margin-bottom:2px;gap:5px;}
     .ref-toolbar .ref-search{padding:3px 8px;min-height:0;}
@@ -1641,7 +1587,6 @@
       .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]{background:#121212;}
       .check-line:is([data-urg="1"],[data-urg="2"],[data-urg="3"]) > input[type=checkbox]:checked{background:var(--urg);}
       .urg-pick:not(.on){background:#1c1c1c;}
-      .reference-sort-bar #refOptionsBtn.on{background:#1d2738;border-color:#3f74a6;}
       .urg-picker,.urg-due-chip,.uc-today,#calPanel,#inboxPanel{background:#161616;}
     }
 
@@ -1666,7 +1611,6 @@
     .next-steps-label{flex:0 0 auto;margin-right:.55em;white-space:nowrap;}
     #referencePane .ref-pane-header .urg-counts{flex:1;min-width:0;margin:0;gap:.45em;overflow:hidden;white-space:nowrap;}
 
-    .od-pad-head .blocks-add,.od-pad-head .blocks-task,.od-pad-head .blocks-remove{font:inherit;letter-spacing:normal;text-transform:none;border:1px solid var(--divider,#777);border-radius:5px;background:transparent;color:inherit;padding:3px 7px;margin-left:5px;cursor:pointer;}
 
     body.one-day #todayScroll .day-row:not(.od-on),
     body.one-day #journalScroll .day-row:not(.od-on){display:none;}
@@ -1767,11 +1711,7 @@
     #centerDownScroll .ce-head{display:flex;flex-wrap:nowrap;justify-content:space-between;align-items:center;width:100%;gap:6px;}
     #centerDownScroll .ce-head strong{flex:1 1 auto;min-width:0;font-size:var(--fw-text);text-align:left;}
     #centerDownScroll .ce-head [data-ce-refresh]{appearance:none;flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;max-width:24px;max-height:24px;padding:0!important;margin:0;font-size:14px;line-height:1;}
-    #centerCalendarList .ce-date{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    #centerCalendarList .ce-date-short{display:none;}
     @container(max-width:360px){
-      #centerCalendarList .ce-date-long{display:none;}
-      #centerCalendarList .ce-date-short{display:inline;}
     }
     /* Calendar follows the same Options font and padding controls as editable cells. */
     #centerDownScroll{padding-inline:calc(8px * var(--workspace-scale,1) * var(--pad-x,1) * var(--side-k,1));font-family:var(--paragraph-font);font-size:var(--fw-text);line-height:1.18;}
@@ -1780,7 +1720,6 @@
     #centerDownScroll .ce-head > strong{flex:0 0 auto;} /* 2026-11-07 (Julius): the title stays; the 🔍 box shrinks instead */
     #centerCalendarList{font:inherit;line-height:inherit;}
     #centerCalendarList .ce-date,#centerCalendarList .ce-group,#centerCalendarList .ce-event,#centerCalendarList .ce-time,#centerCalendarList .ce-title{font-family:inherit;font-size:inherit;line-height:inherit;}
-    #centerCalendarList .ce-date{margin:calc(2px * var(--pad-y,1)) 0;}
     #centerCalendarList .ce-group{margin:calc(5px * var(--pad-y,1)) 0 calc(2px * var(--pad-y,1));}
     #centerCalendarList .ce-event{margin:calc(2px * var(--pad-y,1)) 0;padding:calc(4px * var(--pad-y,1)) calc(6px * var(--pad-x,1));}
     #centerCalendarList .ce-scheduled{margin:calc(2px * var(--pad-y,1)) 0;}
@@ -1865,21 +1804,13 @@
     .fx-tg{border:0;background:transparent;color:inherit;padding:0 2px;width:1.4em;cursor:pointer;font:inherit;flex:0 0 auto;}
     .fx-name,.fx-title,.fx-why{outline:none;min-width:2em;word-break:break-word;overflow-wrap:anywhere;}
     .fx-name{flex:1 1 auto;}
-    .fx-proj{margin:3px 0 3px 6px;padding:3px 6px 4px;border-left:2px solid color-mix(in srgb,#1565c0 45%,transparent);}
-    .fx-ph{display:flex;align-items:center;gap:4px;font-weight:600;}
-    .fx-title{flex:1 1 auto;}
     .fx-name,.fx-title{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;}
     .fx-cat.fx-ungrouped > .fx-ch{display:none;}
     .fx-cat.fx-ungrouped > .fx-body{display:block;}
-    .fx-why{font-size:.88em;color:var(--muted,#777);margin:1px 0 0 1.8em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-    .fx-why:focus{display:block;-webkit-line-clamp:unset;}
     [data-fph]:empty::before{content:attr(data-fph);color:var(--muted,#999);font-weight:400;font-style:italic;}
-    .fx-proj.fx-col .fx-why{display:none;}
     .fx-add{border:0;background:transparent;color:var(--muted,#888);font:inherit;font-size:.82em;padding:2px 4px;cursor:pointer;}
     .fx-cat.fx-col > .fx-body{display:none;}
     .fx-sub{font-weight:400;color:var(--muted,#888);font-size:.85em;}
-    .fx-tasks{margin:2px 0 0 1.8em;}
-    .fx-proj.fx-col .fx-tasks{display:none;}
     .fx-task{display:flex;align-items:flex-start;gap:5px;padding:1px 0;}
     .fx-task input{margin:.2em 0 0;flex:0 0 auto;accent-color:#1565c0;}
     .fx-tt{flex:1 1 auto;outline:none;min-width:2em;word-break:break-word;overflow-wrap:anywhere;}
@@ -1892,19 +1823,11 @@
     .fx-tt{word-break:normal;overflow-wrap:break-word;}
     .fx-note .fx-tt{font-style:italic;color:var(--muted,#888);font-size:.92em;}
     .fx-ago{flex:0 0 auto;margin-left:.35em;font-size:.72em;color:var(--muted,#888);opacity:.75;align-self:center;white-space:nowrap;}
-    .fx-tools{display:none;flex:0 0 auto;gap:1px;align-self:center;}
-    .fx-task:focus-within .fx-tools,.fx-task:hover .fx-tools{display:inline-flex;}
-    .fx-tools button{border:1px solid var(--border,#999);background:transparent;color:inherit;border-radius:5px;font:inherit;font-size:.85em;line-height:1;min-width:22px;height:22px;padding:0 3px;cursor:pointer;}
-    .fx-tools .fx-send{border:0;opacity:.6;}
     .fx-body > .fx-add{padding-left:2px;}
-    .fx-send{border:0;background:transparent;padding:0 2px;cursor:pointer;font-size:.8em;opacity:.35;flex:0 0 auto;}
-    .fx-task:focus-within .fx-send,.fx-send:hover{opacity:1;}
-    .fx-tasks > .fx-add{padding-left:0;}
     /* A color set from the hold menu covers everything inside (2026-11-03, Julius); finished subtasks stay gray. */
     .fx-colored :is(.fx-ch,.fx-ph,.fx-name,.fx-title,.fx-why,.fx-tt,.fx-tg,.fx-add,.fx-sub),.fx-colored .fx-task:not(.fx-done) .fx-tt{color:var(--fx-category-color);}
     .fx-colored .fx-done .fx-tt{color:var(--muted,#888);}
     .fx-colored .fx-task input{accent-color:var(--fx-category-color);}
-    .fx-colored .fx-proj,.fx-proj.fx-colored{border-left-color:var(--fx-category-color);}
     .fx-menu{width:216px;max-width:216px;}
     .fx-swatches{display:flex;flex-wrap:wrap;gap:6px;flex:1 0 100%;}
     .fx-swatch{width:26px;height:26px;padding:0;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;font-size:12px;line-height:1;cursor:pointer;}
@@ -2160,8 +2083,6 @@ body.tc-boxfill #centerCalendarList .ce-event[data-tccat][data-urg]:not(.ce-done
 #centerCalendarList .ce-day-now{position:absolute;left:22px;right:0;border-top:2px solid #ea4335;z-index:2;}
 #centerCalendarList .ce-day-ev{position:absolute;box-sizing:border-box;border-radius:4px;padding:1px 5px;font-size:12px;line-height:1.25;font-family:Roboto,'Segoe UI',system-ui,sans-serif;color:#1f1f1f;overflow:hidden;z-index:1;}
 #centerCalendarList .ce-day-ev b{font-weight:500;} /* Google Calendar look: medium weight, not bold (2026-11-11) */
-#centerCalendarList .ce-day-key{display:flex;flex-wrap:wrap;gap:2px 8px;margin:2px 2px 3px;font-size:10.5px;color:var(--muted);}
-#centerCalendarList .ce-day-key i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle;}
 #centerCalendarList .ce-day-ev b{font-weight:600;}
 #centerCalendarList .ce-day-ev span{opacity:.8;font-size:10px;}
 #centerCalendarList .ce-day-ev.done b{text-decoration:line-through;}

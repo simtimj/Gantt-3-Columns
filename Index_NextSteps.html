@@ -772,32 +772,6 @@
       document.addEventListener('pointerdown',off,true);
     },0);
   }
-  function createRow(u){
-    const row = document.createElement('form');
-    row.className = 'urg-create urg-group';
-    row.dataset.urg = u;
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.placeholder = 'New ' + URG_NAMES[u] + ' task — Title: details';
-    inp.enterKeyHint = 'done';
-    const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'btn tiny'; ok.textContent = 'Add';
-    const no = document.createElement('button'); no.type = 'button'; no.className = 'btn tiny'; no.textContent = '✕';
-    no.title = 'Cancel';
-    no.addEventListener('click',() => { urgCreating = 0; renderUrgent(); });
-    inp.addEventListener('keydown',e => { if(e.key === 'Escape'){ urgCreating = 0; renderUrgent(); } });
-    row.addEventListener('submit',e => {
-      e.preventDefault();
-      const p = splitTitle(inp.value);
-      if(!p.title && !p.details){ inp.focus(); return; }
-      if(addTaskToBacklog(p.title,p.details,u)){
-        urgCreating = 0;
-        renderUrgent();
-        setStatus(URG_NAMES[u] + ' task added to ' + BACKLOG_NAME);
-      }
-    });
-    row.append(inp,ok,no);
-    return row;
-  }
   // "Fix calendar: find which calendar the nap block is on" → title + details.
   function splitTitle(text){
     const t = String(text || '').trim();
@@ -805,8 +779,6 @@
     if(i > 0 && i < 80) return {title:t.slice(0,i).trim(),details:t.slice(i + 1).trim()};
     return {title:t,details:''};
   }
-  // Add a task (checkbox line) at the end of today's Today cell.
-  function addTaskToToday(title,details,urg){ return addTaskToDay(localToday(),title,details,urg); }
   // Tasks typed straight into Urgent go to the Backlog cell, not today (Julius, 2026-10-28).
   function addTaskToBacklog(title,details,urg,onMade){
     const cell = backlogCell();

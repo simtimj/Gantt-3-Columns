@@ -1552,13 +1552,6 @@
     window.tcGripPlace = () => { grip.hidden = true; grip._line = null; grip._copy = null; };
     function startPoint(e){
       if(e.button === 2) return;
-      // Inbox box: drag it out of the inbox into any cell (2026-10-27, Julius).
-      const ib = e.target && e.target.closest ? e.target.closest('#inboxPanel .inbox-box') : null;
-      if(ib){
-        const it = typeof inboxById === 'function' ? inboxById(ib.dataset.iid) : null;
-        if(it) press = {cb:ib,inbox:it,x:e.clientX,y:e.clientY,id:e.pointerId};
-        return;
-      }
       // Drag grip (2026-10-28, Julius): ⠿ at the right end of the line you're in.
       const gp = e.target && e.target.closest ? e.target.closest('#tcGrip') : null;
       if(gp){
@@ -1663,7 +1656,6 @@
       return out;
     }
     function begin(e){
-      if(press.inbox) return beginInbox(e);
       if(press.cal) return beginCal(e);
       const {line,ed} = press;
       if(hold){ clearTimeout(hold.timer); if(hold.mark) hold.mark.classList.remove('tc-holdready'); hold.ready = false; hold = null; }
@@ -1689,31 +1681,6 @@
       grip.hidden = true;
       if(navigator.vibrate) try{ navigator.vibrate(10); }catch(err){}
       drag = {nodes,src:ed,line,ghost,ind,offX:e.clientX - r.left,offY:e.clientY - r.top,x0:e.clientX,x:e.clientX,y:e.clientY,base:tcLvl(line),target:null};
-      try{ press.cb.setPointerCapture(press.id); }catch(err){}
-      press = null;
-      move(e);
-      drag.raf = requestAnimationFrame(autoScroll);
-    }
-    function beginInbox(e){
-      const it = press.inbox, row = press.cb.closest('.inbox-row');
-      if(typeof hideUrgencyPicker === 'function') hideUrgencyPicker();
-      try{ urgPress && clearTimeout(urgPress.timer); urgPress = null; }catch(err){}
-      try{ document.activeElement && document.activeElement.blur && document.activeElement.blur(); }catch(err){}
-      window.getSelection && window.getSelection().removeAllRanges();
-      const line = inboxTaskLine(it,0);
-      const r = (row || press.cb).getBoundingClientRect();
-      const ghost = document.createElement('div');
-      ghost.className = 'tc-ghost';
-      ghost.style.width = Math.min(Math.max(r.width,160),window.innerWidth - 12) + 'px';
-      const g = line.cloneNode(true); g.setAttribute('data-tc','fl'); g.setAttribute('data-tchead','0');
-      ghost.appendChild(g);
-      document.body.appendChild(ghost);
-      const ind = document.createElement('div'); ind.className = 'tc-drop'; ind.hidden = true; document.body.appendChild(ind);
-      if(row) row.classList.add('inbox-dragging');
-      document.body.classList.add('tc-dragging');
-      grip.hidden = true;
-      if(navigator.vibrate) try{ navigator.vibrate(10); }catch(err){}
-      drag = {nodes:[line],inbox:it,row,src:null,line,ghost,ind,offX:e.clientX - r.left,offY:e.clientY - r.top,x0:e.clientX,x:e.clientX,y:e.clientY,base:0,target:null};
       try{ press.cb.setPointerCapture(press.id); }catch(err){}
       press = null;
       move(e);
@@ -1759,26 +1726,6 @@
       line.classList.add('urg-flash');
       setTimeout(() => line.classList.remove('urg-flash'),1400);
       setStatus(t.ed.classList.contains('plan-pad') ? 'Copied to Blocks' : 'Event copied as a task');
-    }
-    function finishInbox(d,t){
-      if(d.row) d.row.classList.remove('inbox-dragging');
-      if(!t) return;
-      if(t.retag) return inboxToToday(d.inbox,Number(t.urg));
-      const line = d.line;
-      if(t.urg) line.dataset.urg = t.urg;
-      line.dataset.level = String(t.level);
-      line.style.marginLeft = t.level ? (t.level * 24) + 'px' : '';
-      captureBeforeEdit(t.ed);
-      const blank = !t.ed.textContent.trim() && !t.ed.querySelector('input,img,hr');
-      if(blank && !t.ed.classList.contains('ref-cell')) t.ed.replaceChildren(line);
-      else if(t.before) t.ed.insertBefore(line,t.before); else t.ed.appendChild(line);
-      if(typeof wireCheckbox === 'function') try{ wireCheckbox(line.querySelector('input')); }catch(err){}
-      refreshCards(t.ed); finishEditorEdit(t.ed);
-      urgChanged(t.ed);
-      if(typeof renderDueBlocks === 'function') try{ renderDueBlocks(); }catch(err){}
-      line.classList.add('urg-flash');
-      setTimeout(() => line.classList.remove('urg-flash'),1400);
-      dismissInbox(d.inbox.id,'Moved to ' + (t.ed.dataset.date ? (typeof shortDayLabel === 'function' ? shortDayLabel(t.ed.dataset.date) : t.ed.dataset.date) : 'Reference'));
     }
     // Drop on an Urgent row (2026-10-28, Julius): lands next to that task in its own cell and takes its urgency.
     // Any spot in the Urgent panel counts (2026-10-28, Julius: dragging into it did nothing unless
@@ -1835,7 +1782,7 @@
     }
     function targetAt(x,y){
       // Onto the calendar (2026-11-23, Julius): a linked event, the line stays (Index_Calendar fwCalTaskTarget).
-      if(!drag.inbox && !drag.cal && window.fwCalTaskTarget){ const ct = fwCalTaskTarget(x,y); if(ct) return ct; }
+      if(!drag.cal && window.fwCalTaskTarget){ const ct = fwCalTaskTarget(x,y); if(ct) return ct; }
       const el = document.elementFromPoint(x,y);
       const ut = urgTargetAt(el,x,y);
       if(ut !== undefined) return ut;
@@ -1942,7 +1889,6 @@
       d.nodes.forEach(n => n.removeAttribute('data-tcdrag'));
       suppressUntil = Date.now() + 450;
       const t = cancelled ? null : d.target;
-      if(d.inbox) return finishInbox(d,t);
       if(d.cal) return finishCal(d,t);
       if(!t) return;
       if(t.calDrop){ if(window.fwCalTaskDrop) fwCalTaskDrop(d.line,d.src,t); return; }

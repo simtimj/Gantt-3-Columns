@@ -177,12 +177,6 @@
   // Tue=fire, Wed=water, Thu=wood, Fri=gold, Sat=earth. The PNG (WeekdayIcons.html) is used as a
   // mask filled with the day's own color (--note-line-adj: Saturday = dirt brown), text height.
   const WD_RATIO = [187/187,186/195,169/202,157/207,174/234,225/126,245/152]; // width / height per PNG
-  function wdIconHtml(s){
-    const d = new Date(s + 'T00:00:00').getDay(), src = (window.WD_ICON_URL || [])[d];
-    if(!src) return '';
-    const m = 'url(' + src + ')';
-    return '<span class="wd-icon" aria-hidden="true" style="width:' + (0.9 * WD_RATIO[d]).toFixed(3) + 'em;-webkit-mask-image:' + m + ';mask-image:' + m + '"></span>';
-  }
   function setStatus(s){
     const status=document.getElementById('status');
     const focusStatus=document.getElementById('focusStatus');
@@ -274,9 +268,7 @@
     // fetch them now and merge only the changed cells.
     if(data.timing && data.timing.fast) setTimeout(() => fwSync(true),400);
     requestAnimationFrame(()=>requestAnimationFrame(()=>{jumpToday(false);setTimeout(()=>jumpToday(false),120);}));
-    // Instant screen: the saved picture goes away; save a fresh one once the page has settled.
     if(!window.__FW_RELEASE__ && data.timing) window.__FW_RELEASE__ = data.timing.release || '';
-    if(window.fwSnapLive){ fwSnapLive(); fwSnapSoon('load',3000); }
   }
   // Speed timing (2026-11-04): sent after drawing, so it can't slow the load. See logSpeed in Code.gs.
   let fwSaveSamples=[],fwSaveSampleSeq=0,fwSpeedReportSeq=0;
@@ -391,14 +383,12 @@
     });
     return {add, start, stop, ORDER, GAP, FRESH, get jobs(){ return Object.keys(jobs); }};
   })();
-  /* Instant screen numbers for the Speed Log (2026-11-21), all ms since the page started opening:
-     screen = when something useful was on screen (the saved picture, else the live draw); snap = shown / none /
-     old / width / late / nostore / embedded; snapMs, reqMs (data asked), dataMs (data arrived), liveMs, snapAgeSec, snapKb. */
+  /* Load numbers for the Speed Log, ms since the page started opening: reqMs (data asked early), dataMs (arrived),
+     liveMs / screen (live draw; the saved-picture fields went with the instant screen, 2026-11-25). */
   function fwSnapInfo(liveMs){
     const S = window.__FW_SNAP || {};
-    return { snap: S.state || 'none', snapMs: S.snapAt != null ? S.snapAt : null, reqMs: S.reqAt != null ? S.reqAt : null,
-      dataMs: S.dataAt != null ? S.dataAt : null, liveMs: liveMs, screen: S.snapAt != null ? Math.min(S.snapAt, liveMs) : liveMs,
-      snapAgeSec: S.ageSec != null ? S.ageSec : null, snapKb: S.kb != null ? S.kb : null };
+    return { snap: S.state || 'none', reqMs: S.reqAt != null ? S.reqAt : null,
+      dataMs: S.dataAt != null ? S.dataAt : null, liveMs: liveMs, screen: liveMs };
   }
   function fwSpeedLog(kind,timing,t0){
     if(!timing) return;
@@ -421,7 +411,7 @@
       fwSpeedLog('load',initial.timing,t0);
       return;
     }
-    // Instant screen (2026-11-21): the early script already asked for the data; use its answer.
+    // The early script (Index.html) already asked for the data; use its answer.
     const S = window.__FW_SNAP || {};
     const useLive = d => {
       if(!(d && Array.isArray(d.days) && d.today)) return false;
@@ -431,13 +421,12 @@
       return true;
     };
     const fallback = () => google.script.run
-      .withSuccessHandler(d => { if(!useLive(d)){ setStatus('Load error: no data'); if(window.fwSnapFail) fwSnapFail('no data'); } })
+      .withSuccessHandler(d => { if(!useLive(d)){ setStatus('Load error: no data'); } })
       .withFailureHandler(e => {
         setStatus(
           'Load error: ' +
           e.message
         );
-        if(window.fwSnapFail) fwSnapFail(e && e.message);
       })
       .getWorkspaceData({fast:true,page:true});
     const fromEarly = () => { S.cb = null; const d = S.data; S.data = null; if(!useLive(d)) fallback(); }; // one retry

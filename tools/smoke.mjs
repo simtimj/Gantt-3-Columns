@@ -1348,51 +1348,23 @@ if(only('drafts')) for(const [name,view] of [['desktop',{width:1300,height:900}]
   if(errors.length){fails+=errors.length;console.error('✗ drafts '+name+': '+errors.join(' | '));}else console.log('✓ drafts '+name+': closed-page recovery, remote merge, reviewed saves and deleted-card retention');
   await ctx.close();
 }
-// Instant screen (2026-11-21, speed item L): save the live page's picture, reopen with slow data → the read-only
-// picture shows at once with "Syncing…", can't be edited or saved, then the live page replaces it; Speed Log gets screen.
-for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 900 }], ['phone', { width: 412, height: 915, isMobile: true, hasTouch: true }]] : [])) {
-  const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, isMobile: view.isMobile, hasTouch: view.hasTouch, timezoneId: 'America/Los_Angeles' });
+// Early data request (2026-11-21; the saved-screen picture was removed 2026-11-25): the page asks for its data before the
+// big script runs and draws from that answer; the Speed Log load row keeps reqMs / dataMs / screen.
+for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 900 }]] : [])) {
+  const ctx = await b.newContext({ viewport: { width: view.width, height: view.height }, timezoneId: 'America/Los_Angeles' });
   const pg = await ctx.newPage(), errs = [];
   pg.on('pageerror', e => errs.push(e.message));
   try {
-    await pg.goto('file://' + out); await pg.waitForTimeout(2200);
-    if (!['none', 'late'].includes(await pg.evaluate(() => window.__FW_SNAP.state))) errs.push('first open (nothing saved yet) should show no picture');
-    await pg.evaluate(() => { document.querySelector('#todayScroll')?.scrollBy(0, 40); window.fwSnapSave('test'); });
-    await pg.waitForFunction(() => window.__FW_SNAP.saved && window.__FW_SNAP.saved.why === 'test', null, { timeout: 5000 });
-    const kb = await pg.evaluate(() => window.__FW_SNAP.saved.kb);
-    await pg.evaluate(() => localStorage.setItem('smokeWsd', '3500'));
-    await pg.reload(); await pg.waitForTimeout(900);
-    const early = await pg.evaluate(() => {
-      const f = document.getElementById('fwSnap'), pill = document.getElementById('fwSnapPill'), d = f && f.contentDocument;
-      return { state: window.__FW_SNAP.state, pill: pill && pill.textContent, inert: !!(d && d.body.hasAttribute('inert')), scripts: f && f.getAttribute('sandbox'),
-        text: d ? d.body.textContent : '', live: !!document.querySelector('#todayScroll .day-editor') };
-    });
-    if (early.state !== 'shown') errs.push('picture not shown (state ' + early.state + ')');
-    if (!/^Syncing…/.test(early.pill || '')) errs.push('no "Syncing…" marker');
-    if (!early.inert || early.scripts !== 'allow-same-origin') errs.push('picture is not read-only (inert + no scripts)');
-    if (!early.text.includes('Pay rent')) errs.push('picture is missing the saved tasks');
-    if (early.live) errs.push('live page drew before the slow data arrived (test timing)');
-    await pg.mouse.click(view.width / 2, view.height / 2); await pg.keyboard.type('zzsnap');
-    await pg.waitForTimeout(3600);
-    const after = await pg.evaluate(() => ({ gone: !document.getElementById('fwSnap') && !document.getElementById('fwSnapPill'),
+    await pg.goto('file://' + out); await pg.waitForTimeout(3800);
+    const r = await pg.evaluate(() => ({ state: window.__FW_SNAP && window.__FW_SNAP.state, pic: !!document.getElementById('fwSnap'),
       live: [...document.querySelectorAll('#todayScroll .day-editor')].some(e => e.textContent.includes('Pay rent')),
-      typed: document.body.textContent.includes('zzsnap'),
-      writes: (window.__calls || []).filter(c => JSON.stringify(c).includes('zzsnap')).map(c => c[0]) }));
-    if (!after.gone) errs.push('picture still covers the live page');
-    if (!after.live) errs.push('live data did not draw after the picture');
-    if (after.typed) errs.push('typing reached a page while the picture showed');
-    if (after.writes.length) errs.push('typing on the picture reached a save: ' + after.writes.join(','));
-    await pg.waitForTimeout(1700);
-    const log = await pg.evaluate(() => { const c = (window.__calls || []).find(c => c[0] === 'logSpeed' && c[1][0] === 'load'); return c && c[1][2]; });
-    if (!log || log.snap !== 'shown' || !(log.screen > 0) || !(log.screen < log.liveMs)) errs.push('Speed Log load row missing screen / snap numbers: ' + JSON.stringify(log && { snap: log.snap, screen: log.screen, liveMs: log.liveMs }));
-    // A different width (phone turned) skips the picture instead of showing a wrong layout.
-    await pg.setViewportSize({ width: view.width + 120, height: view.height }); await pg.reload(); await pg.waitForTimeout(900);
-    const wide = await pg.evaluate(() => ({ state: window.__FW_SNAP.state, f: !!document.getElementById('fwSnap') }));
-    if (wide.state !== 'width' || wide.f) errs.push('width change still showed the picture: ' + wide.state);
-    await pg.waitForTimeout(3200);
-    if (errs.length === 0) console.log('  snapshot ' + kb + ' KB, screen at ' + Math.round(log.screen) + ' ms vs live ' + Math.round(log.liveMs) + ' ms');
+      log: ((window.__calls || []).find(c => c[0] === 'logSpeed' && c[1][0] === 'load') || [])[1] }));
+    if (r.pic) errs.push('a saved picture still shows');
+    if (!r.live) errs.push('live data did not draw');
+    const log = r.log && r.log[2];
+    if (!log || !(log.screen > 0) || log.screen !== log.liveMs || !(log.reqMs >= 0)) errs.push('Speed Log load row missing reqMs / screen: ' + JSON.stringify(log && { reqMs: log.reqMs, screen: log.screen, liveMs: log.liveMs }));
   } catch (e) { errs.push(e.message); }
-  if (errs.length) { fails += errs.length; console.error('✗ snap ' + name + ': ' + errs.join(' | ')); } else console.log('✓ snap ' + name + ': saved picture shows at once, read-only, replaced by live data, Speed Log screen time');
+  if (errs.length) { fails += errs.length; console.error('✗ snap ' + name + ': ' + errs.join(' | ')); } else console.log('✓ snap ' + name + ': early data request draws the live page, no saved picture, Speed Log load numbers');
   await ctx.close();
 }
 // Time Tracker (2026-11-05): tracker/App.html with Core inlined and an in-page fake trackerSync (last write wins,

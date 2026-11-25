@@ -401,7 +401,6 @@
   function showUrgencyPicker(cb,x,y){
     hideUrgencyPicker();
     if(typeof hideContextMenu === 'function') hideContextMenu();
-    if(cb.classList && cb.classList.contains('inbox-box')){ showInboxPicker(cb,x,y); return; }
     // Calendar events (2026-11-03, Julius): same menu, minus what only fits a task saved in a cell.
     // 📅 Calendar panel checkboxes (2026-11-11, Julius) use it too: `.cp-chk` inside a `.cp-ev` card with the same data-ce-* fields.
     const isCal = !!(cb.classList && (cb.classList.contains('ce-check') || cb.classList.contains('cp-chk')));

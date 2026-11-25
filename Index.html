@@ -365,16 +365,10 @@
   window.__FW_RELEASE__ = window.__FW_INITIAL__?.timing?.release || '';
 </script>
 <script>
-  /* =========================================================
-     INSTANT SCREEN (2026-11-21, speed item L; docs/NOTES.md "Instant screen")
-     On open, show the last screen this browser saved — a read-only picture in a script-less iframe with
-     "Syncing…" on top — while the live data loads; the live page then replaces it. The picture is ONLY a
-     picture: it lives in this browser's IndexedDB ('fw-snap'), never feeds state, saves, Drafts or the Sheet,
-     so Safe sync is untouched. Saved after each load / sync and when the page is put away.
-     ========================================================= */
+  /* Early data request (2026-11-21; the saved-screen picture was removed 2026-11-25 as /dev-only bloat):
+     ask for the live data now, before the big script runs. loadWorkspace() picks the answer up. */
   (function(){
-    const S = window.__FW_SNAP = { state: 'none' };
-    // 1) Ask for live data now, before the big script runs (doGet no longer builds it into the page).
+    const S = window.__FW_SNAP = { state: window.__FW_INITIAL__ ? 'embedded' : 'none' };
     if(!window.__FW_INITIAL__ && window.google && google.script && google.script.run){
       S.reqAt = Math.round(performance.now());
       const got = () => { S.dataAt = Math.round(performance.now()); S.got = true; if(S.cb) S.cb(); };
@@ -383,132 +377,7 @@
         .withFailureHandler(e => { S.err = e || { message: 'failed' }; got(); })
         .getWorkspaceData({ fast: true, page: true });
     }
-    const DB = 'fw-snap', ST = 'snap', MAX_AGE = 3 * 864e5;
-    function idb(){
-      return new Promise((res, rej) => {
-        let r; try { r = indexedDB.open(DB, 1); } catch (e) { return rej(e); }
-        r.onupgradeneeded = () => r.result.createObjectStore(ST);
-        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(Error('blocked'));
-      });
-    }
-    const q = v => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    const attrs = list => (list || []).map(([k, v]) => ' ' + k + '="' + q(v) + '"').join('');
-    const ago = ms => { const m = Math.round(ms / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
-    function walk(root, path){ let el = root; for(const i of path){ el = el && el.children[i]; } return el; }
-    // 2) Paint the saved picture (skipped if live data already drew, the width changed, or it is > 3 days old).
-    function paint(sn, css, age){
-      const icons = window.WD_ICON_URL || [];
-      const app = sn.app.replace(/@@WD(\d)@@/g, (m, i) => icons[i] || '');
-      const f = document.createElement('iframe');
-      f.id = 'fwSnap'; f.setAttribute('sandbox', 'allow-same-origin'); f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
-      f.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;z-index:2147483000;transition:opacity .15s;background:' + (sn.bg || '#fff');
-      f.srcdoc = '<!doctype html><html' + attrs(sn.htmlA) + '><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + css +
-        '<style>*{caret-color:transparent!important;animation:none!important}</style></head><body' + attrs(sn.bodyA) + ' inert>' + app + '</body></html>';
-      f.onload = () => {
-        try {
-          const d = f.contentDocument, root = d.getElementById('app');
-          (sn.scroll || []).forEach(([p, t, l]) => { const el = p.length ? walk(root, p) : root; if(el){ el.scrollTop = t; el.scrollLeft = l; } });
-          d.querySelectorAll('#status,#focusStatus').forEach(n => { n.textContent = 'Syncing…'; });
-        } catch (e) {}
-        S.snapAt = Math.round(performance.now());
-      };
-      const pill = document.createElement('div');
-      pill.id = 'fwSnapPill'; pill.setAttribute('role', 'status');
-      pill.style.cssText = 'position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:2147483001;font:600 12px/1.3 system-ui,sans-serif;padding:4px 11px;border-radius:999px;background:rgba(28,28,30,.85);color:#fff;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.3);white-space:nowrap;transition:opacity .15s';
-      pill.textContent = 'Syncing… · saved ' + ago(age) + ' · read-only';
-      document.body.append(f, pill);
-      S.state = 'shown'; S.ageSec = Math.round(age / 1000); S.kb = Math.round(sn.app.length / 1024);
-    }
-    if(window.__FW_INITIAL__) S.state = 'embedded';
-    else idb().then(db => new Promise(res => {
-      const out = {}, tx = db.transaction(ST, 'readonly'), st = tx.objectStore(ST);
-      st.get('screen').onsuccess = e => { out.screen = e.target.result; };
-      st.get('css').onsuccess = e => { out.css = e.target.result; };
-      tx.oncomplete = () => { db.close(); res(out); }; tx.onerror = tx.onabort = () => { db.close(); res(out); };
-    })).then(({ screen, css }) => {
-      if(S.live) { S.state = 'late'; return; } // live data drew first
-      if(!screen || !css || screen.v !== 1 || css.id !== screen.cssId) { S.state = 'none'; return; }
-      const age = Date.now() - screen.ts;
-      if(age < 0 || age > MAX_AGE) { S.state = 'old'; return; }
-      if(Math.abs(screen.w - window.innerWidth) > 2) { S.state = 'width'; return; }
-      paint(screen, css.css, age);
-    }).catch(() => { S.state = 'nostore'; });
-
-    // 3) Live data drew: take the picture away. Called at the end of applyWorkspaceData.
-    window.fwSnapLive = function(){
-      if(S.live) return;
-      S.live = true;
-      const f = document.getElementById('fwSnap'), pill = document.getElementById('fwSnapPill');
-      if(!f && !pill) return;
-      setTimeout(() => {
-        S.goneAt = Math.round(performance.now());
-        [f, pill].forEach(n => { if(n){ n.style.opacity = '0'; setTimeout(() => n.remove(), 180); } });
-      }, 160); // after jumpToday's scroll (rAF + 120 ms)
-    };
-    // Live data could not load: keep the picture, say so, offer a reload.
-    window.fwSnapFail = function(msg){
-      const pill = document.getElementById('fwSnapPill'); if(!pill) return;
-      const a = document.querySelector('.refresh-btn');
-      pill.style.pointerEvents = 'auto'; pill.style.background = 'rgba(160,30,30,.92)';
-      pill.textContent = 'Couldn’t load (' + String(msg || 'error').slice(0, 60) + ') · saved copy · tap to reload';
-      pill.onclick = () => { if(a && a.href && a.getAttribute('href') !== '#') window.top.location.href = a.href; else location.reload(); };
-    };
-
-    // 4) Save the picture of the live page.
-    let cssMem = null, cssId = '', cssDirty = false, lastSave = 0, timer = 0;
-    function collectCss(){
-      let s = '';
-      document.querySelectorAll('style,link[rel="stylesheet"]').forEach(n => {
-        if(n.closest('#app')) return; // inside the picture already
-        if(n.tagName === 'STYLE' && !n.textContent.trim() && n.sheet) { try { s += '<style>' + [...n.sheet.cssRules].map(r => r.cssText).join('\n') + '</style>'; } catch (e) {} }
-        else s += n.outerHTML;
-      });
-      try { (document.adoptedStyleSheets || []).forEach(sh => { s += '<style>' + [...sh.cssRules].map(r => r.cssText).join('\n') + '</style>'; }); } catch (e) {}
-      return s;
-    }
-    function scrolls(root){
-      const out = [], all = root.getElementsByTagName('*');
-      const pathOf = el => { const p = []; while(el && el !== root){ const par = el.parentElement; p.unshift(Array.prototype.indexOf.call(par.children, el)); el = par; } return p; };
-      if(root.scrollTop || root.scrollLeft) out.push([[], root.scrollTop, root.scrollLeft]);
-      for(let i = 0; i < all.length; i++){ const el = all[i]; if(el.scrollTop > 0 || el.scrollLeft > 0) out.push([pathOf(el), el.scrollTop, el.scrollLeft]); }
-      return out;
-    }
-    const attrList = el => [...el.attributes].map(a => [a.name, a.value]);
-    function save(why){
-      if(!S.live || document.getElementById('fwSnap') || !window.indexedDB) return;
-      try {
-        const app = document.getElementById('app'); if(!app) return;
-        const t = performance.now();
-        let html = app.outerHTML;
-        (window.WD_ICON_URL || []).forEach((u, i) => { if(u && u.length > 200) html = html.split(u).join('@@WD' + i + '@@'); }); // icons are base64: keep them out
-        html = html.replace(/(class="[^"]*\brefresh-btn)\s+spin\b/g, '$1');
-        if(html.length > 8e6) { S.saveSkip = 'size'; return; }
-        const css = collectCss();
-        if(css !== cssMem) { cssMem = css; cssId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); cssDirty = true; }
-        const rec = { v: 1, ts: Date.now(), build: window.__FW_BUILD__ || '', w: window.innerWidth, h: window.innerHeight, cssId,
-          htmlA: attrList(document.documentElement), bodyA: attrList(document.body).filter(([k]) => k !== 'inert'),
-          bg: getComputedStyle(document.body).backgroundColor, app: html, scroll: scrolls(app), why };
-        const ms = Math.round(performance.now() - t), withCss = cssDirty;
-        lastSave = Date.now();
-        idb().then(db => {
-          const tx = db.transaction(ST, 'readwrite'), st = tx.objectStore(ST);
-          st.put(rec, 'screen'); if(withCss) st.put({ id: rec.cssId, css }, 'css');
-          tx.oncomplete = () => { db.close(); if(withCss && rec.cssId === cssId) cssDirty = false; S.saved = { at: rec.ts, kb: Math.round(html.length / 1024), ms, why }; };
-          tx.onerror = tx.onabort = () => db.close();
-        }).catch(() => {});
-      } catch (e) {}
-    }
-    // After a load / sync: soon, when the page is idle, at most every 20 s. Put away: right now.
-    window.fwSnapSoon = function(why, delay){
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const go = () => { if(Date.now() - lastSave > 20000) save(why || 'sync'); };
-        if(window.requestIdleCallback) requestIdleCallback(go, { timeout: 3000 }); else go();
-      }, delay == null ? 1500 : delay);
-    };
-    window.fwSnapSave = save;
-    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') save('hide'); });
-    window.addEventListener('pagehide', () => { if(Date.now() - lastSave > 1000) save('hide'); });
+    try { indexedDB.deleteDatabase('fw-snap'); } catch (e) {} // free the old saved pictures
   })();
 </script>
 <?!= HtmlService.createHtmlOutputFromFile('Index_Main').getContent() ?>

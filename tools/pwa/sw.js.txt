@@ -9,10 +9,15 @@ self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL.map(function (u) { return new Request(u, { cache: 'reload' }); })); }));
 });
 
+// Old copies are deleted after the new version takes over, not before (2026-11-26, Speed Log: reloads waited ~1 s for
+// first byte; the page fetch waits for activation, and deleting a big old cache sat in front of it).
 self.addEventListener('activate', function (e) {
-  e.waitUntil(caches.keys().then(function (keys) {
-    return Promise.all(keys.filter(function (k) { return k.indexOf('gantt-') === 0 && k !== CACHE; }).map(function (k) { return caches.delete(k); }));
-  }).then(function () { return self.clients.claim(); }));
+  e.waitUntil(self.clients.claim());
+  setTimeout(function () {
+    caches.keys().then(function (keys) {
+      keys.filter(function (k) { return k.indexOf('gantt-') === 0 && k !== CACHE; }).forEach(function (k) { caches.delete(k); });
+    });
+  }, 3000);
 });
 
 self.addEventListener('message', function (e) { if (e.data === 'skipWaiting') self.skipWaiting(); });

@@ -40,7 +40,7 @@ export function summarizeSpeed(input) {
     const identity=identityOf(client), kind=String(row[1]);
     // Logging time and batched save samples do not identify the operation being measured.
     const fingerprint=JSON.stringify(canonical({ identity,kind,ms,steps,
-      client:Object.fromEntries(['rpcMs','applyMs','render','drawEnd','ready','dom','frameFirstByte','frameDone']
+      client:Object.fromEntries(['rpcMs','applyMs','render','drawEnd','ready','dom','frameFirstByte','frameDone','workerStart','fetchStart']
         .filter(key=>finite(client[key])).map(key=>[key,client[key]])) }));
     const reportId=typeof client.reportId === 'string' ? client.reportId : '';
     let possibleLegacyDuplicate=false;

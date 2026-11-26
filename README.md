@@ -62,6 +62,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 🧪 To be confirmed (2026-11-25)
 
+- **Faster first open after an update** (2026-11-26): the new version takes over first and clears the old copy a few seconds later, instead of making the page wait while it deletes it. The Speed Log now also records when the offline worker started, to tell what the reload wait is.
 - **Opens on Keep In Mind + half calendar** (2026-11-26): every opening lands on the ⭐ Keep In Mind tab on the left half with the half calendar on the right, whatever tab you used last.
 - **Half calendar times not cut off** (2026-11-26): taller event cards put the time on its own line across the full card width, under the checkbox, and it wraps before the dash instead of being cut. Times are shorter when both ends share am/pm ("9 – 10:30am"). Less padding inside the cards.
 - **Full calendar time labels lined up** (2026-11-26): the hour, :15 and :30 labels all end at the same right edge, against the timeline.

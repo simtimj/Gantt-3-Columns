@@ -2945,6 +2945,18 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           const f = p.querySelector('.cp-fad'), h0 = f.getBoundingClientRect().height, bl = p.querySelector('.cp-bl').getBoundingClientRect();
           if (!p.classList.contains('cp-blmin')) out.push('backlog not minimized by default');
           if (bl.top < f.getBoundingClientRect().bottom || bl.height > 60) out.push('minimized backlog is not a bar under all-day');
+          { // Prev tab (2026-11-26): switches, opens the box, shaded; tapping it again minimizes; Backlog tab goes back.
+            const pt = p.querySelector('[data-bl-tab="prev"]');
+            if (!pt || !pt.offsetParent) out.push('no Prev tab');
+            else { pt.click(); await w(120);
+              if (!p.classList.contains('cp-prevtab') || p.classList.contains('cp-blmin')) out.push('Prev tab did not open');
+              else if (!p.querySelector('.cp-prevv').offsetParent) out.push('Prev list not shown');
+              else if (getComputedStyle(pt).backgroundColor === 'rgba(0, 0, 0, 0)') out.push('Prev tab not shaded when open');
+              pt.click(); await w(80); if (!p.classList.contains('cp-blmin')) out.push('Prev tab tap again did not minimize');
+              p.querySelector('.cp-blh > b').click(); await w(80);
+              if (p.classList.contains('cp-prevtab') || p.classList.contains('cp-kimtab')) out.push('Backlog tab did not switch back');
+              p.classList.add('cp-blmin'); try { localStorage.setItem('fw.calFullBlMin', '1'); } catch (e) {} }
+          }
           { const hd = p.querySelector('.cp-blh'), r = hd.getBoundingClientRect(), x = r.right - 30, y = r.top + r.height / 2, t = document.elementFromPoint(x, y);
             if (!t || !hd.contains(t) || t.closest('button')) { if (!hd.contains(t)) out.push('minimized bar: nothing to tap at its right side'); p.querySelector('[data-bl-min]').click(); }
             else t.click(); await w(200); if (p.classList.contains('cp-blmin')) out.push('tapping the minimized bar did not open the backlog'); }

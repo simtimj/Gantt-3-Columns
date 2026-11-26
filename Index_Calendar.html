@@ -170,6 +170,7 @@
     cacheFailed = (r.failed || []).length;
     clearTimeout(saveTimer); saveTimer = setTimeout(cacheSave, 400);
     lkSoon();
+    if(typeof prevSoon === 'function') prevSoon(); // Prev tab count / list (2026-11-26)
     return true;
   }
   const cacheGet = (s, e) => [...evById.values()].filter(x => overlaps(x, s, e));
@@ -1999,14 +2000,17 @@
     if(bh && !bh.querySelector('[data-bl-selmode]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blsort" data-bl-selmode title="Tick several rows, then send them together">Select</button>');
     if(bh && !bh.querySelector('[data-bl-sort]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blsort" data-bl-sort title="Group by date (newest first) / by urgency">Date</button>');
     if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blside" data-bl-side title="Phone: show the backlog on the left or under the calendar"></button><button type="button" class="cp-blclose" data-bl-close title="Close the backlog" aria-label="Close the backlog">✕</button>');
-    if(bh && !bh.querySelector('[data-bl-tab]')){ const b0 = bh.querySelector(':scope > b'); if(b0) b0.insertAdjacentHTML('beforebegin', '<button type="button" class="cp-bltab" data-bl-tab="kim" title="Show Keep In Mind here">Keep In Mind</button>'); }
+    if(bh && !bh.querySelector('[data-bl-tab]')){ const b0 = bh.querySelector(':scope > b'); if(b0) b0.insertAdjacentHTML('beforebegin', '<button type="button" class="cp-bltab" data-bl-tab="kim" title="Show Keep In Mind here">KIM</button>'); }
+    // Prev tab (2026-11-26, Julius): after the Backlog count, before the hint.
+    if(bh && !bh.querySelector('[data-bl-tab="prev"]')){ const c0 = bh.querySelector('[data-bl-count]'); if(c0) c0.insertAdjacentHTML('afterend', '<button type="button" class="cp-bltab" data-bl-tab="prev" title="Yesterday’s unfinished all-day tasks">Prev <span data-prev-n></span></button>'); }
     blEl.addEventListener('click', e => {
-      // Keep In Mind tab (2026-11-25): a tab switches (and opens the box if minimized); tapping the open tab again minimizes, as before.
-      const tk = full && e.target.closest('[data-bl-tab="kim"]'), tb = full && kimTabOn() && e.target.closest('.cp-blh > b');
+      // Tabs KIM / Backlog / Prev (2026-11-25, Prev 2026-11-26): a tab switches (and opens the box if minimized); tapping the
+      // open tab again minimizes, as before. Backlog's tab is the <b> title; when it's the open tab the old handler below runs.
+      const tbtn = full && e.target.closest('[data-bl-tab]'), tk = tbtn && tbtn.dataset.blTab, tb = full && fullTab() !== 'bl' && e.target.closest('.cp-blh > b');
       if(tk || tb){
         e.stopPropagation();
-        if(tk && kimTabOn() && !panel.classList.contains('cp-blmin')){ panel.classList.add('cp-blmin'); lsSet('fw.calFullBlMin', '1'); return; }
-        kimTabSet(!!tk); panel.classList.remove('cp-blmin'); lsSet('fw.calFullBlMin', '0'); return;
+        if(tk && fullTab() === tk && !panel.classList.contains('cp-blmin')){ panel.classList.add('cp-blmin'); lsSet('fw.calFullBlMin', '1'); return; }
+        fullTabSet(tk || 'bl'); panel.classList.remove('cp-blmin'); lsSet('fw.calFullBlMin', '0'); return;
       }
       if(e.target.closest('[data-bl-selmode]')){ e.stopPropagation(); blSelSet(!blSel); }
       else if(e.target.closest('[data-bl-sort]')){ e.stopPropagation(); lsSet('fw.blSort', lsGet('fw.blSort') === 'date' ? 'urg' : 'date'); blRender(); }
@@ -2023,7 +2027,15 @@
   if(blEl && blBody) blBody.after(kimView);
   const kimSrc = () => document.querySelector('#kimScroll .kim-editor');
   function kimTabOn(){ return panel.classList.contains('cp-kimtab'); }
-  function kimTabSet(on){ panel.classList.toggle('cp-kimtab', !!on); lsSet('fw.calFullTab', on ? 'kim' : 'bl'); if(on) kimRender(); }
+  function fullTab(){ return kimTabOn() ? 'kim' : panel.classList.contains('cp-prevtab') ? 'prev' : 'bl'; }
+  function fullTabSet(t){
+    t = t === 'kim' || t === 'prev' ? t : 'bl';
+    panel.classList.toggle('cp-kimtab', t === 'kim'); panel.classList.toggle('cp-prevtab', t === 'prev'); panel.classList.toggle('cp-bltabon', t === 'bl');
+    if(blEl) blEl.querySelectorAll('[data-bl-tab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.blTab === t ? 'true' : 'false'));
+    lsSet('fw.calFullTab', t);
+    if(t === 'kim') kimRender(); else if(t === 'prev') prevLoad();
+  }
+  function kimTabSet(on){ fullTabSet(on ? 'kim' : 'bl'); }
   function kimRender(){
     if(!kimTabOn()) return;
     const src = kimSrc();
@@ -2043,6 +2055,47 @@
     const i = [...kimView.children].indexOf(line), real = src.children[i], rb = real && real.querySelector(':scope > input[type=checkbox], input[type=checkbox]');
     if(rb && (real.textContent || '') === (line.textContent || '')) { rb.click(); setTimeout(kimRender, 120); }
     else { kimRender(); flash('Keep In Mind changed — try again'); }
+  });
+  /* Prev tab (2026-11-26, Julius: "another tab like the backlog: the previous day's all-day events that are
+     incomplete"). Full screen only. Yesterday (LA date) from the calendar copy; same filter as the backlog sweep (open,
+     not recurring, not the red Events calendar). The box ticks it done on the calendar. The count shows on the tab. */
+  const prevView = document.createElement('div'); prevView.className = 'cp-prevv'; prevView.setAttribute('data-bl-prev', '');
+  if(blEl && blBody) kimView.after(prevView);
+  const prevDay = () => addDays(todayLA(), -1);
+  function prevItems(){
+    const d = prevDay(), d1 = addDays(d, 1);
+    return cacheGet(d, d1).filter(x => x && x.allDay && !x.done && !x.schCopy && !x.recurring && !isLife(x) && String(x.start || '').slice(0, 10) <= d)
+      .sort((a, b) => (urgRank(a) - urgRank(b)) || String(a.title || '').localeCompare(String(b.title || '')));
+  }
+  let prevBusy = false, prevSoonT = 0;
+  function prevLoad(){
+    const d = prevDay(), d1 = addDays(d, 1);
+    prevRender();
+    if(prevBusy || (covered(d, d1) && fresh(d, d1)) || !canRun()) return;
+    prevBusy = true; const [ws0, we0] = windowFor(d, d1), at = Date.now();
+    google.script.run.withSuccessHandler(r => { prevBusy = false; cacheApply(r, ws0, we0, at); prevRender(); })
+      .withFailureHandler(() => { prevBusy = false; prevRender(); }).getCalendarRange(ws0, we0);
+  }
+  function prevSoon(){ clearTimeout(prevSoonT); prevSoonT = setTimeout(prevRender, 150); }
+  function prevRender(){
+    const items = prevItems(), n = blEl && blEl.querySelector('[data-prev-n]'), d = prevDay();
+    if(n) n.textContent = items.length || '';
+    if(fullTab() !== 'prev') return;
+    if(!items.length){ prevView.innerHTML = '<div class="cp-blmsg">' + (covered(d, addDays(d, 1)) ? 'Nothing left open from ' + esc(fmtDay(d)) + '.' : 'Loading…') + '</div>'; return; }
+    prevView.innerHTML = '<div class="cp-prevh">' + esc(fmtDay(d)) + '</div>' + items.map(x => { const c = softColor(x.color, false);
+      return '<label class="cp-prevr" data-prev-id="' + esc(x.id) + '"><input type="checkbox"><span class="cp-prevdot" style="background:' + esc(c.bg) + '"></span><span class="cp-prevt">' + esc(String(x.title || '(no title)').replace(/^↪\s*/, '')) + '</span></label>'; }).join('');
+  }
+  prevView.addEventListener('click', e => {
+    const box = e.target.closest('input[type=checkbox]'); if(!box) return;
+    const row = box.closest('[data-prev-id]'), x = row && evById.get(row.dataset.prevId);
+    if(!x || !x.eventId){ flash('This one can’t be ticked here'); box.checked = false; return; }
+    if(!canRun()){ box.checked = false; return; }
+    row.classList.add('cp-prevdone'); x.done = true;
+    const fe = cal && cal.getEventById(x.id); if(fe){ fe.setExtendedProp('done', true); fe.setProp('classNames', ['cp-done']); }
+    google.script.run.withSuccessHandler(() => { setTimeout(prevRender, 400); refetchFresh(); flash('Done ✓'); }).withFailureHandler(err => {
+      x.done = false; if(fe){ fe.setExtendedProp('done', false); fe.setProp('classNames', []); } prevRender();
+      setState('error', 'Couldn’t mark it done: ' + errText(err));
+    }).setCalendarEventDone(x.calId, x.eventId, x.startMs, true);
   });
   const blWidth = () => blCol ? (blCol.getBoundingClientRect().width || 260) : 260;
   function blMode(){
@@ -2112,7 +2165,7 @@
     panel.classList.toggle('cp-blmin', lsGet('fw.calFullBlMin') !== '0'); // minimized by default (2026-11-14, Julius)
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     blPlace(); blRender(); if(!blEl.hidden) blLoad(false);
-    if(typeof kimTabSet === 'function') kimTabSet(lsGet('fw.calFullTab') === 'kim');
+    if(typeof fullTabSet === 'function') fullTabSet(lsGet('fw.calFullTab'));
     setTimeout(() => { try { cal.updateSize(); } catch (e) {} }, 0);
     return true;
   }

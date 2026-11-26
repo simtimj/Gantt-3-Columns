@@ -1339,3 +1339,11 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 - Rename step 1: name "Cairn" in build-pwa page name (tab title, manifest name / short_name = icon label), /dev setTitle, setup page, toolbar wordmark `.app-brand`. Not renamed: repo, Sheet, /dev URL, icon files `gantt-*`, Firestore `gantt*` collections, cache prefix `gantt-` (step 2 later).
 - Phone calendar text (New Tasks row 31): ≤480px CSS vars `--cal-title` 13 / `--cal-meta` 11 / `--cal-axis` 9 px. Skipped the spec's 1-line (week) / 2-line (day) caps: they would undo "Event titles fill the card" (08:45, newer). Skipped ≥40px tap targets (short timed events can't be that tall).
 - CI flake: calendar 3b "timed → all-day" failed on CI only (70aeac5, fd63c99; rerun passed, never fails locally). Smoke now retries that drag once.
+
+## Prev tab in the full calendar (2026-11-26, Julius: "keep it rolling")
+- Ask: bottom box of the full calendar gets another tab like Backlog, "Prev": the previous day's incomplete all-day events; Keep In Mind tab label → "KIM"; the tab you're in shaded darker.
+- Read as: Prev = yesterday (LA date, not the day on screen), same filter as the backlog sweep (allDay, not done, not recurring, not schCopy, not Events/`life`); ↪ prefix hidden. Tab order KIM · Backlog · Prev. Done Julius-side calendar sweep still also lists them in Backlog (overlap is fine: Prev = quick look at yesterday).
+- Code: Index_Calendar `fullTab()` / `fullTabSet('kim'|'bl'|'prev')` (replaces the 2-way kimTabSet, kept as a wrapper; `fw.calFullTab` now kim/bl/prev), `prevLoad` / `prevRender` / `prevSoon` (hooked in `cacheApply`), tick → `setCalendarEventDone`. Reads the calendar cache; fetches `windowFor(yesterday)` if not covered/fresh.
+- CSS (Index_LateCss "Prev tab + tab shading"): open tab = rgba(0,0,0,.5) dark / .12 light, bold, outline; Backlog's `<b>` is a pill too. Minimized hides Select / Date so the bar stays one row on phone (smoke "minimized backlog is a bar" caught the wrap).
+- Smoke: calendar phone full screen → Prev switch / shade / re-tap minimize / back to Backlog.
+- Not done (ask if wanted): stepping back to older days, drag from Prev onto a day.

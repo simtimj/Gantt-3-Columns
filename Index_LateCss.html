@@ -500,6 +500,23 @@
   #calPanel.cp-full.cp-kimtab .cp-blb,#calPanel.cp-full.cp-kimtab .cp-blbar,#calPanel.cp-full.cp-kimtab .cp-blhint,#calPanel.cp-full.cp-kimtab [data-bl-selmode],#calPanel.cp-full.cp-kimtab [data-bl-sort]{display:none!important;}
   #calPanel .cp-kimv .check-line{display:flex;align-items:flex-start;gap:5px;}
   #calPanel .cp-kimv .check-line.done > .check-text{opacity:.55;text-decoration:line-through;}
+  /* Prev tab + tab shading (2026-11-26, Julius: "the tab you're in is shaded darker"). Backlog's tab = the <b> title. */
+  #calPanel .cp-prevv{display:none;}
+  #calPanel.cp-full .cp-blh{gap:4px;}
+  #calPanel.cp-full .cp-bltab,#calPanel.cp-full .cp-blh > b{padding:1px 5px!important;}
+  #calPanel.cp-full.cp-blmin [data-bl-selmode],#calPanel.cp-full.cp-blmin [data-bl-sort]{display:none!important;} /* minimized = just the tabs, one row */
+  #calPanel.cp-full .cp-blh > b{padding:1px 7px;border-radius:7px;border:1px solid var(--cp-line,var(--border));}
+  #calPanel.cp-full.cp-bltabon .cp-blh > b,#calPanel.cp-full.cp-kimtab [data-bl-tab="kim"],#calPanel.cp-full.cp-prevtab [data-bl-tab="prev"]{background:rgba(0,0,0,.5);font-weight:700;color:inherit;border-color:currentColor;}
+  html[data-theme=light] #calPanel.cp-full.cp-bltabon .cp-blh > b,html[data-theme=light] #calPanel.cp-full.cp-kimtab [data-bl-tab="kim"],html[data-theme=light] #calPanel.cp-full.cp-prevtab [data-bl-tab="prev"]{background:rgba(0,0,0,.12);}
+  #calPanel.cp-full.cp-prevtab .cp-blh > b{font-weight:400;color:var(--cp-muted,var(--muted));cursor:pointer;}
+  #calPanel.cp-full.cp-prevtab:not(.cp-blmin) .cp-prevv{display:block;flex:1 1 auto;min-height:0;overflow:auto;padding:2px 8px 8px;font-size:13px;}
+  #calPanel.cp-full.cp-prevtab .cp-blb,#calPanel.cp-full.cp-prevtab .cp-blbar,#calPanel.cp-full.cp-prevtab .cp-blhint,#calPanel.cp-full.cp-prevtab [data-bl-selmode],#calPanel.cp-full.cp-prevtab [data-bl-sort],#calPanel.cp-full.cp-prevtab .cp-kimv{display:none!important;}
+  #calPanel.cp-full.cp-kimtab .cp-prevv{display:none!important;}
+  #calPanel .cp-prevh{font-size:11px;color:var(--cp-muted,var(--muted));padding:2px 0 3px;}
+  #calPanel .cp-prevr{display:flex;align-items:flex-start;gap:6px;padding:3px 0;cursor:pointer;}
+  #calPanel .cp-prevr > input{margin:2px 0 0;flex:none;}
+  #calPanel .cp-prevdot{flex:none;width:8px;height:8px;border-radius:2px;margin-top:5px;}
+  #calPanel .cp-prevr.cp-prevdone .cp-prevt{opacity:.55;text-decoration:line-through;}
   #calPanel.cp-full .cp-fadh{padding:1px 3px 0;}
   #calPanel.cp-full .cp-fadb,#calPanel.cp-full .cp-blb{padding:0 2px 2px;}
   #calPanel.cp-full .cp-fadb{padding:0 1px 1px;}

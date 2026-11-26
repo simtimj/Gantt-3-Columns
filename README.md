@@ -4,7 +4,7 @@ Search aliases: Gantt, Gaunt, Gantt 3 Columns, Focus Workspace. Repo and Sheet k
 
 Google Apps Script web app: a three-column daily workspace — **Today / Tasks**, **Notes** and **Reference** — saved to a Google Sheet. Built mostly from a phone; every push to `main` runs `clasp push`. The /dev link uses that pushed code; the workflow does not update a versioned /exec deployment.
 
-Last updated: 2026-11-25
+Last updated: 2026-11-26
 
 Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICIENCY_DATA_MAP.md). Operating guide: [efficiency handoff and resume steps](docs/EFFICIENCY_HANDOFF.md).
 
@@ -62,6 +62,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 🧪 To be confirmed (2026-11-25)
 
+- **Prev tab in the full calendar** (2026-11-26): the bottom-left box's tabs are now **KIM** · **Backlog** · **Prev (count)**. Prev lists yesterday's unfinished all-day tasks (not recurring, not the red Events calendar), urgency color dot, tick = done on the calendar. The open tab is shaded darker (bold + outline). Minimized = just the tabs on one row (Select / Date show when open).
 - **App renamed to Cairn, step 1** (2026-11-25): tab title, installed-app name + home-screen icon label (manifest name / short_name), /dev page title, setup page ("Open the Cairn app"), and a small "Cairn" wordmark at the left of the toolbar (hidden under 340 px). /dev URL unchanged. The installed app may keep its old icon label until Android refreshes the install (or reinstall).
 - **Phone calendar text size** (2026-11-25): on phones (≤480 px) calendar text uses one scale — titles 13 px, time / meta 11 px, hour labels 9 px (CSS vars `--cal-title / --cal-meta / --cal-axis`); all-day titles were 14 px. Desktop unchanged. Line counts still follow "Event titles fill the card".
 - **Event titles fill the card** (2026-11-25 08:45): in the docked / big / full calendar, a timed event's title now wraps onto as many lines as the card has room for (was capped at 3, then 2 / 1 as the card got shorter), with the time under it; "…" only on the last line that fits. Re-fits when you zoom or resize. 30-minute events now use the same layout (title over time when there's room, one line when there isn't).

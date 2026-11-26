@@ -1357,3 +1357,10 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 - Speed (Julius: "Keep In Mind slow on app opening; Backlog + Prev tabs"): cause = getKim waited for page load + 200 ms + Firebase SDK + persistence + sign-in, then a server read. Now shim `kimRun`: first getKim of a page answers from `pwa.kim.last` (kept after every real read / save), real read behind it → newer → `kimNext` + `fwKimReload()` (merge path). Edits on the old copy: saveKim hash check → conflict → merge. Backlog: `fw.blCache` paints at once, blLoad still refreshes. Prev already reads the device calendar copy; count now computed on full open.
 - Margins: task log inset 3 px, header 2/3 px, list padding 1/4/3 px.
 - Smoke: pwa-fb instant device copy; calendar phone tab order, BL label, no-minimize, ▾, KIM moves in/out.
+
+## Speed Log check 2026-11-26 (STATE Next 1, "keep it rolling")
+- PWA `load` rows (source device, phone w 411), `screen` = usable: fresh opens 775 / 922 ms (back_forward, away 7–15 h) · reloads 1456 / 1472 ms · after a discard 1754 ms. Before (/dev, 11/4): ~5 s server + ~1.8 s browser. Result: ~4–8× faster to usable.
+- Reloads: `frameFirstByte` ~1,020 ms vs 125–345 ms on back_forward. Navigation is already cache-first in sw.js, so the gap is most likely service-worker start-up / Cache Storage open on Android. Not built; next idea if wanted: measure `caches.open` + `match` time inside the worker.
+- `resume` rows: 1–88 ms, skips work as planned (one at 9:15 ran only `blocks`).
+- First day save after a return often `status: conflict` (rpc 1.2–2 s), 4 of the resumes/imports 11/25–26; the merge path handles it. Lead if saves ever feel slow after coming back.
+- An old /dev desktop tab (w 983, opened 11/24) still syncs about hourly (1.2–3.7 s server each). Harmless; closing it saves the calls.

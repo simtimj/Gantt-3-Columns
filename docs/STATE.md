@@ -22,7 +22,7 @@ Short and current. History and build details live in `docs/NOTES.md` (1,300 line
 ## Next (in order)
 - CI: calendar 3b timed → all-day drag retries once (CI-only flake, NOTES "Cairn rename step 1").
 0. Phone check: Cairn name on the installed app + phone calendar text size (README 🧪 2026-11-25) + task log tabs + faster Keep In Mind opening (🧪 2026-11-26).
-1. Speed Log: PWA openings now log `load` rows (source device, from 2026-11-25). After a day, read their `screen` / `drawEnd` (no older PWA rows to compare against; /dev rows are the only before).
+1. ~~Speed Log check~~ done 2026-11-26 (NOTES "Speed Log check 2026-11-26"): PWA usable in 0.8–0.9 s on a fresh open, ~1.5 s on reload, 1.75 s after a discard; /dev was ~5 s server + ~2 s browser. Open leads, not built: (a) reload first byte ~1 s (service worker start-up, page already cache-first); (b) first day save after a return often comes back `conflict` (merge path handles it); (c) an old /dev desktop tab from 11/24 is still syncing hourly.
 
 ## Index_Main split (done 2026-11-25)
 - Main script = 8 parts (Index_Main, _Editors, _Sync, _Reference, _Search, _NextSteps, _CalEvents, _RefOptions; 55–88 KB each). Load-order rule in CODE_MAP.md.

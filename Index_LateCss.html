@@ -868,6 +868,17 @@
   #calPanel .fc .cp-tiny .cp-chk{width:10px;height:10px;border-width:1px;margin-top:0;}
   #calPanel .fc .cp-tiny .cp-done .cp-chk::after,#calPanel .fc .cp-tiny.cp-done .cp-chk::after{font-size:8px;}
   @media (max-width:720px){ #calPanel .cp-chk{width:16px;height:16px;} #calPanel .fc .cp-tiny .cp-chk{width:11px;height:11px;} }
+  /* Half calendar cards (2026-11-26, Julius: "don't cut off the start and end times… use the space underneath the checkbox"):
+     tall cards = checkbox + title on the first row, the time across the full width under both; the time wraps before
+     the dash instead of being cut; less padding. Short cards keep the one-line layout above. */
+  #calPanel.cp-docked .fc .fc-timegrid-event .fc-event-main{padding:1px 4px;}
+  #calPanel.cp-docked .fc .fc-timegrid-event .cp-tend{display:inline-block;white-space:nowrap;}
+  @container cpev (min-height:35px) and (min-width:45px){
+    #calPanel.cp-docked .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1){display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:4px;row-gap:0;align-items:start;}
+    #calPanel.cp-docked .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-evb{display:contents;}
+    #calPanel.cp-docked .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-t{grid-column:2;min-width:0;}
+    #calPanel.cp-docked .fc .fc-timegrid-event .cp-evc:not(.cp-ev-1) .cp-ev-m{grid-column:1 / -1;white-space:normal;overflow:visible;text-overflow:clip;}
+  }
   /* Urgency groups in the all-day row (2026-11-11, Julius). */
   #calPanel .fc-daygrid-event-harness[data-cpgl]::before{content:attr(data-cpgl);display:block;font-size:10.5px;font-weight:600;letter-spacing:.04em;
     text-transform:uppercase;color:var(--cp-muted);padding:5px 4px 1px;}
@@ -1356,6 +1367,9 @@
   /* 2026-11-24 09:56 (Julius: "reduce empty margin in left side of timeline"): hour labels hug the left edge, less room before the sky bar. */
   #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label{padding:0!important;}
   #calPanel:is(.cp-full,.cp-docked) .fc .fc-timegrid-slot-label .cp-sl{align-items:flex-start;}
+  /* 2026-11-26 (Julius: "align the 7:15, 7:30, 8 AM better"): full calendar labels all end at the timeline, like Google. */
+  #calPanel.cp-full .fc .fc-timegrid-slot-label{text-align:right!important;}
+  #calPanel.cp-full .fc .fc-timegrid-slot-label .cp-sl{align-items:flex-end;}
 
   /* 4 + 5. Cards: one corner rounding and one set of card margins everywhere (Today, Notes, Keep In Mind, Next Steps,
      Cal Events, calendar events, title boxes). */

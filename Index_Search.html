@@ -235,10 +235,7 @@
       if(window.renderDayReview) renderDayReview();
       if(window.urgTabSync) urgTabSync();
     };
-    let t = 'focus'; try{ t = localStorage.getItem('fw.centerTab') || 'focus'; }catch(e){} // new device opens on ⭐ Keep In Mind (2026-11-16)
-    if(t === 'wxdaily') t = 'weather'; // daily tab merged into Weather (2026-11-07)
-    if(t === 'new') t = 'fun'; // New things merged into the Fun tab (cleanup 2026-11-09)
-    set(t === 'weather' || t === 'focus' || t === 'review' || t === 'fun' || t === 'urgent' ? t : 'notes');
+    set('focus'); // every opening lands on ⭐ Keep In Mind, whatever tab was last used (2026-11-26, Julius: "always KIM")
     pane.querySelector('.center-tabs')?.addEventListener('click', e => {
       const b = e.target.closest('button[data-ctab]'); if(b) set(b.dataset.ctab);
     });

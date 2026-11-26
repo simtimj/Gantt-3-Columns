@@ -1364,3 +1364,9 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 - `resume` rows: 1–88 ms, skips work as planned (one at 9:15 ran only `blocks`).
 - First day save after a return often `status: conflict` (rpc 1.2–2 s), 4 of the resumes/imports 11/25–26; the merge path handles it. Lead if saves ever feel slow after coming back.
 - An old /dev desktop tab (w 983, opened 11/24) still syncs about hourly (1.2–3.7 s server each). Harmless; closing it saves the calls.
+
+## Opening view + half calendar times + full calendar labels (2026-11-26 09:44, Julius; Calendar park overridden: "do it anyway")
+- Ask: open on the half calendar (right) with Keep In Mind + tabs (left); half calendar start / end times not cut off, use the space under the checkbox, less wasted space; full calendar 7:15 / 7:30 / 8 AM labels lined up.
+- Picks (all recommended): always open on ⭐ KIM (last tab no longer remembered at opening); time on a line under the title; labels on the right edge.
+- Code: Index_Search `initCenterTabs` → `set('focus')`. Index_Calendar `cpRangeHtml`: am/pm once when start and end match ("9 – 10:30am"). Index_LateCss "Half calendar cards": docked tall cards (container ≥ 35 px high, ≥ 45 px wide) = grid, checkbox + title row 1, time spans both columns; `.cp-tend` inline-block so the range wraps before the dash; docked card padding 1px 4px. Full: slot labels `text-align:right`, `.cp-sl` flex-end.
+- Smoke (calendar suite): opening = KIM tab + journal left half + calendar right half + docked (seeded last tab 'notes'); tall docked event times not clipped and start under the checkbox; full screen zoomed-in labels share one right edge and include :15 / :30.

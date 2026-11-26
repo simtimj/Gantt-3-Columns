@@ -1692,8 +1692,20 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
       const pg = await ctx.newPage();
       const errs = [];
       pg.on('pageerror', e => errs.push(e.message));
+      await pg.addInitScript(() => { try { if (!sessionStorage.getItem('smoke.tabSeeded')) { sessionStorage.setItem('smoke.tabSeeded', '1'); localStorage.setItem('fw.centerTab', 'notes'); } } catch (e) {} }); // last tab ≠ Keep In Mind
       await pg.goto('file://' + cOut);
       await pg.waitForTimeout(5000); // let the app's own start-up (imports, live refresh) settle before snapshotting
+      // Opening view (2026-11-26, Julius): Keep In Mind tab on the left half, docked calendar on the right half.
+      { const ov = await pg.evaluate(() => { const out = [], ws = document.getElementById('workspace'), W = ws.getBoundingClientRect();
+          const j = document.getElementById('journalPane'), c = document.getElementById('calPane');
+          if (j.dataset.ctab !== 'focus') out.push('left tab is ' + j.dataset.ctab + ', not Keep In Mind');
+          if (ws.classList.contains('ws-halves')) { const jr = j.getBoundingClientRect(), cr = c.getBoundingClientRect();
+            if (Math.abs(jr.left - W.left) > 3) out.push('tabs column not on the left half: ' + Math.round(jr.left));
+            if (Math.abs(cr.right - W.right) > 3) out.push('calendar not on the right half: ' + Math.round(cr.right) + ' / ' + Math.round(W.right)); }
+          else out.push('half view not on at opening');
+          if (!document.querySelector('#calPane .cp-docked, #calPane #calPanel.cp-docked, #calPanel.cp-docked')) out.push('calendar not docked at opening');
+          return out; });
+        errs.push(...ov.map(x => 'opening: ' + x)); }
       // CAL_SHOT=dir (2026-11-13): screenshot the docked calendar (app slid to the calendar half) for a look.
       if (process.env.CAL_SHOT) { await pg.evaluate(() => { const w = document.getElementById('workspace'); w.scrollLeft = w.scrollWidth; }); await pg.waitForTimeout(600);
         await pg.screenshot({ path: path.join(process.env.CAL_SHOT, 'cal-' + name + '.png') });
@@ -1767,7 +1779,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
             const timed = [...panel.querySelectorAll('.fc-timegrid-event')].find(x => /Dentist/.test(x.textContent));
             if (!timed) out.push('timed event missing: ' + evText());
             else {
-              if (!/(^|[^\d:])9(:00)?\s?am/i.test(timed.textContent)) out.push('timed event not at 9:00 Los Angeles time: ' + timed.textContent);
+              if (!/(^|[^\d:])9(:00)?(\s?am| – 10(:00)?\s?am)/i.test(timed.textContent)) out.push('timed event not at 9:00 Los Angeles time: ' + timed.textContent);
               if (getComputedStyle(timed).backgroundColor !== 'rgb(213, 0, 0)') out.push('timed event not solid in its color (2026-11-21 11:30): ' + getComputedStyle(timed).backgroundColor);
               // Title fills the card (2026-11-25): --cp-tl = whole lines that fit above the time; the title stays inside the card.
               await until(() => timed.querySelector('.cp-ev-t').style.getPropertyValue('--cp-tl'), 1500);
@@ -2699,6 +2711,31 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           if (!r.kept) errs.push('linked drag: the line left its cell');
         }
         await pg.evaluate(() => window.fwCalendar.api().today());
+      }
+      // Half calendar times + full calendar labels (2026-11-26, Julius): tall cards show the whole start–end time (not cut,
+      // running under the checkbox); full screen hour / :15 / :30 labels all end at the same right edge.
+      {
+        const tl = await pg.evaluate(async () => { const wait = ms => new Promise(r => setTimeout(r, ms)), out = [];
+          window.fwCalendar.close(); await wait(800); const a = window.fwCalendar.api(); a.changeView('timeGridDay'); a.today(); a.scrollToTime('08:00'); await wait(500);
+          const evs = [...document.querySelectorAll('#calPanel.cp-docked .fc-timegrid-event:not(.fc-event-mirror)')].filter(e => e.getBoundingClientRect().height >= 40);
+          if (!evs.length) out.push('no tall docked event to check');
+          evs.forEach(e => { const m = e.querySelector('.cp-ev-m'), c = e.querySelector('.cp-chk'), n = (e.querySelector('.cp-ev-t') || {}).textContent;
+            if (!m) return; const mr = m.getBoundingClientRect(), er = e.getBoundingClientRect();
+            if (m.scrollWidth > m.clientWidth + 1 || mr.right > er.right + 1 || mr.bottom > er.bottom + 1) out.push('docked time cut on ' + n + ': ' + m.textContent);
+            if (c && mr.left > c.getBoundingClientRect().left + 1) out.push('docked time not under the checkbox on ' + n); });
+          const btn = [...document.querySelectorAll('[data-cal-open]')].find(x => x.offsetParent); if (!btn) return out.concat('no 📅 button');
+          btn.click(); await wait(900); if (!window.fwCalendar.isFull()) return out.concat('full did not open');
+          const p = window.fwCalendar.api(); p.changeView('timeGridDay'); p.scrollToTime('06:00'); await wait(400);
+          for (let i = 0; i < 4; i++) { const z = document.querySelector('#calPanel .fc-cpZoomIn-button'); if (z) z.click(); await wait(120); }
+          await wait(300);
+          const sl = [...document.querySelectorAll('#calPanel.cp-full .fc-timegrid-slot-label .cp-sl')].filter(x => { const r = x.getBoundingClientRect(); return r.height && r.top > 0 && r.bottom < innerHeight; });
+          const rights = sl.map(x => Math.round(x.getBoundingClientRect().right));
+          if (sl.length < 3) out.push('full: too few labels to compare (' + sl.length + ')');
+          else if (Math.max(...rights) - Math.min(...rights) > 1) out.push('full: labels not lined up on the right: ' + [...new Set(rights)].join(','));
+          if (!sl.some(x => x.closest('.cp-half'))) out.push('full: no :15 / :30 labels after zooming in');
+          for (let i = 0; i < 4; i++) { const z = document.querySelector('#calPanel .fc-cpZoomOut-button'); if (z) z.click(); await wait(120); }
+          window.fwCalendar.close(); await wait(700); return out; });
+        errs.push(...tl.map(x => 'times / labels: ' + x));
       }
       // 📅 button = the newer full-screen calendar, phone too (2026-11-24, Julius: "do the most recent one").
       {

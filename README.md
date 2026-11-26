@@ -62,6 +62,9 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 🧪 To be confirmed (2026-11-25)
 
+- **Opens on Keep In Mind + half calendar** (2026-11-26): every opening lands on the ⭐ Keep In Mind tab on the left half with the half calendar on the right, whatever tab you used last.
+- **Half calendar times not cut off** (2026-11-26): taller event cards put the time on its own line across the full card width, under the checkbox, and it wraps before the dash instead of being cut. Times are shorter when both ends share am/pm ("9 – 10:30am"). Less padding inside the cards.
+- **Full calendar time labels lined up** (2026-11-26): the hour, :15 and :30 labels all end at the same right edge, against the timeline.
 - **Task log tabs** (2026-11-26; task log = the full calendar's bottom-left box): tabs **KIM · Prev · BL n**. **KIM** is the real Keep In Mind moved into the box, so you can edit, tick, pin and fold it the same as in its own pane (it goes back when you switch tabs or close). **Prev** lists yesterday's unfinished all-day tasks (not recurring, not the red Events calendar); tick = done on the calendar. **BL** = Backlog with its count inside the tab. The open tab is shaded darker. Tapping a tab never minimizes; only the ▾ on the left does. Tighter margins.
 - **Faster opening for Keep In Mind + Backlog** (2026-11-26): Keep In Mind paints this device's last copy at once instead of waiting 2–5 s for the database sign-in, then swaps in anything newer. The Backlog list paints its last copy at once too, then refreshes.
 - **App renamed to Cairn, step 1** (2026-11-25): tab title, installed-app name + home-screen icon label (manifest name / short_name), /dev page title, setup page ("Open the Cairn app"), and a small "Cairn" wordmark at the left of the toolbar (hidden under 340 px). /dev URL unchanged. The installed app may keep its old icon label until Android refreshes the install (or reinstall).

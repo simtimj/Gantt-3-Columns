@@ -836,13 +836,14 @@
     lastPeekKey=peekKey;
     const halfChanged=halves && halfW!==lastHalfW;
     lastHalfW=halves?halfW:0;
+    const goRight=wasRight || halfFirst; // read now: a later layout call clearing halfFirst before this frame sent the app back to History (2026-11-26)
+    if(halves && halfChanged)halfFirst=false;
     requestAnimationFrame(()=>{
       // Land on the two chosen columns, with the peek pane just out of view.
       if(peek && peekChanged && !peekRevealing)
         workspace.scrollLeft=peekSide==='left' ? peekWidth : 0;
       // Half view: keep whichever half pair was showing when the window size changes (calendar side stays put).
-      if(halfChanged && !document.body.classList.contains('bl-push'))workspace.scrollLeft=(wasRight || halfFirst) ? halfW+1 : 0;
-      if(halves)halfFirst=false;
+      if(halfChanged && !document.body.classList.contains('bl-push'))workspace.scrollLeft=goRight ? halfW+1 : 0;
       syncDayHeights();restoreDayScroll();
     });
   }
@@ -925,6 +926,9 @@
     updateColumnsLabel();
     localStorage.setItem(VIEW_STORAGE_KEY,JSON.stringify(visiblePanes));
     document.getElementById('workspace').scrollLeft = 0;
+    // 2026-11-26 (Julius: open on the calendar half): the start-up call here used to undo the first half-view scroll
+    // (it runs right after it), so the app opened on History. The first call re-arms it.
+    if(!applyWorkspaceView.ran){ applyWorkspaceView.ran = true; halfFirst = true; lastHalfW = 0; }
     updateWorkspaceLayout();
   }
   function columnsMenuHtml(){

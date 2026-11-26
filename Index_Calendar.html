@@ -1370,7 +1370,10 @@
     if(!ev.end) return one(ev.start, !a.isStart);
     const cut = !a.isStart || !a.isEnd;
     const endTxt = ' – ' + one(ev.end, !a.isEnd);
-    return one(ev.start, !a.isStart) + (cut ? '<span class="cp-tfull">' + endTxt + '</span>' : '<span class="cp-tend">' + endTxt + '</span>');
+    // Shorter range (2026-11-26, Julius: times cut off in the half calendar): "9 – 10:30am", am/pm once when both match.
+    let st = one(ev.start, !a.isStart); const ap = s => (String(s).match(/\s?[ap]\.?m\.?$/i) || [''])[0];
+    if(!cut && ap(st) && ap(st).trim().toLowerCase() === ap(endTxt).trim().toLowerCase()) st = st.slice(0, -ap(st).length);
+    return st +(cut ? '<span class="cp-tfull">' + endTxt + '</span>' : '<span class="cp-tend">' + endTxt + '</span>');
   }
   function cpEvAttrs(ev){
     const x = ev.extendedProps || {}, k = cpCat(x), a = (n, v) => v ? ' data-' + n + '="' + esc(v) + '"' : '';

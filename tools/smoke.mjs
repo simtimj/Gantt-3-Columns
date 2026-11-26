@@ -2726,15 +2726,16 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           const btn = [...document.querySelectorAll('[data-cal-open]')].find(x => x.offsetParent); if (!btn) return out.concat('no 📅 button');
           btn.click(); await wait(900); if (!window.fwCalendar.isFull()) return out.concat('full did not open');
           const p = window.fwCalendar.api(); p.changeView('timeGridDay'); p.scrollToTime('06:00'); await wait(400);
-          for (let i = 0; i < 4; i++) { const z = document.querySelector('#calPanel .fc-cpZoomIn-button'); if (z) z.click(); await wait(120); }
+          const halfOn = () => !!document.querySelector('#calPanel.cp-full .fc-timegrid-slot-label.cp-half'); let zin = 0; // zoom in only until :30 labels show, then undo exactly that (zoom is saved per device)
+          while (!halfOn() && zin < 6) { const z = document.querySelector('#calPanel .fc-cpZoomIn-button'); if (!z) break; z.click(); zin++; await wait(150); }
           await wait(300);
           const sl = [...document.querySelectorAll('#calPanel.cp-full .fc-timegrid-slot-label .cp-sl')].filter(x => { const r = x.getBoundingClientRect(); return r.height && r.top > 0 && r.bottom < innerHeight; });
           const rights = sl.map(x => Math.round(x.getBoundingClientRect().right));
           if (sl.length < 3) out.push('full: too few labels to compare (' + sl.length + ')');
           else if (Math.max(...rights) - Math.min(...rights) > 1) out.push('full: labels not lined up on the right: ' + [...new Set(rights)].join(','));
           if (!sl.some(x => x.closest('.cp-half'))) out.push('full: no :15 / :30 labels after zooming in');
-          for (let i = 0; i < 4; i++) { const z = document.querySelector('#calPanel .fc-cpZoomOut-button'); if (z) z.click(); await wait(120); }
-          window.fwCalendar.close(); await wait(700); return out; });
+          for (let i = 0; i < zin; i++) { const z = document.querySelector('#calPanel .fc-cpZoomOut-button'); if (z) z.click(); await wait(150); }
+          await wait(400); window.fwCalendar.close(); await wait(700); return out; });
         errs.push(...tl.map(x => 'times / labels: ' + x));
       }
       // 📅 button = the newer full-screen calendar, phone too (2026-11-24, Julius: "do the most recent one").

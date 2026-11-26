@@ -25,7 +25,7 @@
     </section>
     <div id="calMount"></div>
     <section class="cp-bl" data-cal-bl aria-label="Calendar backlog" hidden>
-      <div class="cp-blh"><b>Backlog</b> <span class="cp-blc" data-bl-count></span><span class="cp-blhint">hold + drag onto a day</span></div>
+      <div class="cp-blh"><b><span class="cp-bln">Backlog</span><span class="cp-blab">BL</span> <span class="cp-blc" data-bl-count></span></b><span class="cp-blhint">hold + drag onto a day</span></div>
       <div class="cp-blb" data-bl-body></div>
     </section>
     <div class="cp-detail" data-cal-detail hidden></div>
@@ -1056,6 +1056,9 @@
   // ── Calendar backlog (2026-11-11, Julius) ── sweep runs server side at most once a day (calBacklogSync).
   const blEl = panel.querySelector('[data-cal-bl]'), blBody = panel.querySelector('[data-bl-body]'), blCount = panel.querySelector('[data-bl-count]');
   let blData = null, blAt = 0, blBusy = false;
+  // Instant Backlog (2026-11-26, Julius: "Backlog tab is slow"): paint this device's last copy at once; blLoad still
+  // refreshes it (blAt = 0 → counts as old).
+  try { const c = JSON.parse(lsGet('fw.blCache') || 'null'); if(c && Array.isArray(c.items)) blData = {items: c.items, cached: true}; } catch (e) {}
   let blSel = null, blGroups = []; // Select mode (2026-11-15, Julius): a Set of ticked backlog ids, null = off
   const blById = id => ((blData && blData.items) || []).find(x => x.id === id);
   const BL_G = [['1', 'Urgent'], ['2', 'Next'], ['3', 'Later']]; // blank urgency counts as Later (2026-11-12, Julius)
@@ -1064,6 +1067,7 @@
     blBusy = true;
     google.script.run.withSuccessHandler(r => {
       blBusy = false; blData = r || {items: []}; blAt = Date.now(); blRender();
+      try { lsSet('fw.blCache', JSON.stringify({items: blData.items || []})); } catch (e) {}
       const n = r && r.sweep && r.sweep.swept;
       if(n){ if(cal){ flash(n + ' past task' + (n > 1 ? 's' : '') + ' moved to Backlog'); refetchFresh(); } }
     }).withFailureHandler(() => { blBusy = false; }).calBacklogSync();
@@ -1851,6 +1855,7 @@
     if(!isOpen()) return;
     if(full){
       full = false; panel.classList.remove('cp-full', 'cp-fullwk'); document.body.classList.remove('cal-full');
+      if(typeof kimDetach === 'function') kimDetach(); // Keep In Mind back to its own pane
       try { if(cal) cal.setOption('allDaySlot', true); } catch (e) {}
       blEl.hidden = fullBlWas; panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     }
@@ -2001,31 +2006,34 @@
     if(bh && !bh.querySelector('[data-bl-sort]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blsort" data-bl-sort title="Group by date (newest first) / by urgency">Date</button>');
     if(bh && !bh.querySelector('[data-bl-side]')) bh.insertAdjacentHTML('beforeend', '<button type="button" class="cp-blside" data-bl-side title="Phone: show the backlog on the left or under the calendar"></button><button type="button" class="cp-blclose" data-bl-close title="Close the backlog" aria-label="Close the backlog">✕</button>');
     if(bh && !bh.querySelector('[data-bl-tab]')){ const b0 = bh.querySelector(':scope > b'); if(b0) b0.insertAdjacentHTML('beforebegin', '<button type="button" class="cp-bltab" data-bl-tab="kim" title="Show Keep In Mind here">KIM</button>'); }
-    // Prev tab (2026-11-26, Julius): after the Backlog count, before the hint.
-    if(bh && !bh.querySelector('[data-bl-tab="prev"]')){ const c0 = bh.querySelector('[data-bl-count]'); if(c0) c0.insertAdjacentHTML('afterend', '<button type="button" class="cp-bltab" data-bl-tab="prev" title="Yesterday’s unfinished all-day tasks">Prev <span data-prev-n></span></button>'); }
+    // Prev tab (2026-11-26, Julius): order KIM · Prev · BL.
+    if(bh && !bh.querySelector('[data-bl-tab="prev"]')){ const c0 = bh.querySelector(':scope > b'); if(c0) c0.insertAdjacentHTML('beforebegin', '<button type="button" class="cp-bltab" data-bl-tab="prev" title="Yesterday’s unfinished all-day tasks">Prev <span data-prev-n></span></button>'); }
     blEl.addEventListener('click', e => {
-      // Tabs KIM / Backlog / Prev (2026-11-25, Prev 2026-11-26): a tab switches (and opens the box if minimized); tapping the
-      // open tab again minimizes, as before. Backlog's tab is the <b> title; when it's the open tab the old handler below runs.
+      // Tabs KIM · Prev · BL (2026-11-25, Prev 2026-11-26): a tab switches and opens the box if minimized. BL's tab is the
+      // <b> title; when it's already the open tab the handler below only opens a minimized box.
       const tbtn = full && e.target.closest('[data-bl-tab]'), tk = tbtn && tbtn.dataset.blTab, tb = full && fullTab() !== 'bl' && e.target.closest('.cp-blh > b');
       if(tk || tb){
         e.stopPropagation();
-        if(tk && fullTab() === tk && !panel.classList.contains('cp-blmin')){ panel.classList.add('cp-blmin'); lsSet('fw.calFullBlMin', '1'); return; }
+        // 2026-11-26 (Julius): tapping a tab never minimizes; only the ▾ on the left does.
         fullTabSet(tk || 'bl'); panel.classList.remove('cp-blmin'); lsSet('fw.calFullBlMin', '0'); return;
       }
       if(e.target.closest('[data-bl-selmode]')){ e.stopPropagation(); blSelSet(!blSel); }
       else if(e.target.closest('[data-bl-sort]')){ e.stopPropagation(); lsSet('fw.blSort', lsGet('fw.blSort') === 'date' ? 'urg' : 'date'); blRender(); }
       else if(e.target.closest('[data-bl-side]')){ e.stopPropagation(); lsSet('fw.blPhone', lsGet('fw.blPhone') === 'below' ? 'left' : 'below'); blPlace(); setTimeout(() => cal && cal.updateSize(), 0); }
-      else if(full && (e.target.closest('[data-bl-min],.cp-blh > b') || (panel.classList.contains('cp-blmin') && e.target.closest('.cp-blh') && !e.target.closest('button')))){ // minimized: the whole bar opens it (option B)
-        e.stopPropagation(); const m = panel.classList.toggle('cp-blmin'); lsSet('fw.calFullBlMin', m ? '1' : '0'); }
+      else if(full && e.target.closest('[data-bl-min]')){ e.stopPropagation(); const m = panel.classList.toggle('cp-blmin'); lsSet('fw.calFullBlMin', m ? '1' : '0'); } // ▾ = the only minimize
+      else if(full && e.target.closest('.cp-blh > b')){ e.stopPropagation(); if(panel.classList.contains('cp-blmin')){ panel.classList.remove('cp-blmin'); lsSet('fw.calFullBlMin', '0'); } }
+      else if(full && panel.classList.contains('cp-blmin') && e.target.closest('.cp-blh') && !e.target.closest('button')){ // minimized: the whole bar opens it (option B)
+        e.stopPropagation(); panel.classList.remove('cp-blmin'); lsSet('fw.calFullBlMin', '0'); }
       else if(e.target.closest('[data-bl-close]')){ e.stopPropagation(); if(!blEl.hidden) blToggle(); }
     });
   }
-  /* Keep In Mind tab beside Backlog (2026-11-25, Julius: "bottom-left box of the full-screen calendar gets tabs: Keep In
-     Mind first, then Backlog (count)"). Full screen only. The view is a copy of the Keep In Mind list; ticking a box in
-     it ticks the real line (same position), so the list itself is still edited in one place. */
-  const kimView = document.createElement('div'); kimView.className = 'cp-kimv kim-copy'; kimView.setAttribute('data-bl-kim', '');
+  /* KIM tab in the task log (2026-11-25; 2026-11-26 Julius: "edit everything in there, operate the same way as the
+     regular Keep In Mind"). Full screen only. The REAL Keep In Mind (#kimScroll with its editor, listeners, saving,
+     pins, folds) moves into the box while the KIM tab is open, and goes back to its own pane when the tab changes or
+     the full calendar closes. A comment node marks its home. */
+  const kimView = document.createElement('div'); kimView.className = 'cp-kimv'; kimView.setAttribute('data-bl-kim', '');
   if(blEl && blBody) blBody.after(kimView);
-  const kimSrc = () => document.querySelector('#kimScroll .kim-editor');
+  let kimHome = null;
   function kimTabOn(){ return panel.classList.contains('cp-kimtab'); }
   function fullTab(){ return kimTabOn() ? 'kim' : panel.classList.contains('cp-prevtab') ? 'prev' : 'bl'; }
   function fullTabSet(t){
@@ -2033,29 +2041,24 @@
     panel.classList.toggle('cp-kimtab', t === 'kim'); panel.classList.toggle('cp-prevtab', t === 'prev'); panel.classList.toggle('cp-bltabon', t === 'bl');
     if(blEl) blEl.querySelectorAll('[data-bl-tab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.blTab === t ? 'true' : 'false'));
     lsSet('fw.calFullTab', t);
-    if(t === 'kim') kimRender(); else if(t === 'prev') prevLoad();
+    if(t === 'kim') kimRender(); else kimDetach();
+    if(t === 'prev') prevLoad();
   }
   function kimTabSet(on){ fullTabSet(on ? 'kim' : 'bl'); }
   function kimRender(){
-    if(!kimTabOn()) return;
-    const src = kimSrc();
-    if(!src){ kimView.innerHTML = '<div class="cp-blmsg">Keep In Mind isn’t loaded yet.</div>'; return; }
-    const c = src.cloneNode(true);
-    c.removeAttribute('contenteditable'); c.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
-    c.querySelectorAll('[id]').forEach(n => n.removeAttribute('id')); c.removeAttribute('id');
-    kimView.replaceChildren(...c.childNodes);
-    if(!kimView.firstChild) kimView.innerHTML = '<div class="cp-blmsg">Keep In Mind is empty.</div>';
+    if(!full || !kimTabOn()) return;
+    const sc = document.getElementById('kimScroll');
+    if(!sc){ kimView.innerHTML = '<div class="cp-blmsg">Keep In Mind isn’t loaded yet.</div>'; return; }
+    if(sc.parentNode === kimView) return;
+    kimHome = document.createComment('kim-home'); sc.before(kimHome);
+    kimView.replaceChildren(sc);
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 0); // repaint the group borders at the new width
   }
-  let kimObsT = 0;
-  new MutationObserver(ms => { if(!full || !kimTabOn() || !ms.some(m => !kimView.contains(m.target) && !!(m.target.closest ? m.target : m.target.parentElement || document.body).closest('#kimScroll'))) return; clearTimeout(kimObsT); kimObsT = setTimeout(kimRender, 250); })
-    .observe(document.body, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'checked', 'data-fold', 'data-tlhid']});
-  kimView.addEventListener('click', e => {
-    const box = e.target.closest('input[type=checkbox]'); e.preventDefault(); if(!box) return;
-    const line = [...kimView.children].find(n => n.contains(box)), src = kimSrc(); if(!line || !src) return;
-    const i = [...kimView.children].indexOf(line), real = src.children[i], rb = real && real.querySelector(':scope > input[type=checkbox], input[type=checkbox]');
-    if(rb && (real.textContent || '') === (line.textContent || '')) { rb.click(); setTimeout(kimRender, 120); }
-    else { kimRender(); flash('Keep In Mind changed — try again'); }
-  });
+  function kimDetach(){
+    const sc = document.getElementById('kimScroll');
+    if(kimHome && sc && sc.parentNode === kimView){ const a = document.activeElement; if(a && sc.contains(a)) a.blur(); kimHome.replaceWith(sc); setTimeout(() => window.dispatchEvent(new Event('resize')), 0); }
+    kimHome = null;
+  }
   /* Prev tab (2026-11-26, Julius: "another tab like the backlog: the previous day's all-day events that are
      incomplete"). Full screen only. Yesterday (LA date) from the calendar copy; same filter as the backlog sweep (open,
      not recurring, not the red Events calendar). The box ticks it done on the calendar. The count shows on the tab. */
@@ -2082,8 +2085,8 @@
     if(n) n.textContent = items.length || '';
     if(fullTab() !== 'prev') return;
     if(!items.length){ prevView.innerHTML = '<div class="cp-blmsg">' + (covered(d, addDays(d, 1)) ? 'Nothing left open from ' + esc(fmtDay(d)) + '.' : 'Loading…') + '</div>'; return; }
-    prevView.innerHTML = '<div class="cp-prevh">' + esc(fmtDay(d)) + '</div>' + items.map(x => { const c = softColor(x.color, false);
-      return '<label class="cp-prevr" data-prev-id="' + esc(x.id) + '"><input type="checkbox"><span class="cp-prevdot" style="background:' + esc(c.bg) + '"></span><span class="cp-prevt">' + esc(String(x.title || '(no title)').replace(/^↪\s*/, '')) + '</span></label>'; }).join('');
+    prevView.innerHTML = '<div class="cp-prevh">' + esc(fmtDay(d)) + '</div>' + items.map(x => {
+      return '<label class="cp-prevr" data-prev-id="' + esc(x.id) + '"><input type="checkbox"><span class="cp-prevt">' + esc(String(x.title || '(no title)').replace(/^↪\s*/, '')) + '</span></label>'; }).join('');
   }
   prevView.addEventListener('click', e => {
     const box = e.target.closest('input[type=checkbox]'); if(!box) return;
@@ -2166,6 +2169,7 @@
     panel.querySelector('.cp-body').classList.toggle('bl-open', !blEl.hidden);
     blPlace(); blRender(); if(!blEl.hidden) blLoad(false);
     if(typeof fullTabSet === 'function') fullTabSet(lsGet('fw.calFullTab'));
+    if(typeof prevSoon === 'function') prevSoon(); // Prev count from the device's calendar copy right away
     setTimeout(() => { try { cal.updateSize(); } catch (e) {} }, 0);
     return true;
   }

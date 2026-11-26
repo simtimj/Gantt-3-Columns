@@ -34,5 +34,6 @@ Google Apps Script web app (Today / Notes / Reference columns over a Google Shee
 ## His words
 - **Time section** = Morn / After / Night (History): change one, change all three.
 - **calendar / main calendar** = docked right-side calendar; **big calendar** = pop-out.
+- **task log** = the full calendar's bottom-left box (tabs KIM · Prev · BL); the calendar itself = event section.
 - **task cell** = task line / card; **urgency cell** = Urgent area (now **Next Steps**); **reference cell** = Reference card. "Urgent" still = the red level.
 - Urgency 0 / 1 / 2 = red / yellow / blue (stored `data-urg` 1 / 2 / 3); Calendar colors 11 / 5 / 9, done = 8.

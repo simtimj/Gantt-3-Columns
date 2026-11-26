@@ -2946,15 +2946,24 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           if (!p.classList.contains('cp-blmin')) out.push('backlog not minimized by default');
           if (bl.top < f.getBoundingClientRect().bottom || bl.height > 60) out.push('minimized backlog is not a bar under all-day');
           { // Prev tab (2026-11-26): switches, opens the box, shaded; tapping it again minimizes; Backlog tab goes back.
+            { const kt = p.querySelector('[data-bl-tab="kim"]'); kt.click(); await w(120); // the real Keep In Mind moves in, editable
+              const sc = document.getElementById('kimScroll'), ed = sc && sc.querySelector('.kim-editor');
+              if (!sc || !sc.closest('.cp-kimv') || !ed || ed.getAttribute('contenteditable') !== 'true' || !sc.offsetParent) out.push('KIM tab: the real Keep In Mind is not in the task log');
+              if (p.classList.contains('cp-blmin')) out.push('KIM tab tap minimized'); }
             const pt = p.querySelector('[data-bl-tab="prev"]');
             if (!pt || !pt.offsetParent) out.push('no Prev tab');
             else { pt.click(); await w(120);
               if (!p.classList.contains('cp-prevtab') || p.classList.contains('cp-blmin')) out.push('Prev tab did not open');
               else if (!p.querySelector('.cp-prevv').offsetParent) out.push('Prev list not shown');
               else if (getComputedStyle(pt).backgroundColor === 'rgba(0, 0, 0, 0)') out.push('Prev tab not shaded when open');
-              pt.click(); await w(80); if (!p.classList.contains('cp-blmin')) out.push('Prev tab tap again did not minimize');
+              pt.click(); await w(80); if (p.classList.contains('cp-blmin')) out.push('tapping the open Prev tab minimized (only ▾ should)');
+              { const order = [...p.querySelectorAll('.cp-blh > [data-bl-tab], .cp-blh > b')].map(x => x.dataset.blTab || 'bl').join(' ');
+                if (order !== 'kim prev bl') out.push('tab order is ' + order);
+                if (!/^BL\b/.test((p.querySelector('.cp-blh > b').innerText || '').trim())) out.push('BL tab label: ' + p.querySelector('.cp-blh > b').innerText); }
+              p.querySelector('[data-bl-min]').click(); await w(80); if (!p.classList.contains('cp-blmin')) out.push('▾ did not minimize');
               p.querySelector('.cp-blh > b').click(); await w(80);
               if (p.classList.contains('cp-prevtab') || p.classList.contains('cp-kimtab')) out.push('Backlog tab did not switch back');
+              if (document.getElementById('kimScroll').closest('#calPanel')) out.push('Keep In Mind did not go back to its own pane');
               p.classList.add('cp-blmin'); try { localStorage.setItem('fw.calFullBlMin', '1'); } catch (e) {} }
           }
           { const hd = p.querySelector('.cp-blh'), r = hd.getBoundingClientRect(), x = r.right - 30, y = r.top + r.height / 2, t = document.elementFromPoint(x, y);
@@ -3550,6 +3559,23 @@ if (only('pwa-fb')) {
   await pg.waitForTimeout(300);
   const bk = await pg.evaluate(() => ({ n: __fs.backups.length, r: __fs.backups[0] && __fs.backups[0].reason, left: localStorage.getItem('pwa.kim.unconfirmed') }));
   if (bk.n !== 1 || !/newest wins/.test(bk.r || '') || bk.left) errs.push('lost edit not backed up: ' + JSON.stringify(bk));
+  // Instant Keep In Mind (2026-11-26): the next opening paints this device's copy before Firebase is up, then the newer
+  // database copy replaces it (each page has its own fake database: "Gloves from db").
+  {
+    const kept = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('pwa.kim.last') || 'null'); } catch (e) { return null; } });
+    if (!kept || !/From the tablet/.test(kept.html || '')) errs.push('device copy of Keep In Mind not kept: ' + JSON.stringify(kept).slice(0, 100));
+    await pg.evaluate(() => localStorage.setItem('pwa.kim.last', JSON.stringify({ html: '<div>Device copy</div>', h: 'fOLD', at: 1 })));
+    const p2 = await ctx.newPage(); p2.on('pageerror', e => errs.push('page error (2nd open): ' + e.message));
+    await p2.goto(base + '#k=smokekey');
+    const k2 = () => p2.evaluate(() => (document.querySelector('#kimScroll .kim-editor') || {}).innerText || '');
+    let early = ''; for (let i = 0; i < 40 && !early; i++) { early = await k2(); if (!early) await p2.waitForTimeout(25); }
+    const fbUp = await p2.evaluate(() => !!window.__fs);
+    if (!/Device copy/.test(early) || fbUp) errs.push('instant Keep In Mind: not painted from the device copy before Firebase (' + JSON.stringify(early.slice(0, 40)) + ', fb up ' + fbUp + ')');
+    await p2.waitForTimeout(3000);
+    const late = await k2();
+    if (!/Gloves from db/.test(late) || /Device copy/.test(late)) errs.push('instant Keep In Mind: newer database copy did not replace it: ' + JSON.stringify(late.slice(0, 80)));
+    await p2.close();
+  }
   // Offline: Keep In Mind can still be typed in, other editors stay read-only.
   netOff = true; await ctx.setOffline(true); await pg.waitForTimeout(300);
   const off = await pg.evaluate(() => {
@@ -3563,7 +3589,7 @@ if (only('pwa-fb')) {
   if (!/Keep In Mind saves/.test(off.bar || '')) errs.push('offline banner text: ' + off.bar);
   await ctx.close(); srv.close();
   if (errs.length) { fails += errs.length; console.error('✗ pwa-fb:\n  ' + errs.join('\n  ')); }
-  else console.log('✓ pwa-fb: Keep In Mind loads/saves on Firestore + live sync + newest-wins backup + offline editing');
+  else console.log('✓ pwa-fb: Keep In Mind loads/saves on Firestore + live sync + newest-wins backup + instant device copy + offline editing');
 }
 // Days on the database (2026-11-22, NOTES H4): Today saves to the day doc with the server's hashes, an edit still on
 // its way isn't undone by an older server copy, another device's save triggers a sync, an older edit is refused and

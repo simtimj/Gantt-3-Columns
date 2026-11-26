@@ -496,10 +496,9 @@
   #calPanel.cp-full .cp-bltab{display:inline-block;font:inherit;font-weight:400;font-size:12px;padding:1px 7px;border-radius:7px;border:1px solid var(--cp-line,var(--border));background:transparent;color:var(--cp-muted,var(--muted));cursor:pointer;}
   #calPanel.cp-full.cp-kimtab .cp-bltab{font-weight:700;color:inherit;border-color:currentColor;}
   #calPanel.cp-full.cp-kimtab .cp-blh > b{font-weight:400;color:var(--cp-muted,var(--muted));cursor:pointer;}
-  #calPanel.cp-full.cp-kimtab:not(.cp-blmin) .cp-kimv{display:block;flex:1 1 auto;min-height:0;overflow:auto;padding:2px 8px 8px;font-size:13px;}
+  #calPanel.cp-full.cp-kimtab:not(.cp-blmin) .cp-kimv{display:block;flex:1 1 auto;min-height:0;overflow:auto;padding:1px 4px 3px;font-size:13px;}
   #calPanel.cp-full.cp-kimtab .cp-blb,#calPanel.cp-full.cp-kimtab .cp-blbar,#calPanel.cp-full.cp-kimtab .cp-blhint,#calPanel.cp-full.cp-kimtab [data-bl-selmode],#calPanel.cp-full.cp-kimtab [data-bl-sort]{display:none!important;}
-  #calPanel .cp-kimv .check-line{display:flex;align-items:flex-start;gap:5px;}
-  #calPanel .cp-kimv .check-line.done > .check-text{opacity:.55;text-decoration:line-through;}
+  #calPanel .cp-kimv > #kimScroll{display:block!important;flex:none!important;height:auto;overflow:visible;padding:0 0 4px!important;} /* the real Keep In Mind, moved in (2026-11-26) */
   /* Prev tab + tab shading (2026-11-26, Julius: "the tab you're in is shaded darker"). Backlog's tab = the <b> title. */
   #calPanel .cp-prevv{display:none;}
   #calPanel.cp-full .cp-blh{gap:4px;}
@@ -509,13 +508,22 @@
   #calPanel.cp-full.cp-bltabon .cp-blh > b,#calPanel.cp-full.cp-kimtab [data-bl-tab="kim"],#calPanel.cp-full.cp-prevtab [data-bl-tab="prev"]{background:rgba(0,0,0,.5);font-weight:700;color:inherit;border-color:currentColor;}
   html[data-theme=light] #calPanel.cp-full.cp-bltabon .cp-blh > b,html[data-theme=light] #calPanel.cp-full.cp-kimtab [data-bl-tab="kim"],html[data-theme=light] #calPanel.cp-full.cp-prevtab [data-bl-tab="prev"]{background:rgba(0,0,0,.12);}
   #calPanel.cp-full.cp-prevtab .cp-blh > b{font-weight:400;color:var(--cp-muted,var(--muted));cursor:pointer;}
-  #calPanel.cp-full.cp-prevtab:not(.cp-blmin) .cp-prevv{display:block;flex:1 1 auto;min-height:0;overflow:auto;padding:2px 8px 8px;font-size:13px;}
+  #calPanel.cp-full.cp-prevtab:not(.cp-blmin) .cp-prevv{display:block;flex:1 1 auto;min-height:0;overflow:auto;padding:1px 4px 3px;font-size:13px;}
   #calPanel.cp-full.cp-prevtab .cp-blb,#calPanel.cp-full.cp-prevtab .cp-blbar,#calPanel.cp-full.cp-prevtab .cp-blhint,#calPanel.cp-full.cp-prevtab [data-bl-selmode],#calPanel.cp-full.cp-prevtab [data-bl-sort],#calPanel.cp-full.cp-prevtab .cp-kimv{display:none!important;}
   #calPanel.cp-full.cp-kimtab .cp-prevv{display:none!important;}
   #calPanel .cp-prevh{font-size:11px;color:var(--cp-muted,var(--muted));padding:2px 0 3px;}
   #calPanel .cp-prevr{display:flex;align-items:flex-start;gap:6px;padding:3px 0;cursor:pointer;}
   #calPanel .cp-prevr > input{margin:2px 0 0;flex:none;}
-  #calPanel .cp-prevdot{flex:none;width:8px;height:8px;border-radius:2px;margin-top:5px;}
+  /* BL label (2026-11-26): the box says "BL n" in full screen, "Backlog n" elsewhere. */
+  :is(#calPanel,#blCol,#calBlLeft) .cp-blab{display:none;}
+  #calPanel.cp-full .cp-bln{display:none;}
+  #calPanel.cp-full .cp-blab{display:inline;}
+  #calPanel.cp-full .cp-blh > b .cp-blc:empty{display:none;}
+  /* Tighter bottom-left box (2026-11-26, Julius: "reduce the margins"): less inset from the edges, thinner rows. */
+  #calPanel.cp-full .cp-body.bl-open .cp-bl{left:3px;bottom:4px;width:calc(var(--blw) - 6px);}
+  #calPanel.cp-full.cp-blmin .cp-body.bl-open .cp-bl{bottom:4px;}
+  #calPanel.cp-full .cp-blh{padding:2px 3px 1px!important;}
+  #calPanel.cp-full .cp-prevr{padding:2px 0;}
   #calPanel .cp-prevr.cp-prevdone .cp-prevt{opacity:.55;text-decoration:line-through;}
   #calPanel.cp-full .cp-fadh{padding:1px 3px 0;}
   #calPanel.cp-full .cp-fadb,#calPanel.cp-full .cp-blb{padding:0 2px 2px;}

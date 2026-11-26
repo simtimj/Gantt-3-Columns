@@ -1397,6 +1397,36 @@
       }).then(function (r) { if (r && r.fromDb) delete r.fromDb; return r; })
         .catch(function (e) { console.warn('Firestore → server: ' + (e && e.message || e)); return null; });
     }
+    /* Instant Keep In Mind (2026-11-26, Julius: "Keep In Mind is slow on opening"): the database answer waits for the
+       page load + Firebase SDK + sign-in (often 2–5 s). The first getKim of a page answers at once from this device's
+       last copy (pwa.kim.last); the real read runs behind it and, if it's newer, the list reloads (merge path, same as a
+       save from another device). An edit made on the old copy is safe: saveKim checks the hash → conflict → merge. */
+    var KIM_LS = 'pwa.kim.last', kimFirst = true, kimNext = null;
+    function kimKeep(html, h) { if (h) ls.set(KIM_LS, JSON.stringify({ html: String(html || ''), h: String(h), at: Date.now() })); }
+    function kimReal(name, args) {
+      return dbRun(name, args).then(function (r) {
+        if (r) { fromDb[name] = 1; return r; }
+        return call(name, args);
+      }).then(function (r) {
+        if (r && !r.conflict && !r.fresh) kimKeep(name === 'getKim' ? r.html : args[0], r.h);
+        return r;
+      });
+    }
+    function kimRun(name, args) {
+      if (name === 'getKim') {
+        if (kimNext && Date.now() - kimNext.at < 15000) { var n = kimNext.r; kimNext = null; return Promise.resolve(n); }
+        var copy = null; if (kimFirst) { try { copy = JSON.parse(ls.get(KIM_LS) || 'null'); } catch (e) {} }
+        kimFirst = false;
+        if (copy && copy.h && typeof copy.html === 'string') {
+          kimReal(name, args).then(function (r) {
+            if (!r || r.h === copy.h || typeof window.fwKimReload !== 'function') return;
+            kimNext = { r: r, at: Date.now() }; window.fwKimReload();
+          }, function (e) { console.warn('Keep In Mind check: ' + (e && e.message || e)); });
+          return Promise.resolve({ html: copy.html, h: copy.h, fresh: false, build: '', instant: true });
+        }
+      }
+      return kimReal(name, args);
+    }
     // batchCalls: answer what the database can, send the rest to the server as one batch (same answer shape).
     function batch(list) {
       list = Array.isArray(list) ? list : [];
@@ -1443,6 +1473,7 @@
       },
       run: function (name, args) {
         if (name === 'batchCalls') return batch(args[0]);
+        if (name === 'getKim' || name === 'saveKim') return kimRun(name, args);
         if (FN_URL && FN_NAMES[name]) return withTimeout(boot, 4000).catch(function () {}).then(function () { return fnRun(name, args); }).then(function (r) {
           if (r) { fromDb[name] = 1; return r; }
           return call(name, args);

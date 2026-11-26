@@ -1347,3 +1347,13 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 - CSS (Index_LateCss "Prev tab + tab shading"): open tab = rgba(0,0,0,.5) dark / .12 light, bold, outline; Backlog's `<b>` is a pill too. Minimized hides Select / Date so the bar stays one row on phone (smoke "minimized backlog is a bar" caught the wrap).
 - Smoke: calendar phone full screen → Prev switch / shade / re-tap minimize / back to Backlog.
 - Not done (ask if wanted): stepping back to older days, drag from Prev onto a day.
+
+## Task log tabs + faster Keep In Mind / Backlog (2026-11-26 08:53–09:20, Julius)
+- Name: **task log** = the full calendar's bottom-left box (Julius 09:15; also "calendar task section" vs "calendar event section").
+- Tabs reordered **KIM · Prev · BL n** (BL = Backlog, count inside the `<b>` tab; "Backlog" label kept outside full screen via `.cp-bln` / `.cp-blab`).
+- Tab tap never minimizes; only ▾ (`[data-bl-min]`). Tapping BL / the bar while minimized opens it.
+- Prev rows: color square removed (it looked like a 2nd checkbox).
+- KIM tab = the real `#kimScroll` moved into `.cp-kimv` (comment node marks home; `kimDetach()` on tab change + full close). Replaces the read-only clone + MutationObserver. Shim's offline-editable check (`closest('#kimScroll')`) still works.
+- Speed (Julius: "Keep In Mind slow on app opening; Backlog + Prev tabs"): cause = getKim waited for page load + 200 ms + Firebase SDK + persistence + sign-in, then a server read. Now shim `kimRun`: first getKim of a page answers from `pwa.kim.last` (kept after every real read / save), real read behind it → newer → `kimNext` + `fwKimReload()` (merge path). Edits on the old copy: saveKim hash check → conflict → merge. Backlog: `fw.blCache` paints at once, blLoad still refreshes. Prev already reads the device calendar copy; count now computed on full open.
+- Margins: task log inset 3 px, header 2/3 px, list padding 1/4/3 px.
+- Smoke: pwa-fb instant device copy; calendar phone tab order, BL label, no-minimize, ▾, KIM moves in/out.

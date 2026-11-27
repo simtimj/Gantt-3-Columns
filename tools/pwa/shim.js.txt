@@ -1288,8 +1288,18 @@
         return vals();
       });
     }
+    /* Return speed (2026-11-26): the 10-min server check no longer blocks. Before, the first sync after a return
+       (> 10 min away) waited 1.2–4 s on Apps Script while the first edit's save went to the database and came back
+       `conflict` (Speed Log 11/25–26). Now the database answers at once and the server check runs behind it
+       (schedule move + trigger check side effects kept; its answer is only a safety net, not applied). */
+    var srvBg = false;
+    function srvCheck(req) {
+      if (srvBg || Date.now() - lastSrvSync <= 10 * 60000) return;
+      srvBg = true; lastSrvSync = Date.now();
+      call('getSyncState', [req]).catch(function () { lastSrvSync = Date.now() - 9 * 60000; }).then(function () { srvBg = false; });
+    }
     function syncDb(req) {
-      if (!days || !refs || !navigator.onLine || Date.now() - lastSrvSync > 10 * 60000) return Promise.resolve(null);
+      if (!days || !refs || !navigator.onLine) return Promise.resolve(null);
       req = req || {};
       var t0 = Date.now(), dates = Object.keys(req.days || {}).filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
       var refWant = req.ref || {}, wantRef = req.refSync === 2 || Object.keys(refWant).length > 0;
@@ -1319,6 +1329,7 @@
         }
         if (inb !== 'skip') out.inbox = inb;
         out.timing = { total: Date.now() - t0, steps: {}, fromDb: true };
+        srvCheck(req);
         window.__PWA_SYNCDB = (window.__PWA_SYNCDB || 0) + 1; // tests: syncs answered here
         return out;
       });

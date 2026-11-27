@@ -265,3 +265,6 @@ This checkpoint ships documentation only. Rough completion remains65%; no new sp
 ## Dev speed: Index_Main split (2026-11-25, implemented + tested in full smoke, not yet tested live)
 Main script split into 8 files of 55–88 KB (CODE_MAP.md), so a session greps / reads a small file instead of a 525 KB one. No behavior change intended; one function moved for load order (NOTES "Index_Main split").
 
+
+## Non-blocking server sync check (2026-11-26, implemented + tested in smoke pwa-hist, not yet tested live)
+- Shim `syncDb`: the 10-min server `getSyncState` (first sync of a session / after a return) no longer replaces the database answer; `srvCheck` fires it in the background (side effects: schedule move, trigger check; answer ignored). Fixes Speed Log lead (b): first day save after a return came back `conflict` because the edit's save (database, fast) beat the server sync (1.2–4 s). Measure: `resume` / `sync` rows `fromDb` after a return, fewer day-save `conflict`.

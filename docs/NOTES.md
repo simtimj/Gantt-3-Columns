@@ -1375,3 +1375,9 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 - Both slow reloads (11/25 9:19, 11/26 8:55, first byte ~1,020 ms) were `navType: reload` minutes after a deploy, so most likely the "↻ Update ready" reload: the page fetch waits for the new worker to activate, and activate deleted the old app cache (and claimed) inside `waitUntil`.
 - Change (implemented, not measured live): sw.js activate now only claims; old `gantt-*` caches are deleted 3 s later outside `waitUntil`. Speed Log load rows gain `workerStart` / `fetchStart` (Index_Main `fwSpeedLog`, speed-summary fields) to split worker start-up from cache lookup.
 - Resume step: after the next update reload, read that `load` row: `workerStart` high = worker start-up (next idea: smaller worker / nothing heavy at top level); `responseStart - fetchStart` high = cache lookup.
+
+## Non-blocking server sync check (2026-11-26 23:30, "continuous code and optimization", keep it rolling)
+- Speed Log lead (b) from "Speed Log check 2026-11-26": after > 10 min away, `syncDb` returned null so the resume sync went to Apps Script (1.2–4 s, cold); the first edit's save (database) ran before the base was refreshed → `conflict` → merge.
+- Change: shim `syncDb` always answers from the database when ready; `srvCheck(req)` runs the server `getSyncState` behind it when the last server sync is > 10 min old (one at a time, `lastSrvSync` set up front, failure → retry within ~1 min). Answer ignored (PWA has no build bar; days / cards come from the docs).
+- Smoke pwa-hist: first sync after a reload is `fromDb`.
+- Resume step: after a day, check day-save `conflict` count after returns and `sync` rows' rpc time.

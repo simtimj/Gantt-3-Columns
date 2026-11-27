@@ -3896,8 +3896,12 @@ if (only('pwa-hist')) {
   sreq.days[today] = { th: md5(dayNow.tasks), jh: md5(dayNow.journal || '') };
   sreq.ref = { r1: md5('<h2>Db card</h2>') };
   calls.length = 0;
-  await run('getSyncState', sreq);
-  if (!calls.includes('getSyncState')) await run('getSyncState', sreq); // the page may already have done its server sync
+  // Return speed (2026-11-26): a due server check no longer blocks; the database answers and the server runs behind it.
+  await pg.evaluate(() => { window.__PWA_SYNCDB = 0; });
+  const s0 = await run('getSyncState', sreq);
+  await pg.waitForTimeout(300);
+  const db0 = await pg.evaluate(() => window.__PWA_SYNCDB || 0);
+  if (!s0 || !s0.timing || !s0.timing.fromDb || !db0) errs.push('first sync waited on the server: ' + JSON.stringify(s0 && s0.timing) + ' db ' + db0);
   calls.length = 0;
   let sy = await run('getSyncState', sreq);
   if (calls.includes('getSyncState') || !sy || !sy.timing || !sy.timing.fromDb) errs.push('sync not from the database: ' + JSON.stringify(sy).slice(0, 200) + ' ' + calls.join());
@@ -3916,7 +3920,7 @@ if (only('pwa-hist')) {
   if (gH.some(x => /^ref:server:$/.test(x))) errs.push('sync re-read every card: ' + gH.join(' | '));
   await ctx.close(); srv.close();
   if (errs.length) { fails += errs.length; console.error('✗ pwa-hist:\n  ' + errs.join('\n  ')); }
-  else console.log('✓ pwa-hist: opening + past days from the database (dates, hashes, Urgent, seeds, cards, pins + subjects), `up` catch-up, empty day saves, settings (Fun merge, pins, hide list), server before the seed, yesterday\'s copy opens editable at once, sync from the docs (only changes read)');
+  else console.log('✓ pwa-hist: opening + past days from the database (dates, hashes, Urgent, seeds, cards, pins + subjects), `up` catch-up, empty day saves, settings (Fun merge, pins, hide list), server before the seed, yesterday\'s copy opens editable at once, sync from the docs (only changes read, server check never blocks)');
 }
 // Reference on Firestore in the PWA (2026-11-23, NOTES H5 C), fake Firebase SDK: card saves (server hashes), new cards,
 // delete → Archive (del on the subtree), restore, order, expand all go to ganttRef docs, never the server; another

@@ -1385,3 +1385,9 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 ## CI calendar flake check (2026-11-27 02:20, "go ahead" on option C)
 - Since the one-retry fix (11/25), 0 failures in ~30 CI runs (earlier failures 41a8a76 / 3dbb39a / 70aeac5). Root cause not proven (likely the view still settling after the fill-gaps day switch).
 - Smoke now prints `↻ calendar 3b: timed → all-day needed its retry` when the retry runs, so CI logs show how often it happens. If it shows up often: wait for the calendar to finish its date change (not a fixed 400 ms) before the drag.
+
+## Speed Log re-check + update tap (2026-11-27 09:10, "keep going")
+- Update reload 9:06: workerStart 1000, fetchStart 1001, first byte 1005 (same ~1 s as before the 11/26 cache fix) → wait is before the worker answers, most likely activation. Return-sync fix: no return > 10 min on the phone yet since it shipped (old /dev tab w 983 still syncs hourly).
+- Day save `conflict` right after the update reload: the old page's day save (2,025 ms) was likely still in flight when the fixed 1.2 s update pause ran out.
+- Change (shim update button): poll `fwUnsaved()` instead of 1.2 s; reload on `w.state === 'activated'`; controllerchange reload delayed 1.5 s as fallback; 4 s safety. `updTapMs` added to the load row (sessionStorage `fw.updTap`).
+- Resume step: next update reload → `frameFirstByte`, `updTapMs`, any day-save conflict.

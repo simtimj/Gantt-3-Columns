@@ -268,3 +268,8 @@ Main script split into 8 files of 55–88 KB (CODE_MAP.md), so a session greps /
 
 ## Non-blocking server sync check (2026-11-26, implemented + tested in smoke pwa-hist, not yet tested live)
 - Shim `syncDb`: the 10-min server `getSyncState` (first sync of a session / after a return) no longer replaces the database answer; `srvCheck` fires it in the background (side effects: schedule move, trigger check; answer ignored). Fixes Speed Log lead (b): first day save after a return came back `conflict` because the edit's save (database, fast) beat the server sync (1.2–4 s). Measure: `resume` / `sync` rows `fromDb` after a return, fewer day-save `conflict`.
+
+## Update tap: wait for saves + reload at activation (2026-11-27, implemented, not yet tested live)
+- Speed Log 11/27 9:06 update reload: `workerStart` 1000 / `fetchStart` 1001 / first byte 1005 → the whole ~1 s is before the worker answers (cache delete fix of 11/26 didn't change it). Shim update button now reloads on the new worker's `activated` state (controllerchange = 1.5 s fallback). Old page stays visible during the wait.
+- Fixed 1.2 s flush pause → poll `fwUnsaved()` every 150 ms (max 10 s). Same row showed a day save `conflict` right after the update: the old page's 2 s save was still in flight at reload.
+- New load field `updTapMs` = tap → new page ready-ish. Measure: `frameFirstByte` on the next update reload (want ≪ 1,000) and no day-save conflict after it.

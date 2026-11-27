@@ -1605,7 +1605,9 @@
     // and reloading then made the page jump on open (2026-11-21).
     var wantReload = false, reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (!wantReload || reloading) return; reloading = true; location.reload();
+      // Fallback only: the update tap reloads on 'activated'; give it a moment before reloading here.
+      if (!wantReload || reloading) return;
+      setTimeout(function () { if (reloading) return; reloading = true; location.reload(); }, 1500);
     });
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').then(function (reg) {
@@ -1613,10 +1615,30 @@
           if (!w || !navigator.serviceWorker.controller || document.getElementById('pwaUpdate')) return;
           var b = document.createElement('button');
           b.id = 'pwaUpdate'; b.type = 'button'; b.textContent = '↻ Update ready';
+          /* Update tap (2026-11-27, Speed Log 11/27 9:06): (1) wait for the actual saves instead of a fixed 1.2 s
+             (a 2 s day save was still in flight, so the new page started from an old copy and its first save came
+             back `conflict`); (2) reload once the new worker is fully active, not at controllerchange (the reload's
+             page fetch sat ~1,000 ms before the worker answered: workerStart 1000). The old page stays on screen
+             during the wait instead of a blank reload. */
           b.onclick = function () {
             b.textContent = 'Saving…'; b.disabled = true;
             try { if (typeof window.fwFlushAll === 'function') window.fwFlushAll(); } catch (e) {}
-            setTimeout(function () { wantReload = true; w.postMessage('skipWaiting'); }, 1200);
+            var t0 = Date.now();
+            var go = function () {
+              try { sessionStorage.setItem('fw.updTap', String(t0)); } catch (e) {}
+              b.textContent = 'Updating…';
+              var done = function () { if (reloading) return; reloading = true; location.reload(); };
+              w.addEventListener('statechange', function () { if (w.state === 'activated') done(); });
+              wantReload = true; w.postMessage('skipWaiting');
+              setTimeout(function () { wantReload = true; if (navigator.serviceWorker.controller === w || w.state === 'activated') done(); }, 4000);
+            };
+            var wait = function () {
+              var busy = false;
+              try { busy = typeof window.fwUnsaved === 'function' && window.fwUnsaved(); } catch (e) {}
+              if (busy && Date.now() - t0 < 10000) { setTimeout(wait, 150); return; }
+              go();
+            };
+            setTimeout(wait, 50);
           };
           document.body.appendChild(b);
         }

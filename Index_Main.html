@@ -393,9 +393,11 @@
   function fwSpeedLog(kind,timing,t0){
     if(!timing) return;
     const render = Math.round(performance.now() - t0);
+    function fwUpdTapInfo(){ try { const t = +sessionStorage.getItem('fw.updTap'); if(!t) return {}; sessionStorage.removeItem('fw.updTap'); return { updTapMs: Date.now() - t }; } catch(e){ return {}; } }
     setTimeout(() => {
       const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
       const client = fwSpeedContext({ render: render, drawEnd:Math.round(t0 + render), frameFirstByte: Math.round(nav.responseStart || 0), frameDone: Math.round(nav.responseEnd || 0), workerStart: Math.round(nav.workerStart || 0), fetchStart: Math.round(nav.fetchStart || 0), // worker / fetch start split the reload first-byte wait (2026-11-26)
+        ...(kind === 'load' ? fwUpdTapInfo() : {}), // update tap → this page (2026-11-27)
         
         dom: Math.round(nav.domContentLoadedEventEnd || 0), ready: Math.round(performance.now()),
         navType: nav.type || '', ...(timing.source ? { source: timing.source, pwa: 1 } : {}), ...(kind === 'load' ? fwStartInfo : {}), ...(kind === 'load' ? fwSnapInfo(Math.round(t0 + render)) : {}) });

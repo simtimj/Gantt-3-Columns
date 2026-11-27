@@ -1317,10 +1317,11 @@
     #typeSettings .ts-cat-chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 2px;cursor:pointer;}
     #typeSettings .ts-cat-chip{display:inline-flex;align-items:center;gap:4px;padding:1px 7px 1px 4px;border:1px solid var(--border);border-radius:10px;font-size:11px;line-height:16px;}
     #typeSettings .ts-cat-chip i{width:10px;height:10px;border-radius:50%;display:inline-block;}
-    #typeSettings .ts-cats .ts-cat{grid-template-columns:24px 76px minmax(0,1fr) 22px!important;gap:4px!important;margin:0 0 4px!important;padding-bottom:4px!important;}
+    #typeSettings .ts-cats .ts-cat{grid-template-columns:24px minmax(0,1fr) 22px!important;gap:4px!important;margin:0 0 4px!important;padding-bottom:4px!important;}
     #typeSettings .ts-cats .ts-cat input[type=color]{width:24px!important;height:22px!important;}
     #typeSettings .ts-cats .ts-cat input[type=text]{min-height:22px!important;height:22px!important;padding:1px 5px!important;font-size:12px!important;}
-    #typeSettings .ts-cats .ts-cat .ts-cat-words{grid-column:auto!important;font-size:11px!important;}
+    /* Words on their own full-width line, growing to show everything (2026-11-27). */
+    #typeSettings .ts-cats .ts-cat textarea.ts-cat-words,#typeSettings .ts-cat textarea.ts-cat-words{grid-column:1 / -1!important;display:block;width:100%;box-sizing:border-box;min-height:22px;height:auto;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:12px!important;line-height:1.35;background:transparent;color:inherit;resize:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word;}
     #typeSettings .ts-cats .ts-cat .ts-cat-del{width:22px!important;height:22px!important;font-size:11px;}
     #typeSettings .ts-daycols{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:2px 0 8px;}
     #typeSettings .ts-daycols label{display:inline-flex;flex-direction:column;align-items:center;font-size:10px;color:var(--muted);gap:1px;}

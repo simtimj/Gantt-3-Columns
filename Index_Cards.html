@@ -1443,15 +1443,21 @@
     const box = document.getElementById('cardCatList');
     if(!box) return;
     box.innerHTML = '';
+    // Refit the words boxes whenever the list becomes visible / changes width (Options or the section opening).
+    if(!box._fitObs && window.ResizeObserver){ box._fitObs = new ResizeObserver(() => box.querySelectorAll('textarea.ts-cat-words').forEach(t => { if(!t.offsetParent) return; t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; })); box._fitObs.observe(box); }
     const plain = () => CARD_CATS.map(({re,...c}) => c);
     CARD_CATS.forEach((c,i) => {
       const row = document.createElement('div'); row.className = 'ts-cat';
       const col = document.createElement('input'); col.type = 'color'; col.value = c.color; col.title = 'Card color';
       const name = document.createElement('input'); name.type = 'text'; name.className = 'ts-cat-name'; name.value = c.name; name.placeholder = 'Name';
       const del = document.createElement('button'); del.type = 'button'; del.className = 'ts-cat-del'; del.textContent = '✕'; del.title = 'Remove subject';
-      const words = document.createElement('input'); words.type = 'text'; words.className = 'ts-cat-words'; words.value = c.words; words.placeholder = 'words that auto-pick it, comma separated';
+      // Words box = growing textarea on its own line (Julius 2026-11-27: "very small, I want to see all of the contents").
+      const words = document.createElement('textarea'); words.className = 'ts-cat-words'; words.rows = 1; words.value = c.words; words.placeholder = 'words that auto-pick it, comma separated';
+      const fit = () => { if(!words.offsetParent) return; words.style.height = 'auto'; words.style.height = (words.scrollHeight + 2) + 'px'; };
+      words.addEventListener('input',fit); words.addEventListener('focus',fit); requestAnimationFrame(fit);
       const upd = () => { const l = plain(); l[i] = {...l[i], color:col.value, name:name.value.trim() || c.key, words:words.value}; setCardCats(l,true); };
       col.addEventListener('input',upd); name.addEventListener('change',upd); words.addEventListener('change',upd);
+      words.addEventListener('keydown',e => { if(e.key === 'Enter'){ e.preventDefault(); words.blur(); } });
       del.addEventListener('click',() => {
         if(!confirm('Remove the subject "' + c.name + '"? Cards set to it go back to Auto.')) return;
         const l = plain(); l.splice(i,1); setCardCats(l,true); renderCardCatEditor();

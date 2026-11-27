@@ -1391,3 +1391,8 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 - Day save `conflict` right after the update reload: the old page's day save (2,025 ms) was likely still in flight when the fixed 1.2 s update pause ran out.
 - Change (shim update button): poll `fwUnsaved()` instead of 1.2 s; reload on `w.state === 'activated'`; controllerchange reload delayed 1.5 s as fallback; 4 s safety. `updTapMs` added to the load row (sessionStorage `fw.updTap`).
 - Resume step: next update reload → `frameFirstByte`, `updTapMs`, any day-save conflict.
+
+## Card subjects words box (2026-11-27 09:12, Julius: "expand area in options card subjects text box… I want to see all of the contents")
+- Index_Cards `renderCardCatEditor`: words field input → auto-growing textarea (rows 1, fit on input / focus / list resize via ResizeObserver; Enter blurs = saves). CSS: subject row = color · name · ✕, words on a full-width second line.
+- Smoke calendar suite (Options check): longest words box is ≥ 90% row width and not cut off.
+- Local calendar-phone run failed once with no message, then passed 2× (likely the known drag flake).

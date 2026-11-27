@@ -62,6 +62,7 @@ Data organization: [current owners, IDs and a reversible pilot plan](docs/EFFICI
 
 ## 🧪 To be confirmed (2026-11-25)
 
+- **Card subjects: full words box** (2026-11-27): in Options → Card subjects, each subject's auto-pick words now sit on their own full-width line and the box grows to show all of them (Enter = done).
 - **Smoother "↻ Update ready"** (2026-11-27): the button now waits for your saves to actually finish (no fixed pause, so it's instant when nothing is saving) and reloads once the new version is fully ready, so the blank reload should be shorter and the first edit after updating shouldn't hit "Merged with changes".
 - **Faster catch-up when you come back** (2026-11-26): returning after 10+ minutes no longer waits 1–4 s on the server before showing changes from elsewhere; the database answers at once and the server check runs behind it. Should mean fewer "Merged with changes from elsewhere" notes on your first edit after a return.
 - **Faster first open after an update** (2026-11-26): the new version takes over first and clears the old copy a few seconds later, instead of making the page wait while it deletes it. The Speed Log now also records when the offline worker started, to tell what the reload wait is.

@@ -1943,6 +1943,14 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
         if ([...tb.querySelectorAll('button,a')].map(x => x.textContent.trim()).join('|') !== before) out.push('header buttons changed');
         tb.querySelector('[data-layout="scale"]').click(); await wait(100);
         if (document.getElementById('typeSettings').classList.contains('hidden')) out.push('Options button stopped working');
+        // Card subjects words box shows all its text (2026-11-27): full-width textarea, tall enough for the long default list.
+        { const grp = document.querySelector('#typeSettings .ts-cats'); const wasOpen = grp && grp.classList.contains('open');
+          if (grp && !wasOpen) document.getElementById('cardCatToggle').click(); await wait(150);
+          const ta = [...document.querySelectorAll('#cardCatList textarea.ts-cat-words')].sort((a, b) => b.value.length - a.value.length)[0];
+          if (!ta) out.push('subject words box is not a textarea');
+          else { const row = ta.closest('.ts-cat').getBoundingClientRect(), r = ta.getBoundingClientRect();
+            if (r.width < row.width * 0.9 || ta.scrollHeight > ta.clientHeight + 4) out.push('subject words box cut off: ' + JSON.stringify([Math.round(r.width), Math.round(row.width), ta.scrollHeight, ta.clientHeight])); }
+          if (grp && !wasOpen) document.getElementById('cardCatToggle').click(); }
         document.getElementById('closeTypeSettings').click();
         const writes = window.__calls.filter(c => /Calendar/i.test(c[0]) && c[0] !== 'getCalendarRange' && c[0] !== 'getMainCalendarEvents' && c[0] !== 'getCalendarPicker').map(c => c[0]);
         if (writes.length) out.push('calendar write calls: ' + writes.join(', '));

@@ -1381,3 +1381,7 @@ Julius: "Let's get through all these" (the Gaunt backlog in New Tasks) and "send
 - Change: shim `syncDb` always answers from the database when ready; `srvCheck(req)` runs the server `getSyncState` behind it when the last server sync is > 10 min old (one at a time, `lastSrvSync` set up front, failure → retry within ~1 min). Answer ignored (PWA has no build bar; days / cards come from the docs).
 - Smoke pwa-hist: first sync after a reload is `fromDb`.
 - Resume step: after a day, check day-save `conflict` count after returns and `sync` rows' rpc time.
+
+## CI calendar flake check (2026-11-27 02:20, "go ahead" on option C)
+- Since the one-retry fix (11/25), 0 failures in ~30 CI runs (earlier failures 41a8a76 / 3dbb39a / 70aeac5). Root cause not proven (likely the view still settling after the fill-gaps day switch).
+- Smoke now prints `↻ calendar 3b: timed → all-day needed its retry` when the retry runs, so CI logs show how often it happens. If it shows up often: wait for the calendar to finish its date change (not a fixed 400 ms) before the drag.

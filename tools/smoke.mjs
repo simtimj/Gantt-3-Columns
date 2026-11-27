@@ -2436,6 +2436,7 @@ for (const [name, view] of (only('snap') ? [['desktop', { width: 1300, height: 9
           // CI-only flake (2026-11-25, failed 2 of ~10 CI runs, never locally): the drag sometimes lands short of the
           // all-day row on the CI runner. One retry from fresh positions; a real break still fails twice.
           if (!e || !e.allDay || e.start !== day) {
+            console.log('  ↻ calendar 3b: timed → all-day needed its retry (' + JSON.stringify(e && [e.allDay, e.start]) + ')'); // grep CI logs for "needed its retry"
             await center('11:00'); await pg.waitForTimeout(300);
             const a2 = await evPt('Dentist'), b2 = await allDayPt(day);
             if (a2 && b2) { await gesture(a2, b2); await waitIdle(); await pg.waitForTimeout(300); e = await ev('b-' + day); }
